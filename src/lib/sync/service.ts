@@ -19,6 +19,17 @@ import type { SyncableTable } from "./queue";
 import { type RealtimeConfig, RealtimeManager } from "./realtime";
 
 /**
+ * Error thrown when sync is already in progress
+ * Used to distinguish expected "busy" state from actual sync failures
+ */
+export class SyncInProgressError extends Error {
+  constructor() {
+    super("Sync already in progress");
+    this.name = "SyncInProgressError";
+  }
+}
+
+/**
  * Sync result (compatible with SyncEngine)
  */
 export interface SyncResult {
@@ -157,7 +168,7 @@ export class SyncService {
 
   /**
    * Create a standard error result for failed sync operations
-   * 
+   *
    * Helper to ensure consistent error result format across all sync methods.
    * When sync fails, we still call onSyncComplete with this error result to ensure
    * the UI can react (e.g., set initialSyncComplete flag, show error messages).
@@ -181,7 +192,7 @@ export class SyncService {
    */
   public async sync(): Promise<SyncResult> {
     if (this.isSyncing) {
-      throw new Error("Sync already in progress");
+      throw new SyncInProgressError();
     }
 
     this.isSyncing = true;
@@ -210,7 +221,7 @@ export class SyncService {
    */
   public async syncUp(): Promise<SyncResult> {
     if (this.isSyncing) {
-      throw new Error("Sync already in progress");
+      throw new SyncInProgressError();
     }
 
     this.isSyncing = true;
@@ -241,7 +252,7 @@ export class SyncService {
    */
   public async syncDown(): Promise<SyncResult> {
     if (this.isSyncing) {
-      throw new Error("Sync already in progress");
+      throw new SyncInProgressError();
     }
 
     this.isSyncing = true;
@@ -298,7 +309,7 @@ export class SyncService {
    */
   public async syncDownTables(tables: SyncableTable[]): Promise<SyncResult> {
     if (this.isSyncing) {
-      throw new Error("Sync already in progress");
+      throw new SyncInProgressError();
     }
 
     this.isSyncing = true;
@@ -407,6 +418,14 @@ export class SyncService {
           // Silent - no need to log when there's nothing to sync
         }
       } catch (error) {
+        // Silently skip if sync is already in progress (expected on slow connections)
+        if (error instanceof SyncInProgressError) {
+          console.debug(
+            "[SyncService] Skipping periodic syncUp - sync already in progress"
+          );
+          return;
+        }
+
         console.error("[SyncService] Error in periodic syncUp:", error);
         toast.error(
           "Background sync error. Your changes may not be uploaded.",

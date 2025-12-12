@@ -281,6 +281,27 @@ export function getCatalogColumns(
       maxSize: 300,
     },
 
+    {
+      accessorKey: "genre",
+      header: ({ column }) => <SortableHeader column={column} title="Genre" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+    },
+
     // Status (Public/Private)
     {
       accessorKey: "private_for",
@@ -314,6 +335,8 @@ export function getRepertoireColumns(
   callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   const catalogColumns = getCatalogColumns(callbacks);
+
+  const coldef_private_for = catalogColumns.pop() as ColumnDef<any>;
 
   // Add practice-related columns after the basic tune columns
   const practiceColumns: ColumnDef<any>[] = [
@@ -439,8 +462,20 @@ export function getRepertoireColumns(
 
         const date = new Date(value);
         const now = new Date();
-        const diffDays = Math.floor(
-          (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+
+        // Compare dates only (ignore time) to avoid timezone/time-of-day issues
+        const dateOnly = new Date(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate()
+        );
+        const nowOnly = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        const diffDays = Math.round(
+          (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
         );
 
         let color = "text-gray-600 dark:text-gray-400";
@@ -807,9 +842,9 @@ export function getRepertoireColumns(
 
   // Insert practice columns after Structure (index 7) and before Status
   return [
-    ...catalogColumns.slice(0, 7), // select, id, title, type, mode, structure, incipit
+    ...catalogColumns, // select, id, title, type, mode, structure, incipit, genre
     ...practiceColumns,
-    catalogColumns[7], // status (private_for)
+    coldef_private_for, // status (private_for)
   ];
 }
 

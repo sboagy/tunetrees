@@ -100,7 +100,12 @@ setup("authenticate as Alice", async ({ page }) => {
           );
 
           // Check if status output indicates services are running
-          if (statusStdout?.includes("API URL")) {
+          // Look for "API URL", "Project URL", or "REST" which all indicate services are up
+          if (
+            statusStdout?.includes("Project URL") ||
+            statusStdout?.includes("API URL") ||
+            statusStdout?.includes("REST")
+          ) {
             isReady = true;
             console.log(
               `   ✅ Supabase ready after ${attempt} attempts (${4 + attempt * 2}s total)`

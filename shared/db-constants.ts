@@ -116,6 +116,7 @@ export const COL = {
   DAYS_PER_WEEK: "days_per_week",
   WEEKLY_RULES: "weekly_rules",
   EXCEPTIONS: "exceptions",
+  AUTO_SCHEDULE_NEW: "auto_schedule_new",
 
   // prefs_spaced_repetition
   ALG_TYPE: "alg_type",

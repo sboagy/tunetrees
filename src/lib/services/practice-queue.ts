@@ -38,6 +38,7 @@ interface PrefsSchedulingOptions {
   acceptableDelinquencyWindow: number; // Days before today to include lapsed tunes
   minReviewsPerDay: number; // Minimum tunes to practice per day
   maxReviewsPerDay: number; // Maximum tunes to practice per day (0 = uncapped)
+  autoScheduleNew: boolean;
 }
 
 /**
@@ -50,6 +51,7 @@ const DEFAULT_PREFS: PrefsSchedulingOptions = {
   acceptableDelinquencyWindow: 7,
   minReviewsPerDay: 3,
   maxReviewsPerDay: 10,
+  autoScheduleNew: true,
 };
 
 /**
@@ -70,16 +72,26 @@ async function getUserSchedulingPrefs(
       .where(eq(prefsSchedulingOptions.userId, userId))
       .limit(1);
 
+    const testAutoScheduleNewOverride =
+      typeof window !== "undefined"
+        ? (window as any).__TUNETREES_TEST_AUTO_SCHEDULE_NEW__
+        : undefined;
+    const effectiveAutoScheduleNew = testAutoScheduleNewOverride ?? true; // just fall back to global default
+
     if (rows[0]) {
       const r = rows[0];
       return {
         acceptableDelinquencyWindow: r.acceptableDelinquencyWindow ?? 7,
         minReviewsPerDay: r.minReviewsPerDay ?? 3,
         maxReviewsPerDay: r.maxReviewsPerDay ?? 10,
+        autoScheduleNew: effectiveAutoScheduleNew,
       };
     }
   } catch (e) {
-    console.warn("[PracticeQueue] Failed to load user scheduling prefs, using defaults:", e);
+    console.warn(
+      "[PracticeQueue] Failed to load user scheduling prefs, using defaults:",
+      e
+    );
   }
   return DEFAULT_PREFS;
 }
@@ -608,7 +620,9 @@ export async function generateOrGetPracticeQueue(
 ): Promise<DailyPracticeQueueRow[]> {
   // Get user's scheduling preferences from database
   const prefs = await getUserSchedulingPrefs(db, userRef);
-  console.log(`[PracticeQueue] Using user scheduling prefs: delinquency=${prefs.acceptableDelinquencyWindow}, min=${prefs.minReviewsPerDay}, max=${prefs.maxReviewsPerDay}`);
+  console.log(
+    `[PracticeQueue] Using user scheduling prefs: delinquency=${prefs.acceptableDelinquencyWindow}, min=${prefs.minReviewsPerDay}, max=${prefs.maxReviewsPerDay}`
+  );
 
   // Compute scheduling windows
   const windows = computeSchedulingWindows(
@@ -750,18 +764,32 @@ export async function generateOrGetPracticeQueue(
   if (maxReviews === 0 || candidateRows.length < maxReviews) {
     const remainingCapacity =
       maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
-    q3Rows = await db.all<PracticeListStagedRow>(sql`
-      SELECT * 
-      FROM practice_list_staged
-      WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
-        AND deleted = 0
-        AND playlist_deleted = 0
-        AND scheduled IS NULL
-        AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
-      ORDER BY id ASC
-      LIMIT ${remainingCapacity}
-    `);
+    if (prefs.autoScheduleNew) {
+      q3Rows = await db.all<PracticeListStagedRow>(sql`
+        SELECT *
+        FROM practice_list_staged
+        WHERE user_ref = ${userRef}
+          AND playlist_id = ${playlistRef}
+          AND deleted = 0
+          AND playlist_deleted = 0
+          AND scheduled IS NULL
+          AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
+        ORDER BY id ASC
+        LIMIT ${remainingCapacity}
+      `);
+    } else {
+      q3Rows = await db.all<PracticeListStagedRow>(sql`
+        SELECT * 
+        FROM practice_list_staged
+        WHERE user_ref = ${userRef}
+          AND playlist_id = ${playlistRef}
+          AND deleted = 0
+          AND playlist_deleted = 0
+          AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
+        ORDER BY id ASC
+        LIMIT ${remainingCapacity}
+      `);
+    }
 
     for (const row of q3Rows) {
       if (!seenTuneIds.has(row.id)) {

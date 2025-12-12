@@ -19,11 +19,16 @@ import {
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
+import { useCurrentPlaylist } from "../../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
 import {
   getOrCreateTuneOverride,
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
+import {
+  getTuneEditorData,
+  updatePlaylistTuneFields,
+} from "../../../lib/db/queries/tune-user-data";
 import {
   getTuneForUserById,
   updateTuneIfOwned,
@@ -38,8 +43,14 @@ const EditTunePage: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { localDb, userIdInt } = useAuth();
+  const {
+    localDb,
+    userIdInt,
+    incrementPracticeListStagedChanged,
+    incrementRepertoireListChanged,
+  } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const { currentPlaylistId } = useCurrentPlaylist();
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
@@ -47,27 +58,34 @@ const EditTunePage: Component = () => {
     return state?.from || "/";
   });
 
-  // Fetch tune data
+  // Fetch tune data with user-specific fields
   const [tune] = createResource(
     () => {
       const db = localDb();
       const tuneId = params.id;
       const uid = userIdInt();
-      return db && tuneId && uid
-        ? { db, tuneId, uid }
-        : db && tuneId
-          ? { db, tuneId }
+      const playlistId = currentPlaylistId();
+      return db && tuneId && uid && playlistId
+        ? { db, tuneId, uid, playlistId }
+        : db && tuneId && uid
+          ? { db, tuneId, uid }
           : null;
     },
     async (params) => {
       if (!params) return null;
-      if (!params) return null;
-      // Prefer merged override view when user available; fall back to base tune
-      if ("uid" in params && params.uid) {
-        return await getTuneForUserById(params.db, params.tuneId, params.uid);
+
+      // If we have a playlist context, fetch complete editor data
+      if ("playlistId" in params && params.playlistId) {
+        return await getTuneEditorData(
+          params.db,
+          params.tuneId,
+          params.uid,
+          params.playlistId
+        );
       }
-      const { getTuneById } = await import("../../../lib/db/queries/tunes");
-      return await getTuneById(params.db, params.tuneId);
+
+      // Otherwise just fetch base tune data (no user-specific fields)
+      return await getTuneForUserById(params.db, params.tuneId, params.uid);
     }
   );
 
@@ -87,6 +105,7 @@ const EditTunePage: Component = () => {
   ): Promise<string | undefined> => {
     const db = localDb();
     const userId = userIdInt();
+    const playlistId = currentPlaylistId();
 
     if (!db) {
       console.error("Database not initialized");
@@ -110,6 +129,7 @@ const EditTunePage: Component = () => {
     }
 
     try {
+      // PART 1: Save base tune fields (title, type, mode, structure, incipit, genre)
       // Guard: only allow direct tune updates if tune is explicitly owned by user (privateFor matches userId)
       // Public tunes (privateFor null) or tunes owned by another user MUST go through tune_override path.
       const isUserOwnedPrivateTune =
@@ -159,6 +179,26 @@ const EditTunePage: Component = () => {
           }
         }
       }
+
+      // PART 2: Save user-specific fields if we have a playlist context
+      if (playlistId) {
+        // Update playlist_tune fields (learned, goal, scheduled)
+        if (
+          tuneData.learned !== undefined ||
+          tuneData.goal !== undefined ||
+          tuneData.scheduled !== undefined
+        ) {
+          await updatePlaylistTuneFields(db, playlistId, tuneId, {
+            learned: tuneData.learned || null,
+            goal: tuneData.goal || null,
+            scheduled: tuneData.scheduled || null,
+          });
+        }
+      }
+
+      // Signal grids to refresh with updated data
+      incrementPracticeListStagedChanged();
+      incrementRepertoireListChanged();
 
       // Navigate back to where we came from
       navigate(returnPath());

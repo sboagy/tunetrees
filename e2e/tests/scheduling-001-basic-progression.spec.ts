@@ -47,10 +47,6 @@ const RATING_SEQUENCE: Array<"good" | "easy" | "hard"> = [
   "good",
 ];
 
-const REPERTOIRE_SIZE = 419;
-const MAX_DAILY_TUNES = 7;
-const ENABLE_FUZZ = false;
-
 test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
   test.setTimeout(120000);
 
@@ -63,22 +59,10 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
-    await page.addInitScript(
-      (config) => {
-        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = config.playlistSize;
-        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
-        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
-          config.maxReviews;
-      },
-      {
-        playlistSize: REPERTOIRE_SIZE,
-        enableFuzz: ENABLE_FUZZ,
-        maxReviews: MAX_DAILY_TUNES,
-      }
-    );
-
     // Instantiate page object
     ttPage = new TuneTreesPage(page);
+
+    await ttPage.setSchedulingPrefs();
 
     // Seed single tune; schedule yesterday so it's due today
     await setupForPracticeTestsParallel(page, testUser, {

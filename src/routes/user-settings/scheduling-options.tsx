@@ -25,6 +25,7 @@ const SchedulingOptionsPage: Component = () => {
   const [daysPerWeek, setDaysPerWeek] = createSignal<string>("");
   const [weeklyRules, setWeeklyRules] = createSignal<string>("");
   const [exceptions, setExceptions] = createSignal<string>("");
+  const [autoScheduleNew, setAutoScheduleNew] = createSignal<boolean>(true);
 
   // UI state
   const [isLoading, setIsLoading] = createSignal(true);
@@ -53,6 +54,7 @@ const SchedulingOptionsPage: Component = () => {
             setDaysPerWeek(prefs.daysPerWeek?.toString() ?? "");
             setWeeklyRules(prefs.weeklyRules ?? "");
             setExceptions(prefs.exceptions ?? "");
+            setAutoScheduleNew(prefs.autoScheduleNew ?? true);
           }
         })
         .catch((error) => {
@@ -173,6 +175,7 @@ const SchedulingOptionsPage: Component = () => {
         daysPerWeek: parseIntOrNull(daysPerWeek()),
         weeklyRules: weeklyRules().trim() || null,
         exceptions: exceptions().trim() || null,
+        autoScheduleNew: autoScheduleNew(),
       });
 
       setSuccessMessage("Scheduling options updated successfully");
@@ -292,6 +295,29 @@ const SchedulingOptionsPage: Component = () => {
                   </p>
                 </Show>
               </div>
+            </div>
+
+            {/* Auto Schedule New */}
+            <div class="space-y-1.5">
+              <label class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoScheduleNew()}
+                  onChange={(e) => {
+                    setAutoScheduleNew(e.currentTarget.checked);
+                    markDirty();
+                  }}
+                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  data-testid="sched-auto-schedule-new-checkbox"
+                />
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Automatically schedule new tunes
+                </span>
+              </label>
+              <p class="text-xs text-gray-500 dark:text-gray-400 ml-6">
+                Include never-practiced tunes in daily practice queue (Q3
+                bucket).
+              </p>
             </div>
 
             {/* Days per Week */}

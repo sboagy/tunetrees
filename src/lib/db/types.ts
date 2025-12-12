@@ -74,6 +74,7 @@ export interface IUserSchedulingOptions {
   daysPerWeek: number | null;
   weeklyRules: string | null;
   exceptions: string | null;
+  autoScheduleNew: boolean;
 }
 
 // ============================================================================

@@ -387,6 +387,7 @@ export async function setupDeterministicTestParallel(
     "daily_practice_queue",
     "practice_record",
     "tune_override",
+    "prefs_scheduling_options",
   ];
 
   // Step 1: Clear user's state
@@ -398,6 +399,7 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "practice_record");
   await clearUserTable(user, "tune_override");
+  await clearUserTable(user, "prefs_scheduling_options");
 
   await verifyTablesEmpty(user, whichTables);
 
@@ -555,6 +557,9 @@ function applyTableQueryFilters(
     // playlist_tune rows are keyed by playlist_ref; no user_ref column
     query = query.eq("playlist_ref", user.playlistId);
   } else if (tableName === "table_transient_data") {
+    query = query.eq("user_id", user.userId);
+  } else if (tableName === "prefs_scheduling_options") {
+    // prefs_scheduling_options is keyed by user_id (not user_ref)
     query = query.eq("user_id", user.userId);
   } else if (tableName === "tune_override") {
     // tune_override.user_ref references internal user_profile.id, not supabase_user_id.
@@ -801,6 +806,7 @@ export async function setupForPracticeTestsParallel(
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
+  await clearUserTable(user, "prefs_scheduling_options");
 
   // 2. Reset repertoire
   await clearUserTable(user, "playlist_tune");
@@ -810,6 +816,7 @@ export async function setupForPracticeTestsParallel(
     "daily_practice_queue",
     "table_transient_data",
     "tune_override",
+    "prefs_scheduling_options",
     "playlist_tune",
   ]);
 
@@ -913,6 +920,7 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
+  await clearUserTable(user, "prefs_scheduling_options");
 
   // 2. Reset repertoire
   await clearUserTable(user, "playlist_tune");
@@ -922,6 +930,7 @@ export async function setupForRepertoireTestsParallel(
     "daily_practice_queue",
     "table_transient_data",
     "tune_override",
+    "prefs_scheduling_options",
     "playlist_tune",
   ]);
 
@@ -1031,6 +1040,7 @@ export async function setupForCatalogTestsParallel(
     "daily_practice_queue",
     "table_transient_data",
     "tune_override",
+    "prefs_scheduling_options",
     "playlist_tune",
   ];
 
@@ -1045,6 +1055,7 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
+  await clearUserTable(user, "prefs_scheduling_options");
 
   await verifyTablesEmpty(user, whichTables);
 

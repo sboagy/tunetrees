@@ -22,7 +22,7 @@ export interface ITuneOverview {
   structure: string | null;
   mode: string | null;
   incipit: string | null;
-  genre_ref: number | null;
+  genre: string | null;
   private_for: string | null;
   deleted: number;
 

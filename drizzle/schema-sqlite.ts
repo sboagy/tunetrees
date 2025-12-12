@@ -252,6 +252,7 @@ export const prefsSchedulingOptions = sqliteTable(
     daysPerWeek: integer(COL.DAYS_PER_WEEK),
     weeklyRules: text(COL.WEEKLY_RULES),
     exceptions: text(COL.EXCEPTIONS),
+    autoScheduleNew: integer(COL.AUTO_SCHEDULE_NEW).default(1).notNull(),
     syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
     lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),
     deviceId: text(COL.DEVICE_ID),

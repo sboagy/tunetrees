@@ -10,9 +10,10 @@
  * @module components/tunes/TuneEditor
  */
 
+import { A } from "@solidjs/router";
 import abcjs from "abcjs";
 import { eq } from "drizzle-orm";
-import { CircleX, Layers, Pencil, Save, Undo2 } from "lucide-solid";
+import { CircleX, History, Layers, Pencil, Save, Undo2 } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -45,23 +46,18 @@ import {
 import { TagInput } from "./TagInput";
 
 /**
- * Extended tune data for editor (includes practice record and override fields)
+ * Extended tune data for editor (includes playlist_tune fields)
  */
 export interface TuneEditorData extends Tune {
-  // Additional fields from practice records and overrides
+  // Additional fields from tune_override
   request_public?: boolean;
+  // playlist_tune fields
   learned?: string;
-  practiced?: string;
-  quality?: number | null;
-  notes_private?: string;
-  difficulty?: number | null;
-  stability?: number | null;
-  step?: number | null;
-  state?: number | null;
-  repetitions?: number | null;
-  due?: string;
-  easiness?: number | null;
-  interval?: number | null;
+  goal?: string;
+  scheduled?: string;
+  current?: string; // Legacy field (ignored)
+  // practice_record latest due date
+  latest_due?: string;
 }
 
 export interface TuneEditorProps {
@@ -101,41 +97,40 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     props.tune?.request_public || false
   );
 
-  // User/Repertoire specific fields
-  const [learned, setLearned] = createSignal(props.tune?.learned || "");
-  const [practiced, setPracticed] = createSignal(props.tune?.practiced || "");
-  const [quality, setQuality] = createSignal<number | null>(
-    props.tune?.quality || null
-  );
-  const [notes, setNotes] = createSignal(props.tune?.notes_private || "");
+  // Helper to format ISO dates for datetime-local inputs
+  const formatDateForInput = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      if (Number.isNaN(date.getTime())) return "";
+      // datetime-local expects YYYY-MM-DDTHH:mm format in local time
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch {
+      return "";
+    }
+  };
 
-  // FSRS fields (collapsible)
-  const [difficulty, setDifficulty] = createSignal<number | null>(
-    props.tune?.difficulty || null
+  // User/Repertoire specific fields (playlist_tune)
+  const [learned, setLearned] = createSignal(
+    formatDateForInput(props.tune?.learned)
   );
-  const [stability, setStability] = createSignal<number | null>(
-    props.tune?.stability || null
+  const [goal, setGoal] = createSignal(props.tune?.goal || "recall");
+  const [scheduled, setScheduled] = createSignal(
+    formatDateForInput(props.tune?.scheduled)
   );
-  const [step, setStep] = createSignal<number | null>(props.tune?.step || null);
-  const [state, setState] = createSignal<number | null>(
-    props.tune?.state || null
-  );
-  const [repetitions, setRepetitions] = createSignal<number | null>(
-    props.tune?.repetitions || null
-  );
-  const [due, setDue] = createSignal(props.tune?.due || "");
-
-  // SM2 fields (collapsible)
-  const [easiness, setEasiness] = createSignal<number | null>(
-    props.tune?.easiness || null
-  );
-  const [interval, setInterval] = createSignal<number | null>(
-    props.tune?.interval || null
-  );
+  // Next review is computed: scheduled override OR latest practice record due (read-only)
+  const computedNextReview = () => {
+    const scheduledOverride = props.tune?.scheduled;
+    const latestDue = props.tune?.latest_due;
+    return formatDateForInput(scheduledOverride || latestDue);
+  };
 
   // UI state
-  const [sm2Open, setSm2Open] = createSignal(false);
-  const [fsrsOpen, setFsrsOpen] = createSignal(false);
   const [isSaving, setIsSaving] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
   // Determine if form should be read-only (global public toggle removed)
@@ -305,18 +300,11 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     if (requestPublic() !== (props.tune?.request_public || false)) return true;
 
     // Check user/repertoire fields (only if editing existing tune)
-    if (learned() !== (props.tune.learned || "")) return true;
-    if (practiced() !== (props.tune.practiced || "")) return true;
-    if (quality() !== (props.tune.quality || null)) return true;
-    if (notes() !== (props.tune.notes_private || "")) return true;
-    if (difficulty() !== (props.tune.difficulty || null)) return true;
-    if (stability() !== (props.tune.stability || null)) return true;
-    if (step() !== (props.tune.step || null)) return true;
-    if (state() !== (props.tune.state || null)) return true;
-    if (repetitions() !== (props.tune.repetitions || null)) return true;
-    if (due() !== (props.tune.due || "")) return true;
-    if (easiness() !== (props.tune.easiness || null)) return true;
-    if (interval() !== (props.tune.interval || null)) return true;
+    // Use formatted versions for comparison since inputs store formatted strings
+    if (learned() !== formatDateForInput(props.tune.learned)) return true;
+    if (goal() !== (props.tune.goal || "recall")) return true;
+    if (scheduled() !== formatDateForInput(props.tune.scheduled)) return true;
+    // current is read-only, no dirty check needed
 
     return false;
   });
@@ -389,6 +377,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
     setIsSaving(true);
 
+    // Helper to convert datetime-local format to ISO 8601
+    const toIsoString = (dateStr: string | undefined): string | undefined => {
+      if (!dateStr) return undefined;
+      try {
+        const date = new Date(dateStr);
+        if (Number.isNaN(date.getTime())) return undefined;
+        return date.toISOString();
+      } catch {
+        return undefined;
+      }
+    };
+
     const tuneData: Partial<TuneEditorData> = {
       genre: genre() || undefined,
       title: title(),
@@ -398,18 +398,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
       incipit: incipit() || undefined,
       privateFor: props.tune?.privateFor || undefined,
       request_public: requestPublic(),
-      learned: learned() || undefined,
-      practiced: practiced() || undefined,
-      quality: quality(),
-      difficulty: difficulty(),
-      stability: stability(),
-      step: step(),
-      state: state(),
-      repetitions: repetitions(),
-      due: due() || undefined,
-      easiness: easiness(),
-      interval: interval(),
-      notes_private: notes() || undefined,
+      learned: toIsoString(learned()),
+      goal: goal() || undefined,
+      scheduled: toIsoString(scheduled()),
+      // current is read-only, not included in save
     };
 
     try {
@@ -463,14 +455,6 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const handleCancel = () => {
     props.onCancel?.();
   };
-
-  // Chevron rotation for collapsible sections
-  const sm2ChevronRotation = createMemo(() =>
-    sm2Open() ? "rotate(90deg)" : "rotate(0deg)"
-  );
-  const fsrsChevronRotation = createMemo(() =>
-    fsrsOpen() ? "rotate(90deg)" : "rotate(0deg)"
-  );
 
   return (
     <div
@@ -1128,327 +1112,99 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     </div>
                   </div>
 
-                  {/* Practiced Date */}
+                  {/* Practice Goal */}
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label
-                      for="practiced"
+                      for="goal"
                       class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
-                      <em>Practiced Date:</em>
+                      Practice Goal:
+                    </label>
+                    <div class="md:col-span-2">
+                      <select
+                        id="goal"
+                        value={goal()}
+                        onChange={(e) => setGoal(e.currentTarget.value)}
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-select-goal"
+                      >
+                        <option value="initial_learn">Initial Learn</option>
+                        <option value="recall">Recall</option>
+                        <option value="fluency">Fluency</option>
+                        <option value="session_ready">Session Ready</option>
+                        <option value="performance_polish">
+                          Performance Polish
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Schedule Override */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <label
+                      for="scheduled"
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
+                    >
+                      Schedule Override:
                     </label>
                     <div class="md:col-span-2">
                       <input
-                        id="practiced"
+                        id="scheduled"
                         type="datetime-local"
-                        value={practiced()}
-                        onInput={(e) => setPracticed(e.currentTarget.value)}
+                        value={scheduled()}
+                        onInput={(e) => setScheduled(e.currentTarget.value)}
                         disabled={isFormReadOnly()}
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                        data-testid="tune-editor-input-practiced"
+                        data-testid="tune-editor-input-scheduled"
                       />
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Force this tune into your queue on this date. Cleared
+                        after practice.
+                      </p>
                     </div>
                   </div>
 
-                  {/* Quality */}
+                  {/* Next Review (Computed - Read Only) */}
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <label
-                      for="quality"
+                      for="current"
                       class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
-                      <em>Quality:</em>
+                      Next Review (Computed):
                     </label>
                     <div class="md:col-span-2">
                       <input
-                        id="quality"
-                        type="number"
-                        step="0.01"
-                        value={quality() ?? ""}
-                        onInput={(e) =>
-                          setQuality(e.currentTarget.valueAsNumber || null)
+                        id="current"
+                        type="text"
+                        value={
+                          computedNextReview()
+                            ? new Date(computedNextReview()).toLocaleString()
+                            : "Not scheduled"
                         }
-                        disabled={isFormReadOnly()}
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                        data-testid="tune-editor-input-quality"
+                        disabled={true}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm cursor-not-allowed"
+                        data-testid="tune-editor-input-current"
                       />
+                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        FSRS-calculated next review date. Updates automatically
+                        after each practice.
+                      </p>
                     </div>
                   </div>
 
-                  {/* Collapsible SM2 Fields */}
-                  <div class="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setSm2Open(!sm2Open())}
-                      class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                    >
-                      SM2 Fields
-                      <svg
-                        class="w-4 h-4 transition-transform"
-                        style={{ transform: sm2ChevronRotation() }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <title>Toggle SM2 fields</title>
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-
-                    <Show when={sm2Open()}>
-                      <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                        {/* Easiness */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="easiness"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Easiness:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="easiness"
-                              type="number"
-                              step="0.01"
-                              value={easiness() ?? ""}
-                              onInput={(e) =>
-                                setEasiness(
-                                  e.currentTarget.valueAsNumber || null
-                                )
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-easiness"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Interval */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="interval"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Interval:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="interval"
-                              type="number"
-                              value={interval() ?? ""}
-                              onInput={(e) =>
-                                setInterval(
-                                  e.currentTarget.valueAsNumber || null
-                                )
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-interval"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </Show>
-                  </div>
-
-                  {/* Collapsible FSRS Fields */}
-                  <div class="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFsrsOpen(!fsrsOpen())}
-                      class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
-                    >
-                      FSRS Fields
-                      <svg
-                        class="w-4 h-4 transition-transform"
-                        style={{ transform: fsrsChevronRotation() }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <title>Toggle FSRS fields</title>
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-
-                    <Show when={fsrsOpen()}>
-                      <div class="mt-4 space-y-4 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
-                        {/* Difficulty */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="difficulty"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Difficulty:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="difficulty"
-                              type="number"
-                              step="0.01"
-                              value={difficulty() ?? ""}
-                              onInput={(e) =>
-                                setDifficulty(
-                                  e.currentTarget.valueAsNumber || null
-                                )
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-difficulty"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Stability */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="stability"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Stability:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="stability"
-                              type="number"
-                              step="0.01"
-                              value={stability() ?? ""}
-                              onInput={(e) =>
-                                setStability(
-                                  e.currentTarget.valueAsNumber || null
-                                )
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-stability"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Step */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="step"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Step:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="step"
-                              type="number"
-                              value={step() ?? ""}
-                              onInput={(e) =>
-                                setStep(e.currentTarget.valueAsNumber || null)
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-step"
-                            />
-                          </div>
-                        </div>
-
-                        {/* State */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="state"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>State:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="state"
-                              type="number"
-                              value={state() ?? ""}
-                              onInput={(e) =>
-                                setState(e.currentTarget.valueAsNumber || null)
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-state"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Repetitions */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="repetitions"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Repetitions:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="repetitions"
-                              type="number"
-                              value={repetitions() ?? ""}
-                              onInput={(e) =>
-                                setRepetitions(
-                                  e.currentTarget.valueAsNumber || null
-                                )
-                              }
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-repetitions"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Due Date */}
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                          <label
-                            for="due"
-                            class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                          >
-                            <em>Due:</em>
-                          </label>
-                          <div class="md:col-span-2">
-                            <input
-                              id="due"
-                              type="datetime-local"
-                              value={due()}
-                              onInput={(e) => setDue(e.currentTarget.value)}
-                              disabled={isFormReadOnly()}
-                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                              data-testid="tune-editor-input-due"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </Show>
-                  </div>
-
-                  {/* Private Notes */}
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-4">
-                    <label
-                      for="notes"
-                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right pt-2"
-                    >
-                      Private Notes:
-                    </label>
+                  {/* Practice History Link */}
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div class="hidden md:block" />
                     <div class="md:col-span-2">
-                      <textarea
-                        id="notes"
-                        value={notes()}
-                        onInput={(e) => setNotes(e.currentTarget.value)}
-                        placeholder="Your private notes about this tune..."
-                        rows={4}
-                        disabled={isFormReadOnly()}
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                        data-testid="tune-editor-textarea-notes"
-                      />
+                      <A
+                        href={`/tunes/${props.tune?.id}/practice-history`}
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 border border-blue-300 dark:border-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        data-testid="tune-editor-practice-history-link"
+                      >
+                        <History class="w-4 h-4" />
+                        View Practice History
+                      </A>
                     </div>
                   </div>
                 </div>

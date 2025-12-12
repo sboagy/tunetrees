@@ -154,6 +154,12 @@ export class TuneTreesPage {
   // Error Display
   readonly authErrorMessage: Locator;
 
+  // Standard stable factors for test
+  readonly REPERTOIRE_SIZE = 419;
+  readonly MAX_DAILY_TUNES = 7;
+  readonly ENABLE_FUZZ = false;
+  readonly SCHEDULE_NEW_TUNES_AUTOMATICALLY = true;
+
   constructor(page: Page) {
     this.page = page;
 
@@ -676,6 +682,40 @@ export class TuneTreesPage {
 
     // Wait for navigation to login page with convert parameter
     await this.page.waitForURL(/\/login\?convert=true/, { timeout: 10000 });
+  }
+
+  async setSchedulingPrefs(
+    overrides: {
+      playlistSize?: number;
+      enableFuzz?: boolean;
+      maxReviews?: number;
+      scheduleNewTunesAutomatically?: boolean;
+    } = {}
+  ) {
+    const config = {
+      playlistSize: overrides.playlistSize ?? this.REPERTOIRE_SIZE,
+      enableFuzz: overrides.enableFuzz ?? this.ENABLE_FUZZ,
+      maxReviews: overrides.maxReviews ?? this.MAX_DAILY_TUNES,
+      scheduleNewTunesAutomatically:
+        overrides.scheduleNewTunesAutomatically ??
+        this.SCHEDULE_NEW_TUNES_AUTOMATICALLY,
+    };
+
+    await this.page.addInitScript(
+      (cfg: {
+        playlistSize: number;
+        enableFuzz: boolean;
+        maxReviews: number;
+        scheduleNewTunesAutomatically: boolean;
+      }) => {
+        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = cfg.playlistSize;
+        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = cfg.enableFuzz;
+        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ = cfg.maxReviews;
+        (window as any).__TUNETREES_TEST_SCHEDULE_NEW_TUNES_AUTOMATICALLY__ =
+          cfg.scheduleNewTunesAutomatically;
+      },
+      config
+    );
   }
 
   /**

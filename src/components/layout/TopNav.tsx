@@ -995,11 +995,10 @@ export const TopNav: Component = () => {
 
                     {/* Database Browser (Temporarily enabled for production) */}
                     {/* TODO: Restore dev-only condition: <Show when={import.meta.env.DEV}> */}
+                    {/* TODO: Switch back to target="_blank" after https://github.com/sboagy/tunetrees/issues/321 is resolved */}
                     <Show when={true}>
                       <a
                         href="/debug/db"
-                        target="_blank"
-                        rel="noopener noreferrer"
                         class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                         onClick={() => setShowDbMenu(false)}
                       >

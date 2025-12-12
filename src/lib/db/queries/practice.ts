@@ -63,6 +63,7 @@ export interface PracticeListStagedRow {
   learned: number | null;
   goal: string;
   scheduled: string | null;
+  current: string | null;
   user_ref: string;
   playlist_id: string;
   instrument: string | null;
@@ -169,6 +170,7 @@ export async function getPracticeList(
       AND dpq.playlist_ref = ${playlistId}
       AND dpq.active = 1
   `);
+  console.log("[DB identity]", db);
   console.log(
     `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${playlistId}`
   );
@@ -630,6 +632,7 @@ export async function getUserSchedulingOptions(
         daysPerWeek: r.daysPerWeek ?? null,
         weeklyRules: r.weeklyRules ?? null,
         exceptions: r.exceptions ?? null,
+        autoScheduleNew: Boolean(r.autoScheduleNew),
       };
     }
   } catch (e) {
@@ -644,6 +647,7 @@ export async function getUserSchedulingOptions(
     daysPerWeek: null,
     weeklyRules: null,
     exceptions: null,
+    autoScheduleNew: true,
   };
 }
 
