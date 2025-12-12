@@ -78,7 +78,7 @@ export async function getSchedulingOptions(
     daysPerWeek: result[0].daysPerWeek,
     weeklyRules: result[0].weeklyRules,
     exceptions: result[0].exceptions,
-    autoScheduleNew: result[0].autoScheduleNew ? true : false,
+    autoScheduleNew: !!result[0].autoScheduleNew,
   };
 }
 
