@@ -53,6 +53,9 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
   const { needRefresh, updateServiceWorker, checkForUpdate } = usePWAUpdate();
   const [checking, setChecking] = createSignal(false);
 
+  // Delay after clicking "Check for Update" to show "Checking..." state
+  const UPDATE_CHECK_TIMEOUT = 2000;
+
   const handleCheckForUpdate = async () => {
     setChecking(true);
     checkForUpdate();
@@ -60,7 +63,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
     // Give it a moment to check
     setTimeout(() => {
       setChecking(false);
-    }, 2000);
+    }, UPDATE_CHECK_TIMEOUT);
   };
 
   const handleUpdate = async () => {

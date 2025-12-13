@@ -4,16 +4,20 @@
  * Provides access to PWA update state and functions.
  * Can be used by multiple components (UpdatePrompt, AboutDialog, etc.)
  *
+ * Note: This hook initializes service worker registration on first use.
+ * Multiple calls to this hook will return the same global state.
+ *
  * @module lib/hooks/usePWAUpdate
  */
 
-import { createSignal, onMount, onCleanup, type Accessor } from "solid-js";
+import { createSignal, onMount, onCleanup, createEffect, type Accessor } from "solid-js";
 
-// Global state for PWA update
+// Global state for PWA update (singleton pattern)
 let globalNeedRefresh: Accessor<boolean> = () => false;
 let globalUpdateServiceWorker: ((reloadPage?: boolean) => Promise<void>) | null =
   null;
 let globalCheckForUpdate: (() => void) | null = null;
+let isInitialized = false;
 
 export interface PWAUpdateState {
   needRefresh: Accessor<boolean>;
@@ -24,6 +28,7 @@ export interface PWAUpdateState {
 /**
  * Hook to access PWA update state and functions
  * Only works in production builds
+ * First call initializes the service worker, subsequent calls return the same state
  */
 export function usePWAUpdate(): PWAUpdateState {
   const [needRefresh, setNeedRefresh] = createSignal(false);
@@ -31,6 +36,15 @@ export function usePWAUpdate(): PWAUpdateState {
   onMount(async () => {
     // Only in production
     if (import.meta.env.DEV) {
+      return;
+    }
+
+    // Only initialize once (singleton pattern)
+    if (isInitialized) {
+      // Sync with global state
+      createEffect(() => {
+        setNeedRefresh(globalNeedRefresh());
+      });
       return;
     }
 
@@ -61,8 +75,10 @@ export function usePWAUpdate(): PWAUpdateState {
         },
       });
 
-      // Update local state when needRefresh changes
-      setNeedRefresh(needRefreshSignal);
+      // Reactively sync local state with needRefreshSignal
+      createEffect(() => {
+        setNeedRefresh(needRefreshSignal());
+      });
 
       // Store global references
       globalNeedRefresh = needRefreshSignal;
@@ -71,6 +87,8 @@ export function usePWAUpdate(): PWAUpdateState {
         console.log("[PWA] Manual update check requested");
         registration?.update();
       };
+
+      isInitialized = true;
 
       // Cleanup interval on component unmount
       onCleanup(() => {
@@ -84,7 +102,7 @@ export function usePWAUpdate(): PWAUpdateState {
   });
 
   return {
-    needRefresh: import.meta.env.DEV ? () => false : globalNeedRefresh,
+    needRefresh: import.meta.env.DEV ? () => false : needRefresh,
     updateServiceWorker:
       globalUpdateServiceWorker ||
       (async () => {
