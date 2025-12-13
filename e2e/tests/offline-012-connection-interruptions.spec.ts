@@ -31,16 +31,8 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Setup with practice-ready repertoire
     await setupForPracticeTestsParallel(page, testUser, {
-      clearRepertoire: true,
-      seedRepertoire: [
-        { tuneId: "1", tuneTitle: "Tune A" },
-        { tuneId: "2", tuneTitle: "Tune B" },
-        { tuneId: "3", tuneTitle: "Tune C" },
-        { tuneId: "4", tuneTitle: "Tune D" },
-        { tuneId: "5", tuneTitle: "Tune E" },
-        { tuneId: "6", tuneTitle: "Tune F" },
-        { tuneId: "7", tuneTitle: "Tune G" },
-      ],
+      repertoireTunes: ["1", "2", "3", "4", "5", "6", "7"],
+      startTab: "practice",
     });
 
     await page.goto("http://localhost:5173/?tab=practice");

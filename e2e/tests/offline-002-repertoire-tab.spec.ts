@@ -30,19 +30,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
 
     // Setup with 10 tunes in repertoire
     await setupForRepertoireTestsParallel(page, testUser, {
-      clearRepertoire: true,
-      seedRepertoire: [
-        { tuneId: "1", tuneTitle: "The Banshee Reel" },
-        { tuneId: "2", tuneTitle: "The Butterfly" },
-        { tuneId: "3", tuneTitle: "The Kesh Jig" },
-        { tuneId: "4", tuneTitle: "The Maid Behind the Bar" },
-        { tuneId: "5", tuneTitle: "The Silver Spear" },
-        { tuneId: "6", tuneTitle: "The Wise Maid" },
-        { tuneId: "7", tuneTitle: "Morrison's Jig" },
-        { tuneId: "8", tuneTitle: "Drowsy Maggie" },
-        { tuneId: "9", tuneTitle: "The Lark in the Morning" },
-        { tuneId: "10", tuneTitle: "The Rights of Man" },
-      ],
+      repertoireTunes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
     });
 
     // Navigate to Repertoire tab

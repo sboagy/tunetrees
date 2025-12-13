@@ -30,16 +30,12 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     ttPage = new TuneTreesPage(page);
 
     // Setup with substantial repertoire (20 tunes)
-    const repertoire = [];
+    const repertoire: string[] = [];
     for (let i = 1; i <= 20; i++) {
-      repertoire.push({
-        tuneId: `${i}`,
-        tuneTitle: `Test Tune ${i}`,
-      });
+      repertoire.push(`${i}`);
     }
 
     await setupDeterministicTestParallel(page, testUser, {
-      clearRepertoire: true,
       seedRepertoire: repertoire,
     });
 

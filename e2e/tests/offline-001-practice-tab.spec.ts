@@ -31,14 +31,8 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
 
     // Setup with 5 tunes in repertoire
     await setupForPracticeTestsParallel(page, testUser, {
-      clearRepertoire: true,
-      seedRepertoire: [
-        { tuneId: "1", tuneTitle: "Banish Misfortune" },
-        { tuneId: "2", tuneTitle: "The Butterfly" },
-        { tuneId: "3", tuneTitle: "The Kesh Jig" },
-        { tuneId: "4", tuneTitle: "The Road to Lisdoonvarna" },
-        { tuneId: "5", tuneTitle: "The Silver Spear" },
-      ],
+      repertoireTunes: ["1", "2", "3", "4", "5"],
+      startTab: "practice",
     });
 
     // Navigate to Practice tab
