@@ -117,21 +117,16 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
 
     await firstDragHandle.dragTo(secondNoteItem);
 
-    // Wait for reorder to complete
-    await page
-      .waitForResponse(
-        (response) =>
-          response.url().includes("note") && response.status() === 200,
-        { timeout: 15000 }
-      )
-      .catch(() => {
-        // Sync might not make network request immediately, continue
-      });
-
     // Verify order changed - second note should now be first
-    const newFirstNoteTestId = await noteItems
-      .first()
-      .getAttribute("data-testid");
+    // try for a few times
+    let newFirstNoteTestId: string | null = null;
+    for (let i = 0; i < 10; i++) {
+      newFirstNoteTestId = await noteItems.first().getAttribute("data-testid");
+      if (newFirstNoteTestId === `note-item-${secondNoteId}`) {
+        break;
+      }
+      await page.waitForTimeout(20);
+    }
     expect(newFirstNoteTestId).toBe(`note-item-${secondNoteId}`);
   });
 });
