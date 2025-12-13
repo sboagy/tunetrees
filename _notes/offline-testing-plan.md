@@ -743,8 +743,11 @@ Consider creating a mock Supabase service for controlled testing:
 
 ### External Resources
 - [Playwright Network Interception](https://playwright.dev/docs/network)
-- [PWA Offline Testing](https://web.dev/offline-testing/)
+- [Learn PWA - Service Workers & Caching](https://web.dev/learn/pwa/service-workers/)
+- [Workbox Testing & Debugging](https://developer.chrome.com/docs/workbox/troubleshooting-and-logging)
+- [Service Worker Lifecycle](https://developer.chrome.com/docs/workbox/service-worker-lifecycle)
 - [IndexedDB Best Practices](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
+- [Chrome DevTools: Test PWAs](https://developer.chrome.com/docs/devtools/progressive-web-apps/)
 
 ---
 

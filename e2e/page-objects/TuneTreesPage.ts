@@ -169,6 +169,13 @@ export class TuneTreesPage {
   // Error Display
   readonly authErrorMessage: Locator;
 
+  // Sync & Offline Status Elements
+  readonly syncStatusIndicator: Locator;
+  readonly syncButton: Locator;
+  readonly offlineIndicator: Locator;
+  readonly pendingChangesCount: Locator;
+  readonly syncProgressIndicator: Locator;
+
   // Standard stable factors for test
   readonly REPERTOIRE_SIZE = 419;
   readonly MAX_DAILY_TUNES = 7;
@@ -400,6 +407,13 @@ export class TuneTreesPage {
 
     // Error Display
     this.authErrorMessage = page.locator(".bg-red-50, .bg-red-900\\/20");
+
+    // Sync & Offline Status Elements
+    this.syncStatusIndicator = page.getByTestId("sync-status-indicator");
+    this.syncButton = page.getByTestId("sync-button");
+    this.offlineIndicator = page.getByTestId("offline-indicator");
+    this.pendingChangesCount = page.getByTestId("pending-changes-count");
+    this.syncProgressIndicator = page.getByTestId("sync-progress-indicator");
   }
 
   // ===== Authentication Helper Methods =====
