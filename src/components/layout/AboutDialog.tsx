@@ -8,6 +8,7 @@
  */
 
 import type { Component } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -18,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { usePWAUpdate } from "@/lib/hooks/usePWAUpdate";
 
 interface AboutDialogProps {
   isOpen: boolean;
@@ -33,6 +35,7 @@ interface AboutDialogProps {
  * - Environment (dev/production)
  * - Copyright and license info
  * - Links to GitHub and documentation
+ * - Update button (if update available or to check for updates)
  */
 export const AboutDialog: Component<AboutDialogProps> = (props) => {
   // Get build-time constants injected by Vite
@@ -45,6 +48,25 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
   const gitCommit = __GIT_COMMIT__;
   const gitBranch = __GIT_BRANCH__;
   const environment = import.meta.env.MODE;
+
+  // PWA update state (only in production)
+  const { needRefresh, updateServiceWorker, checkForUpdate } = usePWAUpdate();
+  const [checking, setChecking] = createSignal(false);
+
+  const handleCheckForUpdate = async () => {
+    setChecking(true);
+    checkForUpdate();
+    
+    // Give it a moment to check
+    setTimeout(() => {
+      setChecking(false);
+    }, 2000);
+  };
+
+  const handleUpdate = async () => {
+    console.log("[PWA] User clicked Update from About dialog");
+    await updateServiceWorker(true);
+  };
 
   return (
     <AlertDialog
@@ -123,6 +145,43 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
           </dl>
 
           <div class="border-t border-gray-200 dark:border-gray-700 my-4" />
+
+          {/* Update section - only show in production */}
+          <Show when={!import.meta.env.DEV}>
+            <div class="mb-4">
+              <Show
+                when={needRefresh()}
+                fallback={
+                  <Button
+                    onClick={handleCheckForUpdate}
+                    variant="outline"
+                    size="sm"
+                    class="w-full"
+                    disabled={checking()}
+                    data-testid="about-check-update-button"
+                  >
+                    {checking() ? "Checking..." : "Check for Update"}
+                  </Button>
+                }
+              >
+                <div class="space-y-2">
+                  <p class="text-sm text-center text-green-600 dark:text-green-400 font-medium">
+                    Update Available!
+                  </p>
+                  <Button
+                    onClick={handleUpdate}
+                    variant="default"
+                    size="sm"
+                    class="w-full"
+                    data-testid="about-update-button"
+                  >
+                    Update Now
+                  </Button>
+                </div>
+              </Show>
+            </div>
+            <div class="border-t border-gray-200 dark:border-gray-700 mb-4" />
+          </Show>
 
           <div class="text-center space-y-1">
             <p class="text-sm text-gray-600 dark:text-gray-400">
