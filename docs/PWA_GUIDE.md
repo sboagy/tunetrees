@@ -171,32 +171,44 @@ User Device
 ```
 1. New version deployed → Service worker detects update
 2. New service worker enters "waiting" state
-3. onNeedRefresh() callback fires
-4. User sees notification: "New version available. Reload to update."
-5. User reloads page → New service worker activates
-6. App loads with new version
+3. UpdatePrompt component detects waiting state
+4. Toast notification appears: "New version available"
+5. User clicks "Update" → Service worker activates
+6. Page reloads → App loads with new version
 ```
 
 ### User Experience
 
-**Current (Phase 7):**
-- Console log: `[PWA] New version available. Reload to update.`
-- Manual reload required
+**Current (Implemented):**
+- Toast notification appears when update is available
+- "Update" button to apply update immediately (reloads page)
+- "Dismiss" button to hide notification for current session
+- Update checks every hour automatically
+- Non-intrusive (appears in top-right corner)
 
-**Future Enhancement (Phase 9):**
-- UI toast notification with "Update" button
-- One-click update (reload triggered programmatically)
-- Optional: Force update after N days
+**Implementation Details:**
+- Component: `src/components/pwa/UpdatePrompt.tsx`
+- Uses `useRegisterSW` from `virtual:pwa-register/solid`
+- Integrates with `solid-sonner` toast system
+- Only active in production builds
+
+**Future Enhancement:**
+- Show version number in toast (requires build-time version injection)
+- Add "What's new" link to changelog
+- Auto-update if user is idle for X minutes
+- Show update prompt on app resume (visibility change)
 
 ### Developer Workflow
 
 **Development Mode:**
 - Service worker disabled (prevents caching issues)
 - Any existing service workers unregistered on startup
+- UpdatePrompt component does nothing
 
 **Production Mode:**
-- Service worker enabled and registered
+- Service worker enabled and registered via UpdatePrompt
 - Auto-update checks every hour
+- Toast notification appears when update available
 
 **Testing Updates:**
 1. Build: `npm run build`
@@ -204,7 +216,8 @@ User Device
 3. Open DevTools → Application → Service Workers
 4. Click "Update" to force check
 5. See new version in "waiting" state
-6. Reload to activate
+6. Toast notification should appear
+7. Click "Update" in toast to activate
 
 ---
 
@@ -481,7 +494,7 @@ VitePWA({
 ### Phase 9: Advanced PWA Features
 
 - [ ] Install prompt UI (banner or modal)
-- [ ] Update notification toast with "Update Now" button
+- [x] Update notification toast with "Update Now" button ✅ **Implemented**
 - [ ] Cache management UI (view/clear caches)
 - [ ] Manual sync button in toolbar
 - [ ] Push notifications (practice reminders)
