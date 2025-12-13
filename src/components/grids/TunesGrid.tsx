@@ -371,7 +371,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
         ref={(el) => {
           containerRef = el;
         }}
-        class={CONTAINER_CLASSES}
+        class={`${CONTAINER_CLASSES} ${
+          props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
+        }`}
         style={{ "touch-action": "pan-x pan-y" }}
       >
         <table
