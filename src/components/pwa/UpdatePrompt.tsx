@@ -7,7 +7,7 @@
  * Uses vite-plugin-pwa's useRegisterSW hook for detecting and applying updates.
  */
 
-import { type Component, createEffect, onMount } from "solid-js";
+import { type Component, createEffect, onMount, createSignal } from "solid-js";
 import { toast } from "solid-sonner";
 
 export const UpdatePrompt: Component = () => {
@@ -15,6 +15,8 @@ export const UpdatePrompt: Component = () => {
   if (import.meta.env.DEV) {
     return null;
   }
+
+  const [toastShown, setToastShown] = createSignal(false);
 
   onMount(async () => {
     try {
@@ -41,10 +43,11 @@ export const UpdatePrompt: Component = () => {
         },
       });
 
-      // Show toast when update is available
+      // Show toast when update is available (only once)
       createEffect(() => {
-        if (needRefresh()) {
+        if (needRefresh() && !toastShown()) {
           console.log("[PWA] New version available, showing update prompt");
+          setToastShown(true);
 
           // Show a toast with update action
           toast("New version available", {
