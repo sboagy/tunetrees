@@ -10,9 +10,18 @@
 
 import { expect } from "@playwright/test";
 import {
-  goOffline,
-  goOnline,
-} from "../helpers/network-control";
+  CATALOG_TUNE_66_ID,
+  CATALOG_TUNE_70_ID,
+  CATALOG_TUNE_72_ID,
+  CATALOG_TUNE_ABBY_REEL,
+  CATALOG_TUNE_ALASDRUIMS_MARCH,
+  CATALOG_TUNE_ALEXANDERS_ID,
+  CATALOG_TUNE_BANISH_MISFORTUNE,
+  CATALOG_TUNE_COOLEYS_ID,
+  CATALOG_TUNE_KESH_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../src/lib/db/catalog-tune-ids";
+import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import {
   triggerManualSync,
@@ -28,16 +37,30 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
-    // Setup with 10 tunes in repertoire
+    // Setup with 10 tunes in repertoire (navigates to repertoire tab by default)
     await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+      repertoireTunes: [
+        CATALOG_TUNE_KESH_ID,
+        CATALOG_TUNE_COOLEYS_ID,
+        CATALOG_TUNE_BANISH_MISFORTUNE,
+        CATALOG_TUNE_MORRISON_ID,
+        CATALOG_TUNE_ABBY_REEL,
+        CATALOG_TUNE_ALEXANDERS_ID,
+        CATALOG_TUNE_ALASDRUIMS_MARCH,
+        CATALOG_TUNE_66_ID,
+        CATALOG_TUNE_70_ID,
+        CATALOG_TUNE_72_ID,
+      ],
     });
 
-    // Navigate to Repertoire tab
-    await page.goto("http://localhost:5173/?tab=repertoire");
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
+
+    // Wait for at least one tune to appear in the grid
+    await expect(
+      ttPage.repertoireGrid.locator("tbody tr[data-index='0']")
+    ).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test("should delete tunes offline and sync when online", async ({ page }) => {

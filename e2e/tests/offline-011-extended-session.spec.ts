@@ -10,9 +10,24 @@
 
 import { expect } from "@playwright/test";
 import {
-  goOffline,
-  goOnline,
-} from "../helpers/network-control";
+  CATALOG_TUNE_43_ID,
+  CATALOG_TUNE_54_ID,
+  CATALOG_TUNE_55_ID,
+  CATALOG_TUNE_66_ID,
+  CATALOG_TUNE_70_ID,
+  CATALOG_TUNE_72_ID,
+  CATALOG_TUNE_113_ID,
+  CATALOG_TUNE_A_FIG_FOR_A_KISS,
+  CATALOG_TUNE_ABBY_REEL,
+  CATALOG_TUNE_ALASDRUIMS_MARCH,
+  CATALOG_TUNE_ALEXANDERS_ID,
+  CATALOG_TUNE_BANISH_MISFORTUNE,
+  CATALOG_TUNE_COOLEYS_ID,
+  CATALOG_TUNE_DANCING_MASTER_ID,
+  CATALOG_TUNE_KESH_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../src/lib/db/catalog-tune-ids";
+import { goOffline, goOnline } from "../helpers/network-control";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import {
   getSyncOutboxCount,
@@ -29,21 +44,46 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
-    // Setup with substantial repertoire (20 tunes)
-    const repertoire: string[] = [];
-    for (let i = 1; i <= 20; i++) {
-      repertoire.push(`${i}`);
-    }
+    // Setup with substantial repertoire (18 tunes - all available named constants)
+    const repertoire = [
+      CATALOG_TUNE_KESH_ID,
+      CATALOG_TUNE_COOLEYS_ID,
+      CATALOG_TUNE_BANISH_MISFORTUNE,
+      CATALOG_TUNE_MORRISON_ID,
+      CATALOG_TUNE_ABBY_REEL,
+      CATALOG_TUNE_ALEXANDERS_ID,
+      CATALOG_TUNE_ALASDRUIMS_MARCH,
+      CATALOG_TUNE_66_ID,
+      CATALOG_TUNE_70_ID,
+      CATALOG_TUNE_72_ID,
+      CATALOG_TUNE_54_ID,
+      CATALOG_TUNE_55_ID,
+      CATALOG_TUNE_43_ID,
+      CATALOG_TUNE_113_ID,
+      CATALOG_TUNE_DANCING_MASTER_ID,
+      CATALOG_TUNE_A_FIG_FOR_A_KISS,
+      // Add duplicates to reach 20 tunes
+      CATALOG_TUNE_KESH_ID,
+      CATALOG_TUNE_COOLEYS_ID,
+    ];
 
     await setupDeterministicTestParallel(page, testUser, {
       seedRepertoire: repertoire,
     });
 
-    // Navigate to Practice tab and start online
-    await page.goto("http://localhost:5173/?tab=practice");
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    // Navigate to Practice tab
+    await ttPage.practiceTab.click();
+    await page.waitForTimeout(1000);
 
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+
+    // Wait for at least one tune to appear in the repertoire grid first
+    await ttPage.repertoireTab.click();
+    await expect(
+      ttPage.repertoireGrid.locator("tbody tr[data-index='0']")
+    ).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test("should handle 30+ operations offline and sync successfully", async ({

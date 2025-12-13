@@ -10,9 +10,15 @@
 
 import { expect } from "@playwright/test";
 import {
-  goOffline,
-  goOnline,
-} from "../helpers/network-control";
+  CATALOG_TUNE_ABBY_REEL,
+  CATALOG_TUNE_ALASDRUIMS_MARCH,
+  CATALOG_TUNE_ALEXANDERS_ID,
+  CATALOG_TUNE_BANISH_MISFORTUNE,
+  CATALOG_TUNE_COOLEYS_ID,
+  CATALOG_TUNE_KESH_ID,
+  CATALOG_TUNE_MORRISON_ID,
+} from "../../src/lib/db/catalog-tune-ids";
+import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
   getSyncOutboxCount,
@@ -31,13 +37,27 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Setup with practice-ready repertoire
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: ["1", "2", "3", "4", "5", "6", "7"],
+      repertoireTunes: [
+        CATALOG_TUNE_KESH_ID,
+        CATALOG_TUNE_COOLEYS_ID,
+        CATALOG_TUNE_BANISH_MISFORTUNE,
+        CATALOG_TUNE_MORRISON_ID,
+        CATALOG_TUNE_ABBY_REEL,
+        CATALOG_TUNE_ALEXANDERS_ID,
+        CATALOG_TUNE_ALASDRUIMS_MARCH,
+      ],
+      scheduleDaysAgo: 1, // Make tunes due for practice
       startTab: "practice",
     });
 
-    await page.goto("http://localhost:5173/?tab=practice");
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+
+    // Wait for at least one tune to appear in the grid
+    await expect(
+      ttPage.practiceGrid.locator("tbody tr[data-index='0']")
+    ).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test("should handle multiple offline/online transitions without data loss", async ({
@@ -107,9 +127,7 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
     console.log("📝 Phase 5: Create 1 more record while offline");
 
     // Create 1 more practice record while offline again
-    const row = page
-      .locator('[data-testid="practice-grid"] tbody tr')
-      .first();
+    const row = page.locator('[data-testid="practice-grid"] tbody tr').first();
     const againButton = row.locator('button[title="Again"]');
     await againButton.click({ timeout: 10000 });
     await page.waitForTimeout(500);
