@@ -49,10 +49,6 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     // Verify initial data loads correctly
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
 
-    // Click "Today" button to ensure daily queue is populated
-    await page.getByRole("button", { name: "Today" }).click();
-    await page.waitForTimeout(2000); // Give time for queue to populate
-
     // Wait for at least one tune to appear in the grid (data-index is set by virtual table)
     // Retry a few times since queue population might be async
     let attempts = 0;
@@ -111,14 +107,14 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     // Rate a tune using the dropdown (not a direct button)
     // Wait for row to be stable after going offline
     await expect(firstRow).toBeVisible({ timeout: 10000 });
-    
+
     const evalDropdown = firstRow.locator("[data-testid^='recall-eval-']");
     await expect(evalDropdown).toBeVisible({ timeout: 10000 });
-    
+
     // Click without force first - if that fails, the dropdown itself might be broken offline
     await evalDropdown.click();
     await page.waitForTimeout(500); // Give more time for dropdown to open
-    
+
     // Wait for the option to be visible
     const goodOption = page.getByTestId("recall-eval-option-good");
     await expect(goodOption).toBeVisible({ timeout: 10000 });
@@ -174,21 +170,23 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     for (let i = 0; i < 3; i++) {
       const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
       await expect(row).toBeVisible({ timeout: 5000 });
-      
+
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
       await expect(evalDropdown).toBeVisible({ timeout: 5000 });
       await evalDropdown.click({ force: true });
       await page.waitForTimeout(200);
       await page.getByTestId("recall-eval-option-good").click();
       await page.waitForTimeout(300);
-      
+
       await ttPage.submitEvaluationsButton.click();
       await page.waitForTimeout(800); // Allow UI to update between evaluations
     }
 
     // Verify all changes queued
     const pendingCount = await getSyncOutboxCount(page);
-    console.log(`Pending sync count after 3 offline evaluations: ${pendingCount}`);
+    console.log(
+      `Pending sync count after 3 offline evaluations: ${pendingCount}`
+    );
     expect(pendingCount).toBeGreaterThanOrEqual(3);
 
     // Go online and wait for automatic sync
@@ -211,14 +209,14 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     for (let i = 0; i < 2; i++) {
       const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
       await expect(row).toBeVisible({ timeout: 5000 });
-      
+
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
       await expect(evalDropdown).toBeVisible({ timeout: 5000 });
       await evalDropdown.click({ force: true });
       await page.waitForTimeout(200);
       await page.getByTestId("recall-eval-option-good").click();
       await page.waitForTimeout(300);
-      
+
       await ttPage.submitEvaluationsButton.click();
       await page.waitForTimeout(800);
     }
