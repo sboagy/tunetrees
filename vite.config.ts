@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -8,6 +9,23 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
+
+  // Get build-time constants
+  const getGitCommit = () => {
+    try {
+      return execSync("git rev-parse --short HEAD").toString().trim();
+    } catch {
+      return "unknown";
+    }
+  };
+
+  const getGitBranch = () => {
+    try {
+      return execSync("git rev-parse --abbrev-ref HEAD").toString().trim();
+    } catch {
+      return "unknown";
+    }
+  };
 
   return {
     test: {
@@ -129,10 +147,7 @@ export default defineConfig(() => {
               "clsx",
               "tailwind-merge",
             ],
-            "vendor-data": [
-              "@tanstack/solid-table",
-              "@tanstack/solid-virtual",
-            ],
+            "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
             "vendor-supabase": ["@supabase/supabase-js"],
             // Large libraries that should be separate
             "vendor-drizzle": ["drizzle-orm"],
@@ -143,9 +158,15 @@ export default defineConfig(() => {
         },
       },
     },
-    // Define global constant to suppress Workbox logs at build time
+    // Define global constants
     define: {
       __WB_DISABLE_DEV_LOGS: !showWorkboxLogs,
+      __APP_VERSION__: JSON.stringify(
+        process.env.npm_package_version || "0.1.0"
+      ),
+      __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+      __GIT_COMMIT__: JSON.stringify(getGitCommit()),
+      __GIT_BRANCH__: JSON.stringify(getGitBranch()),
     },
   };
 });

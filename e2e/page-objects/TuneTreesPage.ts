@@ -20,6 +20,11 @@ export class TuneTreesPage {
   readonly analysisTab: Locator;
 
   // TopNav Elements
+  readonly logoDropdown: Locator;
+  readonly logoDropdownButton: Locator;
+  readonly logoDropdownPanel: Locator;
+  readonly logoDropdownAboutButton: Locator;
+  readonly logoDropdownWhatsNewLink: Locator;
   readonly playlistDropdown: Locator;
   readonly databaseStatusDropdown: Locator;
   readonly userMenuDropdown: Locator;
@@ -28,6 +33,16 @@ export class TuneTreesPage {
 
   readonly databaseDropdownPanel: Locator;
   readonly userMenuPanel: Locator;
+
+  // About Dialog Elements
+  readonly aboutDialog: Locator;
+  readonly aboutVersion: Locator;
+  readonly aboutBuild: Locator;
+  readonly aboutBranch: Locator;
+  readonly aboutEnvironment: Locator;
+  readonly aboutGithubLink: Locator;
+  readonly aboutDocsLink: Locator;
+  readonly aboutCloseButton: Locator;
 
   // Grids
   readonly practiceGrid: Locator;
@@ -170,6 +185,15 @@ export class TuneTreesPage {
     this.analysisTab = page.getByTestId("tab-analysis");
 
     // TopNav
+    this.logoDropdown = page.getByTestId("logo-dropdown");
+    this.logoDropdownButton = page.getByTestId("logo-dropdown-button");
+    this.logoDropdownPanel = page.getByTestId("logo-dropdown-panel");
+    this.logoDropdownAboutButton = page.getByTestId(
+      "logo-dropdown-about-button"
+    );
+    this.logoDropdownWhatsNewLink = page.getByTestId(
+      "logo-dropdown-whats-new-link"
+    );
     this.playlistDropdown = page.getByTestId("playlist-dropdown");
     this.databaseStatusDropdown = page.getByTestId("database-status-dropdown");
     this.userMenuDropdown = page.getByTestId("user-menu-dropdown");
@@ -179,6 +203,16 @@ export class TuneTreesPage {
 
     this.databaseDropdownPanel = page.getByTestId("database-dropdown-panel");
     this.userMenuPanel = page.getByTestId("user-menu-panel");
+
+    // About Dialog
+    this.aboutDialog = page.getByTestId("about-dialog");
+    this.aboutVersion = page.getByTestId("about-version");
+    this.aboutBuild = page.getByTestId("about-build");
+    this.aboutBranch = page.getByTestId("about-branch");
+    this.aboutEnvironment = page.getByTestId("about-environment");
+    this.aboutGithubLink = page.getByTestId("about-github-link");
+    this.aboutDocsLink = page.getByTestId("about-docs-link");
+    this.aboutCloseButton = page.getByTestId("about-close-button");
 
     // Grids - using data-testid matching tablePurpose prop
     this.practiceGrid = page.getByTestId("tunes-grid-scheduled");

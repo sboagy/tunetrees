@@ -1,6 +1,7 @@
 -- Create storage bucket for user avatar uploads
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('avatars', 'avatars', true)
+-- Note: bucket id must be text type to match newer Supabase storage schema
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('avatars', 'avatars', true, 5242880, ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'])
 ON CONFLICT (id) DO NOTHING;
 
 -- Allow authenticated users to upload their own avatars

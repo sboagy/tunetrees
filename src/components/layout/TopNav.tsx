@@ -30,6 +30,7 @@ import {
 } from "../../lib/services/playlist-service";
 import { getOutboxStats } from "../../lib/sync/outbox";
 import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
+import { AboutDialog } from "./AboutDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 // Helper: format relative time (e.g., 2m, 3h, 5d)
@@ -74,6 +75,157 @@ const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
  * - Network/sync status indicator
  * - Responsive design
  */
+
+/**
+ * Logo Dropdown Component
+ *
+ * Dropdown menu for app-level navigation and information
+ */
+const LogoDropdown: Component<{
+  onOpenAbout: () => void;
+}> = (props) => {
+  const [showDropdown, setShowDropdown] = createSignal(false);
+  let dropdownContainerRef: HTMLDivElement | undefined;
+
+  // Close dropdown when clicking outside
+  useClickOutside(
+    () => dropdownContainerRef,
+    () => {
+      if (showDropdown()) {
+        setShowDropdown(false);
+      }
+    }
+  );
+
+  const handleAboutClick = () => {
+    setShowDropdown(false);
+    props.onOpenAbout();
+  };
+
+  return (
+    <div
+      class="relative"
+      data-testid="logo-dropdown"
+      ref={dropdownContainerRef}
+    >
+      <button
+        type="button"
+        onClick={() => setShowDropdown(!showDropdown())}
+        class="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        aria-label="App menu"
+        aria-expanded={showDropdown()}
+        data-testid="logo-dropdown-button"
+      >
+        <img
+          src="/logo4.png"
+          alt="TuneTrees Logo"
+          width="48"
+          height="48"
+          class="h-12 w-12 object-contain"
+        />
+        <span class="ml-[0ch] text-lg dark:text-blue-400">TuneTrees</span>
+        <svg
+          class="w-4 h-4 transition-transform"
+          classList={{ "rotate-180": showDropdown() }}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu */}
+      <Show when={showDropdown()}>
+        <div class="absolute left-0 top-full mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+          <div class="py-2" data-testid="logo-dropdown-panel">
+            {/* Home */}
+            <a
+              href="/"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={() => setShowDropdown(false)}
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+              Home
+            </a>
+
+            {/* Divider */}
+            <div class="border-t border-gray-200 dark:border-gray-700 my-2" />
+
+            {/* About TuneTrees */}
+            <button
+              type="button"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={handleAboutClick}
+              data-testid="logo-dropdown-about-button"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              About TuneTrees...
+            </button>
+
+            {/* What's New */}
+            <a
+              href="https://github.com/sboagy/tunetrees/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={() => setShowDropdown(false)}
+              data-testid="logo-dropdown-whats-new-link"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
+                />
+              </svg>
+              What's New
+            </a>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+};
 
 /**
  * Playlist Dropdown Component
@@ -348,6 +500,7 @@ export const TopNav: Component = () => {
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const [showDbMenu, setShowDbMenu] = createSignal(false);
   const [showPlaylistManager, setShowPlaylistManager] = createSignal(false);
+  const [showAboutDialog, setShowAboutDialog] = createSignal(false);
   let userMenuContainerRef: HTMLDivElement | undefined;
   let dbMenuContainerRef: HTMLDivElement | undefined;
 
@@ -451,20 +604,8 @@ export const TopNav: Component = () => {
       <div class="px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center gap-6">
-            {/* App Logo */}
-            <a
-              href="/"
-              class="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <img
-                src="/logo4.png"
-                alt="TuneTrees Logo"
-                width="48"
-                height="48"
-                class="h-12 w-12 object-contain"
-              />
-              <span class="ml-[0ch] text-lg dark:text-blue-400">TuneTrees</span>
-            </a>
+            {/* App Logo Dropdown */}
+            <LogoDropdown onOpenAbout={() => setShowAboutDialog(true)} />
 
             {/* Playlist Selector */}
             <PlaylistDropdown
@@ -1030,6 +1171,12 @@ export const TopNav: Component = () => {
       <PlaylistManagerDialog
         isOpen={showPlaylistManager()}
         onClose={() => setShowPlaylistManager(false)}
+      />
+
+      {/* About Dialog */}
+      <AboutDialog
+        isOpen={showAboutDialog()}
+        onClose={() => setShowAboutDialog(false)}
       />
     </nav>
   );
