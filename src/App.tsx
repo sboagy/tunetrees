@@ -12,6 +12,7 @@ import { Toaster } from "solid-sonner";
 import { ProtectedRoute } from "./components/auth";
 import { MainLayout } from "./components/layout";
 import { SidebarDockProvider } from "./components/layout/SidebarDockContext";
+import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
 import { AuthProvider } from "./lib/auth/AuthContext";
 import { CurrentPlaylistProvider } from "./lib/context/CurrentPlaylistContext";
 import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
@@ -73,6 +74,8 @@ function App() {
             <SidebarDockProvider>
               {/* Toast notification provider */}
               <Toaster position="top-right" richColors closeButton />
+              {/* PWA Update Prompt */}
+              <UpdatePrompt />
               {/* <ThemeDebugger /> */}
               <Router>
                 {/* Public Routes */}
