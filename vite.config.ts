@@ -50,7 +50,7 @@ export default defineConfig(() => {
         ],
       }),
       VitePWA({
-        registerType: "autoUpdate",
+        registerType: "prompt",
         includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
         manifest: {
           name: "TuneTrees - Music Practice Manager",
