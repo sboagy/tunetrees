@@ -2,6 +2,19 @@
 
 This guide explains how to test the new PWA update prompt feature.
 
+## Features
+
+### 1. Automatic Toast Notification
+When a new version is available, a persistent toast appears in the top-right corner with:
+- "Update" button - Applies update and reloads the page
+- "Dismiss" button - Hides the toast for the current session
+
+### 2. About Dialog Integration
+The About dialog (accessed via logo dropdown) now includes:
+- **No update available**: "Check for Update" button
+- **Update available**: "Update Available!" message with "Update Now" button
+- Manual update checking capability
+
 ## Prerequisites
 
 - Two terminal windows
@@ -10,7 +23,9 @@ This guide explains how to test the new PWA update prompt feature.
 
 ## Test Procedure
 
-### Step 1: Build and Deploy Initial Version
+### Method 1: Test Toast Notification
+
+#### Step 1: Build and Deploy Initial Version
 
 ```bash
 # Terminal 1: Build the current version
@@ -20,7 +35,7 @@ npm run preview
 
 Open browser to http://localhost:4173 and verify the app loads.
 
-### Step 2: Make a Small Change
+#### Step 2: Make a Small Change
 
 In a second terminal:
 
@@ -31,14 +46,14 @@ In a second terminal:
 
 For example, edit `src/routes/Home.tsx` and change some text.
 
-### Step 3: Build the Updated Version
+#### Step 3: Build the Updated Version
 
 ```bash
 # Terminal 2: Build the new version
 npm run build
 ```
 
-### Step 4: Verify Update Detection
+#### Step 4: Verify Update Detection
 
 1. In Terminal 1, stop the preview server (Ctrl+C)
 2. Start it again: `npm run preview`
@@ -47,7 +62,7 @@ npm run build
 5. Click the "Update" button next to the service worker
 6. Wait a few seconds
 
-### Expected Results
+#### Expected Results
 
 ✅ **Toast notification should appear** with:
 - Title: "New version available"
@@ -64,7 +79,45 @@ npm run build
 - Console log: `[PWA] User dismissed update prompt`
 - Toast disappears
 - App continues with old version
-- Refresh is required to see new version
+- Update remains available (can be accessed via About dialog or will reappear on next reload)
+
+### Method 2: Test About Dialog Update Button
+
+#### Step 1: Follow Steps 1-4 from Method 1
+This ensures an update is available.
+
+#### Step 2: Open About Dialog
+1. Click the TuneTrees logo in the top-left corner
+2. Select "About TuneTrees" from the dropdown menu
+
+#### Expected Results (No Update Available)
+
+✅ **When no update is available**:
+- Shows "Check for Update" button
+- Clicking the button:
+  - Changes to "Checking..." for 2 seconds
+  - Manually triggers service worker update check
+  - If update found, button changes to "Update Now"
+
+✅ **When update is available**:
+- Shows green "Update Available!" message
+- Shows "Update Now" button
+- Clicking "Update Now":
+  - Console log: `[PWA] User clicked Update from About dialog`
+  - Page reloads automatically
+  - New version is active
+
+### What Happens If You Don't Update?
+
+If you dismiss the toast notification or close the About dialog without updating:
+
+1. **App continues running** the current version normally
+2. **Update remains available** and will be detected again:
+   - On next page reload/refresh
+   - Via hourly automatic update check
+   - Via manual "Check for Update" button in About dialog
+3. **No data loss** - all local changes are preserved
+4. **Can update later** at your convenience through the About dialog
 
 ## Alternative Test: Hour-Based Update Check
 
@@ -74,14 +127,16 @@ npm run build
 4. Wait for the automatic update check (runs every hour)
 5. Toast should appear automatically
 
-**Note:** To speed up testing, you can temporarily reduce the interval in `UpdatePrompt.tsx` from `60 * 60 * 1000` to `10 * 1000` (10 seconds).
+**Note:** To speed up testing, you can temporarily reduce the interval in `src/lib/hooks/usePWAUpdate.ts` from `60 * 60 * 1000` to `10 * 1000` (10 seconds).
 
 ## Console Logs to Monitor
 
 - `[PWA] Service Worker registered:` - SW registered successfully
 - `[PWA] New version available, showing update prompt` - Update detected
-- `[PWA] User clicked Update, reloading...` - User accepted update
-- `[PWA] User dismissed update prompt` - User dismissed update
+- `[PWA] User clicked Update, reloading...` - User accepted update from toast
+- `[PWA] User clicked Update from About dialog` - User accepted update from About
+- `[PWA] User dismissed update prompt` - User dismissed update toast
+- `[PWA] Manual update check requested` - User clicked "Check for Update" button
 
 ## Troubleshooting
 
