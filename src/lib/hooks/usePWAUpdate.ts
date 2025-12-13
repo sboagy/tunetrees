@@ -55,7 +55,7 @@ export function usePWAUpdate(): PWAUpdateState {
       let registration: ServiceWorkerRegistration | undefined;
 
       const {
-        needRefresh: [needRefreshSignal, setNeedRefreshSignal],
+        needRefresh: [needRefreshSignal],
         updateServiceWorker,
       } = useRegisterSW({
         onRegistered(reg: ServiceWorkerRegistration | undefined) {
