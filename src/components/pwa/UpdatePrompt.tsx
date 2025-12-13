@@ -7,8 +7,17 @@
  * Uses vite-plugin-pwa's useRegisterSW hook for detecting and applying updates.
  */
 
-import { type Component, createEffect, onMount, createSignal } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  onMount,
+  createSignal,
+  onCleanup,
+} from "solid-js";
 import { toast } from "solid-sonner";
+
+// Duration for persistent toast (doesn't auto-dismiss)
+const PERSISTENT_TOAST_DURATION = Number.POSITIVE_INFINITY;
 
 export const UpdatePrompt: Component = () => {
   // In dev mode, don't render anything
@@ -23,6 +32,9 @@ export const UpdatePrompt: Component = () => {
       // Dynamic import only in production
       const { useRegisterSW } = await import("virtual:pwa-register/solid");
 
+      // Store interval ID for cleanup
+      let updateCheckInterval: number | undefined;
+
       // Register SW and get update state
       const {
         needRefresh: [needRefresh],
@@ -31,7 +43,7 @@ export const UpdatePrompt: Component = () => {
         onRegistered(registration: ServiceWorkerRegistration | undefined) {
           console.log("[PWA] Service Worker registered:", registration);
           // Check for updates every hour
-          setInterval(
+          updateCheckInterval = window.setInterval(
             () => {
               registration?.update();
             },
@@ -43,6 +55,13 @@ export const UpdatePrompt: Component = () => {
         },
       });
 
+      // Cleanup interval on component unmount
+      onCleanup(() => {
+        if (updateCheckInterval !== undefined) {
+          clearInterval(updateCheckInterval);
+        }
+      });
+
       // Show toast when update is available (only once)
       createEffect(() => {
         if (needRefresh() && !toastShown()) {
@@ -52,7 +71,7 @@ export const UpdatePrompt: Component = () => {
           // Show a toast with update action
           toast("New version available", {
             description: "Click Update to refresh and get the latest features.",
-            duration: Number.POSITIVE_INFINITY, // Don't auto-dismiss
+            duration: PERSISTENT_TOAST_DURATION,
             action: {
               label: "Update",
               onClick: async () => {
