@@ -38,6 +38,7 @@ import {
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 let ttPage: TuneTreesPage;
 
@@ -127,7 +128,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await page.getByTestId("tune-editor-save-button").click();
 
     // ASSERT: Verify navigation back to home
-    await expect(page).toHaveURL("http://localhost:5173/?tab=catalog", {
+    await expect(page).toHaveURL(`${BASE_URL}/?tab=catalog`, {
       timeout: 10000,
     });
 
@@ -164,7 +165,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await page.getByTestId("tune-editor-cancel-button").click();
 
     // ASSERT: Verify navigation back to home
-    await expect(page).toHaveURL("http://localhost:5173/?tab=catalog", {
+    await expect(page).toHaveURL(`${BASE_URL}/?tab=catalog`, {
       timeout: 10000,
     });
 

@@ -65,23 +65,22 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
 
   test("should delete tunes offline and sync when online", async ({ page }) => {
     // Count initial tunes
-    const initialCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+
+    const initialCount = await ttPage.getRows("repertoire").count();
     expect(initialCount).toBe(10);
 
     // Go offline
     await goOffline(page);
 
     // Select first 2 tunes
-    const firstCheckbox = page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
+    const firstCheckbox = ttPage
+      .getRows("repertoire")
       .first()
       .locator('input[type="checkbox"]');
     await firstCheckbox.click();
 
-    const secondCheckbox = page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
+    const secondCheckbox = ttPage
+      .getRows("repertoire")
       .nth(1)
       .locator('input[type="checkbox"]');
     await secondCheckbox.click();
@@ -99,9 +98,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await page.waitForTimeout(1000);
 
     // Verify tunes disappeared from grid
-    const afterDeleteCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+    const afterDeleteCount = await ttPage.getRows("repertoire").count();
     expect(afterDeleteCount).toBe(8);
 
     // Go back online
@@ -118,9 +115,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    const finalCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+    const finalCount = await ttPage.getRows("repertoire").count();
     expect(finalCount).toBe(8);
   });
 
@@ -129,8 +124,8 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await goOffline(page);
 
     // Get first tune title before sorting
-    const firstTitleBefore = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
+    const firstTitleBefore = await ttPage
+      .getRows("repertoire")
       .first()
       .locator("td")
       .nth(1) // Title column
@@ -146,8 +141,8 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await page.waitForTimeout(1000);
 
     // Get first tune title after sorting
-    const firstTitleAfter = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
+    const firstTitleAfter = await ttPage
+      .getRows("repertoire")
       .first()
       .locator("td")
       .nth(1)
@@ -166,8 +161,8 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await titleHeader.click(); // Re-sort
     await page.waitForTimeout(1000);
 
-    const firstTitleFinal = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
+    const firstTitleFinal = await ttPage
+      .getRows("repertoire")
       .first()
       .locator("td")
       .nth(1)
@@ -194,15 +189,13 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await page.waitForTimeout(1000);
 
     // Verify only jigs are shown (count should be less than 10)
-    const filteredCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+    const filteredCount = await ttPage.getRows("repertoire").count();
 
     expect(filteredCount).toBeLessThan(10);
 
     // Verify filtered tunes contain "Jig" in type column
-    const typeCell = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
+    const typeCell = await ttPage
+      .getRows("repertoire")
       .first()
       .locator("td")
       .nth(2) // Type column
@@ -217,9 +210,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await page.waitForTimeout(1000);
 
     // Verify all tunes shown again
-    const unfilteredCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+    const unfilteredCount = await ttPage.getRows("repertoire").count();
     expect(unfilteredCount).toBe(10);
 
     // Go back online
@@ -234,8 +225,8 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
 
     // Delete 3 tunes in succession
     for (let i = 0; i < 3; i++) {
-      const checkbox = page
-        .locator('[data-testid="repertoire-grid"] tbody tr')
+      const checkbox = ttPage
+        .getRows("repertoire")
         .first()
         .locator('input[type="checkbox"]');
       await checkbox.click();
@@ -253,9 +244,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     }
 
     // Verify 7 tunes remain
-    const afterDeleteCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+    const afterDeleteCount = await ttPage.getRows("repertoire").count();
     expect(afterDeleteCount).toBe(7);
 
     // Go online and sync
@@ -270,9 +259,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    const finalCount = await page
-      .locator('[data-testid="repertoire-grid"] tbody tr')
-      .count();
+    const finalCount = await ttPage.getRows("repertoire").count();
     expect(finalCount).toBe(7);
   });
 });

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test as setup } from "@playwright/test";
 import { config } from "dotenv";
+import { BASE_URL } from "../test-config";
 
 // Load .env.local for local development (optional, won't fail in CI)
 config({ path: ".env.local" });
@@ -20,7 +21,10 @@ const execAsync = promisify(exec);
 
 const authFile = "e2e/.auth/alice.json";
 const ALICE_EMAIL = "alice.test@tunetrees.test";
-const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD; // Default to null, i.e. its an error if not specified
+const ALICE_PASSWORD =
+  process.env.ALICE_TEST_PASSWORD ||
+  process.env.TEST_USER_PASSWORD ||
+  "TestPassword123!";
 const AUTH_EXPIRY_MINUTES = 10080; // 7 days in minutes (matches jwt_expiry = 604800 seconds in supabase/config.toml)
 
 /**
@@ -38,6 +42,12 @@ setup("authenticate as Alice", async ({ page }) => {
   // Check if auth file exists and is fresh
   const authExists = existsSync(authFile);
   const shouldReset = process.env.RESET_DB === "true";
+
+  // If database was reset, force fresh login (old auth tokens are invalid)
+  if (shouldReset && authExists) {
+    console.log("⚠️  RESET_DB=true, clearing cached auth file...");
+    rmSync(authFile, { force: true });
+  }
 
   if (authExists && !shouldReset) {
     // Check if auth file is recent (not stale)
@@ -272,21 +282,23 @@ END $$;
 
   // Navigate to login page
   console.log("⏳ Navigating to login page...");
-  await page.goto("http://localhost:5173/login");
+  await page.goto(`${BASE_URL}/login`);
+
+  // Debug: Log what we're about to try
+  console.log(`🔍 DEBUG: Attempting login with:`);
+  console.log(`   Email: ${ALICE_EMAIL}`);
+  console.log(`   Password length: ${ALICE_PASSWORD.length} chars`);
+  console.log(`   BASE_URL: ${BASE_URL}`);
+
+  // Check what Supabase URL the page is using
+  const supabaseUrl = await page.evaluate(() => {
+    return (window as any).__SUPABASE_URL || "not set";
+  });
+  console.log(`   Page's Supabase URL: ${supabaseUrl}`);
 
   // Fill in Alice's credentials
   console.log("⏳ Filling credentials for alice.test@tunetrees.test...");
   await page.getByLabel("Email").fill("alice.test@tunetrees.test");
-  if (!ALICE_PASSWORD) {
-    if (!ALICE_PASSWORD) {
-      console.error(
-        "🛑 Missing ALICE_TEST_PASSWORD. Set ALICE_TEST_PASSWORD in your environment to run E2E tests."
-      );
-      throw new Error(
-        "ALICE_TEST_PASSWORD environment variable is not set. Export ALICE_TEST_PASSWORD or provide it in CI secrets."
-      );
-    }
-  }
   await page.locator("input#password").fill(ALICE_PASSWORD);
 
   // Click sign in button

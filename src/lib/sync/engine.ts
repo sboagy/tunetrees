@@ -409,7 +409,14 @@ export class SyncEngine {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      log.error("[SyncEngine] syncWithWorker failed:", errorMsg);
+      // Only log as error if it's not a network connectivity issue (expected when offline)
+      const isNetworkError =
+        errorMsg.includes("Failed to fetch") ||
+        errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
+        errorMsg.includes("NetworkError");
+      if (!isNetworkError) {
+        log.error("[SyncEngine] syncWithWorker failed:", errorMsg);
+      }
       errors.push(errorMsg);
       return {
         success: false,

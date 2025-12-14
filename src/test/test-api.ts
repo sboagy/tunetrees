@@ -546,7 +546,73 @@ async function getTunesByTitles(titles: string[]) {
   `);
   return rows;
 }
+/**
+ * Get count of pending sync outbox items
+ * Used by offline tests to verify sync state
+ */
+async function getSyncOutboxCount(): Promise<number> {
+  const db = await ensureDb();
+  const rows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count FROM sync_push_queue
+  `);
+  return rows[0]?.count ?? 0;
+}
 
+/**
+ * Check if sync is currently in progress
+ * Returns false when offline tests can proceed
+ */
+function isSyncComplete(): boolean {
+  // For offline tests, always return true since we're not actually syncing
+  // In online tests, this would check if the sync service is idle
+  const el = document.querySelector("[data-auth-initialized]");
+  const isSyncing = el?.getAttribute("data-is-syncing") === "true";
+  return !isSyncing;
+}
+
+/**
+ * Get any sync errors that occurred
+ * Returns array of error messages
+ */
+async function getSyncErrors(): Promise<string[]> {
+  // For now, return empty array - in future could query error log table
+  return [];
+}
+
+/**
+ * Get a record from Supabase (remote database)
+ * For offline tests, this will fail - use only in online tests
+ */
+async function getSupabaseRecord(
+  table: string,
+  recordId: string | number
+): Promise<any> {
+  // This requires network access - will fail in offline tests
+  const { data, error } = await supabase
+    .from(table)
+    .select("*")
+    .eq("id", recordId)
+    .single();
+
+  if (error)
+    throw new Error(`Failed to fetch Supabase record: ${error.message}`);
+  return data;
+}
+
+/**
+ * Get a record from local SQLite database
+ */
+async function getLocalRecord(
+  table: string,
+  recordId: string | number
+): Promise<any> {
+  const db = await ensureDb();
+  // Simple query - assumes table has 'id' column
+  const rows = await db.all(
+    sql`SELECT * FROM ${sql.raw(table)} WHERE id = ${recordId} LIMIT 1`
+  );
+  return rows.length > 0 ? rows[0] : null;
+}
 // Attach to window
 declare global {
   interface Window {
@@ -709,6 +775,17 @@ declare global {
       getTunesByTitles: (
         titles: string[]
       ) => Promise<Array<{ id: string; title: string }>>;
+      getSyncOutboxCount: () => Promise<number>;
+      isSyncComplete: () => boolean;
+      getSyncErrors: () => Promise<string[]>;
+      getSupabaseRecord: (
+        table: string,
+        recordId: string | number
+      ) => Promise<any>;
+      getLocalRecord: (
+        table: string,
+        recordId: string | number
+      ) => Promise<any>;
     };
   }
 }
@@ -894,6 +971,21 @@ if (typeof window !== "undefined") {
           // eslint-disable-next-line no-console
           console.warn("[TestApi] dispose clearDb error:", e);
         }
+      },
+      getSyncOutboxCount: async () => {
+        return await getSyncOutboxCount();
+      },
+      isSyncComplete: () => {
+        return isSyncComplete();
+      },
+      getSyncErrors: async () => {
+        return await getSyncErrors();
+      },
+      getSupabaseRecord: async (table: string, recordId: string | number) => {
+        return await getSupabaseRecord(table, recordId);
+      },
+      getLocalRecord: async (table: string, recordId: string | number) => {
+        return await getLocalRecord(table, recordId);
       },
     };
     // eslint-disable-next-line no-console

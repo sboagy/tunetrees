@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { BASE_URL } from "../test-config";
 
 declare global {
   interface Window {
@@ -426,7 +427,7 @@ export class TuneTreesPage {
     await this.page.context().clearCookies();
 
     // Navigate to login page first (required before accessing localStorage)
-    await this.page.goto("http://localhost:5173/login");
+    await this.page.goto(`${BASE_URL}/login`);
     await this.page.waitForLoadState("domcontentloaded");
 
     // Now clear localStorage and IndexedDB (page must be loaded first)
@@ -799,7 +800,7 @@ export class TuneTreesPage {
   /**
    * Navigate to app and wait for initial load
    */
-  async goto(url = "http://localhost:5173") {
+  async goto(url = `${BASE_URL}`) {
     await this.page.goto(url);
     await this.page.waitForLoadState("domcontentloaded");
     await this.page.waitForTimeout(2000); // Allow sync to start

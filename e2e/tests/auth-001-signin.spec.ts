@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { BASE_URL } from "../test-config";
 
 /**
  * AUTH-001: Sign in with valid credentials
@@ -34,7 +35,7 @@ test.describe("AUTH-001: User Authentication", () => {
     page,
   }) => {
     // Navigate to root and clear storage
-    await page.goto("http://localhost:5173");
+    await page.goto(`${BASE_URL}`);
     await page.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();
@@ -56,7 +57,7 @@ test.describe("AUTH-001: User Authentication", () => {
     page,
   }) => {
     // Clear storage and navigate directly to login
-    await page.goto("http://localhost:5173/login");
+    await page.goto(`${BASE_URL}/login`);
     await page.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();
@@ -106,7 +107,7 @@ test.describe("AUTH-001: User Authentication", () => {
 
   test("should show error with invalid credentials", async ({ page }) => {
     // Clear storage and navigate directly to login
-    await page.goto("http://localhost:5173/login");
+    await page.goto(`${BASE_URL}/login`);
     await page.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();

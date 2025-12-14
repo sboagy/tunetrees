@@ -4,6 +4,7 @@ import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -170,18 +171,18 @@ test.describe("Scroll Reset Debugger", () => {
     const logs = captureConsole(page);
 
     // Go to app
-    await ttPage.goto("http://localhost:5173");
+    await ttPage.goto(`${BASE_URL}`);
     // Prime routes to encourage grids to mount even in odd initial states
     try {
-      await page.goto("http://localhost:5173/repertoire");
+      await page.goto(`${BASE_URL}/repertoire`);
       await page.waitForTimeout(800);
     } catch {}
     try {
-      await page.goto("http://localhost:5173/catalog");
+      await page.goto(`${BASE_URL}/catalog`);
       await page.waitForTimeout(800);
     } catch {}
     try {
-      await page.goto("http://localhost:5173/practice");
+      await page.goto(`${BASE_URL}/practice`);
       await page.waitForTimeout(800);
     } catch {}
     // Don't hard-require the user menu; instead, wait for any tab or grid to be visible
@@ -213,7 +214,7 @@ test.describe("Scroll Reset Debugger", () => {
     ]);
     if (!anyUiVisible) {
       // As a last resort, try navigating directly to repertoire route
-      await page.goto("http://localhost:5173/repertoire");
+      await page.goto(`${BASE_URL}/repertoire`);
       await page.waitForTimeout(1000);
     }
 
@@ -259,12 +260,12 @@ test.describe("Scroll Reset Debugger", () => {
             await gotoTab(ttPage, flow.tab);
           } catch {
             // Fallback to route-based nav if tab button not interactable in this viewport/layout
-            await page.goto(`http://localhost:5173/${flow.tab}`);
+            await page.goto(`${BASE_URL}/${flow.tab}`);
             await page.waitForTimeout(500);
           }
         } else {
           // No visible tab button; try route-based nav directly
-          await page.goto(`http://localhost:5173/${flow.tab}`);
+          await page.goto(`${BASE_URL}/${flow.tab}`);
           await page.waitForTimeout(500);
         }
         // If the expected grid/table isn't visible, skip this flow

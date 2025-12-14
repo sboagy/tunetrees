@@ -10,6 +10,7 @@ import {
   verifyClockFrozen,
 } from "../helpers/clock-control";
 import { test } from "../helpers/test-fixture";
+import { BASE_URL } from "../test-config";
 
 /**
  * CLOCK-001: Clock Control Validation
@@ -24,7 +25,7 @@ test.describe
   .skip("CLOCK-001: Clock Control Validation", () => {
     test("should set stable date in browser", async ({ context, page }) => {
       // Navigate to app
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Set stable date
       const testDate = new Date(STANDARD_TEST_DATE);
@@ -44,7 +45,7 @@ test.describe
     });
 
     test("should advance time by days", async ({ context, page }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Start at stable date
       const day1 = getTestDate(0); // 2025-07-20
@@ -66,7 +67,7 @@ test.describe
       context,
       page,
     }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Set stable date
       const testDate = getTestDate(0);
@@ -91,7 +92,7 @@ test.describe
     });
 
     test("should allow time arithmetic", async ({ context, page }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Test getTestDate helper
       const baseDate = getTestDate(0); // 2025-07-20T14:00:00Z
@@ -133,7 +134,7 @@ test.describe
       context,
       page,
     }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Set stable date
       const testDate = getTestDate(0);
@@ -155,7 +156,7 @@ test.describe
       context,
       page,
     }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Simulate 5-day scenario
       const dates: Date[] = [];
@@ -180,7 +181,7 @@ test.describe
       context,
       page,
     }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Set date using ISO string
       await setStableDate(context, "2025-12-25T12:00:00.000Z");
@@ -198,7 +199,7 @@ test.describe
       context,
       page,
     }) => {
-      await page.goto("http://localhost:5173/");
+      await page.goto(`${BASE_URL}`);
 
       // Set date using Date object
       const customDate = new Date("2026-01-01T00:00:00.000Z");

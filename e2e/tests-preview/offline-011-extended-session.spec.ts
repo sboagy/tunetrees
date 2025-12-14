@@ -37,6 +37,7 @@ import {
 } from "../helpers/sync-verification";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 let ttPage: TuneTreesPage;
 
@@ -220,7 +221,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
 
     // ===== ANALYSIS TAB: View stats =====
     console.log("📊 Navigating to Analysis tab...");
-    await page.goto("http://localhost:5173/?tab=analysis");
+    await page.goto(`${BASE_URL}`);
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
     await page.waitForTimeout(1000);
 
@@ -250,7 +251,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     console.log("🔍 Verifying data integrity...");
 
     // Check repertoire count (started with 20, removed 2, added 3 = 21)
-    await page.goto("http://localhost:5173/?tab=repertoire");
+    await page.goto(`${BASE_URL}/?tab=repertoire`);
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     const finalRepertoireCount = await page

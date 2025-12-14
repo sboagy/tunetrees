@@ -7,7 +7,7 @@
  * @module lib/sync
  */
 
-export { clearSyncOutbox, getOutboxStats } from "./outbox";
+export { clearOldOutboxItems, clearSyncOutbox, getOutboxStats } from "./outbox";
 export type {
   SyncableTable,
   SyncOperation,

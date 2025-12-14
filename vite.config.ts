@@ -113,6 +113,16 @@ export default defineConfig(() => {
             additionalManifestEntries: undefined,
             navigateFallbackDenylist: [/^\/api\//],
           }),
+          // Ensure SPA navigations work offline (including URLs with query params like `/?tab=practice`).
+          // Workbox expects a precached URL here; using a relative path avoids cache-key mismatches.
+          navigateFallback: "index.html",
+          navigateFallbackDenylist: [/^\/api/, /^\/assets/],
+          // Treat our query-string navigation URLs as equivalent app-shell navigations.
+          ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^tab$/],
+
+          // 3. Ensure the SW starts controlling the page immediately
+          clientsClaim: true,
+          skipWaiting: true,
         },
         // Inject script to disable Workbox dev logs at runtime
         injectRegister: "inline",

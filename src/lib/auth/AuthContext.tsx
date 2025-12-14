@@ -27,7 +27,11 @@ import {
 } from "../db/client-sqlite";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
-import { clearSyncOutbox, type SyncService, startSyncWorker } from "../sync";
+import {
+  clearOldOutboxItems,
+  type SyncService,
+  startSyncWorker,
+} from "../sync";
 
 /**
  * Authentication state interface
@@ -548,13 +552,9 @@ export const AuthProvider: ParentComponent = (props) => {
         "✅ [initializeLocalDatabase] Database initialized and signal set"
       );
 
-      // Clear any stale sync outbox items from previous sessions
-      // The data will be synced down fresh from Supabase, so stale items
-      // would just cause errors when trying to upload outdated data
-      console.log(
-        "🧹 Clearing sync outbox (stale items from previous session)"
-      );
-      await clearSyncOutbox(db);
+      // Keep pending offline changes across reloads.
+      // Only clear old failed outbox items to avoid long-term buildup.
+      await clearOldOutboxItems(db);
 
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
@@ -1341,6 +1341,13 @@ export const AuthProvider: ParentComponent = (props) => {
       console.warn("⚠️ [syncPracticeScope] Sync service not available");
       return;
     }
+
+    // Skip sync if offline (browser reports no connectivity)
+    if (!navigator.onLine) {
+      console.log("⚠️ [syncPracticeScope] Skipping - browser is offline");
+      return;
+    }
+
     try {
       console.log(
         "🔄 [syncPracticeScope] Starting scoped practice syncDown..."

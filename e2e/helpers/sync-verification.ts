@@ -14,7 +14,7 @@ log.setLevel("info");
 
 /**
  * Wait for sync to complete
- * Polls the sync service status until sync is done
+ * Polls the sync outbox until empty (all changes synced)
  *
  * @param page - Playwright page instance
  * @param timeoutMs - Maximum time to wait for sync
@@ -26,18 +26,40 @@ export async function waitForSync(
   log.info("⏳ Waiting for sync to complete...");
 
   const startTime = Date.now();
+  const pollInterval = 1000; // Poll every second
+  let lastCount = -1;
 
-  await page.waitForFunction(
-    () => {
+  while (Date.now() - startTime < timeoutMs) {
+    const count = await page.evaluate(async () => {
       const api = (window as any).__ttTestApi;
-      if (!api) return false;
-      return api.isSyncComplete?.() ?? false;
-    },
-    { timeout: timeoutMs }
-  );
+      if (!api) throw new Error("__ttTestApi not available");
+      return await api.getSyncOutboxCount();
+    });
 
-  const elapsed = Date.now() - startTime;
-  log.info(`✅ Sync completed in ${elapsed}ms`);
+    if (count !== lastCount) {
+      log.info(`🔄 Sync outbox count: ${count}`);
+      lastCount = count;
+    }
+
+    if (count === 0) {
+      const elapsed = Date.now() - startTime;
+      log.info(`✅ Sync completed in ${elapsed}ms`);
+      return;
+    }
+
+    await page.waitForTimeout(pollInterval);
+  }
+
+  // Timeout - log final state
+  const finalCount = await page.evaluate(async () => {
+    const api = (window as any).__ttTestApi;
+    if (!api) throw new Error("__ttTestApi not available");
+    return await api.getSyncOutboxCount();
+  });
+
+  throw new Error(
+    `Sync did not complete within ${timeoutMs}ms. ${finalCount} items still pending in outbox. Sync may not be running (check if offline or network issues).`
+  );
 }
 
 /**
@@ -89,7 +111,9 @@ export async function verifySyncOutboxCount(
 export async function getSyncOutboxCount(page: Page): Promise<number> {
   return await page.evaluate(async () => {
     const api = (window as any).__ttTestApi;
-    if (!api) throw new Error("__ttTestApi not available");
+    if (!api) {
+      throw new Error("__ttTestApi not available");
+    }
     return await api.getSyncOutboxCount();
   });
 }

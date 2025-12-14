@@ -372,18 +372,32 @@ export class SyncService {
     const syncUpIntervalMs = this.config.syncIntervalMs ?? 30_000; // 30 seconds
     const syncDownIntervalMs = 2 * 60 * 1000; // 2 minutes
 
-    // Initial syncDown on startup (immediate)
-    // This will automatically upload any pending changes first (see syncDown method)
-    console.log("[SyncService] Running initial syncDown on startup...");
-    void this.syncDown().catch((error) => {
-      console.error("[SyncService] Initial syncDown failed:", error);
-      toast.error(
-        "Failed to sync data from server on startup. You may be seeing outdated data.",
-        {
-          duration: 8000,
-        }
+    // Initial syncDown on startup.
+    // IMPORTANT: Never attempt startup sync while offline.
+    // - In offline mode, syncDown() may try to syncUp first.
+    // - syncUp can legitimately prune outbox entries when it can't find the local row.
+    // Deferring avoids unexpected outbox mutation during offline reload flows.
+    const runInitialSyncDown = () => {
+      console.log("[SyncService] Running initial syncDown...");
+      void this.syncDown().catch((error) => {
+        console.error("[SyncService] Initial syncDown failed:", error);
+        toast.error(
+          "Failed to sync data from server on startup. You may be seeing outdated data.",
+          {
+            duration: 8000,
+          }
+        );
+      });
+    };
+
+    if (navigator.onLine) {
+      runInitialSyncDown();
+    } else {
+      console.log(
+        "[SyncService] Offline on startup - deferring initial syncDown until online"
       );
-    });
+      window.addEventListener("online", runInitialSyncDown, { once: true });
+    }
 
     // Periodic syncUp (frequent - push local changes to server)
     // Only runs if there are pending changes to avoid unnecessary network calls
@@ -402,11 +416,24 @@ export class SyncService {
         const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
 
         if (hasPendingChanges) {
+          // Skip sync if offline (browser reports no connectivity)
+          if (!navigator.onLine) {
+            // Silently skip - this is expected behavior when offline
+            return;
+          }
+
           console.log(
             `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
           );
           const result = await this.syncUp();
-          if (!result.success && result.itemsFailed > 0) {
+          // Only show error toast for non-network failures
+          const hasNetworkError = result.errors.some(
+            (e) =>
+              e.includes("Failed to fetch") ||
+              e.includes("ERR_INTERNET_DISCONNECTED") ||
+              e.includes("NetworkError")
+          );
+          if (!result.success && result.itemsFailed > 0 && !hasNetworkError) {
             toast.error(
               `Failed to upload ${result.itemsFailed} changes to server. Will retry automatically.`,
               {
@@ -438,15 +465,31 @@ export class SyncService {
 
     // Periodic syncDown (infrequent - pull remote changes from server)
     this.syncDownIntervalId = window.setInterval(() => {
+      // Skip sync if offline (browser reports no connectivity)
+      if (!navigator.onLine) {
+        // Silently skip - this is expected behavior when offline
+        return;
+      }
+
       console.log("[SyncService] Running periodic syncDown...");
       void this.syncDown().catch((error) => {
         console.error("[SyncService] Periodic syncDown failed:", error);
-        toast.error(
-          "Failed to sync data from server. You may be seeing outdated data.",
-          {
-            duration: 5000,
-          }
-        );
+
+        // Only show error toast for non-network failures
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const isNetworkError =
+          errorMsg.includes("Failed to fetch") ||
+          errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
+          errorMsg.includes("NetworkError");
+
+        if (!isNetworkError) {
+          toast.error(
+            "Failed to sync data from server. You may be seeing outdated data.",
+            {
+              duration: 5000,
+            }
+          );
+        }
       });
     }, syncDownIntervalMs);
 

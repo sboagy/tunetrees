@@ -15,6 +15,7 @@ import {
 } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 /**
  * SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain
@@ -249,10 +250,9 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
           // Navigate with explicit practiceDate param to ensure app sees the correct date
           // (Playwright clock override sometimes fails to affect bundled modules after reload)
           const nextDateIso = currentDate.toISOString().split("T")[0];
-          await page.goto(
-            `http://localhost:5173/practice?practiceDate=${nextDateIso}`,
-            { waitUntil: "domcontentloaded" }
-          );
+          await page.goto(`${BASE_URL}/practice?practiceDate=${nextDateIso}`, {
+            waitUntil: "domcontentloaded",
+          });
 
           await verifyClockFrozen(page, currentDate, undefined, "After Reload");
           await page.waitForTimeout(2000);

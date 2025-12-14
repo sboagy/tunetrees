@@ -20,11 +20,11 @@ import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
   getSyncOutboxCount,
-  triggerManualSync,
   verifySyncOutboxEmpty,
   waitForSync,
 } from "../helpers/sync-verification";
 import { test } from "../helpers/test-fixture";
+import { waitForServiceWorker } from "../helpers/wait-for-service-worker";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
@@ -198,9 +198,30 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     await verifySyncOutboxEmpty(page);
   });
 
+  // async function waitForServiceWorker() {
+  //   await ttPage.page.evaluate(async () => {
+  //     // Wait until the service worker is controlling the page
+  //     if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+  //       await new Promise((resolve) => {
+  //         navigator.serviceWorker.addEventListener("controllerchange", resolve);
+  //       });
+  //     }
+  //   });
+  // }
+
   test("should persist offline evaluations across page reload", async ({
     page,
   }) => {
+    // Make sure the Service Worker is not fully activated and controlling the
+    // page before the network is disconnected.
+    await page.context().setOffline(false);
+    const currentUrl = page.url();
+    // await page.goto(currentUrl);
+    // await page.context().serviceWorkers();
+    // await waitForServiceWorker();
+    console.log("2. Waiting for Service Worker to register...");
+    await waitForServiceWorker(page.context(), currentUrl);
+
     // Go offline
     await goOffline(page);
     await page.waitForTimeout(1000);
@@ -227,13 +248,20 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     expect(beforeReload).toBeGreaterThanOrEqual(2);
 
     // Reload page (still offline)
-    await page.reload();
-    await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
+
+    // await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
+    await page.waitForTimeout(2000);
+
+    const immediatelyBeforeReload = await getSyncOutboxCount(page);
+    await page.goto(currentUrl);
+    // await page.reload();
     await page.waitForTimeout(2000);
 
     // Verify pending changes still queued
     const afterReload = await getSyncOutboxCount(page);
-    console.log(`Pending sync count after reload: ${afterReload}`);
+    console.log(
+      `Pending sync count after reload: ${afterReload}, immediatelyBeforeReload: ${immediatelyBeforeReload}`
+    );
     expect(afterReload).toBe(beforeReload);
 
     // Go online and wait for automatic sync
