@@ -154,7 +154,17 @@ jobs:
         run: |
           npm run dev &
           DEV_PID=$!
-          sleep 10
+          echo "⏳ Waiting for dev server on http://localhost:5173/..."
+          ATTEMPTS=0
+          until curl -fsS "http://localhost:5173/" > /dev/null; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 60 ]; then
+              echo "❌ Dev server did not become ready in time"
+              kill $DEV_PID || true
+              exit 1
+            fi
+            sleep 1
+          done
           npm run db:local:gen-test-auth
           kill $DEV_PID || true
           pkill -f "vite" || true
@@ -288,6 +298,29 @@ jobs:
       # --- Playwright PWA Specifics ---
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
+
+      - name: Generate Auth States
+        run: |
+          npm run dev &
+          DEV_PID=$!
+          echo "⏳ Waiting for dev server on http://localhost:5173/..."
+          ATTEMPTS=0
+          until curl -fsS "http://localhost:5173/" > /dev/null; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 60 ]; then
+              echo "❌ Dev server did not become ready in time"
+              kill $DEV_PID || true
+              exit 1
+            fi
+            sleep 1
+          done
+          npm run db:local:gen-test-auth
+          kill $DEV_PID || true
+          pkill -f "vite" || true
+          sleep 1
+        env:
+          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       - name: Setup Cloudflare Worker
         run: |
