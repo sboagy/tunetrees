@@ -35,6 +35,10 @@ import { dailyPracticeQueue } from "../../lib/db/schema";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
 import {
+  clearStagedEvaluation,
+  stagePracticeEvaluation,
+} from "../../lib/services/practice-staging";
+import {
   formatAsWindowStart,
   getPracticeDate,
 } from "../../lib/utils/practice-date";
@@ -399,18 +403,12 @@ const PracticeIndex: Component = () => {
     try {
       if (evaluation === "") {
         // Clear staged data when "(Not Set)" selected
-        const { clearStagedEvaluation } = await import(
-          "../../lib/services/practice-staging"
-        );
         await clearStagedEvaluation(db, userIdVal, tuneId, playlistId);
         console.log(
           `🗑️  [PracticeIndex] Cleared staged evaluation for tune ${tuneId}`
         );
       } else {
         // Stage FSRS preview for actual evaluations
-        const { stagePracticeEvaluation } = await import(
-          "../../lib/services/practice-staging"
-        );
         await stagePracticeEvaluation(
           db,
           userIdVal,

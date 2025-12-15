@@ -105,14 +105,16 @@ export async function clearTunetreesStorageDB(page: Page) {
 
       tryDelete();
     });
-    log.debug("✅ Cleared local IndexedDB cache");
+    // eslint-disable-next-line no-console
+    console.log("✅ Cleared local IndexedDB cache");
 
     // Clear app caches (but preserve auth state for parallel workers)
 
     // 1) Clear sessionStorage only (non-persistent storage)
     try {
       sessionStorage.clear();
-      log.debug("✅ Cleared sessionStorage");
+      // eslint-disable-next-line no-console
+      console.log("✅ Cleared sessionStorage");
     } catch (err) {
       console.warn("Failed to clear sessionStorage:", err);
     }
@@ -131,7 +133,8 @@ export async function clearTunetreesStorageDB(page: Page) {
         localStorage.removeItem(key);
       }
       if (keysToRemove.length > 0) {
-        log.debug(
+        // eslint-disable-next-line no-console
+        console.log(
           `✅ Cleared ${keysToRemove.length} sync timestamp key(s) from localStorage`
         );
       }
@@ -143,8 +146,20 @@ export async function clearTunetreesStorageDB(page: Page) {
     if (typeof caches !== "undefined") {
       try {
         const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((n) => caches.delete(n)));
-        log.debug("✅ Cleared CacheStorage caches:", cacheNames);
+        // IMPORTANT: Preserve Workbox precache so offline SPA navigations (e.g. /?tab=practice)
+        // can still be fulfilled by cached app-shell HTML.
+        const preserved = cacheNames.filter((n) =>
+          n.startsWith("workbox-precache-")
+        );
+        const toDelete = cacheNames.filter(
+          (n) => !n.startsWith("workbox-precache-")
+        );
+
+        await Promise.all(toDelete.map((n) => caches.delete(n)));
+        // eslint-disable-next-line no-console
+        console.log("✅ Cleared CacheStorage caches:", toDelete);
+        // eslint-disable-next-line no-console
+        console.log("🛡️ Preserved Workbox precache:", preserved);
       } catch (err) {
         console.warn("Failed to clear CacheStorage:", err);
       }
@@ -173,7 +188,8 @@ export async function clearTunetreesStorageDB(page: Page) {
         }
       }
 
-      log.debug("✅ Cleared in-memory globals/test hooks");
+      // eslint-disable-next-line no-console
+      console.log("✅ Cleared in-memory globals/test hooks");
     } catch (err) {
       console.warn("Failed to clear in-memory globals:", err);
     }
@@ -225,6 +241,7 @@ async function waitForSyncComplete(
 // ============================================================================
 
 import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
+import { BASE_URL } from "../test-config";
 import { getTestUserClient, type TestUser } from "./test-users";
 
 // Cache mapping from Supabase user UUID -> internal user_profile.id (user_ref)
@@ -282,7 +299,7 @@ export async function setupDeterministicTestParallel(
     currentUrl === "about:blank" ||
     currentUrl.startsWith("data:")
   ) {
-    await page.goto("http://localhost:5173/");
+    await page.goto(`${BASE_URL}`);
     await waitForSyncComplete(page);
   }
 
@@ -400,6 +417,7 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "practice_record");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "table_transient_data");
 
   await verifyTablesEmpty(user, whichTables);
 
@@ -856,7 +874,7 @@ export async function setupForPracticeTestsParallel(
     currentUrl === "about:blank" ||
     currentUrl.startsWith("data:")
   ) {
-    await page.goto("http://localhost:5173/");
+    await page.goto(`${BASE_URL}`);
     await waitForSyncComplete(page);
   }
 
@@ -975,7 +993,7 @@ export async function setupForRepertoireTestsParallel(
     currentUrl === "about:blank" ||
     currentUrl.startsWith("data:")
   ) {
-    await page.goto("http://localhost:5173/");
+    await page.goto(`${BASE_URL}`);
     await waitForSyncComplete(page);
   }
 
@@ -1098,7 +1116,7 @@ export async function setupForCatalogTestsParallel(
     currentUrl === "about:blank" ||
     currentUrl.startsWith("data:")
   ) {
-    await page.goto("http://localhost:5173/", {
+    await page.goto(`${BASE_URL}`, {
       waitUntil: "domcontentloaded",
     });
     await page.waitForTimeout(1000);

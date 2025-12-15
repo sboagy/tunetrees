@@ -81,7 +81,8 @@ const UserSettingsLayout: ParentComponent = (props) => {
 
   const handleClose = () => {
     setIsOpen(false);
-    navigate("/");
+    // Navigate back to preserve tab/playlist context
+    navigate(-1);
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {

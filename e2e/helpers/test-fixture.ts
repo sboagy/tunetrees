@@ -97,7 +97,7 @@ export const test = base.extend<TestUserFixture & { consoleLogs: string[] }>({
   },
 
   // Override storageState to use the assigned user's auth file (lowercase key)
-  storageState: async ({ testUserKey, testUser }, use) => {
+  storageState: async ({ testUserKey, testUser }, use, testInfo) => {
     const authFile = `e2e/.auth/${testUserKey}.json`;
 
     // Check if auth file is fresh, warn if stale
@@ -110,8 +110,27 @@ export const test = base.extend<TestUserFixture & { consoleLogs: string[] }>({
       );
     }
 
-    log.debug(`🔐 Worker auth: ${authFile} (fresh)`);
-    await use(authFile);
+    // For preview/PWA tests (port 4173), rewrite origins from dev port (5173)
+    const baseUrl = testInfo.project.use.baseURL || "";
+    if (baseUrl.includes("4173")) {
+      const authData = JSON.parse(readFileSync(authFile, "utf-8"));
+
+      // Rewrite all origin URLs from localhost:5173 to localhost:4173
+      if (authData.origins) {
+        authData.origins = authData.origins.map((origin: any) => ({
+          ...origin,
+          origin: origin.origin?.replace("localhost:5173", "localhost:4173"),
+        }));
+      }
+
+      log.debug(
+        `🔐 Worker auth: ${authFile} (rewritten for preview port 4173)`
+      );
+      await use(authData);
+    } else {
+      log.debug(`🔐 Worker auth: ${authFile} (fresh)`);
+      await use(authFile);
+    }
   },
   // Capture browser console logs and attach to test report
   consoleLogs: async ({ page }, use, testInfo) => {

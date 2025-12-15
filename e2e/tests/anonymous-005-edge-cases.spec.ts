@@ -8,11 +8,12 @@
  *
  * Prerequisites:
  * - Supabase running with enable_anonymous_sign_ins = true
- * - Development server running on http://localhost:5173
+ * - Development server running on ${BASE_URL}
  */
 
 import { test as base, expect } from "@playwright/test";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 // Override the base test to NOT use stored auth state (we need fresh sessions)
 const test = base.extend({
@@ -40,7 +41,7 @@ test.describe("Anonymous User Edge Cases", () => {
     await expect(ttPage.practiceTab).toBeVisible({ timeout: 10000 });
 
     // Try to navigate back to login manually
-    await page.goto("http://localhost:5173/login");
+    await page.goto(`${BASE_URL}/login`);
     await page.waitForLoadState("domcontentloaded");
 
     // Should either:

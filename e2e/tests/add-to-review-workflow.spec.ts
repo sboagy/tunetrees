@@ -9,6 +9,7 @@ import {
 } from "../../tests/fixtures/test-data";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+import { BASE_URL } from "../test-config";
 
 test.describe("Add To Review - Complete Workflow", () => {
   // SKIP: UI BUG - Add To Review adds ALL tunes instead of just selected ones
@@ -17,7 +18,7 @@ test.describe("Add To Review - Complete Workflow", () => {
     page,
     testUser,
   }) => {
-    await page.goto("http://localhost:5173/");
+    await page.goto(`${BASE_URL}`);
 
     // Setup deterministic state: seed 6 specific tunes in repertoire, unscheduled
     await setupDeterministicTestParallel(page, testUser, {

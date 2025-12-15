@@ -27,7 +27,11 @@ import {
 } from "../db/client-sqlite";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
-import { clearSyncOutbox, type SyncService, startSyncWorker } from "../sync";
+import {
+  clearOldOutboxItems,
+  type SyncService,
+  startSyncWorker,
+} from "../sync";
 
 /**
  * Authentication state interface
@@ -466,6 +470,15 @@ export const AuthProvider: ParentComponent = (props) => {
       // Set anonymous flag early (before sync)
       setIsAnonymous(true);
 
+      // Offline-first: local SQLite is already usable at this point (we just ensured
+      // user_profile exists). Allow UI to load immediately, even if initial syncDown
+      // is deferred while offline.
+      setUserIdInt(anonymousUserId);
+      setInitialSyncComplete(true);
+      console.log(
+        `✅ [AuthContext] Anonymous local DB ready (offline-safe). userIdInt=${anonymousUserId}`
+      );
+
       // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
       // The sync worker will pull all public reference data from the Worker endpoint
       // This replaces the old direct Supabase queries for reference data
@@ -544,17 +557,25 @@ export const AuthProvider: ParentComponent = (props) => {
       // Initialize user-namespaced database (handles user switching automatically)
       const db = await initializeSqliteDb(userId);
       setLocalDb(db);
+
+      // Offline-first: if we can resolve the internal user ID from local SQLite,
+      // the UI should be allowed to load immediately (even if initial syncDown
+      // is deferred while offline).
+      const internalId = await getUserInternalIdFromLocalDb(db, userId);
+      if (internalId) {
+        setUserIdInt(internalId);
+        setInitialSyncComplete(true);
+        console.log(
+          `✅ [AuthContext] Local DB ready (offline-safe). userIdInt=${internalId}`
+        );
+      }
       console.log(
         "✅ [initializeLocalDatabase] Database initialized and signal set"
       );
 
-      // Clear any stale sync outbox items from previous sessions
-      // The data will be synced down fresh from Supabase, so stale items
-      // would just cause errors when trying to upload outdated data
-      console.log(
-        "🧹 Clearing sync outbox (stale items from previous session)"
-      );
-      await clearSyncOutbox(db);
+      // Keep pending offline changes across reloads.
+      // Only clear old failed outbox items to avoid long-term buildup.
+      await clearOldOutboxItems(db);
 
       // Set up auto-persistence (store cleanup for later)
       autoPersistCleanup = setupAutoPersist();
@@ -1341,6 +1362,13 @@ export const AuthProvider: ParentComponent = (props) => {
       console.warn("⚠️ [syncPracticeScope] Sync service not available");
       return;
     }
+
+    // Skip sync if offline (browser reports no connectivity)
+    if (!navigator.onLine) {
+      console.log("⚠️ [syncPracticeScope] Skipping - browser is offline");
+      return;
+    }
+
     try {
       console.log(
         "🔄 [syncPracticeScope] Starting scoped practice syncDown..."

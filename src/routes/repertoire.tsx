@@ -314,11 +314,6 @@ const RepertoirePage: Component = () => {
     console.log("[RepertoirePage] tableInstance updated:", !!tableInstance());
   });
 
-  const handleRemoveFromRepertoire = async () => {
-    // TODO: Implement removal logic
-    alert("Remove From Repertoire - Not yet implemented");
-  };
-
   return (
     <div class="h-full flex flex-col">
       {/* Toolbar with Search and Filters */}
@@ -337,7 +332,6 @@ const RepertoirePage: Component = () => {
           availableGenres={availableGenres()}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
-          onRemoveFromRepertoire={handleRemoveFromRepertoire}
           playlistId={currentPlaylistId() || undefined}
         />
       </Show>

@@ -1,4 +1,5 @@
 import { chromium, type FullConfig } from "@playwright/test";
+import { BASE_URL } from "./test-config";
 
 /**
  * Global setup for Playwright tests
@@ -19,7 +20,7 @@ async function globalSetup(_config: FullConfig) {
 
   try {
     // Wait for the dev server to be ready
-    const baseURL = "http://localhost:5173";
+    const baseURL = `${BASE_URL}`;
     console.log(`🌐 Waiting for dev server at ${baseURL}`);
 
     // Try to connect to the server with retries

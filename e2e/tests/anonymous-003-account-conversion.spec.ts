@@ -9,7 +9,7 @@
  *
  * Prerequisites:
  * - Supabase running with enable_anonymous_sign_ins = true
- * - Development server running on http://localhost:5173
+ * - Development server running on ${BASE_URL}
  */
 
 import { test as base, expect } from "@playwright/test";
