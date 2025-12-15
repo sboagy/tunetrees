@@ -22,7 +22,7 @@ import { Columns } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { getDb } from "../../lib/db/client-sqlite";
+import { getDb, persistDb } from "../../lib/db/client-sqlite";
 import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 import {
@@ -124,6 +124,9 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
         tuneIds,
         auth.user()!.id
       );
+
+      // Persist database immediately so offline refresh retains the added repertoire rows.
+      await persistDb();
 
       // Show feedback
       let message = "";

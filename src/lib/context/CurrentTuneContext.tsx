@@ -1,9 +1,13 @@
 import {
   createContext,
+  createEffect,
   createSignal,
   type ParentComponent,
   useContext,
 } from "solid-js";
+
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useCurrentPlaylist } from "@/lib/context/CurrentPlaylistContext";
 
 interface CurrentTuneContextValue {
   currentTuneId: () => string | null;
@@ -32,7 +36,44 @@ const CurrentTuneContext = createContext<CurrentTuneContextValue>();
  * ```
  */
 export const CurrentTuneProvider: ParentComponent = (props) => {
-  const [currentTuneId, setCurrentTuneId] = createSignal<string | null>(null);
+  const { user } = useAuth();
+  const { currentPlaylistId } = useCurrentPlaylist();
+
+  const [currentTuneId, setCurrentTuneIdInternal] = createSignal<string | null>(
+    null
+  );
+
+  const storageKey = () => {
+    if (typeof window === "undefined") return null;
+    const userId = user()?.id;
+    if (!userId) return null;
+    const playlistId = currentPlaylistId();
+    // Scope tune selection to the active playlist when available.
+    return playlistId
+      ? `tunetrees:selectedTune:${userId}:${playlistId}`
+      : `tunetrees:selectedTune:${userId}`;
+  };
+
+  // Restore selection on refresh (and when user/playlist changes).
+  createEffect(() => {
+    const key = storageKey();
+    if (!key) {
+      setCurrentTuneIdInternal(null);
+      return;
+    }
+
+    const stored = localStorage.getItem(key);
+    setCurrentTuneIdInternal(stored || null);
+  });
+
+  const setCurrentTuneId = (id: string | null) => {
+    setCurrentTuneIdInternal(id);
+    const key = storageKey();
+    if (!key) return;
+
+    if (id) localStorage.setItem(key, id);
+    else localStorage.removeItem(key);
+  };
 
   const value: CurrentTuneContextValue = {
     currentTuneId,

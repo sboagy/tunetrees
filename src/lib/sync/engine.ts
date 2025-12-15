@@ -344,16 +344,43 @@ export class SyncEngine {
             if (change.deleted) {
               // Delete local
               const pk = adapter.primaryKey;
+              const localKeyData = adapter.toLocal(change.data);
 
               if (Array.isArray(pk)) {
-                const conditions = pk.map((k) =>
-                  eq((table as any)[k], change.data[k])
-                );
+                const conditions = pk
+                  .map((k) => {
+                    const columnKey = toCamelCase(k);
+                    const value = localKeyData[columnKey];
+                    if (typeof value === "undefined") {
+                      log.warn(
+                        `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
+                        { rowId: change.rowId }
+                      );
+                      return null;
+                    }
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    return eq((table as any)[columnKey], value);
+                  })
+                  .filter((c): c is ReturnType<typeof eq> => c !== null);
+
+                if (conditions.length !== pk.length) {
+                  continue;
+                }
                 await this.localDb.delete(table).where(and(...conditions));
               } else {
+                const columnKey = toCamelCase(pk);
+                const value = localKeyData[columnKey];
+                if (typeof value === "undefined") {
+                  log.warn(
+                    `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
+                    { rowId: change.rowId }
+                  );
+                  continue;
+                }
                 await this.localDb
                   .delete(table)
-                  .where(eq((table as any)[pk], change.data[pk]));
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  .where(eq((table as any)[columnKey], value));
               }
             } else {
               // Upsert local

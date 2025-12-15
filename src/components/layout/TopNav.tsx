@@ -239,7 +239,6 @@ const PlaylistDropdown: Component<{
   const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
   const [showDropdown, setShowDropdown] = createSignal(false);
   let dropdownContainerRef: HTMLDivElement | undefined;
-  const { initialSyncComplete } = useAuth();
 
   // Close dropdown when clicking outside
   useClickOutside(
@@ -259,8 +258,6 @@ const PlaylistDropdown: Component<{
       const db = localDb();
       const userId = user()?.id;
       const version = repertoireListChanged(); // Triggers refetch when playlists change
-      const syncComplete = initialSyncComplete();
-      if (!syncComplete) return null;
 
       console.log("🔍 [TopNav] Playlists dependency check:", {
         hasDb: !!db,
@@ -276,7 +273,7 @@ const PlaylistDropdown: Component<{
       });
 
       // Fetch if database and user are ready
-      // Will return empty array on first login, then refetch when repertoire changes (version increments)
+      // Don't wait for sync - playlists exist in local DB
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {

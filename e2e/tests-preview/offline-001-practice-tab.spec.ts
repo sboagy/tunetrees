@@ -16,6 +16,7 @@ import {
   CATALOG_TUNE_KESH_ID,
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
@@ -28,10 +29,15 @@ import { waitForServiceWorker } from "../helpers/wait-for-service-worker";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
+let currentDate: Date;
 
 test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
+
+    // Freeze clock
+    currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
 
     // Setup with 5 tunes in repertoire
     await setupForPracticeTestsParallel(page, testUser, {
@@ -43,6 +49,7 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
         CATALOG_TUNE_ABBY_REEL,
       ],
       scheduleDaysAgo: 1, // Make tunes due for practice
+      scheduleBaseDate: currentDate,
       startTab: "practice",
     });
 

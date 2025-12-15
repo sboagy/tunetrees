@@ -18,6 +18,7 @@ import {
   CATALOG_TUNE_KESH_ID,
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
@@ -30,10 +31,15 @@ import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
+let currentDate: Date;
 
 test.describe("OFFLINE-012: Connection Interruptions", () => {
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
+
+    // Freeze clock
+    currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
 
     // Setup with practice-ready repertoire
     await setupForPracticeTestsParallel(page, testUser, {
@@ -47,6 +53,7 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
         CATALOG_TUNE_ALASDRUIMS_MARCH,
       ],
       scheduleDaysAgo: 1, // Make tunes due for practice
+      scheduleBaseDate: currentDate,
       startTab: "practice",
     });
 
@@ -67,12 +74,9 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Create 3 practice records while online
     for (let i = 0; i < 3; i++) {
-      const row = page
-        .locator('[data-testid="practice-grid"] tbody tr')
-        .first();
-      const goodButton = row.locator('button[title="Good"]');
-      await goodButton.click({ timeout: 10000 });
-      await page.waitForTimeout(500);
+      const row = ttPage.getRows("scheduled").first();
+      await ttPage.setRowEvaluation(row, "good");
+      await ttPage.submitEvaluationsButton.click();
     }
 
     // Wait for sync
@@ -91,12 +95,9 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Create 2 more practice records offline
     for (let i = 0; i < 2; i++) {
-      const row = page
-        .locator('[data-testid="practice-grid"] tbody tr')
-        .first();
-      const easyButton = row.locator('button[title="Easy"]');
-      await easyButton.click({ timeout: 10000 });
-      await page.waitForTimeout(500);
+      const row = ttPage.getRows("scheduled").first();
+      await ttPage.setRowEvaluation(row, "easy");
+      await ttPage.submitEvaluationsButton.click();
     }
 
     // Verify pending changes
@@ -127,9 +128,9 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
     console.log("📝 Phase 5: Create 1 more record while offline");
 
     // Create 1 more practice record while offline again
-    const row = page.locator('[data-testid="practice-grid"] tbody tr').first();
-    const againButton = row.locator('button[title="Again"]');
-    await againButton.click({ timeout: 10000 });
+    const row = ttPage.getRows("scheduled").first();
+    await ttPage.setRowEvaluation(row, "again");
+    await ttPage.submitEvaluationsButton.click();
     await page.waitForTimeout(500);
 
     // Check total pending
@@ -154,9 +155,7 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Should have completed 6 total evaluations (3 + 2 + 1)
-    const practiceCount = await page
-      .locator('[data-testid="practice-grid"] tbody tr')
-      .count();
+    const practiceCount = await ttPage.getRows("scheduled").count();
 
     // Expect at least 1 tune remaining (started with 7, completed 6)
     expect(practiceCount).toBeGreaterThanOrEqual(1);
@@ -174,13 +173,10 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
       // Go offline
       await goOffline(page);
 
-      // Make 1 change
-      const row = page
-        .locator('[data-testid="practice-grid"] tbody tr')
-        .first();
-      const goodButton = row.locator('button[title="Good"]');
-      await goodButton.click({ timeout: 10000 });
-      await page.waitForTimeout(300);
+      const row = ttPage.getRows("scheduled").first();
+      await ttPage.setRowEvaluation(row, "good");
+      await ttPage.submitEvaluationsButton.click();
+      await page.waitForTimeout(500);
 
       // Go online briefly
       await goOnline(page);
@@ -205,12 +201,10 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Make 3 changes
     for (let i = 0; i < 3; i++) {
-      const row = page
-        .locator('[data-testid="practice-grid"] tbody tr')
-        .first();
-      const goodButton = row.locator('button[title="Good"]');
-      await goodButton.click({ timeout: 10000 });
-      await page.waitForTimeout(300);
+      const row = ttPage.getRows("scheduled").first();
+      await ttPage.setRowEvaluation(row, "good");
+      await ttPage.submitEvaluationsButton.click();
+      await page.waitForTimeout(500);
     }
 
     // Check pending before reload

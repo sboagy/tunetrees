@@ -58,6 +58,7 @@ export class TuneTreesPage {
   readonly modeFilter: Locator;
   readonly genreFilter: Locator;
   readonly playlistFilter: Locator;
+  readonly clearFilters: Locator;
 
   // Toolbar Buttons - Generic (may not work on all tabs/viewports)
   readonly addTuneButton: Locator; // Generic by title
@@ -237,6 +238,7 @@ export class TuneTreesPage {
     this.playlistFilter = page.getByRole("button", {
       name: "Filter by Playlist",
     });
+    this.clearFilters = page.getByRole("button", { name: /^Clear All/i });
 
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
     this.addTuneButton = page.getByRole("button", { name: "Add a new tune" });
@@ -1297,6 +1299,39 @@ export class TuneTreesPage {
     }
   }
 
+  async setRowEvaluation(
+    whichRow: Locator,
+    evalValue: string,
+    doTimeouts = true
+  ) {
+    const allowed = ["again", "hard", "good", "easy", "not-set"] as const;
+    if (!allowed.includes(evalValue as (typeof allowed)[number])) {
+      throw new Error(
+        `Invalid evaluation value "${evalValue}". Expected one of: ${allowed.join(
+          ", "
+        )}`
+      );
+    }
+    const evalDropdown = whichRow.locator("[data-testid^='recall-eval-']");
+    await expect(evalDropdown).toBeVisible({ timeout: 5000 });
+
+    // ACT: Select "Again" rating
+    await evalDropdown.click();
+    if (doTimeouts) {
+      await this.page.waitForTimeout(50);
+    }
+
+    const whichOption = this.page.getByTestId(
+      `recall-eval-option-${evalValue}`
+    );
+    await expect(whichOption).toBeVisible({ timeout: 5000 });
+    await whichOption.click();
+
+    if (doTimeouts) {
+      await this.page.waitForTimeout(50);
+    }
+  }
+
   async selectFlashcardEvaluation(
     value: "again" | "hard" | "good" | "easy" | "not-set" = "good"
   ) {
@@ -1488,8 +1523,29 @@ export class TuneTreesPage {
     const joditEditor = this.notesNewEditor.locator(".jodit-wysiwyg");
     await joditEditor.click();
     await joditEditor.fill(content);
+
+    // Poll until save button is enabled (editor may initialize asynchronously)
+    const maxRetries = 500;
+    const retryDelayMs = 10;
+    let saveEnabled = false;
+    for (let i = 0; i < maxRetries; i++) {
+      saveEnabled = await this.notesSaveButton.isEnabled().catch(() => false);
+      if (saveEnabled) break;
+      await this.page.waitForTimeout(retryDelayMs);
+    }
+    if (!saveEnabled) {
+      await this.page.screenshot({
+        path: `test-results/notes-save-button-timeout-${Date.now()}.png`,
+      });
+      throw new Error(
+        "Notes save button did not become enabled within timeout"
+      );
+    }
+
     await this.notesSaveButton.click();
-    await this.page.waitForLoadState("networkidle", { timeout: 15000 });
+    // Wait for Jodit editor to disappear indicating save completed
+    await expect(joditEditor).not.toBeVisible({ timeout: 10000 });
+    // await this.page.waitForLoadState("networkidle", { timeout: 15000 });
   }
 
   // ===== References Panel helpers =====

@@ -21,6 +21,7 @@ import {
   CATALOG_TUNE_KESH_ID,
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { goOffline, goOnline } from "../helpers/network-control";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import {
@@ -32,10 +33,15 @@ import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
+let currentDate: Date;
 
 test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
+
+    // Freeze clock
+    currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
 
     // Setup with 10 tunes in repertoire (navigates to repertoire tab by default)
     await setupForRepertoireTestsParallel(page, testUser, {
@@ -88,11 +94,10 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     // Click delete button
     await ttPage.repertoireDeleteButton.click({ timeout: 10000 });
 
-    // Confirm deletion dialog (if exists)
-    const confirmButton = page.getByRole("button", { name: /confirm|delete/i });
-    if (await confirmButton.isVisible({ timeout: 2000 })) {
-      await confirmButton.click();
-    }
+    // Confirm deletion dialog (required)
+    const confirmButton = page.getByRole("button", { name: /^delete$/i });
+    await expect(confirmButton).toBeVisible({ timeout: 5000 });
+    await confirmButton.click();
 
     // Wait for UI update
     await page.waitForTimeout(1000);
@@ -133,7 +138,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
 
     // Click on title column header to sort
     const titleHeader = page.locator(
-      '[data-testid="repertoire-grid"] thead th:has-text("Title")'
+      '[data-testid="tunes-grid-repertoire"] thead th:has-text("Title")'
     );
     await titleHeader.click();
 
@@ -181,9 +186,15 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     // Wait for filter panel
     await page.waitForTimeout(500);
 
+    const filterByType = page.getByRole("button", { name: "Filter by Type" });
+    await filterByType.click();
+
     // Select "Jig" from type filter
-    const typeFilterSelect = page.locator('select[data-testid="type-filter"]');
-    await typeFilterSelect.selectOption("Jig");
+    const typeFilterSelect = page.locator("label").filter({ hasText: "JigD" });
+    await typeFilterSelect.check();
+
+    // Close the filters
+    await ttPage.filtersButton.click();
 
     // Wait for filter to apply
     await page.waitForTimeout(1000);
@@ -204,7 +215,10 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     expect(typeCell?.toLowerCase()).toContain("jig");
 
     // Clear filter
-    await typeFilterSelect.selectOption("");
+    await ttPage.filtersButton.click();
+    await ttPage.clearFilters.click();
+    // Close the filters panel
+    await ttPage.filtersButton.click();
 
     // Wait for reset
     await page.waitForTimeout(1000);
@@ -234,11 +248,10 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
       await ttPage.repertoireDeleteButton.click({ timeout: 10000 });
 
       const confirmButton = page.getByRole("button", {
-        name: /confirm|delete/i,
+        name: /^delete$/i,
       });
-      if (await confirmButton.isVisible({ timeout: 2000 })) {
-        await confirmButton.click();
-      }
+      await expect(confirmButton).toBeVisible({ timeout: 5000 });
+      await confirmButton.click();
 
       await page.waitForTimeout(500);
     }

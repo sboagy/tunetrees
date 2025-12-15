@@ -23,7 +23,8 @@ import { Columns } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { getDb } from "../../lib/db/client-sqlite";
+import { getDb, persistDb } from "../../lib/db/client-sqlite";
+import { removeTuneFromPlaylist } from "../../lib/db/queries/playlists";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
@@ -46,6 +47,15 @@ import {
 } from "../grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { Button } from "../ui/button";
 
 export interface RepertoireToolbarProps {
   /** Search query */
@@ -74,17 +84,22 @@ export interface RepertoireToolbarProps {
   selectedRowsCount?: number;
   /** Table instance for column visibility control and row selection */
   table?: Table<ITuneOverview>;
-  /** Handler for Remove From Repertoire action */
-  onRemoveFromRepertoire?: () => void;
   /** Playlist ID for adding tunes to practice queue */
   playlistId?: string;
 }
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
-  const { incrementPracticeListStagedChanged, forceSyncUp, userIdInt } =
-    useAuth();
+  const {
+    incrementPracticeListStagedChanged,
+    incrementRepertoireListChanged,
+    forceSyncUp,
+    user,
+    userIdInt,
+  } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [isDeleting, setIsDeleting] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
 
@@ -174,16 +189,51 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     setShowAddTuneDialog(true);
   };
 
-  const handleRemoveFromRepertoire = () => {
-    if (props.onRemoveFromRepertoire) {
-      props.onRemoveFromRepertoire();
-    } else {
-      alert("Remove From Repertoire - Not yet implemented");
+  const removeSelectedFromRepertoire = async (): Promise<void> => {
+    if (!props.table) return;
+    if (!props.playlistId) return;
+
+    const currentUserId = user()?.id;
+    if (!currentUserId) return;
+
+    const selectedRows = props.table.getSelectedRowModel().rows;
+    if (selectedRows.length === 0) return;
+
+    const tuneIds = selectedRows.map((row) => row.original.id);
+
+    const db = getDb();
+
+    setIsDeleting(true);
+    try {
+      // Soft-delete playlist_tune rows so they disappear from repertoire immediately
+      await Promise.all(
+        tuneIds.map((tuneId) =>
+          removeTuneFromPlaylist(db, props.playlistId!, tuneId, currentUserId)
+        )
+      );
+
+      // Persist local DB to IndexedDB so offline reload keeps the deletion
+      await persistDb();
+
+      // Clear selection and refresh repertoire list
+      props.table.resetRowSelection();
+      incrementRepertoireListChanged();
+
+      // If we happen to be online, push immediately; if offline, outbox will flush later
+      if (navigator.onLine) {
+        await forceSyncUp();
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleDeleteTunes = () => {
-    alert("Delete Tunes - Not yet implemented");
+  const handleRemoveFromRepertoire = async () => {
+    await removeSelectedFromRepertoire();
+  };
+
+  const handleDeleteTunes = async () => {
+    setShowDeleteConfirm(true);
   };
 
   const handleColumnsToggle = () => {
@@ -393,6 +443,40 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         open={showAddTuneDialog()}
         onOpenChange={setShowAddTuneDialog}
       />
+
+      {/* Confirm Delete Dialog */}
+      <AlertDialog
+        open={showDeleteConfirm()}
+        onOpenChange={setShowDeleteConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete selected tunes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected tunes from your repertoire.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting()}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                await removeSelectedFromRepertoire();
+                setShowDeleteConfirm(false);
+              }}
+              disabled={isDeleting()}
+            >
+              Delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -417,6 +417,7 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "practice_record");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "table_transient_data");
 
   await verifyTablesEmpty(user, whichTables);
 

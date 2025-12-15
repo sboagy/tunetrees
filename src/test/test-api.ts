@@ -205,6 +205,17 @@ async function getPracticeCount(playlistId: string) {
   return rows[0]?.count ?? 0;
 }
 
+async function getRepertoireCount(playlistId: string) {
+  const db = await ensureDb();
+  const rows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM playlist_tune pt
+    WHERE pt.playlist_ref = ${playlistId}
+      AND pt.deleted = 0
+  `);
+  return rows[0]?.count ?? 0;
+}
+
 async function getTuneOverrideCountForCurrentUser() {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
@@ -608,8 +619,8 @@ async function getLocalRecord(
 ): Promise<any> {
   const db = await ensureDb();
   // Simple query - assumes table has 'id' column
-  const rows = await db.all(
-    sql`SELECT * FROM ${sql.raw(table)} WHERE id = ${recordId} LIMIT 1`
+  const rows = db.all(
+    `SELECT * FROM ${sql.raw(table)} WHERE id = ${recordId} LIMIT 1`
   );
   return rows.length > 0 ? rows[0] : null;
 }
@@ -627,6 +638,7 @@ declare global {
         userRef: string; // UUID
       }>;
       getPracticeCount: (playlistId: string) => Promise<number>; // UUID
+      getRepertoireCount: (playlistId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
@@ -806,6 +818,7 @@ if (typeof window !== "undefined") {
       },
       seedAddToReview,
       getPracticeCount,
+      getRepertoireCount,
       getTuneOverrideCountForCurrentUser,
       getPracticeRecords,
       getLatestPracticeRecord,

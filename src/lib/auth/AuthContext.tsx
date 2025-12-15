@@ -470,6 +470,15 @@ export const AuthProvider: ParentComponent = (props) => {
       // Set anonymous flag early (before sync)
       setIsAnonymous(true);
 
+      // Offline-first: local SQLite is already usable at this point (we just ensured
+      // user_profile exists). Allow UI to load immediately, even if initial syncDown
+      // is deferred while offline.
+      setUserIdInt(anonymousUserId);
+      setInitialSyncComplete(true);
+      console.log(
+        `✅ [AuthContext] Anonymous local DB ready (offline-safe). userIdInt=${anonymousUserId}`
+      );
+
       // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
       // The sync worker will pull all public reference data from the Worker endpoint
       // This replaces the old direct Supabase queries for reference data
@@ -548,6 +557,18 @@ export const AuthProvider: ParentComponent = (props) => {
       // Initialize user-namespaced database (handles user switching automatically)
       const db = await initializeSqliteDb(userId);
       setLocalDb(db);
+
+      // Offline-first: if we can resolve the internal user ID from local SQLite,
+      // the UI should be allowed to load immediately (even if initial syncDown
+      // is deferred while offline).
+      const internalId = await getUserInternalIdFromLocalDb(db, userId);
+      if (internalId) {
+        setUserIdInt(internalId);
+        setInitialSyncComplete(true);
+        console.log(
+          `✅ [AuthContext] Local DB ready (offline-safe). userIdInt=${internalId}`
+        );
+      }
       console.log(
         "✅ [initializeLocalDatabase] Database initialized and signal set"
       );
