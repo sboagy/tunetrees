@@ -10,12 +10,19 @@
  * @module lib/hooks/usePWAUpdate
  */
 
-import { createSignal, onMount, onCleanup, createEffect, type Accessor } from "solid-js";
+import {
+  type Accessor,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 
 // Global state for PWA update (singleton pattern)
 let globalNeedRefresh: Accessor<boolean> = () => false;
-let globalUpdateServiceWorker: ((reloadPage?: boolean) => Promise<void>) | null =
-  null;
+let globalUpdateServiceWorker:
+  | ((reloadPage?: boolean) => Promise<void>)
+  | null = null;
 let globalCheckForUpdate: (() => void) | null = null;
 let isInitialized = false;
 
@@ -103,15 +110,21 @@ export function usePWAUpdate(): PWAUpdateState {
 
   return {
     needRefresh: import.meta.env.DEV ? () => false : needRefresh,
-    updateServiceWorker:
-      globalUpdateServiceWorker ||
-      (async () => {
+    updateServiceWorker: async (reloadPage?: boolean) => {
+      if (!globalUpdateServiceWorker) {
         console.warn("[PWA] updateServiceWorker not initialized");
-      }),
-    checkForUpdate:
-      globalCheckForUpdate ||
-      (() => {
+        return;
+      }
+
+      await globalUpdateServiceWorker(reloadPage);
+    },
+    checkForUpdate: () => {
+      if (!globalCheckForUpdate) {
         console.warn("[PWA] checkForUpdate not initialized");
-      }),
+        return;
+      }
+
+      globalCheckForUpdate();
+    },
   };
 }
