@@ -112,7 +112,6 @@ test-output.txtnp
 e2e/artifacts/**/*
 test-output-e2e.txt
 e2e/tests/scroll-persistence.spec.ts
-.gitignore
 test-retest-output.txt
 test-chromium-both-output.txt
 failures.list
