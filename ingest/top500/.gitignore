@@ -1,1 +1,5 @@
 rollingstone.csv
+output/
+dist/
+*.json
+!tsconfig.json
