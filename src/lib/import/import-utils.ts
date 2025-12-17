@@ -15,6 +15,12 @@ import type {
 } from "./the-session-schemas";
 
 /**
+ * Cloudflare Worker URL for CORS proxy
+ * Uses environment variable or defaults to local development URL
+ */
+const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
+
+/**
  * Extracted tune information from parsing
  */
 export interface IExtractedTuneInfo {
@@ -49,8 +55,7 @@ export async function fetchTheSessionURLsFromTitle(
     const theSessionUrl = `https://thesession.org/tunes/search?${typeQuery}mode=&q=${encodedTitle}&format=json`;
 
     // Use CORS proxy through Cloudflare Worker
-    const workerUrl = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
-    const proxyUrl = `${workerUrl}/api/proxy/thesession?url=${encodeURIComponent(theSessionUrl)}`;
+    const proxyUrl = `${WORKER_URL}/api/proxy/thesession?url=${encodeURIComponent(theSessionUrl)}`;
 
     const response = await fetch(proxyUrl, {
       headers: {
@@ -83,8 +88,7 @@ export async function fetchTuneInfoFromTheSessionURL(
     const tuneUrl = `${primaryUrl}?format=json`;
 
     // Use CORS proxy through Cloudflare Worker
-    const workerUrl = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
-    const proxyUrl = `${workerUrl}/api/proxy/thesession?url=${encodeURIComponent(tuneUrl)}`;
+    const proxyUrl = `${WORKER_URL}/api/proxy/thesession?url=${encodeURIComponent(tuneUrl)}`;
 
     const response = await fetch(proxyUrl, {
       headers: {

@@ -638,37 +638,54 @@ export default {
           return errorResponse("Missing 'url' query parameter", 400);
         }
 
-        // Validate that the URL is from thesession.org
+        // Validate that the URL is from thesession.org (exact hostname match)
         const targetUrlObj = new URL(targetUrl);
-        if (!targetUrlObj.hostname.endsWith("thesession.org")) {
+        if (targetUrlObj.hostname !== "thesession.org") {
           return errorResponse(
             "Invalid URL - only thesession.org is allowed",
             400
           );
         }
 
-        // Fetch from TheSession.org
+        // Fetch from TheSession.org with timeout
         console.log(`[HTTP] Proxying request to: ${targetUrl}`);
-        const response = await fetch(targetUrl, {
-          headers: {
-            Accept: "application/json",
-            "User-Agent": "TuneTrees-PWA/1.0",
-          },
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-        if (!response.ok) {
-          console.error(
-            `[HTTP] TheSession.org returned error: ${response.status}`
-          );
-          return errorResponse(
-            `TheSession.org API error: ${response.statusText}`,
-            response.status
-          );
+        try {
+          const response = await fetch(targetUrl, {
+            headers: {
+              Accept: "application/json",
+              "User-Agent": "TuneTrees-PWA/1.0",
+            },
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            console.error(
+              `[HTTP] TheSession.org returned error: ${response.status}`
+            );
+            return errorResponse(
+              `TheSession.org API error: ${response.statusText}`,
+              response.status
+            );
+          }
+
+          // Return the response with CORS headers
+          const data = await response.json();
+          return jsonResponse(data);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === "AbortError") {
+            return errorResponse(
+              "Request to TheSession.org timed out",
+              504
+            );
+          }
+          throw fetchError;
         }
-
-        // Return the response with CORS headers
-        const data = await response.json();
-        return jsonResponse(data);
       } catch (error) {
         console.error("[HTTP] Proxy error:", error);
         return errorResponse(
