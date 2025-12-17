@@ -241,9 +241,9 @@ describe("daily_practice_queue normalization", () => {
 
     const remote = adapter.toRemote(local);
 
-    expect(remote.window_start_utc).toBe("2025-11-30T00:00:00");
-    expect(remote.window_end_utc).toBe("2025-12-01T00:00:00");
-    expect(remote.generated_at).toBe("2025-11-30T08:00:00");
+    expect(remote.window_start_utc).toBe("2025-11-30T00:00:00Z");
+    expect(remote.window_end_utc).toBe("2025-12-01T00:00:00Z");
+    expect(remote.generated_at).toBe("2025-11-30T08:00:00Z");
     expect(remote.completed_at).toBeNull();
     expect(remote.active).toBe(true);
   });
@@ -258,7 +258,7 @@ describe("daily_practice_queue normalization", () => {
 
     const remote = adapter.toRemote(local);
 
-    expect(remote.window_start_utc).toBe("2025-11-30T00:00:00");
+    expect(remote.window_start_utc).toBe("2025-11-30T00:00:00Z");
   });
 });
 

@@ -38,67 +38,15 @@ import type {
   Tune,
   TuneSchedulingInfo,
 } from "../types";
+import type { ITuneOverview } from "../view-types";
 
 /**
  * Practice List Staged Row
  *
- * Complete row from practice_list_staged VIEW.
- * This VIEW merges tune + playlist_tune + practice_record (latest) + table_transient_data.
- *
- * Used by practice grid - contains ALL data including staging/preview.
+ * Canonical shape for rows from the `practice_list_staged` VIEW.
+ * This is shared with the UI grid layer via ITuneOverview to avoid drift.
  */
-export interface PracticeListStagedRow {
-  // Core tune info
-  id: string;
-  title: string;
-  type: string;
-  mode: string;
-  structure: string | null;
-  incipit: string | null;
-  genre: string | null;
-  private_for: string | null;
-  deleted: number;
-
-  // Playlist info
-  learned: number | null;
-  goal: string;
-  scheduled: string | null;
-  current: string | null;
-  user_ref: string;
-  playlist_id: string;
-  instrument: string | null;
-  playlist_deleted: number;
-
-  // Latest practice data (COALESCE between transient and historical)
-  latest_state: number | null;
-  latest_practiced: string | null;
-  latest_quality: number | null;
-  latest_easiness: number | null;
-  latest_difficulty: number | null;
-  latest_stability: number | null;
-  latest_interval: number | null;
-  latest_step: number | null;
-  latest_repetitions: number | null;
-  latest_due: string | null;
-  latest_backup_practiced: string | null;
-  latest_goal: string | null;
-  latest_technique: string | null;
-
-  // Aggregated data
-  tags: string | null;
-  notes: string | null;
-  favorite_url: string | null;
-
-  // Transient/staging fields
-  purpose: string | null;
-  note_private: string | null;
-  note_public: string | null;
-  recall_eval: string | null;
-
-  // Flags
-  has_override: number;
-  has_staged: number;
-}
+export type PracticeListStagedRow = ITuneOverview;
 
 /**
  * Practice List Staged with Queue Info
@@ -106,12 +54,12 @@ export interface PracticeListStagedRow {
  * Extends PracticeListStagedRow with daily_practice_queue fields.
  * This is what the practice grid actually displays.
  */
-export interface PracticeListStagedWithQueue extends PracticeListStagedRow {
+export type PracticeListStagedWithQueue = PracticeListStagedRow & {
   // From daily_practice_queue
   bucket: number;
   order_index: number;
   completed_at: string | null;
-}
+};
 
 /**
  * DEPRECATED: Old interface - remove after migration
@@ -304,12 +252,16 @@ export async function getDueTunesLegacy(
     .select({
       // Tune info
       tuneRef: tune.id,
+      idForeign: tune.idForeign,
       title: tune.title,
       type: tune.type,
       mode: tune.mode,
       structure: tune.structure,
       genre: tune.genre,
       incipit: tune.incipit,
+      composer: tune.composer,
+      artist: tune.artist,
+      releaseYear: tune.releaseYear,
       deleted: tune.deleted,
       privateFor: tune.privateFor,
       syncVersion: tune.syncVersion,
@@ -392,7 +344,7 @@ export async function getDueTunesLegacy(
         latest_practiced: row.latest_practiced,
         tune: {
           id: row.tuneRef,
-          idForeign: null, // Not available in practice_list_staged view
+          idForeign: row.idForeign,
           primaryOrigin: null, // Not available in practice_list_staged view
           title: row.title,
           type: row.type,
@@ -400,6 +352,9 @@ export async function getDueTunesLegacy(
           structure: row.structure,
           genre: row.genre,
           incipit: row.incipit,
+          composer: row.composer,
+          artist: row.artist,
+          releaseYear: row.releaseYear,
           deleted: row.deleted,
           privateFor: row.privateFor,
           syncVersion: row.syncVersion,
@@ -433,7 +388,7 @@ export async function getDueTunesLegacy(
         latest_practiced: row.latest_practiced,
         tune: {
           id: row.tuneRef,
-          idForeign: null, // Not available in practice_list_staged view
+          idForeign: row.idForeign,
           primaryOrigin: null, // Not available in practice_list_staged view
           title: row.title,
           type: row.type,
@@ -441,6 +396,9 @@ export async function getDueTunesLegacy(
           structure: row.structure,
           genre: row.genre,
           incipit: row.incipit,
+          composer: row.composer,
+          artist: row.artist,
+          releaseYear: row.releaseYear,
           deleted: row.deleted,
           privateFor: row.privateFor,
           syncVersion: row.syncVersion,
@@ -711,6 +669,9 @@ export async function getPracticeHistory(
         structure: tune.structure,
         incipit: tune.incipit,
         genre: tune.genre,
+        composer: tune.composer,
+        artist: tune.artist,
+        releaseYear: tune.releaseYear,
         deleted: tune.deleted,
         privateFor: tune.privateFor,
         syncVersion: tune.syncVersion,
@@ -951,6 +912,9 @@ export async function getPracticeRecords(
         structure: tune.structure,
         incipit: tune.incipit,
         genre: tune.genre,
+        composer: tune.composer,
+        artist: tune.artist,
+        releaseYear: tune.releaseYear,
         deleted: tune.deleted,
         privateFor: tune.privateFor,
         syncVersion: tune.syncVersion,

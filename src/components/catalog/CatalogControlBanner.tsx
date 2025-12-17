@@ -209,7 +209,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               value={props.searchQuery}
               onInput={(e) => props.onSearchChange(e.currentTarget.value)}
               placeholder="Filter"
-              title="Search/filter tunes by title, incipit, or structure"
+              title="Search/filter tunes by title, artist, composer, incipit, or structure"
               class="w-full px-4 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[12ch]"
               style="min-width: 12ch"
             />

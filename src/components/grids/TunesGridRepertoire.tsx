@@ -104,7 +104,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
         const a = t.title?.toLowerCase().includes(query);
         const b = t.incipit?.toLowerCase().includes(query);
         const c = t.structure?.toLowerCase().includes(query);
-        if (!a && !b && !c) return false;
+        const d = t.composer?.toLowerCase().includes(query);
+        const e = t.artist?.toLowerCase().includes(query);
+        if (!a && !b && !c && !d && !e) return false;
       }
       if (types.length > 0 && t.type && !types.includes(t.type)) return false;
       if (modes.length > 0 && t.mode && !modes.includes(t.mode)) return false;

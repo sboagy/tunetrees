@@ -398,11 +398,24 @@ function buildQueueRows(
   const now = new Date();
   const generatedAt = now.toISOString().replace("T", " ").substring(0, 19);
 
+  const normalizeTimestamp = (
+    value: string | number | null | undefined
+  ): string | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "string") return value;
+
+    // Heuristic: treat small numbers as epoch seconds, otherwise epoch ms
+    const ms = value < 100_000_000_000 ? value * 1000 : value;
+    const dt = new Date(ms);
+    if (Number.isNaN(dt.getTime())) return null;
+    return dt.toISOString();
+  };
+
   for (let orderIndex = 0; orderIndex < rows.length; orderIndex++) {
     const row = rows[orderIndex];
-    const scheduledVal = row.scheduled;
-    const latestVal = row.latest_due;
-    const coalescedRaw = scheduledVal || latestVal || windows.startTs;
+    const scheduledVal = normalizeTimestamp(row.scheduled);
+    const latestVal = normalizeTimestamp(row.latest_due);
+    const coalescedRaw = scheduledVal ?? latestVal ?? windows.startTs;
     const bucket = forceBucket ?? classifyQueueBucket(coalescedRaw, windows);
 
     results.push({

@@ -469,7 +469,10 @@ export const tag = sqliteTable(
 
 export const tune = sqliteTable(TBL.TUNE, {
   id: text(COL.ID).primaryKey().notNull(), // UUID
-  idForeign: integer(COL.ID_FOREIGN), // Legacy integer ID for provenance tracking (nullable, non-unique)
+  composer: text(COL.COMPOSER),
+  artist: text(COL.ARTIST),
+  idForeign: text(COL.ID_FOREIGN), // External ID (Spotify, YouTube, etc.)
+  releaseYear: integer(COL.RELEASE_YEAR),
   primaryOrigin: text(COL.PRIMARY_ORIGIN).default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
   title: text(COL.TITLE),
   type: text(COL.TYPE),
@@ -498,6 +501,10 @@ export const tuneOverride = sqliteTable(TBL.TUNE_OVERRIDE, {
   genre: text(COL.GENRE).references(() => genre.id), // UUID FK
   mode: text(COL.MODE),
   incipit: text(COL.INCIPIT),
+  composer: text(COL.COMPOSER),
+  artist: text(COL.ARTIST),
+  idForeign: text(COL.ID_FOREIGN),
+  releaseYear: integer(COL.RELEASE_YEAR),
   deleted: integer(COL.DELETED).default(0).notNull(),
   syncVersion: integer(COL.SYNC_VERSION).default(1).notNull(),
   lastModifiedAt: text(COL.LAST_MODIFIED_AT).notNull(),

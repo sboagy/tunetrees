@@ -2,7 +2,7 @@
  * New Tune Route
  *
  * Protected route for creating a new tune.
- * Accepts query parameters for imported tune data (title, type, mode, structure, incipit, genre, sourceUrl).
+ * Accepts query parameters for imported tune data (title, type, mode, structure, incipit, genre, composer, artist, idForeign, releaseYear, sourceUrl).
  * Covers the entire viewport including tabs, with sidebar visible.
  *
  * @module routes/tunes/new
@@ -40,6 +40,13 @@ const NewTunePage: Component = () => {
     return typeof v === "string" && v.length > 0 ? v : undefined;
   };
 
+  const qpInt = (key: string): number | undefined => {
+    const v = qp(key);
+    if (!v) return undefined;
+    const n = Number.parseInt(v, 10);
+    return Number.isFinite(n) ? n : undefined;
+  };
+
   const initialData = createMemo(() => ({
     title: qp("title") || "",
     type: qp("type") || undefined,
@@ -47,6 +54,10 @@ const NewTunePage: Component = () => {
     structure: qp("structure") || undefined,
     incipit: qp("incipit") || undefined,
     genre: qp("genre") || undefined,
+    composer: qp("composer") || undefined,
+    artist: qp("artist") || undefined,
+    idForeign: qp("idForeign") || qp("id_foreign") || undefined,
+    releaseYear: qpInt("releaseYear") ?? qpInt("release_year") ?? undefined,
     sourceUrl: qp("sourceUrl") || undefined,
   }));
 
@@ -76,6 +87,10 @@ const NewTunePage: Component = () => {
         structure: tuneData.structure ?? undefined,
         incipit: tuneData.incipit ?? undefined,
         genre: tuneData.genre ?? undefined,
+        composer: tuneData.composer ?? undefined,
+        artist: tuneData.artist ?? undefined,
+        idForeign: tuneData.idForeign ?? undefined,
+        releaseYear: tuneData.releaseYear ?? undefined,
         privateFor: userId, // Required by RLS policy for tune inserts
       });
 

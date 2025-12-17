@@ -137,6 +137,10 @@ export function getDefaultTableState(
     case "catalog":
       baseState.columnVisibility = {
         incipit: false,
+        composer: true,
+        artist: true,
+        release_year: true,
+        id_foreign: false,
       };
       baseState.sorting = [{ id: "title", desc: false }]; // Sort by title
       break;

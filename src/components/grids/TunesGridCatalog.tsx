@@ -161,7 +161,15 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
         const matchesTitle = tune.title?.toLowerCase().includes(query);
         const matchesIncipit = tune.incipit?.toLowerCase().includes(query);
         const matchesStructure = tune.structure?.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesIncipit && !matchesStructure) {
+        const matchesComposer = tune.composer?.toLowerCase().includes(query);
+        const matchesArtist = tune.artist?.toLowerCase().includes(query);
+        if (
+          !matchesTitle &&
+          !matchesIncipit &&
+          !matchesStructure &&
+          !matchesComposer &&
+          !matchesArtist
+        ) {
           return false;
         }
       }

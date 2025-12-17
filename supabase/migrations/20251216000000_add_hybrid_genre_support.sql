@@ -1,5 +1,74 @@
--- public.practice_list_staged source
+-- Migration: Add Hybrid Genre Support (Trad/Pop/Classical)
+-- Date: 2025-12-16
+-- Issue: #246
+--
+-- This migration adds support for different music genres:
+-- 1. composer (text) - For Classical/Choral ("The Creator")
+-- 2. artist (text) - For Pop/Rock/Jazz ("The Performer")
+-- 3. id_foreign type change (int4 → text) - For Spotify/YouTube IDs
+-- 4. release_year (int4) - For decade-based filtering
 
+-- PART 1: Add new columns to tune table
+ALTER TABLE public.tune 
+  ADD COLUMN IF NOT EXISTS composer text NULL,
+  ADD COLUMN IF NOT EXISTS artist text NULL,
+  ADD COLUMN IF NOT EXISTS release_year int4 NULL;
+
+-- PART 2: Ensure id_foreign is text (convert in-place when needed)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tune'
+      AND column_name = 'id_foreign'
+  ) THEN
+    IF (
+      SELECT data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'tune'
+        AND column_name = 'id_foreign'
+    ) <> 'text' THEN
+      EXECUTE 'ALTER TABLE public.tune ALTER COLUMN id_foreign TYPE text USING id_foreign::text';
+    END IF;
+  ELSE
+    EXECUTE 'ALTER TABLE public.tune ADD COLUMN id_foreign text NULL';
+  END IF;
+END $$;
+
+-- PART 3: Add same columns to tune_override table
+ALTER TABLE public.tune_override 
+  ADD COLUMN IF NOT EXISTS composer text NULL,
+  ADD COLUMN IF NOT EXISTS artist text NULL,
+  ADD COLUMN IF NOT EXISTS release_year int4 NULL;
+
+-- Ensure tune_override.id_foreign is text (convert in-place when needed)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tune_override'
+      AND column_name = 'id_foreign'
+  ) THEN
+    IF (
+      SELECT data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'tune_override'
+        AND column_name = 'id_foreign'
+    ) <> 'text' THEN
+      EXECUTE 'ALTER TABLE public.tune_override ALTER COLUMN id_foreign TYPE text USING id_foreign::text';
+    END IF;
+  ELSE
+    EXECUTE 'ALTER TABLE public.tune_override ADD COLUMN id_foreign text NULL';
+  END IF;
+END $$;
+
+-- PART 3b: Refresh views that surface tune + override fields
 CREATE OR REPLACE VIEW public.practice_list_staged
 AS SELECT tune.id,
     COALESCE(tune_override.title, tune.title) AS title,
@@ -8,10 +77,6 @@ AS SELECT tune.id,
     COALESCE(tune_override.mode, tune.mode) AS mode,
     COALESCE(tune_override.incipit, tune.incipit) AS incipit,
     COALESCE(tune_override.genre, tune.genre) AS genre,
-    COALESCE(tune_override.composer, tune.composer) AS composer,
-    COALESCE(tune_override.artist, tune.artist) AS artist,
-    COALESCE(tune_override.id_foreign, tune.id_foreign) AS id_foreign,
-    COALESCE(tune_override.release_year, tune.release_year) AS release_year,
     tune.private_for,
     tune.deleted,
     playlist_tune.learned,
@@ -55,7 +120,11 @@ AS SELECT tune.id,
         CASE
             WHEN td.practiced IS NOT NULL OR td.quality IS NOT NULL OR td.easiness IS NOT NULL OR td.difficulty IS NOT NULL OR td."interval" IS NOT NULL OR td.step IS NOT NULL OR td.repetitions IS NOT NULL OR td.due IS NOT NULL OR td.backup_practiced IS NOT NULL OR td.goal IS NOT NULL OR td.technique IS NOT NULL OR td.stability IS NOT NULL THEN 1
             ELSE 0
-        END AS has_staged
+        END AS has_staged,
+      COALESCE(tune_override.composer, tune.composer) AS composer,
+      COALESCE(tune_override.artist, tune.artist) AS artist,
+      COALESCE(tune_override.id_foreign, tune.id_foreign) AS id_foreign,
+      COALESCE(tune_override.release_year, tune.release_year) AS release_year
    FROM tune
      LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
      LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
@@ -87,3 +156,19 @@ AS SELECT tune.id,
      LEFT JOIN tag ON tag.tune_ref = tune.id
      LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref
   WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref;
+
+-- PART 4: Update RLS policies (if any exist for these columns)
+-- Currently no specific RLS policies needed for these metadata fields
+
+-- PART 5: Create indexes for common query patterns (optional, for performance)
+-- These can be added later based on query patterns:
+-- CREATE INDEX IF NOT EXISTS idx_tune_composer ON public.tune(composer) WHERE composer IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_tune_artist ON public.tune(artist) WHERE artist IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_tune_release_year ON public.tune(release_year) WHERE release_year IS NOT NULL;
+
+-- Verification queries (uncomment to run):
+-- SELECT column_name, data_type FROM information_schema.columns 
+-- WHERE table_name = 'tune' AND column_name IN ('composer', 'artist', 'release_year', 'id_foreign');
+-- 
+-- SELECT column_name, data_type FROM information_schema.columns 
+-- WHERE table_name = 'tune_override' AND column_name IN ('composer', 'artist', 'release_year', 'id_foreign');

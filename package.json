@@ -26,6 +26,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:local:remigrate": "playwright clear-cache && supabase db reset && npx tsx scripts/generate-auth-states.ts",
     "db:local:reset": "playwright clear-cache && RESET_DB=true playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup && npx tsx scripts/generate-auth-states.ts",
+    "db:ci:reset:noseed": "supabase db reset --no-seed",
     "db:ci:reset": "supabase db reset",
     "db:local:gen-test-auth": "npx tsx scripts/generate-auth-states.ts",
     "db:dump-migration": "npx supabase db dump --local --schema public -f supabase/migrations/20241101000000_initial_schema.sql",

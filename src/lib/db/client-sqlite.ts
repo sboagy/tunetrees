@@ -259,6 +259,7 @@ export async function initializeDb(
           // Note: 0004_true_union_jack.sql skipped - avatar_url already exists in base schema
           "/drizzle/migrations/sqlite/0005_add_display_order.sql",
           "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
+          "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });

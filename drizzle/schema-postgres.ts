@@ -116,7 +116,10 @@ export const tune = pgTable("tune", {
   id: uuid("id")
     .primaryKey()
     .$defaultFn(() => generateId()),
-  idForeign: integer("id_foreign"), // Legacy integer ID for provenance tracking (nullable, non-unique)
+  composer: text("composer"),
+  artist: text("artist"),
+  idForeign: text("id_foreign"),
+  releaseYear: integer("release_year"),
   primaryOrigin: text("primary_origin").default("irishtune.info"), // Source: 'irishtune.info', 'user_created', etc.
   title: text("title"),
   type: text("type"),
@@ -153,6 +156,10 @@ export const tuneOverride = pgTable("tune_override", {
   genre: text("genre").references(() => genre.id),
   mode: text("mode"),
   incipit: text("incipit"),
+  composer: text("composer"),
+  artist: text("artist"),
+  idForeign: text("id_foreign"),
+  releaseYear: integer("release_year"),
   deleted: boolean("deleted").default(false).notNull(),
 
   // Sync columns

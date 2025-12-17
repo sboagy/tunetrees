@@ -302,6 +302,96 @@ export function getCatalogColumns(
       maxSize: 300,
     },
 
+    // Composer (for Classical/Choral)
+    {
+      accessorKey: "composer",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="Composer" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="text-sm text-gray-700 dark:text-gray-300 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 200,
+      minSize: 120,
+      maxSize: 300,
+    },
+
+    // Artist (for Pop/Rock/Jazz)
+    {
+      accessorKey: "artist",
+      header: ({ column }) => <SortableHeader column={column} title="Artist" />,
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="text-sm text-gray-700 dark:text-gray-300 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 200,
+      minSize: 120,
+      maxSize: 300,
+    },
+
+    // Release Year
+    {
+      accessorKey: "release_year",
+      header: ({ column }) => <SortableHeader column={column} title="Year" />,
+      cell: (info) => {
+        const value = info.getValue() as number | null;
+        return value ? (
+          <span class="text-sm font-mono text-gray-600 dark:text-gray-400">
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      sortingFn: numericSortingFn,
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
+    },
+
+    // Foreign ID (Spotify/YouTube)
+    {
+      accessorKey: "id_foreign",
+      header: ({ column }) => (
+        <SortableHeader column={column} title="External ID" />
+      ),
+      cell: (info) => {
+        const value = info.getValue() as string | null;
+        return value ? (
+          <span
+            class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate block max-w-xs"
+            title={value}
+          >
+            {value}
+          </span>
+        ) : (
+          <span class="text-gray-400">—</span>
+        );
+      },
+      size: 150,
+      minSize: 100,
+      maxSize: 250,
+    },
+
     // Status (Public/Private)
     {
       accessorKey: "private_for",

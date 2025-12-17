@@ -249,9 +249,9 @@ describe("getNormalizer", () => {
       other_field: "unchanged",
     };
     const output = normalizer(input);
-    expect(output.window_start_utc).toBe("2025-11-30T00:00:00");
-    expect(output.window_end_utc).toBe("2025-12-01T00:00:00");
-    expect(output.generated_at).toBe("2025-11-30T08:00:00");
+    expect(output.window_start_utc).toBe("2025-11-30T00:00:00Z");
+    expect(output.window_end_utc).toBe("2025-12-01T00:00:00Z");
+    expect(output.generated_at).toBe("2025-11-30T08:00:00Z");
     expect(output.completed_at).toBeNull(); // null unchanged
     expect(output.other_field).toBe("unchanged");
   });

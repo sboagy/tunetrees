@@ -79,11 +79,11 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
   // Form state signals
   const init = (field: keyof TuneEditorData): string => {
-    return (
-      (props.tune && (props.tune as any)[field]) ||
-      (props.initialData && (props.initialData as any)[field]) ||
-      ""
-    );
+    const fromTune = props.tune?.[field];
+    const fromInitial = props.initialData?.[field];
+    const raw = fromTune ?? fromInitial;
+    if (raw === null || raw === undefined) return "";
+    return String(raw);
   };
 
   const [genre, setGenre] = createSignal(init("genre"));
@@ -92,6 +92,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const [structure, setStructure] = createSignal(init("structure"));
   const [mode, setMode] = createSignal(init("mode"));
   const [incipit, setIncipit] = createSignal(init("incipit"));
+  const [composer, setComposer] = createSignal(init("composer"));
+  const [artist, setArtist] = createSignal(init("artist"));
+  const [idForeign, setIdForeign] = createSignal(init("idForeign"));
+  const [releaseYear, setReleaseYear] = createSignal(init("releaseYear"));
   const [selectedTags, setSelectedTags] = createSignal<string[]>([]);
   const [requestPublic, setRequestPublic] = createSignal(
     props.tune?.request_public || false
@@ -161,6 +165,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     structure,
     mode,
     incipit,
+    composer,
+    artist,
+    idForeign,
+    releaseYear,
   };
   const fieldHasOverride = (field: string): boolean => {
     if (!props.tune || !baseTune()) return false;
@@ -216,6 +224,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
         break;
       case "incipit":
         setIncipit(publicVal);
+        break;
+      case "composer":
+        setComposer(publicVal);
+        break;
+      case "artist":
+        setArtist(publicVal);
+        break;
+      case "idForeign":
+        setIdForeign(publicVal);
+        break;
+      case "releaseYear":
+        setReleaseYear(publicVal ? String(publicVal) : "");
         break;
     }
     setRevealed((r) => ({ ...r, [field]: false }));
@@ -297,6 +317,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     if (structure() !== init("structure")) return true;
     if (mode() !== init("mode")) return true;
     if (incipit() !== init("incipit")) return true;
+    if (composer() !== init("composer")) return true;
+    if (artist() !== init("artist")) return true;
+    if (idForeign() !== init("idForeign")) return true;
+    if (releaseYear() !== init("releaseYear")) return true;
     if (requestPublic() !== (props.tune?.request_public || false)) return true;
 
     // Check user/repertoire fields (only if editing existing tune)
@@ -396,6 +420,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
       structure: structure() || undefined,
       mode: mode() || undefined,
       incipit: incipit() || undefined,
+      composer: composer() || undefined,
+      artist: artist() || undefined,
+      idForeign: idForeign() || undefined,
+      releaseYear: releaseYear() ? Number(releaseYear()) : undefined,
       privateFor: props.tune?.privateFor || undefined,
       request_public: requestPublic(),
       learned: toIsoString(learned()),
@@ -1032,6 +1060,245 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     <div class="border border-gray-200 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-900">
                       <div ref={abcPreviewRef} class="abc-preview" />
                     </div>
+                  </div>
+                </div>
+
+                {/* Composer */}
+                <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
+                  <label
+                    for="composer"
+                    class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
+                  >
+                    Composer:
+                  </label>
+                  <div class="flex-1 space-y-2">
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="text"
+                        id="composer"
+                        value={composer()}
+                        onInput={(e) => setComposer(e.currentTarget.value)}
+                        placeholder="e.g., Bach, Mozart (Classical/Choral)"
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-composer"
+                      />
+                      <Show when={fieldHasOverride("composer")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("composer")}
+                          data-testid="override-indicator-composer"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show
+                      when={revealed().composer && fieldHasOverride("composer")}
+                    >
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-composer"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("composer")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-composer"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {baseTune()?.composer || ""}
+                        </p>
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* Artist */}
+                <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
+                  <label
+                    for="artist"
+                    class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
+                  >
+                    Artist:
+                  </label>
+                  <div class="flex-1 space-y-2">
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="text"
+                        id="artist"
+                        value={artist()}
+                        onInput={(e) => setArtist(e.currentTarget.value)}
+                        placeholder="e.g., Beatles, Miles Davis (Pop/Rock/Jazz)"
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-artist"
+                      />
+                      <Show when={fieldHasOverride("artist")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("artist")}
+                          data-testid="override-indicator-artist"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show
+                      when={revealed().artist && fieldHasOverride("artist")}
+                    >
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-artist"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("artist")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-artist"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {baseTune()?.artist || ""}
+                        </p>
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* Release Year */}
+                <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
+                  <label
+                    for="release_year"
+                    class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
+                  >
+                    Release Year:
+                  </label>
+                  <div class="flex-1 space-y-2">
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="number"
+                        id="release_year"
+                        value={releaseYear()}
+                        onInput={(e) => setReleaseYear(e.currentTarget.value)}
+                        placeholder="e.g., 1969"
+                        min="1000"
+                        max="2100"
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-release_year"
+                      />
+                      <Show when={fieldHasOverride("releaseYear")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("releaseYear")}
+                          data-testid="override-indicator-release_year"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show
+                      when={
+                        revealed()["releaseYear"] &&
+                        fieldHasOverride("releaseYear")
+                      }
+                    >
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-release_year"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("releaseYear")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-release_year"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words">
+                          {baseTune()?.releaseYear || ""}
+                        </p>
+                      </div>
+                    </Show>
+                  </div>
+                </div>
+
+                {/* External ID */}
+                <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
+                  <label
+                    for="id_foreign"
+                    class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
+                  >
+                    External ID:
+                  </label>
+                  <div class="flex-1 space-y-2">
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="text"
+                        id="id_foreign"
+                        value={idForeign()}
+                        onInput={(e) => setIdForeign(e.currentTarget.value)}
+                        placeholder="Spotify ID, YouTube ID, etc."
+                        disabled={isFormReadOnly()}
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm font-mono disabled:opacity-60 disabled:cursor-not-allowed"
+                        data-testid="tune-editor-input-id_foreign"
+                      />
+                      <Show when={fieldHasOverride("idForeign")}>
+                        <button
+                          type="button"
+                          onClick={() => toggleReveal("idForeign")}
+                          data-testid="override-indicator-id_foreign"
+                          title="Reveal public value / revert"
+                          class="shrink-0 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <Layers class="w-4 h-4 text-gray-400" />
+                        </button>
+                      </Show>
+                    </div>
+                    <Show
+                      when={
+                        revealed()["idForeign"] && fieldHasOverride("idForeign")
+                      }
+                    >
+                      <div
+                        class="mt-2 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 space-y-1"
+                        data-testid="override-reveal-id_foreign"
+                      >
+                        <div class="flex justify-between items-center">
+                          <span class="font-medium">Public Value:</span>
+                          <button
+                            type="button"
+                            onClick={() => void revertField("idForeign")}
+                            class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            data-testid="override-revert-id_foreign"
+                          >
+                            Revert <Undo2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p class="italic break-words font-mono">
+                          {baseTune()?.idForeign || ""}
+                        </p>
+                      </div>
+                    </Show>
                   </div>
                 </div>
 

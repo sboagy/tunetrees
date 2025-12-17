@@ -560,6 +560,10 @@ export async function getPlaylistTunes(
       // Tune fields
       tuneId: tune.id,
       title: tune.title,
+      composer: tune.composer,
+      artist: tune.artist,
+      idForeign: tune.idForeign,
+      releaseYear: tune.releaseYear,
       type: tune.type,
       mode: tune.mode,
       structure: tune.structure,
@@ -587,6 +591,10 @@ export async function getPlaylistTunes(
     tune: {
       id: row.tuneId,
       title: row.title,
+      composer: row.composer,
+      artist: row.artist,
+      idForeign: row.idForeign,
+      releaseYear: row.releaseYear,
       type: row.type,
       mode: row.mode,
       structure: row.structure,
