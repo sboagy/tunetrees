@@ -16,9 +16,28 @@ import type {
 
 /**
  * Cloudflare Worker URL for CORS proxy
- * Uses environment variable or defaults to local development URL
+ * Uses environment variable with smart fallback for development
+ * 
+ * In production (HTTPS), defaults to same-origin to avoid mixed content issues
+ * In development (HTTP), defaults to localhost:8787
  */
-const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
+const getWorkerUrl = (): string => {
+  // If explicitly set via environment variable, use that
+  if (import.meta.env.VITE_WORKER_URL) {
+    return import.meta.env.VITE_WORKER_URL;
+  }
+  
+  // Smart default based on current page protocol
+  // In production (HTTPS), assume worker is same origin
+  // In development (HTTP), assume worker is on localhost:8787
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    return window.location.origin;
+  }
+  
+  return "http://localhost:8787";
+};
+
+const WORKER_URL = getWorkerUrl();
 
 /**
  * Extracted tune information from parsing

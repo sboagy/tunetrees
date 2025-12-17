@@ -638,11 +638,27 @@ export default {
           return errorResponse("Missing 'url' query parameter", 400);
         }
 
-        // Validate that the URL is from thesession.org (exact hostname match)
-        const targetUrlObj = new URL(targetUrl);
+        // Validate that the URL is from thesession.org (exact hostname and protocol match)
+        let targetUrlObj: URL;
+        try {
+          targetUrlObj = new URL(targetUrl);
+        } catch (urlError) {
+          return errorResponse(
+            "Invalid URL format",
+            400
+          );
+        }
+
+        // Security checks: exact hostname and HTTPS protocol
         if (targetUrlObj.hostname !== "thesession.org") {
           return errorResponse(
             "Invalid URL - only thesession.org is allowed",
+            400
+          );
+        }
+        if (targetUrlObj.protocol !== "https:") {
+          return errorResponse(
+            "Invalid URL - only HTTPS protocol is allowed",
             400
           );
         }
@@ -673,8 +689,18 @@ export default {
             );
           }
 
-          // Return the response with CORS headers
-          const data = await response.json();
+          // Parse JSON response with error handling
+          let data: unknown;
+          try {
+            data = await response.json();
+          } catch (jsonError) {
+            console.error("[HTTP] Invalid JSON response from TheSession.org");
+            return errorResponse(
+              "Invalid JSON response from TheSession.org",
+              502
+            );
+          }
+
           return jsonResponse(data);
         } catch (fetchError) {
           clearTimeout(timeoutId);
