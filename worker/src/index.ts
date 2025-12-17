@@ -626,6 +626,58 @@ export default {
       return new Response("OK", { status: 200, headers: CORS_HEADERS });
     }
 
+    // TheSession.org CORS proxy endpoint
+    // This endpoint proxies requests to TheSession.org API to bypass CORS restrictions
+    if (request.method === "GET" && url.pathname === "/api/proxy/thesession") {
+      console.log(`[HTTP] GET /api/proxy/thesession received`);
+
+      try {
+        // Get the target URL from query parameter
+        const targetUrl = url.searchParams.get("url");
+        if (!targetUrl) {
+          return errorResponse("Missing 'url' query parameter", 400);
+        }
+
+        // Validate that the URL is from thesession.org
+        const targetUrlObj = new URL(targetUrl);
+        if (!targetUrlObj.hostname.endsWith("thesession.org")) {
+          return errorResponse(
+            "Invalid URL - only thesession.org is allowed",
+            400
+          );
+        }
+
+        // Fetch from TheSession.org
+        console.log(`[HTTP] Proxying request to: ${targetUrl}`);
+        const response = await fetch(targetUrl, {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "TuneTrees-PWA/1.0",
+          },
+        });
+
+        if (!response.ok) {
+          console.error(
+            `[HTTP] TheSession.org returned error: ${response.status}`
+          );
+          return errorResponse(
+            `TheSession.org API error: ${response.statusText}`,
+            response.status
+          );
+        }
+
+        // Return the response with CORS headers
+        const data = await response.json();
+        return jsonResponse(data);
+      } catch (error) {
+        console.error("[HTTP] Proxy error:", error);
+        return errorResponse(
+          `Proxy error: ${error instanceof Error ? error.message : String(error)}`,
+          500
+        );
+      }
+    }
+
     // Sync endpoint
     if (request.method === "POST" && url.pathname === "/api/sync") {
       console.log(`[HTTP] POST /api/sync received`);

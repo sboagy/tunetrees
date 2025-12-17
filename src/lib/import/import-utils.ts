@@ -37,6 +37,7 @@ export interface IImportedTuneData {
 
 /**
  * Fetch tune search results from TheSession.org by title
+ * Uses CORS proxy through Cloudflare Worker to avoid browser CORS restrictions
  */
 export async function fetchTheSessionURLsFromTitle(
   title: string,
@@ -47,7 +48,11 @@ export async function fetchTheSessionURLsFromTitle(
     const typeQuery = tuneType ? `type=${tuneType}&` : "";
     const theSessionUrl = `https://thesession.org/tunes/search?${typeQuery}mode=&q=${encodedTitle}&format=json`;
 
-    const response = await fetch(theSessionUrl, {
+    // Use CORS proxy through Cloudflare Worker
+    const workerUrl = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
+    const proxyUrl = `${workerUrl}/api/proxy/thesession?url=${encodeURIComponent(theSessionUrl)}`;
+
+    const response = await fetch(proxyUrl, {
       headers: {
         Accept: "application/json",
       },
@@ -67,6 +72,7 @@ export async function fetchTheSessionURLsFromTitle(
 
 /**
  * Fetch tune details from TheSession.org by URL
+ * Uses CORS proxy through Cloudflare Worker to avoid browser CORS restrictions
  */
 export async function fetchTuneInfoFromTheSessionURL(
   tuneUrlBase: string
@@ -76,7 +82,11 @@ export async function fetchTuneInfoFromTheSessionURL(
     const primaryUrl = url.origin + url.pathname;
     const tuneUrl = `${primaryUrl}?format=json`;
 
-    const response = await fetch(tuneUrl, {
+    // Use CORS proxy through Cloudflare Worker
+    const workerUrl = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
+    const proxyUrl = `${workerUrl}/api/proxy/thesession?url=${encodeURIComponent(tuneUrl)}`;
+
+    const response = await fetch(proxyUrl, {
       headers: {
         Accept: "application/json",
       },
