@@ -13,7 +13,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "solid-sonner";
-import type { SqliteDatabase } from "../db/client-sqlite";
+import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
 import { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
 import { type RealtimeConfig, RealtimeManager } from "./realtime";
@@ -289,6 +289,18 @@ export class SyncService {
 
       const result = await this.syncEngine.syncDown();
 
+      // Ensure remote changes survive a quick refresh.
+      // Relying solely on `beforeunload`/interval persistence is unreliable because
+      // async work may be aborted during navigation.
+      try {
+        await persistDb();
+      } catch (error) {
+        console.warn(
+          "[SyncService] Failed to persist DB after syncDown:",
+          error
+        );
+      }
+
       // Notify callback (same as sync() method)
       this.config.onSyncComplete?.(result);
 
@@ -339,6 +351,16 @@ export class SyncService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const engine: any = this.syncEngine as any;
       const result: SyncResult = await engine.syncDownTables(tables);
+
+      try {
+        await persistDb();
+      } catch (error) {
+        console.warn(
+          "[SyncService] Failed to persist DB after scoped syncDown:",
+          error
+        );
+      }
+
       this.config.onSyncComplete?.(result);
       return result;
     } catch (error) {
