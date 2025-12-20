@@ -118,6 +118,18 @@ const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
 const CURRENT_DB_VERSION = 7;
 
+// Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
+const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
+
+function clearLastSyncTimestampForUser(userId: string): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(`${LAST_SYNC_TIMESTAMP_KEY_PREFIX}_${userId}`);
+  } catch (e) {
+    console.warn("⚠️ Failed to clear last sync timestamp:", e);
+  }
+}
+
 // Track which user's database is currently loaded
 let currentUserId: string | null = null;
 
@@ -249,6 +261,10 @@ export async function initializeDb(
           await deleteFromIndexedDB(dbKey);
           await deleteFromIndexedDB(dbVersionKey);
         }
+
+        // DB is being recreated; any persisted incremental sync watermark is now invalid.
+        clearLastSyncTimestampForUser(userId);
+
         sqliteDb = new SQL.Database();
         console.log("📋 Applying SQLite schema migrations...");
         const migrations = [
@@ -312,6 +328,8 @@ export async function initializeDb(
       if (migrationNeeded) {
         console.log("🔄 Executing schema migration...");
         try {
+          // Local data will be cleared; force next syncDown to run as a full sync.
+          clearLastSyncTimestampForUser(userId);
           await clearLocalDatabaseForMigration(drizzleDb);
           setLocalSchemaVersion(getCurrentSchemaVersion());
           clearMigrationParams();
@@ -529,6 +547,7 @@ export async function clearDb(): Promise<void> {
   if (currentUserId) {
     await deleteFromIndexedDB(getDbKey(currentUserId));
     await deleteFromIndexedDB(getDbVersionKey(currentUserId));
+    clearLastSyncTimestampForUser(currentUserId);
   }
   currentUserId = null;
   dbReady = false;

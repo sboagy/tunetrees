@@ -7,15 +7,13 @@ import type { Note } from "../types";
 export interface CreateNoteData {
   tuneRef: string; // UUID
   noteText: string;
-  userRef?: string; // UUID
+  userRef: string; // UUID (user_profile.id)
   playlistRef?: string; // UUID
-  public?: boolean;
   favorite?: boolean;
 }
 
 export interface UpdateNoteData {
   noteText?: string;
-  public?: boolean;
   favorite?: boolean;
   displayOrder?: number;
 }
@@ -85,10 +83,11 @@ export async function createNote(
       id: generateId(), // Generate UUID
       tuneRef: data.tuneRef,
       noteText: data.noteText,
-      userRef: data.userRef || null,
+      userRef: data.userRef,
       playlistRef: data.playlistRef || null,
       createdDate: now,
-      public: data.public ? 1 : 0,
+      // `public` is ignored for visibility; all user-created notes are private for now.
+      public: 0,
       favorite: data.favorite ? 1 : 0,
       deleted: 0,
       lastModifiedAt: now,
@@ -119,10 +118,6 @@ export async function updateNote(
 
   if (data.noteText !== undefined) {
     updateData.noteText = data.noteText;
-  }
-
-  if (data.public !== undefined) {
-    updateData.public = data.public ? 1 : 0;
   }
 
   if (data.favorite !== undefined) {

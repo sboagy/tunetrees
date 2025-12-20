@@ -172,7 +172,7 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
             id="playlist-editor-title"
             class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white"
           >
-            {props.playlistId ? "Edit Playlist" : "Create New Playlist"}
+            {props.playlistId ? "Edit Repertoire" : "Create New Repertoire"}
           </h2>
           <div class="flex items-center gap-4">
             <button

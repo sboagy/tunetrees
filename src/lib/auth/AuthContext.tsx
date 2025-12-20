@@ -480,8 +480,8 @@ export const AuthProvider: ParentComponent = (props) => {
       );
 
       // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
-      // The sync worker will pull all public reference data from the Worker endpoint
-      // This replaces the old direct Supabase queries for reference data
+      // The sync worker pulls system/shared reference rows (user_ref NULL) plus user-owned rows.
+      // This replaces the old direct Supabase queries for reference data.
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
         console.log("📥 Starting sync worker for anonymous user...");
         const syncWorker = await startSyncWorkerForUser(

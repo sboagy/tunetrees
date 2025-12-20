@@ -43,7 +43,8 @@ The script generates a JSON catalog at `output/public_catalog.json` (in this dir
   "year": 1975,
   "links": {
     "youtube": "https://www.youtube.com/results?search_query=...",
-    "chordie": "https://www.chordie.com/songs.php?q=..."
+    "chordie": "https://www.chordie.com/songs.php?q=...",
+    "spotify": "https://open.spotify.com/search/..."
   },
   "origin": "rolling_stone_top_500_v1"
 }

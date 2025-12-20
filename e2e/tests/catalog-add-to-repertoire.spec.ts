@@ -35,9 +35,11 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 test.describe
   .serial("Catalog: Add To Repertoire", () => {
     let currentTestUser: TestUser;
+    let ttPage: TuneTreesPage;
 
     test.beforeEach(async ({ page, testUser }) => {
       currentTestUser = testUser;
+      ttPage = new TuneTreesPage(page);
       // Fast setup: clear repertoire, start on catalog tab
       await setupForCatalogTestsParallel(page, testUser, {
         emptyRepertoire: true,
@@ -181,7 +183,7 @@ test.describe
     test("should handle tunes already in repertoire @side-effects", async ({
       page,
     }) => {
-      const ttPage = new TuneTreesPage(page);
+      // const ttPage = new TuneTreesPage(page);
       // First add user's private tune to repertoire
       await page.getByTestId("tab-catalog").click();
       await page.waitForTimeout(500);
@@ -259,6 +261,8 @@ test.describe
       // First add tune 66
       await page.getByTestId("tab-catalog").click();
       await page.waitForTimeout(500);
+
+      await ttPage.filterByGenre("Irish Traditional Music");
 
       const checkbox = page.getByRole("checkbox", {
         name: `Select row ${CATALOG_TUNE_66_ID}`,

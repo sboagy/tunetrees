@@ -8,7 +8,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * TOPNAV-004: Playlist Manager Modal Dialog
  * Priority: High
  *
- * Tests that the "Manage Playlists..." button opens a modal dialog
+ * Tests that the "Manage Repertoires..." button opens a modal dialog
  * instead of navigating to a separate page, matching the legacy app behavior.
  */
 
@@ -44,8 +44,8 @@ test.describe("TOPNAV-004: Playlist Manager Modal", () => {
       timeout: 5000,
     });
 
-    // Click "Manage Playlists..."
-    await page.getByRole("button", { name: /Manage Playlists/i }).click();
+    // Click "Manage Repertoires..."
+    await page.getByTestId("manage-repertoires-button").click();
 
     // Wait for modal
     const modal = page.getByTestId("playlist-manager-dialog");
@@ -53,9 +53,11 @@ test.describe("TOPNAV-004: Playlist Manager Modal", () => {
     return { modal };
   }
 
-  test("should open playlist manager modal when clicking 'Manage Playlists' button", async () => {
+  test("should open playlist manager modal when clicking 'Manage Repertoires' button", async () => {
     const { modal } = await openPlaylistManagerModal();
-    await expect(ttPage.page.getByText("Manage Playlists")).toBeVisible({
+    await expect(
+      ttPage.page.getByRole("heading", { name: "Repertoires" })
+    ).toBeVisible({
       timeout: 5000,
     });
     await expect(modal).toBeVisible();
@@ -63,7 +65,7 @@ test.describe("TOPNAV-004: Playlist Manager Modal", () => {
 
   test("should display playlist list in modal", async () => {
     const { modal } = await openPlaylistManagerModal();
-    await expect(modal.getByText(/Showing.*playlists/i)).toBeVisible({
+    await expect(modal.getByText(/Showing.*repertoires/i)).toBeVisible({
       timeout: 10000,
     });
   });
@@ -92,7 +94,7 @@ test.describe("TOPNAV-004: Playlist Manager Modal", () => {
     await openPlaylistManagerModal();
     const createButton = ttPage.page.getByTestId("create-playlist-button");
     await expect(createButton).toBeVisible({ timeout: 5000 });
-    await expect(createButton).toContainText(/Create New Playlist/i);
+    await expect(createButton).toContainText(/New Repertoire/i);
   });
 
   test("should not navigate to /playlists route when opening modal", async () => {

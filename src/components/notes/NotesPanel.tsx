@@ -67,14 +67,15 @@ export const NotesPanel: Component = () => {
   const handleCreateNote = async () => {
     const tuneId = currentTuneId();
     if (!tuneId || !newNoteContent().trim()) return;
+    const userId = user()?.id;
+    if (!userId) return;
 
     try {
       const db = getDb();
       await createNote(db, {
         tuneRef: tuneId,
         noteText: newNoteContent(),
-        userRef: user()?.id, // Already a UUID string
-        public: false,
+        userRef: userId, // user_profile.id (UUID)
       });
 
       // Reset form

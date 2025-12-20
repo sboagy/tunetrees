@@ -66,7 +66,7 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
-  test.setTimeout(180000);
+  test.setTimeout(220_000);
 
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);

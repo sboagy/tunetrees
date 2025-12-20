@@ -38,7 +38,11 @@ import {
   mergeWithDefaults,
   saveTableState,
 } from "./table-state-persistence";
-import type { ICellEditorCallbacks, TablePurpose } from "./types";
+import type {
+  ICellEditorCallbacks,
+  ITableStateExtended,
+  TablePurpose,
+} from "./types";
 
 export interface ITunesGridProps<T extends { id: string | number }> {
   tablePurpose: TablePurpose; // "catalog" | "repertoire" | "scheduled"
@@ -65,6 +69,101 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const collectColumnIds = (
+    cols: ColumnDef<T, unknown>[]
+  ): ReadonlySet<string> => {
+    const ids = new Set<string>();
+
+    const visit = (col: ColumnDef<T, unknown>) => {
+      const anyCol = col as unknown as {
+        id?: string;
+        accessorKey?: unknown;
+        columns?: ColumnDef<T, unknown>[];
+      };
+
+      if (Array.isArray(anyCol.columns)) {
+        for (const child of anyCol.columns) visit(child);
+        return;
+      }
+
+      const inferredId =
+        anyCol.id ??
+        (typeof anyCol.accessorKey === "string" ? anyCol.accessorKey : null);
+      if (typeof inferredId === "string" && inferredId.length > 0) {
+        ids.add(inferredId);
+      }
+    };
+
+    for (const c of cols) visit(c);
+    return ids;
+  };
+
+  const sanitizeInitialTableState = (
+    state: ITableStateExtended,
+    allowedColumnIds: ReadonlySet<string>
+  ): ITableStateExtended => {
+    // Migrate old/deprecated column IDs to current ones where possible.
+    const mapColumnId = (id: string): string => {
+      if (
+        id === "evaluation" &&
+        !allowedColumnIds.has("evaluation") &&
+        allowedColumnIds.has("recall_eval")
+      ) {
+        return "recall_eval";
+      }
+      return id;
+    };
+
+    function filterByAllowed<TValue>(
+      record: Record<string, TValue> | undefined
+    ): Record<string, TValue> | undefined {
+      if (!record) return record;
+      const out: Record<string, TValue> = {};
+      for (const [key, value] of Object.entries(record)) {
+        const mapped = mapColumnId(key);
+        if (allowedColumnIds.has(mapped)) out[mapped] = value;
+      }
+      return out;
+    }
+
+    const sanitizeOrder = (
+      order: string[] | undefined
+    ): string[] | undefined => {
+      if (!order) return order;
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const id of order) {
+        const mapped = mapColumnId(id);
+        if (!allowedColumnIds.has(mapped)) continue;
+        if (seen.has(mapped)) continue;
+        seen.add(mapped);
+        out.push(mapped);
+      }
+      return out;
+    };
+
+    const sanitizeSorting = (
+      sorting: ITableStateExtended["sorting"]
+    ): ITableStateExtended["sorting"] => {
+      if (!sorting) return sorting;
+      const out: Array<{ id: string; desc: boolean }> = [];
+      for (const s of sorting) {
+        const mapped = mapColumnId(s.id);
+        if (!allowedColumnIds.has(mapped)) continue;
+        out.push({ ...s, id: mapped });
+      }
+      return out;
+    };
+
+    return {
+      ...state,
+      columnVisibility: filterByAllowed(state.columnVisibility),
+      columnSizing: filterByAllowed(state.columnSizing),
+      columnOrder: sanitizeOrder(state.columnOrder),
+      sorting: sanitizeSorting(state.sorting),
+    };
+  };
+
   // State persistence key
   const stateKey = createMemo(() => ({
     userId: props.userId,
@@ -72,11 +171,21 @@ export const TunesGrid = (<T extends { id: string | number }>(
     playlistId: props.playlistId ?? "0",
   }));
 
+  // Resolve columns early (used to sanitize persisted state before initializing TanStack)
+  const initialColumns: ColumnDef<T, unknown>[] =
+    props.columns && props.columns.length > 0
+      ? props.columns
+      : (getDefaultColumns(
+          props.tablePurpose,
+          props.cellCallbacks
+        ) as unknown as ColumnDef<T, unknown>[]);
+  const allowedColumnIds = collectColumnIds(initialColumns);
+
   // Load persisted state
   const loadedState = loadTableState(stateKey());
-  const initialState = mergeWithDefaults(
-    loadedState,
-    props.tablePurpose as any
+  const initialState = sanitizeInitialTableState(
+    mergeWithDefaults(loadedState, props.tablePurpose as any),
+    allowedColumnIds
   );
 
   // Table state signals
@@ -150,6 +259,53 @@ export const TunesGrid = (<T extends { id: string | number }>(
       props.tablePurpose,
       props.cellCallbacks
     ) as unknown as ColumnDef<T, unknown>[];
+  });
+
+  const filterVisibility = (
+    vs: VisibilityState,
+    allowed: ReadonlySet<string>
+  ) => {
+    const out: VisibilityState = {};
+    for (const [key, val] of Object.entries(vs)) {
+      if (allowed.has(key)) out[key] = val;
+    }
+    return out;
+  };
+  const filterSizing = (
+    cs: ColumnSizingState,
+    allowed: ReadonlySet<string>
+  ) => {
+    const out: ColumnSizingState = {};
+    for (const [key, val] of Object.entries(cs)) {
+      if (allowed.has(key)) out[key] = val;
+    }
+    return out;
+  };
+  const filterOrder = (
+    order: ColumnOrderState,
+    allowed: ReadonlySet<string>
+  ) => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const id of order) {
+      if (!allowed.has(id)) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
+  };
+  const filterSorting = (s: SortingState, allowed: ReadonlySet<string>) => {
+    return s.filter((x) => allowed.has(x.id));
+  };
+
+  // If the column set changes (rare), prune state to valid column IDs to avoid TanStack warnings.
+  createEffect(() => {
+    const allowed = collectColumnIds(resolvedColumns());
+    setColumnVisibility((prev) => filterVisibility(prev, allowed));
+    setColumnSizing((prev) => filterSizing(prev, allowed));
+    setColumnOrder((prev) => filterOrder(prev, allowed));
+    setSorting((prev) => filterSorting(prev, allowed));
   });
 
   // Create table instance

@@ -544,7 +544,7 @@ export function getRepertoireColumns(
         //   respect any subsequently set manual override (since staging is no longer active).
         const completedAt = info.cell.row.original.completed_at;
         const value =
-          info.row.getValue("evaluation") && !completedAt
+          info.row.getValue("recall_eval") && !completedAt
             ? (info.row.getValue("latest_due") as string | null)
             : (info.getValue() as string | null);
 

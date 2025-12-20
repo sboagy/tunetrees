@@ -123,6 +123,7 @@
                 const links = [];
                 if (song.links.youtube) links.push(`<a href="${song.links.youtube}" target="_blank">YouTube</a>`);
                 if (song.links.chordie) links.push(`<a href="${song.links.chordie}" target="_blank">Chordie</a>`);
+                if (song.links.spotify) links.push(`<a href="${song.links.spotify}" target="_blank">Spotify</a>`);
                 
                 row.innerHTML = `
                     <td>${song.id}</td>

@@ -246,8 +246,8 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
               }}
               class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
               disabled={isDeleting}
-              title="Edit playlist"
-              aria-label="Edit playlist"
+              title="Edit repertoire"
+              aria-label="Edit repertoire"
             >
               <Pencil size={16} />
             </button>
@@ -320,7 +320,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
               fallback={<span>Loading playlists...</span>}
             >
               Showing {filteredPlaylists().length} of {playlists()?.length || 0}{" "}
-              playlists
+              repertoires
             </Show>
           </div>
         </div>

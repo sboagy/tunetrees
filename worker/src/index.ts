@@ -22,6 +22,7 @@ import {
   getBooleanColumns,
   getConflictTarget,
   getNormalizer,
+  getPrimaryKey,
   hasDeletedFlag,
   SYNCABLE_TABLES,
   type SyncableTableName,
@@ -67,13 +68,37 @@ function snakeToCamel(s: string): string {
 // ============================================================================
 
 /**
- * Get column definitions for a table's primary/conflict key.
+ * Get column definitions for a table's conflict target.
+ *
+ * This is used for UPSERT operations (onConflict target).
  */
-function getPkColumns(
+function getConflictKeyColumns(
   tableName: string,
   table: DrizzleTable
 ): { col: DrizzleColumn; prop: string }[] {
   const snakeKeys = getConflictTarget(tableName);
+  return snakeKeys.map((snakeKey) => {
+    const camelKey = snakeToCamel(snakeKey);
+    const col = table[camelKey];
+    if (!col) {
+      throw new Error(`Column '${camelKey}' not found in '${tableName}'`);
+    }
+    return { col, prop: camelKey };
+  });
+}
+
+/**
+ * Get column definitions for a table's primary key.
+ *
+ * This is preferred for DELETE operations because the client may only send PK
+ * values (e.g., daily_practice_queue sends only `id`).
+ */
+function getPrimaryKeyColumns(
+  tableName: string,
+  table: DrizzleTable
+): { col: DrizzleColumn; prop: string }[] {
+  const primaryKey = getPrimaryKey(tableName);
+  const snakeKeys = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
   return snakeKeys.map((snakeKey) => {
     const camelKey = snakeToCamel(snakeKey);
     const col = table[camelKey];
@@ -98,7 +123,7 @@ function extractRowId(
   }
 
   // Composite key - serialize to JSON
-  const pkCols = getPkColumns(tableName, table);
+  const pkCols = getConflictKeyColumns(tableName, table);
   const pkValues: Record<string, unknown> = {};
   for (const pk of pkCols) {
     pkValues[pk.prop] = row[pk.prop];
@@ -209,7 +234,8 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
     return;
   }
 
-  const pkCols = getPkColumns(change.table, t);
+  const upsertKeyCols = getConflictKeyColumns(change.table, t);
+  const deleteKeyCols = getPrimaryKeyColumns(change.table, t);
   const data = sqliteToPostgres(
     change.table,
     change.data as Record<string, unknown>
@@ -220,9 +246,16 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
   );
 
   if (change.deleted) {
-    await applyDelete(tx, change.table, table, pkCols, change);
+    await applyDelete(
+      tx,
+      change.table,
+      table,
+      deleteKeyCols,
+      upsertKeyCols,
+      change
+    );
   } else {
-    await applyUpsert(tx, table, pkCols, data);
+    await applyUpsert(tx, table, upsertKeyCols, data);
   }
 }
 
@@ -230,12 +263,39 @@ async function applyDelete(
   tx: Transaction,
   tableName: string,
   table: DrizzleTable,
-  pkCols: { col: unknown; prop: string }[],
+  primaryKeyCols: { col: unknown; prop: string }[],
+  conflictKeyCols: { col: unknown; prop: string }[],
   change: SyncChange
 ): Promise<void> {
-  const whereConditions = pkCols.map((pk) =>
-    eq(pk.col as any, (change.data as Record<string, unknown>)[pk.prop])
-  );
+  const changeData = change.data as Record<string, unknown>;
+
+  const buildWhere = (cols: { col: unknown; prop: string }[]) => {
+    const missing: string[] = [];
+    const whereConditions = cols.map((pk) => {
+      const value = changeData[pk.prop];
+      if (typeof value === "undefined" || value === null) {
+        missing.push(pk.prop);
+      }
+      return eq(pk.col as any, value as any);
+    });
+    return { whereConditions, missing };
+  };
+
+  // Prefer primary key columns for deletes; fall back to conflict key columns.
+  let { whereConditions, missing } = buildWhere(primaryKeyCols);
+  if (missing.length > 0) {
+    const fallback = buildWhere(conflictKeyCols);
+    if (fallback.missing.length === 0) {
+      whereConditions = fallback.whereConditions;
+      missing = [];
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing delete key(s) for ${tableName}: ${missing.join(", ")} (rowId=${change.rowId})`
+    );
+  }
 
   if (hasDeletedFlag(tableName)) {
     // Soft delete: set deleted = true
@@ -320,10 +380,32 @@ function rowToSyncChange(
  * Returns null if the table should be skipped entirely.
  */
 function buildUserFilter(
+  tableName: SyncableTableName,
   table: DrizzleTable,
   ctx: SyncContext
 ): unknown[] | null {
   const conditions: unknown[] = [];
+
+  // `user_profile` must never sync other users' rows into the client.
+  // The JWT subject is the Supabase Auth user ID, which matches `supabase_user_id`.
+  if (tableName === "user_profile" && table.supabaseUserId) {
+    conditions.push(eq(table.supabaseUserId, ctx.userId));
+    return conditions;
+  }
+
+  // Special case: references are "system" when `user_ref` is NULL.
+  // IMPORTANT: `reference.user_ref` FK's to `user_profile.id` (internal ID).
+  // We *do not* sync other users' `user_profile` rows.
+  // Therefore, syncing any reference row owned by another user would violate
+  // the client's FK constraint and could abort initial sync.
+  //
+  // Visibility semantics (ignore `reference.public`):
+  // - system/legacy references: user_ref IS NULL
+  // - private references: user_ref = ctx.userId
+  if (tableName === "reference" && table.userRef) {
+    conditions.push(or(isNull(table.userRef), eq(table.userRef, ctx.userId)));
+    return conditions;
+  }
 
   if (table.userId) {
     conditions.push(eq(table.userId, ctx.userId));
@@ -365,7 +447,7 @@ async function fetchTableForInitialSync(
   if (!meta) return [];
 
   // Build user filter
-  const conditions = buildUserFilter(t, ctx);
+  const conditions = buildUserFilter(tableName, t, ctx);
   if (conditions === null) {
     console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
     return []; // Skip table (e.g., no playlists)
@@ -459,7 +541,7 @@ async function fetchChangedRowsFromTable(
   }
 
   // Build conditions: last_modified_at > lastSyncAt AND user_filter
-  const userConditions = buildUserFilter(t, ctx);
+  const userConditions = buildUserFilter(tableName, t, ctx);
   if (userConditions === null) {
     console.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
     return []; // Skip table (e.g., no playlists)
