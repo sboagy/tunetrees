@@ -46,7 +46,7 @@ Key tables:
 - `tune` - Tune metadata
 - `playlist` - User playlists
 - `playlist_tune` - Tunes in playlists
-- `practice_record` - Practice history (immutable)
+- `practice_record` - Practice history (no deletes)
 - `daily_practice_queue` - Daily practice snapshot
 - `table_transient_data` - Staging for uncommitted evaluations
 - `sync_queue` - Pending sync operations
@@ -151,10 +151,34 @@ await pullRemoteChanges();  // Then download
 
 ## Key Invariants
 
-1. **`practice_record` is immutable** - Never update or delete
+1. **`practice_record` has no deletes (currently)** - Users can update their own practice records; deletes are disallowed (future: consider soft deletes)
 2. **Unique constraints enforced locally** - Prevents sync conflicts
 3. **All writes queue for sync** - Never write directly to Supabase
 4. **Persist after every write** - Survives page refresh
+
+## Admin: Deleting `practice_record` (Break-Glass)
+
+Deletes are blocked at the database layer by default.
+
+If you must delete a row (e.g., correcting a bad import), use the explicit per-session flag:
+
+```sql
+begin;
+set local app.allow_practice_record_delete = 'on';
+delete from public.practice_record where id = '...';
+commit;
+```
+
+Shell example via `psql`:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+begin;
+set local app.allow_practice_record_delete = 'on';
+delete from public.practice_record where id = '...';
+commit;
+SQL
+```
 
 ## Working with the Schema
 
