@@ -111,6 +111,9 @@ test.describe("REFS-002: References Drag Reorder", () => {
     const firstRefId = firstRefTestId?.replace("reference-item-", "") || "";
     const secondRefId = secondRefTestId?.replace("reference-item-", "") || "";
 
+    expect(firstRefId).not.toBe("");
+    expect(secondRefId).not.toBe("");
+
     // Verify first reference is "First Reference"
     await expect(page.getByText("First Reference").first()).toBeVisible();
 
@@ -120,23 +123,18 @@ test.describe("REFS-002: References Drag Reorder", () => {
     );
     const secondRefItem = page.getByTestId(`reference-item-${secondRefId}`);
 
-    await firstDragHandle.dragTo(secondRefItem);
+    await expect(firstDragHandle).toBeVisible({ timeout: 5000 });
+    await expect(secondRefItem).toBeVisible({ timeout: 5000 });
+    await firstDragHandle.scrollIntoViewIfNeeded();
+    await secondRefItem.scrollIntoViewIfNeeded();
 
-    // Wait for reorder to complete
-    await page
-      .waitForResponse(
-        (response) =>
-          response.url().includes("reference") && response.status() === 200,
-        { timeout: 15000 }
-      )
-      .catch(() => {
-        // Sync might not make network request immediately, continue
-      });
+    await firstDragHandle.dragTo(secondRefItem, { force: true });
 
     // Verify order changed - second reference should now be first
-    const newFirstRefTestId = await refItems
-      .first()
-      .getAttribute("data-testid");
-    expect(newFirstRefTestId).toBe(`reference-item-${secondRefId}`);
+    await expect
+      .poll(async () => refItems.first().getAttribute("data-testid"), {
+        timeout: 5000,
+      })
+      .toBe(`reference-item-${secondRefId}`);
   });
 });
