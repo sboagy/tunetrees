@@ -331,6 +331,20 @@ export async function initializeDb(
           // Local data will be cleared; force next syncDown to run as a full sync.
           clearLastSyncTimestampForUser(userId);
           await clearLocalDatabaseForMigration(drizzleDb);
+
+          // Important: schema migrations invalidate any existing local outbox.
+          // If we don't clear it, the app may attempt to upload thousands of stale changes
+          // before allowing syncDown, which can fail due to request size or server rejection.
+          try {
+            sqliteDb?.run("DELETE FROM sync_push_queue");
+            sqliteDb?.run(
+              "UPDATE sync_trigger_control SET disabled = 0 WHERE id = 1"
+            );
+            console.log("✅ Cleared sync outbox after migration");
+          } catch (e) {
+            console.warn("⚠️ Failed to clear sync outbox after migration:", e);
+          }
+
           setLocalSchemaVersion(getCurrentSchemaVersion());
           clearMigrationParams();
           if (forcedReset) {
