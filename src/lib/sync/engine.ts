@@ -295,142 +295,177 @@ export class SyncEngine {
         }
       }
 
-      // 3. Call Worker
-      const response = await workerClient.sync(
+      const applyRemoteChanges = async (remoteChanges: SyncChange[]) => {
+        if (remoteChanges.length === 0) return;
+
+        const sqliteInstance = await getSqliteInstance();
+        if (!sqliteInstance) return;
+
+        suppressSyncTriggers(sqliteInstance);
+        try {
+          // Sort changes by dependency to avoid FK violations
+          const sortedChanges = [...remoteChanges].sort((a, b) => {
+            const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
+            const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
+            return orderA - orderB;
+          });
+
+          for (const change of sortedChanges) {
+            affectedTablesSet.add(change.table);
+            const adapter = getAdapter(change.table as SyncableTableName);
+
+            const schemaKey = TABLE_TO_SCHEMA_KEY[change.table] || change.table;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const table = (localSchema as any)[schemaKey];
+
+            if (!table) {
+              log.warn(
+                `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
+              );
+              continue;
+            }
+
+            try {
+              if (change.deleted) {
+                // Delete local
+                const pk = adapter.primaryKey;
+                const localKeyData = adapter.toLocal(change.data);
+
+                if (Array.isArray(pk)) {
+                  const conditions = pk
+                    .map((k) => {
+                      const columnKey = toCamelCase(k);
+                      const value = localKeyData[columnKey];
+                      if (typeof value === "undefined") {
+                        log.warn(
+                          `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
+                          { rowId: change.rowId }
+                        );
+                        return null;
+                      }
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      return eq((table as any)[columnKey], value);
+                    })
+                    .filter((c): c is ReturnType<typeof eq> => c !== null);
+
+                  if (conditions.length !== pk.length) {
+                    continue;
+                  }
+                  await this.localDb.delete(table).where(and(...conditions));
+                } else {
+                  const columnKey = toCamelCase(pk);
+                  const value = localKeyData[columnKey];
+                  if (typeof value === "undefined") {
+                    log.warn(
+                      `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
+                      { rowId: change.rowId }
+                    );
+                    continue;
+                  }
+                  await this.localDb
+                    .delete(table)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    .where(eq((table as any)[columnKey], value));
+                }
+              } else {
+                // Upsert local
+                const sanitizedData = sanitizeData(change.data);
+                await this.localDb
+                  .insert(table)
+                  .values(sanitizedData)
+                  .onConflictDoUpdate({
+                    target: Array.isArray(adapter.primaryKey)
+                      ? adapter.primaryKey.map(
+                          (k) => (table as any)[toCamelCase(k)]
+                        )
+                      : (table as any)[
+                          toCamelCase(adapter.primaryKey as string)
+                        ],
+                    set: sanitizedData,
+                  });
+              }
+              synced++;
+            } catch (e) {
+              failed++;
+              const errorMsg = e instanceof Error ? e.message : "Unknown error";
+              errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
+              log.error(
+                `[SyncEngine] Failed to apply change to ${change.table} rowId=${change.rowId}:`,
+                e
+              );
+              // Continue applying other tables so core UI data isn't blocked
+            }
+          }
+        } finally {
+          enableSyncTriggers(sqliteInstance);
+        }
+      };
+
+      const isInitialSync = !this.lastSyncTimestamp;
+      let pullCursor: string | undefined;
+      let syncStartedAt: string | undefined;
+
+      // 3. Call Worker (Push + first Pull page)
+      const firstResponse = await workerClient.sync(
         changes,
-        this.lastSyncTimestamp || undefined
+        this.lastSyncTimestamp || undefined,
+        {
+          pageSize: 200,
+        }
       );
 
-      // Debug logging (only when VITE_SYNC_DEBUG=true)
-      if (SYNC_DEBUG && response.debug) {
-        syncLog("Worker Debug Logs:", JSON.stringify(response.debug));
+      if (SYNC_DEBUG && firstResponse.debug) {
+        syncLog("Worker Debug Logs:", JSON.stringify(firstResponse.debug));
       }
       if (SYNC_DEBUG) {
         const tableCounts: Record<string, number> = {};
-        for (const change of response.changes) {
+        for (const change of firstResponse.changes) {
           tableCounts[change.table] = (tableCounts[change.table] || 0) + 1;
         }
         syncLog("Received changes:", tableCounts);
-        syncLog("Total change count:", response.changes.length);
+        syncLog("Total change count:", firstResponse.changes.length);
       }
 
-      // 4. Apply Remote Changes
-      if (response.changes.length > 0) {
-        const sqliteInstance = await getSqliteInstance();
-        if (sqliteInstance) {
-          suppressSyncTriggers(sqliteInstance);
+      pullCursor = firstResponse.nextCursor;
+      syncStartedAt = firstResponse.syncStartedAt;
 
-          try {
-            // Sort changes by dependency to avoid FK violations
-            const sortedChanges = [...response.changes].sort((a, b) => {
-              const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
-              const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
-              return orderA - orderB;
-            });
+      // 4. Apply first page of remote changes
+      await applyRemoteChanges(firstResponse.changes);
 
-            for (const change of sortedChanges) {
-              affectedTablesSet.add(change.table);
-              const adapter = getAdapter(change.table as SyncableTableName);
-
-              const schemaKey =
-                TABLE_TO_SCHEMA_KEY[change.table] || change.table;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const table = (localSchema as any)[schemaKey];
-
-              if (!table) {
-                log.warn(
-                  `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
-                );
-                continue;
-              }
-
-              try {
-                if (change.deleted) {
-                  // Delete local
-                  const pk = adapter.primaryKey;
-                  const localKeyData = adapter.toLocal(change.data);
-
-                  if (Array.isArray(pk)) {
-                    const conditions = pk
-                      .map((k) => {
-                        const columnKey = toCamelCase(k);
-                        const value = localKeyData[columnKey];
-                        if (typeof value === "undefined") {
-                          log.warn(
-                            `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
-                            { rowId: change.rowId }
-                          );
-                          return null;
-                        }
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        return eq((table as any)[columnKey], value);
-                      })
-                      .filter((c): c is ReturnType<typeof eq> => c !== null);
-
-                    if (conditions.length !== pk.length) {
-                      continue;
-                    }
-                    await this.localDb.delete(table).where(and(...conditions));
-                  } else {
-                    const columnKey = toCamelCase(pk);
-                    const value = localKeyData[columnKey];
-                    if (typeof value === "undefined") {
-                      log.warn(
-                        `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
-                        { rowId: change.rowId }
-                      );
-                      continue;
-                    }
-                    await this.localDb
-                      .delete(table)
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      .where(eq((table as any)[columnKey], value));
-                  }
-                } else {
-                  // Upsert local
-                  const sanitizedData = sanitizeData(change.data);
-                  await this.localDb
-                    .insert(table)
-                    .values(sanitizedData)
-                    .onConflictDoUpdate({
-                      target: Array.isArray(adapter.primaryKey)
-                        ? adapter.primaryKey.map(
-                            (k) => (table as any)[toCamelCase(k)]
-                          )
-                        : (table as any)[
-                            toCamelCase(adapter.primaryKey as string)
-                          ],
-                      set: sanitizedData,
-                    });
-                }
-                synced++;
-              } catch (e) {
-                failed++;
-                const errorMsg =
-                  e instanceof Error ? e.message : "Unknown error";
-                errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
-                log.error(
-                  `[SyncEngine] Failed to apply change to ${change.table} rowId=${change.rowId}:`,
-                  e
-                );
-                // Continue applying other tables so core UI data isn't blocked
-              }
-            }
-          } finally {
-            enableSyncTriggers(sqliteInstance);
-          }
-        }
-      }
-
-      // 5. Cleanup Outbox
+      // 5. Cleanup Outbox (only once, after push has been accepted)
       for (const item of sortedItems) {
         await markOutboxCompleted(this.localDb, item.id);
       }
 
-      // 6. Update Timestamp (persists to localStorage for incremental sync after restart)
+      // 6. If initial sync is paginated, pull remaining pages (no push)
+      if (isInitialSync && pullCursor) {
+        while (pullCursor) {
+          const pageResponse = await workerClient.sync([], undefined, {
+            pullCursor,
+            syncStartedAt,
+            pageSize: 200,
+          });
+
+          pullCursor = pageResponse.nextCursor;
+          syncStartedAt = pageResponse.syncStartedAt ?? syncStartedAt;
+
+          await applyRemoteChanges(pageResponse.changes);
+        }
+      }
+
+      // 7. Update Timestamp (persists to localStorage for incremental sync after restart)
       // Only advance the watermark if we successfully applied all remote changes.
-      if (response.syncedAt && failed === 0) {
-        this.setLastSyncTimestamp(response.syncedAt);
+      if (failed === 0) {
+        if (isInitialSync) {
+          // Prefer the stable initial watermark provided by the worker.
+          if (syncStartedAt) {
+            this.setLastSyncTimestamp(syncStartedAt);
+          } else if (firstResponse.syncedAt) {
+            this.setLastSyncTimestamp(firstResponse.syncedAt);
+          }
+        } else if (firstResponse.syncedAt) {
+          this.setLastSyncTimestamp(firstResponse.syncedAt);
+        }
       }
 
       return {

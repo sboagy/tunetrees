@@ -7,7 +7,7 @@
  *
  * @module worker/index
  */
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -46,6 +46,48 @@ interface SyncContext {
   userId: string;
   userPlaylistIds: Set<string>;
   now: string;
+}
+
+interface InitialSyncCursorV1 {
+  v: 1;
+  tableIndex: number;
+  offset: number;
+  syncStartedAt: string;
+}
+
+function encodeCursor(cursor: InitialSyncCursorV1): string {
+  return btoa(JSON.stringify(cursor));
+}
+
+function decodeCursor(raw: string): InitialSyncCursorV1 {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(atob(raw));
+  } catch {
+    throw new Error("Invalid pullCursor");
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Invalid pullCursor");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  if (obj.v !== 1) throw new Error("Unsupported pullCursor version");
+  const tableIndex = Number(obj.tableIndex);
+  const offset = Number(obj.offset);
+  const syncStartedAt = String(obj.syncStartedAt);
+
+  if (!Number.isFinite(tableIndex) || tableIndex < 0) {
+    throw new Error("Invalid pullCursor.tableIndex");
+  }
+  if (!Number.isFinite(offset) || offset < 0) {
+    throw new Error("Invalid pullCursor.offset");
+  }
+  if (!syncStartedAt || Number.isNaN(Date.parse(syncStartedAt))) {
+    throw new Error("Invalid pullCursor.syncStartedAt");
+  }
+
+  return { v: 1, tableIndex, offset, syncStartedAt };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -217,6 +259,15 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
     change.table === "sync_change_log"
   ) {
     console.log(`[PUSH] Skipping sync infrastructure table: ${change.table}`);
+    return;
+  }
+
+  // Historical invariants: practice records are append-only.
+  // Do not allow deletes from clients (even if they attempt one).
+  if (change.table === "practice_record" && change.deleted) {
+    console.warn(
+      `[PUSH] Refusing DELETE for practice_record rowId=${change.rowId}`
+    );
     return;
   }
 
@@ -474,6 +525,57 @@ async function fetchTableForInitialSync(
   return changes;
 }
 
+async function fetchTableForInitialSyncPage(
+  tx: Transaction,
+  tableName: SyncableTableName,
+  ctx: SyncContext,
+  syncStartedAt: string,
+  offset: number,
+  limit: number
+): Promise<SyncChange[]> {
+  const table = schema.tables[tableName];
+  if (!table) return [];
+
+  const t = table as DrizzleTable;
+  const meta = TABLE_REGISTRY[tableName];
+  if (!meta) return [];
+
+  const conditions = buildUserFilter(tableName, t, ctx);
+  if (conditions === null) {
+    console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
+    return [];
+  }
+
+  const whereConditions: unknown[] = [...conditions];
+
+  // Make a best-effort snapshot for multi-page initial sync.
+  // If the table has lastModifiedAt, only include rows up to syncStartedAt.
+  if (t.lastModifiedAt) {
+    whereConditions.push(lte(t.lastModifiedAt, syncStartedAt));
+  }
+
+  let query = tx.select().from(table);
+  if (whereConditions.length > 0) {
+    // @ts-expect-error - dynamic where
+    query = query.where(and(...whereConditions));
+  }
+
+  // @ts-expect-error - limit/offset on dynamic query
+  const rows = await query.limit(limit).offset(offset);
+
+  console.log(
+    `[PULL:INITIAL] ${tableName}: fetched page rows=${rows.length} offset=${offset} limit=${limit}`
+  );
+
+  const changes: SyncChange[] = [];
+  for (const row of rows) {
+    const r = row as Record<string, unknown>;
+    const rowId = extractRowId(tableName, r, t);
+    changes.push(rowToSyncChange(tableName, rowId, r));
+  }
+  return changes;
+}
+
 /**
  * Initial sync: fetch all user-accessible rows from all tables.
  */
@@ -495,6 +597,95 @@ async function processInitialSync(
     `[PULL:INITIAL] Completed initial sync: ${allChanges.length} total changes across ${SYNCABLE_TABLES.length} tables`
   );
   return allChanges;
+}
+
+async function processInitialSyncPaged(
+  tx: Transaction,
+  ctx: SyncContext,
+  cursorRaw: string | undefined,
+  syncStartedAtHint: string | undefined,
+  pageSizeHint: number | undefined
+): Promise<{
+  changes: SyncChange[];
+  nextCursor?: string;
+  syncStartedAt: string;
+}> {
+  const MAX_PAGE_SIZE = 500;
+  const DEFAULT_PAGE_SIZE = 200;
+  const requested =
+    typeof pageSizeHint === "number" && Number.isFinite(pageSizeHint)
+      ? Math.max(1, Math.floor(pageSizeHint))
+      : DEFAULT_PAGE_SIZE;
+  const pageSize = Math.min(requested, MAX_PAGE_SIZE);
+
+  let tableIndex = 0;
+  let offset = 0;
+  let syncStartedAt = syncStartedAtHint;
+
+  if (cursorRaw) {
+    const cursor = decodeCursor(cursorRaw);
+    tableIndex = cursor.tableIndex;
+    offset = cursor.offset;
+    syncStartedAt = cursor.syncStartedAt;
+  }
+
+  if (!syncStartedAt) {
+    syncStartedAt = ctx.now;
+  }
+
+  // Advance until we find a table with rows to return, or we finish.
+  while (tableIndex < SYNCABLE_TABLES.length) {
+    const tableName = SYNCABLE_TABLES[tableIndex] as SyncableTableName;
+    const changes = await fetchTableForInitialSyncPage(
+      tx,
+      tableName,
+      ctx,
+      syncStartedAt,
+      offset,
+      pageSize
+    );
+
+    if (changes.length === 0) {
+      // Either table is empty / skipped OR we've paged past the end.
+      // Move to next table.
+      tableIndex += 1;
+      offset = 0;
+      continue;
+    }
+
+    const nextOffset = offset + changes.length;
+    const isLastPageForTable = changes.length < pageSize;
+
+    if (isLastPageForTable) {
+      const nextTableIndex = tableIndex + 1;
+      if (nextTableIndex >= SYNCABLE_TABLES.length) {
+        return { changes, syncStartedAt };
+      }
+      return {
+        changes,
+        syncStartedAt,
+        nextCursor: encodeCursor({
+          v: 1,
+          tableIndex: nextTableIndex,
+          offset: 0,
+          syncStartedAt,
+        }),
+      };
+    }
+
+    return {
+      changes,
+      syncStartedAt,
+      nextCursor: encodeCursor({
+        v: 1,
+        tableIndex,
+        offset: nextOffset,
+        syncStartedAt,
+      }),
+    };
+  }
+
+  return { changes: [], syncStartedAt };
 }
 
 // ============================================================================
@@ -623,6 +814,8 @@ async function handleSync(
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
   let responseChanges: SyncChange[] = [];
+  let nextCursor: string | undefined;
+  let syncStartedAt: string | undefined;
   const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
 
   console.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
@@ -656,7 +849,17 @@ async function handleSync(
         ctx
       );
     } else {
-      responseChanges = await processInitialSync(tx, ctx);
+      // Paginate initial sync to avoid oversized payloads / timeouts.
+      const page = await processInitialSyncPaged(
+        tx,
+        ctx,
+        payload.pullCursor,
+        payload.syncStartedAt,
+        payload.pageSize
+      );
+      responseChanges = page.changes;
+      nextCursor = page.nextCursor;
+      syncStartedAt = page.syncStartedAt;
     }
 
     // NO GARBAGE COLLECTION NEEDED!
@@ -670,6 +873,8 @@ async function handleSync(
   return {
     changes: responseChanges,
     syncedAt: now,
+    nextCursor,
+    syncStartedAt,
   };
 }
 

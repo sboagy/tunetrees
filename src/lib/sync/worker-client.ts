@@ -15,12 +15,20 @@ export class WorkerClient {
 
   async sync(
     changes: SyncChange[],
-    lastSyncAt?: string
+    lastSyncAt?: string,
+    options?: {
+      pullCursor?: string;
+      syncStartedAt?: string;
+      pageSize?: number;
+    }
   ): Promise<SyncResponse> {
     const payload: SyncRequest = {
       changes,
       lastSyncAt,
       schemaVersion: 1,
+      pullCursor: options?.pullCursor,
+      syncStartedAt: options?.syncStartedAt,
+      pageSize: options?.pageSize,
     };
 
     const response = await fetch(`${WORKER_URL}/api/sync`, {
