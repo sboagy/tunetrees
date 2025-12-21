@@ -769,11 +769,26 @@ async function clearUserTable(
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
   let error: any = null;
-  // Unified deletion path; RLS ensures only caller's rows are affected.
-  let query = supabase.from(tableName).delete();
-  query = applyTableQueryFilters(tableName, query, user);
-  const { error: delError } = await query;
-  error = delError;
+
+  // practice_record deletes are blocked by a DB trigger unless the per-transaction
+  // flag `app.allow_practice_record_delete` is set. Supabase requests are each
+  // their own transaction, so we use an RPC that sets the flag and deletes in
+  // one call.
+  if (tableName === "practice_record") {
+    const { error: rpcError } = await supabase.rpc(
+      "e2e_clear_practice_record",
+      {
+        target_playlist: user.playlistId,
+      }
+    );
+    error = rpcError;
+  } else {
+    // Unified deletion path; RLS ensures only caller's rows are affected.
+    let query = supabase.from(tableName).delete();
+    query = applyTableQueryFilters(tableName, query, user);
+    const { error: delError } = await query;
+    error = delError;
+  }
 
   if (error && !error.message?.includes("no rows")) {
     console.error(`[${user.name}] Failed to clear ${tableName}:`, error);
