@@ -482,49 +482,6 @@ function buildUserFilter(
   return conditions;
 }
 
-/**
- * Fetch all rows from a single table for initial sync.
- */
-async function fetchTableForInitialSync(
-  tx: Transaction,
-  tableName: SyncableTableName,
-  ctx: SyncContext
-): Promise<SyncChange[]> {
-  const table = schema.tables[tableName];
-  if (!table) return [];
-
-  const t = table as DrizzleTable;
-  const meta = TABLE_REGISTRY[tableName];
-  if (!meta) return [];
-
-  // Build user filter
-  const conditions = buildUserFilter(tableName, t, ctx);
-  if (conditions === null) {
-    console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
-    return []; // Skip table (e.g., no playlists)
-  }
-
-  // Query
-  let query = tx.select().from(table);
-  if (conditions.length > 0) {
-    // @ts-expect-error - dynamic where
-    query = query.where(and(...conditions));
-  }
-
-  const rows = await query;
-  console.log(`[PULL:INITIAL] ${tableName}: fetched ${rows.length} rows`);
-
-  // Convert rows to SyncChanges
-  const changes: SyncChange[] = [];
-  for (const row of rows) {
-    const r = row as Record<string, unknown>;
-    const rowId = extractRowId(tableName, r, t);
-    changes.push(rowToSyncChange(tableName, rowId, r));
-  }
-
-  return changes;
-}
-
 async function fetchTableForInitialSyncPage(
   tx: Transaction,
   tableName: SyncableTableName,
@@ -560,7 +517,6 @@ async function fetchTableForInitialSyncPage(
     query = query.where(and(...whereConditions));
   }
 
-  // @ts-expect-error - limit/offset on dynamic query
   const rows = await query.limit(limit).offset(offset);
 
   console.log(
@@ -574,29 +530,6 @@ async function fetchTableForInitialSyncPage(
     changes.push(rowToSyncChange(tableName, rowId, r));
   }
   return changes;
-}
-
-/**
- * Initial sync: fetch all user-accessible rows from all tables.
- */
-async function processInitialSync(
-  tx: Transaction,
-  ctx: SyncContext
-): Promise<SyncChange[]> {
-  console.log(
-    `[PULL:INITIAL] Starting initial sync for user ${ctx.userId}, playlists: [${Array.from(ctx.userPlaylistIds).join(", ")}]`
-  );
-  const allChanges: SyncChange[] = [];
-
-  for (const tableName of SYNCABLE_TABLES) {
-    const tableChanges = await fetchTableForInitialSync(tx, tableName, ctx);
-    allChanges.push(...tableChanges);
-  }
-
-  console.log(
-    `[PULL:INITIAL] Completed initial sync: ${allChanges.length} total changes across ${SYNCABLE_TABLES.length} tables`
-  );
-  return allChanges;
 }
 
 async function processInitialSyncPaged(
