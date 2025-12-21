@@ -69,7 +69,7 @@ test.describe
       expect(scheduledText).not.toContain("Today");
     });
 
-    test("should evaluate first tune as Good", async ({ page }) => {
+    test("should evaluate first tune as Good", async () => {
       // ARRANGE: Get first tune evaluation dropdown
       const rows = ttPage.getRows("scheduled");
       const firstRow = rows.first();
@@ -93,7 +93,7 @@ test.describe
       await expect(badgeSpan).toHaveText("1");
     });
 
-    test("should evaluate second tune as Hard", async ({ page }) => {
+    test("should evaluate second tune as Hard", async () => {
       const rows = ttPage.getRows("scheduled");
       const secondRow = rows.nth(1);
 
