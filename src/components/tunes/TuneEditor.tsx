@@ -1215,7 +1215,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     </div>
                     <Show
                       when={
-                        revealed()["releaseYear"] &&
+                        revealed().releaseYear &&
                         fieldHasOverride("releaseYear")
                       }
                     >
@@ -1276,7 +1276,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                     </div>
                     <Show
                       when={
-                        revealed()["idForeign"] && fieldHasOverride("idForeign")
+                        revealed().idForeign && fieldHasOverride("idForeign")
                       }
                     >
                       <div
