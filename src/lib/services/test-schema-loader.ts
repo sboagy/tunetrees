@@ -14,7 +14,7 @@
  * ```
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
@@ -25,15 +25,11 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 export function applyMigrations(db: BetterSQLite3Database): void {
   const migrationsDir = join(process.cwd(), "drizzle", "migrations", "sqlite");
 
-  // Load migration files in order (including UUID migrations)
-  const migrations = [
-    "0000_lowly_obadiah_stane.sql",
-    "0001_thin_chronomancer.sql",
-    "0002_nappy_roland_deschain.sql",
-    "0003_friendly_cerebro.sql",
-    "0004_true_union_jack.sql",
-    "0005_add_display_order.sql",
-  ];
+  // Load migration files in order (keeps test schema aligned with production migrations)
+  // We only consider top-level numbered migration SQL files.
+  const migrations = readdirSync(migrationsDir)
+    .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+    .sort((a, b) => a.localeCompare(b));
 
   for (const migrationFile of migrations) {
     const migrationPath = join(migrationsDir, migrationFile);
@@ -66,7 +62,7 @@ export function applyMigrations(db: BetterSQLite3Database): void {
           continue;
         }
 
-        db.run(statement as any);
+        db.run(statement as unknown as string);
       } catch (error) {
         console.error(`Failed to execute statement from ${migrationFile}:`);
         console.error(statement);

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top 500 Catalog Viewer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f8f9fa;
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 0;
+        }
+        th:hover {
+            background: #e9ecef;
+        }
+        th::after {
+            content: ' ⇅';
+            opacity: 0.3;
+        }
+        th.sort-asc::after {
+            content: ' ↑';
+            opacity: 1;
+        }
+        th.sort-desc::after {
+            content: ' ↓';
+            opacity: 1;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .stats {
+            margin: 20px 0;
+            padding: 10px;
+            background: #e7f3ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Top 500 Catalog Viewer</h1>
+        <div class="stats">
+            <strong>Total Songs:</strong> <span id="count">Loading...</span>
+        </div>
+        <table id="catalogTable">
+            <thead>
+                <tr>
+                    <th data-col="id">ID</th>
+                    <th data-col="title">Title</th>
+                    <th data-col="artist">Artist</th>
+                    <th data-col="composer">Composer</th>
+                    <th data-col="genre">Genre</th>
+                    <th data-col="year">Year</th>
+                    <th data-col="key">Key</th>
+                    <th>Links</th>
+                </tr>
+            </thead>
+            <tbody id="catalogBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let catalogData = [];
+        let sortColumn = null;
+        let sortDirection = 'asc';
+
+        // Load the JSON data
+        fetch('./output/public_catalog.json')
+            .then(response => response.json())
+            .then(data => {
+                catalogData = data;
+                document.getElementById('count').textContent = data.length;
+                renderTable();
+            })
+            .catch(error => {
+                console.error('Error loading catalog:', error);
+                document.getElementById('count').textContent = 'Error loading data';
+            });
+
+        function renderTable() {
+            const tbody = document.getElementById('catalogBody');
+            tbody.innerHTML = '';
+
+            catalogData.forEach(song => {
+                const row = document.createElement('tr');
+                
+                const links = [];
+                if (song.links.youtube) links.push(`<a href="${song.links.youtube}" target="_blank">YouTube</a>`);
+                if (song.links.chordie) links.push(`<a href="${song.links.chordie}" target="_blank">Chordie</a>`);
+                if (song.links.spotify) links.push(`<a href="${song.links.spotify}" target="_blank">Spotify</a>`);
+                
+                row.innerHTML = `
+                    <td>${song.id}</td>
+                    <td>${song.title}</td>
+                    <td>${song.artist}</td>
+                    <td>${song.composer || '-'}</td>
+                    <td>${song.genre || '-'}</td>
+                    <td>${song.year || '-'}</td>
+                    <td>${song.key || '-'}</td>
+                    <td>${links.join(' | ')}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function sortTable(column) {
+            // Toggle direction if same column
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+
+            // Sort the data
+            catalogData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+
+                // Handle null/undefined
+                if (aVal == null) aVal = '';
+                if (bVal == null) bVal = '';
+
+                // Convert to comparable types
+                if (column === 'year') {
+                    aVal = Number(aVal) || 0;
+                    bVal = Number(bVal) || 0;
+                } else {
+                    aVal = String(aVal).toLowerCase();
+                    bVal = String(bVal).toLowerCase();
+                }
+
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // Update header classes
+            document.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            const header = document.querySelector(`th[data-col="${column}"]`);
+            if (header) {
+                header.classList.add(`sort-${sortDirection}`);
+            }
+
+            renderTable();
+        }
+
+        // Add click handlers to headers
+        document.querySelectorAll('th[data-col]').forEach(th => {
+            th.addEventListener('click', () => {
+                sortTable(th.dataset.col);
+            });
+        });
+    </script>
+</body>
+</html>

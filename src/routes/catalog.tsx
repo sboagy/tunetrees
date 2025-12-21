@@ -284,36 +284,25 @@ const CatalogPage: Component = () => {
       isLoading: allGenres.loading,
     });
 
-    // If genres are still loading, return empty array
-    if (allGenres.loading || genres.length === 0) {
-      log.debug("CATALOG availableGenres: loading or no genres");
-      return [];
+    // IMPORTANT: `tune.genre` is historically inconsistent across datasets.
+    // - In newer schema it's a FK (genre.id)
+    // - In older/imported data it may already be a display name
+    // Build filter options that work in both cases.
+    const genreNames = new Set<string>();
+    const genreById = new Map<string, string>();
+    for (const g of genres) {
+      if (g.id && g.name) genreById.set(g.id, g.name);
     }
 
-    // Get unique genre IDs from tunes
-    const genreIds = new Set<string>();
-    tunes.forEach((tune) => {
-      if (tune.genre) genreIds.add(tune.genre);
-    });
+    for (const tune of tunes) {
+      const raw = tune.genre;
+      if (!raw) continue;
+      genreNames.add(genreById.get(raw) ?? raw);
+    }
 
-    log.debug("CATALOG Genre IDs from tunes:", Array.from(genreIds));
-
-    // Map genre IDs to genre names
-    const genreNames: string[] = [];
-    genreIds.forEach((genreId) => {
-      const genre = genres.find((g) => g.id === genreId);
-      if (genre?.name) {
-        genreNames.push(genre.name);
-        log.debug(`CATALOG Found genre: ${genreId} -> ${genre.name}`);
-      } else {
-        log.warn(`CATALOG Genre ID not found: "${genreId}"`, {
-          availableIds: genres.map((g) => g.id),
-        });
-      }
-    });
-
-    log.debug("CATALOG Final genre names:", genreNames);
-    return genreNames.sort();
+    const result = Array.from(genreNames).sort();
+    log.debug("CATALOG Final genre names:", result);
+    return result;
   });
 
   // Handle tune selection (double-click opens editor)

@@ -202,6 +202,54 @@ export const TuneDetail: Component<TuneDetailProps> = (props) => {
                     </div>
                   </Show>
 
+                  {/* Composer */}
+                  <Show when={props.tune.composer}>
+                    <div>
+                      <dt class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Composer
+                      </dt>
+                      <dd class="mt-1 text-gray-900 dark:text-white">
+                        {props.tune.composer}
+                      </dd>
+                    </div>
+                  </Show>
+
+                  {/* Artist */}
+                  <Show when={props.tune.artist}>
+                    <div>
+                      <dt class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Artist
+                      </dt>
+                      <dd class="mt-1 text-gray-900 dark:text-white">
+                        {props.tune.artist}
+                      </dd>
+                    </div>
+                  </Show>
+
+                  {/* Release Year */}
+                  <Show when={props.tune.releaseYear}>
+                    <div>
+                      <dt class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Year
+                      </dt>
+                      <dd class="mt-1 text-gray-900 dark:text-white">
+                        {props.tune.releaseYear}
+                      </dd>
+                    </div>
+                  </Show>
+
+                  {/* External ID */}
+                  <Show when={props.tune.idForeign}>
+                    <div>
+                      <dt class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        External ID
+                      </dt>
+                      <dd class="mt-1 text-gray-900 dark:text-white font-mono text-sm">
+                        {props.tune.idForeign}
+                      </dd>
+                    </div>
+                  </Show>
+
                   {/* Tags */}
                   <div class="md:col-span-2">
                     <dt class="text-sm font-medium text-gray-600 dark:text-gray-400">

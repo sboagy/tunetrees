@@ -218,6 +218,7 @@ export class SyncEngine {
     const startTime = new Date().toISOString();
     const errors: string[] = [];
     let synced = 0;
+    let failed = 0;
     const affectedTablesSet = new Set<string>();
 
     try {
@@ -319,99 +320,105 @@ export class SyncEngine {
         if (sqliteInstance) {
           suppressSyncTriggers(sqliteInstance);
 
-          // Sort changes by dependency to avoid FK violations
-          const sortedChanges = [...response.changes].sort((a, b) => {
-            const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
-            const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
-            return orderA - orderB;
-          });
+          try {
+            // Sort changes by dependency to avoid FK violations
+            const sortedChanges = [...response.changes].sort((a, b) => {
+              const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
+              const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
+              return orderA - orderB;
+            });
 
-          for (const change of sortedChanges) {
-            affectedTablesSet.add(change.table);
-            const adapter = getAdapter(change.table as SyncableTableName);
+            for (const change of sortedChanges) {
+              affectedTablesSet.add(change.table);
+              const adapter = getAdapter(change.table as SyncableTableName);
 
-            const schemaKey = TABLE_TO_SCHEMA_KEY[change.table] || change.table;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const table = (localSchema as any)[schemaKey];
+              const schemaKey =
+                TABLE_TO_SCHEMA_KEY[change.table] || change.table;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const table = (localSchema as any)[schemaKey];
 
-            if (!table) {
-              log.warn(
-                `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
-              );
-              continue;
-            }
+              if (!table) {
+                log.warn(
+                  `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
+                );
+                continue;
+              }
 
-            if (change.deleted) {
-              // Delete local
-              const pk = adapter.primaryKey;
-              const localKeyData = adapter.toLocal(change.data);
+              try {
+                if (change.deleted) {
+                  // Delete local
+                  const pk = adapter.primaryKey;
+                  const localKeyData = adapter.toLocal(change.data);
 
-              if (Array.isArray(pk)) {
-                const conditions = pk
-                  .map((k) => {
-                    const columnKey = toCamelCase(k);
+                  if (Array.isArray(pk)) {
+                    const conditions = pk
+                      .map((k) => {
+                        const columnKey = toCamelCase(k);
+                        const value = localKeyData[columnKey];
+                        if (typeof value === "undefined") {
+                          log.warn(
+                            `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
+                            { rowId: change.rowId }
+                          );
+                          return null;
+                        }
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        return eq((table as any)[columnKey], value);
+                      })
+                      .filter((c): c is ReturnType<typeof eq> => c !== null);
+
+                    if (conditions.length !== pk.length) {
+                      continue;
+                    }
+                    await this.localDb.delete(table).where(and(...conditions));
+                  } else {
+                    const columnKey = toCamelCase(pk);
                     const value = localKeyData[columnKey];
                     if (typeof value === "undefined") {
                       log.warn(
-                        `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
+                        `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
                         { rowId: change.rowId }
                       );
-                      return null;
+                      continue;
                     }
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    return eq((table as any)[columnKey], value);
-                  })
-                  .filter((c): c is ReturnType<typeof eq> => c !== null);
-
-                if (conditions.length !== pk.length) {
-                  continue;
+                    await this.localDb
+                      .delete(table)
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      .where(eq((table as any)[columnKey], value));
+                  }
+                } else {
+                  // Upsert local
+                  const sanitizedData = sanitizeData(change.data);
+                  await this.localDb
+                    .insert(table)
+                    .values(sanitizedData)
+                    .onConflictDoUpdate({
+                      target: Array.isArray(adapter.primaryKey)
+                        ? adapter.primaryKey.map(
+                            (k) => (table as any)[toCamelCase(k)]
+                          )
+                        : (table as any)[
+                            toCamelCase(adapter.primaryKey as string)
+                          ],
+                      set: sanitizedData,
+                    });
                 }
-                await this.localDb.delete(table).where(and(...conditions));
-              } else {
-                const columnKey = toCamelCase(pk);
-                const value = localKeyData[columnKey];
-                if (typeof value === "undefined") {
-                  log.warn(
-                    `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
-                    { rowId: change.rowId }
-                  );
-                  continue;
-                }
-                await this.localDb
-                  .delete(table)
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  .where(eq((table as any)[columnKey], value));
-              }
-            } else {
-              // Upsert local
-              const sanitizedData = sanitizeData(change.data);
-
-              try {
-                await this.localDb
-                  .insert(table)
-                  .values(sanitizedData)
-                  .onConflictDoUpdate({
-                    target: Array.isArray(adapter.primaryKey)
-                      ? adapter.primaryKey.map(
-                          (k) => (table as any)[toCamelCase(k)]
-                        )
-                      : (table as any)[
-                          toCamelCase(adapter.primaryKey as string)
-                        ],
-                    set: sanitizedData,
-                  });
+                synced++;
               } catch (e) {
+                failed++;
+                const errorMsg =
+                  e instanceof Error ? e.message : "Unknown error";
+                errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
                 log.error(
-                  `[SyncEngine] Failed to insert into ${change.table}:`,
+                  `[SyncEngine] Failed to apply change to ${change.table} rowId=${change.rowId}:`,
                   e
                 );
-                throw e;
+                // Continue applying other tables so core UI data isn't blocked
               }
             }
-            synced++;
+          } finally {
+            enableSyncTriggers(sqliteInstance);
           }
-
-          enableSyncTriggers(sqliteInstance);
         }
       }
 
@@ -421,14 +428,15 @@ export class SyncEngine {
       }
 
       // 6. Update Timestamp (persists to localStorage for incremental sync after restart)
-      if (response.syncedAt) {
+      // Only advance the watermark if we successfully applied all remote changes.
+      if (response.syncedAt && failed === 0) {
         this.setLastSyncTimestamp(response.syncedAt);
       }
 
       return {
-        success: true,
+        success: failed === 0,
         itemsSynced: synced,
-        itemsFailed: 0,
+        itemsFailed: failed,
         conflicts: 0,
         errors,
         timestamp: startTime,
@@ -448,7 +456,7 @@ export class SyncEngine {
       return {
         success: false,
         itemsSynced: synced,
-        itemsFailed: 0,
+        itemsFailed: failed,
         conflicts: 0,
         errors,
         timestamp: startTime,

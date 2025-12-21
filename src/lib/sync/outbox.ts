@@ -8,7 +8,7 @@
  * @module lib/sync/outbox
  */
 
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import {
@@ -190,33 +190,34 @@ export async function getOutboxStats(db: SqliteDatabase): Promise<{
   failed: number;
   total: number;
 }> {
-  // Get all items and count in memory (simpler than group by)
-  const items = await db
-    .select({ status: syncPushQueue.status })
+  // IMPORTANT: Don't fetch all outbox rows into JS.
+  // The outbox can grow large (especially when offline), and selecting all rows
+  // will allocate a huge array and can crash the tab.
+  const [{ count: pendingCount } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(syncPushQueue)
+    .where(eq(syncPushQueue.status, "pending"));
+
+  const [{ count: inProgressCount } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(syncPushQueue)
+    .where(eq(syncPushQueue.status, "in_progress"));
+
+  const [{ count: failedCount } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(syncPushQueue)
+    .where(eq(syncPushQueue.status, "failed"));
+
+  const [{ count: totalCount } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)` })
     .from(syncPushQueue);
 
-  const stats = {
-    pending: 0,
-    inProgress: 0,
-    failed: 0,
-    total: items.length,
+  return {
+    pending: Number(pendingCount ?? 0),
+    inProgress: Number(inProgressCount ?? 0),
+    failed: Number(failedCount ?? 0),
+    total: Number(totalCount ?? 0),
   };
-
-  for (const row of items) {
-    switch (row.status) {
-      case "pending":
-        stats.pending++;
-        break;
-      case "in_progress":
-        stats.inProgress++;
-        break;
-      case "failed":
-        stats.failed++;
-        break;
-    }
-  }
-
-  return stats;
 }
 
 /**

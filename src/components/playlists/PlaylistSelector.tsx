@@ -6,7 +6,7 @@
  *
  * Features:
  * - Shows all user playlists
- * - Displays selected playlist name
+ * - Displays selected repertoire name
  * - Persists selection across sessions
  * - Loads playlists from local SQLite
  * - Auto-selects default playlist if none selected

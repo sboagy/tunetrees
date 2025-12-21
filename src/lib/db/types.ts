@@ -157,6 +157,10 @@ export interface CreateTuneInput {
   structure?: string;
   incipit?: string;
   genre?: string; // UUID
+  composer?: string;
+  artist?: string;
+  idForeign?: string; // External ID (Spotify, YouTube, etc.) - text
+  releaseYear?: number;
   privateFor?: string; // User UUID (was integer)
 }
 

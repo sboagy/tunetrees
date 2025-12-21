@@ -91,12 +91,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     const genreNames = props.selectedGenreNames || [];
     const all = allGenres() || [];
 
-    const genreIds: string[] = [];
-    if (genreNames.length > 0) {
-      for (const name of genreNames) {
-        const g = all.find((x) => x.name === name);
-        if (g) genreIds.push(g.id);
-      }
+    const genreById = new Map<string, string>();
+    for (const g of all) {
+      if (g.id && g.name) genreById.set(g.id, g.name);
     }
 
     return base.filter((t): boolean => {
@@ -104,12 +101,16 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
         const a = t.title?.toLowerCase().includes(query);
         const b = t.incipit?.toLowerCase().includes(query);
         const c = t.structure?.toLowerCase().includes(query);
-        if (!a && !b && !c) return false;
+        const d = t.composer?.toLowerCase().includes(query);
+        const e = t.artist?.toLowerCase().includes(query);
+        if (!a && !b && !c && !d && !e) return false;
       }
       if (types.length > 0 && t.type && !types.includes(t.type)) return false;
       if (modes.length > 0 && t.mode && !modes.includes(t.mode)) return false;
-      if (genreIds.length > 0 && t.genre && !genreIds.includes(t.genre))
-        return false;
+      if (genreNames.length > 0 && t.genre) {
+        const tuneGenreName = genreById.get(t.genre) ?? t.genre;
+        if (!genreNames.includes(tuneGenreName)) return false;
+      }
       return true;
     });
   });

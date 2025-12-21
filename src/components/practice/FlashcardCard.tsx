@@ -225,6 +225,57 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
         {/* Detail Fields - Shown based on current face and field visibility settings */}
         <div class="flex-1 overflow-y-auto space-y-6">
+          {/* Composer */}
+          <Show when={isFieldVisible()("composer")}>
+            <div data-testid="flashcard-field-composer">
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Composer
+              </h3>
+              <p class="text-gray-900 dark:text-gray-100">
+                {props.tune.composer || "—"}
+              </p>
+            </div>
+          </Show>
+
+          {/* Artist */}
+          <Show when={isFieldVisible()("artist")}>
+            <div data-testid="flashcard-field-artist">
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Artist
+              </h3>
+              <p class="text-gray-900 dark:text-gray-100">
+                {props.tune.artist || "—"}
+              </p>
+            </div>
+          </Show>
+
+          {/* Release Year */}
+          <Show when={isFieldVisible()("release_year")}>
+            <div data-testid="flashcard-field-release_year">
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Release Year
+              </h3>
+              <p class="text-gray-900 dark:text-gray-100">
+                {props.tune.release_year !== null &&
+                props.tune.release_year !== undefined
+                  ? props.tune.release_year
+                  : "—"}
+              </p>
+            </div>
+          </Show>
+
+          {/* External ID */}
+          <Show when={isFieldVisible()("id_foreign")}>
+            <div data-testid="flashcard-field-id_foreign">
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                External ID
+              </h3>
+              <p class="text-gray-900 dark:text-gray-100 font-mono break-all">
+                {props.tune.id_foreign || "—"}
+              </p>
+            </div>
+          </Show>
+
           {/* Structure */}
           <Show when={isFieldVisible()("structure")}>
             <div data-testid="flashcard-field-structure">

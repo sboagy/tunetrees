@@ -23,6 +23,7 @@ import { useCurrentPlaylist } from "../../../lib/context/CurrentPlaylistContext"
 import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
 import {
   getOrCreateTuneOverride,
+  type TuneOverrideInput,
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
 import {
@@ -144,25 +145,37 @@ const EditTunePage: Component = () => {
           structure: tuneData.structure ?? undefined,
           incipit: tuneData.incipit ?? undefined,
           genre: tuneData.genre ?? undefined,
+          composer: tuneData.composer ?? undefined,
+          artist: tuneData.artist ?? undefined,
+          idForeign: tuneData.idForeign ?? undefined,
+          releaseYear: tuneData.releaseYear ?? undefined,
         }))
       ) {
         // Updated base tune (owned by user)
       } else {
         // Public tune or another user's tune - use tune_override
         // Build override input with only changed fields
-        const overrideInput: any = {};
+        const overrideInput: TuneOverrideInput = {};
         if (tuneData.title !== currentTune.title)
-          overrideInput.title = tuneData.title;
+          overrideInput.title = tuneData.title ?? undefined;
         if (tuneData.type !== currentTune.type)
-          overrideInput.type = tuneData.type;
+          overrideInput.type = tuneData.type ?? undefined;
         if (tuneData.mode !== currentTune.mode)
-          overrideInput.mode = tuneData.mode;
+          overrideInput.mode = tuneData.mode ?? undefined;
         if (tuneData.structure !== currentTune.structure)
-          overrideInput.structure = tuneData.structure;
+          overrideInput.structure = tuneData.structure ?? undefined;
         if (tuneData.incipit !== currentTune.incipit)
-          overrideInput.incipit = tuneData.incipit;
+          overrideInput.incipit = tuneData.incipit ?? undefined;
         if (tuneData.genre !== currentTune.genre)
-          overrideInput.genre = tuneData.genre;
+          overrideInput.genre = tuneData.genre ?? undefined;
+        if (tuneData.composer !== currentTune.composer)
+          overrideInput.composer = tuneData.composer ?? undefined;
+        if (tuneData.artist !== currentTune.artist)
+          overrideInput.artist = tuneData.artist ?? undefined;
+        if (tuneData.idForeign !== currentTune.idForeign)
+          overrideInput.idForeign = tuneData.idForeign ?? undefined;
+        if (tuneData.releaseYear !== currentTune.releaseYear)
+          overrideInput.releaseYear = tuneData.releaseYear ?? undefined;
 
         // Only proceed if there are actual changes
         if (Object.keys(overrideInput).length > 0) {

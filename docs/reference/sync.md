@@ -186,6 +186,29 @@ await table.delete().match({
 
 ## Critical Rules
 
+## Current Data Visibility Semantics
+
+TuneTrees is offline-first and syncs rows into a local SQLite WASM database.
+To keep the local database privacy-safe and deterministic, the sync layer must
+ensure that the client never receives rows that contain other users' IDs.
+
+Today (December 2025) we are not implementing cross-user sharing of `reference`
+or `note` rows.
+
+### `reference` and `note` "public" columns
+
+For now, the `public` columns on the `reference` and `note` tables are **ignored**
+for visibility and sync.
+
+- A row is considered **system/legacy** only when its `user_ref` is `NULL`.
+- A row is considered **user-owned** only when its `user_ref` matches the current
+  logged-in user.
+- Rows with `user_ref` set to a different user must never be synced down to the
+  client.
+
+This is enforced in the worker's per-table filters and mirrored in client-side
+queries.
+
 ### 1. Sync Up Before Sync Down
 
 **Why?** Prevents "zombie records" where deleted items reappear.

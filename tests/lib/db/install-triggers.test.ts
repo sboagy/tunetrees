@@ -6,10 +6,12 @@
 
 import initSqlJs, { type Database } from "sql.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TABLE_REGISTRY } from "../../../shared/table-meta";
 import {
   areSyncTriggersInstalled,
   areSyncTriggersSuppressed,
-  createSyncOutboxTable,
+  createSyncPushQueueTable,
+  createSyncTriggerControlTable,
   enableSyncTriggers,
   getSyncTriggerCount,
   installSyncTriggers,
@@ -34,7 +36,8 @@ beforeEach(async () => {
     CREATE TABLE tune (
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT,
-      genre TEXT
+      genre TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -199,18 +202,18 @@ afterEach(() => {
   }
 });
 
-describe("createSyncOutboxTable", () => {
-  it("creates sync_outbox table with correct schema", () => {
-    createSyncOutboxTable(db);
+describe("createSyncPushQueueTable", () => {
+  it("creates sync_push_queue table with correct schema", () => {
+    createSyncPushQueueTable(db);
 
     // Check table exists
     const tables = db.exec(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='sync_outbox'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='sync_push_queue'"
     );
     expect(tables[0]?.values).toHaveLength(1);
 
     // Check columns
-    const pragma = db.exec("PRAGMA table_info(sync_outbox)");
+    const pragma = db.exec("PRAGMA table_info(sync_push_queue)");
     const columns = pragma[0]?.values.map((row) => row[1]) || [];
     expect(columns).toContain("id");
     expect(columns).toContain("table_name");
@@ -224,23 +227,23 @@ describe("createSyncOutboxTable", () => {
   });
 
   it("creates indexes", () => {
-    createSyncOutboxTable(db);
+    createSyncPushQueueTable(db);
 
     const indexes = db.exec(
-      "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='sync_outbox'"
+      "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='sync_push_queue'"
     );
     const indexNames = indexes[0]?.values.map((row) => row[0]) || [];
-    expect(indexNames).toContain("idx_outbox_status_changed");
-    expect(indexNames).toContain("idx_outbox_table_row");
+    expect(indexNames).toContain("idx_push_queue_status_changed");
+    expect(indexNames).toContain("idx_push_queue_table_row");
   });
 
   it("is idempotent", () => {
-    createSyncOutboxTable(db);
-    createSyncOutboxTable(db); // Should not throw
-    createSyncOutboxTable(db); // Should not throw
+    createSyncPushQueueTable(db);
+    createSyncPushQueueTable(db); // Should not throw
+    createSyncPushQueueTable(db); // Should not throw
 
     const tables = db.exec(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='sync_outbox'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='sync_push_queue'"
     );
     expect(tables[0]?.values).toHaveLength(1);
   });
@@ -255,16 +258,21 @@ describe("installSyncTriggers", () => {
     expect(verification.missingTables).toHaveLength(0);
   });
 
-  // 19 tables × 3 operations = 57 triggers
-  it("creates 57 triggers (19 tables × 3 operations)", () => {
+  it("creates expected triggers for all tables", () => {
     installSyncTriggers(db);
+
+    const tableCount = Object.keys(TABLE_REGISTRY).length;
+    const autoModifiedCount = Object.values(TABLE_REGISTRY).filter(
+      (meta) => meta.supportsIncremental
+    ).length;
+    const expected = tableCount * 3 + autoModifiedCount;
 
     const result = db.exec(`
       SELECT COUNT(*) FROM sqlite_master
       WHERE type = 'trigger' AND name LIKE 'trg_%'
     `);
     const count = Number(result[0]?.values[0]?.[0] || 0);
-    expect(count).toBe(57);
+    expect(count).toBe(expected);
   });
 
   it("is idempotent", () => {
@@ -278,7 +286,8 @@ describe("installSyncTriggers", () => {
 
 describe("areSyncTriggersInstalled", () => {
   it("returns false before installation", () => {
-    createSyncOutboxTable(db);
+    createSyncTriggerControlTable(db);
+    createSyncPushQueueTable(db);
     expect(areSyncTriggersInstalled(db)).toBe(false);
   });
 
@@ -308,13 +317,13 @@ describe("trigger functionality", () => {
     installSyncTriggers(db);
   });
 
-  it("creates outbox entry on INSERT for single-PK table", () => {
+  it("creates push queue entry on INSERT for single-PK table", () => {
     db.run(
       "INSERT INTO tune (id, title, genre) VALUES ('tune-1', 'Test Tune', 'irish')"
     );
 
     const outbox = db.exec(
-      "SELECT * FROM sync_outbox WHERE table_name = 'tune'"
+      "SELECT * FROM sync_push_queue WHERE table_name = 'tune'"
     );
     expect(outbox[0]?.values).toHaveLength(1);
 
@@ -325,16 +334,18 @@ describe("trigger functionality", () => {
     expect(row?.[4]).toBe("pending"); // status
   });
 
-  it("creates outbox entry on UPDATE", () => {
+  it("creates push queue entry on UPDATE", () => {
     db.run(
       "INSERT INTO tune (id, title, genre) VALUES ('tune-2', 'Test Tune', 'irish')"
     );
-    db.run("DELETE FROM sync_outbox"); // Clear INSERT entry
+    db.run("DELETE FROM sync_push_queue"); // Clear INSERT entry
 
-    db.run("UPDATE tune SET title = 'Updated Tune' WHERE id = 'tune-2'");
+    db.run(
+      "UPDATE tune SET title = 'Updated Tune', last_modified_at = '2025-01-01T00:00:00Z' WHERE id = 'tune-2'"
+    );
 
     const outbox = db.exec(
-      "SELECT * FROM sync_outbox WHERE table_name = 'tune'"
+      "SELECT * FROM sync_push_queue WHERE table_name = 'tune'"
     );
     expect(outbox[0]?.values).toHaveLength(1);
 
@@ -343,16 +354,16 @@ describe("trigger functionality", () => {
     expect(row?.[3]).toBe("UPDATE"); // operation
   });
 
-  it("creates outbox entry on DELETE", () => {
+  it("creates push queue entry on DELETE", () => {
     db.run(
       "INSERT INTO tune (id, title, genre) VALUES ('tune-3', 'Test Tune', 'irish')"
     );
-    db.run("DELETE FROM sync_outbox"); // Clear INSERT entry
+    db.run("DELETE FROM sync_push_queue"); // Clear INSERT entry
 
     db.run("DELETE FROM tune WHERE id = 'tune-3'");
 
     const outbox = db.exec(
-      "SELECT * FROM sync_outbox WHERE table_name = 'tune'"
+      "SELECT * FROM sync_push_queue WHERE table_name = 'tune'"
     );
     expect(outbox[0]?.values).toHaveLength(1);
 
@@ -367,7 +378,7 @@ describe("trigger functionality", () => {
     );
 
     const outbox = db.exec(
-      "SELECT row_id FROM sync_outbox WHERE table_name = 'playlist'"
+      "SELECT row_id FROM sync_push_queue WHERE table_name = 'playlist'"
     );
     expect(outbox[0]?.values[0]?.[0]).toBe("pl-1");
   });
@@ -375,14 +386,14 @@ describe("trigger functionality", () => {
   it("uses composite key JSON for genre_tune_type", () => {
     db.run("INSERT INTO genre (id, name) VALUES ('genre-1', 'Irish')");
     db.run("INSERT INTO tune_type (id, name) VALUES ('type-1', 'Jig')");
-    db.run("DELETE FROM sync_outbox");
+    db.run("DELETE FROM sync_push_queue");
 
     db.run(
       "INSERT INTO genre_tune_type (genre_id, tune_type_id) VALUES ('genre-1', 'type-1')"
     );
 
     const outbox = db.exec(
-      "SELECT row_id FROM sync_outbox WHERE table_name = 'genre_tune_type'"
+      "SELECT row_id FROM sync_push_queue WHERE table_name = 'genre_tune_type'"
     );
     const rowId = outbox[0]?.values[0]?.[0] as string;
     const parsed = JSON.parse(rowId);
@@ -396,7 +407,7 @@ describe("trigger functionality", () => {
       "INSERT INTO user_profile (supabase_user_id, id) VALUES ('sup-1', 'user-1')"
     );
     db.run("INSERT INTO playlist (playlist_id, name) VALUES ('pl-1', 'Test')");
-    db.run("DELETE FROM sync_outbox");
+    db.run("DELETE FROM sync_push_queue");
 
     db.run(`
       INSERT INTO table_state (user_id, screen_size, purpose, playlist_id, settings)
@@ -404,7 +415,7 @@ describe("trigger functionality", () => {
     `);
 
     const outbox = db.exec(
-      "SELECT row_id FROM sync_outbox WHERE table_name = 'table_state'"
+      "SELECT row_id FROM sync_push_queue WHERE table_name = 'table_state'"
     );
     const rowId = outbox[0]?.values[0]?.[0] as string;
     const parsed = JSON.parse(rowId);
@@ -420,7 +431,7 @@ describe("trigger functionality", () => {
     db.run("INSERT INTO tune (id, title) VALUES ('t-2', 'Tune 2')");
     db.run("INSERT INTO tune (id, title) VALUES ('t-3', 'Tune 3')");
 
-    const outbox = db.exec("SELECT id FROM sync_outbox");
+    const outbox = db.exec("SELECT id FROM sync_push_queue");
     const ids = outbox[0]?.values.map((row) => row[0]) || [];
 
     // All IDs should be unique
@@ -436,7 +447,7 @@ describe("trigger functionality", () => {
   it("generates ISO 8601 timestamps", () => {
     db.run("INSERT INTO tune (id, title) VALUES ('t-1', 'Test')");
 
-    const outbox = db.exec("SELECT changed_at FROM sync_outbox");
+    const outbox = db.exec("SELECT changed_at FROM sync_push_queue");
     const timestamp = outbox[0]?.values[0]?.[0] as string;
 
     // Should be ISO 8601 format with milliseconds
@@ -446,12 +457,14 @@ describe("trigger functionality", () => {
 
 describe("verifySyncTriggers", () => {
   it("reports all tables missing before installation", () => {
-    createSyncOutboxTable(db);
+    createSyncTriggerControlTable(db);
+    createSyncPushQueueTable(db);
     const verification = verifySyncTriggers(db);
 
     expect(verification.installed).toBe(false);
-    // 19 tables
-    expect(verification.missingTables.length).toBe(19);
+    expect(verification.missingTables.length).toBe(
+      Object.keys(TABLE_REGISTRY).length
+    );
     expect(verification.missingTables).toContain("tune");
     expect(verification.missingTables).toContain("playlist");
     expect(verification.missingTables).toContain("genre_tune_type");
@@ -490,7 +503,7 @@ describe("trigger suppression", () => {
 
   it("suppressed triggers do not create outbox entries", () => {
     // Clear any existing outbox entries
-    db.run("DELETE FROM sync_outbox");
+    db.run("DELETE FROM sync_push_queue");
 
     // Suppress triggers
     suppressSyncTriggers(db);
@@ -501,13 +514,13 @@ describe("trigger suppression", () => {
     );
 
     // Verify no outbox entry was created
-    const outbox = db.exec("SELECT * FROM sync_outbox");
+    const outbox = db.exec("SELECT * FROM sync_push_queue");
     expect(outbox.length === 0 || outbox[0]?.values.length === 0).toBe(true);
   });
 
   it("enabled triggers create outbox entries normally", () => {
     // Clear any existing outbox entries
-    db.run("DELETE FROM sync_outbox");
+    db.run("DELETE FROM sync_push_queue");
 
     // Ensure triggers are enabled
     enableSyncTriggers(db);
@@ -517,7 +530,7 @@ describe("trigger suppression", () => {
 
     // Verify outbox entry was created
     const outbox = db.exec(
-      "SELECT table_name, operation FROM sync_outbox WHERE row_id = 't-enabled'"
+      "SELECT table_name, operation FROM sync_push_queue WHERE row_id = 't-enabled'"
     );
     expect(outbox.length).toBe(1);
     expect(outbox[0]?.values.length).toBe(1);
@@ -527,7 +540,7 @@ describe("trigger suppression", () => {
 
   it("suppression survives multiple operations", () => {
     // Clear any existing outbox entries
-    db.run("DELETE FROM sync_outbox");
+    db.run("DELETE FROM sync_push_queue");
 
     // Suppress triggers
     suppressSyncTriggers(db);
@@ -538,13 +551,13 @@ describe("trigger suppression", () => {
     db.run("DELETE FROM tune WHERE id = 't1'");
 
     // Verify no outbox entries were created
-    const outbox = db.exec("SELECT * FROM sync_outbox");
+    const outbox = db.exec("SELECT * FROM sync_push_queue");
     expect(outbox.length === 0 || outbox[0]?.values.length === 0).toBe(true);
   });
 
   it("re-enabling triggers works for subsequent operations", () => {
     // Clear any existing outbox entries
-    db.run("DELETE FROM sync_outbox");
+    db.run("DELETE FROM sync_push_queue");
 
     // Suppress, do operation, re-enable
     suppressSyncTriggers(db);
@@ -559,7 +572,7 @@ describe("trigger suppression", () => {
     );
 
     // Verify only the second insert created an outbox entry
-    const outbox = db.exec("SELECT row_id FROM sync_outbox");
+    const outbox = db.exec("SELECT row_id FROM sync_push_queue");
     expect(outbox.length).toBe(1);
     expect(outbox[0]?.values.length).toBe(1);
     expect(outbox[0]?.values[0]?.[0]).toBe("t-after");

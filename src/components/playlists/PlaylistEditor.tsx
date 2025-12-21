@@ -139,7 +139,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
     const newErrors: Record<string, string> = {};
 
     if (!name().trim()) {
-      newErrors.name = "Playlist name is required";
+      newErrors.name = "Repertoire name is required";
     }
 
     setErrors(newErrors);
@@ -182,7 +182,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
           <Show when={props.playlist}>
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
               <p class="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Playlist ID:</strong> {props.playlist?.playlistId}
+                <strong>Repertoire ID:</strong> {props.playlist?.playlistId}
               </p>
               <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
                 <strong>User Ref:</strong> {props.playlist?.userRef}
@@ -190,13 +190,13 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
             </div>
           </Show>
 
-          {/* Playlist Name */}
+          {/* Repertoire Name */}
           <div class="space-y-2">
             <label
               for="playlist-name"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Playlist Name <span class="text-red-500">*</span>
+              Repertoire Name <span class="text-red-500">*</span>
             </label>
             <input
               id="playlist-name"
@@ -211,7 +211,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               <p class="text-xs text-red-500">{errors().name}</p>
             </Show>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Give your playlist a descriptive name (e.g., "My Irish Tunes",
+              Give your repertoire a descriptive name (e.g., "My Irish Tunes",
               "Beginner Bluegrass")
             </p>
           </div>
@@ -243,8 +243,8 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               </Show>
             </select>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Set a default genre for tunes in this playlist (e.g., ITRAD, BGRA,
-              OTIME)
+              Set a default genre for tunes in this repertoire (e.g., ITRAD,
+              BGRA, OTIME)
             </p>
           </div>
 
@@ -283,7 +283,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               <p class="text-xs text-red-500">{errors().instrumentRef}</p>
             </Show>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Select the instrument for this playlist (e.g., Irish Flute,
+              Select the instrument for this repertoire (e.g., Irish Flute,
               Mandolin).
             </p>
           </div>
@@ -307,7 +307,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
               ))}
             </select>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              Choose the spaced repetition algorithm for this playlist's
+              Choose the spaced repetition algorithm for this repertoire's
               practice scheduling.
             </p>
           </div>

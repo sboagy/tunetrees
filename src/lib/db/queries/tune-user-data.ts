@@ -223,7 +223,6 @@ export async function getOrCreatePrivateNote(
       and(
         eq(note.tuneRef, tuneId),
         eq(note.userRef, userId),
-        eq(note.public, 0),
         eq(note.deleted, 0)
       )
     )
