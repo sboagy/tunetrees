@@ -306,6 +306,23 @@ export async function initializeDb(
       await initializeViews(drizzleDb);
       try {
         ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
+
+        // Backward-compatible adds for hybrid tune fields.
+        // Some existing IndexedDB DBs were created before these columns existed,
+        // but sync may deliver rows containing them (e.g., tune_override.composer).
+        ensureColumnExists("tune", "composer", "composer text");
+        ensureColumnExists("tune", "artist", "artist text");
+        ensureColumnExists("tune", "id_foreign", "id_foreign text");
+        ensureColumnExists("tune", "release_year", "release_year integer");
+
+        ensureColumnExists("tune_override", "composer", "composer text");
+        ensureColumnExists("tune_override", "artist", "artist text");
+        ensureColumnExists("tune_override", "id_foreign", "id_foreign text");
+        ensureColumnExists(
+          "tune_override",
+          "release_year",
+          "release_year integer"
+        );
       } catch (err) {
         console.warn("⚠️ Column ensure check failed:", err);
       }
