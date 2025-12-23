@@ -371,16 +371,12 @@ export class SyncEngine {
                 // Upsert local
                 const sanitizedData = sanitizeData(change.data);
 
-                // Special-case tables with logical uniqueness not expressed by primary key.
-                // practice_record is unique by (tune_ref, playlist_ref, practiced) and may
-                // legitimately conflict during sync if IDs diverged historically.
+                // practice_record: upsert by primary key id.
+                // This prevents initial sync from failing when a record already exists locally
+                // (e.g., IndexedDB retained while sync state is reset).
                 const conflictTarget =
                   change.table === "practice_record"
-                    ? [
-                        (table as any).tuneRef,
-                        (table as any).playlistRef,
-                        (table as any).practiced,
-                      ]
+                    ? (table as any).id
                     : Array.isArray(adapter.primaryKey)
                       ? adapter.primaryKey.map(
                           (k) => (table as any)[toCamelCase(k)]
