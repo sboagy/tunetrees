@@ -31,6 +31,40 @@ import {
 import * as schema from "./schema-postgres";
 
 // ============================================================================
+// DB CONNECTION
+// ============================================================================
+
+type PostgresClient = ReturnType<typeof postgres>;
+type DrizzleDb = ReturnType<typeof drizzle>;
+
+function createDb(env: Env): {
+  client: PostgresClient;
+  db: DrizzleDb;
+  close: () => Promise<void>;
+} {
+  const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("Database configuration error - no connection string");
+  }
+
+  // IMPORTANT (Cloudflare Workers): Do NOT cache/reuse database clients across requests.
+  // Newer Workers runtimes enforce request-scoped I/O; reusing a client can trigger:
+  // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
+  const client = postgres(connectionString);
+  const db = drizzle(client, { schema });
+
+  const close = async () => {
+    try {
+      await client.end({ timeout: 5 });
+    } catch {
+      // ignore
+    }
+  };
+
+  return { client, db, close };
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -858,24 +892,18 @@ export default {
       }
 
       // Connect to database
-      const connectionString =
-        env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
-      if (!connectionString) {
-        console.error(
-          `[HTTP] Database configuration error - no connection string`
-        );
-        return errorResponse("Database configuration error", 500);
-      }
-
       try {
-        const client = postgres(connectionString);
-        const db = drizzle(client, { schema });
+        const { db, close } = createDb(env);
         const payload = (await request.json()) as SyncRequest;
 
-        console.log(`[HTTP] Sync request parsed, calling handleSync`);
-        const response = await handleSync(db, payload, userId);
-        console.log(`[HTTP] Sync completed successfully`);
-        return jsonResponse(response);
+        try {
+          console.log(`[HTTP] Sync request parsed, calling handleSync`);
+          const response = await handleSync(db, payload, userId);
+          console.log(`[HTTP] Sync completed successfully`);
+          return jsonResponse(response);
+        } finally {
+          await close();
+        }
       } catch (error) {
         console.error("[HTTP] Sync error:", error);
         return errorResponse(String(error), 500);
