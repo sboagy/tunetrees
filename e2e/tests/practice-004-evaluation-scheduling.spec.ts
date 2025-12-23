@@ -182,7 +182,7 @@ test.describe
       const rows = ttPage.getRows("scheduled");
       const firstRow = rows.first();
 
-      await ttPage.setRowEvaluation(firstRow, "good");
+      await ttPage.setRowEvaluation(firstRow, "good", 500);
 
       // Verify evaluation count is 1
       const badgeSpan = await ttPage.submitEvaluationsButton
@@ -191,7 +191,7 @@ test.describe
 
       await expect(badgeSpan).toHaveText("1");
 
-      await ttPage.setRowEvaluation(firstRow, "not-set");
+      await ttPage.setRowEvaluation(firstRow, "not-set", 500);
 
       const evalNotSetDropdown = page
         .getByRole("cell", { name: "(Not Set)" })
