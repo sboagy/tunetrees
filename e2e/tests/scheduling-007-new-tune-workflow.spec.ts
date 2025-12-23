@@ -121,6 +121,22 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           { table: "tune_override", column: "tune_ref" },
         ];
         for (const { table, column, filterPlaylist } of cascade) {
+          if (table === "practice_record") {
+            const { error } = await supabase.rpc(
+              "e2e_delete_practice_record_by_tunes",
+              {
+                target_playlist: testUser.playlistId,
+                tune_ids: uniqueIds,
+              }
+            );
+            if (error) {
+              console.warn(
+                `[CLEANUP] Error deleting from ${table}: ${error.message}`
+              );
+            }
+            continue;
+          }
+
           let del = supabase.from(table).delete().in(column, uniqueIds);
           if (filterPlaylist) del = del.eq("playlist_ref", testUser.playlistId);
           const { error } = await del;
@@ -449,11 +465,10 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
             .delete()
             .in("tune_ref", ids)
             .eq("playlist_ref", testUser.playlistId);
-          await supabase
-            .from("practice_record")
-            .delete()
-            .in("tune_ref", ids)
-            .eq("playlist_ref", testUser.playlistId);
+          await supabase.rpc("e2e_delete_practice_record_by_tunes", {
+            target_playlist: testUser.playlistId,
+            tune_ids: ids,
+          });
           await supabase
             .from("daily_practice_queue")
             .delete()
@@ -565,11 +580,10 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
             .delete()
             .in("tune_ref", ids)
             .eq("playlist_ref", testUser.playlistId);
-          await supabase
-            .from("practice_record")
-            .delete()
-            .in("tune_ref", ids)
-            .eq("playlist_ref", testUser.playlistId);
+          await supabase.rpc("e2e_delete_practice_record_by_tunes", {
+            target_playlist: testUser.playlistId,
+            tune_ids: ids,
+          });
           await supabase
             .from("daily_practice_queue")
             .delete()

@@ -573,7 +573,12 @@ export const TopNav: Component = () => {
   // Poll for pending sync count (skip for anonymous users - they don't sync)
   createEffect(() => {
     const db = localDb();
-    if (!db || isAnonymous()) {
+    // In Playwright E2E runs, avoid polling SQLite WASM in the UI.
+    // This has caused browser OOMs under heavy parallelism.
+    const isE2E =
+      typeof window !== "undefined" && !!(window as any).__ttTestApi;
+
+    if (!db || isAnonymous() || isE2E) {
       setPendingCount(0); // Reset count for anonymous users
       return;
     }

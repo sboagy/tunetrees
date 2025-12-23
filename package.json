@@ -31,6 +31,7 @@
     "db:local:gen-test-auth": "npx tsx scripts/generate-auth-states.ts",
     "db:dump-migration": "npx supabase db dump --local --schema public -f supabase/migrations/20241101000000_initial_schema.sql",
     "db:dump-seed": "npx supabase db dump --local --data-only --schema public,auth -f supabase/seed.sql",
+    "db:remote:backup": "tsx scripts/backup-supabase-linked.ts",
     "db:remote:migrate-legacy": "supabase db reset --linked --no-seed && npx tsx scripts/migrate-production-to-supabase.ts --remote",
     "db:local:migrate-legacy": "supabase db reset --no-seed && npx tsx scripts/migrate-production-to-supabase.ts && npx tsx scripts/setup-test-environment.ts",
     "db:remote:apply-top500": "supabase db execute --linked --file supabase/seeds/rsTop500.sql",

@@ -210,6 +210,15 @@ export const AuthProvider: ParentComponent = (props) => {
     "full" | "incremental" | null
   >(null);
 
+  // Track last sync outcome for diagnostics (and Playwright E2E gating)
+  const [lastSyncSuccess, setLastSyncSuccess] = createSignal<boolean | null>(
+    null
+  );
+  const [lastSyncErrorCount, setLastSyncErrorCount] = createSignal(0);
+  const [lastSyncErrorSummary, setLastSyncErrorSummary] = createSignal<
+    string | null
+  >(null);
+
   // View-specific change signals for optimistic updates
   const [practiceListStagedChanged, setPracticeListStagedChanged] =
     createSignal(0);
@@ -272,6 +281,24 @@ export const AuthProvider: ParentComponent = (props) => {
         log.debug(
           "Sync completed, incrementing remote sync down completion version"
         );
+
+        // Record last sync outcome for E2E and UI diagnostics.
+        setLastSyncSuccess(result?.success ?? null);
+        const errorCount = result?.errors?.length ?? 0;
+        setLastSyncErrorCount(errorCount);
+        if (errorCount > 0) {
+          const first = result?.errors?.[0];
+          let summary: string;
+          try {
+            summary =
+              typeof first === "string" ? first : JSON.stringify(first) ?? "";
+          } catch {
+            summary = String(first);
+          }
+          setLastSyncErrorSummary(summary);
+        } else {
+          setLastSyncErrorSummary(null);
+        }
 
         setRemoteSyncDownCompletionVersion((prev) => {
           const newVersion = prev + 1;
@@ -1492,6 +1519,11 @@ export const AuthProvider: ParentComponent = (props) => {
       <div
         data-auth-initialized={!loading()}
         data-sync-version={remoteSyncDownCompletionVersion()}
+        data-sync-success={
+          lastSyncSuccess() === null ? "" : String(lastSyncSuccess())
+        }
+        data-sync-error-count={String(lastSyncErrorCount())}
+        data-sync-error-summary={lastSyncErrorSummary() ?? ""}
         style={{ display: "contents" }}
       >
         {props.children}

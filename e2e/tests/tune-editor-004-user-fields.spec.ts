@@ -5,6 +5,7 @@ import {
   CATALOG_TUNE_DANCING_MASTER_ID,
   CATALOG_TUNE_KESH_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -27,10 +28,14 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 let ttPage: TuneTreesPage;
+let currentDate: Date;
 
 test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
+
+    currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
 
     // Start with clean repertoire with some test data
     await setupDeterministicTestParallel(page, testUser, {
@@ -370,14 +375,21 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(tuneEditorForm).toBeVisible({ timeout: 10000 });
 
     // Verify all fields
-    await expect(page.getByTestId("tune-editor-input-learned")).toHaveValue(
-      "2024-01-10T09:00"
+    const tuneEditorInputLearned = page.getByTestId(
+      "tune-editor-input-learned"
     );
+    const tuneEditorInputScheduled = page.getByTestId(
+      "tune-editor-input-scheduled"
+    );
+    // const tuneEditorInputLearnedValue =
+    //   await tuneEditorInputLearned.inputValue();
+    // const tuneEditorInputScheduledValue =
+    //   await tuneEditorInputScheduled.inputValue();
+
+    await expect(tuneEditorInputLearned).toHaveValue("2024-01-10T09:00");
     await expect(page.getByTestId("tune-editor-select-goal")).toHaveValue(
       "session_ready"
     );
-    await expect(page.getByTestId("tune-editor-input-scheduled")).toHaveValue(
-      "2024-03-15T14:00"
-    );
+    await expect(tuneEditorInputScheduled).toHaveValue("2024-03-15T14:00");
   });
 });

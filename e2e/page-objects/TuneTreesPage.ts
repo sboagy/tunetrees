@@ -1322,7 +1322,7 @@ export class TuneTreesPage {
   async setRowEvaluation(
     whichRow: Locator,
     evalValue: string,
-    doTimeouts = true
+    doTimeouts: boolean | number = true
   ) {
     const allowed = ["again", "hard", "good", "easy", "not-set"] as const;
     if (!allowed.includes(evalValue as (typeof allowed)[number])) {
@@ -1338,7 +1338,8 @@ export class TuneTreesPage {
     // ACT: Select "Again" rating
     await evalDropdown.click();
     if (doTimeouts) {
-      await this.page.waitForTimeout(50);
+      const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
+      await this.page.waitForTimeout(delay);
     }
 
     const whichOption = this.page.getByTestId(
@@ -1348,7 +1349,8 @@ export class TuneTreesPage {
     await whichOption.click();
 
     if (doTimeouts) {
-      await this.page.waitForTimeout(50);
+      const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
+      await this.page.waitForTimeout(delay);
     }
   }
 

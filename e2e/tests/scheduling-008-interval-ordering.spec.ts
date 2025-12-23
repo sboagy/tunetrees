@@ -56,7 +56,7 @@ let currentDate: Date;
 
 test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () => {
   // Extend timeout for this suite due to multiple tune creations & evaluations
-  test.setTimeout(60000);
+  test.setTimeout(120_000);
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
@@ -158,6 +158,21 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
           { table: "tune_override", column: "tune_ref" },
         ];
         for (const { table, column, filterPlaylist } of cascade) {
+          if (table === "practice_record") {
+            const { error: delErr } = await supabase.rpc(
+              "e2e_delete_practice_record_by_tunes",
+              {
+                target_playlist: testUser.playlistId,
+                tune_ids: uniqueIds,
+              }
+            );
+            if (delErr) {
+              console.warn(
+                `[SCHED-008 CLEANUP] ${table} delete error: ${delErr.message}`
+              );
+            }
+            continue;
+          }
           let del = supabase.from(table).delete().in(column, uniqueIds);
           if (filterPlaylist) del = del.eq("playlist_ref", testUser.playlistId);
           const { error: delErr } = await del;
