@@ -437,6 +437,11 @@ export async function persistDb(): Promise<void> {
   if (!sqliteDb) {
     throw new Error("SQLite database not initialized");
   }
+
+  // Capture a stable reference to avoid races if the global is cleared while this async
+  // function is running (e.g., Playwright teardown calling clearLocalDatabase).
+  const dbToPersist = sqliteDb;
+
   if (!dbReady) {
     console.warn("⏭️  Skipping persist until DB initialization completes");
     return;
@@ -447,7 +452,7 @@ export async function persistDb(): Promise<void> {
   }
   const dbKey = getDbKey(currentUserId);
   const dbVersionKey = getDbVersionKey(currentUserId);
-  const data = sqliteDb.export();
+  const data = dbToPersist.export();
   await saveToIndexedDB(dbKey, data);
   // Save version number
   await saveToIndexedDB(dbVersionKey, new Uint8Array([CURRENT_DB_VERSION]));
@@ -455,8 +460,12 @@ export async function persistDb(): Promise<void> {
 
   // DEV VERIFICATION: load saved blob and verify critical table counts match
   try {
-    // Only run verification in development builds to avoid extra overhead in prod
-    if (import.meta.env.MODE !== "production") {
+    // Only run verification in development builds to avoid extra overhead in prod.
+    // Skip in Playwright E2E: verification duplicates the full DB in WASM memory and
+    // can OOM when many tests run in parallel.
+    const isE2E = typeof window !== "undefined" && !!(window as any).__ttTestApi;
+
+    if (import.meta.env.MODE !== "production" && !isE2E) {
       // Reuse existing module; if not yet initialized skip verification
       if (!sqlJsModule) {
         console.warn("Persist verification skipped: sql.js module not ready");
@@ -464,7 +473,7 @@ export async function persistDb(): Promise<void> {
         const savedDb = new sqlJsModule.Database(data);
 
         // Count rows in table_transient_data in-memory vs saved blob
-        const inMemRes = sqliteDb.exec(
+        const inMemRes = dbToPersist.exec(
           "SELECT COUNT(*) as c FROM table_transient_data;"
         );
         const savedRes = savedDb.exec(
