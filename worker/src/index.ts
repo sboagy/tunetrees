@@ -7,7 +7,7 @@
  *
  * @module worker/index
  */
-import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -73,6 +73,10 @@ export interface Env {
   DATABASE_URL?: string;
   SUPABASE_URL: string;
   SUPABASE_JWT_SECRET: string;
+  /** When "true", emits extra sync diagnostics logs (initial sync only). */
+  SYNC_DIAGNOSTICS?: string;
+  /** Optional: only emit diagnostics when JWT sub matches this value. */
+  SYNC_DIAGNOSTICS_USER_ID?: string;
 }
 
 /** Context passed through sync operations */
@@ -80,6 +84,64 @@ interface SyncContext {
   userId: string;
   userPlaylistIds: Set<string>;
   now: string;
+  diagnosticsEnabled: boolean;
+}
+
+async function logPlaylistTuneInitialSyncDiagnostics(
+  tx: Transaction,
+  ctx: SyncContext,
+  syncStartedAt: string
+): Promise<void> {
+  const playlistIds = Array.from(ctx.userPlaylistIds);
+  if (playlistIds.length === 0) return;
+
+  const baseWhere = inArray(schema.playlistTune.playlistRef, playlistIds);
+  const snapshotWhere = and(
+    baseWhere,
+    lte(schema.playlistTune.lastModifiedAt, syncStartedAt)
+  );
+
+  const [totalAll] = await tx
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.playlistTune)
+    .where(baseWhere);
+  const [totalSnapshot] = await tx
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.playlistTune)
+    .where(snapshotWhere);
+
+  const [snapshotDeleted0] = await tx
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.playlistTune)
+    .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 0)));
+  const [snapshotDeleted1] = await tx
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.playlistTune)
+    .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 1)));
+
+  const [minMax] = await tx
+    .select({
+      min: sql<string>`min(${schema.playlistTune.lastModifiedAt})`,
+      max: sql<string>`max(${schema.playlistTune.lastModifiedAt})`,
+    })
+    .from(schema.playlistTune)
+    .where(baseWhere);
+
+  console.log("[SYNC_DIAG] playlist_tune initial-sync snapshot", {
+    userId: ctx.userId,
+    userPlaylistCount: playlistIds.length,
+    syncStartedAt,
+    totals: {
+      all: Number(totalAll?.n ?? 0),
+      snapshot: Number(totalSnapshot?.n ?? 0),
+      snapshotDeleted0: Number(snapshotDeleted0?.n ?? 0),
+      snapshotDeleted1: Number(snapshotDeleted1?.n ?? 0),
+    },
+    lastModifiedAt: {
+      min: minMax?.min ?? null,
+      max: minMax?.max ?? null,
+    },
+  });
 }
 
 interface InitialSyncCursorV1 {
@@ -545,6 +607,14 @@ async function fetchTableForInitialSyncPage(
     whereConditions.push(lte(t.lastModifiedAt, syncStartedAt));
   }
 
+  if (
+    ctx.diagnosticsEnabled &&
+    tableName === "playlist_tune" &&
+    offset === 0
+  ) {
+    await logPlaylistTuneInitialSyncDiagnostics(tx, ctx, syncStartedAt);
+  }
+
   let query = tx.select().from(table);
   if (whereConditions.length > 0) {
     // @ts-expect-error - dynamic where
@@ -777,7 +847,8 @@ async function processIncrementalSync(
 async function handleSync(
   db: ReturnType<typeof drizzle>,
   payload: SyncRequest,
-  userId: string
+  userId: string,
+  diagnosticsEnabled: boolean
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
   let responseChanges: SyncChange[] = [];
@@ -803,6 +874,7 @@ async function handleSync(
       userId,
       userPlaylistIds: new Set(userPlaylists.map((p) => p.id)),
       now,
+      diagnosticsEnabled,
     };
 
     // PUSH: Apply client changes
@@ -891,6 +963,10 @@ export default {
         return errorResponse("Unauthorized", 401);
       }
 
+      const diagnosticsEnabled =
+        env.SYNC_DIAGNOSTICS === "true" &&
+        (!env.SYNC_DIAGNOSTICS_USER_ID || env.SYNC_DIAGNOSTICS_USER_ID === userId);
+
       // Connect to database
       try {
         const { db, close } = createDb(env);
@@ -898,7 +974,7 @@ export default {
 
         try {
           console.log(`[HTTP] Sync request parsed, calling handleSync`);
-          const response = await handleSync(db, payload, userId);
+          const response = await handleSync(db, payload, userId, diagnosticsEnabled);
           console.log(`[HTTP] Sync completed successfully`);
           return jsonResponse(response);
         } finally {
