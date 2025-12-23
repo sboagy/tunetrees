@@ -370,17 +370,30 @@ export class SyncEngine {
               } else {
                 // Upsert local
                 const sanitizedData = sanitizeData(change.data);
-                await this.localDb
-                  .insert(table)
-                  .values(sanitizedData)
-                  .onConflictDoUpdate({
-                    target: Array.isArray(adapter.primaryKey)
+
+                // Special-case tables with logical uniqueness not expressed by primary key.
+                // practice_record is unique by (tune_ref, playlist_ref, practiced) and may
+                // legitimately conflict during sync if IDs diverged historically.
+                const conflictTarget =
+                  change.table === "practice_record"
+                    ? [
+                        (table as any).tuneRef,
+                        (table as any).playlistRef,
+                        (table as any).practiced,
+                      ]
+                    : Array.isArray(adapter.primaryKey)
                       ? adapter.primaryKey.map(
                           (k) => (table as any)[toCamelCase(k)]
                         )
                       : (table as any)[
                           toCamelCase(adapter.primaryKey as string)
-                        ],
+                        ];
+
+                await this.localDb
+                  .insert(table)
+                  .values(sanitizedData)
+                  .onConflictDoUpdate({
+                    target: conflictTarget,
                     set: sanitizedData,
                   });
               }
