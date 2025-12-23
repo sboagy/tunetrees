@@ -60,9 +60,15 @@ export function needsMigration(): boolean {
 
   // Check localStorage version
   const localVersion = getLocalSchemaVersion();
+  // If we've never stored a schema version before, treat this as first-run,
+  // not a migration. We'll stamp the version after DB init.
+  if (localVersion === null) {
+    return false;
+  }
+
   const needsUpdate = localVersion !== CURRENT_SCHEMA_VERSION;
 
-  if (needsUpdate && localVersion !== null) {
+  if (needsUpdate) {
     console.warn(
       `⚠️ Schema version mismatch: local=${localVersion}, current=${CURRENT_SCHEMA_VERSION}`
     );
@@ -94,9 +100,13 @@ export function isForcedReset(): boolean {
  * @param db - The Drizzle database instance
  */
 export async function clearLocalDatabaseForMigration(
-  db: any // TODO: Type this properly when we have the db client type
+  db: unknown
 ): Promise<void> {
   console.log("🔄 Schema migration detected - clearing local database...");
+
+  const drizzleDb = db as {
+    delete: <TTable>(table: TTable) => { run: () => unknown };
+  };
 
   try {
     // Import schema tables
@@ -131,7 +141,7 @@ export async function clearLocalDatabaseForMigration(
 
     for (const table of tablesToClear) {
       try {
-        await db.delete(table).run();
+        await drizzleDb.delete(table).run();
       } catch (error) {
         console.warn(`Failed to clear table ${table.toString()}:`, error);
         // Continue clearing other tables even if one fails

@@ -377,6 +377,9 @@ export async function initializeDb(
       } else {
         const currentLocal = getLocalSchemaVersion();
         if (!currentLocal) {
+          console.warn(
+            `ℹ️ Setting initial schema_version=${getCurrentSchemaVersion()}`
+          );
           setLocalSchemaVersion(getCurrentSchemaVersion());
         }
       }
@@ -480,7 +483,8 @@ export async function persistDb(): Promise<void> {
     // Only run verification in development builds to avoid extra overhead in prod.
     // Skip in Playwright E2E: verification duplicates the full DB in WASM memory and
     // can OOM when many tests run in parallel.
-    const isE2E = typeof window !== "undefined" && !!(window as any).__ttTestApi;
+    const isE2E =
+      typeof window !== "undefined" && !!(window as any).__ttTestApi;
 
     if (import.meta.env.MODE !== "production" && !isE2E) {
       // Reuse existing module; if not yet initialized skip verification
