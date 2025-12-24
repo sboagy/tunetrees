@@ -479,13 +479,6 @@ async function persistQueueRows(
       // Insert into local database
       // Sync is handled automatically by SQL triggers populating sync_outbox
       await db.insert(dailyPracticeQueue).values(fullRow).run();
-
-      const debugRow = await db
-        .select()
-        .from(dailyPracticeQueue)
-        .where(eq(dailyPracticeQueue.id, id))
-        .all();
-      console.log(`debugRow: ${debugRow}`);
     }
 
     // Fetch back the inserted rows
@@ -549,18 +542,21 @@ export async function ensureDailyQueue(
   // Check if queue exists for this date
   // NOTE: We now use ISO format (YYYY-MM-DDTHH:MM:SS) consistently
   // For backward compatibility, also check space-separated format during transition
-  const existing = await db.all<{ count: number }>(
-    sql`SELECT COUNT(*) as count 
-        FROM daily_practice_queue 
-        WHERE user_ref = ${userRef} 
-          AND playlist_ref = ${playlistRef} 
-          AND (
-            window_start_utc = ${windowStartUtc}
-            OR window_start_utc = ${windowStartUtc.replace("T", " ")}
-          )`
-  );
+  // Use an existence check instead of COUNT(*) to reduce memory/CPU for SQL.js,
+  // especially during long e2e runs with many user sessions.
+  const existing = await db.all<{ one: number }>(sql`
+    SELECT 1 as one
+    FROM daily_practice_queue
+    WHERE user_ref = ${userRef}
+      AND playlist_ref = ${playlistRef}
+      AND (
+        window_start_utc = ${windowStartUtc}
+        OR window_start_utc = ${windowStartUtc.replace("T", " ")}
+      )
+    LIMIT 1
+  `);
 
-  const queueExists = (existing[0]?.count ?? 0) > 0;
+  const queueExists = existing.length > 0;
 
   if (queueExists) {
     console.log(`[PracticeQueue] ✓ Queue already exists for ${windowStartUtc}`);
@@ -649,11 +645,13 @@ export async function generateOrGetPracticeQueue(
   // ⚠️ GUARD: Check if database has been populated yet
   // On fresh login, queue may try to generate before initial sync completes
   // If practice_list_staged is empty, return empty queue and let sync trigger reload
-  const stagedCount = await db.all<{ count: number }>(
-    sql`SELECT COUNT(*) as count FROM practice_list_staged 
-        WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}`
-  );
-  const hasData = (stagedCount[0]?.count ?? 0) > 0;
+  const stagedExists = await db.all<{ one: number }>(sql`
+    SELECT 1 as one
+    FROM practice_list_staged
+    WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}
+    LIMIT 1
+  `);
+  const hasData = stagedExists.length > 0;
 
   if (!hasData && !forceRegen) {
     console.log(
