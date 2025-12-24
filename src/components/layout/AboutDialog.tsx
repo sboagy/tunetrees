@@ -59,7 +59,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
   const handleCheckForUpdate = async () => {
     setChecking(true);
     checkForUpdate();
-    
+
     // Give it a moment to check
     setTimeout(() => {
       setChecking(false);
