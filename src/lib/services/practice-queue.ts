@@ -26,6 +26,10 @@ import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
 import { generateId } from "../utils/uuid";
 
+type QueueCandidateRow = Pick<PracticeListStagedRow, "id" | "scheduled" | "latest_due">;
+
+const HARD_QUEUE_ROW_CAP = 5000;
+
 // Type alias to support both sql.js (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
@@ -385,7 +389,7 @@ async function fetchExistingActiveQueue(
  * @returns Array of queue row objects ready for insertion
  */
 function buildQueueRows(
-  rows: PracticeListStagedRow[],
+  rows: QueueCandidateRow[],
   windows: SchedulingWindows,
   prefs: PrefsSchedulingOptions,
   userRef: string,
@@ -695,14 +699,15 @@ export async function generateOrGetPracticeQueue(
   // Implements max_reviews capacity constraint across all buckets
 
   const maxReviews = prefs.maxReviewsPerDay || 0; // 0 = uncapped
+  const effectiveMaxReviews = maxReviews > 0 ? maxReviews : HARD_QUEUE_ROW_CAP;
   const seenTuneIds = new Set<string>();
-  const candidateRows: PracticeListStagedRow[] = [];
+  const candidateRows: QueueCandidateRow[] = [];
 
   // Q1: Due Today (scheduled or latest_due within [startTs, endTs))
-  let q1Rows: PracticeListStagedRow[];
+  let q1Rows: QueueCandidateRow[];
   if (maxReviews > 0) {
-    q1Rows = await db.all<PracticeListStagedRow>(sql`
-      SELECT * 
+    q1Rows = await db.all<QueueCandidateRow>(sql`
+      SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
         AND playlist_id = ${playlistRef}
@@ -716,8 +721,8 @@ export async function generateOrGetPracticeQueue(
       LIMIT ${maxReviews}
     `);
   } else {
-    q1Rows = await db.all<PracticeListStagedRow>(sql`
-      SELECT * 
+      q1Rows = await db.all<QueueCandidateRow>(sql`
+        SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
         AND playlist_id = ${playlistRef}
@@ -728,6 +733,7 @@ export async function generateOrGetPracticeQueue(
           OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
         )
       ORDER BY COALESCE(scheduled, latest_due) ASC
+        LIMIT ${effectiveMaxReviews}
     `);
   }
 
@@ -739,12 +745,14 @@ export async function generateOrGetPracticeQueue(
   console.log(`[PracticeQueue] Q1 (due today): ${q1Rows.length} tunes`);
 
   // Q2: Recently Lapsed (if capacity remains)
-  let q2Rows: PracticeListStagedRow[] = [];
+  let q2Rows: QueueCandidateRow[] = [];
   if (maxReviews === 0 || candidateRows.length < maxReviews) {
     const remainingCapacity =
-      maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
-    q2Rows = await db.all<PracticeListStagedRow>(sql`
-      SELECT * 
+      maxReviews === 0
+        ? Math.max(0, effectiveMaxReviews - candidateRows.length)
+        : maxReviews - candidateRows.length;
+    q2Rows = await db.all<QueueCandidateRow>(sql`
+      SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
         AND playlist_id = ${playlistRef}
@@ -771,13 +779,15 @@ export async function generateOrGetPracticeQueue(
   // Q3: New/Unscheduled tunes (if capacity still remains)
   // Never-scheduled tunes (scheduled IS NULL AND latest_due IS NULL)
   // OR practiced long ago but never scheduled (scheduled IS NULL AND latest_due < windowFloorTs)
-  let q3Rows: PracticeListStagedRow[] = [];
+  let q3Rows: QueueCandidateRow[] = [];
   if (maxReviews === 0 || candidateRows.length < maxReviews) {
     const remainingCapacity =
-      maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
+      maxReviews === 0
+        ? Math.max(0, effectiveMaxReviews - candidateRows.length)
+        : maxReviews - candidateRows.length;
     if (prefs.autoScheduleNew) {
-      q3Rows = await db.all<PracticeListStagedRow>(sql`
-        SELECT *
+      q3Rows = await db.all<QueueCandidateRow>(sql`
+        SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
           AND playlist_id = ${playlistRef}
@@ -789,8 +799,8 @@ export async function generateOrGetPracticeQueue(
         LIMIT ${remainingCapacity}
       `);
     } else {
-      q3Rows = await db.all<PracticeListStagedRow>(sql`
-        SELECT * 
+      q3Rows = await db.all<QueueCandidateRow>(sql`
+        SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
           AND playlist_id = ${playlistRef}
@@ -814,12 +824,14 @@ export async function generateOrGetPracticeQueue(
 
   // Q4: Old Lapsed tunes (if capacity still remains)
   // Very old scheduled tunes (scheduled before windowFloorTs)
-  let q4Rows: PracticeListStagedRow[] = [];
+  let q4Rows: QueueCandidateRow[] = [];
   if (maxReviews === 0 || candidateRows.length < maxReviews) {
     const remainingCapacity =
-      maxReviews === 0 ? 999999 : maxReviews - candidateRows.length;
-    q4Rows = await db.all<PracticeListStagedRow>(sql`
-      SELECT * 
+      maxReviews === 0
+        ? Math.max(0, effectiveMaxReviews - candidateRows.length)
+        : maxReviews - candidateRows.length;
+    q4Rows = await db.all<QueueCandidateRow>(sql`
+      SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
         AND playlist_id = ${playlistRef}
@@ -985,8 +997,13 @@ export async function addTunesToQueue(
 
   // Query backlog tunes (older than delinquency window)
   // These are tunes scheduled before windowFloorTs that aren't in the queue yet
-  const backlogRows = await db.all<PracticeListStagedRow>(sql`
-    SELECT * 
+  const backlogLimit = Math.min(
+    HARD_QUEUE_ROW_CAP,
+    Math.max(count * 50, count + existing.length + 25)
+  );
+
+  const backlogRows = await db.all<QueueCandidateRow>(sql`
+    SELECT id, scheduled, latest_due
     FROM practice_list_staged
     WHERE user_ref = ${userRef}
       AND playlist_id = ${playlistRef}
@@ -997,12 +1014,13 @@ export async function addTunesToQueue(
         OR (scheduled IS NULL AND latest_due < ${windows.windowFloorTs})
       )
     ORDER BY COALESCE(scheduled, latest_due) DESC
+    LIMIT ${backlogLimit}
   `);
 
   console.log(`[AddTunes] Found ${backlogRows.length} backlog tunes`);
 
   // Filter out tunes already in queue
-  const newRows: PracticeListStagedRow[] = [];
+  const newRows: QueueCandidateRow[] = [];
   for (const row of backlogRows) {
     if (!existingTuneIds.has(row.id)) {
       newRows.push(row);

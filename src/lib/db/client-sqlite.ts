@@ -41,8 +41,11 @@ let sqliteDb: SqlJsDatabase | null = null;
 let drizzleDb: ReturnType<typeof drizzle> | null = null;
 let dbReady = false;
 let isClearing = false; // set while clearDb executes
-let initAborted = false; // set if clearDb called mid-initialization
 let isInitializingDb = false; // guard flag for abort logic
+
+// Monotonic cancellation token for async initialization.
+// Each `clearDb()` increments this value, invalidating any in-flight `initializeDb()`.
+let initEpoch = 0;
 
 // Singleton sql.js initialization management
 let sqlJsInitPromise: Promise<SqlJsStatic> | null = null;
@@ -166,6 +169,15 @@ export async function initializeDb(
     `🔁 initializeDb call #${initializeDbCalls} for user: ${userId.substring(0, 8)}...`
   );
 
+  const myInitEpoch = initEpoch;
+  const ensureNotCleared = () => {
+    if (initEpoch !== myInitEpoch) {
+      throw new Error(
+        "Database initialization aborted: clearDb() was called during initialization."
+      );
+    }
+  };
+
   // If we have an existing DB for a DIFFERENT user, persist and close it
   if (drizzleDb && currentUserId && currentUserId !== userId) {
     console.log(
@@ -197,11 +209,6 @@ export async function initializeDb(
   if (initializeDbPromise) {
     return initializeDbPromise;
   }
-  if (initAborted) {
-    throw new Error(
-      "Database initialization previously aborted; clearDb completed."
-    );
-  }
 
   console.log(
     `🔧 Initializing SQLite WASM database (call #${initializeDbCalls})...`
@@ -212,9 +219,7 @@ export async function initializeDb(
     try {
       // Load sql.js WASM module via singleton
       const SQL = await getSqlJs();
-      if (initAborted) {
-        throw new Error("Initialization aborted after sql.js module load.");
-      }
+      ensureNotCleared();
       // (Rest of original body moved inside try below)
       // Check if schema migration is needed (e.g., integer IDs → UUIDs)
       const migrationNeeded = needsMigration();
@@ -241,6 +246,7 @@ export async function initializeDb(
       const dbVersionKey = getDbVersionKey(userId);
       const existingData = await loadFromIndexedDB(dbKey);
       const storedVersion = await loadFromIndexedDB(dbVersionKey);
+      ensureNotCleared();
       const storedVersionNum =
         storedVersion && storedVersion.length > 0 ? storedVersion[0] : 0;
 
@@ -304,6 +310,7 @@ export async function initializeDb(
       }
 
       await initializeViews(drizzleDb);
+      ensureNotCleared();
       try {
         ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
 
@@ -339,6 +346,9 @@ export async function initializeDb(
       console.log(
         `✅ SQLite WASM database ready for user: ${userId.substring(0, 8)}...`
       );
+
+      // Only publish global state if this init hasn't been invalidated.
+      ensureNotCleared();
       currentUserId = userId;
       dbReady = true;
 
@@ -407,7 +417,7 @@ export async function initializeDb(
   return initializeDbPromise.finally(() => {
     isInitializingDb = false;
     // If aborted during init ensure state reflects not ready
-    if (initAborted && drizzleDb) {
+    if (initEpoch !== myInitEpoch && drizzleDb) {
       try {
         sqliteDb?.close();
       } catch (_) {
@@ -416,6 +426,7 @@ export async function initializeDb(
       sqliteDb = null;
       drizzleDb = null;
       dbReady = false;
+      initializeDbPromise = null;
     }
   });
 }
@@ -578,14 +589,30 @@ export async function closeDb(): Promise<void> {
  */
 export async function clearDb(): Promise<void> {
   isClearing = true;
+  // Invalidate any in-flight initializeDb() ASAP.
+  initEpoch += 1;
   if (isInitializingDb) {
     console.warn("⚠️ clearDb called during initialization; aborting init.");
-    initAborted = true;
   }
+
+  // Allow a subsequent initializeDb() call to start fresh.
+  initializeDbPromise = null;
   if (sqliteDb) {
     sqliteDb.close();
     sqliteDb = null;
     drizzleDb = null;
+  }
+
+  // Playwright E2E: fully reset the sql.js module so its WASM linear memory
+  // can be reclaimed by GC. sql.js grows memory but does not shrink it, so
+  // long, highly-parallel E2E runs can hit `Error: out of memory` even after
+  // closing individual Database instances.
+  const isE2E =
+    typeof window !== "undefined" && !!(window as unknown as any).__ttTestApi;
+  if (isE2E) {
+    sqlJsModule = null;
+    sqlJsInitPromise = null;
+    sqlJsInitAttempts = 0;
   }
 
   if (currentUserId) {

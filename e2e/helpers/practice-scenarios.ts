@@ -220,8 +220,21 @@ async function waitForSyncComplete(
   timeoutMs = 30000
 ): Promise<void> {
   const startTime = Date.now();
+  let didRetryAfterFetchFailure = false;
 
   log.debug("⏳ Waiting for initial sync to complete...");
+
+  const isTransientFetchFailure = (summary: string): boolean => {
+    const s = summary.toLowerCase();
+    return (
+      s.includes("failed to fetch") ||
+      // Some browsers / consoles truncate the final character in this message.
+      s.includes("failed to fet") ||
+      s.includes("networkerror") ||
+      s.includes("load failed") ||
+      s.includes("fetch")
+    );
+  };
 
   // Poll for sync completion by checking if initial syncDown has finished
   while (Date.now() - startTime < timeoutMs) {
@@ -243,6 +256,18 @@ async function waitForSyncComplete(
 
     // If initial sync completed but failed, fail fast with the underlying error.
     if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
+      if (
+        !didRetryAfterFetchFailure &&
+        isTransientFetchFailure(status.errorSummary)
+      ) {
+        didRetryAfterFetchFailure = true;
+        log.debug(
+          `⚠️ Initial sync failed with transient fetch error; reloading once to retry. ${status.errorSummary}`
+        );
+        await page.waitForTimeout(500);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        continue;
+      }
       throw new Error(
         `⚠️ Initial sync completed but failed (success='${status.successStr}', errors=${status.errorCount}). ${status.errorSummary}`
       );
