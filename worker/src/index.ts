@@ -607,11 +607,7 @@ async function fetchTableForInitialSyncPage(
     whereConditions.push(lte(t.lastModifiedAt, syncStartedAt));
   }
 
-  if (
-    ctx.diagnosticsEnabled &&
-    tableName === "playlist_tune" &&
-    offset === 0
-  ) {
+  if (ctx.diagnosticsEnabled && tableName === "playlist_tune" && offset === 0) {
     await logPlaylistTuneInitialSyncDiagnostics(tx, ctx, syncStartedAt);
   }
 
@@ -965,7 +961,8 @@ export default {
 
       const diagnosticsEnabled =
         env.SYNC_DIAGNOSTICS === "true" &&
-        (!env.SYNC_DIAGNOSTICS_USER_ID || env.SYNC_DIAGNOSTICS_USER_ID === userId);
+        (!env.SYNC_DIAGNOSTICS_USER_ID ||
+          env.SYNC_DIAGNOSTICS_USER_ID === userId);
 
       // Connect to database
       try {
@@ -974,7 +971,12 @@ export default {
 
         try {
           console.log(`[HTTP] Sync request parsed, calling handleSync`);
-          const response = await handleSync(db, payload, userId, diagnosticsEnabled);
+          const response = await handleSync(
+            db,
+            payload,
+            userId,
+            diagnosticsEnabled
+          );
           console.log(`[HTTP] Sync completed successfully`);
           return jsonResponse(response);
         } finally {
