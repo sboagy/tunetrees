@@ -501,6 +501,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 type={showPassword() ? "text" : "password"}
                 value={password()}
                 onInput={(e) => setPassword(e.currentTarget.value)}
+                autocomplete={isSignUp() ? "new-password" : "current-password"}
                 placeholder="••••••••"
                 class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 disabled={isSubmitting() || loading()}

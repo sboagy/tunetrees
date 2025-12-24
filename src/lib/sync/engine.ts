@@ -371,27 +371,66 @@ export class SyncEngine {
                 // Upsert local
                 const sanitizedData = sanitizeData(change.data);
 
-                // practice_record: upsert by primary key id.
-                // This prevents initial sync from failing when a record already exists locally
-                // (e.g., IndexedDB retained while sync state is reset).
-                const conflictTarget =
-                  change.table === "practice_record"
-                    ? (table as any).id
-                    : Array.isArray(adapter.primaryKey)
-                      ? adapter.primaryKey.map(
-                          (k) => (table as any)[toCamelCase(k)]
-                        )
-                      : (table as any)[
-                          toCamelCase(adapter.primaryKey as string)
-                        ];
+                if (change.table === "practice_record") {
+                  // practice_record has two distinct uniqueness constraints:
+                  // - PK: id
+                  // - Unique: (tune_ref, playlist_ref, practiced)
+                  // During initial sync with a retained IndexedDB, either may collide.
+                  // Strategy:
+                  // 1) Upsert by id (handles retained rows with same id)
+                  // 2) If that fails due to the composite unique constraint, upsert by the composite key
+                  try {
+                    await this.localDb
+                      .insert(table)
+                      .values(sanitizedData)
+                      .onConflictDoUpdate({
+                        target: (table as any).id,
+                        set: sanitizedData,
+                      });
+                  } catch (e) {
+                    const errorMsg = e instanceof Error ? e.message : String(e);
+                    const isCompositeUniqueViolation =
+                      errorMsg.includes(
+                        "practice_record.tune_ref, practice_record.playlist_ref, practice_record.practiced"
+                      ) ||
+                      errorMsg.includes(
+                        "practice_record_tune_ref_playlist_ref_practiced_unique"
+                      );
 
-                await this.localDb
-                  .insert(table)
-                  .values(sanitizedData)
-                  .onConflictDoUpdate({
-                    target: conflictTarget,
-                    set: sanitizedData,
-                  });
+                    if (!isCompositeUniqueViolation) {
+                      throw e;
+                    }
+
+                    const { id: _ignoredId, ...sanitizedDataWithoutId } =
+                      sanitizedData as Record<string, unknown>;
+
+                    await this.localDb
+                      .insert(table)
+                      .values(sanitizedData)
+                      .onConflictDoUpdate({
+                        target: [
+                          (table as any).tuneRef,
+                          (table as any).playlistRef,
+                          (table as any).practiced,
+                        ],
+                        set: sanitizedDataWithoutId,
+                      });
+                  }
+                } else {
+                  const conflictTarget = Array.isArray(adapter.primaryKey)
+                    ? adapter.primaryKey.map(
+                        (k) => (table as any)[toCamelCase(k)]
+                      )
+                    : (table as any)[toCamelCase(adapter.primaryKey as string)];
+
+                  await this.localDb
+                    .insert(table)
+                    .values(sanitizedData)
+                    .onConflictDoUpdate({
+                      target: conflictTarget,
+                      set: sanitizedData,
+                    });
+                }
               }
               synced++;
             } catch (e) {

@@ -7,7 +7,18 @@
  *
  * @module worker/index
  */
-import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  max,
+  min,
+  or,
+} from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -102,27 +113,27 @@ async function logPlaylistTuneInitialSyncDiagnostics(
   );
 
   const [totalAll] = await tx
-    .select({ n: sql<number>`count(*)` })
+    .select({ n: count() })
     .from(schema.playlistTune)
     .where(baseWhere);
   const [totalSnapshot] = await tx
-    .select({ n: sql<number>`count(*)` })
+    .select({ n: count() })
     .from(schema.playlistTune)
     .where(snapshotWhere);
 
   const [snapshotDeleted0] = await tx
-    .select({ n: sql<number>`count(*)` })
+    .select({ n: count() })
     .from(schema.playlistTune)
     .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 0)));
   const [snapshotDeleted1] = await tx
-    .select({ n: sql<number>`count(*)` })
+    .select({ n: count() })
     .from(schema.playlistTune)
     .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 1)));
 
   const [minMax] = await tx
     .select({
-      min: sql<string>`min(${schema.playlistTune.lastModifiedAt})`,
-      max: sql<string>`max(${schema.playlistTune.lastModifiedAt})`,
+      min: min(schema.playlistTune.lastModifiedAt),
+      max: max(schema.playlistTune.lastModifiedAt),
     })
     .from(schema.playlistTune)
     .where(baseWhere);
@@ -936,58 +947,63 @@ function errorResponse(message: string, status = 500): Response {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    // CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
-
-    // Health check
-    if (request.method === "GET" && url.pathname === "/health") {
-      return new Response("OK", { status: 200, headers: CORS_HEADERS });
-    }
-
-    // Sync endpoint
-    if (request.method === "POST" && url.pathname === "/api/sync") {
-      console.log(`[HTTP] POST /api/sync received`);
-
-      // Authenticate
-      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
-      if (!userId) {
-        console.log(`[HTTP] Unauthorized - JWT verification failed`);
-        return errorResponse("Unauthorized", 401);
+      // CORS preflight
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: CORS_HEADERS });
       }
 
-      const diagnosticsEnabled =
-        env.SYNC_DIAGNOSTICS === "true" &&
-        (!env.SYNC_DIAGNOSTICS_USER_ID ||
-          env.SYNC_DIAGNOSTICS_USER_ID === userId);
+      // Health check
+      if (request.method === "GET" && url.pathname === "/health") {
+        return new Response("OK", { status: 200, headers: CORS_HEADERS });
+      }
 
-      // Connect to database
-      try {
-        const { db, close } = createDb(env);
-        const payload = (await request.json()) as SyncRequest;
+      // Sync endpoint
+      if (request.method === "POST" && url.pathname === "/api/sync") {
+        console.log(`[HTTP] POST /api/sync received`);
 
-        try {
-          console.log(`[HTTP] Sync request parsed, calling handleSync`);
-          const response = await handleSync(
-            db,
-            payload,
-            userId,
-            diagnosticsEnabled
-          );
-          console.log(`[HTTP] Sync completed successfully`);
-          return jsonResponse(response);
-        } finally {
-          await close();
+        // Authenticate
+        const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
+        if (!userId) {
+          console.log(`[HTTP] Unauthorized - JWT verification failed`);
+          return errorResponse("Unauthorized", 401);
         }
-      } catch (error) {
-        console.error("[HTTP] Sync error:", error);
-        return errorResponse(String(error), 500);
-      }
-    }
 
-    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+        const diagnosticsEnabled =
+          env.SYNC_DIAGNOSTICS === "true" &&
+          (!env.SYNC_DIAGNOSTICS_USER_ID ||
+            env.SYNC_DIAGNOSTICS_USER_ID === userId);
+
+        // Connect to database
+        try {
+          const { db, close } = createDb(env);
+          const payload = (await request.json()) as SyncRequest;
+
+          try {
+            console.log(`[HTTP] Sync request parsed, calling handleSync`);
+            const response = await handleSync(
+              db,
+              payload,
+              userId,
+              diagnosticsEnabled
+            );
+            console.log(`[HTTP] Sync completed successfully`);
+            return jsonResponse(response);
+          } finally {
+            await close();
+          }
+        } catch (error) {
+          console.error("[HTTP] Sync error:", error);
+          return errorResponse(String(error), 500);
+        }
+      }
+
+      return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+    } catch (error) {
+      console.error("[HTTP] Unhandled error:", error);
+      return errorResponse("Internal Server Error", 500);
+    }
   },
 };

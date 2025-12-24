@@ -14,8 +14,8 @@
     <!-- Preconnect to Supabase for faster API calls -->
     <link rel="preconnect" href="https://nbowmctaebpfxqpzxfkb.supabase.co" crossorigin />
     
-    <!-- Preload critical WASM file for offline SQLite -->
-    <link rel="preload" href="/sql-wasm/sql-wasm.wasm" as="fetch" crossorigin />
+    <!-- Prefetch WASM file for offline SQLite (used after auth) -->
+    <link rel="prefetch" href="/sql-wasm/sql-wasm.wasm" crossorigin />
     
     <title>TuneTrees - Music Practice Manager</title>
     
