@@ -71,6 +71,7 @@ export class SyncService {
   private isSyncing = false;
   private syncIntervalId: number | null = null; // For syncUp interval
   private syncDownIntervalId: number | null = null; // For syncDown interval
+  private consecutiveSyncUpFailures = 0;
 
   constructor(db: SqliteDatabase, config: SyncServiceConfig) {
     this.db = db;
@@ -455,13 +456,30 @@ export class SyncService {
               e.includes("ERR_INTERNET_DISCONNECTED") ||
               e.includes("NetworkError")
           );
-          if (!result.success && result.itemsFailed > 0 && !hasNetworkError) {
-            toast.error(
-              `Failed to upload ${result.itemsFailed} changes to server. Will retry automatically.`,
-              {
-                duration: 5000,
-              }
-            );
+
+          if (result.success) {
+            this.consecutiveSyncUpFailures = 0;
+          } else {
+            this.consecutiveSyncUpFailures += 1;
+          }
+
+          // `itemsFailed` reflects local apply failures for pulled changes.
+          // Push failures often surface only in `errors`, so toast on those too.
+          if (!result.success && !hasNetworkError) {
+            const shouldToast =
+              this.consecutiveSyncUpFailures === 1 ||
+              this.consecutiveSyncUpFailures === 5 ||
+              this.consecutiveSyncUpFailures === 10;
+
+            if (shouldToast) {
+              const summary = result.errors[0] ?? "Unknown server error";
+              toast.error(
+                `Sync upload failed (attempt ${this.consecutiveSyncUpFailures}). Your data is still saved locally. ${summary}`,
+                {
+                  duration: 7000,
+                }
+              );
+            }
           }
         } else {
           // Silent - no need to log when there's nothing to sync

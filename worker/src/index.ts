@@ -48,6 +48,57 @@ import * as schema from "./schema-postgres";
 type PostgresClient = ReturnType<typeof postgres>;
 type DrizzleDb = ReturnType<typeof drizzle>;
 
+type PostgresJsErrorLike = {
+  message?: unknown;
+  code?: unknown;
+  detail?: unknown;
+  hint?: unknown;
+  table_name?: unknown;
+  column_name?: unknown;
+  constraint_name?: unknown;
+};
+
+function isPostgresJsErrorLike(error: unknown): error is PostgresJsErrorLike {
+  return typeof error === "object" && error !== null;
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function formatDbError(error: unknown): string {
+  const fallback = error instanceof Error ? error.message : String(error);
+  if (!isPostgresJsErrorLike(error)) return fallback;
+
+  const code = toOptionalString(error.code);
+  const detail = toOptionalString(error.detail);
+  const hint = toOptionalString(error.hint);
+  const table = toOptionalString(error.table_name);
+  const column = toOptionalString(error.column_name);
+  const constraint = toOptionalString(error.constraint_name);
+
+  // Prefer structured Postgres fields over verbose wrapped messages that may
+  // include raw SQL/params.
+  const parts = [
+    code ? `code=${code}` : undefined,
+    table ? `table=${table}` : undefined,
+    column ? `column=${column}` : undefined,
+    constraint ? `constraint=${constraint}` : undefined,
+    detail ? `detail=${detail}` : undefined,
+    hint ? `hint=${hint}` : undefined,
+  ].filter((p): p is string => typeof p === "string");
+
+  if (parts.length > 0) {
+    return parts.join(" | ");
+  }
+
+  // Last resort: strip params from known wrapped format.
+  if (fallback.includes("\nparams:")) {
+    return fallback.split("\nparams:")[0];
+  }
+  return fallback;
+}
+
 function createDb(env: Env): {
   client: PostgresClient;
   db: DrizzleDb;
@@ -304,6 +355,44 @@ function sqliteToPostgres(
   return result;
 }
 
+function coerceEmptyStringNumericFieldsToNull(
+  tableName: string,
+  data: Record<string, unknown>
+): { data: Record<string, unknown>; coerced: string[] } {
+  // Self-healing for older/local SQLite data that may contain empty strings
+  // in numeric fields (e.g. "" for REAL/INTEGER). Postgres rejects these.
+  // Keep this intentionally narrow to avoid changing meaning for text columns.
+  const numericPropsByTable: Partial<Record<SyncableTableName, string[]>> = {
+    practice_record: [
+      "quality",
+      "easiness",
+      "difficulty",
+      "stability",
+      "interval",
+      "step",
+      "repetitions",
+      "lapses",
+      "elapsedDays",
+      "state",
+    ],
+  };
+
+  const props =
+    numericPropsByTable[tableName as SyncableTableName] ?? ([] as string[]);
+  if (props.length === 0) return { data, coerced: [] };
+
+  const result = { ...data };
+  const coerced: string[] = [];
+  for (const prop of props) {
+    const value = result[prop];
+    if (typeof value === "string" && value.trim() === "") {
+      result[prop] = null;
+      coerced.push(prop);
+    }
+  }
+  return { data: result, coerced };
+}
+
 /**
  * Convert Postgres booleans to SQLite integers (0/1).
  */
@@ -394,10 +483,17 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
 
   const upsertKeyCols = getConflictKeyColumns(change.table, t);
   const deleteKeyCols = getPrimaryKeyColumns(change.table, t);
-  const data = sqliteToPostgres(
+  let data = sqliteToPostgres(
     change.table,
     change.data as Record<string, unknown>
   );
+  const coerced = coerceEmptyStringNumericFieldsToNull(change.table, data);
+  data = coerced.data;
+  if (coerced.coerced.length > 0) {
+    console.warn(
+      `[PUSH] Coerced empty-string numeric fields to NULL for ${change.table} rowId=${change.rowId}: ${coerced.coerced.join(", ")}`
+    );
+  }
 
   console.log(
     `[PUSH] Applying ${change.deleted ? "DELETE" : "UPSERT"} to ${change.table}, rowId: ${change.rowId}`
@@ -495,7 +591,13 @@ async function processPushChanges(
 ): Promise<void> {
   console.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
-    await applyChange(tx, change);
+    try {
+      await applyChange(tx, change);
+    } catch (e) {
+      throw new Error(
+        `[PUSH] Failed applying ${change.table} rowId=${change.rowId}: ${formatDbError(e)}`
+      );
+    }
   }
   console.log(`[PUSH] Completed processing ${changes.length} changes`);
 }
@@ -996,7 +1098,7 @@ export default {
           }
         } catch (error) {
           console.error("[HTTP] Sync error:", error);
-          return errorResponse(String(error), 500);
+          return errorResponse(formatDbError(error), 500);
         }
       }
 
