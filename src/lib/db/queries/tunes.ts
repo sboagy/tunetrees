@@ -101,7 +101,23 @@ export async function getTunesForUser(
     ? // When showPublic=true, return only tune table data (no overrides)
       sql`
       SELECT 
-        t.*
+        t.id,
+        t.id_foreign as idForeign,
+        t.primary_origin as primaryOrigin,
+        t.title,
+        t.type,
+        t.structure,
+        t.mode,
+        t.incipit,
+        t.genre,
+        t.composer,
+        t.artist,
+        t.release_year as releaseYear,
+        t.private_for as privateFor,
+        t.deleted,
+        t.sync_version as syncVersion,
+        t.last_modified_at as lastModifiedAt,
+        t.device_id as deviceId
       FROM tune t
       WHERE t.deleted = 0
       ORDER BY t.title
@@ -110,19 +126,22 @@ export async function getTunesForUser(
       sql`
       SELECT 
         t.id,
-        t.id_foreign,
-        t.primary_origin,
+        COALESCE(o.id_foreign, t.id_foreign) as idForeign,
+        t.primary_origin as primaryOrigin,
         COALESCE(o.title, t.title) as title,
         COALESCE(o.type, t.type) as type,
         COALESCE(o.structure, t.structure) as structure,
         COALESCE(o.mode, t.mode) as mode,
         COALESCE(o.incipit, t.incipit) as incipit,
         COALESCE(o.genre, t.genre) as genre,
-        t.private_for,
+        COALESCE(o.composer, t.composer) as composer,
+        COALESCE(o.artist, t.artist) as artist,
+        COALESCE(o.release_year, t.release_year) as releaseYear,
+        t.private_for as privateFor,
         t.deleted,
-        t.sync_version,
-        t.last_modified_at,
-        t.device_id
+        t.sync_version as syncVersion,
+        t.last_modified_at as lastModifiedAt,
+        t.device_id as deviceId
       FROM tune t
       LEFT JOIN tune_override o 
         ON t.id = o.tune_ref 
@@ -146,7 +165,24 @@ export async function getTuneForUserById(
 ): Promise<Tune | null> {
   const query = showPublic
     ? sql`
-        SELECT t.*
+        SELECT
+          t.id,
+          t.id_foreign as idForeign,
+          t.primary_origin as primaryOrigin,
+          t.title,
+          t.type,
+          t.structure,
+          t.mode,
+          t.incipit,
+          t.genre,
+          t.composer,
+          t.artist,
+          t.release_year as releaseYear,
+          t.private_for as privateFor,
+          t.deleted,
+          t.sync_version as syncVersion,
+          t.last_modified_at as lastModifiedAt,
+          t.device_id as deviceId
         FROM tune t
         WHERE t.deleted = 0 AND t.id = ${tuneId}
         LIMIT 1
@@ -154,19 +190,22 @@ export async function getTuneForUserById(
     : sql`
         SELECT 
           t.id,
-          t.id_foreign,
-          t.primary_origin,
+          COALESCE(o.id_foreign, t.id_foreign) as idForeign,
+          t.primary_origin as primaryOrigin,
           COALESCE(o.title, t.title) as title,
           COALESCE(o.type, t.type) as type,
           COALESCE(o.structure, t.structure) as structure,
           COALESCE(o.mode, t.mode) as mode,
           COALESCE(o.incipit, t.incipit) as incipit,
           COALESCE(o.genre, t.genre) as genre,
-          t.private_for,
+          COALESCE(o.composer, t.composer) as composer,
+          COALESCE(o.artist, t.artist) as artist,
+          COALESCE(o.release_year, t.release_year) as releaseYear,
+          t.private_for as privateFor,
           t.deleted,
-          t.sync_version,
-          t.last_modified_at,
-          t.device_id
+          t.sync_version as syncVersion,
+          t.last_modified_at as lastModifiedAt,
+          t.device_id as deviceId
         FROM tune t
         LEFT JOIN tune_override o
           ON t.id = o.tune_ref
@@ -199,6 +238,10 @@ export async function createTune(
       structure: input.structure || null,
       incipit: input.incipit || null,
       genre: input.genre || null,
+      composer: input.composer || null,
+      artist: input.artist || null,
+      idForeign: input.idForeign || null,
+      releaseYear: input.releaseYear || null,
       privateFor: input.privateFor || null,
       deleted: 0,
       syncVersion: 0,
@@ -236,6 +279,13 @@ export async function updateTune(
     updateData.structure = input.structure || null;
   if (input.incipit !== undefined) updateData.incipit = input.incipit || null;
   if (input.genre !== undefined) updateData.genre = input.genre || null;
+  if (input.composer !== undefined)
+    updateData.composer = input.composer || null;
+  if (input.artist !== undefined) updateData.artist = input.artist || null;
+  if (input.idForeign !== undefined)
+    updateData.idForeign = input.idForeign || null;
+  if (input.releaseYear !== undefined)
+    updateData.releaseYear = input.releaseYear || null;
   if (input.privateFor !== undefined)
     updateData.privateFor = input.privateFor || null;
 

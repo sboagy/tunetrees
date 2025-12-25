@@ -121,10 +121,10 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
               id="playlist-manager-title"
               class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate"
             >
-              Manage Playlists
+              Repertoires
             </h2>
             <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 hidden sm:block">
-              Create, edit, and organize your practice playlists
+              Create, edit, and organize your repertoires
             </p>
           </div>
           <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0 ml-2">
@@ -148,7 +148,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
                   d="M12 4v16m8-8H4"
                 />
               </svg>
-              <span class="hidden sm:inline">Create New Playlist</span>
+              <span class="hidden sm:inline">New Repertoire</span>
               <span class="sm:hidden">New</span>
             </button>
             <button

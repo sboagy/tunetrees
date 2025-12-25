@@ -81,7 +81,9 @@ export async function simulateIntermittentConnection(
     throw new Error("dropRate must be between 0 and 1");
   }
 
-  log.info(`📡 Simulating intermittent connection (${dropRate * 100}% drop rate)...`);
+  log.info(
+    `📡 Simulating intermittent connection (${dropRate * 100}% drop rate)...`
+  );
 
   const handler = async (route: Route) => {
     if (Math.random() < dropRate) {

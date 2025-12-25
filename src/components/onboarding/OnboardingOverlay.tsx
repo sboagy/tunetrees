@@ -81,18 +81,18 @@ export const OnboardingOverlay: Component = () => {
 
                 <div class="space-y-4">
                   <p class="text-gray-600 dark:text-gray-300">
-                    Let's get you started! First, you'll need a playlist to
-                    organize your tunes.
+                    Let's get you started! First, create a repertoire to
+                    organize tunes.
                   </p>
 
                   <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
                     <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                      What's a playlist?
+                      What's a repertoire?
                     </h3>
                     <p class="text-sm text-blue-800 dark:text-blue-200">
-                      A playlist is a collection of tunes you want to practice.
-                      You can have different playlists for different
-                      instruments, genres, or skill levels.
+                      A repertoire provides the context for specific
+                      instruments, genres, or practice goals. You can manage
+                      multiple repertoires or maintain a single one.
                     </p>
                   </div>
 
@@ -108,8 +108,9 @@ export const OnboardingOverlay: Component = () => {
                       type="button"
                       onClick={() => setShowPlaylistDialog(true)}
                       class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+                      data-testid="onboarding-create-repertoire"
                     >
-                      Create Playlist
+                      Create Repertoire
                     </button>
                   </div>
                 </div>
@@ -164,7 +165,7 @@ export const OnboardingOverlay: Component = () => {
                       <p class="text-sm text-green-800 dark:text-green-200">
                         Click on a tune and use the{" "}
                         <strong>"Add to Repertoire"</strong> button to add it to
-                        your playlist.
+                        the current repertoire.
                       </p>
                     </div>
 

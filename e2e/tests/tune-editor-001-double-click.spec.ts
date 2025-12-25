@@ -100,10 +100,7 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(page.getByLabel(/title/i)).toHaveValue(/a fig for a kiss/i);
   });
 
-  test("should allow editing tune fields and submitting", async ({
-    page,
-    baseURL,
-  }) => {
+  test("should allow editing tune fields and submitting", async ({ page }) => {
     // ARRANGE: Navigate to editor
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);

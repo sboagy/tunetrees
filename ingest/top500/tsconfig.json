@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "dist", "output"]
+}

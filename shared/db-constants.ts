@@ -170,6 +170,9 @@ export const COL = {
 
   // tune
   ID_FOREIGN: "id_foreign",
+  COMPOSER: "composer",
+  ARTIST: "artist",
+  RELEASE_YEAR: "release_year",
   PRIMARY_ORIGIN: "primary_origin",
   TYPE: "type",
   STRUCTURE: "structure",

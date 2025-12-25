@@ -123,7 +123,9 @@ const LogoDropdown: Component<{
           height="48"
           class="h-12 w-12 object-contain"
         />
-        <span class="ml-[0ch] text-lg dark:text-blue-400">TuneTrees</span>
+        <span class="hidden sm:inline ml-[0ch] text-lg dark:text-blue-400">
+          TuneTrees
+        </span>
         <svg
           class="w-4 h-4 transition-transform"
           classList={{ "rotate-180": showDropdown() }}
@@ -230,7 +232,7 @@ const LogoDropdown: Component<{
 /**
  * Playlist Dropdown Component
  *
- * Dropdown for selecting active playlist with "Manage Playlists..." option
+ * Dropdown for selecting active playlist with "Manage Repertoires..." option
  */
 const PlaylistDropdown: Component<{
   onOpenPlaylistManager: () => void;
@@ -369,9 +371,13 @@ const PlaylistDropdown: Component<{
         <span class="hidden md:inline font-medium">
           {selectedPlaylist()
             ? getPlaylistDisplayName(selectedPlaylist()!)
-            : "No Playlist"}
+            : "No Repertoire"}
         </span>
-        <span class="md:hidden">📋</span>
+        <span class="md:hidden inline-block max-w-[8ch] min-w-0 truncate font-medium">
+          {selectedPlaylist()
+            ? getPlaylistDisplayName(selectedPlaylist()!)
+            : "No Repertoire"}
+        </span>
         <svg
           class="w-4 h-4 transition-transform"
           classList={{ "rotate-180": showDropdown() }}
@@ -393,12 +399,12 @@ const PlaylistDropdown: Component<{
       <Show when={showDropdown()}>
         <div class="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
           <div class="py-2" data-testid="top-nav-manage-playlists-panel">
-            {/* Playlists List */}
+            {/* Repertoires List */}
             <Show
               when={!playlists.loading && playlists()}
               fallback={
                 <div class="px-4 py-2 text-sm text-gray-500">
-                  Loading playlists...
+                  Loading repertoires...
                 </div>
               }
             >
@@ -445,11 +451,12 @@ const PlaylistDropdown: Component<{
             {/* Divider */}
             <div class="border-t border-gray-200 dark:border-gray-700 my-2" />
 
-            {/* Manage Playlists */}
+            {/* Manage Repertoires */}
             <button
               type="button"
               class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
               onClick={handleManagePlaylists}
+              data-testid="manage-repertoires-button"
             >
               <svg
                 class="w-4 h-4"
@@ -471,7 +478,7 @@ const PlaylistDropdown: Component<{
                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              Manage Playlists...
+              Configure Repertoires...
             </button>
           </div>
         </div>
@@ -566,7 +573,12 @@ export const TopNav: Component = () => {
   // Poll for pending sync count (skip for anonymous users - they don't sync)
   createEffect(() => {
     const db = localDb();
-    if (!db || isAnonymous()) {
+    // In Playwright E2E runs, avoid polling SQLite WASM in the UI.
+    // This has caused browser OOMs under heavy parallelism.
+    const isE2E =
+      typeof window !== "undefined" && !!(window as any).__ttTestApi;
+
+    if (!db || isAnonymous() || isE2E) {
       setPendingCount(0); // Reset count for anonymous users
       return;
     }
@@ -603,11 +615,15 @@ export const TopNav: Component = () => {
           <div class="flex items-center gap-6">
             {/* App Logo Dropdown */}
             <LogoDropdown onOpenAbout={() => setShowAboutDialog(true)} />
-
             {/* Playlist Selector */}
-            <PlaylistDropdown
-              onOpenPlaylistManager={() => setShowPlaylistManager(true)}
-            />
+            <div class="flex items-center gap--1">
+              <span class="hidden sm:inline text-sm font-medium text-gray-600 dark:text-gray-400">
+                Current Repertoire:
+              </span>
+              <PlaylistDropdown
+                onOpenPlaylistManager={() => setShowPlaylistManager(true)}
+              />
+            </div>
           </div>
 
           {/* User Info + Theme + Logout */}

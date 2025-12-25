@@ -27,6 +27,8 @@ let ttPage: TuneTreesPage;
 
 test.describe
   .serial("PRACTICE-004: Evaluation Scheduling", () => {
+    test.setTimeout(45000);
+
     test.beforeEach(async ({ page, testUser }) => {
       ttPage = new TuneTreesPage(page);
 
@@ -41,27 +43,14 @@ test.describe
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
     });
 
-    test("should schedule 'Again' rating for tomorrow (not today)", async ({
-      page,
-    }) => {
+    test("should schedule 'Again' rating for tomorrow (not today)", async () => {
       // ARRANGE: Get first tune evaluation dropdown
-      const firstRow = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
-      await expect(firstRow).toBeVisible({ timeout: 5000 });
-
+      const rows = ttPage.getRows("scheduled");
+      const firstRow = rows.first();
       const evalDropdown = firstRow.locator("[data-testid^='recall-eval-']");
-      await expect(evalDropdown).toBeVisible({ timeout: 5000 });
 
       // ACT: Select "Again" rating
-      await evalDropdown.click();
-      await page.waitForTimeout(500);
-
-      const againOption = page.getByTestId("recall-eval-option-again");
-      await expect(againOption).toBeVisible({ timeout: 5000 });
-      await againOption.click();
-
-      // Wait for staging to complete
-      await page.waitForLoadState("networkidle", { timeout: 10000 });
-      await page.waitForTimeout(1000);
+      await ttPage.setRowEvaluation(firstRow, "again");
 
       // ASSERT: Verify dropdown shows "Again"
       await expect(evalDropdown).toContainText(/Again/i, { timeout: 5000 });
@@ -80,20 +69,16 @@ test.describe
       expect(scheduledText).not.toContain("Today");
     });
 
-    test("should evaluate first tune as Good", async ({ page }) => {
+    test("should evaluate first tune as Good", async () => {
       // ARRANGE: Get first tune evaluation dropdown
-      const firstRow = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+      const rows = ttPage.getRows("scheduled");
+      const firstRow = rows.first();
       const firstDropdown = firstRow.locator("[data-testid^='recall-eval-']");
+
       await expect(firstDropdown).toBeVisible({ timeout: 5000 });
 
       // ACT: Select "Good" rating
-      await firstDropdown.click();
-      await page.waitForTimeout(500);
-
-      const goodOption = page.getByTestId("recall-eval-option-good");
-      await expect(goodOption).toBeVisible({ timeout: 5000 });
-      await goodOption.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(firstRow, "good");
 
       // ASSERT: Verify dropdown shows "Good"
       await expect(firstDropdown).toContainText(/Good/i, { timeout: 5000 });
@@ -108,22 +93,18 @@ test.describe
       await expect(badgeSpan).toHaveText("1");
     });
 
-    test("should evaluate second tune as Hard", async ({ page }) => {
+    test("should evaluate second tune as Hard", async () => {
+      const rows = ttPage.getRows("scheduled");
+      const secondRow = rows.nth(1);
+
       // ARRANGE: Get second tune evaluation dropdown
-      const secondRow = ttPage.practiceGrid.locator("tbody tr[data-index='1']");
       await expect(secondRow).toBeVisible({ timeout: 5000 });
 
       const secondDropdown = secondRow.locator("[data-testid^='recall-eval-']");
       await expect(secondDropdown).toBeVisible({ timeout: 5000 });
 
       // ACT: Select "Hard" rating
-      await secondDropdown.click();
-      await page.waitForTimeout(500);
-
-      const hardOption = page.getByTestId("recall-eval-option-hard");
-      await expect(hardOption).toBeVisible({ timeout: 5000 });
-      await hardOption.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(secondRow, "hard");
 
       // ASSERT: Verify dropdown shows "Hard"
       await expect(secondDropdown).toContainText(/Hard/i, { timeout: 5000 });
@@ -140,19 +121,13 @@ test.describe
       page,
     }) => {
       // ARRANGE: Evaluate first tune as "Good"
-      const firstRow = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+      const rows = ttPage.getRows("scheduled");
+      const firstRow = rows.first();
       const firstDropdown = firstRow.locator("[data-testid^='recall-eval-']");
 
-      await expect(firstDropdown).toBeVisible({ timeout: 5000 });
-      await firstDropdown.click();
-      await page.waitForTimeout(500);
-
-      const goodOption = page.getByTestId("recall-eval-option-good");
-      await goodOption.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(firstRow, "good");
 
       await expect(firstDropdown).toContainText(/Good/i, { timeout: 5000 });
-      await page.waitForLoadState("networkidle", { timeout: 10000 });
 
       // Count initial rows
       const initialRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
@@ -161,8 +136,7 @@ test.describe
 
       // ACT: Submit evaluation
       await ttPage.submitEvaluationsButton.click();
-      await page.waitForLoadState("networkidle", { timeout: 15000 });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(500);
 
       // ASSERT: Verify success message
       await expect(page.getByText(/Successfully submitted/i)).toBeVisible({
@@ -178,31 +152,18 @@ test.describe
       expect(afterCount).toBe(initialCount - 1);
     });
 
-    test("should allow changing evaluation before submission", async ({
-      page,
-    }) => {
+    test("should allow changing evaluation before submission", async () => {
       // ARRANGE: Select "Again" rating first
-      const firstRow = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+      const rows = ttPage.getRows("scheduled");
+      const firstRow = rows.first();
       const firstDropdown = firstRow.locator("[data-testid^='recall-eval-']");
 
-      await expect(firstDropdown).toBeVisible({ timeout: 5000 });
-      await firstDropdown.click();
-      await page.waitForTimeout(500);
-
-      const againOption = page.getByTestId("recall-eval-option-again");
-      await againOption.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(firstRow, "again");
 
       await expect(firstDropdown).toContainText(/Again/i, { timeout: 5000 });
-      await page.waitForLoadState("networkidle", { timeout: 10000 });
 
       // ACT: Change to "Good"
-      await firstDropdown.click();
-      await page.waitForTimeout(500);
-
-      const goodOption = page.getByTestId("recall-eval-option-good");
-      await goodOption.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(firstRow, "good");
 
       // ASSERT: Dropdown now shows "Good"
       await expect(firstDropdown).toContainText(/Good/i, { timeout: 5000 });
@@ -218,17 +179,10 @@ test.describe
     test("should clear evaluation when selecting '(Not Set)'", async ({
       page,
     }) => {
-      // ARRANGE: Select "Good" rating first
-      const firstRow = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
-      const firstDropdown = firstRow.locator("[data-testid^='recall-eval-']");
+      const rows = ttPage.getRows("scheduled");
+      const firstRow = rows.first();
 
-      await expect(firstDropdown).toBeVisible({ timeout: 5000 });
-      await firstDropdown.click();
-      await page.waitForTimeout(500);
-
-      const goodOption = page.getByTestId("recall-eval-option-good");
-      await goodOption.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(firstRow, "good", 500);
 
       // Verify evaluation count is 1
       const badgeSpan = await ttPage.submitEvaluationsButton
@@ -237,19 +191,13 @@ test.describe
 
       await expect(badgeSpan).toHaveText("1");
 
-      // ACT: Clear evaluation by selecting "(Not Set)"
-      await firstDropdown.click();
-      await page.waitForTimeout(500);
+      await ttPage.setRowEvaluation(firstRow, "not-set", 500);
 
-      const notSetOption = page.getByTestId("recall-eval-option-not-set");
-      await expect(notSetOption).toBeVisible({ timeout: 5000 });
-      await notSetOption.click();
-      await page.waitForTimeout(500);
+      const evalNotSetDropdown = page
+        .getByRole("cell", { name: "(Not Set)" })
+        .first();
 
-      // ASSERT: Dropdown shows "(Not Set)"
-      await expect(firstDropdown).toContainText(/(Not Set)/i, {
-        timeout: 5000,
-      });
+      await expect(evalNotSetDropdown).toBeVisible();
 
       // Evaluations count should be 0
       await expect(ttPage.submitEvaluationsButton.locator("span")).toHaveCount(

@@ -5,6 +5,8 @@
  * Based on the practice_list_staged view and legacy implementation.
  */
 
+import type { ITuneOverview } from "../../lib/db/view-types";
+
 /**
  * Table purpose identifier - determines which grid variant to use
  */
@@ -14,60 +16,7 @@ export type TablePurpose = "scheduled" | "repertoire" | "catalog";
  * Tune overview data structure from practice_list_staged view
  * Combines tune data with practice records and transient staging data
  */
-export interface ITuneOverview {
-  // Tune basic info
-  id: string;
-  title: string | null;
-  type: string | null;
-  structure: string | null;
-  mode: string | null;
-  incipit: string | null;
-  genre: string | null;
-  private_for: string | null;
-  deleted: number;
-
-  // Playlist info
-  user_ref: string;
-  playlist_id: string;
-  instrument: string | null;
-  learned: number | null;
-  scheduled: number | null;
-  playlist_deleted: number | null;
-
-  // Practice record data (latest or staged)
-  latest_state: number | null;
-  latest_practiced: string | null;
-  latest_quality: number | null;
-  latest_easiness: number | null;
-  latest_difficulty: number | null;
-  latest_stability: number | null;
-  latest_interval: number | null;
-  latest_step: number | null;
-  latest_repetitions: number | null;
-  latest_due: string | null;
-  latest_backup_practiced: string | null;
-  latest_goal: string | null;
-  latest_technique: string | null;
-
-  // Transient/staging data
-  goal: string | null;
-  purpose: string | null;
-  note_private: string | null;
-  note_public: string | null;
-  recall_eval: string | null;
-
-  // Queue data (from daily_practice_queue)
-  bucket?: number | null; // Queue bucket (1=Due Today, 2=Lapsed, 3=New, 4=Old Lapsed)
-  order_index?: number | null; // Position in queue
-  completed_at?: string | null; // Timestamp when evaluation was submitted
-
-  // Metadata
-  tags: string | null;
-  notes: string | null;
-  favorite_url: string | null;
-  has_override: number;
-  has_staged: number;
-}
+export type { ITuneOverview };
 
 /**
  * Column sizing state

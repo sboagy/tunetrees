@@ -545,7 +545,6 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   prefs_scheduling_options: 12,
   prefs_spaced_repetition: 13,
   tab_group_main_state: 14,
-  table_state: 15,
 
   // Core data
   tune: 20,
@@ -555,6 +554,9 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   reference: 24,
   user_annotation: 25,
   tune_override: 26,
+
+  // UI state (depends on user_profile + playlist)
+  table_state: 27,
 
   // Junction/dependent tables (must come after their referenced tables)
   playlist_tune: 30,

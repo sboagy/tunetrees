@@ -50,6 +50,7 @@ const Home: Component = () => {
     loading,
     isAnonymous,
     initialSyncComplete,
+    lastSyncTimestamp,
     localDb,
     userIdInt,
   } = useAuth();
@@ -86,37 +87,44 @@ const Home: Component = () => {
   // Check if onboarding is needed for users with no playlists
   createEffect(() => {
     // Wait for auth to be loaded and initial sync to complete
-    if (
-      !loading() &&
-      (user() || isAnonymous()) &&
-      initialSyncComplete() &&
-      !hasCheckedOnboarding()
-    ) {
-      setHasCheckedOnboarding(true);
+    if (loading() || (!user() && !isAnonymous()) || !initialSyncComplete()) {
+      return;
+    }
+    if (hasCheckedOnboarding()) return;
 
-      // Check if user has any playlists
-      const db = localDb();
-      // Use userIdInt which is the correct UUID for both regular and anonymous users
-      const userId = userIdInt();
-
-      if (db && userId) {
-        void (async () => {
-          try {
-            const playlists = await getUserPlaylists(db, userId);
-            const hasPlaylists = playlists.length > 0;
-
-            if (shouldShowOnboarding(hasPlaylists)) {
-              console.log("🎓 No playlists found, starting onboarding");
-              // Small delay to let UI settle
-              setTimeout(() => {
-                startOnboarding();
-              }, 500);
-            }
-          } catch (error) {
-            console.error("Failed to check playlists for onboarding:", error);
-          }
-        })();
+    // IMPORTANT: After local storage wipe, local DB starts empty and playlists are only
+    // available after the first syncDown completes. If we check too early, we incorrectly
+    // show the onboarding flow to users who already have playlists.
+    if (user() && !isAnonymous()) {
+      // Only gate when online; if offline we can't wait for syncDown.
+      if (navigator.onLine && !lastSyncTimestamp()) {
+        return;
       }
+    }
+
+    // Check if user has any playlists
+    const db = localDb();
+    // Use userIdInt which is the correct UUID for both regular and anonymous users
+    const userId = userIdInt();
+
+    if (db && userId) {
+      setHasCheckedOnboarding(true);
+      void (async () => {
+        try {
+          const playlists = await getUserPlaylists(db, userId);
+          const hasPlaylists = playlists.length > 0;
+
+          if (shouldShowOnboarding(hasPlaylists)) {
+            console.log("🎓 No playlists found, starting onboarding");
+            // Small delay to let UI settle
+            setTimeout(() => {
+              startOnboarding();
+            }, 500);
+          }
+        } catch (error) {
+          console.error("Failed to check playlists for onboarding:", error);
+        }
+      })();
     }
   });
 

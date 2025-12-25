@@ -37,7 +37,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
 
     await expect(playlistButton).toBeVisible({ timeout: 10000 });
 
-    // Should show playlist name or instrument name
+    // Should show repertoire name or instrument name
     await expect(playlistButton).toContainText(
       new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i")
     );
@@ -85,7 +85,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     });
   });
 
-  test("should show 'Manage Playlists' button in dropdown", async ({
+  test("should show 'Manage Repertoires' button in dropdown", async ({
     page,
   }) => {
     const playlistButton = page
@@ -96,10 +96,10 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
       .first();
     await playlistButton.click();
 
-    // Look for "Manage Playlists" button
-    await expect(
-      page.getByRole("button", { name: /Manage Playlists/i })
-    ).toBeVisible({ timeout: 2000 });
+    // Look for "Manage Repertoires" button
+    await expect(page.getByTestId("manage-repertoires-button")).toBeVisible({
+      timeout: 2000,
+    });
   });
 
   test("should close dropdown when clicking outside", async ({ page }) => {

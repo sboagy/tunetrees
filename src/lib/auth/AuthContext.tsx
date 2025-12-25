@@ -8,6 +8,7 @@
  */
 
 import type { AuthError, Session, User } from "@supabase/supabase-js";
+import { sql } from "drizzle-orm";
 import {
   type Accessor,
   createContext,
@@ -210,6 +211,15 @@ export const AuthProvider: ParentComponent = (props) => {
     "full" | "incremental" | null
   >(null);
 
+  // Track last sync outcome for diagnostics (and Playwright E2E gating)
+  const [lastSyncSuccess, setLastSyncSuccess] = createSignal<boolean | null>(
+    null
+  );
+  const [lastSyncErrorCount, setLastSyncErrorCount] = createSignal(0);
+  const [lastSyncErrorSummary, setLastSyncErrorSummary] = createSignal<
+    string | null
+  >(null);
+
   // View-specific change signals for optimistic updates
   const [practiceListStagedChanged, setPracticeListStagedChanged] =
     createSignal(0);
@@ -223,6 +233,86 @@ export const AuthProvider: ParentComponent = (props) => {
 
   // Track if database is being initialized to prevent double initialization
   let isInitializing = false;
+
+  // Optional one-time sync diagnostics (off by default).
+  // Enable via `VITE_SYNC_DIAGNOSTICS=true` to log row counts after sync.
+  const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+  let syncDiagnosticsRan = false;
+
+  async function runSyncDiagnostics(db: SqliteDatabase): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+
+      const totals = await db.all<{ table: string; count: number }>(sql`
+        SELECT 'user_profile' AS table, COUNT(*) AS count FROM user_profile
+        UNION ALL SELECT 'playlist', COUNT(*) FROM playlist
+        UNION ALL SELECT 'playlist_tune', COUNT(*) FROM playlist_tune
+        UNION ALL SELECT 'tune', COUNT(*) FROM tune
+        UNION ALL SELECT 'practice_record', COUNT(*) FROM practice_record
+        UNION ALL SELECT 'daily_practice_queue', COUNT(*) FROM daily_practice_queue
+      `);
+
+      const playlistSummary = await db.all<{
+        playlist_id: string;
+        name: string | null;
+        user_ref: string;
+        deleted: number;
+        tune_count: number;
+        active_queue: number;
+        staged_rows: number;
+      }>(sql`
+        SELECT
+          p.playlist_id,
+          p.name,
+          p.user_ref,
+          p.deleted,
+          (
+            SELECT COUNT(*)
+            FROM playlist_tune pt
+            WHERE pt.playlist_ref = p.playlist_id
+              AND pt.deleted = 0
+          ) AS tune_count,
+          (
+            SELECT COUNT(*)
+            FROM daily_practice_queue dpq
+            WHERE dpq.playlist_ref = p.playlist_id
+              AND dpq.active = 1
+          ) AS active_queue,
+          (
+            SELECT COUNT(*)
+            FROM practice_list_staged pls
+            WHERE pls.playlist_id = p.playlist_id
+              AND pls.playlist_deleted = 0
+              AND pls.deleted = 0
+          ) AS staged_rows
+        FROM playlist p
+        ORDER BY tune_count DESC
+        LIMIT 10
+      `);
+
+      const stagedTop = await db.all<{
+        playlist_id: string;
+        count: number;
+      }>(sql`
+        SELECT playlist_id, COUNT(*) AS count
+        FROM practice_list_staged
+        WHERE playlist_deleted = 0
+          AND deleted = 0
+        GROUP BY playlist_id
+        ORDER BY count DESC
+        LIMIT 10
+      `);
+
+      console.warn("🔎 [SYNC_DIAG] Snapshot", {
+        at: now,
+        totals,
+        topPlaylists: playlistSummary,
+        stagedTop,
+      });
+    } catch (e) {
+      console.warn("⚠️ [SYNC_DIAG] Failed to collect diagnostics", e);
+    }
+  }
 
   /**
    * Query local SQLite for user's internal ID from user_profile.
@@ -272,6 +362,24 @@ export const AuthProvider: ParentComponent = (props) => {
         log.debug(
           "Sync completed, incrementing remote sync down completion version"
         );
+
+        // Record last sync outcome for E2E and UI diagnostics.
+        setLastSyncSuccess(result?.success ?? null);
+        const errorCount = result?.errors?.length ?? 0;
+        setLastSyncErrorCount(errorCount);
+        if (errorCount > 0) {
+          const first = result?.errors?.[0];
+          let summary: string;
+          try {
+            summary =
+              typeof first === "string" ? first : (JSON.stringify(first) ?? "");
+          } catch {
+            summary = String(first);
+          }
+          setLastSyncErrorSummary(summary);
+        } else {
+          setLastSyncErrorSummary(null);
+        }
 
         setRemoteSyncDownCompletionVersion((prev) => {
           const newVersion = prev + 1;
@@ -348,6 +456,17 @@ export const AuthProvider: ParentComponent = (props) => {
             "🔔 [AuthContext] Initial sync - triggering all view signals"
           );
           triggerAllViewSignals();
+        }
+
+        // One-time post-sync diagnostics (helps pinpoint missing repertoire/practice data).
+        // Runs after first successful sync completion.
+        if (
+          SYNC_DIAGNOSTICS &&
+          !syncDiagnosticsRan &&
+          result?.success === true
+        ) {
+          syncDiagnosticsRan = true;
+          await runSyncDiagnostics(db);
         }
 
         // Granular Signaling: Trigger specific view refreshes
@@ -480,8 +599,8 @@ export const AuthProvider: ParentComponent = (props) => {
       );
 
       // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
-      // The sync worker will pull all public reference data from the Worker endpoint
-      // This replaces the old direct Supabase queries for reference data
+      // The sync worker pulls system/shared reference rows (user_ref NULL) plus user-owned rows.
+      // This replaces the old direct Supabase queries for reference data.
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
         console.log("📥 Starting sync worker for anonymous user...");
         const syncWorker = await startSyncWorkerForUser(
@@ -1492,6 +1611,11 @@ export const AuthProvider: ParentComponent = (props) => {
       <div
         data-auth-initialized={!loading()}
         data-sync-version={remoteSyncDownCompletionVersion()}
+        data-sync-success={
+          lastSyncSuccess() === null ? "" : String(lastSyncSuccess())
+        }
+        data-sync-error-count={String(lastSyncErrorCount())}
+        data-sync-error-summary={lastSyncErrorSummary() ?? ""}
         style={{ display: "contents" }}
       >
         {props.children}

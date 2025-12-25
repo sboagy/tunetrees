@@ -7,7 +7,7 @@
  * @module lib/db/queries/references
  */
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -55,20 +55,25 @@ export async function getReferencesByTune(
   tuneId: string, // UUID
   supabaseUserId?: string
 ): Promise<Reference[]> {
-  const conditions = [
+  // Visibility semantics (ignore `reference.public`):
+  // - system/legacy references: user_ref IS NULL
+  // - private references: user_ref = supabaseUserId
+  const baseConditions = [
     eq(schema.reference.tuneRef, tuneId),
     eq(schema.reference.deleted, 0),
   ];
 
-  // If user ID provided, filter to user's references
-  if (supabaseUserId) {
-    conditions.push(eq(schema.reference.userRef, supabaseUserId));
-  }
+  const visibilityCondition = supabaseUserId
+    ? or(
+        eq(schema.reference.userRef, supabaseUserId),
+        isNull(schema.reference.userRef)
+      )
+    : isNull(schema.reference.userRef);
 
   return await db
     .select()
     .from(schema.reference)
-    .where(and(...conditions))
+    .where(and(...baseConditions, visibilityCondition))
     .orderBy(asc(schema.reference.displayOrder), desc(schema.reference.id))
     .all();
 }
@@ -120,7 +125,8 @@ export async function createReference(
       refType: data.refType || null,
       title: data.title || null,
       comment: data.comment || null,
-      public: data.public ? 1 : 0,
+      // `public` is ignored for visibility; all user-created references are private for now.
+      public: 0,
       favorite: data.favorite ? 1 : 0,
       deleted: 0,
       lastModifiedAt: now,
@@ -169,8 +175,10 @@ export async function updateReference(
     updateData.comment = data.comment;
   }
 
+  // `public` is ignored for visibility; for now we don't allow user-created
+  // references to become public via client-side updates.
   if (data.public !== undefined) {
-    updateData.public = data.public ? 1 : 0;
+    updateData.public = 0;
   }
 
   if (data.favorite !== undefined) {

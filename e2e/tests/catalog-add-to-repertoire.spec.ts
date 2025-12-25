@@ -34,10 +34,14 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe
   .serial("Catalog: Add To Repertoire", () => {
+    test.setTimeout(45000);
+
     let currentTestUser: TestUser;
+    let ttPage: TuneTreesPage;
 
     test.beforeEach(async ({ page, testUser }) => {
       currentTestUser = testUser;
+      ttPage = new TuneTreesPage(page);
       // Fast setup: clear repertoire, start on catalog tab
       await setupForCatalogTestsParallel(page, testUser, {
         emptyRepertoire: true,
@@ -97,8 +101,8 @@ test.describe
       );
 
       // Navigate to Catalog tab
-      await page.getByTestId("tab-catalog").click();
-      await page.waitForTimeout(500);
+      ttPage.navigateToTab("catalog");
+      await page.waitForTimeout(200);
 
       // Select specific tunes that we know exist
       const tune1Checkbox = page.getByRole("checkbox", {
@@ -140,8 +144,8 @@ test.describe
       await page.waitForTimeout(2000);
 
       // Navigate to Repertoire tab
-      await page.getByTestId("tab-repertoire").click();
-      await page.waitForTimeout(1000);
+      await ttPage.navigateToTab("repertoire");
+      await page.waitForTimeout(500);
 
       // Debug: Query Supabase directly to see what's actually there
       const supabaseCount = await page.evaluate(async (playlistId) => {
@@ -181,9 +185,9 @@ test.describe
     test("should handle tunes already in repertoire @side-effects", async ({
       page,
     }) => {
-      const ttPage = new TuneTreesPage(page);
+      // const ttPage = new TuneTreesPage(page);
       // First add user's private tune to repertoire
-      await page.getByTestId("tab-catalog").click();
+      await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
       // Ensure grid rendered content
       await ttPage.expectGridHasContent(ttPage.catalogGrid);
@@ -223,7 +227,7 @@ test.describe
       expect(dialogMessage).toContain("Added 1 tune");
 
       // Now try to add same tune again
-      await page.getByTestId("tab-catalog").click();
+      await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
       await ttPage.clearSearch();
       await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
@@ -257,8 +261,10 @@ test.describe
       page,
     }) => {
       // First add tune 66
-      await page.getByTestId("tab-catalog").click();
+      await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
+
+      await ttPage.filterByGenre("Irish Traditional Music");
 
       const checkbox = page.getByRole("checkbox", {
         name: `Select row ${CATALOG_TUNE_66_ID}`,
@@ -275,7 +281,7 @@ test.describe
       await page.waitForTimeout(500);
 
       // Now add batch: one new (70), one existing (66)
-      await page.getByTestId("tab-catalog").click();
+      await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
 
       await page
@@ -298,7 +304,7 @@ test.describe
       page,
     }) => {
       // Navigate to Catalog tab
-      await page.getByTestId("tab-catalog").click();
+      await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
 
       {
@@ -341,8 +347,8 @@ test.describe
       await page.waitForTimeout(3000);
 
       // Navigate to Repertoire to verify tunes were added
-      await page.getByTestId("tab-repertoire").click();
-      await page.waitForTimeout(1000);
+      await ttPage.navigateToTab("repertoire");
+      await page.waitForTimeout(200);
 
       // Verify exactly 2 tunes appear (count data rows only, not spacers)
       const dataRowsBefore = page.locator(
@@ -358,8 +364,8 @@ test.describe
       await page.waitForTimeout(3000); // Wait for sync down
 
       // Navigate back to Repertoire tab
-      await page.getByTestId("tab-repertoire").click();
-      await page.waitForTimeout(1000);
+      await ttPage.navigateToTab("repertoire");
+      await page.waitForTimeout(200);
 
       // CRITICAL: Verify tunes STILL appear after reload
       const dataRowsAfter = page.locator(

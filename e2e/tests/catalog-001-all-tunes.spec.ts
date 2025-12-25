@@ -115,6 +115,8 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   });
 
   test("should allow filtering by tune type", async () => {
+    await ttPage.filterByGenre("Irish Traditional Music");
+
     // Use Page Object to filter by Jig type
     await ttPage.filterByType("JigD");
 

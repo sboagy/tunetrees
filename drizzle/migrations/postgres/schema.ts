@@ -809,13 +809,13 @@ export const reference = pgTable(
       foreignColumns: [userProfile.id],
       name: "reference_user_ref_user_profile_id_fk",
     }),
-    pgPolicy("Users can view own or public references", {
+    pgPolicy("Users can view own or system references", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`((user_ref IN ( SELECT user_profile.id
+      using: sql`((user_ref IS NULL) OR (user_ref IN ( SELECT user_profile.id
    FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid()))) OR (public = true))`,
+  WHERE (user_profile.supabase_user_id = auth.uid()))))`,
     }),
     pgPolicy("Users can insert own references", {
       as: "permissive",

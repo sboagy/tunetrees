@@ -41,8 +41,11 @@ let sqliteDb: SqlJsDatabase | null = null;
 let drizzleDb: ReturnType<typeof drizzle> | null = null;
 let dbReady = false;
 let isClearing = false; // set while clearDb executes
-let initAborted = false; // set if clearDb called mid-initialization
 let isInitializingDb = false; // guard flag for abort logic
+
+// Monotonic cancellation token for async initialization.
+// Each `clearDb()` increments this value, invalidating any in-flight `initializeDb()`.
+let initEpoch = 0;
 
 // Singleton sql.js initialization management
 let sqlJsInitPromise: Promise<SqlJsStatic> | null = null;
@@ -118,6 +121,18 @@ const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
 const CURRENT_DB_VERSION = 7;
 
+// Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
+const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
+
+function clearLastSyncTimestampForUser(userId: string): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(`${LAST_SYNC_TIMESTAMP_KEY_PREFIX}_${userId}`);
+  } catch (e) {
+    console.warn("⚠️ Failed to clear last sync timestamp:", e);
+  }
+}
+
 // Track which user's database is currently loaded
 let currentUserId: string | null = null;
 
@@ -154,6 +169,15 @@ export async function initializeDb(
     `🔁 initializeDb call #${initializeDbCalls} for user: ${userId.substring(0, 8)}...`
   );
 
+  const myInitEpoch = initEpoch;
+  const ensureNotCleared = () => {
+    if (initEpoch !== myInitEpoch) {
+      throw new Error(
+        "Database initialization aborted: clearDb() was called during initialization."
+      );
+    }
+  };
+
   // If we have an existing DB for a DIFFERENT user, persist and close it
   if (drizzleDb && currentUserId && currentUserId !== userId) {
     console.log(
@@ -185,11 +209,6 @@ export async function initializeDb(
   if (initializeDbPromise) {
     return initializeDbPromise;
   }
-  if (initAborted) {
-    throw new Error(
-      "Database initialization previously aborted; clearDb completed."
-    );
-  }
 
   console.log(
     `🔧 Initializing SQLite WASM database (call #${initializeDbCalls})...`
@@ -200,9 +219,7 @@ export async function initializeDb(
     try {
       // Load sql.js WASM module via singleton
       const SQL = await getSqlJs();
-      if (initAborted) {
-        throw new Error("Initialization aborted after sql.js module load.");
-      }
+      ensureNotCleared();
       // (Rest of original body moved inside try below)
       // Check if schema migration is needed (e.g., integer IDs → UUIDs)
       const migrationNeeded = needsMigration();
@@ -229,6 +246,7 @@ export async function initializeDb(
       const dbVersionKey = getDbVersionKey(userId);
       const existingData = await loadFromIndexedDB(dbKey);
       const storedVersion = await loadFromIndexedDB(dbVersionKey);
+      ensureNotCleared();
       const storedVersionNum =
         storedVersion && storedVersion.length > 0 ? storedVersion[0] : 0;
 
@@ -249,6 +267,10 @@ export async function initializeDb(
           await deleteFromIndexedDB(dbKey);
           await deleteFromIndexedDB(dbVersionKey);
         }
+
+        // DB is being recreated; any persisted incremental sync watermark is now invalid.
+        clearLastSyncTimestampForUser(userId);
+
         sqliteDb = new SQL.Database();
         console.log("📋 Applying SQLite schema migrations...");
         const migrations = [
@@ -259,6 +281,7 @@ export async function initializeDb(
           // Note: 0004_true_union_jack.sql skipped - avatar_url already exists in base schema
           "/drizzle/migrations/sqlite/0005_add_display_order.sql",
           "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
+          "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
@@ -287,8 +310,26 @@ export async function initializeDb(
       }
 
       await initializeViews(drizzleDb);
+      ensureNotCleared();
       try {
         ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
+
+        // Backward-compatible adds for hybrid tune fields.
+        // Some existing IndexedDB DBs were created before these columns existed,
+        // but sync may deliver rows containing them (e.g., tune_override.composer).
+        ensureColumnExists("tune", "composer", "composer text");
+        ensureColumnExists("tune", "artist", "artist text");
+        ensureColumnExists("tune", "id_foreign", "id_foreign text");
+        ensureColumnExists("tune", "release_year", "release_year integer");
+
+        ensureColumnExists("tune_override", "composer", "composer text");
+        ensureColumnExists("tune_override", "artist", "artist text");
+        ensureColumnExists("tune_override", "id_foreign", "id_foreign text");
+        ensureColumnExists(
+          "tune_override",
+          "release_year",
+          "release_year integer"
+        );
       } catch (err) {
         console.warn("⚠️ Column ensure check failed:", err);
       }
@@ -305,13 +346,32 @@ export async function initializeDb(
       console.log(
         `✅ SQLite WASM database ready for user: ${userId.substring(0, 8)}...`
       );
+
+      // Only publish global state if this init hasn't been invalidated.
+      ensureNotCleared();
       currentUserId = userId;
       dbReady = true;
 
       if (migrationNeeded) {
         console.log("🔄 Executing schema migration...");
         try {
+          // Local data will be cleared; force next syncDown to run as a full sync.
+          clearLastSyncTimestampForUser(userId);
           await clearLocalDatabaseForMigration(drizzleDb);
+
+          // Important: schema migrations invalidate any existing local outbox.
+          // If we don't clear it, the app may attempt to upload thousands of stale changes
+          // before allowing syncDown, which can fail due to request size or server rejection.
+          try {
+            sqliteDb?.run("DELETE FROM sync_push_queue");
+            sqliteDb?.run(
+              "UPDATE sync_trigger_control SET disabled = 0 WHERE id = 1"
+            );
+            console.log("✅ Cleared sync outbox after migration");
+          } catch (e) {
+            console.warn("⚠️ Failed to clear sync outbox after migration:", e);
+          }
+
           setLocalSchemaVersion(getCurrentSchemaVersion());
           clearMigrationParams();
           if (forcedReset) {
@@ -327,6 +387,9 @@ export async function initializeDb(
       } else {
         const currentLocal = getLocalSchemaVersion();
         if (!currentLocal) {
+          console.warn(
+            `ℹ️ Setting initial schema_version=${getCurrentSchemaVersion()}`
+          );
           setLocalSchemaVersion(getCurrentSchemaVersion());
         }
       }
@@ -354,7 +417,7 @@ export async function initializeDb(
   return initializeDbPromise.finally(() => {
     isInitializingDb = false;
     // If aborted during init ensure state reflects not ready
-    if (initAborted && drizzleDb) {
+    if (initEpoch !== myInitEpoch && drizzleDb) {
       try {
         sqliteDb?.close();
       } catch (_) {
@@ -363,6 +426,7 @@ export async function initializeDb(
       sqliteDb = null;
       drizzleDb = null;
       dbReady = false;
+      initializeDbPromise = null;
     }
   });
 }
@@ -404,6 +468,11 @@ export async function persistDb(): Promise<void> {
   if (!sqliteDb) {
     throw new Error("SQLite database not initialized");
   }
+
+  // Capture a stable reference to avoid races if the global is cleared while this async
+  // function is running (e.g., Playwright teardown calling clearLocalDatabase).
+  const dbToPersist = sqliteDb;
+
   if (!dbReady) {
     console.warn("⏭️  Skipping persist until DB initialization completes");
     return;
@@ -414,7 +483,7 @@ export async function persistDb(): Promise<void> {
   }
   const dbKey = getDbKey(currentUserId);
   const dbVersionKey = getDbVersionKey(currentUserId);
-  const data = sqliteDb.export();
+  const data = dbToPersist.export();
   await saveToIndexedDB(dbKey, data);
   // Save version number
   await saveToIndexedDB(dbVersionKey, new Uint8Array([CURRENT_DB_VERSION]));
@@ -422,8 +491,13 @@ export async function persistDb(): Promise<void> {
 
   // DEV VERIFICATION: load saved blob and verify critical table counts match
   try {
-    // Only run verification in development builds to avoid extra overhead in prod
-    if (import.meta.env.MODE !== "production") {
+    // Only run verification in development builds to avoid extra overhead in prod.
+    // Skip in Playwright E2E: verification duplicates the full DB in WASM memory and
+    // can OOM when many tests run in parallel.
+    const isE2E =
+      typeof window !== "undefined" && !!(window as any).__ttTestApi;
+
+    if (import.meta.env.MODE !== "production" && !isE2E) {
       // Reuse existing module; if not yet initialized skip verification
       if (!sqlJsModule) {
         console.warn("Persist verification skipped: sql.js module not ready");
@@ -431,7 +505,7 @@ export async function persistDb(): Promise<void> {
         const savedDb = new sqlJsModule.Database(data);
 
         // Count rows in table_transient_data in-memory vs saved blob
-        const inMemRes = sqliteDb.exec(
+        const inMemRes = dbToPersist.exec(
           "SELECT COUNT(*) as c FROM table_transient_data;"
         );
         const savedRes = savedDb.exec(
@@ -515,19 +589,36 @@ export async function closeDb(): Promise<void> {
  */
 export async function clearDb(): Promise<void> {
   isClearing = true;
+  // Invalidate any in-flight initializeDb() ASAP.
+  initEpoch += 1;
   if (isInitializingDb) {
     console.warn("⚠️ clearDb called during initialization; aborting init.");
-    initAborted = true;
   }
+
+  // Allow a subsequent initializeDb() call to start fresh.
+  initializeDbPromise = null;
   if (sqliteDb) {
     sqliteDb.close();
     sqliteDb = null;
     drizzleDb = null;
   }
 
+  // Playwright E2E: fully reset the sql.js module so its WASM linear memory
+  // can be reclaimed by GC. sql.js grows memory but does not shrink it, so
+  // long, highly-parallel E2E runs can hit `Error: out of memory` even after
+  // closing individual Database instances.
+  const isE2E =
+    typeof window !== "undefined" && !!(window as unknown as any).__ttTestApi;
+  if (isE2E) {
+    sqlJsModule = null;
+    sqlJsInitPromise = null;
+    sqlJsInitAttempts = 0;
+  }
+
   if (currentUserId) {
     await deleteFromIndexedDB(getDbKey(currentUserId));
     await deleteFromIndexedDB(getDbVersionKey(currentUserId));
+    clearLastSyncTimestampForUser(currentUserId);
   }
   currentUserId = null;
   dbReady = false;
@@ -561,7 +652,7 @@ export function setupAutoPersist(): () => void {
   });
 
   // Periodic persistence (every 30 seconds)
-  const intervalId = setInterval(persistHandler, 300000);
+  const intervalId = setInterval(persistHandler, 30_000);
 
   // Return cleanup function
   return () => {

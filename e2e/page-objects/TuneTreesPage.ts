@@ -234,7 +234,7 @@ export class TuneTreesPage {
     this.filtersButton = page.getByRole("button", { name: "Filter options" });
     this.typeFilter = page.getByRole("button", { name: "Filter by Type" });
     this.modeFilter = page.getByRole("button", { name: "Filter by Mode" });
-    this.genreFilter = page.getByRole("button", { name: "Filter by Mode" });
+    this.genreFilter = page.getByRole("button", { name: "Filter by Genre" });
     this.playlistFilter = page.getByRole("button", {
       name: "Filter by Playlist",
     });
@@ -536,8 +536,8 @@ export class TuneTreesPage {
     const welcomeHeading = this.page.getByRole("heading", {
       name: /Welcome to TuneTrees/i,
     });
-    const createPlaylistButton = this.page.locator(
-      'button:has-text("Create Playlist")'
+    const createPlaylistButton = this.page.getByTestId(
+      "onboarding-create-repertoire"
     );
 
     // Wait for the app to potentially show onboarding (600ms delay + buffer)
@@ -554,8 +554,8 @@ export class TuneTreesPage {
       const playlistDialog = this.page.getByRole("dialog");
       await playlistDialog.waitFor({ state: "visible", timeout: 5000 });
 
-      // Fill in the playlist name
-      const nameInput = playlistDialog.getByLabel(/Playlist Name|Name/i);
+      // Fill in the repertoire name
+      const nameInput = playlistDialog.getByLabel(/Repertoire Name|Name/i);
       await nameInput.fill(playlistName);
 
       // Click "Create" or "Save" button
@@ -1034,6 +1034,25 @@ export class TuneTreesPage {
   /**
    * Filter by type (Jig, Reel, etc.)
    */
+  async filterByGenre(genre: string) {
+    await this.filtersButton.click();
+    await this.page.waitForTimeout(500);
+    await this.genreFilter.click();
+    await this.page.waitForTimeout(500);
+
+    const option = this.page.getByRole("checkbox", {
+      name: genre,
+    });
+
+    await option.isVisible();
+    await option.setChecked(true);
+    await this.page.waitForTimeout(1000);
+    await this.filtersButton.click();
+  }
+
+  /**
+   * Filter by type (Jig, Reel, etc.)
+   */
   async filterByType(type: string) {
     await this.filtersButton.click();
     await this.page.waitForTimeout(500);
@@ -1043,10 +1062,11 @@ export class TuneTreesPage {
     const typePanel = this.page.getByText("AirBDnceFlingFling/");
     const option = typePanel.getByRole("checkbox", { name: type });
 
-    if (await option.isVisible({ timeout: 1000 })) {
-      await option.setChecked(true);
-      await this.page.waitForTimeout(1000);
-    }
+    await option.isVisible();
+    await option.setChecked(true);
+    await this.page.waitForTimeout(1000);
+
+    await this.filtersButton.click();
   }
 
   /**
@@ -1302,7 +1322,7 @@ export class TuneTreesPage {
   async setRowEvaluation(
     whichRow: Locator,
     evalValue: string,
-    doTimeouts = true
+    doTimeouts: boolean | number = true
   ) {
     const allowed = ["again", "hard", "good", "easy", "not-set"] as const;
     if (!allowed.includes(evalValue as (typeof allowed)[number])) {
@@ -1318,7 +1338,8 @@ export class TuneTreesPage {
     // ACT: Select "Again" rating
     await evalDropdown.click();
     if (doTimeouts) {
-      await this.page.waitForTimeout(50);
+      const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
+      await this.page.waitForTimeout(delay);
     }
 
     const whichOption = this.page.getByTestId(
@@ -1328,7 +1349,8 @@ export class TuneTreesPage {
     await whichOption.click();
 
     if (doTimeouts) {
-      await this.page.waitForTimeout(50);
+      const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
+      await this.page.waitForTimeout(delay);
     }
   }
 

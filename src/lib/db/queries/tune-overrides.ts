@@ -23,6 +23,10 @@ export interface TuneOverrideInput {
   genre?: string;
   mode?: string;
   incipit?: string;
+  composer?: string;
+  artist?: string;
+  idForeign?: string;
+  releaseYear?: number;
 }
 
 /**
@@ -83,6 +87,10 @@ export async function getOrCreateTuneOverride(
     genre: initialValues?.genre || null,
     mode: initialValues?.mode || null,
     incipit: initialValues?.incipit || null,
+    composer: initialValues?.composer || null,
+    artist: initialValues?.artist || null,
+    idForeign: initialValues?.idForeign || null,
+    releaseYear: initialValues?.releaseYear || null,
     deleted: 0,
     syncVersion: 0,
     lastModifiedAt: now,
@@ -108,8 +116,10 @@ export async function updateTuneOverride(
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
 
+  type TuneOverrideInsert = typeof schema.tuneOverride.$inferInsert;
+
   // Build update object with only provided fields
-  const updateData: any = {
+  const updateData: Partial<TuneOverrideInsert> = {
     lastModifiedAt: now,
     deviceId: deviceId,
   };
@@ -121,6 +131,13 @@ export async function updateTuneOverride(
   if (input.genre !== undefined) updateData.genre = input.genre || null;
   if (input.mode !== undefined) updateData.mode = input.mode || null;
   if (input.incipit !== undefined) updateData.incipit = input.incipit || null;
+  if (input.composer !== undefined)
+    updateData.composer = input.composer || null;
+  if (input.artist !== undefined) updateData.artist = input.artist || null;
+  if (input.idForeign !== undefined)
+    updateData.idForeign = input.idForeign || null;
+  if (input.releaseYear !== undefined)
+    updateData.releaseYear = input.releaseYear || null;
 
   await db
     .update(schema.tuneOverride)
@@ -154,12 +171,24 @@ export async function clearTuneOverrideFields(
   const now = new Date().toISOString();
   const deviceId = getDeviceId();
 
-  const updateData: any = {
+  type TuneOverrideInsert = typeof schema.tuneOverride.$inferInsert;
+
+  const updateData: Partial<TuneOverrideInsert> = {
     lastModifiedAt: now,
     deviceId,
   };
+
   for (const f of fields) {
-    updateData[f] = null;
+    if (f === "title") updateData.title = null;
+    if (f === "type") updateData.type = null;
+    if (f === "structure") updateData.structure = null;
+    if (f === "genre") updateData.genre = null;
+    if (f === "mode") updateData.mode = null;
+    if (f === "incipit") updateData.incipit = null;
+    if (f === "composer") updateData.composer = null;
+    if (f === "artist") updateData.artist = null;
+    if (f === "idForeign") updateData.idForeign = null;
+    if (f === "releaseYear") updateData.releaseYear = null;
   }
   await db
     .update(schema.tuneOverride)
@@ -182,6 +211,10 @@ export async function clearTuneOverrideFields(
     row.genre,
     row.mode,
     row.incipit,
+    row.composer,
+    row.artist,
+    row.idForeign,
+    row.releaseYear,
   ].some((v) => v !== null);
 
   if (!hasAny) {

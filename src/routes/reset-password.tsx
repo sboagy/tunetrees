@@ -74,6 +74,7 @@ export default function ResetPassword() {
                 <input
                   id="password"
                   type="password"
+                  autocomplete="new-password"
                   placeholder="Enter new password"
                   value={password()}
                   onInput={(e) => setPassword(e.currentTarget.value)}
@@ -93,6 +94,7 @@ export default function ResetPassword() {
                 <input
                   id="confirmPassword"
                   type="password"
+                  autocomplete="new-password"
                   placeholder="Confirm new password"
                   value={confirmPassword()}
                   onInput={(e) => setConfirmPassword(e.currentTarget.value)}

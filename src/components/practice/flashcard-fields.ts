@@ -10,6 +10,10 @@
 export type FlashcardField =
   | "type"
   | "mode"
+  | "composer"
+  | "artist"
+  | "release_year"
+  | "id_foreign"
   | "structure"
   | "incipit"
   | "note_public"
@@ -40,6 +44,30 @@ export const FLASHCARD_FIELDS: FlashcardFieldConfig[] = [
     label: "Mode",
     defaultVisibleFront: true,
     defaultVisibleBack: true,
+  },
+  {
+    id: "composer",
+    label: "Composer",
+    defaultVisibleFront: false,
+    defaultVisibleBack: true,
+  },
+  {
+    id: "artist",
+    label: "Artist",
+    defaultVisibleFront: false,
+    defaultVisibleBack: true,
+  },
+  {
+    id: "release_year",
+    label: "Release Year",
+    defaultVisibleFront: false,
+    defaultVisibleBack: false,
+  },
+  {
+    id: "id_foreign",
+    label: "External ID",
+    defaultVisibleFront: false,
+    defaultVisibleBack: false,
   },
   {
     id: "structure",

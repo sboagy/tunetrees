@@ -7,7 +7,18 @@
  *
  * @module worker/index
  */
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  max,
+  min,
+  or,
+} from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -22,12 +33,47 @@ import {
   getBooleanColumns,
   getConflictTarget,
   getNormalizer,
+  getPrimaryKey,
   hasDeletedFlag,
   SYNCABLE_TABLES,
   type SyncableTableName,
   TABLE_REGISTRY,
 } from "../../shared/table-meta";
 import * as schema from "./schema-postgres";
+
+// ============================================================================
+// DB CONNECTION
+// ============================================================================
+
+type PostgresClient = ReturnType<typeof postgres>;
+type DrizzleDb = ReturnType<typeof drizzle>;
+
+function createDb(env: Env): {
+  client: PostgresClient;
+  db: DrizzleDb;
+  close: () => Promise<void>;
+} {
+  const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("Database configuration error - no connection string");
+  }
+
+  // IMPORTANT (Cloudflare Workers): Do NOT cache/reuse database clients across requests.
+  // Newer Workers runtimes enforce request-scoped I/O; reusing a client can trigger:
+  // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
+  const client = postgres(connectionString);
+  const db = drizzle(client, { schema });
+
+  const close = async () => {
+    try {
+      await client.end({ timeout: 5 });
+    } catch {
+      // ignore
+    }
+  };
+
+  return { client, db, close };
+}
 
 // ============================================================================
 // TYPES
@@ -38,6 +84,10 @@ export interface Env {
   DATABASE_URL?: string;
   SUPABASE_URL: string;
   SUPABASE_JWT_SECRET: string;
+  /** When "true", emits extra sync diagnostics logs (initial sync only). */
+  SYNC_DIAGNOSTICS?: string;
+  /** Optional: only emit diagnostics when JWT sub matches this value. */
+  SYNC_DIAGNOSTICS_USER_ID?: string;
 }
 
 /** Context passed through sync operations */
@@ -45,6 +95,106 @@ interface SyncContext {
   userId: string;
   userPlaylistIds: Set<string>;
   now: string;
+  diagnosticsEnabled: boolean;
+}
+
+async function logPlaylistTuneInitialSyncDiagnostics(
+  tx: Transaction,
+  ctx: SyncContext,
+  syncStartedAt: string
+): Promise<void> {
+  const playlistIds = Array.from(ctx.userPlaylistIds);
+  if (playlistIds.length === 0) return;
+
+  const baseWhere = inArray(schema.playlistTune.playlistRef, playlistIds);
+  const snapshotWhere = and(
+    baseWhere,
+    lte(schema.playlistTune.lastModifiedAt, syncStartedAt)
+  );
+
+  const [totalAll] = await tx
+    .select({ n: count() })
+    .from(schema.playlistTune)
+    .where(baseWhere);
+  const [totalSnapshot] = await tx
+    .select({ n: count() })
+    .from(schema.playlistTune)
+    .where(snapshotWhere);
+
+  const [snapshotDeleted0] = await tx
+    .select({ n: count() })
+    .from(schema.playlistTune)
+    .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 0)));
+  const [snapshotDeleted1] = await tx
+    .select({ n: count() })
+    .from(schema.playlistTune)
+    .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 1)));
+
+  const [minMax] = await tx
+    .select({
+      min: min(schema.playlistTune.lastModifiedAt),
+      max: max(schema.playlistTune.lastModifiedAt),
+    })
+    .from(schema.playlistTune)
+    .where(baseWhere);
+
+  console.log("[SYNC_DIAG] playlist_tune initial-sync snapshot", {
+    userId: ctx.userId,
+    userPlaylistCount: playlistIds.length,
+    syncStartedAt,
+    totals: {
+      all: Number(totalAll?.n ?? 0),
+      snapshot: Number(totalSnapshot?.n ?? 0),
+      snapshotDeleted0: Number(snapshotDeleted0?.n ?? 0),
+      snapshotDeleted1: Number(snapshotDeleted1?.n ?? 0),
+    },
+    lastModifiedAt: {
+      min: minMax?.min ?? null,
+      max: minMax?.max ?? null,
+    },
+  });
+}
+
+interface InitialSyncCursorV1 {
+  v: 1;
+  tableIndex: number;
+  offset: number;
+  syncStartedAt: string;
+}
+
+function encodeCursor(cursor: InitialSyncCursorV1): string {
+  return btoa(JSON.stringify(cursor));
+}
+
+function decodeCursor(raw: string): InitialSyncCursorV1 {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(atob(raw));
+  } catch {
+    throw new Error("Invalid pullCursor");
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Invalid pullCursor");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  if (obj.v !== 1) throw new Error("Unsupported pullCursor version");
+  const tableIndex = Number(obj.tableIndex);
+  const offset = Number(obj.offset);
+  const syncStartedAt = String(obj.syncStartedAt);
+
+  if (!Number.isFinite(tableIndex) || tableIndex < 0) {
+    throw new Error("Invalid pullCursor.tableIndex");
+  }
+  if (!Number.isFinite(offset) || offset < 0) {
+    throw new Error("Invalid pullCursor.offset");
+  }
+  if (!syncStartedAt || Number.isNaN(Date.parse(syncStartedAt))) {
+    throw new Error("Invalid pullCursor.syncStartedAt");
+  }
+
+  return { v: 1, tableIndex, offset, syncStartedAt };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,13 +217,37 @@ function snakeToCamel(s: string): string {
 // ============================================================================
 
 /**
- * Get column definitions for a table's primary/conflict key.
+ * Get column definitions for a table's conflict target.
+ *
+ * This is used for UPSERT operations (onConflict target).
  */
-function getPkColumns(
+function getConflictKeyColumns(
   tableName: string,
   table: DrizzleTable
 ): { col: DrizzleColumn; prop: string }[] {
   const snakeKeys = getConflictTarget(tableName);
+  return snakeKeys.map((snakeKey) => {
+    const camelKey = snakeToCamel(snakeKey);
+    const col = table[camelKey];
+    if (!col) {
+      throw new Error(`Column '${camelKey}' not found in '${tableName}'`);
+    }
+    return { col, prop: camelKey };
+  });
+}
+
+/**
+ * Get column definitions for a table's primary key.
+ *
+ * This is preferred for DELETE operations because the client may only send PK
+ * values (e.g., daily_practice_queue sends only `id`).
+ */
+function getPrimaryKeyColumns(
+  tableName: string,
+  table: DrizzleTable
+): { col: DrizzleColumn; prop: string }[] {
+  const primaryKey = getPrimaryKey(tableName);
+  const snakeKeys = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
   return snakeKeys.map((snakeKey) => {
     const camelKey = snakeToCamel(snakeKey);
     const col = table[camelKey];
@@ -98,7 +272,7 @@ function extractRowId(
   }
 
   // Composite key - serialize to JSON
-  const pkCols = getPkColumns(tableName, table);
+  const pkCols = getConflictKeyColumns(tableName, table);
   const pkValues: Record<string, unknown> = {};
   for (const pk of pkCols) {
     pkValues[pk.prop] = row[pk.prop];
@@ -195,6 +369,15 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
     return;
   }
 
+  // Historical invariants: practice records are append-only.
+  // Do not allow deletes from clients (even if they attempt one).
+  if (change.table === "practice_record" && change.deleted) {
+    console.warn(
+      `[PUSH] Refusing DELETE for practice_record rowId=${change.rowId}`
+    );
+    return;
+  }
+
   const table = schema.tables[change.table as keyof typeof schema.tables];
   if (!table) {
     console.log(`[PUSH] Unknown table: ${change.table}`);
@@ -209,7 +392,8 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
     return;
   }
 
-  const pkCols = getPkColumns(change.table, t);
+  const upsertKeyCols = getConflictKeyColumns(change.table, t);
+  const deleteKeyCols = getPrimaryKeyColumns(change.table, t);
   const data = sqliteToPostgres(
     change.table,
     change.data as Record<string, unknown>
@@ -220,9 +404,16 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
   );
 
   if (change.deleted) {
-    await applyDelete(tx, change.table, table, pkCols, change);
+    await applyDelete(
+      tx,
+      change.table,
+      table,
+      deleteKeyCols,
+      upsertKeyCols,
+      change
+    );
   } else {
-    await applyUpsert(tx, table, pkCols, data);
+    await applyUpsert(tx, table, upsertKeyCols, data);
   }
 }
 
@@ -230,12 +421,39 @@ async function applyDelete(
   tx: Transaction,
   tableName: string,
   table: DrizzleTable,
-  pkCols: { col: unknown; prop: string }[],
+  primaryKeyCols: { col: unknown; prop: string }[],
+  conflictKeyCols: { col: unknown; prop: string }[],
   change: SyncChange
 ): Promise<void> {
-  const whereConditions = pkCols.map((pk) =>
-    eq(pk.col as any, (change.data as Record<string, unknown>)[pk.prop])
-  );
+  const changeData = change.data as Record<string, unknown>;
+
+  const buildWhere = (cols: { col: unknown; prop: string }[]) => {
+    const missing: string[] = [];
+    const whereConditions = cols.map((pk) => {
+      const value = changeData[pk.prop];
+      if (typeof value === "undefined" || value === null) {
+        missing.push(pk.prop);
+      }
+      return eq(pk.col as any, value as any);
+    });
+    return { whereConditions, missing };
+  };
+
+  // Prefer primary key columns for deletes; fall back to conflict key columns.
+  let { whereConditions, missing } = buildWhere(primaryKeyCols);
+  if (missing.length > 0) {
+    const fallback = buildWhere(conflictKeyCols);
+    if (fallback.missing.length === 0) {
+      whereConditions = fallback.whereConditions;
+      missing = [];
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing delete key(s) for ${tableName}: ${missing.join(", ")} (rowId=${change.rowId})`
+    );
+  }
 
   if (hasDeletedFlag(tableName)) {
     // Soft delete: set deleted = true
@@ -320,10 +538,32 @@ function rowToSyncChange(
  * Returns null if the table should be skipped entirely.
  */
 function buildUserFilter(
+  tableName: SyncableTableName,
   table: DrizzleTable,
   ctx: SyncContext
 ): unknown[] | null {
   const conditions: unknown[] = [];
+
+  // `user_profile` must never sync other users' rows into the client.
+  // The JWT subject is the Supabase Auth user ID, which matches `supabase_user_id`.
+  if (tableName === "user_profile" && table.supabaseUserId) {
+    conditions.push(eq(table.supabaseUserId, ctx.userId));
+    return conditions;
+  }
+
+  // Special case: references are "system" when `user_ref` is NULL.
+  // IMPORTANT: `reference.user_ref` FK's to `user_profile.id` (internal ID).
+  // We *do not* sync other users' `user_profile` rows.
+  // Therefore, syncing any reference row owned by another user would violate
+  // the client's FK constraint and could abort initial sync.
+  //
+  // Visibility semantics (ignore `reference.public`):
+  // - system/legacy references: user_ref IS NULL
+  // - private references: user_ref = ctx.userId
+  if (tableName === "reference" && table.userRef) {
+    conditions.push(or(isNull(table.userRef), eq(table.userRef, ctx.userId)));
+    return conditions;
+  }
 
   if (table.userId) {
     conditions.push(eq(table.userId, ctx.userId));
@@ -349,13 +589,13 @@ function buildUserFilter(
   return conditions;
 }
 
-/**
- * Fetch all rows from a single table for initial sync.
- */
-async function fetchTableForInitialSync(
+async function fetchTableForInitialSyncPage(
   tx: Transaction,
   tableName: SyncableTableName,
-  ctx: SyncContext
+  ctx: SyncContext,
+  syncStartedAt: string,
+  offset: number,
+  limit: number
 ): Promise<SyncChange[]> {
   const table = schema.tables[tableName];
   if (!table) return [];
@@ -364,55 +604,132 @@ async function fetchTableForInitialSync(
   const meta = TABLE_REGISTRY[tableName];
   if (!meta) return [];
 
-  // Build user filter
-  const conditions = buildUserFilter(t, ctx);
+  const conditions = buildUserFilter(tableName, t, ctx);
   if (conditions === null) {
     console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
-    return []; // Skip table (e.g., no playlists)
+    return [];
   }
 
-  // Query
+  const whereConditions: unknown[] = [...conditions];
+
+  // Make a best-effort snapshot for multi-page initial sync.
+  // If the table has lastModifiedAt, only include rows up to syncStartedAt.
+  if (t.lastModifiedAt) {
+    whereConditions.push(lte(t.lastModifiedAt, syncStartedAt));
+  }
+
+  if (ctx.diagnosticsEnabled && tableName === "playlist_tune" && offset === 0) {
+    await logPlaylistTuneInitialSyncDiagnostics(tx, ctx, syncStartedAt);
+  }
+
   let query = tx.select().from(table);
-  if (conditions.length > 0) {
+  if (whereConditions.length > 0) {
     // @ts-expect-error - dynamic where
-    query = query.where(and(...conditions));
+    query = query.where(and(...whereConditions));
   }
 
-  const rows = await query;
-  console.log(`[PULL:INITIAL] ${tableName}: fetched ${rows.length} rows`);
+  const rows = await query.limit(limit).offset(offset);
 
-  // Convert rows to SyncChanges
+  console.log(
+    `[PULL:INITIAL] ${tableName}: fetched page rows=${rows.length} offset=${offset} limit=${limit}`
+  );
+
   const changes: SyncChange[] = [];
   for (const row of rows) {
     const r = row as Record<string, unknown>;
     const rowId = extractRowId(tableName, r, t);
     changes.push(rowToSyncChange(tableName, rowId, r));
   }
-
   return changes;
 }
 
-/**
- * Initial sync: fetch all user-accessible rows from all tables.
- */
-async function processInitialSync(
+async function processInitialSyncPaged(
   tx: Transaction,
-  ctx: SyncContext
-): Promise<SyncChange[]> {
-  console.log(
-    `[PULL:INITIAL] Starting initial sync for user ${ctx.userId}, playlists: [${Array.from(ctx.userPlaylistIds).join(", ")}]`
-  );
-  const allChanges: SyncChange[] = [];
+  ctx: SyncContext,
+  cursorRaw: string | undefined,
+  syncStartedAtHint: string | undefined,
+  pageSizeHint: number | undefined
+): Promise<{
+  changes: SyncChange[];
+  nextCursor?: string;
+  syncStartedAt: string;
+}> {
+  const MAX_PAGE_SIZE = 500;
+  const DEFAULT_PAGE_SIZE = 200;
+  const requested =
+    typeof pageSizeHint === "number" && Number.isFinite(pageSizeHint)
+      ? Math.max(1, Math.floor(pageSizeHint))
+      : DEFAULT_PAGE_SIZE;
+  const pageSize = Math.min(requested, MAX_PAGE_SIZE);
 
-  for (const tableName of SYNCABLE_TABLES) {
-    const tableChanges = await fetchTableForInitialSync(tx, tableName, ctx);
-    allChanges.push(...tableChanges);
+  let tableIndex = 0;
+  let offset = 0;
+  let syncStartedAt = syncStartedAtHint;
+
+  if (cursorRaw) {
+    const cursor = decodeCursor(cursorRaw);
+    tableIndex = cursor.tableIndex;
+    offset = cursor.offset;
+    syncStartedAt = cursor.syncStartedAt;
   }
 
-  console.log(
-    `[PULL:INITIAL] Completed initial sync: ${allChanges.length} total changes across ${SYNCABLE_TABLES.length} tables`
-  );
-  return allChanges;
+  if (!syncStartedAt) {
+    syncStartedAt = ctx.now;
+  }
+
+  // Advance until we find a table with rows to return, or we finish.
+  while (tableIndex < SYNCABLE_TABLES.length) {
+    const tableName = SYNCABLE_TABLES[tableIndex] as SyncableTableName;
+    const changes = await fetchTableForInitialSyncPage(
+      tx,
+      tableName,
+      ctx,
+      syncStartedAt,
+      offset,
+      pageSize
+    );
+
+    if (changes.length === 0) {
+      // Either table is empty / skipped OR we've paged past the end.
+      // Move to next table.
+      tableIndex += 1;
+      offset = 0;
+      continue;
+    }
+
+    const nextOffset = offset + changes.length;
+    const isLastPageForTable = changes.length < pageSize;
+
+    if (isLastPageForTable) {
+      const nextTableIndex = tableIndex + 1;
+      if (nextTableIndex >= SYNCABLE_TABLES.length) {
+        return { changes, syncStartedAt };
+      }
+      return {
+        changes,
+        syncStartedAt,
+        nextCursor: encodeCursor({
+          v: 1,
+          tableIndex: nextTableIndex,
+          offset: 0,
+          syncStartedAt,
+        }),
+      };
+    }
+
+    return {
+      changes,
+      syncStartedAt,
+      nextCursor: encodeCursor({
+        v: 1,
+        tableIndex,
+        offset: nextOffset,
+        syncStartedAt,
+      }),
+    };
+  }
+
+  return { changes: [], syncStartedAt };
 }
 
 // ============================================================================
@@ -459,7 +776,7 @@ async function fetchChangedRowsFromTable(
   }
 
   // Build conditions: last_modified_at > lastSyncAt AND user_filter
-  const userConditions = buildUserFilter(t, ctx);
+  const userConditions = buildUserFilter(tableName, t, ctx);
   if (userConditions === null) {
     console.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
     return []; // Skip table (e.g., no playlists)
@@ -537,10 +854,13 @@ async function processIncrementalSync(
 async function handleSync(
   db: ReturnType<typeof drizzle>,
   payload: SyncRequest,
-  userId: string
+  userId: string,
+  diagnosticsEnabled: boolean
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
   let responseChanges: SyncChange[] = [];
+  let nextCursor: string | undefined;
+  let syncStartedAt: string | undefined;
   const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
 
   console.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
@@ -561,6 +881,7 @@ async function handleSync(
       userId,
       userPlaylistIds: new Set(userPlaylists.map((p) => p.id)),
       now,
+      diagnosticsEnabled,
     };
 
     // PUSH: Apply client changes
@@ -574,7 +895,17 @@ async function handleSync(
         ctx
       );
     } else {
-      responseChanges = await processInitialSync(tx, ctx);
+      // Paginate initial sync to avoid oversized payloads / timeouts.
+      const page = await processInitialSyncPaged(
+        tx,
+        ctx,
+        payload.pullCursor,
+        payload.syncStartedAt,
+        payload.pageSize
+      );
+      responseChanges = page.changes;
+      nextCursor = page.nextCursor;
+      syncStartedAt = page.syncStartedAt;
     }
 
     // NO GARBAGE COLLECTION NEEDED!
@@ -588,6 +919,8 @@ async function handleSync(
   return {
     changes: responseChanges,
     syncedAt: now,
+    nextCursor,
+    syncStartedAt,
   };
 }
 
@@ -614,54 +947,63 @@ function errorResponse(message: string, status = 500): Response {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    // CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
-
-    // Health check
-    if (request.method === "GET" && url.pathname === "/health") {
-      return new Response("OK", { status: 200, headers: CORS_HEADERS });
-    }
-
-    // Sync endpoint
-    if (request.method === "POST" && url.pathname === "/api/sync") {
-      console.log(`[HTTP] POST /api/sync received`);
-
-      // Authenticate
-      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
-      if (!userId) {
-        console.log(`[HTTP] Unauthorized - JWT verification failed`);
-        return errorResponse("Unauthorized", 401);
+      // CORS preflight
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: CORS_HEADERS });
       }
 
-      // Connect to database
-      const connectionString =
-        env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
-      if (!connectionString) {
-        console.error(
-          `[HTTP] Database configuration error - no connection string`
-        );
-        return errorResponse("Database configuration error", 500);
+      // Health check
+      if (request.method === "GET" && url.pathname === "/health") {
+        return new Response("OK", { status: 200, headers: CORS_HEADERS });
       }
 
-      try {
-        const client = postgres(connectionString);
-        const db = drizzle(client, { schema });
-        const payload = (await request.json()) as SyncRequest;
+      // Sync endpoint
+      if (request.method === "POST" && url.pathname === "/api/sync") {
+        console.log(`[HTTP] POST /api/sync received`);
 
-        console.log(`[HTTP] Sync request parsed, calling handleSync`);
-        const response = await handleSync(db, payload, userId);
-        console.log(`[HTTP] Sync completed successfully`);
-        return jsonResponse(response);
-      } catch (error) {
-        console.error("[HTTP] Sync error:", error);
-        return errorResponse(String(error), 500);
+        // Authenticate
+        const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
+        if (!userId) {
+          console.log(`[HTTP] Unauthorized - JWT verification failed`);
+          return errorResponse("Unauthorized", 401);
+        }
+
+        const diagnosticsEnabled =
+          env.SYNC_DIAGNOSTICS === "true" &&
+          (!env.SYNC_DIAGNOSTICS_USER_ID ||
+            env.SYNC_DIAGNOSTICS_USER_ID === userId);
+
+        // Connect to database
+        try {
+          const { db, close } = createDb(env);
+          const payload = (await request.json()) as SyncRequest;
+
+          try {
+            console.log(`[HTTP] Sync request parsed, calling handleSync`);
+            const response = await handleSync(
+              db,
+              payload,
+              userId,
+              diagnosticsEnabled
+            );
+            console.log(`[HTTP] Sync completed successfully`);
+            return jsonResponse(response);
+          } finally {
+            await close();
+          }
+        } catch (error) {
+          console.error("[HTTP] Sync error:", error);
+          return errorResponse(String(error), 500);
+        }
       }
+
+      return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+    } catch (error) {
+      console.error("[HTTP] Unhandled error:", error);
+      return errorResponse("Internal Server Error", 500);
     }
-
-    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
   },
 };

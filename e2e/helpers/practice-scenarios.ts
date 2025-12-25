@@ -119,6 +119,18 @@ export async function clearTunetreesStorageDB(page: Page) {
       console.warn("Failed to clear sessionStorage:", err);
     }
 
+    // 1a) Clear Practice queue-date keys.
+    // These can leak in via Playwright storageState and cause Practice to render
+    // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
+    try {
+      localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+      localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+      // eslint-disable-next-line no-console
+      console.log("✅ Cleared practice queue date keys from localStorage");
+    } catch (err) {
+      console.warn("Failed to clear practice queue date keys:", err);
+    }
+
     // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
     // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
     try {
@@ -208,22 +220,61 @@ async function waitForSyncComplete(
   timeoutMs = 30000
 ): Promise<void> {
   const startTime = Date.now();
+  let didRetryAfterFetchFailure = false;
 
   log.debug("⏳ Waiting for initial sync to complete...");
 
+  const isTransientFetchFailure = (summary: string): boolean => {
+    const s = summary.toLowerCase();
+    return (
+      s.includes("failed to fetch") ||
+      // Some browsers / consoles truncate the final character in this message.
+      s.includes("failed to fet") ||
+      s.includes("networkerror") ||
+      s.includes("load failed") ||
+      s.includes("fetch")
+    );
+  };
+
   // Poll for sync completion by checking if initial syncDown has finished
   while (Date.now() - startTime < timeoutMs) {
-    // Check if initial sync is complete via test API
-    const syncComplete = await page.evaluate(() => {
-      // Check if test API indicates sync is complete
-      if ((window as any).__ttTestApi?.isInitialSyncComplete()) {
-        return true;
-      }
-      return false;
+    const status = await page.evaluate(() => {
+      const el = document.querySelector(
+        "[data-auth-initialized]"
+      ) as HTMLElement | null;
+      const versionStr = el?.getAttribute("data-sync-version") || "0";
+      const successStr = el?.getAttribute("data-sync-success") || "";
+      const errorCountStr = el?.getAttribute("data-sync-error-count") || "0";
+      const errorSummary = el?.getAttribute("data-sync-error-summary") || "";
+
+      const version = Number.parseInt(versionStr, 10) || 0;
+      const errorCount = Number.parseInt(errorCountStr, 10) || 0;
+      const success = successStr === "true";
+
+      return { version, successStr, success, errorCount, errorSummary };
     });
 
-    if (syncComplete) {
-      log.debug("✅ Initial sync complete detected");
+    // If initial sync completed but failed, fail fast with the underlying error.
+    if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
+      if (
+        !didRetryAfterFetchFailure &&
+        isTransientFetchFailure(status.errorSummary)
+      ) {
+        didRetryAfterFetchFailure = true;
+        log.debug(
+          `⚠️ Initial sync failed with transient fetch error; reloading once to retry. ${status.errorSummary}`
+        );
+        await page.waitForTimeout(500);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        continue;
+      }
+      throw new Error(
+        `⚠️ Initial sync completed but failed (success='${status.successStr}', errors=${status.errorCount}). ${status.errorSummary}`
+      );
+    }
+
+    if (status.version >= 1 && status.success && status.errorCount === 0) {
+      log.debug("✅ Initial sync complete (success) detected");
       return;
     }
 
@@ -364,6 +415,21 @@ export async function setupDeterministicTestParallel(
         ];
         for (const { table, column, extraFilters } of tablesToDelete) {
           try {
+            if (table === "practice_record") {
+              const { error } = await supabase.rpc(
+                "e2e_delete_practice_record_by_tunes",
+                {
+                  target_playlist: user.playlistId,
+                  tune_ids: uniqueIds,
+                }
+              );
+              if (error) {
+                console.warn(
+                  `[${user.name}] Error deleting from ${table}: ${error.message}`
+                );
+              }
+              continue;
+            }
             let del = supabase.from(table).delete().in(column, uniqueIds);
             if (extraFilters) del = extraFilters(del);
             const { error } = await del;
@@ -769,11 +835,26 @@ async function clearUserTable(
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
   let error: any = null;
-  // Unified deletion path; RLS ensures only caller's rows are affected.
-  let query = supabase.from(tableName).delete();
-  query = applyTableQueryFilters(tableName, query, user);
-  const { error: delError } = await query;
-  error = delError;
+
+  // practice_record deletes are blocked by a DB trigger unless the per-transaction
+  // flag `app.allow_practice_record_delete` is set. Supabase requests are each
+  // their own transaction, so we use an RPC that sets the flag and deletes in
+  // one call.
+  if (tableName === "practice_record") {
+    const { error: rpcError } = await supabase.rpc(
+      "e2e_clear_practice_record",
+      {
+        target_playlist: user.playlistId,
+      }
+    );
+    error = rpcError;
+  } else {
+    // Unified deletion path; RLS ensures only caller's rows are affected.
+    let query = supabase.from(tableName).delete();
+    query = applyTableQueryFilters(tableName, query, user);
+    const { error: delError } = await query;
+    error = delError;
+  }
 
   if (error && !error.message?.includes("no rows")) {
     console.error(`[${user.name}] Failed to clear ${tableName}:`, error);

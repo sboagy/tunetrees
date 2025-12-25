@@ -7,7 +7,7 @@
  * @module e2e/helpers/storage-inspection
  */
 
-import { expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import log from "loglevel";
 
 log.setLevel("info");
@@ -238,7 +238,7 @@ export async function getLocalStorageSize(page: Page): Promise<number> {
   const size = await page.evaluate(() => {
     let totalSize = 0;
     for (const key in localStorage) {
-      if (localStorage.hasOwnProperty(key)) {
+      if (Object.hasOwn(localStorage, key)) {
         totalSize += localStorage[key].length + key.length;
       }
     }
