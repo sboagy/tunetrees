@@ -36,24 +36,25 @@ export default defineConfig(() => {
         "/api/proxy/thesession": {
           target: "https://thesession.org",
           changeOrigin: true,
-          rewrite: (path, req) => {
+          rewrite: (path: string) => {
             // Extract the URL from query parameter and return just the path
-            // Use request host to construct proper URL (supports different hosts/ports)
-            const protocol = req.headers["x-forwarded-proto"] || "http";
-            const host = req.headers.host || "localhost";
-            const url = new URL(`${protocol}://${host}${path}`);
-            const targetUrl = url.searchParams.get("url");
-            if (targetUrl) {
-              const targetUrlObj = new URL(targetUrl);
-              return targetUrlObj.pathname + targetUrlObj.search;
+            try {
+              const url = new URL(path, "http://localhost");
+              const targetUrl = url.searchParams.get("url");
+              if (targetUrl) {
+                const targetUrlObj = new URL(targetUrl);
+                return targetUrlObj.pathname + targetUrlObj.search;
+              }
+            } catch (error) {
+              console.error("[Vite Proxy] Error parsing URL:", error);
             }
             return path;
           },
-          configure: (proxy, _options) => {
-            proxy.on("error", (err, _req, _res) => {
+          configure: (proxy) => {
+            proxy.on("error", (err) => {
               console.log("[Vite Proxy] Error:", err);
             });
-            proxy.on("proxyReq", (proxyReq, req, _res) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
               console.log(
                 `[Vite Proxy] Proxying: ${req.method} ${req.url}`
               );
