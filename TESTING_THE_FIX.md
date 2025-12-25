@@ -4,56 +4,36 @@
 This document provides instructions for manually testing the fix for the "Failed to fetch" error when importing tunes from TheSession.org.
 
 ## The Fix
-The fix adds a CORS proxy endpoint in the Cloudflare Worker that routes requests to TheSession.org, bypassing browser CORS restrictions.
+The fix uses different CORS proxy strategies for development vs production:
+
+### Development (Vite Dev Server)
+- **Vite proxy** (configured in `vite.config.ts`) proxies `/api/proxy/thesession` requests to TheSession.org
+- No separate worker needed for development
+- Just run `npm run dev` and the proxy is automatically available
+
+### Production (Cloudflare Pages)
+- **Cloudflare Pages Function** (`/functions/api/proxy/thesession.ts`) handles proxy requests
+- Deployed automatically with your app (no separate worker deployment)
+- Keeps sync functionality separate from import functionality
 
 ### Changed Files
-- `worker/src/index.ts` - Added `/api/proxy/thesession` endpoint
-- `src/lib/import/import-utils.ts` - Updated to use proxy endpoint
-- `.env.example`, `.env.local.example`, `.env.production.example` - Added `VITE_WORKER_URL`
-
-## Prerequisites
-1. Supabase local instance running (`supabase start`)
-2. Environment variables configured (copy `.env.local.example` to `.env.local`)
+- `functions/api/proxy/thesession.ts` - New Cloudflare Pages Function for production proxy
+- `vite.config.ts` - Added Vite proxy configuration for development
+- `src/lib/import/import-utils.ts` - Updated to use same-origin proxy endpoint
+- `.env.example`, `.env.local.example`, `.env.production.example` - Removed `VITE_WORKER_URL` (no longer needed)
 
 ## Testing Steps
 
-### Option 1: Manual Testing (Recommended)
+### Development Testing (Simple!)
 
-#### Step 1: Start the Cloudflare Worker (Terminal 1)
-```bash
-cd worker
-npm install  # If not already installed
-npm run dev
-```
-
-The worker should start on `http://localhost:8787`
-
-You should see output like:
-```
-⎔ Starting local server...
-[wrangler:inf] Ready on http://localhost:8787
-```
-
-#### Step 2: Set Environment Variable (if needed)
-If you don't have a `.env.local` file:
-```bash
-cd ..  # Back to root
-cp .env.local.example .env.local
-```
-
-Verify it contains:
-```bash
-VITE_WORKER_URL=http://localhost:8787
-```
-
-#### Step 3: Start the Vite Dev Server (Terminal 2)
+#### Step 1: Start the Vite Dev Server
 ```bash
 npm run dev
 ```
 
-The dev server should start on `http://localhost:5173`
+The dev server starts on `http://localhost:5173` with built-in proxy support.
 
-#### Step 4: Test the Import Feature
+#### Step 2: Test the Import Feature
 1. Open browser to `http://localhost:5173`
 2. Log in with test credentials (or create a new account)
 3. Navigate to the **Catalog** tab
@@ -71,81 +51,95 @@ The dev server should start on `http://localhost:5173`
 ❌ **Failure**: 
 - Red "Failed to fetch" error message appears (original bug)
 
-### Option 2: Run Both Services Together
-Use the combined script (requires `concurrently` package):
-```bash
-npm run dev:all
-```
+### Production Testing
 
-This starts both the worker and dev server in a single terminal.
-
-### Option 3: Automated E2E Test
-Run the Playwright E2E test (requires worker to be running):
-```bash
-# Terminal 1: Start worker
-cd worker && npm run dev
-
-# Terminal 2: Run tests
-ENABLE_IMPORT_TESTS=true npx playwright test tune-import-001-thesession
-```
-
-Note: E2E tests are skipped by default to avoid external dependencies. Set `ENABLE_IMPORT_TESTS=true` to enable them.
+The Cloudflare Pages Function is automatically deployed with your app to Cloudflare Pages. No separate deployment needed.
 
 ## Troubleshooting
 
+### "Failed to fetch" error in development
+- Make sure you're running `npm run dev` (not just the worker)
+- Check browser console for actual error details
+- Verify the Network tab shows requests going to `/api/proxy/thesession`
+- Check Vite console for proxy logs
+
 ### "Connection refused" error
-- Make sure the worker is running on port 8787
-- Check that `VITE_WORKER_URL` is set correctly in `.env.local`
-
-### "Invalid URL - only thesession.org is allowed"
-- The proxy endpoint validates that only thesession.org URLs are proxied (security feature)
-- Make sure you're using the correct TheSession.org URL format
-
-### Worker not starting
-- Check that you have the correct Node.js version (v18+)
-- Run `npm install` in the `worker` directory
-- Check wrangler.toml configuration
+- Make sure the dev server is running on port 5173
+- Check that there are no port conflicts
 
 ### CORS errors still appearing
 - Clear browser cache and reload
 - Check browser console for actual error details
-- Verify the fetch calls in the Network tab are going to `localhost:8787/api/proxy/thesession`
+- Verify the fetch calls in the Network tab are going to the correct endpoint
 
 ## Production Deployment
 
-### Worker Deployment
-1. Deploy the worker to Cloudflare:
-   ```bash
-   cd worker
-   npm run deploy
-   ```
+### Automatic Deployment
+When you deploy to Cloudflare Pages, the Pages Function is automatically deployed with your app:
 
-2. Set the JWT secret:
-   ```bash
-   npx wrangler secret put SUPABASE_JWT_SECRET
-   ```
+```bash
+npm run build
+npm run deploy  # Or wrangler pages deploy dist
+```
 
-3. Update `.env.production` with the deployed worker URL:
-   ```bash
-   VITE_WORKER_URL=https://tunetrees-pwa.pages.dev
-   ```
+The `/functions` directory is automatically recognized by Cloudflare Pages and deployed as serverless functions.
 
 ### Verification
 After deployment, test the import feature on the production site to ensure the fix works in production.
 
-## Additional Notes
+## Architecture Comparison
 
-### Security
-- The proxy endpoint validates that only thesession.org URLs are allowed
-- The worker adds a User-Agent header to identify TuneTrees requests
-- No authentication is required for the proxy endpoint (TheSession.org API is public)
+### Old Architecture (What We Fixed)
+```
+❌ Browser → Direct fetch to thesession.org
+   Result: CORS blocked by browser
+```
 
-### Performance
-- The proxy adds minimal latency (< 100ms typically)
-- The worker runs on Cloudflare's edge network for fast response times
-- Consider adding caching in the future for frequently accessed tunes
+### New Architecture
+```
+Development:
+✅ Browser → Vite proxy (/api/proxy/thesession) → TheSession.org
+   No CORS issue (same origin to browser)
 
-### Future Improvements
-- Add rate limiting to prevent abuse
-- Implement caching for tune data
-- Add support for irishtune.info (currently not implemented)
+Production:
+✅ Browser → Pages Function (/api/proxy/thesession) → TheSession.org
+   No CORS issue (same origin to browser)
+```
+
+## Advantages of This Approach
+
+1. **Simpler Development**: No need to run a separate worker (`wrangler dev`)
+2. **Cleaner Architecture**: Import proxy stays with the app, sync worker stays separate
+3. **No Environment Variables**: No need for `VITE_WORKER_URL` configuration
+4. **Automatic Deployment**: Pages Functions deploy with the app
+5. **Same Origin**: No mixed content issues, works in both HTTP (dev) and HTTPS (prod)
+
+## Security Notes
+
+### Security Features (Same as Before)
+- Proxy validates that only thesession.org URLs are allowed
+- HTTPS-only protocol enforcement
+- 10-second timeout prevents hanging connections
+- JSON response validation
+- No sensitive data transmitted
+
+### Attack Vectors Prevented
+- ✅ Subdomain attacks (exact hostname matching)
+- ✅ Protocol manipulation (HTTPS-only)
+- ✅ Resource exhaustion (timeout)
+- ✅ Malformed URLs (validation)
+- ✅ Malformed JSON (validation)
+
+## Future Improvements
+
+### Rate Limiting
+Add rate limiting to prevent abuse (can be done in Pages Function)
+
+### Caching
+Implement caching for frequently accessed tunes (can use Cloudflare KV with Pages Functions)
+
+### IrishTune.info Support
+Add support for irishtune.info imports (similar proxy setup)
+
+### Analytics
+Track import usage and errors (Cloudflare Analytics)

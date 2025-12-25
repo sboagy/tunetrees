@@ -4,6 +4,10 @@
  * Functions for importing tunes from external sources (TheSession.org, IrishTune.info).
  * Ported from legacy Next.js app to SolidJS PWA.
  *
+ * Uses CORS proxy to bypass browser restrictions:
+ * - Development: Vite dev server proxy (vite.config.ts)
+ * - Production: Cloudflare Pages Function (/functions/api/proxy/thesession.ts)
+ *
  * @module lib/import/import-utils
  */
 
@@ -15,29 +19,22 @@ import type {
 } from "./the-session-schemas";
 
 /**
- * Cloudflare Worker URL for CORS proxy
- * Uses environment variable with smart fallback for development
+ * Get the CORS proxy URL for TheSession.org API calls
  * 
- * In production (HTTPS), defaults to same-origin to avoid mixed content issues
- * In development (HTTP), defaults to localhost:8787
+ * In both development and production, the proxy is at the same origin
+ * to avoid CORS and mixed content issues:
+ * - Development: Vite dev server proxies /api/proxy/thesession to thesession.org
+ * - Production: Cloudflare Pages Function at /api/proxy/thesession
+ * 
+ * This eliminates the need for VITE_WORKER_URL environment variable
  */
-const getWorkerUrl = (): string => {
-  // If explicitly set via environment variable, use that
-  if (import.meta.env.VITE_WORKER_URL) {
-    return import.meta.env.VITE_WORKER_URL;
-  }
-  
-  // Smart default based on current page protocol
-  // In production (HTTPS), assume worker is same origin
-  // In development (HTTP), assume worker is on localhost:8787
-  if (typeof window !== "undefined" && window.location.protocol === "https:") {
-    return window.location.origin;
-  }
-  
-  return "http://localhost:8787";
-};
-
-const WORKER_URL = getWorkerUrl();
+function getProxyUrl(targetUrl: string): string {
+  // Use same-origin proxy endpoint
+  // In dev: Vite proxies this to thesession.org
+  // In prod: Cloudflare Pages Function handles this
+  const encodedUrl = encodeURIComponent(targetUrl);
+  return `/api/proxy/thesession?url=${encodedUrl}`;
+}
 
 /**
  * Extracted tune information from parsing
@@ -62,7 +59,7 @@ export interface IImportedTuneData {
 
 /**
  * Fetch tune search results from TheSession.org by title
- * Uses CORS proxy through Cloudflare Worker to avoid browser CORS restrictions
+ * Uses CORS proxy (Vite in dev, Pages Function in prod) to bypass browser restrictions
  */
 export async function fetchTheSessionURLsFromTitle(
   title: string,
@@ -73,8 +70,8 @@ export async function fetchTheSessionURLsFromTitle(
     const typeQuery = tuneType ? `type=${tuneType}&` : "";
     const theSessionUrl = `https://thesession.org/tunes/search?${typeQuery}mode=&q=${encodedTitle}&format=json`;
 
-    // Use CORS proxy through Cloudflare Worker
-    const proxyUrl = `${WORKER_URL}/api/proxy/thesession?url=${encodeURIComponent(theSessionUrl)}`;
+    // Use same-origin proxy endpoint
+    const proxyUrl = getProxyUrl(theSessionUrl);
 
     const response = await fetch(proxyUrl, {
       headers: {
@@ -96,7 +93,7 @@ export async function fetchTheSessionURLsFromTitle(
 
 /**
  * Fetch tune details from TheSession.org by URL
- * Uses CORS proxy through Cloudflare Worker to avoid browser CORS restrictions
+ * Uses CORS proxy (Vite in dev, Pages Function in prod) to bypass browser restrictions
  */
 export async function fetchTuneInfoFromTheSessionURL(
   tuneUrlBase: string
@@ -106,8 +103,8 @@ export async function fetchTuneInfoFromTheSessionURL(
     const primaryUrl = url.origin + url.pathname;
     const tuneUrl = `${primaryUrl}?format=json`;
 
-    // Use CORS proxy through Cloudflare Worker
-    const proxyUrl = `${WORKER_URL}/api/proxy/thesession?url=${encodeURIComponent(tuneUrl)}`;
+    // Use same-origin proxy endpoint
+    const proxyUrl = getProxyUrl(tuneUrl);
 
     const response = await fetch(proxyUrl, {
       headers: {
