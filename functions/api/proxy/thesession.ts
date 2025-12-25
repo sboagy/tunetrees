@@ -15,8 +15,16 @@
  * @module functions/api/proxy/thesession
  */
 
-interface Env {
-  // No environment variables needed for this proxy
+/**
+ * Cloudflare Pages Functions context interface
+ * https://developers.cloudflare.com/pages/functions/api-reference/
+ */
+interface PagesContext {
+  request: Request;
+  env: Record<string, string>;
+  params: Record<string, string>;
+  waitUntil: (promise: Promise<unknown>) => void;
+  next: () => Promise<Response>;
 }
 
 const CORS_HEADERS = {
@@ -37,13 +45,9 @@ function errorResponse(message: string, status = 500): Response {
 }
 
 /**
- * Cloudflare Pages Function handler
- * Note: Pages Functions use a different API than Workers
+ * Cloudflare Pages Function handler for GET requests
  */
-export async function onRequestGet(context: {
-  request: Request;
-  env: Env;
-}): Promise<Response> {
+export async function onRequestGet(context: PagesContext): Promise<Response> {
   const { request } = context;
   const url = new URL(request.url);
 

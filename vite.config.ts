@@ -36,9 +36,12 @@ export default defineConfig(() => {
         "/api/proxy/thesession": {
           target: "https://thesession.org",
           changeOrigin: true,
-          rewrite: (path) => {
+          rewrite: (path, req) => {
             // Extract the URL from query parameter and return just the path
-            const url = new URL(`http://localhost${path}`);
+            // Use request host to construct proper URL (supports different hosts/ports)
+            const protocol = req.headers["x-forwarded-proto"] || "http";
+            const host = req.headers.host || "localhost";
+            const url = new URL(`${protocol}://${host}${path}`);
             const targetUrl = url.searchParams.get("url");
             if (targetUrl) {
               const targetUrlObj = new URL(targetUrl);
