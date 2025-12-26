@@ -23,7 +23,10 @@ import {
   normalizeKey,
   normalizeTuneType,
 } from "../../lib/import/import-utils";
-import type { ITheSessionTuneSummary } from "../../lib/import/the-session-schemas";
+import type {
+  ITheSessionTune,
+  ITheSessionTuneSummary,
+} from "../../lib/import/the-session-schemas";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -91,6 +94,13 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   // Import state
   const [isImporting, setIsImporting] = createSignal(false);
   const [importError, setImportError] = createSignal<string | null>(null);
+
+  // Pending tune data for multi-setting selection
+  const [pendingTheSessionTune, setPendingTheSessionTune] =
+    createSignal<ITheSessionTune | null>(null);
+  const [pendingTheSessionUrl, setPendingTheSessionUrl] = createSignal<
+    string | null
+  >(null);
 
   // Available genres (simplified - could be fetched from DB). Use simple string array for Select
   const genres: string[] = ["ITRAD", "OTIME", "BLUES"];
@@ -196,6 +206,11 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         abc: s.abc,
         id: s.id,
       }));
+
+      // Persist tune data + source URL so selection can complete import
+      setPendingTheSessionTune(tuneData);
+      setPendingTheSessionUrl(url);
+
       setSettingOptions(settings);
       setShowSettingSelectDialog(true);
       // Wait for user to select (handled by onSettingSelect callback)
@@ -210,7 +225,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
    * Create tune from TheSession data
    */
   const createTuneFromTheSessionData = async (
-    tuneData: any,
+    tuneData: ITheSessionTune,
     settingIndex: number,
     sourceUrl: string
   ) => {
@@ -241,6 +256,8 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         state: { from: fullPath },
       });
       setMainDialogOpen(false);
+      setPendingTheSessionTune(null);
+      setPendingTheSessionUrl(null);
     } catch (error) {
       console.error("Error creating tune:", error);
       setImportError("Failed to create tune from imported data");
@@ -260,10 +277,15 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
    * Handle setting selection from SelectSettingDialog
    */
   const handleSettingSelect = async (settingIndex: number) => {
-    // This is a simplified version - in full implementation, we'd need to
-    // store the tune data and use it here
-    console.log("Setting selected:", settingIndex);
-    // TODO: Complete the import with selected setting
+    const tuneData = pendingTheSessionTune();
+    const sourceUrl = pendingTheSessionUrl();
+
+    if (!tuneData || !sourceUrl) {
+      setImportError("Unable to complete import: missing tune data");
+      return;
+    }
+
+    await createTuneFromTheSessionData(tuneData, settingIndex, sourceUrl);
   };
 
   return (
