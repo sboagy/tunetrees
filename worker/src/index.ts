@@ -678,7 +678,32 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
           )}`
         );
         const minimal = minimalPracticeRecordPayload(sanitized.data);
-        await applyUpsert(tx, table, upsertKeyCols, minimal);
+
+        try {
+          await applyUpsert(tx, table, upsertKeyCols, minimal);
+        } catch (e2) {
+          const pgErr = findPostgresErrorLike(e2);
+          const code = typeof pgErr?.code === "string" ? pgErr.code : undefined;
+          const constraint =
+            typeof pgErr?.constraint_name === "string"
+              ? pgErr.constraint_name
+              : undefined;
+
+          // If the row already exists by primary key, we can safely upsert on id.
+          // This can happen if the composite conflict target doesn't match
+          // (e.g., practiced is NULL/changed), but the id is already present.
+          if (code === "23505" && constraint === "practice_record_pkey") {
+            console.warn(
+              `[PUSH] practice_record minimal upsert hit PK conflict; retrying by id rowId=${change.rowId}: ${formatDbError(
+                e2
+              )}`
+            );
+            await applyUpsert(tx, table, deleteKeyCols, minimal);
+            return;
+          }
+
+          throw e2;
+        }
       }
     } else {
       await applyUpsert(tx, table, upsertKeyCols, data);
