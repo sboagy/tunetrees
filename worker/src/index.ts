@@ -48,6 +48,89 @@ import * as schema from "./schema-postgres";
 type PostgresClient = ReturnType<typeof postgres>;
 type DrizzleDb = ReturnType<typeof drizzle>;
 
+type PostgresJsErrorLike = {
+  message?: unknown;
+  code?: unknown;
+  detail?: unknown;
+  hint?: unknown;
+  table_name?: unknown;
+  column_name?: unknown;
+  constraint_name?: unknown;
+  cause?: unknown;
+};
+
+function isPostgresJsErrorLike(error: unknown): error is PostgresJsErrorLike {
+  return typeof error === "object" && error !== null;
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getErrorCause(error: unknown): unknown {
+  if (!isPostgresJsErrorLike(error)) return undefined;
+  return error.cause;
+}
+
+function findPostgresErrorLike(
+  error: unknown
+): PostgresJsErrorLike | undefined {
+  // Some libraries wrap the underlying Postgres error under `cause`.
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (isPostgresJsErrorLike(current)) {
+      // Heuristic: if it has any of the Postgres-ish fields, treat it as one.
+      if (
+        typeof current.code !== "undefined" ||
+        typeof current.detail !== "undefined" ||
+        typeof current.constraint_name !== "undefined" ||
+        typeof current.table_name !== "undefined" ||
+        typeof current.column_name !== "undefined"
+      ) {
+        return current;
+      }
+    }
+    const next = getErrorCause(current);
+    if (typeof next === "undefined") break;
+    current = next;
+  }
+  return undefined;
+}
+
+function formatDbError(error: unknown): string {
+  const fallback = error instanceof Error ? error.message : String(error);
+  const pgErr = findPostgresErrorLike(error);
+  if (!pgErr) return fallback;
+
+  const code = toOptionalString(pgErr.code);
+  const detail = toOptionalString(pgErr.detail);
+  const hint = toOptionalString(pgErr.hint);
+  const table = toOptionalString(pgErr.table_name);
+  const column = toOptionalString(pgErr.column_name);
+  const constraint = toOptionalString(pgErr.constraint_name);
+
+  // Prefer structured Postgres fields over verbose wrapped messages that may
+  // include raw SQL/params.
+  const parts = [
+    code ? `code=${code}` : undefined,
+    table ? `table=${table}` : undefined,
+    column ? `column=${column}` : undefined,
+    constraint ? `constraint=${constraint}` : undefined,
+    detail ? `detail=${detail}` : undefined,
+    hint ? `hint=${hint}` : undefined,
+  ].filter((p): p is string => typeof p === "string");
+
+  if (parts.length > 0) {
+    return parts.join(" | ");
+  }
+
+  // Last resort: strip params from known wrapped format.
+  if (fallback.includes("\nparams:")) {
+    return fallback.split("\nparams:")[0];
+  }
+  return fallback;
+}
+
 function createDb(env: Env): {
   client: PostgresClient;
   db: DrizzleDb;
@@ -304,6 +387,156 @@ function sqliteToPostgres(
   return result;
 }
 
+function coerceEmptyStringNumericFieldsToNull(
+  tableName: string,
+  data: Record<string, unknown>
+): { data: Record<string, unknown>; coerced: string[] } {
+  // Self-healing for older/local SQLite data that may contain empty strings
+  // in numeric fields (e.g. "" for REAL/INTEGER). Postgres rejects these.
+  // Keep this intentionally narrow to avoid changing meaning for text columns.
+  const numericPropsByTable: Partial<Record<SyncableTableName, string[]>> = {
+    practice_record: [
+      "quality",
+      "easiness",
+      "difficulty",
+      "stability",
+      "interval",
+      "step",
+      "repetitions",
+      "lapses",
+      "elapsedDays",
+      "state",
+    ],
+  };
+
+  const props =
+    numericPropsByTable[tableName as SyncableTableName] ?? ([] as string[]);
+  if (props.length === 0) return { data, coerced: [] };
+
+  const result = { ...data };
+  const coerced: string[] = [];
+  for (const prop of props) {
+    const value = result[prop];
+    if (typeof value === "string" && value.trim() === "") {
+      result[prop] = null;
+      coerced.push(prop);
+    }
+  }
+  return { data: result, coerced };
+}
+
+function sanitizePracticeRecordForPostgres(
+  change: SyncChange,
+  data: Record<string, unknown>
+): { data: Record<string, unknown>; changed: string[] } {
+  if (change.table !== "practice_record") return { data, changed: [] };
+
+  const changed: string[] = [];
+  const result: Record<string, unknown> = { ...data };
+
+  // Ensure required sync metadata is always present.
+  if (
+    typeof result.lastModifiedAt !== "string" ||
+    result.lastModifiedAt === ""
+  ) {
+    result.lastModifiedAt = change.lastModifiedAt;
+    changed.push("lastModifiedAt");
+  }
+  if (
+    typeof result.syncVersion !== "number" &&
+    !(
+      typeof result.syncVersion === "string" && result.syncVersion.trim() !== ""
+    )
+  ) {
+    result.syncVersion = 1;
+    changed.push("syncVersion");
+  }
+
+  const numericFields: Array<{ prop: string; kind: "int" | "float" }> = [
+    { prop: "quality", kind: "int" },
+    { prop: "easiness", kind: "float" },
+    { prop: "difficulty", kind: "float" },
+    { prop: "stability", kind: "float" },
+    { prop: "interval", kind: "int" },
+    { prop: "step", kind: "int" },
+    { prop: "repetitions", kind: "int" },
+    { prop: "lapses", kind: "int" },
+    { prop: "elapsedDays", kind: "int" },
+    { prop: "state", kind: "int" },
+  ];
+
+  for (const field of numericFields) {
+    const value = result[field.prop];
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed === "") {
+        result[field.prop] = null;
+        changed.push(field.prop);
+        continue;
+      }
+
+      const parsed =
+        field.kind === "int" ? Number.parseInt(trimmed, 10) : Number(trimmed);
+      if (!Number.isFinite(parsed)) {
+        result[field.prop] = null;
+        changed.push(field.prop);
+        continue;
+      }
+
+      result[field.prop] = field.kind === "int" ? Math.trunc(parsed) : parsed;
+      changed.push(field.prop);
+    } else if (typeof value === "number" && !Number.isFinite(value)) {
+      result[field.prop] = null;
+      changed.push(field.prop);
+    }
+  }
+
+  // Timestamp columns in Postgres are nullable. Empty strings are not valid.
+  const timestampProps = ["practiced", "due", "backupPracticed"] as const;
+  for (const prop of timestampProps) {
+    const value = result[prop];
+    if (typeof value === "string" && value.trim() === "") {
+      result[prop] = null;
+      changed.push(prop);
+    }
+  }
+
+  // deviceId may exist as empty string in older clients; prefer NULL.
+  if (typeof result.deviceId === "string" && result.deviceId.trim() === "") {
+    result.deviceId = null;
+    changed.push("deviceId");
+  }
+
+  return { data: result, changed };
+}
+
+function minimalPracticeRecordPayload(
+  data: Record<string, unknown>
+): Record<string, unknown> {
+  // Keep the smallest useful subset. This is only used as a fallback retry
+  // when the full upsert fails (to avoid stranding practice history).
+  const keep = [
+    "id",
+    "playlistRef",
+    "tuneRef",
+    "practiced",
+    "quality",
+    "due",
+    "backupPracticed",
+    "goal",
+    "technique",
+    "syncVersion",
+    "lastModifiedAt",
+    "deviceId",
+  ];
+
+  const result: Record<string, unknown> = {};
+  for (const k of keep) {
+    if (k in data) result[k] = data[k];
+  }
+  return result;
+}
+
 /**
  * Convert Postgres booleans to SQLite integers (0/1).
  */
@@ -394,10 +627,17 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
 
   const upsertKeyCols = getConflictKeyColumns(change.table, t);
   const deleteKeyCols = getPrimaryKeyColumns(change.table, t);
-  const data = sqliteToPostgres(
+  let data = sqliteToPostgres(
     change.table,
     change.data as Record<string, unknown>
   );
+  const coerced = coerceEmptyStringNumericFieldsToNull(change.table, data);
+  data = coerced.data;
+  if (coerced.coerced.length > 0) {
+    console.warn(
+      `[PUSH] Coerced empty-string numeric fields to NULL for ${change.table} rowId=${change.rowId}: ${coerced.coerced.join(", ")}`
+    );
+  }
 
   console.log(
     `[PUSH] Applying ${change.deleted ? "DELETE" : "UPSERT"} to ${change.table}, rowId: ${change.rowId}`
@@ -413,7 +653,36 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
       change
     );
   } else {
-    await applyUpsert(tx, table, upsertKeyCols, data);
+    if (change.table === "practice_record") {
+      const sanitized = sanitizePracticeRecordForPostgres(change, data);
+      if (sanitized.changed.length > 0) {
+        console.warn(
+          `[PUSH] Sanitized practice_record rowId=${change.rowId}: ${sanitized.changed.join(", ")}`
+        );
+      }
+
+      try {
+        // IMPORTANT: A failed statement inside a Postgres transaction marks the
+        // transaction as aborted, and all subsequent statements will fail with
+        // code=25P02. Use a savepoint so we can retry with a sanitized/minimal
+        // payload without poisoning the outer transaction.
+        await tx.transaction(async (sp) => {
+          await applyUpsert(sp, table, upsertKeyCols, sanitized.data);
+        });
+      } catch (e) {
+        // Retry once with a minimal payload. This trades some optional FSRS
+        // fields for resilience, while still preserving the practice event.
+        console.warn(
+          `[PUSH] practice_record upsert retry (minimal payload) rowId=${change.rowId}: ${formatDbError(
+            e
+          )}`
+        );
+        const minimal = minimalPracticeRecordPayload(sanitized.data);
+        await applyUpsert(tx, table, upsertKeyCols, minimal);
+      }
+    } else {
+      await applyUpsert(tx, table, upsertKeyCols, data);
+    }
   }
 }
 
@@ -495,7 +764,13 @@ async function processPushChanges(
 ): Promise<void> {
   console.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
-    await applyChange(tx, change);
+    try {
+      await applyChange(tx, change);
+    } catch (e) {
+      throw new Error(
+        `[PUSH] Failed applying ${change.table} rowId=${change.rowId}: ${formatDbError(e)}`
+      );
+    }
   }
   console.log(`[PUSH] Completed processing ${changes.length} changes`);
 }
@@ -996,7 +1271,7 @@ export default {
           }
         } catch (error) {
           console.error("[HTTP] Sync error:", error);
-          return errorResponse(String(error), 500);
+          return errorResponse(formatDbError(error), 500);
         }
       }
 

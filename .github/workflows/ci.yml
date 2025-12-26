@@ -6,7 +6,7 @@ name: CI - Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/is354_sync_errors]
   pull_request:
     branches: [main]
 
@@ -424,7 +424,7 @@ jobs:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
     needs: [test, test-pwa-offline] # Deploy only if ALL tests pass
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors')
     environment: vite_pwa_env
 
     steps:
@@ -463,7 +463,7 @@ jobs:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
     needs: [test, test-pwa-offline]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors')
     environment: vite_pwa_env
     steps:
       - uses: actions/checkout@v4
