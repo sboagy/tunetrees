@@ -72,7 +72,9 @@ function getErrorCause(error: unknown): unknown {
   return error.cause;
 }
 
-function findPostgresErrorLike(error: unknown): PostgresJsErrorLike | undefined {
+function findPostgresErrorLike(
+  error: unknown
+): PostgresJsErrorLike | undefined {
   // Some libraries wrap the underlying Postgres error under `cause`.
   let current: unknown = error;
   for (let depth = 0; depth < 4; depth += 1) {
@@ -433,13 +435,18 @@ function sanitizePracticeRecordForPostgres(
   const result: Record<string, unknown> = { ...data };
 
   // Ensure required sync metadata is always present.
-  if (typeof result.lastModifiedAt !== "string" || result.lastModifiedAt === "") {
+  if (
+    typeof result.lastModifiedAt !== "string" ||
+    result.lastModifiedAt === ""
+  ) {
     result.lastModifiedAt = change.lastModifiedAt;
     changed.push("lastModifiedAt");
   }
   if (
     typeof result.syncVersion !== "number" &&
-    !(typeof result.syncVersion === "string" && result.syncVersion.trim() !== "")
+    !(
+      typeof result.syncVersion === "string" && result.syncVersion.trim() !== ""
+    )
   ) {
     result.syncVersion = 1;
     changed.push("syncVersion");
@@ -655,7 +662,13 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
       }
 
       try {
-        await applyUpsert(tx, table, upsertKeyCols, sanitized.data);
+        // IMPORTANT: A failed statement inside a Postgres transaction marks the
+        // transaction as aborted, and all subsequent statements will fail with
+        // code=25P02. Use a savepoint so we can retry with a sanitized/minimal
+        // payload without poisoning the outer transaction.
+        await tx.transaction(async (sp) => {
+          await applyUpsert(sp, table, upsertKeyCols, sanitized.data);
+        });
       } catch (e) {
         // Retry once with a minimal payload. This trades some optional FSRS
         // fields for resilience, while still preserving the practice event.
