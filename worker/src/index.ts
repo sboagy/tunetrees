@@ -680,7 +680,10 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
         const minimal = minimalPracticeRecordPayload(sanitized.data);
 
         try {
-          await applyUpsert(tx, table, upsertKeyCols, minimal);
+          // Use a savepoint so a failed minimal upsert doesn't abort the outer transaction.
+          await tx.transaction(async (sp) => {
+            await applyUpsert(sp, table, upsertKeyCols, minimal);
+          });
         } catch (e2) {
           const pgErr = findPostgresErrorLike(e2);
           const code = typeof pgErr?.code === "string" ? pgErr.code : undefined;
@@ -698,7 +701,10 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
                 e2
               )}`
             );
-            await applyUpsert(tx, table, deleteKeyCols, minimal);
+            // Retry by primary key inside its own savepoint for the same reason.
+            await tx.transaction(async (sp) => {
+              await applyUpsert(sp, table, deleteKeyCols, minimal);
+            });
             return;
           }
 
