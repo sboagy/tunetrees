@@ -423,13 +423,63 @@ export class SyncEngine {
                       )
                     : (table as any)[toCamelCase(adapter.primaryKey as string)];
 
-                  await this.localDb
-                    .insert(table)
-                    .values(sanitizedData)
-                    .onConflictDoUpdate({
-                      target: conflictTarget,
-                      set: sanitizedData,
-                    });
+                  // Some tables have a natural composite unique key (adapter.conflictKeys)
+                  // in addition to a synthetic PK (id). If we only upsert by id, an insert
+                  // can fail on the composite unique constraint when the same logical row
+                  // exists locally with a different id (e.g. retained IndexedDB + initial sync).
+                  // Strategy:
+                  // 1) Upsert by primary key (current behavior)
+                  // 2) If that fails due to the composite unique constraint, upsert by the
+                  //    composite key without ever updating `id`.
+                  const compositeKeys = adapter.conflictKeys;
+                  const isSingleIdPk =
+                    !Array.isArray(adapter.primaryKey) &&
+                    adapter.primaryKey === "id";
+
+                  if (isSingleIdPk && compositeKeys) {
+                    try {
+                      await this.localDb
+                        .insert(table)
+                        .values(sanitizedData)
+                        .onConflictDoUpdate({
+                          target: conflictTarget,
+                          set: sanitizedData,
+                        });
+                    } catch (e) {
+                      const errorMsg =
+                        e instanceof Error ? e.message : String(e);
+                      const isCompositeUniqueViolation =
+                        errorMsg.includes("UNIQUE constraint failed:") &&
+                        compositeKeys.every((k) =>
+                          errorMsg.includes(`${change.table}.${k}`)
+                        );
+
+                      if (!isCompositeUniqueViolation) {
+                        throw e;
+                      }
+
+                      const { id: _ignoredId, ...sanitizedDataWithoutId } =
+                        sanitizedData as Record<string, unknown>;
+
+                      await this.localDb
+                        .insert(table)
+                        .values(sanitizedData)
+                        .onConflictDoUpdate({
+                          target: compositeKeys.map(
+                            (k) => (table as any)[toCamelCase(k)]
+                          ),
+                          set: sanitizedDataWithoutId,
+                        });
+                    }
+                  } else {
+                    await this.localDb
+                      .insert(table)
+                      .values(sanitizedData)
+                      .onConflictDoUpdate({
+                        target: conflictTarget,
+                        set: sanitizedData,
+                      });
+                  }
                 }
               }
               synced++;
