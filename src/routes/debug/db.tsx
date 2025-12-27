@@ -11,7 +11,9 @@ import type { Component } from "solid-js";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { supabase } from "@/lib/supabase/client";
 import { getFailedOutboxItems, retryOutboxItem } from "@/lib/sync/outbox";
+import { TABLE_REGISTRY } from "../../../shared/table-meta";
 
 interface QueryResult {
   columns: string[];
@@ -19,7 +21,7 @@ interface QueryResult {
 }
 
 export default function DatabaseBrowser(): ReturnType<Component> {
-  const { localDb } = useAuth();
+  const { localDb, isAnonymous } = useAuth();
   const [query, setQuery] = createSignal(
     "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
   );
@@ -27,6 +29,8 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   const [error, setError] = createSignal<string | null>(null);
   const [executionTime, setExecutionTime] = createSignal<number>(0);
   const [tipsOpen, setTipsOpen] = createSignal(false);
+  const [compareRunning, setCompareRunning] = createSignal(false);
+  const [compareTable, setCompareTable] = createSignal<string>("__all__");
 
   // Get table list for quick access
   const [tables] = createResource(localDb, async (db) => {
@@ -198,6 +202,214 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     }
   };
 
+  const buildRowKey = (pk: string | string[], row: Record<string, unknown>) => {
+    if (Array.isArray(pk)) {
+      const obj: Record<string, unknown> = {};
+      for (const k of pk) obj[k] = row[k];
+      return JSON.stringify(obj);
+    }
+    return String(row[pk]);
+  };
+
+  const compareWithSupabase = async () => {
+    setError(null);
+    setResults(null);
+    setExecutionTime(0);
+
+    if (isAnonymous()) {
+      toast.error("Anonymous mode has no Supabase data to compare");
+      return;
+    }
+
+    if (!navigator.onLine) {
+      toast.error("You are offline; Supabase comparison requires network");
+      return;
+    }
+
+    const db = localDb();
+    if (!db) {
+      toast.error("Database not initialized");
+      return;
+    }
+
+    setCompareRunning(true);
+    const start = performance.now();
+
+    try {
+      // Use the already-loaded local tables list to avoid probing unknown tables.
+      const localTables = new Set(tables() ?? []);
+
+      const selectedTable = compareTable();
+      const tableFilter =
+        selectedTable === "__all__" ? null : (selectedTable as string);
+
+      const mismatchRows: Array<{
+        table: string;
+        type:
+          | "missing_in_supabase"
+          | "missing_in_sqlite"
+          | "last_modified_at_diff";
+        row_id: string;
+        local_last_modified_at: string | null;
+        remote_last_modified_at: string | null;
+      }> = [];
+
+      const MAX_MISMATCH_ROWS = 2000;
+      let truncated = false;
+
+      for (const [tableName, meta] of Object.entries(TABLE_REGISTRY)) {
+        if (tableFilter && tableName !== tableFilter) continue;
+        if (!localTables.has(tableName)) continue;
+
+        const pkCols = Array.isArray(meta.primaryKey)
+          ? meta.primaryKey
+          : [meta.primaryKey];
+        const hasLastModified = meta.supportsIncremental;
+        const columns = hasLastModified
+          ? [...pkCols, "last_modified_at"]
+          : [...pkCols];
+
+        // Local keys
+        const localSql = `SELECT ${columns.join(", ")} FROM ${tableName};`;
+        const localRows = await db.all<Record<string, unknown>>(localSql);
+        const localMap = new Map<string, string | null>();
+
+        for (const row of localRows) {
+          const key = buildRowKey(meta.primaryKey, row);
+          const lm = hasLastModified
+            ? ((row as { last_modified_at?: string | null }).last_modified_at ??
+              null)
+            : null;
+          localMap.set(key, lm);
+        }
+
+        // Remote keys (paged)
+        const remoteMap = new Map<string, string | null>();
+        const pageSize = 1000;
+        let from = 0;
+
+        while (true) {
+          let q = supabase.from(tableName).select(columns.join(","));
+          for (const pk of pkCols) {
+            q = q.order(pk, { ascending: true });
+          }
+          const { data, error: remoteError } = await q.range(
+            from,
+            from + pageSize - 1
+          );
+
+          if (remoteError) {
+            // Skip table if RLS or schema mismatch; surface error once.
+            mismatchRows.push({
+              table: tableName,
+              type: "missing_in_supabase",
+              row_id: `__error__: ${remoteError.message}`,
+              local_last_modified_at: null,
+              remote_last_modified_at: null,
+            });
+            break;
+          }
+
+          const page = data ?? [];
+          if (page.length === 0) break;
+
+          for (const row of page as unknown as Record<string, unknown>[]) {
+            const key = buildRowKey(meta.primaryKey, row);
+            const lm = hasLastModified
+              ? ((row as { last_modified_at?: string | null })
+                  .last_modified_at ?? null)
+              : null;
+            remoteMap.set(key, lm);
+          }
+
+          if (page.length < pageSize) break;
+          from += page.length;
+        }
+
+        // Missing in Supabase
+        for (const [key, localLm] of localMap) {
+          if (!remoteMap.has(key)) {
+            mismatchRows.push({
+              table: tableName,
+              type: "missing_in_supabase",
+              row_id: key,
+              local_last_modified_at: localLm,
+              remote_last_modified_at: null,
+            });
+            if (mismatchRows.length >= MAX_MISMATCH_ROWS) {
+              truncated = true;
+              break;
+            }
+          }
+        }
+        if (truncated) break;
+
+        // Missing in SQLite + timestamp differences
+        for (const [key, remoteLm] of remoteMap) {
+          const localLm = localMap.get(key);
+          if (!localMap.has(key)) {
+            mismatchRows.push({
+              table: tableName,
+              type: "missing_in_sqlite",
+              row_id: key,
+              local_last_modified_at: null,
+              remote_last_modified_at: remoteLm,
+            });
+          } else if (hasLastModified && localLm !== remoteLm) {
+            mismatchRows.push({
+              table: tableName,
+              type: "last_modified_at_diff",
+              row_id: key,
+              local_last_modified_at: localLm ?? null,
+              remote_last_modified_at: remoteLm ?? null,
+            });
+          }
+
+          if (mismatchRows.length >= MAX_MISMATCH_ROWS) {
+            truncated = true;
+            break;
+          }
+        }
+
+        if (truncated) break;
+      }
+
+      const end = performance.now();
+      setExecutionTime(end - start);
+
+      setResults({
+        columns: [
+          "table",
+          "type",
+          "row_id",
+          "local_last_modified_at",
+          "remote_last_modified_at",
+        ],
+        values: mismatchRows.map((r) => [
+          r.table,
+          r.type,
+          r.row_id,
+          r.local_last_modified_at,
+          r.remote_last_modified_at,
+        ]),
+      });
+
+      if (mismatchRows.length === 0) {
+        toast.success("No mismatches found");
+      } else {
+        toast.warning(
+          `Found ${mismatchRows.length}${truncated ? "+" : ""} mismatches`
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      toast.error(`Compare failed: ${msg}`);
+    } finally {
+      setCompareRunning(false);
+    }
+  };
+
   return (
     <div class="fixed inset-0 flex flex-col bg-white dark:bg-gray-950">
       {/* Header */}
@@ -272,6 +484,37 @@ export default function DatabaseBrowser(): ReturnType<Component> {
               >
                 🔄 Retry Failed Sync Items
               </button>
+
+              <button
+                type="button"
+                onClick={compareWithSupabase}
+                disabled={compareRunning()}
+                class="w-full mt-2 px-3 py-2 text-sm rounded bg-sky-100 dark:bg-sky-900/20 hover:bg-sky-200 dark:hover:bg-sky-900/30 text-sky-900 dark:text-sky-300 font-medium transition-colors"
+                classList={{
+                  "opacity-50 cursor-not-allowed": compareRunning(),
+                }}
+              >
+                🔎 Compare SQLite vs Supabase
+              </button>
+
+              <label
+                for="compare-table"
+                class="block mt-2 text-xs text-gray-600 dark:text-gray-400"
+              >
+                Compare table
+              </label>
+              <select
+                id="compare-table"
+                value={compareTable()}
+                onChange={(e) => setCompareTable(e.currentTarget.value)}
+                disabled={compareRunning()}
+                class="w-full mt-1 px-3 py-2 text-sm rounded border bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+              >
+                <option value="__all__">All tables</option>
+                <For each={tables() ?? []}>
+                  {(t) => <option value={t}>{t}</option>}
+                </For>
+              </select>
             </div>
           </div>
         </div>

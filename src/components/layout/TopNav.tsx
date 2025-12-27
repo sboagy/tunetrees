@@ -30,6 +30,15 @@ import {
 } from "../../lib/services/playlist-service";
 import { getOutboxStats } from "../../lib/sync/outbox";
 import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
+import {
+  AlertDialog,
+  AlertDialogCloseButton,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { AboutDialog } from "./AboutDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -505,8 +514,39 @@ export const TopNav: Component = () => {
   const [showDbMenu, setShowDbMenu] = createSignal(false);
   const [showPlaylistManager, setShowPlaylistManager] = createSignal(false);
   const [showAboutDialog, setShowAboutDialog] = createSignal(false);
+  const [showForceSyncUpConfirm, setShowForceSyncUpConfirm] =
+    createSignal(false);
+  const [pendingDeleteCount, setPendingDeleteCount] = createSignal(0);
+  const [forceSyncUpBusy, setForceSyncUpBusy] = createSignal(false);
   let userMenuContainerRef: HTMLDivElement | undefined;
   let dbMenuContainerRef: HTMLDivElement | undefined;
+
+  const getPendingDeleteCount = async (): Promise<number> => {
+    const db = localDb();
+    if (!db) return 0;
+    const rows = await db.all<{ count: number }>(
+      "SELECT COUNT(*) as count FROM sync_push_queue WHERE status IN ('pending','in_progress') AND lower(operation) = 'delete';"
+    );
+    return Number(rows[0]?.count ?? 0);
+  };
+
+  const runForceSyncUp = async (opts?: { allowDeletes?: boolean }) => {
+    setForceSyncUpBusy(true);
+    try {
+      await forceSyncUp(opts);
+      toast.success(
+        opts?.allowDeletes === false
+          ? "Uploaded local changes (deletions skipped)"
+          : "Local changes uploaded to server"
+      );
+    } catch (error) {
+      console.error("❌ [Force Sync Up] Sync failed:", error);
+      toast.error("Failed to upload changes");
+    } finally {
+      setForceSyncUpBusy(false);
+      setShowDbMenu(false);
+    }
+  };
 
   // Fetch user avatar (refetch when remote sync completes)
   const [userAvatar] = createResource(
@@ -1048,25 +1088,29 @@ export const TopNav: Component = () => {
                             "🔄 [Force Sync Up] Button clicked - starting sync..."
                           );
                           try {
-                            await forceSyncUp();
-                            console.log(
-                              "✅ [Force Sync Up] Sync completed successfully"
-                            );
-                            toast.success("Local changes uploaded to server");
-                            setShowDbMenu(false); // Close menu after successful sync
+                            const deletes = await getPendingDeleteCount();
+                            setPendingDeleteCount(deletes);
+
+                            if (deletes > 0) {
+                              setShowForceSyncUpConfirm(true);
+                              return;
+                            }
+
+                            await runForceSyncUp();
                           } catch (error) {
                             console.error(
-                              "❌ [Force Sync Up] Sync failed:",
+                              "❌ [Force Sync Up] Preflight failed:",
                               error
                             );
-                            toast.error("Failed to upload changes");
-                            setShowDbMenu(false); // Close menu even on error
+                            toast.error("Failed to check pending deletes");
+                            setShowDbMenu(false);
                           }
                         }}
                         class="w-full px-4 py-2 text-left text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors flex items-center gap-2 rounded-md font-medium"
-                        disabled={!isOnline()}
+                        disabled={!isOnline() || forceSyncUpBusy()}
                         classList={{
-                          "opacity-50 cursor-not-allowed": !isOnline(),
+                          "opacity-50 cursor-not-allowed":
+                            !isOnline() || forceSyncUpBusy(),
                         }}
                       >
                         <svg
@@ -1092,6 +1136,55 @@ export const TopNav: Component = () => {
                         )}
                       </button>
                     </div>
+
+                    <AlertDialog
+                      open={showForceSyncUpConfirm()}
+                      onOpenChange={setShowForceSyncUpConfirm}
+                    >
+                      <AlertDialogContent>
+                        <AlertDialogCloseButton />
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Allow record deletions?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {pendingDeleteCount()} pending delete operation(s)
+                            are queued for upload. You can upload changes
+                            without deletions, or allow deletions to be applied
+                            on Supabase.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <button
+                            type="button"
+                            class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                            onClick={() => setShowForceSyncUpConfirm(false)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            class="px-4 py-2 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
+                            onClick={async () => {
+                              setShowForceSyncUpConfirm(false);
+                              await runForceSyncUp({ allowDeletes: false });
+                            }}
+                          >
+                            Upload (no deletions)
+                          </button>
+                          <button
+                            type="button"
+                            class="px-4 py-2 rounded-md bg-red-600 text-white text-sm hover:bg-red-700"
+                            onClick={async () => {
+                              setShowForceSyncUpConfirm(false);
+                              await runForceSyncUp({ allowDeletes: true });
+                            }}
+                          >
+                            Upload (allow deletions)
+                          </button>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
 
                     {/* Force Sync Down Button */}
                     <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
