@@ -156,19 +156,19 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
         .first()
         .locator('input[type="checkbox"]');
       await checkbox.click();
-      await expect(ttPage.repertoireDeleteButton).toBeEnabled({
+      await expect(ttPage.repertoireRemoveButton).toBeEnabled({
         timeout: 5000,
       });
-      await ttPage.repertoireDeleteButton.click({ timeout: 10000 });
+      await ttPage.repertoireRemoveButton.click({ timeout: 10000 });
 
       const heading = page.getByRole("heading", {
-        name: "Delete selected tunes?",
+        name: "Remove selected tunes?",
       });
       await expect(heading).toBeVisible({ timeout: 10000 });
       const dialog = page
         .locator('[role="dialog"], [role="alertdialog"]')
         .filter({ has: heading });
-      await dialog.getByRole("button", { name: /^Delete$/ }).click();
+      await dialog.getByRole("button", { name: /^Remove$/ }).click();
 
       await expect
         .poll(async () => getLocalRepertoireCount(page, testUser.playlistId), {

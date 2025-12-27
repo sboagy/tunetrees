@@ -2,15 +2,14 @@
  * Repertoire Toolbar Component
  *
  * Toolbar for the Repertoire tab with complete controls.
- * Layout: Add To Review | Filter textbox | Filters | Add Tune | Remove From Repertoire | Delete Tunes | Columns
+ * Layout: Add To Review | Filter textbox | Filters | Add Tune | Remove From Repertoire | Columns
  *
  * Features:
  * - Add To Review button with icon (left-most)
  * - Responsive filter textbox (min-width 12ch)
  * - Combined filter dropdown (Type, Mode, Genre - NO Playlist filter)
  * - Add Tune button with + icon (opens AddTuneDialog)
- * - Remove From Repertoire button (enabled when rows selected)
- * - Delete Tunes button with trash icon
+ * - Remove From Repertoire button (enabled when rows selected, shows confirmation)
  * - Columns dropdown
  * - Tooltips for all controls
  * - Responsive text labels
@@ -31,7 +30,6 @@ import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
   TOOLBAR_BUTTON_BASE,
-  TOOLBAR_BUTTON_DANGER,
   TOOLBAR_BUTTON_GROUP_CLASSES,
   TOOLBAR_BUTTON_NEUTRAL_ALT,
   TOOLBAR_BUTTON_PRIMARY,
@@ -80,7 +78,7 @@ export interface RepertoireToolbarProps {
   availableModes: string[];
   /** Available genres */
   availableGenres: string[];
-  /** Selected rows count for Remove/Delete button state */
+  /** Selected rows count for Remove button state */
   selectedRowsCount?: number;
   /** Table instance for column visibility control and row selection */
   table?: Table<ITuneOverview>;
@@ -98,8 +96,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
-  const [isDeleting, setIsDeleting] = createSignal(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
+  const [isRemoving, setIsRemoving] = createSignal(false);
   let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
 
@@ -203,7 +201,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
     const db = getDb();
 
-    setIsDeleting(true);
+    setIsRemoving(true);
     try {
       // Soft-delete playlist_tune rows so they disappear from repertoire immediately
       await Promise.all(
@@ -224,16 +222,12 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         await forceSyncUp();
       }
     } finally {
-      setIsDeleting(false);
+      setIsRemoving(false);
     }
   };
 
   const handleRemoveFromRepertoire = async () => {
-    await removeSelectedFromRepertoire();
-  };
-
-  const handleDeleteTunes = async () => {
-    setShowDeleteConfirm(true);
+    setShowRemoveConfirm(true);
   };
 
   const handleColumnsToggle = () => {
@@ -346,6 +340,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             type="button"
             onClick={handleRemoveFromRepertoire}
             title="Remove selected tunes from repertoire"
+            data-testid="repertoire-remove-button"
             disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_WARNING}`}
           >
@@ -365,32 +360,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             </svg>
             <span class="hidden md:inline">Remove From Repertoire</span>
             <span class="hidden sm:inline md:hidden">Remove</span>
-          </button>
-
-          {/* Delete Tunes button */}
-          <button
-            type="button"
-            onClick={handleDeleteTunes}
-            title="Delete selected tunes"
-            data-testid="repertoire-delete-button"
-            disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
-          >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            <span class="hidden sm:inline">Delete</span>
           </button>
         </div>
 
@@ -444,14 +413,14 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         onOpenChange={setShowAddTuneDialog}
       />
 
-      {/* Confirm Delete Dialog */}
+      {/* Confirm Remove From Repertoire Dialog */}
       <AlertDialog
-        open={showDeleteConfirm()}
-        onOpenChange={setShowDeleteConfirm}
+        open={showRemoveConfirm()}
+        onOpenChange={setShowRemoveConfirm}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete selected tunes?</AlertDialogTitle>
+            <AlertDialogTitle>Remove selected tunes?</AlertDialogTitle>
             <AlertDialogDescription>
               This removes the selected tunes from your repertoire.
             </AlertDialogDescription>
@@ -459,8 +428,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           <AlertDialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowDeleteConfirm(false)}
-              disabled={isDeleting()}
+              onClick={() => setShowRemoveConfirm(false)}
+              disabled={isRemoving()}
             >
               Cancel
             </Button>
@@ -468,11 +437,11 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
               variant="destructive"
               onClick={async () => {
                 await removeSelectedFromRepertoire();
-                setShowDeleteConfirm(false);
+                setShowRemoveConfirm(false);
               }}
-              disabled={isDeleting()}
+              disabled={isRemoving()}
             >
-              Delete
+              Remove
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

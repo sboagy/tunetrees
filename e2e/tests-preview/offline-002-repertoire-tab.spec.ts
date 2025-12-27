@@ -91,11 +91,11 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
       .locator('input[type="checkbox"]');
     await secondCheckbox.click();
 
-    // Click delete button
-    await ttPage.repertoireDeleteButton.click({ timeout: 10000 });
+    // Click Remove From Repertoire button
+    await ttPage.repertoireRemoveButton.click({ timeout: 10000 });
 
-    // Confirm deletion dialog (required)
-    const confirmButton = page.getByRole("button", { name: /^delete$/i });
+    // Confirm removal dialog (required)
+    const confirmButton = page.getByRole("button", { name: /^remove$/i });
     await expect(confirmButton).toBeVisible({ timeout: 5000 });
     await confirmButton.click();
 
@@ -245,10 +245,10 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
         .locator('input[type="checkbox"]');
       await checkbox.click();
 
-      await ttPage.repertoireDeleteButton.click({ timeout: 10000 });
+      await ttPage.repertoireRemoveButton.click({ timeout: 10000 });
 
       const confirmButton = page.getByRole("button", {
-        name: /^delete$/i,
+        name: /^remove$/i,
       });
       await expect(confirmButton).toBeVisible({ timeout: 5000 });
       await confirmButton.click();

@@ -74,7 +74,7 @@ export class TuneTreesPage {
   readonly repertoireAddTuneButton: Locator;
   readonly repertoireColumnsButton: Locator;
   readonly repertoireAddToReviewButton: Locator;
-  readonly repertoireDeleteButton: Locator;
+  readonly repertoireRemoveButton: Locator;
 
   readonly practiceColumnsButton: Locator;
   // Practice-specific controls
@@ -261,7 +261,7 @@ export class TuneTreesPage {
       "repertoire-columns-button"
     );
     this.repertoireAddToReviewButton = page.getByTestId("add-to-review-button");
-    this.repertoireDeleteButton = page.getByTestId("repertoire-delete-button");
+    this.repertoireRemoveButton = page.getByTestId("repertoire-remove-button");
 
     // Tab-specific Toolbar Buttons - Practice
     this.practiceColumnsButton = page.getByTestId("practice-columns-button");
@@ -987,12 +987,9 @@ export class TuneTreesPage {
       });
     }
     if (options.delete !== undefined) {
+      // Note: Delete button only exists on catalog tab, not on repertoire
       const deleteBtn =
-        tab === "catalog"
-          ? this.catalogDeleteButton
-          : tab === "repertoire"
-            ? this.repertoireDeleteButton
-            : this.deleteButton;
+        tab === "catalog" ? this.catalogDeleteButton : this.deleteButton;
 
       if (options.delete) {
         await expect(deleteBtn).toBeVisible();
