@@ -661,13 +661,25 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
         );
       }
 
+      // practice_record is keyed by a natural composite key in Postgres
+      // (tune_ref, playlist_ref, practiced). When we UPSERT by that key,
+      // we must NOT update the primary key `id`, otherwise we can create
+      // PK collisions across devices / retries.
+      const compositeUpsertOpts = { omitSetProps: ["id"] } as const;
+
       try {
         // IMPORTANT: A failed statement inside a Postgres transaction marks the
         // transaction as aborted, and all subsequent statements will fail with
         // code=25P02. Use a savepoint so we can retry with a sanitized/minimal
         // payload without poisoning the outer transaction.
         await tx.transaction(async (sp) => {
-          await applyUpsert(sp, table, upsertKeyCols, sanitized.data);
+          await applyUpsert(
+            sp,
+            table,
+            upsertKeyCols,
+            sanitized.data,
+            compositeUpsertOpts
+          );
         });
       } catch (e) {
         // Retry once with a minimal payload. This trades some optional FSRS
@@ -678,7 +690,84 @@ async function applyChange(tx: Transaction, change: SyncChange): Promise<void> {
           )}`
         );
         const minimal = minimalPracticeRecordPayload(sanitized.data);
-        await applyUpsert(tx, table, upsertKeyCols, minimal);
+
+        try {
+          // Use a savepoint so a failed minimal upsert doesn't abort the outer transaction.
+          await tx.transaction(async (sp) => {
+            await applyUpsert(
+              sp,
+              table,
+              upsertKeyCols,
+              minimal,
+              compositeUpsertOpts
+            );
+          });
+        } catch (e2) {
+          const pgErr = findPostgresErrorLike(e2);
+          const code = typeof pgErr?.code === "string" ? pgErr.code : undefined;
+          const constraint =
+            typeof pgErr?.constraint_name === "string"
+              ? pgErr.constraint_name
+              : undefined;
+
+          // If the row already exists by primary key, we can safely upsert on id.
+          // This can happen if the composite conflict target doesn't match
+          // (e.g., practiced is NULL/changed), but the id is already present.
+          if (code === "23505" && constraint === "practice_record_pkey") {
+            console.warn(
+              `[PUSH] practice_record minimal upsert hit PK conflict; retrying by id rowId=${change.rowId}: ${formatDbError(
+                e2
+              )}`
+            );
+
+            try {
+              // Retry by primary key inside its own savepoint for the same reason.
+              await tx.transaction(async (sp) => {
+                await applyUpsert(sp, table, deleteKeyCols, minimal, {
+                  omitSetProps: ["id"],
+                });
+              });
+              return;
+            } catch (e3) {
+              const pgErr3 = findPostgresErrorLike(e3);
+              const code3 =
+                typeof pgErr3?.code === "string" ? pgErr3.code : undefined;
+              const constraint3 =
+                typeof pgErr3?.constraint_name === "string"
+                  ? pgErr3.constraint_name
+                  : undefined;
+
+              // If updating by id would violate the composite unique key, we
+              // treat this as a duplicate practice event already present.
+              // Heal by updating the existing composite-key row (without touching id).
+              if (
+                code3 === "23505" &&
+                constraint3 ===
+                  "practice_record_tune_ref_playlist_ref_practiced_key"
+              ) {
+                console.warn(
+                  `[PUSH] practice_record by-id retry hit composite unique; healing by composite upsert rowId=${change.rowId}: ${formatDbError(
+                    e3
+                  )}`
+                );
+                await tx.transaction(async (sp) => {
+                  await applyUpsert(
+                    sp,
+                    table,
+                    upsertKeyCols,
+                    minimal,
+                    compositeUpsertOpts
+                  );
+                });
+                return;
+              }
+
+              throw e3;
+            }
+          }
+
+          throw e2;
+        }
       }
     } else {
       await applyUpsert(tx, table, upsertKeyCols, data);
@@ -743,15 +832,33 @@ async function applyUpsert(
   tx: Transaction,
   table: DrizzleTable,
   pkCols: { col: unknown; prop: string }[],
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  opts?: {
+    /**
+     * Properties to omit from the UPDATE set (still inserted on first write).
+     * This is critical when upserting on a non-PK unique key.
+     */
+    omitSetProps?: readonly string[];
+  }
 ): Promise<void> {
   const targetCols = pkCols.map((pk) => pk.col);
+
+  let setData: Record<string, unknown> = data;
+  const omit = opts?.omitSetProps ?? [];
+  if (omit.length > 0) {
+    setData = { ...data };
+    for (const prop of omit) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete setData[prop];
+    }
+  }
+
   await tx
     .insert(table)
     .values(data)
     .onConflictDoUpdate({
       target: targetCols as any,
-      set: data,
+      set: setData,
     });
 }
 

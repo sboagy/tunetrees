@@ -220,7 +220,9 @@ export class SyncService {
   /**
    * Push local changes to Supabase only (using trigger-based outbox)
    */
-  public async syncUp(): Promise<SyncResult> {
+  public async syncUp(options?: {
+    allowDeletes?: boolean;
+  }): Promise<SyncResult> {
     if (this.isSyncing) {
       throw new SyncInProgressError();
     }
@@ -228,7 +230,7 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
-      const result = await this.syncEngine.syncUpFromOutbox();
+      const result = await this.syncEngine.syncUpFromOutbox(options);
 
       // Notify callback (same as sync() method)
       this.config.onSyncComplete?.(result);

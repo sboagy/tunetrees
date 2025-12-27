@@ -13,6 +13,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyMigrations } from "../services/test-schema-loader";
 import {
+  backfillPracticeRecordOutbox,
   clearOldOutboxItems,
   fetchLocalRowByPrimaryKey,
   getDrizzleTable,
@@ -66,6 +67,20 @@ function insertTune(
   `);
 }
 
+function insertUserProfile(supabaseUserId: string): void {
+  db.run(sql`
+    INSERT INTO user_profile (supabase_user_id, id, deleted, sync_version, last_modified_at)
+    VALUES (${supabaseUserId}, ${supabaseUserId}, 0, 1, datetime('now'))
+  `);
+}
+
+function insertPlaylist(playlistId: string, userRef: string): void {
+  db.run(sql`
+    INSERT INTO playlist (playlist_id, user_ref, deleted, sync_version, last_modified_at)
+    VALUES (${playlistId}, ${userRef}, 0, 1, datetime('now'))
+  `);
+}
+
 // Helper to insert genre_tune_type (composite key)
 function insertGenreTuneType(genreId: string, tuneTypeId: string): void {
   // First ensure the referenced genres and tune_types exist
@@ -89,6 +104,84 @@ function insertGenreTuneType(genreId: string, tuneTypeId: string): void {
 }
 
 describe("Sync Outbox Operations", () => {
+  describe("backfillPracticeRecordOutbox", () => {
+    it("creates outbox rows for recent practice_record rows", async () => {
+      insertUserProfile("sb-1");
+      insertPlaylist("pl-1", "sb-1");
+      insertTune("t-1", "Tune", "reel");
+
+      db.run(sql`
+        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        VALUES ('pr-1', 'pl-1', 't-1', '2025-12-27T00:00:00.000Z', 1, '2025-12-27T00:00:00.000Z')
+      `);
+      db.run(sql`
+        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        VALUES ('pr-2', 'pl-1', 't-1', '2025-12-27T00:00:01.000Z', 1, '2025-12-27T00:00:01.000Z')
+      `);
+
+      const inserted = await backfillPracticeRecordOutbox(
+        db as any,
+        "2025-12-26T00:00:00.000Z"
+      );
+      expect(inserted).toBe(2);
+
+      const outbox = await db.all(sql`
+        SELECT table_name, row_id, status, operation
+        FROM sync_push_queue
+        WHERE table_name = 'practice_record'
+        ORDER BY row_id
+      `);
+      expect(outbox).toEqual([
+        {
+          table_name: "practice_record",
+          row_id: "pr-1",
+          status: "pending",
+          operation: "UPDATE",
+        },
+        {
+          table_name: "practice_record",
+          row_id: "pr-2",
+          status: "pending",
+          operation: "UPDATE",
+        },
+      ]);
+    });
+
+    it("is idempotent for already-queued rows", async () => {
+      insertUserProfile("sb-1");
+      insertPlaylist("pl-1", "sb-1");
+      insertTune("t-1", "Tune", "reel");
+
+      db.run(sql`
+        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        VALUES ('pr-3', 'pl-1', 't-1', '2025-12-27T00:00:02.000Z', 1, '2025-12-27T00:00:02.000Z')
+      `);
+      insertOutboxItem(
+        "item-pr-3",
+        "practice_record",
+        "pr-3",
+        "UPDATE",
+        "pending",
+        "2025-12-27T00:00:03.000Z"
+      );
+
+      const inserted = await backfillPracticeRecordOutbox(
+        db as any,
+        "2025-12-26T00:00:00.000Z"
+      );
+      expect(inserted).toBe(0);
+
+      const count = (
+        db.all(sql`
+        SELECT COUNT(*) as n
+        FROM sync_push_queue
+        WHERE table_name = 'practice_record' AND row_id = 'pr-3'
+      `) as Array<{ n: unknown }>
+      ).at(0)?.n;
+      expect(Number(count)).toBe(1);
+    });
+  });
+
   describe("getPendingOutboxItems", () => {
     it("returns empty array when no items", async () => {
       const items = await getPendingOutboxItems(db as any);

@@ -119,7 +119,7 @@ interface AuthState {
   forceSyncDown: (opts?: { full?: boolean }) => Promise<void>;
 
   /** Force sync up to Supabase (push local changes immediately) */
-  forceSyncUp: () => Promise<void>;
+  forceSyncUp: (opts?: { allowDeletes?: boolean }) => Promise<void>;
   /** Last successful syncDown ISO timestamp (null if none yet) */
   lastSyncTimestamp: Accessor<string | null>;
   /** Mode of last syncDown ('full' | 'incremental' | null if none yet) */
@@ -1429,7 +1429,7 @@ export const AuthProvider: ParentComponent = (props) => {
   /**
    * Force sync up to Supabase (push local changes immediately)
    */
-  const forceSyncUp = async () => {
+  const forceSyncUp = async (opts?: { allowDeletes?: boolean }) => {
     if (!syncServiceInstance) {
       console.warn("⚠️ [ForceSyncUp] Sync service not available");
       log.warn("Sync service not available");
@@ -1440,7 +1440,7 @@ export const AuthProvider: ParentComponent = (props) => {
       console.log("🔄 [ForceSyncUp] Starting sync up to Supabase...");
       log.info("Forcing sync up to Supabase...");
 
-      const result = await syncServiceInstance.syncUp();
+      const result = await syncServiceInstance.syncUp(opts);
 
       console.log("✅ [ForceSyncUp] Sync up completed:", {
         success: result.success,
