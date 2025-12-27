@@ -215,12 +215,16 @@ export class SyncEngine {
   /**
    * Bidirectional sync with Cloudflare Worker
    */
-  async syncWithWorker(): Promise<SyncResult> {
+  async syncWithWorker(options?: {
+    allowDeletes?: boolean;
+  }): Promise<SyncResult> {
     const startTime = new Date().toISOString();
     const errors: string[] = [];
     let synced = 0;
     let failed = 0;
     const affectedTablesSet = new Set<string>();
+
+    const allowDeletes = options?.allowDeletes ?? true;
 
     try {
       // 1. Get Auth Token
@@ -262,11 +266,17 @@ export class SyncEngine {
       // Sort by dependency to ensure correct order (though worker handles transaction)
       const sortedItems = sortOutboxItemsByDependency(pendingItems);
       const changes: SyncChange[] = [];
+      const outboxItemsToComplete: OutboxItem[] = [];
 
       for (const item of sortedItems) {
         const adapter = getAdapter(item.tableName as SyncableTableName);
 
         if (item.operation.toLowerCase() === "delete") {
+          if (!allowDeletes) {
+            // Safety mode: do not push DELETE operations.
+            // Leave the outbox item pending so it can be reviewed and retried later.
+            continue;
+          }
           // For DELETE, parse rowId to get keys
           // rowId is snake_case JSON or string from trigger
           const parsedRowId = item.rowId.startsWith("{")
@@ -287,6 +297,7 @@ export class SyncEngine {
             deleted: true,
             lastModifiedAt: item.changedAt, // Use changedAt from outbox
           });
+          outboxItemsToComplete.push(item);
         } else {
           // INSERT/UPDATE
           const localRow = await fetchLocalRowByPrimaryKey(
@@ -305,6 +316,7 @@ export class SyncEngine {
               lastModifiedAt:
                 (localRow as any).lastModifiedAt || item.changedAt,
             });
+            outboxItemsToComplete.push(item);
           } else {
             log.warn(
               `[SyncEngine] Local row missing for ${item.tableName}:${item.rowId}`
@@ -553,7 +565,9 @@ export class SyncEngine {
       await applyRemoteChanges(firstResponse.changes);
 
       // 5. Cleanup Outbox (only once, after push has been accepted)
-      for (const item of sortedItems) {
+      // IMPORTANT: Only clear items we actually pushed (or explicitly pruned).
+      // If deletes are disallowed, leave those outbox entries pending.
+      for (const item of outboxItemsToComplete) {
         await markOutboxCompleted(this.localDb, item.id);
       }
 
@@ -623,8 +637,10 @@ export class SyncEngine {
   /**
    * Alias for sync() - kept for API compatibility with SyncService.
    */
-  async syncUpFromOutbox(): Promise<SyncResult> {
-    return this.syncWithWorker();
+  async syncUpFromOutbox(options?: {
+    allowDeletes?: boolean;
+  }): Promise<SyncResult> {
+    return this.syncWithWorker(options);
   }
 
   /**
