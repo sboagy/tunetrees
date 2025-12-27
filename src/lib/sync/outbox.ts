@@ -93,14 +93,7 @@ export async function backfillPracticeRecordOutbox(
     .from(practiceRecord)
     .where(gte(practiceRecord.lastModifiedAt, sinceIso));
 
-  const ids = rows
-    .map((r) => r.id)
-    .filter(
-      (id): id is string | number =>
-        typeof id === "string" || typeof id === "number"
-    )
-    .map((id) => String(id))
-    .filter((id) => id.length > 0);
+  const ids = rows.map((r) => String(r.id ?? "")).filter((id) => id.length > 0);
 
   if (ids.length === 0) return 0;
 
@@ -268,31 +261,37 @@ export async function getOutboxStats(db: SqliteDatabase): Promise<{
   // IMPORTANT: Don't fetch all outbox rows into JS.
   // The outbox can grow large (especially when offline), and selecting all rows
   // will allocate a huge array and can crash the tab.
-  const [{ count: pendingCount } = { count: 0 }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(syncPushQueue)
-    .where(eq(syncPushQueue.status, "pending"));
+  const pendingRows = await db.all(sql`
+    SELECT COUNT(*) AS n
+    FROM sync_push_queue
+    WHERE status = 'pending'
+  `);
 
-  const [{ count: inProgressCount } = { count: 0 }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(syncPushQueue)
-    .where(eq(syncPushQueue.status, "in_progress"));
+  const inProgressRows = await db.all(sql`
+    SELECT COUNT(*) AS n
+    FROM sync_push_queue
+    WHERE status = 'in_progress'
+  `);
 
-  const [{ count: failedCount } = { count: 0 }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(syncPushQueue)
-    .where(eq(syncPushQueue.status, "failed"));
+  const failedRows = await db.all(sql`
+    SELECT COUNT(*) AS n
+    FROM sync_push_queue
+    WHERE status = 'failed'
+  `);
 
-  const [{ count: totalCount } = { count: 0 }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(syncPushQueue);
+  const totalRows = await db.all(sql`
+    SELECT COUNT(*) AS n
+    FROM sync_push_queue
+  `);
 
-  return {
-    pending: Number(pendingCount ?? 0),
-    inProgress: Number(inProgressCount ?? 0),
-    failed: Number(failedCount ?? 0),
-    total: Number(totalCount ?? 0),
-  };
+  const pending = Number((pendingRows as Array<{ n: unknown }>)[0]?.n ?? 0);
+  const inProgress = Number(
+    (inProgressRows as Array<{ n: unknown }>)[0]?.n ?? 0
+  );
+  const failed = Number((failedRows as Array<{ n: unknown }>)[0]?.n ?? 0);
+  const total = Number((totalRows as Array<{ n: unknown }>)[0]?.n ?? 0);
+
+  return { pending, inProgress, failed, total };
 }
 
 /**
