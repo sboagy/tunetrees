@@ -171,13 +171,11 @@ describe("Sync Outbox Operations", () => {
       );
       expect(inserted).toBe(0);
 
-      const count = db
-        .all(sql`
-          SELECT COUNT(*) as n
-          FROM sync_push_queue
-          WHERE table_name = 'practice_record' AND row_id = 'pr-3'
-        `)
-        .at(0)?.n;
+      const count = (db.all(sql`
+        SELECT COUNT(*) as n
+        FROM sync_push_queue
+        WHERE table_name = 'practice_record' AND row_id = 'pr-3'
+      `) as Array<{ n: unknown }>).at(0)?.n;
       expect(Number(count)).toBe(1);
     });
   });
