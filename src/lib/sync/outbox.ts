@@ -8,7 +8,7 @@
  * @module lib/sync/outbox
  */
 
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import {
@@ -19,6 +19,19 @@ import type { SqliteDatabase } from "../db/client-sqlite";
 import { toCamelCase } from "./casing";
 
 const { syncPushQueue } = localSchema;
+
+function randomHexId(bytesLength = 16): string {
+  const bytes = new Uint8Array(bytesLength);
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && "getRandomValues" in cryptoObj) {
+    cryptoObj.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 /**
  * Outbox item status
@@ -59,6 +72,68 @@ export async function getPendingOutboxItems(
     .limit(limit);
 
   return items;
+}
+
+/**
+ * Backfill outbox entries for practice_record rows.
+ *
+ * Why this exists:
+ * During syncDown, the engine suppresses triggers to prevent remote changes from
+ * re-entering the outbox. If the user writes local data during that window, those
+ * writes won't be captured by triggers and will never be pushed.
+ */
+export async function backfillPracticeRecordOutbox(
+  db: SqliteDatabase,
+  sinceIso: string
+): Promise<number> {
+  const { practiceRecord } = localSchema;
+
+  const rows = await db
+    .select({ id: practiceRecord.id })
+    .from(practiceRecord)
+    .where(gte(practiceRecord.lastModifiedAt, sinceIso));
+
+  const ids = rows
+    .map((r) => r.id)
+    .filter(
+      (id): id is string | number =>
+        typeof id === "string" || typeof id === "number"
+    )
+    .map((id) => String(id))
+    .filter((id) => id.length > 0);
+
+  if (ids.length === 0) return 0;
+
+  const existing = await db
+    .select({ rowId: syncPushQueue.rowId })
+    .from(syncPushQueue)
+    .where(
+      and(
+        eq(syncPushQueue.tableName, "practice_record"),
+        inArray(syncPushQueue.rowId, ids)
+      )
+    );
+
+  const existingIds = new Set(existing.map((e) => e.rowId));
+  const missingIds = ids.filter((id) => !existingIds.has(id));
+  if (missingIds.length === 0) return 0;
+
+  const nowIso = new Date().toISOString();
+  await db.insert(syncPushQueue).values(
+    missingIds.map((id) => ({
+      id: randomHexId(),
+      tableName: "practice_record",
+      rowId: id,
+      operation: "UPDATE",
+      status: "pending",
+      changedAt: nowIso,
+      attempts: 0,
+      lastError: null,
+      syncedAt: null,
+    }))
+  );
+
+  return missingIds.length;
 }
 
 /**

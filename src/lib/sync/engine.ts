@@ -22,6 +22,7 @@ import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import { toCamelCase } from "./casing";
 import {
+  backfillPracticeRecordOutbox,
   fetchLocalRowByPrimaryKey,
   getOutboxStats,
   getPendingOutboxItems,
@@ -230,6 +231,27 @@ export class SyncEngine {
         throw new Error("No active session");
       }
       const workerClient = new WorkerClient(session.access_token);
+
+      // Safety: if triggers were suppressed during syncDown while the user wrote data,
+      // those rows won't be in sync_push_queue and will never be pushed.
+      // Backfill recent practice_record rows so they're uploaded.
+      try {
+        const since = new Date(
+          Date.now() - 1000 * 60 * 60 * 24 * 30
+        ).toISOString();
+        const backfilled = await backfillPracticeRecordOutbox(
+          this.localDb,
+          since
+        );
+        if (backfilled > 0) {
+          log.warn(
+            `[SyncEngine] Backfilled ${backfilled} practice_record outbox entries (recent changes)`
+          );
+        }
+      } catch (e) {
+        // Never fail sync because of best-effort backfill.
+        log.warn("[SyncEngine] practice_record outbox backfill failed", e);
+      }
 
       // 2. Gather Pending Changes (Push)
       const pendingItems = await getPendingOutboxItems(
