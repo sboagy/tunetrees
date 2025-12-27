@@ -179,8 +179,10 @@ export function getCatalogColumns(
       cell: (info) => {
         const tune = info.row.original;
         const title = (info.getValue() as string) || "";
-        // Use favorite_url if available, otherwise use irishtune.info
-        const href = tune.favorite_url;
+        // Use favorite_url if available, otherwise fallback to irishtune.info
+        // Note: id_foreign exists but is for Spotify/YouTube IDs, not web URLs
+        const href =
+          tune.favorite_url || `https://www.irishtune.info/tune/${tune.id}/`;
         return (
           <a
             href={href}
