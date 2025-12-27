@@ -22,6 +22,7 @@ import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import { toCamelCase } from "./casing";
 import {
+  backfillPracticeRecordOutbox,
   fetchLocalRowByPrimaryKey,
   getOutboxStats,
   getPendingOutboxItems,
@@ -214,12 +215,16 @@ export class SyncEngine {
   /**
    * Bidirectional sync with Cloudflare Worker
    */
-  async syncWithWorker(): Promise<SyncResult> {
+  async syncWithWorker(options?: {
+    allowDeletes?: boolean;
+  }): Promise<SyncResult> {
     const startTime = new Date().toISOString();
     const errors: string[] = [];
     let synced = 0;
     let failed = 0;
     const affectedTablesSet = new Set<string>();
+
+    const allowDeletes = options?.allowDeletes ?? true;
 
     try {
       // 1. Get Auth Token
@@ -231,6 +236,27 @@ export class SyncEngine {
       }
       const workerClient = new WorkerClient(session.access_token);
 
+      // Safety: if triggers were suppressed during syncDown while the user wrote data,
+      // those rows won't be in sync_push_queue and will never be pushed.
+      // Backfill recent practice_record rows so they're uploaded.
+      try {
+        const since = new Date(
+          Date.now() - 1000 * 60 * 60 * 24 * 30
+        ).toISOString();
+        const backfilled = await backfillPracticeRecordOutbox(
+          this.localDb,
+          since
+        );
+        if (backfilled > 0) {
+          log.warn(
+            `[SyncEngine] Backfilled ${backfilled} practice_record outbox entries (recent changes)`
+          );
+        }
+      } catch (e) {
+        // Never fail sync because of best-effort backfill.
+        log.warn("[SyncEngine] practice_record outbox backfill failed", e);
+      }
+
       // 2. Gather Pending Changes (Push)
       const pendingItems = await getPendingOutboxItems(
         this.localDb,
@@ -240,11 +266,17 @@ export class SyncEngine {
       // Sort by dependency to ensure correct order (though worker handles transaction)
       const sortedItems = sortOutboxItemsByDependency(pendingItems);
       const changes: SyncChange[] = [];
+      const outboxItemsToComplete: OutboxItem[] = [];
 
       for (const item of sortedItems) {
         const adapter = getAdapter(item.tableName as SyncableTableName);
 
         if (item.operation.toLowerCase() === "delete") {
+          if (!allowDeletes) {
+            // Safety mode: do not push DELETE operations.
+            // Leave the outbox item pending so it can be reviewed and retried later.
+            continue;
+          }
           // For DELETE, parse rowId to get keys
           // rowId is snake_case JSON or string from trigger
           const parsedRowId = item.rowId.startsWith("{")
@@ -265,6 +297,7 @@ export class SyncEngine {
             deleted: true,
             lastModifiedAt: item.changedAt, // Use changedAt from outbox
           });
+          outboxItemsToComplete.push(item);
         } else {
           // INSERT/UPDATE
           const localRow = await fetchLocalRowByPrimaryKey(
@@ -283,6 +316,7 @@ export class SyncEngine {
               lastModifiedAt:
                 (localRow as any).lastModifiedAt || item.changedAt,
             });
+            outboxItemsToComplete.push(item);
           } else {
             log.warn(
               `[SyncEngine] Local row missing for ${item.tableName}:${item.rowId}`
@@ -423,13 +457,63 @@ export class SyncEngine {
                       )
                     : (table as any)[toCamelCase(adapter.primaryKey as string)];
 
-                  await this.localDb
-                    .insert(table)
-                    .values(sanitizedData)
-                    .onConflictDoUpdate({
-                      target: conflictTarget,
-                      set: sanitizedData,
-                    });
+                  // Some tables have a natural composite unique key (adapter.conflictKeys)
+                  // in addition to a synthetic PK (id). If we only upsert by id, an insert
+                  // can fail on the composite unique constraint when the same logical row
+                  // exists locally with a different id (e.g. retained IndexedDB + initial sync).
+                  // Strategy:
+                  // 1) Upsert by primary key (current behavior)
+                  // 2) If that fails due to the composite unique constraint, upsert by the
+                  //    composite key without ever updating `id`.
+                  const compositeKeys = adapter.conflictKeys;
+                  const isSingleIdPk =
+                    !Array.isArray(adapter.primaryKey) &&
+                    adapter.primaryKey === "id";
+
+                  if (isSingleIdPk && compositeKeys) {
+                    try {
+                      await this.localDb
+                        .insert(table)
+                        .values(sanitizedData)
+                        .onConflictDoUpdate({
+                          target: conflictTarget,
+                          set: sanitizedData,
+                        });
+                    } catch (e) {
+                      const errorMsg =
+                        e instanceof Error ? e.message : String(e);
+                      const isCompositeUniqueViolation =
+                        errorMsg.includes("UNIQUE constraint failed:") &&
+                        compositeKeys.every((k) =>
+                          errorMsg.includes(`${change.table}.${k}`)
+                        );
+
+                      if (!isCompositeUniqueViolation) {
+                        throw e;
+                      }
+
+                      const { id: _ignoredId, ...sanitizedDataWithoutId } =
+                        sanitizedData as Record<string, unknown>;
+
+                      await this.localDb
+                        .insert(table)
+                        .values(sanitizedData)
+                        .onConflictDoUpdate({
+                          target: compositeKeys.map(
+                            (k) => (table as any)[toCamelCase(k)]
+                          ),
+                          set: sanitizedDataWithoutId,
+                        });
+                    }
+                  } else {
+                    await this.localDb
+                      .insert(table)
+                      .values(sanitizedData)
+                      .onConflictDoUpdate({
+                        target: conflictTarget,
+                        set: sanitizedData,
+                      });
+                  }
                 }
               }
               synced++;
@@ -481,7 +565,9 @@ export class SyncEngine {
       await applyRemoteChanges(firstResponse.changes);
 
       // 5. Cleanup Outbox (only once, after push has been accepted)
-      for (const item of sortedItems) {
+      // IMPORTANT: Only clear items we actually pushed (or explicitly pruned).
+      // If deletes are disallowed, leave those outbox entries pending.
+      for (const item of outboxItemsToComplete) {
         await markOutboxCompleted(this.localDb, item.id);
       }
 
@@ -551,8 +637,10 @@ export class SyncEngine {
   /**
    * Alias for sync() - kept for API compatibility with SyncService.
    */
-  async syncUpFromOutbox(): Promise<SyncResult> {
-    return this.syncWithWorker();
+  async syncUpFromOutbox(options?: {
+    allowDeletes?: boolean;
+  }): Promise<SyncResult> {
+    return this.syncWithWorker(options);
   }
 
   /**
