@@ -179,8 +179,11 @@ export function getCatalogColumns(
       cell: (info) => {
         const tune = info.row.original;
         const title = (info.getValue() as string) || "";
-        // Use favorite_url if available, otherwise use irishtune.info
-        const href = tune.favorite_url;
+        // Use favorite_url if available, then external_ref, otherwise fallback to irishtune.info
+        const href =
+          tune.favorite_url ||
+          tune.external_ref ||
+          `https://www.irishtune.info/tune/${tune.id}/`;
         return (
           <a
             href={href}
