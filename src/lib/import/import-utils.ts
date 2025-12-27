@@ -4,6 +4,10 @@
  * Functions for importing tunes from external sources (TheSession.org, IrishTune.info).
  * Ported from legacy Next.js app to SolidJS PWA.
  *
+ * Uses CORS proxy to bypass browser restrictions:
+ * - Development: Vite dev server proxy (vite.config.ts)
+ * - Production: Cloudflare Pages Function (/functions/api/proxy/thesession.ts)
+ *
  * @module lib/import/import-utils
  */
 
@@ -13,6 +17,24 @@ import type {
   ITheSessionQueryResults,
   ITheSessionTune,
 } from "./the-session-schemas";
+
+/**
+ * Get the CORS proxy URL for TheSession.org API calls
+ * 
+ * In both development and production, the proxy is at the same origin
+ * to avoid CORS and mixed content issues:
+ * - Development: Vite dev server proxies /api/proxy/thesession to thesession.org
+ * - Production: Cloudflare Pages Function at /api/proxy/thesession
+ * 
+ * This eliminates the need for VITE_WORKER_URL environment variable
+ */
+function getProxyUrl(targetUrl: string): string {
+  // Use same-origin proxy endpoint
+  // In dev: Vite proxies this to thesession.org
+  // In prod: Cloudflare Pages Function handles this
+  const encodedUrl = encodeURIComponent(targetUrl);
+  return `/api/proxy/thesession?url=${encodedUrl}`;
+}
 
 /**
  * Extracted tune information from parsing
@@ -37,6 +59,7 @@ export interface IImportedTuneData {
 
 /**
  * Fetch tune search results from TheSession.org by title
+ * Uses CORS proxy (Vite in dev, Pages Function in prod) to bypass browser restrictions
  */
 export async function fetchTheSessionURLsFromTitle(
   title: string,
@@ -47,7 +70,10 @@ export async function fetchTheSessionURLsFromTitle(
     const typeQuery = tuneType ? `type=${tuneType}&` : "";
     const theSessionUrl = `https://thesession.org/tunes/search?${typeQuery}mode=&q=${encodedTitle}&format=json`;
 
-    const response = await fetch(theSessionUrl, {
+    // Use same-origin proxy endpoint
+    const proxyUrl = getProxyUrl(theSessionUrl);
+
+    const response = await fetch(proxyUrl, {
       headers: {
         Accept: "application/json",
       },
@@ -67,6 +93,7 @@ export async function fetchTheSessionURLsFromTitle(
 
 /**
  * Fetch tune details from TheSession.org by URL
+ * Uses CORS proxy (Vite in dev, Pages Function in prod) to bypass browser restrictions
  */
 export async function fetchTuneInfoFromTheSessionURL(
   tuneUrlBase: string
@@ -76,7 +103,10 @@ export async function fetchTuneInfoFromTheSessionURL(
     const primaryUrl = url.origin + url.pathname;
     const tuneUrl = `${primaryUrl}?format=json`;
 
-    const response = await fetch(tuneUrl, {
+    // Use same-origin proxy endpoint
+    const proxyUrl = getProxyUrl(tuneUrl);
+
+    const response = await fetch(proxyUrl, {
       headers: {
         Accept: "application/json",
       },
