@@ -89,6 +89,10 @@ export async function stagePracticeEvaluation(
   technique: string = ""
 ): Promise<FSRSPreviewMetrics> {
   const now = new Date();
+  // Make practiced timestamps deterministic across devices by removing
+  // millisecond precision. This reduces near-duplicate practice events
+  // that differ only by fractional seconds.
+  now.setMilliseconds(0);
   // Build RecordPracticeInput for evaluatePractice
   const input: RecordPracticeInput = {
     tuneRef: tuneId,

@@ -26,7 +26,10 @@ import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
 import { generateId } from "../utils/uuid";
 
-type QueueCandidateRow = Pick<PracticeListStagedRow, "id" | "scheduled" | "latest_due">;
+type QueueCandidateRow = Pick<
+  PracticeListStagedRow,
+  "id" | "scheduled" | "latest_due"
+>;
 
 const HARD_QUEUE_ROW_CAP = 5000;
 
@@ -721,7 +724,7 @@ export async function generateOrGetPracticeQueue(
       LIMIT ${maxReviews}
     `);
   } else {
-      q1Rows = await db.all<QueueCandidateRow>(sql`
+    q1Rows = await db.all<QueueCandidateRow>(sql`
         SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}

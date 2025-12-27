@@ -94,35 +94,47 @@ export async function evaluatePractice(
   record: NewPracticeRecord;
   prior: PracticeRecord | null;
 }> {
+  // Normalize practiced timestamps to whole-second precision.
+  // This avoids cross-device millisecond differences (e.g. ".158") creating
+  // near-duplicate practice events and composite-key mismatches in sync.
+  const practiced = new Date(input.practiced);
+  practiced.setMilliseconds(0);
+  const normalizedInput: RecordPracticeInput = { ...input, practiced };
+
   const prefs = await getUserPreferences(db, userId);
   if (!prefs) {
     throw new Error("User FSRS preferences not found");
   }
   const scheduling = await getUserSchedulingOptions(db, userId);
-  const fsrsService = new FSRSService(prefs, scheduling, db, input.playlistRef);
+  const fsrsService = new FSRSService(
+    prefs,
+    scheduling,
+    db,
+    normalizedInput.playlistRef
+  );
   const latestRecord = await getLatestPracticeRecord(
     db,
-    input.tuneRef,
-    input.playlistRef
+    normalizedInput.tuneRef,
+    normalizedInput.playlistRef
   );
   const schedule = latestRecord
-    ? fsrsService.processReview(input, latestRecord)
-    : fsrsService.processFirstReview(input);
+    ? fsrsService.processReview(normalizedInput, latestRecord)
+    : fsrsService.processFirstReview(normalizedInput);
 
   // Lapses business rule override (Again only increments when prior state was Review=2)
   const priorState = latestRecord?.state ?? 0;
   let lapsesValue = latestRecord?.lapses ?? 0;
-  if (input.quality === FSRS_QUALITY_MAP.AGAIN && priorState === 2) {
+  if (normalizedInput.quality === FSRS_QUALITY_MAP.AGAIN && priorState === 2) {
     lapsesValue += 1;
   }
 
   const record: NewPracticeRecord = {
     id: generateId(),
     lastModifiedAt: getPracticeDate().toISOString(),
-    playlistRef: input.playlistRef,
-    tuneRef: input.tuneRef,
-    practiced: input.practiced.toISOString(),
-    quality: input.quality,
+    playlistRef: normalizedInput.playlistRef,
+    tuneRef: normalizedInput.tuneRef,
+    practiced: normalizedInput.practiced.toISOString(),
+    quality: normalizedInput.quality,
     easiness: null,
     interval: schedule.interval,
     repetitions: schedule.reps,
@@ -134,8 +146,8 @@ export async function evaluatePractice(
     state: schedule.state,
     difficulty: schedule.difficulty,
     step: null,
-    goal: input.goal || "recall",
-    technique: input.technique || null,
+    goal: normalizedInput.goal || "recall",
+    technique: normalizedInput.technique || null,
   };
   return { schedule, record, prior: latestRecord ?? null };
 }
@@ -317,6 +329,7 @@ export async function commitStagedEvaluations(
   playlistId: string,
   windowStartUtc?: string
 ): Promise<{ success: boolean; count: number; error?: string }> {
+  let didStartTransaction = false;
   try {
     console.log("=== commitStagedEvaluations START ===");
     console.log("Parameters:", {
@@ -464,6 +477,12 @@ export async function commitStagedEvaluations(
       console.log("No evaluations to commit after filtering, returning");
       return { success: true, count: 0 };
     }
+
+    // Run the commit as a single atomic transaction. This prevents
+    // partial-success states (e.g., practice_record inserted but transient rows
+    // not cleared) which can cause subsequent re-submits to collide.
+    await db.run(sql`BEGIN`);
+    didStartTransaction = true;
 
     // 4. For each staged evaluation, create practice_record and update related tables
     const committedTuneIds: string[] = [];
@@ -651,6 +670,9 @@ export async function commitStagedEvaluations(
       console.log(`✓ Completed processing tune ${staged.tune_id}`);
     }
 
+    await db.run(sql`COMMIT`);
+    didStartTransaction = false;
+
     // 5. Persist database to IndexedDB
     console.log("Persisting database...");
     await persistDb();
@@ -665,6 +687,14 @@ export async function commitStagedEvaluations(
       count: committedTuneIds.length,
     };
   } catch (error) {
+    if (didStartTransaction) {
+      try {
+        const { sql } = await import("drizzle-orm");
+        await db.run(sql`ROLLBACK`);
+      } catch (rollbackError) {
+        console.error("Failed to rollback transaction:", rollbackError);
+      }
+    }
     console.error("=== commitStagedEvaluations ERROR ===", error);
     return {
       success: false,
