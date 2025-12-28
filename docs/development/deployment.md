@@ -65,6 +65,8 @@ npm install
 
 ### Worker Secrets
 
+⚠️ **CRITICAL**: The worker MUST have these secrets configured or it will fail with CORS errors:
+
 ```bash
 npx wrangler secret put SUPABASE_JWT_SECRET
 npx wrangler secret put DATABASE_URL
@@ -73,12 +75,32 @@ npx wrangler secret put DATABASE_URL
 - `SUPABASE_JWT_SECRET`: From Supabase Dashboard → Settings → API → JWT Secret
 - `DATABASE_URL`: Supabase connection string (use "Session pooler" for Workers)
 
+**Verify secrets are set**:
+```bash
+npx wrangler secret list
+```
+
 ### Deploy Worker
 
 ```bash
 cd worker
 npx wrangler deploy
 ```
+
+**Test deployment**:
+```bash
+# Health check
+curl https://tunetrees-sync-worker.sboagy.workers.dev/health
+
+# CORS preflight
+curl -X OPTIONS \
+  -H "Origin: https://tunetrees.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -v \
+  https://tunetrees-sync-worker.sboagy.workers.dev/api/sync
+```
+
+See [CORS Troubleshooting](../troubleshooting/cors-sync-worker.md) if you encounter CORS errors.
 
 ## Custom Domain
 
