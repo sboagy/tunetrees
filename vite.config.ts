@@ -28,6 +28,43 @@ export default defineConfig(() => {
   };
 
   return {
+    // Development server configuration
+    server: {
+      proxy: {
+        // Proxy TheSession.org API requests to bypass CORS in development
+        // This matches the pattern used by the import utils
+        "/api/proxy/thesession": {
+          target: "https://thesession.org",
+          changeOrigin: true,
+          rewrite: (path: string) => {
+            // Extract the URL from query parameter and return just the path
+            try {
+              const url = new URL(path, "http://localhost");
+              const targetUrl = url.searchParams.get("url");
+              if (targetUrl) {
+                const targetUrlObj = new URL(targetUrl);
+                return targetUrlObj.pathname + targetUrlObj.search;
+              }
+            } catch (error) {
+              console.error("[Vite Proxy] Error parsing URL:", error);
+            }
+            return path;
+          },
+          configure: (proxy) => {
+            proxy.on("error", (err) => {
+              console.log("[Vite Proxy] Error:", err);
+            });
+            proxy.on("proxyReq", (proxyReq, req) => {
+              console.log(
+                `[Vite Proxy] Proxying: ${req.method} ${req.url}`
+              );
+              proxyReq.setHeader("Accept", "application/json");
+              proxyReq.setHeader("User-Agent", "TuneTrees-PWA-Dev/1.0");
+            });
+          },
+        },
+      },
+    },
     test: {
       exclude: [
         "**/node_modules/**",
