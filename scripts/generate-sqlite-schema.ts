@@ -8,7 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const INPUT_FILE = path.join(__dirname, "../drizzle/schema-postgres.ts");
-const OUTPUT_FILE = path.join(__dirname, "../drizzle/schema-sqlite.generated.ts");
+const OUTPUT_FILE = path.join(
+  __dirname,
+  "../drizzle/schema-sqlite.generated.ts"
+);
 
 function parseArgs(argv: string[]): { check: boolean } {
   return { check: argv.includes("--check") };
@@ -44,7 +47,9 @@ function buildColumnSqlNameMap(columnsArg: ts.Expression): Map<string, string> {
   for (const prop of columnsArg.properties) {
     if (!ts.isPropertyAssignment(prop)) continue;
     if (!ts.isIdentifier(prop.name) && !ts.isStringLiteral(prop.name)) continue;
-    const propName = ts.isIdentifier(prop.name) ? prop.name.text : prop.name.text;
+    const propName = ts.isIdentifier(prop.name)
+      ? prop.name.text
+      : prop.name.text;
 
     // Column definitions are typically like: foo: uuid("foo")...
     const initializer = prop.initializer;
@@ -61,7 +66,7 @@ function buildColumnSqlNameMap(columnsArg: ts.Expression): Map<string, string> {
   return map;
 }
 
-function isUniqueOnCall(node: ts.Expression): node is ts.CallExpression {
+function isUniqueOnCall(node: ts.Node): node is ts.CallExpression {
   if (!ts.isCallExpression(node)) return false;
   if (!ts.isPropertyAccessExpression(node.expression)) return false;
   if (node.expression.name.text !== "on") return false;
@@ -71,8 +76,12 @@ function isUniqueOnCall(node: ts.Expression): node is ts.CallExpression {
   return base.expression.text === "unique";
 }
 
-function isCheckCall(node: ts.Expression): boolean {
-  return ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "check";
+function isCheckCall(node: ts.Node): boolean {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === "check"
+  );
 }
 
 function replaceImports(sf: ts.SourceFile): ts.SourceFile {
@@ -98,13 +107,41 @@ function replaceImports(sf: ts.SourceFile): ts.SourceFile {
         false,
         undefined,
         ts.factory.createNamedImports([
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("index")),
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("integer")),
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("primaryKey")),
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("real")),
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("sqliteTable")),
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("text")),
-          ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("uniqueIndex")),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("index")
+          ),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("integer")
+          ),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("primaryKey")
+          ),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("real")
+          ),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("sqliteTable")
+          ),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("text")
+          ),
+          ts.factory.createImportSpecifier(
+            false,
+            undefined,
+            ts.factory.createIdentifier("uniqueIndex")
+          ),
         ])
       );
 
@@ -120,7 +157,10 @@ function replaceImports(sf: ts.SourceFile): ts.SourceFile {
 
     // Swap pgSyncColumns -> sqliteSyncColumns
     if (moduleName === "./sync-columns") {
-      if (!stmt.importClause?.namedBindings || !ts.isNamedImports(stmt.importClause.namedBindings)) {
+      if (
+        !stmt.importClause?.namedBindings ||
+        !ts.isNamedImports(stmt.importClause.namedBindings)
+      ) {
         statements.push(stmt);
         continue;
       }
@@ -131,7 +171,11 @@ function replaceImports(sf: ts.SourceFile): ts.SourceFile {
         const local = s.name.text;
         if (imported === "pgSyncColumns" && local === "pgSyncColumns") {
           newSpecs.push(
-            ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier("sqliteSyncColumns"))
+            ts.factory.createImportSpecifier(
+              false,
+              undefined,
+              ts.factory.createIdentifier("sqliteSyncColumns")
+            )
           );
           continue;
         }
@@ -156,7 +200,15 @@ function replaceImports(sf: ts.SourceFile): ts.SourceFile {
         ts.factory.createNamedImports(newSpecs)
       );
 
-      statements.push(ts.factory.updateImportDeclaration(stmt, stmt.modifiers, importClause, stmt.moduleSpecifier));
+      statements.push(
+        ts.factory.updateImportDeclaration(
+          stmt,
+          stmt.modifiers,
+          importClause,
+          stmt.moduleSpecifier,
+          stmt.attributes
+        )
+      );
       continue;
     }
 
@@ -200,7 +252,11 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
       }
 
       // Replace spread ...pgSyncColumns with ...sqliteSyncColumns
-      if (ts.isSpreadAssignment(visited) && ts.isIdentifier(visited.expression) && visited.expression.text === "pgSyncColumns") {
+      if (
+        ts.isSpreadAssignment(visited) &&
+        ts.isIdentifier(visited.expression) &&
+        visited.expression.text === "pgSyncColumns"
+      ) {
         return ts.factory.updateSpreadAssignment(
           visited,
           ts.factory.createIdentifier("sqliteSyncColumns")
@@ -229,8 +285,14 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
       }
 
       // Convert .default(true/false) -> .default(1/0)
-      if (ts.isCallExpression(visited) && ts.isPropertyAccessExpression(visited.expression)) {
-        if (visited.expression.name.text === "default" && visited.arguments.length === 1) {
+      if (
+        ts.isCallExpression(visited) &&
+        ts.isPropertyAccessExpression(visited.expression)
+      ) {
+        if (
+          visited.expression.name.text === "default" &&
+          visited.arguments.length === 1
+        ) {
           const arg = visited.arguments[0];
           if (
             arg &&
@@ -240,9 +302,12 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
             const intLiteral = ts.factory.createNumericLiteral(
               arg.kind === ts.SyntaxKind.TrueKeyword ? 1 : 0
             );
-            return ts.factory.updateCallExpression(visited, visited.expression, visited.typeArguments, [
-              intLiteral,
-            ]);
+            return ts.factory.updateCallExpression(
+              visited,
+              visited.expression,
+              visited.typeArguments,
+              [intLiteral]
+            );
           }
         }
       }
@@ -256,10 +321,18 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
   // Table-aware transforms: unique().on(...) -> uniqueIndex("...").on(...)
   const tableAwareTransformer: ts.TransformerFactory<ts.SourceFile> = (ctx) => {
     const v: ts.Visitor = (node) => {
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "sqliteTable") {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "sqliteTable"
+      ) {
         const [tableNameExpr, columnsExpr, configExpr] = node.arguments;
-        const tableName = tableNameExpr ? getStringLiteral(tableNameExpr) : null;
-        const colMap = columnsExpr ? buildColumnSqlNameMap(columnsExpr) : new Map<string, string>();
+        const tableName = tableNameExpr
+          ? getStringLiteral(tableNameExpr)
+          : null;
+        const colMap = columnsExpr
+          ? buildColumnSqlNameMap(columnsExpr)
+          : new Map<string, string>();
 
         if (tableName && configExpr && ts.isArrowFunction(configExpr)) {
           // Visit the config expression with access to tableName + columns map.
@@ -284,9 +357,17 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
                 [ts.factory.createStringLiteral(uniqueName)]
               );
 
-              const onAccess = ts.factory.createPropertyAccessExpression(uniqueIndexCall, "on");
+              const onAccess = ts.factory.createPropertyAccessExpression(
+                uniqueIndexCall,
+                "on"
+              );
 
-              return ts.factory.updateCallExpression(n, onAccess, n.typeArguments, n.arguments);
+              return ts.factory.updateCallExpression(
+                n,
+                onAccess,
+                n.typeArguments,
+                n.arguments
+              );
             }
 
             // Strip any remaining check(...) calls inside config
@@ -300,11 +381,12 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
 
           const newConfig = ts.visitNode(configExpr, configVisitor);
 
-          return ts.factory.updateCallExpression(node, node.expression, node.typeArguments, [
-            tableNameExpr,
-            columnsExpr,
-            newConfig as ts.Expression,
-          ]);
+          return ts.factory.updateCallExpression(
+            node,
+            node.expression,
+            node.typeArguments,
+            [tableNameExpr, columnsExpr, newConfig as ts.Expression]
+          );
         }
 
         return ts.visitEachChild(node, v, ctx);
@@ -329,7 +411,13 @@ function generateSqliteSchemaText(): string {
   }
   const input = fs.readFileSync(INPUT_FILE, "utf-8");
 
-  const sf = ts.createSourceFile(INPUT_FILE, input, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
+  const sf = ts.createSourceFile(
+    INPUT_FILE,
+    input,
+    ts.ScriptTarget.ESNext,
+    true,
+    ts.ScriptKind.TS
+  );
   const transformed = transformFile(sf);
 
   const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
@@ -350,7 +438,9 @@ function main(): void {
     }
     const existing = fs.readFileSync(OUTPUT_FILE, "utf-8");
     if (existing !== outputText) {
-      console.error("❌ SQLite schema is out of date. Run: npm run schema:sqlite:gen");
+      console.error(
+        "❌ SQLite schema is out of date. Run: npm run schema:sqlite:gen"
+      );
       process.exit(1);
     }
     console.log("✅ SQLite schema is up to date.");
