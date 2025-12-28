@@ -26,6 +26,7 @@ export interface ITuneOverview {
   composer: string | null;
   artist: string | null;
   id_foreign: string | null;
+  primary_origin: string | null;
   release_year: number | null;
   private_for: string | null;
   deleted: number;

@@ -179,21 +179,38 @@ export function getCatalogColumns(
       cell: (info) => {
         const tune = info.row.original;
         const title = (info.getValue() as string) || "";
+        // Row shape differs by grid:
+        // - Repertoire/Scheduled: raw VIEW row (snake_case)
+        // - Catalog: Tune row from Drizzle (camelCase)
+        const favoriteUrl =
+          (tune as any).favorite_url ?? (tune as any).favoriteUrl ?? null;
+        const primaryOrigin =
+          (tune as any).primary_origin ?? (tune as any).primaryOrigin ?? null;
+        const idForeign =
+          (tune as any).id_foreign ?? (tune as any).idForeign ?? null;
+
         // Use favorite_url if available, otherwise fallback to irishtune.info
-        // Note: id_foreign exists but is for Spotify/YouTube IDs, not web URLs
+        // Note: id_foreign is used as the irishtune.info tune id (not a general URL)
         const href =
-          tune.favorite_url || `https://www.irishtune.info/tune/${tune.id}/`;
-        return (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {title}
-          </a>
-        );
+          favoriteUrl ??
+          (primaryOrigin === "irishtune.info" && idForeign
+            ? `https://www.irishtune.info/tune/${idForeign}/`
+            : undefined);
+        if (href) {
+          return (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title}
+            </a>
+          );
+        } else {
+          return title;
+        }
       },
       size: 250,
       minSize: 100,
@@ -352,7 +369,9 @@ export function getCatalogColumns(
 
     // Release Year
     {
-      accessorKey: "release_year",
+      id: "release_year",
+      accessorFn: (row) =>
+        (row as any).release_year ?? (row as any).releaseYear ?? null,
       header: ({ column }) => <SortableHeader column={column} title="Year" />,
       cell: (info) => {
         const value = info.getValue() as number | null;
@@ -372,7 +391,9 @@ export function getCatalogColumns(
 
     // Foreign ID (Spotify/YouTube)
     {
-      accessorKey: "id_foreign",
+      id: "id_foreign",
+      accessorFn: (row) =>
+        (row as any).id_foreign ?? (row as any).idForeign ?? null,
       header: ({ column }) => (
         <SortableHeader column={column} title="External ID" />
       ),
@@ -396,7 +417,9 @@ export function getCatalogColumns(
 
     // Status (Public/Private)
     {
-      accessorKey: "private_for",
+      id: "private_for",
+      accessorFn: (row) =>
+        (row as any).private_for ?? (row as any).privateFor ?? null,
       header: ({ column }) => (
         <SortableHeader column={column} title="Ownership" />
       ),
