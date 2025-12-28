@@ -517,6 +517,7 @@ export const prefsSchedulingOptions = pgTable("prefs_scheduling_options", {
   acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
     .default(21)
     .notNull(),
+  autoScheduleNew: boolean("auto_schedule_new").default(true).notNull(),
   minReviewsPerDay: integer("min_reviews_per_day"),
   maxReviewsPerDay: integer("max_reviews_per_day"),
   daysPerWeek: integer("days_per_week"),

@@ -230,9 +230,9 @@ export const practiceRecord = sqliteTable("practice_record", {
     ...sqliteSyncColumns,
 }, (t) => [
     uniqueIndex("practice_record_tune_ref_playlist_ref_practiced_unique").on(t.tuneRef, t.playlistRef, t.practiced),
-    index("idx_practice_record_id").on(t.id.desc()),
-    index("idx_practice_record_tune_playlist_practiced").on(t.tuneRef, t.playlistRef, t.practiced.desc()),
-    index("idx_practice_record_practiced").on(t.practiced.desc()),
+    index("idx_practice_record_id").on(t.id),
+    index("idx_practice_record_tune_playlist_practiced").on(t.tuneRef, t.playlistRef, t.practiced),
+    index("idx_practice_record_practiced").on(t.practiced),
 ]);
 /**
  * Daily Practice Queue table
@@ -390,6 +390,7 @@ export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
     acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
         .default(21)
         .notNull(),
+    autoScheduleNew: integer("auto_schedule_new").default(1).notNull(),
     minReviewsPerDay: integer("min_reviews_per_day"),
     maxReviewsPerDay: integer("max_reviews_per_day"),
     daysPerWeek: integer("days_per_week"),

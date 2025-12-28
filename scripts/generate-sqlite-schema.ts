@@ -235,6 +235,19 @@ function transformFile(sf: ts.SourceFile): ts.SourceFile {
     const v: ts.Visitor = (node) => {
       const visited = ts.visitEachChild(node, v, ctx);
 
+      // SQLite schema builders don't support column ordering helpers like .asc()/.desc().
+      // These show up primarily in index definitions.
+      if (
+        ts.isCallExpression(visited) &&
+        ts.isPropertyAccessExpression(visited.expression) &&
+        visited.arguments.length === 0
+      ) {
+        const orderFn = visited.expression.name.text;
+        if (orderFn === "asc" || orderFn === "desc") {
+          return visited.expression.expression;
+        }
+      }
+
       // Drop check(...) entries from arrays (table config lists)
       if (ts.isArrayLiteralExpression(visited)) {
         const newElements = visited.elements.filter((el) => {
