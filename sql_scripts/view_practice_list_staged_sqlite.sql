@@ -17,6 +17,7 @@ SELECT
     COALESCE(tune_override.composer, tune.composer) AS composer,
     COALESCE(tune_override.artist, tune.artist) AS artist,
     COALESCE(tune_override.id_foreign, tune.id_foreign) AS id_foreign,
+    tune.primary_origin AS primary_origin,
     COALESCE(tune_override.release_year, tune.release_year) AS release_year,
     tune.private_for,
     tune.deleted,
