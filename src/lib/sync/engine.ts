@@ -484,7 +484,9 @@ export class SyncEngine {
           try {
             const backfilled = await backfillOutboxSince(
               this.localDb,
-              triggersSuppressedAt
+              triggersSuppressedAt,
+              undefined,
+              this.deviceId
             );
             if (backfilled > 0) {
               log.warn(

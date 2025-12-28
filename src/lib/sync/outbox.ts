@@ -103,7 +103,8 @@ function buildCompositeRowId(
 export async function backfillOutboxForTable(
   db: SqliteDatabase,
   tableName: SyncableTableName,
-  sinceIso: string
+  sinceIso: string,
+  deviceId?: string
 ): Promise<number> {
   const meta = TABLE_REGISTRY[tableName];
   if (!meta?.supportsIncremental) {
@@ -128,8 +129,19 @@ export async function backfillOutboxForTable(
     throw new Error("Invalid sinceIso: unexpected quote");
   }
 
+  if (deviceId && deviceId.includes("'")) {
+    throw new Error("Invalid deviceId: unexpected quote");
+  }
+
+  // When applying remote changes during syncDown, we suppress triggers. Any rows written in
+  // that window will have their remote device_id (or null). We only want to backfill rows
+  // written by THIS device while triggers were suppressed (e.g., user edits).
+  const deviceClause = deviceId
+    ? ` AND "device_id" = '${deviceId}'`
+    : "";
+
   const query = sql.raw(
-    `SELECT ${selectCols} FROM "${tableName}" WHERE "${lastModifiedCol}" >= '${sinceIso}'`
+    `SELECT ${selectCols} FROM "${tableName}" WHERE "${lastModifiedCol}" >= '${sinceIso}'${deviceClause}`
   );
 
   const rows = (await db.all(query)) as Array<Record<string, unknown>>;
@@ -184,7 +196,8 @@ export async function backfillOutboxForTable(
 export async function backfillOutboxSince(
   db: SqliteDatabase,
   sinceIso: string,
-  tableNames?: string[]
+  tableNames?: string[],
+  deviceId?: string
 ): Promise<number> {
   const targets: SyncableTableName[] = (
     tableNames ?? Object.keys(TABLE_REGISTRY)
@@ -194,7 +207,7 @@ export async function backfillOutboxSince(
 
   let total = 0;
   for (const tableName of targets) {
-    total += await backfillOutboxForTable(db, tableName, sinceIso);
+    total += await backfillOutboxForTable(db, tableName, sinceIso, deviceId);
   }
   return total;
 }
