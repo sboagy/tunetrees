@@ -138,7 +138,10 @@ function createDb(env: Env): {
 } {
   const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("Database configuration error - no connection string");
+    const msg = env.HYPERDRIVE 
+      ? "HYPERDRIVE binding has no connectionString"
+      : "DATABASE_URL not configured";
+    throw new Error(`Database configuration error: ${msg}`);
   }
 
   // IMPORTANT (Cloudflare Workers): Do NOT cache/reuse database clients across requests.
@@ -1310,47 +1313,75 @@ async function handleSync(
 // HTTP HANDLER
 // ============================================================================
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+/**
+ * Get appropriate CORS headers for the request origin.
+ * Allows all origins for backward compatibility and ease of deployment.
+ */
+function getCorsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get("Origin") || "*";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400", // 24 hours
+  };
+}
 
-function jsonResponse(data: unknown, status = 200): Response {
+function jsonResponse(
+  data: unknown,
+  status = 200,
+  corsHeaders: Record<string, string>
+): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-function errorResponse(message: string, status = 500): Response {
-  return jsonResponse({ error: message }, status);
+function errorResponse(
+  message: string,
+  status = 500,
+  corsHeaders: Record<string, string>
+): Response {
+  return jsonResponse({ error: message }, status, corsHeaders);
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Get CORS headers for this request (needed for all responses)
+    const corsHeaders = getCorsHeaders(request);
+
     try {
       const url = new URL(request.url);
 
-      // CORS preflight
+      // CORS preflight - handle immediately
       if (request.method === "OPTIONS") {
-        return new Response(null, { headers: CORS_HEADERS });
+        return new Response(null, { 
+          status: 204,
+          headers: corsHeaders 
+        });
       }
 
       // Health check
       if (request.method === "GET" && url.pathname === "/health") {
-        return new Response("OK", { status: 200, headers: CORS_HEADERS });
+        return new Response("OK", { status: 200, headers: corsHeaders });
       }
 
       // Sync endpoint
       if (request.method === "POST" && url.pathname === "/api/sync") {
         console.log(`[HTTP] POST /api/sync received`);
 
+        // Validate environment configuration
+        if (!env.SUPABASE_JWT_SECRET) {
+          console.error("[HTTP] SUPABASE_JWT_SECRET not configured");
+          return errorResponse("Server configuration error", 500, corsHeaders);
+        }
+
         // Authenticate
         const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
         if (!userId) {
           console.log(`[HTTP] Unauthorized - JWT verification failed`);
-          return errorResponse("Unauthorized", 401);
+          return errorResponse("Unauthorized", 401, corsHeaders);
         }
 
         const diagnosticsEnabled =
@@ -1372,20 +1403,20 @@ export default {
               diagnosticsEnabled
             );
             console.log(`[HTTP] Sync completed successfully`);
-            return jsonResponse(response);
+            return jsonResponse(response, 200, corsHeaders);
           } finally {
             await close();
           }
         } catch (error) {
           console.error("[HTTP] Sync error:", error);
-          return errorResponse(formatDbError(error), 500);
+          return errorResponse(formatDbError(error), 500, corsHeaders);
         }
       }
 
-      return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+      return new Response("Not Found", { status: 404, headers: corsHeaders });
     } catch (error) {
       console.error("[HTTP] Unhandled error:", error);
-      return errorResponse("Internal Server Error", 500);
+      return errorResponse("Internal Server Error", 500, corsHeaders);
     }
   },
 };
