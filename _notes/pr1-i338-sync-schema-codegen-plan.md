@@ -31,7 +31,7 @@ This PR makes meaningful progress toward that end-state, but it does **not** yet
 What this PR does implement today:
 - Deterministic generation of a committed SQLite schema file via a TypeScript AST transform:
   - Input: `drizzle/schema-postgres.ts`
-  - Generator: `scripts/generate-sqlite-schema.ts`
+  - Generator: `oosync/src/generate-sqlite-schema.ts`
   - Output: `drizzle/schema-sqlite.generated.ts`
   - Stable import surface: `drizzle/schema-sqlite.ts` re-exports generated schema and defines client-only tables (e.g. `syncPushQueue`).
 - CI drift guard: `npm run schema:sqlite:check` fails the build if the generated schema is stale.

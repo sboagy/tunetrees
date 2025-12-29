@@ -136,9 +136,7 @@ export async function backfillOutboxForTable(
   // When applying remote changes during syncDown, we suppress triggers. Any rows written in
   // that window will have their remote device_id (or null). We only want to backfill rows
   // written by THIS device while triggers were suppressed (e.g., user edits).
-  const deviceClause = deviceId
-    ? ` AND "device_id" = '${deviceId}'`
-    : "";
+  const deviceClause = deviceId ? ` AND "device_id" = '${deviceId}'` : "";
 
   const query = sql.raw(
     `SELECT ${selectCols} FROM "${tableName}" WHERE "${lastModifiedCol}" >= '${sinceIso}'${deviceClause}`
