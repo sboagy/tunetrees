@@ -890,8 +890,11 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!isPanelSearchVisible) {
+        await this.page.waitForTimeout(50); // Trying to help flaky test
         await this.filtersButton.click();
-        await this.page.waitForTimeout(500); // Wait for panel to open
+        await expect(this.searchBoxPanel).toBeVisible();
+        await expect(this.searchBoxPanel).toBeAttached();
+        await expect(this.searchBoxPanel).toBeEnabled();
       }
 
       await this.searchBoxPanel.fill(tuneTitle);
@@ -902,6 +905,7 @@ export class TuneTreesPage {
           .isVisible({ timeout: 1000 })
           .catch(() => false);
         if (filtersVisible) {
+          await this.page.waitForTimeout(50); // Trying to help flaky test
           await this.filtersButton.click();
         } else {
           await this.page.keyboard.press("Escape").catch(() => {});
