@@ -129,7 +129,7 @@ export async function backfillOutboxForTable(
     throw new Error("Invalid sinceIso: unexpected quote");
   }
 
-  if (deviceId && deviceId.includes("'")) {
+  if (deviceId?.includes("'")) {
     throw new Error("Invalid deviceId: unexpected quote");
   }
 

@@ -160,6 +160,7 @@ export class SyncEngine {
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
   private userId: string;
+  private deviceId: string;
 
   /** Get the user-specific localStorage key for sync timestamp */
   private get syncTimestampKey(): string {
@@ -170,12 +171,14 @@ export class SyncEngine {
     localDb: SqliteDatabase,
     supabase: SupabaseClient,
     userId: string,
-    config: Partial<SyncConfig> = {}
+    config: Partial<SyncConfig> = {},
+    deviceId: string = "local"
   ) {
     this.localDb = localDb;
     this.supabase = supabase;
     this.userId = userId;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.deviceId = deviceId;
 
     // Load persisted timestamp from localStorage (enables incremental sync after app restart)
     this.lastSyncTimestamp = localStorage.getItem(this.syncTimestampKey);
