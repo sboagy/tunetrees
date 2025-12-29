@@ -219,20 +219,27 @@ Determinism rules:
   - “Change Postgres schema (migrations/SQL) → run `npm run codegen:schema` → commit generated files.”
 - Make it explicit which artifacts are generated and should never be hand-edited.
 
+### Checklist status (what’s done so far)
+
+The checkboxes below reflect what is implemented in the repo today.
+
+- Checked items are verified via code/CI (sync is metadata-driven, schema codegen + drift guard are in place, and schema mismatch self-heals while preserving pending local writes).
+- Unchecked items are remaining follow-ups for PR #350 (most notably: documenting the explicit sync-core boundary, adding the planned Vitest coverage, and updating docs like `_notes/schema-migration-strategy.md` / README with the new “change once + generate” workflow).
+
 ### PR checklist
 
 This checklist is scoped to **PR #350 (PR1)**. Items that belong to the Option A (Postgres-introspection) end-state are tracked as a follow-up (see “Option A Phase 2 Checklist” above).
 
 #### Architecture / Scope
 - [ ] Sync-core boundary is explicit and documented (what’s “core” vs “app glue”).
-- [ ] Sync-core contains **no table-specific branching** (no `practice_record` hacks).
-- [ ] Worker and client both consume the same shared sync table metadata.
+- [x] Sync-core contains **no table-specific branching** (no `practice_record` hacks).
+- [x] Worker and client both consume the same shared sync table metadata.
 
 #### Schema Source-of-Truth + Codegen (This PR)
-- [ ] Postgres remains the authoritative schema definition, but this PR’s generator input is `drizzle/schema-postgres.ts` (bridge until Phase 2 introspection).
-- [ ] SQLite Drizzle schema is generated (no manual edits to the generated file).
-- [ ] Codegen is deterministic (`npm run schema:sqlite:check` passes; re-running yields no diff).
-- [ ] CI runs the drift check early and fails loudly if generated output is stale.
+- [x] Postgres remains the authoritative schema definition, but this PR’s generator input is `drizzle/schema-postgres.ts` (bridge until Phase 2 introspection).
+- [x] SQLite Drizzle schema is generated (no manual edits to the generated file).
+- [x] Codegen is deterministic (`npm run schema:sqlite:check` passes; re-running yields no diff).
+- [x] CI runs the drift check early and fails loudly if generated output is stale.
 
 #### Schema Source-of-Truth + Codegen (Option A Phase 2 Follow-up)
 - [ ] `npm run codegen:schema` introspects Postgres (`information_schema`/`pg_catalog`) as the generator input.
@@ -241,11 +248,11 @@ This checklist is scoped to **PR #350 (PR1)**. Items that belong to the Option A
 - [ ] Generated shared metadata keeps worker and client in lock-step.
 
 #### Self-healing (Upgrade Reliability)
-- [ ] App detects local SQLite schema mismatch at startup.
-- [ ] Self-healing is **generic** (no per-table repair logic).
-- [ ] Pending local writes (push queue/outbox) are preserved across heal.
-- [ ] Triggers/push-queue infrastructure is re-installed after heal.
-- [ ] After heal, sync proceeds successfully and local DB is consistent.
+- [x] App detects local SQLite schema mismatch at startup.
+- [x] Self-healing is **generic** (no per-table repair logic).
+- [x] Pending local writes (push queue/outbox) are preserved across heal.
+- [x] Triggers/push-queue infrastructure is re-installed after heal.
+- [x] After heal, sync proceeds successfully and local DB is consistent.
 
 #### Testing
 - [ ] Vitest tests cover sync-core generic behavior across ≥2 different tables.
