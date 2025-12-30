@@ -8,12 +8,13 @@
  * @module lib/sync/outbox
  */
 
-import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import {
   getPrimaryKey,
   type SyncableTableName,
+  TABLE_REGISTRY,
 } from "../../../shared/table-meta";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { toCamelCase } from "./casing";
@@ -74,49 +75,110 @@ export async function getPendingOutboxItems(
   return items;
 }
 
+function isSyncableTableName(value: string): value is SyncableTableName {
+  return value in TABLE_REGISTRY;
+}
+
+function buildCompositeRowId(
+  primaryKey: string[],
+  row: Record<string, unknown>
+): string {
+  const obj: Record<string, unknown> = {};
+  for (const key of primaryKey) {
+    obj[key] = row[key];
+  }
+  return JSON.stringify(obj);
+}
+
 /**
- * Backfill outbox entries for practice_record rows.
+ * Backfill outbox entries for rows that may have been written while triggers were suppressed.
  *
  * Why this exists:
  * During syncDown, the engine suppresses triggers to prevent remote changes from
  * re-entering the outbox. If the user writes local data during that window, those
  * writes won't be captured by triggers and will never be pushed.
+ *
+ * This must remain generic (no per-table hacks).
  */
-export async function backfillPracticeRecordOutbox(
+export async function backfillOutboxForTable(
   db: SqliteDatabase,
-  sinceIso: string
+  tableName: SyncableTableName,
+  sinceIso: string,
+  deviceId?: string
 ): Promise<number> {
-  const { practiceRecord } = localSchema;
+  const meta = TABLE_REGISTRY[tableName];
+  if (!meta?.supportsIncremental) {
+    return 0;
+  }
 
-  const rows = await db
-    .select({ id: practiceRecord.id })
-    .from(practiceRecord)
-    .where(gte(practiceRecord.lastModifiedAt, sinceIso));
+  const lastModifiedCol = "last_modified_at";
+  if (!meta.timestamps.includes(lastModifiedCol)) {
+    return 0;
+  }
 
-  const ids = rows.map((r) => String(r.id ?? "")).filter((id) => id.length > 0);
+  const primaryKey = getPrimaryKey(tableName);
+  const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+  const selectCols = pkCols.map((c) => `"${c}"`).join(", ");
 
-  if (ids.length === 0) return 0;
+  // NOTE: Avoid drizzle tagged-template `sql\`...\`` here.
+  // The typescript SQL tagged-template plugin does not understand `sql.raw(...)`
+  // and treats interpolations as `$1/$2/...` params, which makes `FROM $2` invalid.
+  // This query only uses vetted identifiers (SyncableTableName + known column) and
+  // a guarded ISO timestamp.
+  if (sinceIso.includes("'")) {
+    throw new Error("Invalid sinceIso: unexpected quote");
+  }
+
+  if (deviceId?.includes("'")) {
+    throw new Error("Invalid deviceId: unexpected quote");
+  }
+
+  // When applying remote changes during syncDown, we suppress triggers. Any rows written in
+  // that window will have their remote device_id (or null). We only want to backfill rows
+  // written by THIS device while triggers were suppressed (e.g., user edits).
+  const deviceClause = deviceId ? ` AND "device_id" = '${deviceId}'` : "";
+
+  const query = sql.raw(
+    `SELECT ${selectCols} FROM "${tableName}" WHERE "${lastModifiedCol}" >= '${sinceIso}'${deviceClause}`
+  );
+
+  const rows = (await db.all(query)) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return 0;
+
+  const rowIds = rows
+    .map((row) => {
+      if (Array.isArray(primaryKey)) {
+        return buildCompositeRowId(primaryKey, row);
+      }
+      const value = row[primaryKey];
+      return typeof value === "undefined" || value === null
+        ? ""
+        : String(value);
+    })
+    .filter((id) => id.length > 0);
+
+  if (rowIds.length === 0) return 0;
 
   const existing = await db
     .select({ rowId: syncPushQueue.rowId })
     .from(syncPushQueue)
     .where(
       and(
-        eq(syncPushQueue.tableName, "practice_record"),
-        inArray(syncPushQueue.rowId, ids)
+        eq(syncPushQueue.tableName, tableName),
+        inArray(syncPushQueue.rowId, rowIds)
       )
     );
 
   const existingIds = new Set(existing.map((e) => e.rowId));
-  const missingIds = ids.filter((id) => !existingIds.has(id));
+  const missingIds = rowIds.filter((id) => !existingIds.has(id));
   if (missingIds.length === 0) return 0;
 
   const nowIso = new Date().toISOString();
   await db.insert(syncPushQueue).values(
-    missingIds.map((id) => ({
+    missingIds.map((rowId) => ({
       id: randomHexId(),
-      tableName: "practice_record",
-      rowId: id,
+      tableName,
+      rowId,
       operation: "UPDATE",
       status: "pending",
       changedAt: nowIso,
@@ -127,6 +189,25 @@ export async function backfillPracticeRecordOutbox(
   );
 
   return missingIds.length;
+}
+
+export async function backfillOutboxSince(
+  db: SqliteDatabase,
+  sinceIso: string,
+  tableNames?: string[],
+  deviceId?: string
+): Promise<number> {
+  const targets: SyncableTableName[] = (
+    tableNames ?? Object.keys(TABLE_REGISTRY)
+  )
+    .filter(isSyncableTableName)
+    .filter((t) => TABLE_REGISTRY[t]?.supportsIncremental);
+
+  let total = 0;
+  for (const tableName of targets) {
+    total += await backfillOutboxForTable(db, tableName, sinceIso, deviceId);
+  }
+  return total;
 }
 
 /**

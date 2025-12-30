@@ -13,7 +13,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyMigrations } from "../services/test-schema-loader";
 import {
-  backfillPracticeRecordOutbox,
+  backfillOutboxForTable,
   clearOldOutboxItems,
   fetchLocalRowByPrimaryKey,
   getDrizzleTable,
@@ -104,7 +104,7 @@ function insertGenreTuneType(genreId: string, tuneTypeId: string): void {
 }
 
 describe("Sync Outbox Operations", () => {
-  describe("backfillPracticeRecordOutbox", () => {
+  describe("backfillOutboxForTable", () => {
     it("creates outbox rows for recent practice_record rows", async () => {
       insertUserProfile("sb-1");
       insertPlaylist("pl-1", "sb-1");
@@ -119,8 +119,9 @@ describe("Sync Outbox Operations", () => {
         VALUES ('pr-2', 'pl-1', 't-1', '2025-12-27T00:00:01.000Z', 1, '2025-12-27T00:00:01.000Z')
       `);
 
-      const inserted = await backfillPracticeRecordOutbox(
+      const inserted = await backfillOutboxForTable(
         db as any,
+        "practice_record",
         "2025-12-26T00:00:00.000Z"
       );
       expect(inserted).toBe(2);
@@ -165,8 +166,9 @@ describe("Sync Outbox Operations", () => {
         "2025-12-27T00:00:03.000Z"
       );
 
-      const inserted = await backfillPracticeRecordOutbox(
+      const inserted = await backfillOutboxForTable(
         db as any,
+        "practice_record",
         "2025-12-26T00:00:00.000Z"
       );
       expect(inserted).toBe(0);
@@ -179,6 +181,39 @@ describe("Sync Outbox Operations", () => {
       `) as Array<{ n: unknown }>
       ).at(0)?.n;
       expect(Number(count)).toBe(1);
+    });
+
+    it("creates JSON row_id for composite primary keys (playlist_tune)", async () => {
+      insertUserProfile("sb-1");
+      insertPlaylist("pl-1", "sb-1");
+      insertTune("t-1", "Tune", "reel");
+
+      db.run(sql`
+        INSERT INTO playlist_tune (playlist_ref, tune_ref, deleted, sync_version, last_modified_at)
+        VALUES ('pl-1', 't-1', 0, 1, '2025-12-27T00:00:00.000Z')
+      `);
+
+      const inserted = await backfillOutboxForTable(
+        db as any,
+        "playlist_tune",
+        "2025-12-26T00:00:00.000Z"
+      );
+      expect(inserted).toBe(1);
+
+      const outbox = await db.all(sql`
+        SELECT table_name, row_id, status, operation
+        FROM sync_push_queue
+        WHERE table_name = 'playlist_tune'
+      `);
+
+      expect(outbox).toEqual([
+        {
+          table_name: "playlist_tune",
+          row_id: JSON.stringify({ playlist_ref: "pl-1", tune_ref: "t-1" }),
+          status: "pending",
+          operation: "UPDATE",
+        },
+      ]);
     });
   });
 

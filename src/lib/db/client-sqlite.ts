@@ -32,6 +32,7 @@ import {
   needsMigration,
   setLocalSchemaVersion,
 } from "./migration-version";
+import { createOutboxBackup, type IOutboxBackup } from "./outbox-backup";
 
 /**
  * SQLite WASM instance
@@ -118,6 +119,7 @@ const INDEXEDDB_STORE = "databases";
 // Base keys - will be namespaced by user ID
 const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
+const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
 const CURRENT_DB_VERSION = 7;
 
@@ -148,6 +150,67 @@ function getDbKey(userId: string): string {
  */
 function getDbVersionKey(userId: string): string {
   return `${DB_VERSION_KEY_PREFIX}-${userId}`;
+}
+
+function getOutboxBackupKey(userId: string): string {
+  return `${OUTBOX_BACKUP_KEY_PREFIX}-${userId}`;
+}
+
+function encodeJsonToBytes(value: unknown): Uint8Array {
+  const encoder = new TextEncoder();
+  return encoder.encode(JSON.stringify(value));
+}
+
+function decodeJsonFromBytes(data: Uint8Array): unknown {
+  const decoder = new TextDecoder();
+  return JSON.parse(decoder.decode(data));
+}
+
+export async function saveOutboxBackupForUser(
+  userId: string,
+  backup: IOutboxBackup
+): Promise<void> {
+  await saveToIndexedDB(getOutboxBackupKey(userId), encodeJsonToBytes(backup));
+}
+
+export async function loadOutboxBackupForUser(
+  userId: string
+): Promise<IOutboxBackup | null> {
+  const bytes = await loadFromIndexedDB(getOutboxBackupKey(userId));
+  if (!bytes) return null;
+
+  const parsed = decodeJsonFromBytes(bytes);
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    (parsed as { version?: unknown }).version !== 1
+  ) {
+    return null;
+  }
+
+  return parsed as IOutboxBackup;
+}
+
+export async function clearOutboxBackupForUser(userId: string): Promise<void> {
+  await deleteFromIndexedDB(getOutboxBackupKey(userId));
+}
+
+async function backupPendingOutboxBestEffort(
+  userId: string,
+  db: SqlJsDatabase
+): Promise<void> {
+  try {
+    // Avoid replaying stale backups if there's nothing to preserve this time.
+    await clearOutboxBackupForUser(userId);
+    const backup = createOutboxBackup(db);
+    if (backup.items.length === 0) return;
+    await saveOutboxBackupForUser(userId, backup);
+    console.log(
+      `💾 Backed up ${backup.items.length} outbox item(s) for migration/recreate replay`
+    );
+  } catch (e) {
+    console.warn("⚠️ Failed to back up outbox before migration/recreate:", e);
+  }
 }
 
 let initializeDbCalls = 0;
@@ -225,6 +288,14 @@ export async function initializeDb(
       const migrationNeeded = needsMigration();
       const forcedReset = isForcedReset();
 
+      if (forcedReset) {
+        try {
+          await clearOutboxBackupForUser(userId);
+        } catch (e) {
+          console.warn("⚠️ Failed to clear outbox backup for forced reset:", e);
+        }
+      }
+
       if (migrationNeeded) {
         const localVersion = getLocalSchemaVersion();
         const currentVersion = getCurrentSchemaVersion();
@@ -261,6 +332,15 @@ export async function initializeDb(
         console.log("✅ Views recreated successfully");
       } else {
         if (existingData) {
+          // If we're about to drop/recreate the DB due to a serialized-version mismatch,
+          // preserve any pending local changes so we can replay them after the next full sync.
+          try {
+            const oldDb = new SQL.Database(existingData);
+            await backupPendingOutboxBestEffort(userId, oldDb);
+            oldDb.close();
+          } catch (e) {
+            console.warn("⚠️ Failed to inspect old DB for outbox backup:", e);
+          }
           console.log(
             `🔄 Database version mismatch (stored: ${storedVersionNum}, current: ${CURRENT_DB_VERSION}). Recreating...`
           );
@@ -357,6 +437,12 @@ export async function initializeDb(
         try {
           // Local data will be cleared; force next syncDown to run as a full sync.
           clearLastSyncTimestampForUser(userId);
+
+          // Preserve any pending local changes before we clear user tables.
+          // Forced resets are explicitly user-initiated wipes; don't preserve.
+          if (!forcedReset && sqliteDb) {
+            await backupPendingOutboxBestEffort(userId, sqliteDb);
+          }
           await clearLocalDatabaseForMigration(drizzleDb);
 
           // Important: schema migrations invalidate any existing local outbox.

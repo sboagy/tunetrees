@@ -13,16 +13,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SyncChange } from "../../../shared/sync-types";
-import { getSqliteInstance, type SqliteDatabase } from "../db/client-sqlite";
+import {
+  clearOutboxBackupForUser,
+  getSqliteInstance,
+  loadOutboxBackupForUser,
+  type SqliteDatabase,
+} from "../db/client-sqlite";
 import {
   enableSyncTriggers,
   suppressSyncTriggers,
 } from "../db/install-triggers";
+import { replayOutboxBackup } from "../db/outbox-backup";
 import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import { toCamelCase } from "./casing";
 import {
-  backfillPracticeRecordOutbox,
+  backfillOutboxSince,
   fetchLocalRowByPrimaryKey,
   getOutboxStats,
   getPendingOutboxItems,
@@ -80,9 +86,35 @@ const DEFAULT_CONFIG: SyncConfig = {
  * - playlist_tune before practice_record (implicit practice dependency)
  */
 import {
+  SYNCABLE_TABLES,
   TABLE_SYNC_ORDER,
   TABLE_TO_SCHEMA_KEY,
 } from "../../../shared/table-meta";
+
+function sqliteTableHasAnyRows(
+  sqliteInstance: { exec: (sql: string) => any[] },
+  tableName: string
+): boolean {
+  // Table names are trusted constants from SYNCABLE_TABLES.
+  const result = sqliteInstance.exec(`SELECT 1 FROM "${tableName}" LIMIT 1`);
+  const first = result[0];
+  return Boolean(
+    first && Array.isArray(first.values) && first.values.length > 0
+  );
+}
+
+async function hasAnyLocalSyncData(): Promise<boolean> {
+  const sqliteInstance = await getSqliteInstance();
+  if (!sqliteInstance) return true;
+
+  for (const tableName of SYNCABLE_TABLES) {
+    try {
+      if (sqliteTableHasAnyRows(sqliteInstance, tableName)) return true;
+    } catch {}
+  }
+
+  return false;
+}
 
 /**
  * Sort outbox items by table dependency order.
@@ -154,6 +186,7 @@ export class SyncEngine {
   private config: SyncConfig;
   private lastSyncTimestamp: string | null = null;
   private userId: string;
+  private deviceId: string;
 
   /** Get the user-specific localStorage key for sync timestamp */
   private get syncTimestampKey(): string {
@@ -164,12 +197,14 @@ export class SyncEngine {
     localDb: SqliteDatabase,
     supabase: SupabaseClient,
     userId: string,
-    config: Partial<SyncConfig> = {}
+    config: Partial<SyncConfig> = {},
+    deviceId: string = "local"
   ) {
     this.localDb = localDb;
     this.supabase = supabase;
     this.userId = userId;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.deviceId = deviceId;
 
     // Load persisted timestamp from localStorage (enables incremental sync after app restart)
     this.lastSyncTimestamp = localStorage.getItem(this.syncTimestampKey);
@@ -224,6 +259,22 @@ export class SyncEngine {
     let failed = 0;
     const affectedTablesSet = new Set<string>();
 
+    let isInitialSync = !this.lastSyncTimestamp;
+    if (!isInitialSync) {
+      const hasAnyData = await hasAnyLocalSyncData();
+      if (!hasAnyData) {
+        log.warn(
+          `[SyncEngine] Local DB appears empty but lastSyncTimestamp exists for user ${this.userId}; forcing full sync`
+        );
+        this.clearLastSyncTimestamp();
+        isInitialSync = true;
+      }
+    }
+
+    const pendingOutboxBackup = isInitialSync
+      ? await loadOutboxBackupForUser(this.userId)
+      : null;
+
     const allowDeletes = options?.allowDeletes ?? true;
 
     try {
@@ -235,27 +286,6 @@ export class SyncEngine {
         throw new Error("No active session");
       }
       const workerClient = new WorkerClient(session.access_token);
-
-      // Safety: if triggers were suppressed during syncDown while the user wrote data,
-      // those rows won't be in sync_push_queue and will never be pushed.
-      // Backfill recent practice_record rows so they're uploaded.
-      try {
-        const since = new Date(
-          Date.now() - 1000 * 60 * 60 * 24 * 30
-        ).toISOString();
-        const backfilled = await backfillPracticeRecordOutbox(
-          this.localDb,
-          since
-        );
-        if (backfilled > 0) {
-          log.warn(
-            `[SyncEngine] Backfilled ${backfilled} practice_record outbox entries (recent changes)`
-          );
-        }
-      } catch (e) {
-        // Never fail sync because of best-effort backfill.
-        log.warn("[SyncEngine] practice_record outbox backfill failed", e);
-      }
 
       // 2. Gather Pending Changes (Push)
       const pendingItems = await getPendingOutboxItems(
@@ -329,18 +359,43 @@ export class SyncEngine {
         }
       }
 
-      const applyRemoteChanges = async (remoteChanges: SyncChange[]) => {
+      const isForeignKeyConstraintFailure = (e: unknown): boolean => {
+        const msg = e instanceof Error ? e.message : String(e);
+        return /FOREIGN KEY constraint failed/i.test(msg);
+      };
+
+      // Remote changes that failed FK constraints on first pass. This can happen
+      // when the worker paginates by time and a child row arrives in an earlier page
+      // than its parent row. We'll retry after all pages are applied.
+      const deferredForeignKeyChanges: SyncChange[] = [];
+
+      const applyRemoteChanges = async (
+        remoteChanges: SyncChange[],
+        opts?: {
+          deferForeignKeyFailuresTo?: SyncChange[];
+        }
+      ) => {
         if (remoteChanges.length === 0) return;
 
         const sqliteInstance = await getSqliteInstance();
         if (!sqliteInstance) return;
 
+        // While applying remote changes, suppress triggers so remote writes don't
+        // re-enter the outbox. If the user writes locally during this window, those
+        // changes may be missed; we backfill after re-enabling triggers.
+        const triggersSuppressedAt = new Date().toISOString();
         suppressSyncTriggers(sqliteInstance);
         try {
-          // Sort changes by dependency to avoid FK violations
+          // Sort changes by dependency to avoid FK violations.
+          // Inserts/updates: parent tables first. Deletes: child tables first.
           const sortedChanges = [...remoteChanges].sort((a, b) => {
             const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
             const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
+
+            if (a.deleted && b.deleted) return orderB - orderA;
+            if (!a.deleted && !b.deleted) return orderA - orderB;
+            if (a.deleted) return 1;
+            if (b.deleted) return -1;
             return orderA - orderB;
           });
 
@@ -385,7 +440,10 @@ export class SyncEngine {
                   if (conditions.length !== pk.length) {
                     continue;
                   }
-                  await this.localDb.delete(table).where(and(...conditions));
+                  await this.localDb
+                    .delete(table)
+                    .where(and(...conditions))
+                    .run();
                 } else {
                   const columnKey = toCamelCase(pk);
                   const value = localKeyData[columnKey];
@@ -399,36 +457,50 @@ export class SyncEngine {
                   await this.localDb
                     .delete(table)
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .where(eq((table as any)[columnKey], value));
+                    .where(eq((table as any)[columnKey], value))
+                    .run();
                 }
               } else {
                 // Upsert local
                 const sanitizedData = sanitizeData(change.data);
 
-                if (change.table === "practice_record") {
-                  // practice_record has two distinct uniqueness constraints:
-                  // - PK: id
-                  // - Unique: (tune_ref, playlist_ref, practiced)
-                  // During initial sync with a retained IndexedDB, either may collide.
-                  // Strategy:
-                  // 1) Upsert by id (handles retained rows with same id)
-                  // 2) If that fails due to the composite unique constraint, upsert by the composite key
+                const conflictTarget = Array.isArray(adapter.primaryKey)
+                  ? adapter.primaryKey.map(
+                      (k) => (table as any)[toCamelCase(k)]
+                    )
+                  : (table as any)[toCamelCase(adapter.primaryKey as string)];
+
+                // Some tables have a natural composite unique key (adapter.conflictKeys)
+                // in addition to a synthetic PK (id). If we only upsert by id, an insert
+                // can fail on the composite unique constraint when the same logical row
+                // exists locally with a different id (e.g. retained IndexedDB + initial sync).
+                // Strategy:
+                // 1) Upsert by primary key (current behavior)
+                // 2) If that fails due to the composite unique constraint, upsert by the
+                //    composite key without ever updating `id`.
+                const compositeKeys = adapter.conflictKeys;
+                const isSingleIdPk =
+                  !Array.isArray(adapter.primaryKey) &&
+                  adapter.primaryKey === "id";
+
+                if (isSingleIdPk && compositeKeys) {
                   try {
                     await this.localDb
                       .insert(table)
                       .values(sanitizedData)
                       .onConflictDoUpdate({
-                        target: (table as any).id,
+                        target: conflictTarget,
                         set: sanitizedData,
-                      });
+                      })
+                      .run();
                   } catch (e) {
                     const errorMsg = e instanceof Error ? e.message : String(e);
                     const isCompositeUniqueViolation =
-                      errorMsg.includes(
-                        "practice_record.tune_ref, practice_record.playlist_ref, practice_record.practiced"
-                      ) ||
-                      errorMsg.includes(
-                        "practice_record_tune_ref_playlist_ref_practiced_unique"
+                      errorMsg.includes("UNIQUE constraint failed:") &&
+                      compositeKeys.every(
+                        (k) =>
+                          errorMsg.includes(`${change.table}.${k}`) ||
+                          errorMsg.includes(k)
                       );
 
                     if (!isCompositeUniqueViolation) {
@@ -442,82 +514,36 @@ export class SyncEngine {
                       .insert(table)
                       .values(sanitizedData)
                       .onConflictDoUpdate({
-                        target: [
-                          (table as any).tuneRef,
-                          (table as any).playlistRef,
-                          (table as any).practiced,
-                        ],
+                        target: compositeKeys.map(
+                          (k) => (table as any)[toCamelCase(k)]
+                        ),
                         set: sanitizedDataWithoutId,
-                      });
+                      })
+                      .run();
                   }
                 } else {
-                  const conflictTarget = Array.isArray(adapter.primaryKey)
-                    ? adapter.primaryKey.map(
-                        (k) => (table as any)[toCamelCase(k)]
-                      )
-                    : (table as any)[toCamelCase(adapter.primaryKey as string)];
-
-                  // Some tables have a natural composite unique key (adapter.conflictKeys)
-                  // in addition to a synthetic PK (id). If we only upsert by id, an insert
-                  // can fail on the composite unique constraint when the same logical row
-                  // exists locally with a different id (e.g. retained IndexedDB + initial sync).
-                  // Strategy:
-                  // 1) Upsert by primary key (current behavior)
-                  // 2) If that fails due to the composite unique constraint, upsert by the
-                  //    composite key without ever updating `id`.
-                  const compositeKeys = adapter.conflictKeys;
-                  const isSingleIdPk =
-                    !Array.isArray(adapter.primaryKey) &&
-                    adapter.primaryKey === "id";
-
-                  if (isSingleIdPk && compositeKeys) {
-                    try {
-                      await this.localDb
-                        .insert(table)
-                        .values(sanitizedData)
-                        .onConflictDoUpdate({
-                          target: conflictTarget,
-                          set: sanitizedData,
-                        });
-                    } catch (e) {
-                      const errorMsg =
-                        e instanceof Error ? e.message : String(e);
-                      const isCompositeUniqueViolation =
-                        errorMsg.includes("UNIQUE constraint failed:") &&
-                        compositeKeys.every((k) =>
-                          errorMsg.includes(`${change.table}.${k}`)
-                        );
-
-                      if (!isCompositeUniqueViolation) {
-                        throw e;
-                      }
-
-                      const { id: _ignoredId, ...sanitizedDataWithoutId } =
-                        sanitizedData as Record<string, unknown>;
-
-                      await this.localDb
-                        .insert(table)
-                        .values(sanitizedData)
-                        .onConflictDoUpdate({
-                          target: compositeKeys.map(
-                            (k) => (table as any)[toCamelCase(k)]
-                          ),
-                          set: sanitizedDataWithoutId,
-                        });
-                    }
-                  } else {
-                    await this.localDb
-                      .insert(table)
-                      .values(sanitizedData)
-                      .onConflictDoUpdate({
-                        target: conflictTarget,
-                        set: sanitizedData,
-                      });
-                  }
+                  await this.localDb
+                    .insert(table)
+                    .values(sanitizedData)
+                    .onConflictDoUpdate({
+                      target: conflictTarget,
+                      set: sanitizedData,
+                    })
+                    .run();
                 }
               }
               synced++;
             } catch (e) {
+              if (isForeignKeyConstraintFailure(e)) {
+                const target = opts?.deferForeignKeyFailuresTo;
+                if (target) {
+                  target.push(change);
+                } else {
+                  deferredForeignKeyChanges.push(change);
+                }
+                continue;
+              }
+
               failed++;
               const errorMsg = e instanceof Error ? e.message : "Unknown error";
               errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
@@ -530,10 +556,30 @@ export class SyncEngine {
           }
         } finally {
           enableSyncTriggers(sqliteInstance);
+
+          // Best-effort backfill: if a user wrote while triggers were suppressed,
+          // ensure those changes make it into the outbox.
+          try {
+            const backfilled = await backfillOutboxSince(
+              this.localDb,
+              triggersSuppressedAt,
+              undefined,
+              this.deviceId
+            );
+            if (backfilled > 0) {
+              log.warn(
+                `[SyncEngine] Backfilled ${backfilled} outbox entries written during trigger suppression`
+              );
+            }
+          } catch (e) {
+            // Never fail sync because of best-effort backfill.
+            log.warn(
+              "[SyncEngine] Outbox backfill after trigger suppression failed",
+              e
+            );
+          }
         }
       };
-
-      const isInitialSync = !this.lastSyncTimestamp;
       let pullCursor: string | undefined;
       let syncStartedAt: string | undefined;
 
@@ -584,6 +630,68 @@ export class SyncEngine {
           syncStartedAt = pageResponse.syncStartedAt ?? syncStartedAt;
 
           await applyRemoteChanges(pageResponse.changes);
+        }
+      }
+
+      // 6c. Retry any remote changes that failed FK constraints on first pass.
+      // This resolves cross-page dependency ordering problems.
+      if (deferredForeignKeyChanges.length > 0) {
+        let remaining = deferredForeignKeyChanges;
+        deferredForeignKeyChanges.length = 0;
+
+        // Keep passes small; most cases resolve in 1-2 passes.
+        for (let pass = 1; pass <= 3 && remaining.length > 0; pass++) {
+          const next: SyncChange[] = [];
+          const beforeSynced = synced;
+
+          await applyRemoteChanges(remaining, {
+            deferForeignKeyFailuresTo: next,
+          });
+
+          const progress = synced > beforeSynced;
+          remaining = next;
+          if (!progress) break;
+        }
+
+        // Any remaining FK failures are real inconsistencies; surface them.
+        if (remaining.length > 0) {
+          for (const change of remaining) {
+            failed++;
+            errors.push(
+              `${change.table}:${change.rowId}: FOREIGN KEY constraint failed`
+            );
+          }
+        }
+      }
+
+      // 6b. If we recreated/cleared the DB, replay any pending local edits that were
+      // backed up from the old schema. This is intentionally one-shot.
+      if (isInitialSync && pendingOutboxBackup?.items?.length) {
+        const sqliteInstance = await getSqliteInstance();
+        if (sqliteInstance) {
+          try {
+            const result = replayOutboxBackup(
+              sqliteInstance,
+              pendingOutboxBackup
+            );
+            log.info(
+              `[SyncEngine] Replayed outbox backup: applied=${result.applied} skipped=${result.skipped} errors=${result.errors.length}`
+            );
+            if (result.errors.length > 0) {
+              log.warn(
+                "[SyncEngine] Outbox backup replay had errors",
+                result.errors.slice(0, 5)
+              );
+            }
+          } catch (e) {
+            log.warn("[SyncEngine] Outbox backup replay failed", e);
+          } finally {
+            try {
+              await clearOutboxBackupForUser(this.userId);
+            } catch (e) {
+              log.warn("[SyncEngine] Failed to clear outbox backup", e);
+            }
+          }
         }
       }
 

@@ -75,7 +75,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
         <DropdownMenu.Trigger
           data-testid={`recall-eval-${props.tuneId}`}
           class="w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <span class={selectedOption().color}>{selectedOption().label}</span>
           <ChevronDown class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
@@ -85,7 +85,6 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
           <DropdownMenu.Content
             data-testid={`recall-eval-menu-${props.tuneId}`}
             class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-72 overflow-auto"
-            onPointerDown={(e) => e.stopPropagation()}
           >
             <For each={options}>
               {(option) => (

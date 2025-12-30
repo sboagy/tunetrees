@@ -890,8 +890,11 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!isPanelSearchVisible) {
+        await this.page.waitForTimeout(50); // Trying to help flaky test
         await this.filtersButton.click();
-        await this.page.waitForTimeout(500); // Wait for panel to open
+        await expect(this.searchBoxPanel).toBeVisible();
+        await expect(this.searchBoxPanel).toBeAttached();
+        await expect(this.searchBoxPanel).toBeEnabled();
       }
 
       await this.searchBoxPanel.fill(tuneTitle);
@@ -902,6 +905,7 @@ export class TuneTreesPage {
           .isVisible({ timeout: 1000 })
           .catch(() => false);
         if (filtersVisible) {
+          await this.page.waitForTimeout(50); // Trying to help flaky test
           await this.filtersButton.click();
         } else {
           await this.page.keyboard.press("Escape").catch(() => {});
@@ -1316,6 +1320,20 @@ export class TuneTreesPage {
     }
   }
 
+  parseTuneIdFromRecallEvalTestId(testId: string | null): string | null {
+    if (!testId) return null;
+    if (!testId.startsWith("recall-eval-")) return null;
+    const tuneId = testId.slice("recall-eval-".length);
+
+    // Basic UUID sanity check (36 chars with hyphens)
+    if (tuneId.length !== 36) return null;
+    if (tuneId[8] !== "-" || tuneId[13] !== "-" || tuneId[18] !== "-") {
+      return null;
+    }
+
+    return tuneId;
+  }
+
   async setRowEvaluation(
     whichRow: Locator,
     evalValue: string,
@@ -1332,23 +1350,56 @@ export class TuneTreesPage {
     const evalDropdown = whichRow.locator("[data-testid^='recall-eval-']");
     await expect(evalDropdown).toBeVisible({ timeout: 5000 });
 
-    // ACT: Select "Again" rating
-    await evalDropdown.click();
-    if (doTimeouts) {
-      const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
-      await this.page.waitForTimeout(delay);
+    const dropdownTestId = await evalDropdown.getAttribute("data-testid");
+    const tuneId = this.parseTuneIdFromRecallEvalTestId(dropdownTestId);
+    if (!tuneId) {
+      throw new Error(
+        `Expected tuneId to be present on recall evaluation dropdown (data-testid=${String(
+          dropdownTestId
+        )})`
+      );
     }
 
-    const whichOption = this.page.getByTestId(
-      `recall-eval-option-${evalValue}`
+    const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // ACT: Select rating
+      await evalDropdown.click({ delay: 50 });
+
+      try {
+        await expect(menu).toBeVisible({ timeout: 3000 });
+      } catch {
+        // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
+        // Avoid hanging until the full test timeout; back out and retry.
+        try {
+          await this.page.keyboard.press("Escape");
+        } catch {}
+
+        if (doTimeouts) {
+          const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
+          await this.page.waitForTimeout(delay);
+        }
+        continue;
+      }
+
+      const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
+      await expect(whichOption).toBeVisible({ timeout: 3000 });
+
+      await whichOption.click({ timeout: 3000 });
+      await expect(menu)
+        .toBeHidden({ timeout: 3000 })
+        .catch(() => undefined);
+
+      if (doTimeouts) {
+        const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
+        await this.page.waitForTimeout(delay);
+      }
+      return;
+    }
+
+    throw new Error(
+      `Failed to select evaluation ${evalValue} for tune ${tuneId} after retries`
     );
-    await expect(whichOption).toBeVisible({ timeout: 5000 });
-    await whichOption.click();
-
-    if (doTimeouts) {
-      const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
-      await this.page.waitForTimeout(delay);
-    }
   }
 
   async selectFlashcardEvaluation(

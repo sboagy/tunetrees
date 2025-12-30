@@ -647,13 +647,14 @@ export const TunesGrid = (<T extends { id: string | number }>(
               {(virtualRow) => {
                 const row = table.getRowModel().rows[virtualRow.index];
                 if (!row) return null;
+
                 return (
                   <tr
-                    class={ROW_CLASSES}
-                    classList={{
-                      "border-t-2 border-b-2 border-blue-500":
-                        props.currentRowId === (row.original as any).id,
-                    }}
+                    class={
+                      props.currentRowId === (row.original as any).id
+                        ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
+                        : ROW_CLASSES
+                    }
                     onClick={() => props.onRowClick?.(row.original)}
                     onDblClick={() => props.onRowDoubleClick?.(row.original)}
                     data-index={virtualRow.index}

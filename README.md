@@ -76,7 +76,11 @@ npm run build      # Production build
 npm run test       # Unit tests
 npm run test:e2e   # E2E tests (Playwright)
 npm run typecheck  # TypeScript check
-npm run lint       # ESLint
+npm run lint       # Biome lint
+
+# Schema codegen (Postgres → SQLite)
+npm run codegen:schema       # Generate drizzle/schema-sqlite.generated.ts via Postgres introspection
+npm run schema:sqlite:check  # Drift guard (alias of codegen:schema:check)
 ```
 
 ## Contributing

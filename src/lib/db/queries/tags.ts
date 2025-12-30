@@ -65,7 +65,7 @@ export async function getTuneTags(
 ): Promise<TuneTag[]> {
   const results = await db
     .select({
-      tagId: schema.tag.id,
+      tagId: schema.tag.tagId,
       tagText: schema.tag.tagText,
     })
     .from(schema.tag)
@@ -103,7 +103,7 @@ export async function addTagToTune(
     const result = await db
       .insert(schema.tag)
       .values({
-        id: generateId(),
+        tagId: generateId(),
         tuneRef: tuneId,
         userRef: supabaseUserId,
         tagText: tagText.trim().toLowerCase(), // Normalize tag text
@@ -165,7 +165,7 @@ export async function removeTagById(
 ): Promise<boolean> {
   const result = await db
     .delete(schema.tag)
-    .where(eq(schema.tag.id, tagId))
+    .where(eq(schema.tag.tagId, tagId))
     .returning()
     .all();
 

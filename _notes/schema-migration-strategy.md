@@ -7,6 +7,19 @@
 
 ---
 
+## Current Canonical Workflow (Dec 2025)
+
+- **Source-of-truth:** local Supabase Postgres (migrations/seed applied via `supabase db reset`).
+- **Generated artifact:** `drizzle/schema-sqlite.generated.ts`.
+- **Generator:** `npm run codegen:schema` (queries `information_schema` / `pg_catalog`).
+- **Drift guard:** `npm run schema:sqlite:check` (alias of `codegen:schema:check`) runs in CI after DB reset.
+
+Notes:
+- `drizzle/schema-sqlite.ts` remains the stable import surface, and continues to define client-only tables.
+- If you need to point codegen at a different Postgres instance, pass `--databaseUrl=...` or set `OOSYNC_DATABASE_URL`.
+
+---
+
 ## Table of Contents
 
 1. [Critical Architecture Decision: Hybrid User Model](#critical-architecture-decision-hybrid-user-model)
