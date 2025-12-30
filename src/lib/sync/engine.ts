@@ -86,9 +86,35 @@ const DEFAULT_CONFIG: SyncConfig = {
  * - playlist_tune before practice_record (implicit practice dependency)
  */
 import {
+  SYNCABLE_TABLES,
   TABLE_SYNC_ORDER,
   TABLE_TO_SCHEMA_KEY,
 } from "../../../shared/table-meta";
+
+function sqliteTableHasAnyRows(
+  sqliteInstance: { exec: (sql: string) => any[] },
+  tableName: string
+): boolean {
+  // Table names are trusted constants from SYNCABLE_TABLES.
+  const result = sqliteInstance.exec(`SELECT 1 FROM "${tableName}" LIMIT 1`);
+  const first = result[0];
+  return Boolean(
+    first && Array.isArray(first.values) && first.values.length > 0
+  );
+}
+
+async function hasAnyLocalSyncData(): Promise<boolean> {
+  const sqliteInstance = await getSqliteInstance();
+  if (!sqliteInstance) return true;
+
+  for (const tableName of SYNCABLE_TABLES) {
+    try {
+      if (sqliteTableHasAnyRows(sqliteInstance, tableName)) return true;
+    } catch {}
+  }
+
+  return false;
+}
 
 /**
  * Sort outbox items by table dependency order.
@@ -233,7 +259,18 @@ export class SyncEngine {
     let failed = 0;
     const affectedTablesSet = new Set<string>();
 
-    const isInitialSync = !this.lastSyncTimestamp;
+    let isInitialSync = !this.lastSyncTimestamp;
+    if (!isInitialSync) {
+      const hasAnyData = await hasAnyLocalSyncData();
+      if (!hasAnyData) {
+        log.warn(
+          `[SyncEngine] Local DB appears empty but lastSyncTimestamp exists for user ${this.userId}; forcing full sync`
+        );
+        this.clearLastSyncTimestamp();
+        isInitialSync = true;
+      }
+    }
+
     const pendingOutboxBackup = isInitialSync
       ? await loadOutboxBackupForUser(this.userId)
       : null;
@@ -322,7 +359,22 @@ export class SyncEngine {
         }
       }
 
-      const applyRemoteChanges = async (remoteChanges: SyncChange[]) => {
+      const isForeignKeyConstraintFailure = (e: unknown): boolean => {
+        const msg = e instanceof Error ? e.message : String(e);
+        return /FOREIGN KEY constraint failed/i.test(msg);
+      };
+
+      // Remote changes that failed FK constraints on first pass. This can happen
+      // when the worker paginates by time and a child row arrives in an earlier page
+      // than its parent row. We'll retry after all pages are applied.
+      const deferredForeignKeyChanges: SyncChange[] = [];
+
+      const applyRemoteChanges = async (
+        remoteChanges: SyncChange[],
+        opts?: {
+          deferForeignKeyFailuresTo?: SyncChange[];
+        }
+      ) => {
         if (remoteChanges.length === 0) return;
 
         const sqliteInstance = await getSqliteInstance();
@@ -334,10 +386,16 @@ export class SyncEngine {
         const triggersSuppressedAt = new Date().toISOString();
         suppressSyncTriggers(sqliteInstance);
         try {
-          // Sort changes by dependency to avoid FK violations
+          // Sort changes by dependency to avoid FK violations.
+          // Inserts/updates: parent tables first. Deletes: child tables first.
           const sortedChanges = [...remoteChanges].sort((a, b) => {
             const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
             const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
+
+            if (a.deleted && b.deleted) return orderB - orderA;
+            if (!a.deleted && !b.deleted) return orderA - orderB;
+            if (a.deleted) return 1;
+            if (b.deleted) return -1;
             return orderA - orderB;
           });
 
@@ -382,7 +440,10 @@ export class SyncEngine {
                   if (conditions.length !== pk.length) {
                     continue;
                   }
-                  await this.localDb.delete(table).where(and(...conditions));
+                  await this.localDb
+                    .delete(table)
+                    .where(and(...conditions))
+                    .run();
                 } else {
                   const columnKey = toCamelCase(pk);
                   const value = localKeyData[columnKey];
@@ -396,7 +457,8 @@ export class SyncEngine {
                   await this.localDb
                     .delete(table)
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .where(eq((table as any)[columnKey], value));
+                    .where(eq((table as any)[columnKey], value))
+                    .run();
                 }
               } else {
                 // Upsert local
@@ -429,7 +491,8 @@ export class SyncEngine {
                       .onConflictDoUpdate({
                         target: conflictTarget,
                         set: sanitizedData,
-                      });
+                      })
+                      .run();
                   } catch (e) {
                     const errorMsg = e instanceof Error ? e.message : String(e);
                     const isCompositeUniqueViolation =
@@ -455,7 +518,8 @@ export class SyncEngine {
                           (k) => (table as any)[toCamelCase(k)]
                         ),
                         set: sanitizedDataWithoutId,
-                      });
+                      })
+                      .run();
                   }
                 } else {
                   await this.localDb
@@ -464,11 +528,22 @@ export class SyncEngine {
                     .onConflictDoUpdate({
                       target: conflictTarget,
                       set: sanitizedData,
-                    });
+                    })
+                    .run();
                 }
               }
               synced++;
             } catch (e) {
+              if (isForeignKeyConstraintFailure(e)) {
+                const target = opts?.deferForeignKeyFailuresTo;
+                if (target) {
+                  target.push(change);
+                } else {
+                  deferredForeignKeyChanges.push(change);
+                }
+                continue;
+              }
+
               failed++;
               const errorMsg = e instanceof Error ? e.message : "Unknown error";
               errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
@@ -555,6 +630,37 @@ export class SyncEngine {
           syncStartedAt = pageResponse.syncStartedAt ?? syncStartedAt;
 
           await applyRemoteChanges(pageResponse.changes);
+        }
+      }
+
+      // 6c. Retry any remote changes that failed FK constraints on first pass.
+      // This resolves cross-page dependency ordering problems.
+      if (deferredForeignKeyChanges.length > 0) {
+        let remaining = deferredForeignKeyChanges;
+        deferredForeignKeyChanges.length = 0;
+
+        // Keep passes small; most cases resolve in 1-2 passes.
+        for (let pass = 1; pass <= 3 && remaining.length > 0; pass++) {
+          const next: SyncChange[] = [];
+          const beforeSynced = synced;
+
+          await applyRemoteChanges(remaining, {
+            deferForeignKeyFailuresTo: next,
+          });
+
+          const progress = synced > beforeSynced;
+          remaining = next;
+          if (!progress) break;
+        }
+
+        // Any remaining FK failures are real inconsistencies; surface them.
+        if (remaining.length > 0) {
+          for (const change of remaining) {
+            failed++;
+            errors.push(
+              `${change.table}:${change.rowId}: FOREIGN KEY constraint failed`
+            );
+          }
         }
       }
 

@@ -68,6 +68,7 @@ const PracticeIndex: Component = () => {
     localDb,
     incrementPracticeListStagedChanged,
     practiceListStagedChanged,
+    remoteSyncDownCompletionVersion,
     initialSyncComplete,
     syncPracticeScope,
   } = useAuth();
@@ -78,15 +79,22 @@ const PracticeIndex: Component = () => {
     () => {
       const db = localDb();
       const currentUser = user();
-      const version = practiceListStagedChanged(); // Refetch when practice list changes
-      const syncComplete = initialSyncComplete(); // Wait for initial sync
+      const syncReady = initialSyncComplete();
+      const isOnline =
+        typeof navigator !== "undefined" ? navigator.onLine : true;
+      const remoteSyncReady =
+        remoteSyncDownCompletionVersion() > 0 ||
+        !isOnline ||
+        import.meta.env.VITE_DISABLE_SYNC === "true";
 
-      if (!syncComplete) {
-        console.log("[PracticeIndex] Waiting for initial sync to complete...");
+      if (!syncReady || !remoteSyncReady) {
+        console.log(
+          "[PracticeIndex] Waiting for initial sync/syncDown before resolving userId..."
+        );
         return null;
       }
 
-      return db && currentUser ? { db, userId: currentUser.id, version } : null;
+      return db && currentUser ? { db, userId: currentUser.id } : null;
     },
     async (params) => {
       if (!params) return null;
@@ -263,11 +271,17 @@ const PracticeIndex: Component = () => {
       const db = localDb();
       const playlistId = currentPlaylistId();
       const date = queueDate(); // Use user-controlled queue date, not getPracticeDate()
-      const syncComplete = initialSyncComplete(); // Wait for initial sync
+      const syncReady = initialSyncComplete();
+      const isOnline =
+        typeof navigator !== "undefined" ? navigator.onLine : true;
+      const remoteSyncReady =
+        remoteSyncDownCompletionVersion() > 0 ||
+        !isOnline ||
+        import.meta.env.VITE_DISABLE_SYNC === "true";
 
-      if (!syncComplete) {
+      if (!syncReady || !remoteSyncReady) {
         console.log(
-          "[PracticeIndex] Waiting for initial sync before initializing queue..."
+          "[PracticeIndex] Waiting for initial sync/syncDown before initializing queue..."
         );
         return null;
       }
