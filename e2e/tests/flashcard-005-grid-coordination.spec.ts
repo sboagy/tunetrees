@@ -3,6 +3,7 @@ import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
+import { setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -17,11 +18,21 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Grid Coordination", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    let ttPage: TuneTreesPage;
+    let currentDate: Date;
+
+    test.beforeEach(async ({ page, context, testUser }) => {
+      ttPage = new TuneTreesPage(page);
+
+      // Set stable starting date
+      currentDate = new Date("2025-12-30T00:00:00.000Z");
+      await setStableDate(context, currentDate);
+
       const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // 2 tunes
         scheduleDaysAgo: 1, // Ensure both are due today
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
     });
@@ -217,18 +228,15 @@ test.describe
       // Ensure grid is rendered with at least two rows
       const grid = app.practiceGrid;
       await app.expectGridHasContent(grid);
-      // Click second grid row via evaluation trigger's row ancestor (more stable across layouts)
-      // Scroll a bit to ensure second row is rendered in virtualized grid
-      await grid
-        .locator("tbody")
-        .evaluate((el: HTMLElement) => el.scrollTo(0, el.scrollHeight));
-      const secondRowTrigger = grid
-        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-        .last();
-      await expect(secondRowTrigger).toBeVisible({ timeout: 10000 });
-      const row = secondRowTrigger.locator("xpath=ancestor::tr");
-      const firstCell = row.locator("td").first(); // Click neutral cell
-      await firstCell.click();
+
+      const rows = ttPage.getRows("scheduled");
+      await ttPage.setRowEvaluation(rows.nth(0), "good", 500);
+      await ttPage.setRowEvaluation(rows.nth(1), "easy", 500);
+
+      // The logic was changed, such that clicking on a row no longer selects it as the
+      // current tune.  Accordingly, we also click on it here to make it the current
+      // tune row.
+      await rows.nth(1).getByRole("cell", { name: "Lapsed" }).first().click();
 
       // Open flashcard mode and verify it starts on second item
       await app.enableFlashcardMode();
@@ -258,36 +266,18 @@ test.describe
     test("07. Multiple evaluations sync correctly", async ({ page }) => {
       // Evaluate first tune in grid
       const app = new TuneTreesPage(page);
+      // Ensure grid is rendered with at least two rows
       const grid = app.practiceGrid;
-      let gridEvalTrigger = grid
-        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-        .first();
-      await gridEvalTrigger.click();
-      await page.getByTestId("recall-eval-option-good").click();
-      await page.waitForTimeout(300);
+      await app.expectGridHasContent(grid);
 
-      // Evaluate second tune in grid
-      // Ensure second row is rendered in virtualized grid
-      const triggerCount = await grid
-        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-        .count();
-      if (triggerCount < 2) {
-        test.fixme(
-          true,
-          `Only ${triggerCount} practice row(s) available; need at least 2 to verify multiple eval sync.`
-        );
-        return;
-      }
-      await grid
-        .locator("tbody")
-        .evaluate((el: HTMLElement) => el.scrollTo(0, el.scrollHeight));
-      gridEvalTrigger = grid.getByTestId(/^recall-eval-[0-9a-f-]+$/i).last();
-      await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
-      await gridEvalTrigger.click();
-      await page.getByTestId("recall-eval-option-easy").click();
-      // ...note this will change the "current" row, so the row we just set will be what comes
-      // in flashcards, per current spec behavior. (I'm not certain I love this behavior yet.  -sb)
-      await page.waitForTimeout(300);
+      const rows = ttPage.getRows("scheduled");
+      await ttPage.setRowEvaluation(rows.nth(0), "good", 500);
+      await ttPage.setRowEvaluation(rows.nth(1), "easy", 500);
+
+      // The logic was changed, such that clicking on a row no longer selects it as the
+      // current tune.  Accordingly, we also click on it here to make it the current
+      // tune row.
+      await rows.nth(1).getByRole("cell", { name: "Lapsed" }).first().click();
 
       // Open flashcard mode
       await app.enableFlashcardMode();

@@ -103,10 +103,16 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
+    const rows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+    await expect
+      .poll(async () => await rows.count(), {
+        timeout: 20000,
+        message: "Practice queue did not reach expected size in time",
+      })
+      .toBe(ALL_TUNES.length);
+
     // Verify all tunes are in queue
-    const initialRowCount = await ttPage.practiceGrid
-      .locator("tbody tr[data-index]")
-      .count();
+    const initialRowCount = await rows.count();
     console.log(`  Initial queue size: ${initialRowCount} tunes`);
     expect(initialRowCount).toBe(ALL_TUNES.length);
 
@@ -119,9 +125,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
     // Evaluate each tune based on its assigned rating
     // NOTE: Grid order may differ from ALL_TUNES order, so we extract tune ID from each row
-    const rowCount = await ttPage.practiceGrid
-      .locator("tbody tr[data-index]")
-      .count();
+    const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
       const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
       await expect(row).toBeVisible({ timeout: 10000 });
@@ -129,8 +133,14 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       // Extract tune ID from the eval dropdown's data-testid (format: recall-eval-{uuid})
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
       await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-      const testId = await evalDropdown.getAttribute("data-testid");
-      const tuneId = testId?.replace("recall-eval-", "") ?? "";
+      const tuneId = ttPage.parseTuneIdFromRecallEvalTestId(
+        await evalDropdown.getAttribute("data-testid")
+      );
+      if (!tuneId) {
+        throw new Error(
+          "Expected tuneId to be present on recall evaluation dropdown"
+        );
+      }
 
       // Get the rating for this tune ID
       const rating = tuneRatings.get(tuneId);
@@ -141,10 +151,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
         continue;
       }
 
-      await evalDropdown.click();
-      await page.waitForTimeout(200);
-      await page.getByTestId(`recall-eval-option-${rating}`).click();
-      await page.waitForTimeout(300);
+      await ttPage.setRowEvaluation(row, rating);
 
       console.log(
         `  Row ${i + 1}: ${rating.toUpperCase()} (tune: ${tuneId.substring(0, 8)}...)`
@@ -299,6 +306,14 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // First, practice all tunes on Day 1
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
+    const rows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+    await expect
+      .poll(async () => await rows.count(), {
+        timeout: 20000,
+        message: "Practice queue did not reach expected size in time",
+      })
+      .toBe(ALL_TUNES.length);
+
     const tuneRatings = new Map<string, "easy" | "good" | "hard" | "again">();
     for (const tuneId of EASY_TUNES) tuneRatings.set(tuneId, "easy");
     for (const tuneId of GOOD_TUNES) tuneRatings.set(tuneId, "good");
@@ -306,24 +321,26 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     for (const tuneId of AGAIN_TUNES) tuneRatings.set(tuneId, "again");
 
     // Extract tune ID from each row's eval dropdown testid to apply correct rating
-    const rowCount = await ttPage.practiceGrid
-      .locator("tbody tr[data-index]")
-      .count();
+    const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
       const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
       await expect(row).toBeVisible({ timeout: 10000 });
 
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
       await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-      const testId = await evalDropdown.getAttribute("data-testid");
-      const tuneId = testId?.replace("recall-eval-", "") ?? "";
+      const tuneId = ttPage.parseTuneIdFromRecallEvalTestId(
+        await evalDropdown.getAttribute("data-testid")
+      );
+      if (!tuneId) {
+        throw new Error(
+          "Expected tuneId to be present on recall evaluation dropdown"
+        );
+      }
+
       const rating = tuneRatings.get(tuneId);
       if (!rating) continue;
 
-      await evalDropdown.click();
-      await page.waitForTimeout(200);
-      await page.getByTestId(`recall-eval-option-${rating}`).click();
-      await page.waitForTimeout(300);
+      await ttPage.setRowEvaluation(row, rating);
     }
 
     await ttPage.submitEvaluationsButton.click();
@@ -415,6 +432,14 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // === DAY 1: Initial evaluations ===
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
+    const rows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+    await expect
+      .poll(async () => await rows.count(), {
+        timeout: 20000,
+        message: "Practice queue did not reach expected size in time",
+      })
+      .toBe(ALL_TUNES.length);
+
     const tuneRatings = new Map<string, "easy" | "good" | "hard" | "again">();
     for (const tuneId of EASY_TUNES) tuneRatings.set(tuneId, "easy");
     for (const tuneId of GOOD_TUNES) tuneRatings.set(tuneId, "good");
@@ -422,24 +447,26 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     for (const tuneId of AGAIN_TUNES) tuneRatings.set(tuneId, "again");
 
     // Extract tune ID from each row's eval dropdown testid to apply correct rating
-    const rowCount = await ttPage.practiceGrid
-      .locator("tbody tr[data-index]")
-      .count();
+    const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
       const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
       await expect(row).toBeVisible({ timeout: 10000 });
 
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
       await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-      const testId = await evalDropdown.getAttribute("data-testid");
-      const tuneId = testId?.replace("recall-eval-", "") ?? "";
+      const tuneId = ttPage.parseTuneIdFromRecallEvalTestId(
+        await evalDropdown.getAttribute("data-testid")
+      );
+      if (!tuneId) {
+        throw new Error(
+          "Expected tuneId to be present on recall evaluation dropdown"
+        );
+      }
+
       const rating = tuneRatings.get(tuneId);
       if (!rating) continue;
 
-      await evalDropdown.click();
-      await page.waitForTimeout(200);
-      await page.getByTestId(`recall-eval-option-${rating}`).click();
-      await page.waitForTimeout(300);
+      await ttPage.setRowEvaluation(row, rating);
     }
 
     await ttPage.submitEvaluationsButton.click();
@@ -512,10 +539,16 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
         const evalDropdown = row.locator("[data-testid^='recall-eval-']");
         await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-        await evalDropdown.click();
-        await page.waitForTimeout(200);
-        await page.getByTestId("recall-eval-option-good").click();
-        await page.waitForTimeout(300);
+        const tuneId = ttPage.parseTuneIdFromRecallEvalTestId(
+          await evalDropdown.getAttribute("data-testid")
+        );
+        if (!tuneId) {
+          throw new Error(
+            "Expected tuneId to be present on recall evaluation dropdown"
+          );
+        }
+
+        await ttPage.setRowEvaluation(row, "good");
 
         await ttPage.submitEvaluationsButton.click();
         await page.waitForLoadState("networkidle", { timeout: 15000 });
