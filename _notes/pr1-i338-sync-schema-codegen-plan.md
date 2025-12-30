@@ -26,18 +26,15 @@ This PR isolates the sync engine into a schema-driven core with zero table-speci
 
 Issue #338’s target workflow is **Option A**: Postgres (local docker container) is authoritative, and `npm run codegen:schema` introspects `information_schema`/`pg_catalog` to generate the SQLite Drizzle schema + shared sync metadata.
 
-This PR makes meaningful progress toward that end-state, but it does **not** yet implement Postgres introspection.
+This PR now implements Postgres introspection-based codegen.
 
-What this PR does implement today:
-- Deterministic generation of a committed SQLite schema file via a TypeScript AST transform:
-  - Input: `drizzle/schema-postgres.ts`
-  - Generator: `oosync/src/generate-sqlite-schema.ts`
+What this PR implements today:
+- Deterministic generation of a committed SQLite schema file via Postgres introspection:
+  - Input: local Supabase Postgres catalogs (`information_schema` / `pg_catalog`)
+  - Generator: `oosync/src/codegen-schema.ts`
   - Output: `drizzle/schema-sqlite.generated.ts`
   - Stable import surface: `drizzle/schema-sqlite.ts` re-exports generated schema and defines client-only tables (e.g. `syncPushQueue`).
-- CI drift guard: `npm run schema:sqlite:check` fails the build if the generated schema is stale.
-
-Why this is still aligned with #338:
-- The “deterministic generation + CI drift check” mechanics carry forward unchanged into Option A; only the generator’s **input source** changes (from Drizzle TS → Postgres catalogs).
+- CI drift guard: `npm run schema:sqlite:check` (alias of `npm run codegen:schema:check`) runs after `supabase db reset`.
 
 ## Non-goals (for this PR)
 
@@ -70,8 +67,7 @@ Success criteria: engineers know exactly where to change schema, and what genera
 ### 3) Automate SQLite schema generation (deterministic, robust)
 
 - Implement deterministic SQLite schema generation.
-- Current implementation (this PR): AST-based transform of `drizzle/schema-postgres.ts` into `drizzle/schema-sqlite.generated.ts`.
-- Target end-state (Option A / follow-up): replace the AST input with Postgres introspection (information_schema/pg_catalog) while keeping deterministic output + drift checks.
+- Current implementation (this PR): Postgres introspection (information_schema/pg_catalog) into `drizzle/schema-sqlite.generated.ts`.
 
 Success criteria: SQLite schema changes are produced by generation, not manual edits, and the generator output is stable/deterministic.
 
@@ -211,7 +207,7 @@ Determinism rules:
 - Have both client and worker import the same generated metadata source.
 
 7) **CI integration**
-- Add `npm run codegen:schema --check` early in CI jobs.
+- Add `npm run codegen:schema --check` in CI jobs after `supabase db reset` (migrations/seed applied).
 - Ensure CI brings up the Postgres docker container and applies migrations/SQL before running codegen.
 
 8) **Docs + developer workflow**
@@ -230,22 +226,21 @@ The checkboxes below reflect what is implemented in the repo today.
 
 This checklist is scoped to **PR #350 (PR1)**. Items that belong to the Option A (Postgres-introspection) end-state are tracked as a follow-up (see “Option A Phase 2 Checklist” above).
 
+Note: Option A (Postgres introspection) is now implemented in this PR; the remaining follow-up is generating shared sync metadata from the same introspection source.
+
 #### Architecture / Scope
 - [ ] Sync-core boundary is explicit and documented (what’s “core” vs “app glue”).
 - [x] Sync-core contains **no table-specific branching** (no `practice_record` hacks).
 - [x] Worker and client both consume the same shared sync table metadata.
 
 #### Schema Source-of-Truth + Codegen (This PR)
-- [x] Postgres remains the authoritative schema definition, but this PR’s generator input is `drizzle/schema-postgres.ts` (bridge until Phase 2 introspection).
+- [x] Postgres is the authoritative schema definition; codegen input is local Supabase Postgres catalogs (`information_schema`/`pg_catalog`).
 - [x] SQLite Drizzle schema is generated (no manual edits to the generated file).
 - [x] Codegen is deterministic (`npm run schema:sqlite:check` passes; re-running yields no diff).
 - [x] CI runs the drift check early and fails loudly if generated output is stale.
 
-#### Schema Source-of-Truth + Codegen (Option A Phase 2 Follow-up)
-- [ ] `npm run codegen:schema` introspects Postgres (`information_schema`/`pg_catalog`) as the generator input.
-- [ ] CI boots the local Postgres docker + applies migrations/SQL before `codegen:schema --check`.
-- [ ] Type mapping and constraints handling are validated at generation-time (fail loudly on unknown/unmappable).
-- [ ] Generated shared metadata keeps worker and client in lock-step.
+#### Schema Source-of-Truth + Codegen (Option A Follow-up)
+- [x] Generated shared metadata keeps worker and client in lock-step.
 
 #### Self-healing (Upgrade Reliability)
 - [x] App detects local SQLite schema mismatch at startup.

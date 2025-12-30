@@ -58,9 +58,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check SQLite schema is generated
-        run: npm run schema:sqlite:check
-
       # --- Supabase Setup ---
       - name: Cache Supabase CLI
         id: cache-supabase
@@ -126,6 +123,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      - name: Check SQLite schema via Postgres introspection
+        run: npm run schema:sqlite:check
 
       # --- Playwright Setup ---
       - name: Cache Playwright Browsers
@@ -239,9 +239,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check SQLite schema is generated
-        run: npm run schema:sqlite:check
-
       # --- Self-Contained Supabase Setup (Required for parallelism) ---
       - name: Cache Supabase CLI
         id: cache-supabase
@@ -300,6 +297,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      - name: Check SQLite schema via Postgres introspection
+        run: npm run schema:sqlite:check
 
       # --- Playwright PWA Specifics ---
       - name: Install Playwright Browsers
