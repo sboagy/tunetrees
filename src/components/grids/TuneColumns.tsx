@@ -991,7 +991,7 @@ export function getScheduledColumns(
       sortingFn: noSortingFn,
       cell: (info) => {
         const row = info.row.original;
-        const tuneId = row.tune?.id || row.tuneRef || row.id;
+        const tuneId = row.tune_id || row.tune?.id || row.tuneRef || row.id;
         const currentEval = info.getValue() as string;
         const completedAt = row.completed_at;
 
