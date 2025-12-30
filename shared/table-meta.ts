@@ -11,6 +11,13 @@
  * @module lib/sync/table-meta
  */
 
+import {
+  type SyncableTableName as GeneratedSyncableTableName,
+  SYNCABLE_TABLES as SYNCABLE_TABLES_GENERATED,
+  TABLE_REGISTRY_CORE,
+  type TableMetaCore,
+} from "./table-meta.generated";
+
 /**
  * Category of change for UI signaling
  */
@@ -20,6 +27,8 @@ export type ChangeCategory =
   | "catalog"
   | "user"
   | null;
+
+export type SyncableTableName = GeneratedSyncableTableName;
 
 /**
  * Metadata for a syncable table
@@ -105,271 +114,49 @@ function normalizePracticeRecord(
  * All syncable tables must be registered here.
  * Keys are snake_case table names (matching Supabase/PostgreSQL).
  */
-export const TABLE_REGISTRY: Record<string, TableMeta> = {
-  // ===== Reference Data Tables =====
+export const SYNCABLE_TABLES = SYNCABLE_TABLES_GENERATED;
 
-  genre: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: [],
-    booleanColumns: [],
-    supportsIncremental: false,
-    hasDeletedFlag: false,
-    changeCategory: "catalog",
-  },
-
-  tune_type: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: [],
-    booleanColumns: [],
-    supportsIncremental: false,
-    hasDeletedFlag: false,
-    changeCategory: "catalog",
-  },
-
-  genre_tune_type: {
-    primaryKey: ["genre_id", "tune_type_id"],
-    uniqueKeys: ["genre_id", "tune_type_id"],
-    timestamps: [],
-    booleanColumns: [],
-    supportsIncremental: false,
-    hasDeletedFlag: false,
-    changeCategory: "catalog",
-  },
-
-  // ===== User Profile =====
-
-  user_profile: {
-    primaryKey: "supabase_user_id", // Non-standard PK
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "user",
-  },
-
-  // ===== Instrument =====
-
-  instrument: {
-    primaryKey: "id",
-    uniqueKeys: ["private_to_user", "instrument"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "catalog",
-  },
-
-  // ===== User Preferences =====
-
-  prefs_scheduling_options: {
-    primaryKey: "user_id",
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: [],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
-    changeCategory: "user",
-  },
-
-  prefs_spaced_repetition: {
-    primaryKey: ["user_id", "alg_type"],
-    uniqueKeys: ["user_id", "alg_type"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["enable_fuzzing"],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
-    changeCategory: "user",
-  },
-
-  // ===== Playlist =====
-
-  playlist: {
-    primaryKey: "playlist_id", // Non-standard PK name
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "repertoire",
-  },
-
-  // ===== Table State =====
-
-  table_state: {
-    primaryKey: ["user_id", "screen_size", "purpose", "playlist_id"],
-    uniqueKeys: ["user_id", "screen_size", "purpose", "playlist_id"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: [],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
-    changeCategory: null,
-  },
-
-  tab_group_main_state: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["practice_show_submitted", "practice_mode_flashcard"],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
-    changeCategory: null,
-  },
-
-  // ===== Tune =====
-
-  tune: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "catalog",
-  },
-
-  // ===== Playlist-Tune Association =====
-
-  playlist_tune: {
-    primaryKey: ["playlist_ref", "tune_ref"],
-    uniqueKeys: ["playlist_ref", "tune_ref"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "repertoire",
-  },
-
-  // ===== Practice Record =====
-
+const TABLE_EXTRAS: Record<
+  SyncableTableName,
+  Pick<TableMeta, "changeCategory" | "normalize">
+> = {
+  genre: { changeCategory: "catalog" },
+  tune_type: { changeCategory: "catalog" },
+  genre_tune_type: { changeCategory: "catalog" },
+  user_profile: { changeCategory: "user" },
+  instrument: { changeCategory: "catalog" },
+  prefs_scheduling_options: { changeCategory: "user" },
+  prefs_spaced_repetition: { changeCategory: "user" },
+  playlist: { changeCategory: "repertoire" },
+  table_state: { changeCategory: null },
+  tab_group_main_state: { changeCategory: null },
+  tune: { changeCategory: "catalog" },
+  playlist_tune: { changeCategory: "repertoire" },
   practice_record: {
-    primaryKey: "id",
-    uniqueKeys: ["tune_ref", "playlist_ref", "practiced"],
-    timestamps: ["practiced", "last_modified_at"],
-    booleanColumns: [],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
+    changeCategory: "practice",
     normalize: normalizePracticeRecord,
-    changeCategory: "practice",
   },
-
-  // ===== Daily Practice Queue =====
-
   daily_practice_queue: {
-    primaryKey: "id",
-    uniqueKeys: ["user_ref", "playlist_ref", "window_start_utc", "tune_ref"],
-    timestamps: [
-      "window_start_utc",
-      "window_end_utc",
-      "generated_at",
-      "completed_at",
-      "snapshot_coalesced_ts",
-      "last_modified_at",
-    ],
-    booleanColumns: ["active"],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
+    changeCategory: "practice",
     normalize: normalizeDailyPracticeQueue,
-    changeCategory: "practice",
   },
-
-  // ===== Table Transient Data (Practice Staging) =====
-
-  table_transient_data: {
-    primaryKey: ["user_id", "tune_id", "playlist_id"],
-    uniqueKeys: ["user_id", "tune_id", "playlist_id"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: [],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
-    changeCategory: "practice",
-  },
-
-  // ===== Note =====
-
-  note: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["created_date", "last_modified_at"],
-    booleanColumns: ["public", "favorite", "deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "repertoire",
-  },
-
-  // ===== Reference =====
-
-  reference: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["public", "favorite", "deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "repertoire",
-  },
-
-  // ===== Tag =====
-
-  tag: {
-    primaryKey: "id",
-    uniqueKeys: ["user_ref", "tune_ref", "tag_text"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: [],
-    supportsIncremental: true,
-    hasDeletedFlag: false,
-    changeCategory: "repertoire",
-  },
-
-  // ===== Tune Override =====
-
-  tune_override: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    changeCategory: "repertoire",
-  },
+  table_transient_data: { changeCategory: "practice" },
+  note: { changeCategory: "repertoire" },
+  reference: { changeCategory: "repertoire" },
+  tag: { changeCategory: "repertoire" },
+  tune_override: { changeCategory: "repertoire" },
 };
 
-/**
- * All syncable table names (in sync dependency order)
- */
-export const SYNCABLE_TABLES = [
-  // Reference data first (no dependencies)
-  "genre",
-  "tune_type",
-  "genre_tune_type",
-  // User profile (needed for FKs)
-  "user_profile",
-  // Instrument (depends on user_profile)
-  "instrument",
-  // User preferences
-  "prefs_scheduling_options",
-  "prefs_spaced_repetition",
-  // Playlist (depends on user_profile)
-  "playlist",
-  // Table state (depends on playlist)
-  "table_state",
-  "tab_group_main_state",
-  // Tune (depends on genre, user_profile)
-  "tune",
-  // Associations and user data
-  "playlist_tune",
-  "practice_record",
-  "daily_practice_queue",
-  "table_transient_data",
-  "note",
-  "reference",
-  "tag",
-  "tune_override",
-] as const;
+export const TABLE_REGISTRY_MERGED: Record<SyncableTableName, TableMeta> =
+  Object.fromEntries(
+    Object.entries(TABLE_REGISTRY_CORE).map(([tableName, core]) => {
+      const extras = TABLE_EXTRAS[tableName as SyncableTableName];
+      return [tableName, { ...(core as TableMetaCore), ...extras }];
+    })
+  ) as Record<SyncableTableName, TableMeta>;
 
-export type SyncableTableName = (typeof SYNCABLE_TABLES)[number];
+// Preserve existing export signature used across codebase/tests.
+export const TABLE_REGISTRY: Record<string, TableMeta> = TABLE_REGISTRY_MERGED;
 
 /**
  * Tables with composite primary keys
