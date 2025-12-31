@@ -161,14 +161,43 @@ Where to add them:
 - schema drift guard remains green (`npm run schema:sqlite:check`)
 
 ## Checklist
-- [ ] Path aliases added and builds green
-- [ ] `oosync/src/runtime/platform` interfaces defined; app adapter compiles
-- [ ] Protocol types have a single canonical import (`@oosync/shared/protocol`)
-- [ ] Schema/meta contract is generated into `shared/generated/sync/*` and imported via `@shared-generated/*`
-- [ ] No consumer imports protocol/meta via relative paths (enforce the canonical imports above)
-- [ ] Worker implementation is in `oosync/worker/*`
-- [ ] Top-level `worker/*` is wrapper-only (no app imports)
-- [ ] No behavior changes intended; CI green
+- [x] Path aliases added and builds green
+- [x] `oosync/src/runtime/platform` interfaces defined
+- [ ] App adapter compiles (planned: `src/lib/sync/oosync-platform.ts`) (not required for this PR unless we start consuming `IPlatform` in app/worker)
+- [x] Protocol types have a single canonical import (`@oosync/shared/protocol`) for app code
+- [x] Schema/meta contract is generated into `shared/generated/sync/*`
+- [x] Schema/meta contract imported via `@shared-generated/*` for app code
+- [ ] Worker-bundled code uses canonical imports (blocked by Wrangler bundling not honoring TS `paths`)
+- [ ] No consumer imports protocol/meta via relative paths (currently false for worker-bundled graph due to Wrangler)
+- [x] Worker implementation is in `oosync/worker/*`
+- [x] Top-level `worker/*` is wrapper-only (no app imports)
+- [x] No behavior changes intended; CI green
+
+## Remainder of this PR (plan)
+
+Goal: keep PR2 scoped to “boundary + wiring” while keeping builds green.
+
+1) **Accept the current Wrangler constraint explicitly (documented exception)**
+  - Wrangler/esbuild does not honor TypeScript `compilerOptions.paths` for module resolution when bundling.
+  - Because the worker implementation lives under `oosync/worker/*` and imports `oosync/src/*`, the worker-bundled graph currently uses **relative imports** for protocol + generated contract to keep `wrangler dev/build` working.
+  - This PR will document this as a known limitation/exception rather than trying to force canonical imports and risking worker regressions.
+
+2) **Enforce canonical imports where we can (app + tooling)**
+  - App code should import protocol via `@oosync/shared/protocol` and generated contract via `@shared-generated/sync`.
+  - Node/tooling builds should continue to resolve the same aliases (already covered by `tsconfig.node.json`).
+
+3) **Defer “no relative imports anywhere” to a focused follow-up (Phase 1.5 / Phase 2)**
+  To truly satisfy “no relative imports” for the worker-bundled graph, we need one of these approaches:
+  - **Option A (preferred): Build `oosync` as a real package** (workspace/package + build output), so worker imports resolve as normal node package imports (no TS `paths` needed at bundle time).
+  - **Option B: Wrangler-compatible aliasing** (if Wrangler supports it in our version/config), so worker bundling can resolve `@oosync/*` + `@shared-generated/*`.
+  - **Option C: Generate a worker-specific entry graph** where aliases are rewritten to relative paths during a prebuild step.
+   
+  This PR’s deliverable is the boundary + wrapper; a follow-up PR will pick one option and then flip the remaining checklist items.
+
+4) **Platform adapter file (`src/lib/sync/oosync-platform.ts`)**
+  - `IPlatform` is defined but not yet consumed in app code.
+  - If we don’t consume it in this PR, we can leave the adapter as a Phase 2+ task.
+  - If reviewers want the interface “proven”, add a minimal adapter and a no-op usage (still no behavior changes).
 
 === /PR #354 DESCRIPTION (copy/paste) ===
 

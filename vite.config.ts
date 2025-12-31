@@ -172,6 +172,8 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+        "@oosync": path.resolve(__dirname, "./oosync/src"),
+        "@shared-generated": path.resolve(__dirname, "./shared/generated"),
       },
     },
     // Build optimizations

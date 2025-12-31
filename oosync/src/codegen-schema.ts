@@ -14,7 +14,7 @@ const DEFAULT_OUTPUT_SQLITE_SCHEMA_FILE = path.join(
 
 const DEFAULT_OUTPUT_TABLE_META_FILE = path.join(
   __dirname,
-  "../../shared/table-meta.generated.ts"
+  "../../shared/generated/sync/table-meta.generated.ts"
 );
 
 const LOCAL_SUPABASE_DATABASE_URL =

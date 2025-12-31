@@ -15,7 +15,7 @@ import {
   getPrimaryKey,
   type SyncableTableName,
   TABLE_REGISTRY,
-} from "../../../shared/table-meta";
+} from "@oosync/shared/table-meta";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { toCamelCase } from "./casing";
 

@@ -7,6 +7,13 @@
     "types": ["node"],
     "skipLibCheck": true,
 
+    /* Path Aliases (needed for oosync build) */
+    "baseUrl": ".",
+    "paths": {
+      "@oosync/*": ["./oosync/src/*"],
+      "@shared-generated/*": ["./shared/generated/*"]
+    },
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

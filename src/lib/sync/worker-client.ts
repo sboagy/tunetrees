@@ -2,7 +2,7 @@ import type {
   SyncChange,
   SyncRequest,
   SyncResponse,
-} from "../../../shared/sync-types";
+} from "@oosync/shared/protocol";
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
 

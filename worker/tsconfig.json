@@ -9,7 +9,17 @@
     "strict": true,
     "outDir": "./dist",
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@oosync/*": ["../oosync/src/*"],
+      "@shared-generated/*": ["../shared/generated/*"]
+    }
   },
-  "include": ["src/**/*", "../shared/**/*"]
+  "include": [
+    "src/**/*",
+    "../shared/generated/**/*",
+    "../oosync/src/**/*",
+    "../oosync/worker/src/**/*"
+  ]
 }

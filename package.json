@@ -80,6 +80,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.0",
+    "jose": "^6.1.2",
     "jodit": "^4.7.9",
     "jodit-react": "^5.2.38",
     "loglevel": "^1.9.2",
