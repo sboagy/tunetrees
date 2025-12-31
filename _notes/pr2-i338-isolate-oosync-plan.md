@@ -1,3 +1,177 @@
+=== PR #354 DESCRIPTION (copy/paste) ===
+
+Fixes #338  
+Part of epic #304  
+Follow-up to #350  
+
+## Summary
+This PR defines the **runtime boundary** for the SQLite WASM ↔ Postgres sync system by introducing `oosync` as a portable library surface, plus a worker implementation that lives under `oosync/worker/*`.
+
+Goal: make `oosync` future-standalone (own repo later), with strict dependency direction and a shared, generated contract.
+
+## Non-goals
+- No product behavior changes (refactor/wiring only).
+- No UI orchestration moved into `oosync` (toasts, Solid/Auth wiring, scheduling intervals stay in app `src/`).
+- No monorepo toolchain (keep single repo build).
+
+## Proposed end-state directory structure (with dependency notes)
+
+Note: this tree shows the *target* end-state. Some files under `oosync/src/runtime/core/*` are **Phase 2+ placeholders** and are not required for this PR (PR2 is primarily boundary + wiring).
+
+```
+repo-root/                                         # root wiring only; avoid cross-layer imports
+  shared/                                          # shared artifacts; must not import from app `src/` or `oosync/`
+    generated/                                     # generated outputs; pure types/data/constants only
+      sync/                                        # shared schema/meta contract consumed by app + oosync + worker
+        index.ts
+        table-meta.generated.ts
+
+  oosync/                                          # portable library home (future standalone repo)
+    src/                                           # oosync TypeScript sources; must not import from app `src/` or top-level `worker/`
+      index.ts
+
+      shared/
+        index.ts                                   # barrel exports for shared contract (protocol, errors)
+        protocol/                                  # protocol types must be runtime-agnostic
+          index.ts
+          sync-types.ts
+          errors.ts
+
+      runtime/
+        index.ts                                   # barrel exports for runtime core
+        platform/                                  # interfaces owned by oosync; implemented by app/worker adapters
+          index.ts
+          types.ts                                 # Platform interface(s)
+        core/                                      # (Phase 2+ placeholder) portable logic; no Solid/UI, no localStorage/navigator
+          index.ts
+          engine-core.ts                           # (Phase 2+ placeholder) “pure” core engine (no browser globals)
+          outbox-core.ts                           # (Phase 2+ placeholder) core outbox semantics (no SQLite binding)
+          casing.ts
+          invariants.ts
+
+      client/
+        index.ts
+        worker-client.ts                           # client helper; may depend on `fetch`, must not depend on app `src/`
+
+      codegen/
+        index.ts
+        codegen-schema.ts                          # current introspection generator
+        codegen.config.ts
+
+    worker/                                        # worker implementation owned by oosync; no imports from app `src/`
+      src/                                         # Cloudflare Worker runtime code
+        index.ts                                   # Worker entry (implementation)
+        routes/
+          sync.ts
+        runtime/                                   # Cloudflare runtime specifics
+          ...
+
+  src/                                             # TuneTrees app; may import from `oosync/src/*` + `shared/generated/*`
+    lib/
+      sync/
+        engine.ts                                  # app adapter around oosync core
+        service.ts                                 # app orchestration (stays app-side)
+        realtime.ts                                # likely app-side unless made portable
+
+  worker/                                          # thin wrapper for Wrangler/build/deploy; no imports from app `src/`
+    src/
+      index.ts                                     # wrapper entrypoint; forwards to `oosync/worker/src/index.ts`
+    wrangler.toml (or config that points at this wrapper)
+```
+
+## Source of truth (folder ownership)
+- `oosync/src/*`: portable library code + interfaces/types owned by `oosync`.
+- `oosync/worker/*`: worker implementation owned by `oosync` (Cloudflare runtime).
+- `worker/*` (top-level): **thin wrapper only** for Wrangler/build/deploy; forwards into `oosync/worker/*`.
+- `shared/generated/*`: shared generated artifacts (schema/meta contract) consumed by app + `oosync` + worker.
+
+## Dependency rules (must hold at all times)
+- `oosync` must not import from app `src/*`.
+- `oosync/src/*` must not import from `oosync/worker/*` (core cannot depend on worker runtime).
+- Worker (impl + wrapper) must not import from app `src/*`.
+- `shared/generated/*` must be pure generated types/data/constants (no app imports).
+
+Example expectations for `shared/generated/*`:
+- ✅ `export const tableMeta = { ... } as const;`
+- ❌ `import { something } from "@/lib/..."` (no app imports)
+
+### Allowed imports matrix
+✅ allowed, ❌ not allowed
+
+| From \\ To | `shared/generated/*` | `oosync/src/*` | `oosync/worker/*` | app `src/*` | top-level `worker/*` wrapper |
+|---|---:|---:|---:|---:|---:|
+| `shared/generated/*` | ✅ (internal only) | ❌ | ❌ | ❌ | ❌ |
+| `oosync/src/*` | ✅ | ✅ (internal) | ❌ | ❌ | ❌ |
+| `oosync/worker/*` | ✅ | ✅ | ✅ (internal) | ❌ | ❌ |
+| app `src/*` | ✅ | ✅ | ❌ | ✅ (internal) | ❌ |
+| top-level `worker/*` wrapper | ❌ | ❌ | ✅ | ❌ | ✅ (internal) |
+
+Notes:
+- The wrapper exists only for build/deploy wiring and should be thin (re-export/forward to `oosync/worker/*`).
+- If we later publish `oosync` as its own repo, `shared/generated/*` likely becomes a separate published artifact.
+
+## Implementation plan (ordered)
+
+### Phase 0: Library boundary scaffolding (no behavior change)
+1) Add TypeScript path aliases
+- `@oosync/*` → `oosync/src/*`
+- `@shared-generated/*` → `shared/generated/*`
+
+Where to add them:
+- App/Vite typecheck: `tsconfig.app.json` (`compilerOptions.paths`)
+- Worker typecheck/build: `worker/tsconfig.json` (`compilerOptions.paths`) or ensure the worker build uses a tsconfig that includes these paths
+- Tooling/Node tsconfig (if any scripts import these paths): `tsconfig.node.json`
+
+2) Create `oosync` public surfaces (barrels)
+- `oosync/src/index.ts`
+- `oosync/src/shared/index.ts`
+- `oosync/src/runtime/index.ts`
+
+3) Define `oosync`-owned interfaces
+- Add `oosync/src/runtime/platform/types.ts` (`Platform`, logger, clock, storage abstraction, trigger controller, minimal SQLite surface).
+- Add an app adapter in app code: `src/lib/sync/oosync-platform.ts` implementing those interfaces (no behavior changes).
+
+4) Define canonical protocol types under `oosync`
+- Add `oosync/src/shared/protocol/*` and make app + worker import protocol types from `@oosync/shared/protocol`.
+
+5) Ensure schema/meta contract is external and generated
+- Ensure codegen output required by `oosync` runtime is emitted to `shared/generated/sync/*`.
+- Both app and worker import it from `@shared-generated/sync`.
+
+### Phase 1: Worker “owned by oosync” with wrapper
+6) Move (or introduce) worker implementation under `oosync/worker/*`
+- Add `oosync/worker/src/index.ts` as the worker entrypoint.
+- Keep Cloudflare-specific runtime code here.
+
+7) Convert top-level `worker/*` into a thin wrapper
+- `worker/src/index.ts` should forward to `oosync/worker/src/index.ts`.
+- Wrapper should re-export the worker module’s `default` export unchanged (no extra logic).
+- Wrangler points at the wrapper entrypoint.
+
+### Phase 2+: Extract portable engine core (follow-up PRs)
+8) Split sync engine into:
+- `oosync` core (platform-agnostic push/pull/apply logic)
+- app adapter (wires SQLite WASM + persistence + UI orchestration)
+
+## Verification (must pass)
+- `npm run typecheck`
+- `npm run lint`
+- `npm run build` (app)
+- worker build succeeds (existing CI job)
+- schema drift guard remains green (`npm run schema:sqlite:check`)
+
+## Checklist
+- [ ] Path aliases added and builds green
+- [ ] `oosync/src/runtime/platform` interfaces defined; app adapter compiles
+- [ ] Protocol types have a single canonical import (`@oosync/shared/protocol`)
+- [ ] Schema/meta contract is generated into `shared/generated/sync/*` and imported via `@shared-generated/*`
+- [ ] No consumer imports protocol/meta via relative paths (enforce the canonical imports above)
+- [ ] Worker implementation is in `oosync/worker/*`
+- [ ] Top-level `worker/*` is wrapper-only (no app imports)
+- [ ] No behavior changes intended; CI green
+
+=== /PR #354 DESCRIPTION (copy/paste) ===
+
 === ME ===
 So, now a broader question (no changes yet please):
 Given for the epic https://github.com/sboagy/tunetrees/issues/304 and our 
