@@ -1,8 +1,12 @@
-# PR #354 — Phase 1.5 (Option A) Follow-up Plan
+# PR #354 — Follow-up Packaging Plan (Option A)
 
-**Goal:** Eliminate worker-bundled relative imports and enforce canonical imports (`@oosync/*`, `@shared-generated/*`) *everywhere* by making `oosync` a real package artifact that Wrangler can resolve at bundle time.
+**Prerequisite:** Complete Phase 1.5 schema-agnostic isolation first.
 
-This is a follow-up PR to PR #354.
+- See: `_notes/pr2-i338-phase-1.5-schema-agnostic-oosync-plan.md`
+
+**Goal (this doc):** After `oosync` no longer references any TuneTrees schema/tables, eliminate worker-bundled relative imports and enforce canonical imports by making `oosync` a real package artifact that Wrangler can resolve at bundle time.
+
+This is a follow-up PR to PR #354, but it should happen **after** schema-agnostic isolation.
 
 ## Background / Current Limitation
 
@@ -12,10 +16,8 @@ This is a follow-up PR to PR #354.
 
 ## Desired End State
 
-- Worker-bundled code imports:
-  - protocol/types via `@oosync/shared/protocol`
-  - schema/meta via `@shared-generated/sync`
-  - any other library code via `@oosync/...`
+- Worker-bundled code imports runtime/protocol via a real package import (no TS `paths` reliance at bundle time).
+- TuneTrees schema/meta lives in a separate module/package and is imported by app/worker (not by `oosync`).
 - No worker-bundled file imports `../../src/...` or `../../../shared/generated/...`.
 - Root app/tooling continues to use TS aliases, but worker bundling no longer depends on TS alias support.
 
@@ -43,17 +45,17 @@ This is a follow-up PR to PR #354.
   - `oosync:clean`: remove `oosync/dist`
 - Update root `build` / `typecheck` flow if needed so CI builds `oosync` before bundling worker.
 
-### 4) Provide `@shared-generated/*` as a package-like import for Wrangler
-Pick one of these sub-options (A1 preferred):
+### 4) Package the TuneTrees schema/meta separately from `oosync`
+Once schema is injected (Phase 1.5 prerequisite), keep `oosync` and schema/meta as separate artifacts.
 
-**A1 (preferred): ship generated contract inside `@tunetrees/oosync`**
-- Make `oosync` re-export the generated schema/meta from `shared/generated/sync/*`.
-- Change worker imports to `@tunetrees/oosync/generated/sync` (or similar) so Wrangler resolves everything from a single package.
-- Keep `shared/generated/*` as the source-of-truth generation output, but treat it as an input to `oosync` build.
+Pick one of these:
 
-**A2: create a tiny `@tunetrees/shared-generated` package**
-- Add `shared/generated/package.json` + build step (or mark as `type: module` with direct TS if Wrangler can consume it post-build).
-- Worker imports `@tunetrees/shared-generated/sync`.
+**A1 (preferred): create a small TuneTrees schema package**
+- Example name: `@tunetrees/sync-schema`.
+- Exports an implementation of the `ISyncSchemaDescription` interface.
+
+**A2: keep schema/meta repo-local but still package-like for Wrangler**
+- Add a minimal package boundary around the generated schema/meta folder so Wrangler can resolve it without TS `paths`.
 
 ### 5) Update worker to import package paths
 - Replace worker-bundled relative imports with package imports.
@@ -61,14 +63,14 @@ Pick one of these sub-options (A1 preferred):
 - Confirm worker wrapper still remains thin.
 
 ### 6) Keep app imports stable
-- App continues to import via `@oosync/*` (TS alias) *or* migrate to the real package name.
-- Prefer migrating app to the real package name once stable (optional for Phase 1.5).
+- App continues to import `oosync` via TS alias or real package name.
+- App/worker import TuneTrees schema/meta from the separate schema module/package.
 
 ## Implementation Steps (PR Checklist)
 
 1. Add `oosync/package.json` + `oosync/tsconfig.json` and build output directory `oosync/dist/`.
 2. Add root scripts to build `oosync`.
-3. Decide A1 vs A2 for generated contract exposure.
+3. Decide how TuneTrees schema/meta is packaged (A1 vs A2).
 4. Switch worker-bundled imports to package imports (no relative imports).
 5. Update CI/build scripts so worker build runs after `oosync` build.
 6. Verify:
@@ -87,6 +89,7 @@ Pick one of these sub-options (A1 preferred):
 
 ## Definition of Done
 
-- Worker-bundled code contains **no** relative imports into `oosync/src/*` or `shared/generated/*`.
+- Worker-bundled code contains **no** relative imports into `oosync/src/*`.
+- Worker-bundled code resolves TuneTrees schema/meta via a package/module boundary (no relative import coupling).
 - Worker uses canonical imports.
 - All existing verification commands remain green.
