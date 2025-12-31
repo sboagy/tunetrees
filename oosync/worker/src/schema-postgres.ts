@@ -20,7 +20,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { COL, TBL } from "../../shared/db-constants";
+import { COL, TBL } from "../../src/shared/protocol";
 
 export const dailyPracticeQueue = pgTable(
   TBL.DAILY_PRACTICE_QUEUE,

@@ -6,7 +6,7 @@
 
 import initSqlJs, { type Database } from "sql.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TABLE_REGISTRY } from "../../../shared/table-meta";
+import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 import {
   areSyncTriggersInstalled,
   areSyncTriggersSuppressed,

@@ -17,7 +17,7 @@
  */
 
 import type { Database as SqlJsDatabase } from "sql.js";
-import { TABLE_REGISTRY } from "../../../shared/table-meta";
+import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 
 /**
  * Create the sync trigger control table.

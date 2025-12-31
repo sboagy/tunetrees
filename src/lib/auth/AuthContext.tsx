@@ -18,7 +18,7 @@ import {
   type ParentComponent,
   useContext,
 } from "solid-js";
-import { TABLE_REGISTRY } from "../../../shared/table-meta";
+import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,

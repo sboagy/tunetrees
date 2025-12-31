@@ -5,7 +5,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { SYNCABLE_TABLES } from "../../../shared/table-meta";
+import { SYNCABLE_TABLES } from "@oosync/shared/table-meta";
 import {
   batchToLocal,
   batchToRemote,
