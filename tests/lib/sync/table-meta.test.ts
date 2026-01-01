@@ -4,7 +4,6 @@
  * @module tests/lib/sync/table-meta.test
  */
 
-import { describe, expect, it } from "vitest";
 import {
   buildRowIdForOutbox,
   COMPOSITE_PK_TABLES,
@@ -21,7 +20,8 @@ import {
   SYNCABLE_TABLES,
   supportsIncremental,
   TABLE_REGISTRY,
-} from "@oosync/shared/table-meta";
+} from "@sync-schema/table-meta";
+import { describe, expect, it } from "vitest";
 
 describe("TABLE_REGISTRY completeness", () => {
   it("has entries for all SYNCABLE_TABLES", () => {

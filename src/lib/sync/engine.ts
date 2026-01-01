@@ -9,10 +9,10 @@
  * @module lib/sync/engine
  */
 
+import type { SyncChange } from "@oosync/shared/protocol";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import * as localSchema from "../../../drizzle/schema-sqlite";
-import type { SyncChange } from "@oosync/shared/protocol";
 import {
   clearOutboxBackupForUser,
   getSqliteInstance,
@@ -89,7 +89,7 @@ import {
   SYNCABLE_TABLES,
   TABLE_SYNC_ORDER,
   TABLE_TO_SCHEMA_KEY,
-} from "@oosync/shared/table-meta";
+} from "@sync-schema/table-meta";
 
 function sqliteTableHasAnyRows(
   sqliteInstance: { exec: (sql: string) => any[] },

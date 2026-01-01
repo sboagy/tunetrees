@@ -23,12 +23,7 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
-import { COL } from "../../src/shared/protocol";
-import type {
-  SyncChange,
-  SyncRequest,
-  SyncResponse,
-} from "../../src/shared/protocol";
+import { COL } from "../../../shared/sync-schema/db-constants";
 import {
   getBooleanColumns,
   getConflictTarget,
@@ -38,7 +33,12 @@ import {
   SYNCABLE_TABLES,
   type SyncableTableName,
   TABLE_REGISTRY,
-} from "../../src/shared/table-meta";
+} from "../../../shared/sync-schema/table-meta";
+import type {
+  SyncChange,
+  SyncRequest,
+  SyncResponse,
+} from "../../src/shared/protocol";
 import * as schema from "./schema-postgres";
 
 // ============================================================================
@@ -138,7 +138,7 @@ function createDb(env: Env): {
 } {
   const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
   if (!connectionString) {
-    const msg = env.HYPERDRIVE 
+    const msg = env.HYPERDRIVE
       ? "HYPERDRIVE binding has no connectionString"
       : "DATABASE_URL not configured";
     throw new Error(`Database configuration error: ${msg}`);
@@ -172,11 +172,18 @@ type Hyperdrive = {
   connectionString?: string;
 };
 
-type IncomingSyncTableName = SyncableTableName | "sync_push_queue" | "sync_change_log";
-type IncomingSyncChange = Omit<SyncChange, "table"> & { table: IncomingSyncTableName };
+type IncomingSyncTableName =
+  | SyncableTableName
+  | "sync_push_queue"
+  | "sync_change_log";
+type IncomingSyncChange = SyncChange<IncomingSyncTableName>;
 
-function isClientSyncChange(change: IncomingSyncChange): change is SyncChange {
-  return change.table !== "sync_push_queue" && change.table !== "sync_change_log";
+function isClientSyncChange(
+  change: IncomingSyncChange
+): change is SyncChange<SyncableTableName> {
+  return (
+    change.table !== "sync_push_queue" && change.table !== "sync_change_log"
+  );
 }
 
 export interface Env {
@@ -884,7 +891,7 @@ async function applyUpsert(
  */
 async function processPushChanges(
   tx: Transaction,
-  changes: SyncChange[]
+  changes: IncomingSyncChange[]
 ): Promise<void> {
   console.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
@@ -1284,7 +1291,7 @@ async function handleSync(
     };
 
     // PUSH: Apply client changes
-    await processPushChanges(tx, payload.changes);
+    await processPushChanges(tx, payload.changes as IncomingSyncChange[]);
 
     // PULL: Gather changes for client
     if (payload.lastSyncAt) {
@@ -1336,7 +1343,10 @@ function getCorsHeaders(request: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, apikey, x-client-info",
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
     "Access-Control-Max-Age": "86400", // 24 hours
   };
 }
@@ -1370,9 +1380,9 @@ export default {
 
       // CORS preflight - handle immediately
       if (request.method === "OPTIONS") {
-        return new Response(null, { 
+        return new Response(null, {
           status: 204,
-          headers: corsHeaders 
+          headers: corsHeaders,
         });
       }
 

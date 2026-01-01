@@ -1,25 +1,10 @@
-/**
- * Table Metadata Registry
- *
- * Single source of truth for sync-related table metadata:
- * - Primary keys (standard and non-standard)
- * - Composite unique keys for UPSERT conflict resolution
- * - Timestamp columns for incremental sync
- * - Boolean columns for SQLite integer ↔ Postgres boolean conversion
- * - Per-table normalization functions
- *
- * @module lib/sync/table-meta
- */
-
-import {
-  type SyncableTableName as GeneratedSyncableTableName,
-  SYNCABLE_TABLES as SYNCABLE_TABLES_GENERATED,
-  TABLE_REGISTRY_CORE,
-  type TableMetaCore,
-} from "../../../shared/generated/sync";
+// Schema-agnostic table metadata contract for `oosync`.
+//
+// `oosync` must not own any concrete application schema (TuneTrees or otherwise).
+// Consumers (app/worker/tests) provide a table registry.
 
 /**
- * Category of change for UI signaling
+ * Category of change for UI signaling (optional; consumers may ignore).
  */
 export type ChangeCategory =
   | "repertoire"
@@ -28,282 +13,143 @@ export type ChangeCategory =
   | "user"
   | null;
 
-export type SyncableTableName = GeneratedSyncableTableName;
-
 /**
- * Metadata for a syncable table
+ * Minimal metadata `oosync` needs to reason about row identity.
+ *
+ * Consumers are free to extend this shape in their own layer.
  */
-export interface TableMeta {
+export interface ITableMeta {
   /** Primary key column(s) in snake_case */
-  primaryKey: string | string[];
+  primaryKey: string | readonly string[];
   /** Unique constraint columns for UPSERT (snake_case), null if none */
-  uniqueKeys: string[] | null;
+  uniqueKeys: readonly string[] | null;
   /** Timestamp columns (snake_case) */
-  timestamps: string[];
-  /** Boolean columns that need SQLite integer ↔ Postgres boolean conversion */
-  booleanColumns: string[];
+  timestamps: readonly string[];
+  /** Boolean columns needing SQLite integer ↔ Postgres boolean conversion */
+  booleanColumns: readonly string[];
   /** Whether this table supports incremental sync (has last_modified_at) */
   supportsIncremental: boolean;
   /** Whether this table has a deleted flag for soft deletes */
   hasDeletedFlag: boolean;
   /** Category of change for UI signaling */
-  changeCategory: ChangeCategory;
+  changeCategory?: ChangeCategory;
   /** Optional per-table normalization (e.g., datetime format) */
-  normalize?: (row: Record<string, unknown>) => Record<string, unknown>;
+  normalize?: (
+    row: Readonly<Record<string, unknown>>
+  ) => Record<string, unknown>;
 }
 
-/**
- * Normalize datetime fields that may have space or T separator
- * Standardizes to ISO format with T separator
- */
-function normalizeDatetimeFields(
-  row: Record<string, unknown>,
-  fields: string[]
-): Record<string, unknown> {
-  const normalized = { ...row };
-  for (const field of fields) {
-    const value = normalized[field];
-    if (typeof value === "string") {
-      // Replace single space between date and time with T, if present
-      let result = value.includes(" ") ? value.replace(" ", "T") : value;
+export type TableRegistry = Readonly<Record<string, ITableMeta>>;
 
-      // If there is already an explicit timezone (Z or offset), leave as-is
-      if (/Z$/i.test(result) || /[+-]\d{2}:?\d{2}$/.test(result)) {
-        normalized[field] = result;
-        continue;
-      }
-
-      // Otherwise, treat as UTC and append Z
-      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(result)) {
-        result = `${result}Z`;
-      }
-
-      normalized[field] = result;
-    }
-  }
-  return normalized;
+function isPrimaryKeyArray(
+  pk: ITableMeta["primaryKey"]
+): pk is readonly string[] {
+  return Array.isArray(pk);
 }
 
-/**
- * Normalize daily_practice_queue datetime formats
- */
-function normalizeDailyPracticeQueue(
-  row: Record<string, unknown>
-): Record<string, unknown> {
-  return normalizeDatetimeFields(row, [
-    "window_start_utc",
-    "window_end_utc",
-    "generated_at",
-    "completed_at",
-    "snapshot_coalesced_ts",
-  ]);
-}
-
-/**
- * Normalize practice_record datetime formats
- */
-function normalizePracticeRecord(
-  row: Record<string, unknown>
-): Record<string, unknown> {
-  return normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]);
-}
-
-/**
- * Complete table metadata registry
- *
- * All syncable tables must be registered here.
- * Keys are snake_case table names (matching Supabase/PostgreSQL).
- */
-export const SYNCABLE_TABLES = SYNCABLE_TABLES_GENERATED;
-
-const TABLE_EXTRAS: Record<
-  SyncableTableName,
-  Pick<TableMeta, "changeCategory" | "normalize">
-> = {
-  genre: { changeCategory: "catalog" },
-  tune_type: { changeCategory: "catalog" },
-  genre_tune_type: { changeCategory: "catalog" },
-  user_profile: { changeCategory: "user" },
-  instrument: { changeCategory: "catalog" },
-  prefs_scheduling_options: { changeCategory: "user" },
-  prefs_spaced_repetition: { changeCategory: "user" },
-  playlist: { changeCategory: "repertoire" },
-  table_state: { changeCategory: null },
-  tab_group_main_state: { changeCategory: null },
-  tune: { changeCategory: "catalog" },
-  playlist_tune: { changeCategory: "repertoire" },
-  practice_record: {
-    changeCategory: "practice",
-    normalize: normalizePracticeRecord,
-  },
-  daily_practice_queue: {
-    changeCategory: "practice",
-    normalize: normalizeDailyPracticeQueue,
-  },
-  table_transient_data: { changeCategory: "practice" },
-  note: { changeCategory: "repertoire" },
-  reference: { changeCategory: "repertoire" },
-  tag: { changeCategory: "repertoire" },
-  tune_override: { changeCategory: "repertoire" },
-};
-
-export const TABLE_REGISTRY_MERGED: Record<SyncableTableName, TableMeta> =
-  Object.fromEntries(
-    Object.entries(TABLE_REGISTRY_CORE).map(([tableName, core]) => {
-      const extras = TABLE_EXTRAS[tableName as SyncableTableName];
-      return [tableName, { ...(core as TableMetaCore), ...extras }];
-    })
-  ) as Record<SyncableTableName, TableMeta>;
-
-// Preserve existing export signature used across codebase/tests.
-export const TABLE_REGISTRY: Record<string, TableMeta> = TABLE_REGISTRY_MERGED;
-
-/**
- * Tables with composite primary keys
- */
-export const COMPOSITE_PK_TABLES: SyncableTableName[] = [
-  "genre_tune_type",
-  "prefs_spaced_repetition",
-  "table_state",
-  "playlist_tune",
-  "table_transient_data",
-];
-
-/**
- * Tables with non-standard primary key column names (not 'id')
- */
-export const NON_STANDARD_PK_TABLES: Record<string, string> = {
-  playlist: "playlist_id",
-  user_profile: "supabase_user_id",
-  prefs_scheduling_options: "user_id",
-};
-
-// ===== Helper Functions =====
-
-/**
- * Get the primary key column(s) for a table (snake_case)
- */
-export function getPrimaryKey(tableName: string): string | string[] {
-  const meta = TABLE_REGISTRY[tableName];
-  if (!meta) {
-    throw new Error(`Unknown table: ${tableName}`);
-  }
-  return meta.primaryKey;
-}
-
-/**
- * Get unique constraint columns for UPSERT (snake_case)
- * Returns null for tables without unique constraints
- */
-export function getUniqueKeys(tableName: string): string[] | null {
-  const meta = TABLE_REGISTRY[tableName];
-  if (!meta) {
-    throw new Error(`Unknown table: ${tableName}`);
-  }
-  return meta.uniqueKeys;
-}
-
-/**
- * Get the conflict target columns for UPSERT operations
- * Uses uniqueKeys if available, otherwise falls back to primaryKey
- */
-export function getConflictTarget(tableName: string): string[] {
-  const meta = TABLE_REGISTRY[tableName];
-  if (!meta) {
-    throw new Error(`Unknown table: ${tableName}`);
-  }
-
-  if (meta.uniqueKeys) {
-    return meta.uniqueKeys;
-  }
-
-  // Fall back to primary key
-  return Array.isArray(meta.primaryKey) ? meta.primaryKey : [meta.primaryKey];
-}
-
-/**
- * Check if a table supports incremental sync (has last_modified_at)
- */
-export function supportsIncremental(tableName: string): boolean {
-  const meta = TABLE_REGISTRY[tableName];
-  return meta?.supportsIncremental ?? false;
-}
-
-/**
- * Check if a table has soft delete support (deleted flag)
- */
-export function hasDeletedFlag(tableName: string): boolean {
-  const meta = TABLE_REGISTRY[tableName];
-  return meta?.hasDeletedFlag ?? false;
-}
-
-/**
- * Get boolean columns that need conversion for a table
- */
-export function getBooleanColumns(tableName: string): string[] {
-  const meta = TABLE_REGISTRY[tableName];
-  return meta?.booleanColumns ?? [];
-}
-
-/**
- * Get the normalization function for a table (if any)
- */
-export function getNormalizer(
+function getRequiredMeta(
+  registry: TableRegistry,
   tableName: string
-): ((row: Record<string, unknown>) => Record<string, unknown>) | undefined {
-  const meta = TABLE_REGISTRY[tableName];
-  return meta?.normalize;
+): ITableMeta {
+  const meta = registry[tableName];
+  if (!meta) {
+    throw new Error(`Unknown table: ${tableName}`);
+  }
+  return meta;
 }
 
-/**
- * Check if a table is registered
- */
-export function isRegisteredTable(tableName: string): boolean {
-  return tableName in TABLE_REGISTRY;
+export function getPrimaryKey(
+  registry: TableRegistry,
+  tableName: string
+): string | readonly string[] {
+  return getRequiredMeta(registry, tableName).primaryKey;
 }
 
-/**
- * Check if a table has a composite primary key
- */
-export function hasCompositePK(tableName: string): boolean {
-  const meta = TABLE_REGISTRY[tableName];
+export function getUniqueKeys(
+  registry: TableRegistry,
+  tableName: string
+): readonly string[] | null {
+  return getRequiredMeta(registry, tableName).uniqueKeys;
+}
+
+export function getConflictTarget(
+  registry: TableRegistry,
+  tableName: string
+): readonly string[] {
+  const meta = getRequiredMeta(registry, tableName);
+  if (meta.uniqueKeys) return meta.uniqueKeys;
+  const pk = meta.primaryKey;
+  return isPrimaryKeyArray(pk) ? pk : [pk];
+}
+
+export function supportsIncremental(
+  registry: TableRegistry,
+  tableName: string
+): boolean {
+  return registry[tableName]?.supportsIncremental ?? false;
+}
+
+export function hasDeletedFlag(
+  registry: TableRegistry,
+  tableName: string
+): boolean {
+  return registry[tableName]?.hasDeletedFlag ?? false;
+}
+
+export function getBooleanColumns(
+  registry: TableRegistry,
+  tableName: string
+): readonly string[] {
+  return registry[tableName]?.booleanColumns ?? [];
+}
+
+export function getNormalizer(
+  registry: TableRegistry,
+  tableName: string
+):
+  | ((row: Readonly<Record<string, unknown>>) => Record<string, unknown>)
+  | undefined {
+  return registry[tableName]?.normalize;
+}
+
+export function isRegisteredTable(
+  registry: TableRegistry,
+  tableName: string
+): boolean {
+  return tableName in registry;
+}
+
+export function hasCompositePK(
+  registry: TableRegistry,
+  tableName: string
+): boolean {
+  const meta = registry[tableName];
   return Array.isArray(meta?.primaryKey);
 }
 
-/**
- * Build a JSON string for composite key storage in sync_outbox
- * Returns the simple ID string for single-column PKs
- */
 export function buildRowIdForOutbox(
+  registry: TableRegistry,
   tableName: string,
-  row: Record<string, unknown>
+  row: Readonly<Record<string, unknown>>
 ): string {
-  const pk = getPrimaryKey(tableName);
-
-  if (Array.isArray(pk)) {
-    // Composite key - store as JSON
+  const pk = getPrimaryKey(registry, tableName);
+  if (isPrimaryKeyArray(pk)) {
     const keyObj: Record<string, unknown> = {};
     for (const col of pk) {
       keyObj[col] = row[col];
     }
     return JSON.stringify(keyObj);
   }
-
-  // Simple key - store directly
   return String(row[pk]);
 }
 
-/**
- * Parse a row_id from sync_outbox back to key values
- */
 export function parseOutboxRowId(
+  registry: TableRegistry,
   tableName: string,
   rowId: string
 ): Record<string, unknown> | string {
-  const pk = getPrimaryKey(tableName);
-
-  if (Array.isArray(pk)) {
-    // Composite key - parse JSON
+  const pk = getPrimaryKey(registry, tableName);
+  if (isPrimaryKeyArray(pk)) {
     try {
       return JSON.parse(rowId) as Record<string, unknown>;
     } catch {
@@ -312,74 +158,5 @@ export function parseOutboxRowId(
       );
     }
   }
-
-  // Simple key - return as-is
   return rowId;
 }
-
-/**
- * Sync order for tables to respect foreign key dependencies
- */
-export const TABLE_SYNC_ORDER: Record<string, number> = {
-  // Reference data (no dependencies)
-  genre: 1,
-  tune_type: 2,
-  genre_tune_type: 3,
-
-  // User data (base tables)
-  user_profile: 10,
-  instrument: 11, // depends on user_profile via private_to_user
-  prefs_scheduling_options: 12,
-  prefs_spaced_repetition: 13,
-  tab_group_main_state: 14,
-
-  // Core data
-  tune: 20,
-  playlist: 21,
-  tag: 22,
-  note: 23,
-  reference: 24,
-  user_annotation: 25,
-  tune_override: 26,
-
-  // UI state (depends on user_profile + playlist)
-  table_state: 27,
-
-  // Junction/dependent tables (must come after their referenced tables)
-  playlist_tune: 30,
-  repertoire: 31,
-  table_transient_data: 32,
-
-  // Practice data (depends on tune, playlist, playlist_tune)
-  daily_practice_queue: 40,
-  practice_record: 41,
-};
-
-/**
- * Mapping from table name to schema key (camelCase)
- */
-export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
-  daily_practice_queue: "dailyPracticeQueue",
-  genre: "genre",
-  genre_tune_type: "genreTuneType",
-  instrument: "instrument",
-  note: "note",
-  playlist: "playlist",
-  playlist_tune: "playlistTune",
-  practice_record: "practiceRecord",
-  prefs_scheduling_options: "prefsSchedulingOptions",
-  prefs_spaced_repetition: "prefsSpacedRepetition",
-  reference: "reference",
-  sync_outbox: "syncOutbox",
-  tab_group_main_state: "tabGroupMainState",
-  table_state: "tableState",
-  tune: "tune",
-  tune_attribute: "tuneAttribute",
-  tune_type: "tuneType",
-  user_profile: "userProfile",
-  tag: "tag",
-  repertoire: "repertoire",
-  table_transient_data: "tableTransientData",
-  user_annotation: "userAnnotation",
-  tune_override: "tuneOverride",
-};

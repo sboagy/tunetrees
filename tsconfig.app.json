@@ -27,7 +27,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@oosync/*": ["./oosync/src/*"],
-      "@shared-generated/*": ["./shared/generated/*"]
+      "@shared-generated/*": ["./shared/generated/*"],
+      "@sync-schema/*": ["./shared/sync-schema/*"]
     }
   },
   "include": ["src", "shared", "oosync/src"]

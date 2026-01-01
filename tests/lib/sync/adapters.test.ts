@@ -4,8 +4,8 @@
  * @module tests/lib/sync/adapters.test
  */
 
+import { SYNCABLE_TABLES } from "@sync-schema/table-meta";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SYNCABLE_TABLES } from "@oosync/shared/table-meta";
 import {
   batchToLocal,
   batchToRemote,
@@ -365,7 +365,9 @@ describe("batchToRemote", () => {
 });
 
 describe("all syncable tables have adapters", () => {
-  it.each(SYNCABLE_TABLES)("can create adapter for %s", (tableName) => {
+  const cases = SYNCABLE_TABLES.map((tableName) => [tableName] as const);
+
+  it.each(cases)("can create adapter for %s", (tableName) => {
     const adapter = createAdapter(tableName);
     expect(adapter.tableName).toBe(tableName);
     expect(adapter.primaryKey).toBeDefined();

@@ -14,4 +14,9 @@ export type {
   SyncStatus,
 } from "./queue";
 
-export { type SyncResult, SyncService, startSyncWorker } from "./service";
+export {
+  SyncInProgressError,
+  type SyncResult,
+  SyncService,
+  startSyncWorker,
+} from "./service";

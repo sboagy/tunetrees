@@ -11,7 +11,8 @@
     "baseUrl": ".",
     "paths": {
       "@oosync/*": ["./oosync/src/*"],
-      "@shared-generated/*": ["./shared/generated/*"]
+      "@shared-generated/*": ["./shared/generated/*"],
+      "@sync-schema/*": ["./shared/sync-schema/*"]
     },
 
     /* Bundler mode */

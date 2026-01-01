@@ -8,6 +8,7 @@
  */
 
 import type { AuthError, Session, User } from "@supabase/supabase-js";
+import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import { sql } from "drizzle-orm";
 import {
   type Accessor,
@@ -18,7 +19,6 @@ import {
   type ParentComponent,
   useContext,
 } from "solid-js";
-import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
@@ -30,6 +30,7 @@ import { log } from "../logger";
 import { supabase } from "../supabase/client";
 import {
   clearOldOutboxItems,
+  SyncInProgressError,
   type SyncService,
   startSyncWorker,
 } from "../sync";
@@ -1436,11 +1437,37 @@ export const AuthProvider: ParentComponent = (props) => {
       return;
     }
 
+    const waitForSyncIdle = async (timeoutMs = 15_000) => {
+      const startedAt = Date.now();
+      while (syncServiceInstance?.syncing) {
+        if (Date.now() - startedAt > timeoutMs) {
+          throw new Error("Timed out waiting for in-progress sync to finish");
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    };
+
     try {
       console.log("🔄 [ForceSyncUp] Starting sync up to Supabase...");
       log.info("Forcing sync up to Supabase...");
 
-      const result = await syncServiceInstance.syncUp(opts);
+      let result: Awaited<ReturnType<SyncService["syncUp"]>>;
+      try {
+        result = await syncServiceInstance.syncUp(opts);
+      } catch (error) {
+        if (
+          error instanceof SyncInProgressError ||
+          (error instanceof Error && error.name === "SyncInProgressError")
+        ) {
+          console.warn(
+            "⚠️ [ForceSyncUp] Sync already in progress - waiting and retrying..."
+          );
+          await waitForSyncIdle();
+          result = await syncServiceInstance.syncUp(opts);
+        } else {
+          throw error;
+        }
+      }
 
       console.log("✅ [ForceSyncUp] Sync up completed:", {
         success: result.success,
