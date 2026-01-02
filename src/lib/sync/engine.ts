@@ -105,7 +105,12 @@ function sqliteTableHasAnyRows(
 
 async function hasAnyLocalSyncData(): Promise<boolean> {
   const sqliteInstance = await getSqliteInstance();
-  if (!sqliteInstance) return true;
+  // If sql.js isn't initialized yet, we cannot reliably inspect the DB.
+  // In the specific scenario where we have a persisted lastSyncTimestamp but the
+  // local DB was cleared/reset (common in E2E), treating this as "has data"
+  // causes us to incorrectly do an incremental sync against an empty DB.
+  // Safer default: assume empty so the caller can force a full sync.
+  if (!sqliteInstance) return false;
 
   for (const tableName of SYNCABLE_TABLES) {
     try {
@@ -507,9 +512,6 @@ export class SyncEngine {
                       throw e;
                     }
 
-                    const { id: _ignoredId, ...sanitizedDataWithoutId } =
-                      sanitizedData as Record<string, unknown>;
-
                     await this.localDb
                       .insert(table)
                       .values(sanitizedData)
@@ -517,7 +519,22 @@ export class SyncEngine {
                         target: compositeKeys.map(
                           (k) => (table as any)[toCamelCase(k)]
                         ),
-                        set: sanitizedDataWithoutId,
+                        // Default behavior: do not update synthetic PK `id` when resolving
+                        // a natural unique-key conflict (prevents rewiring local foreign keys).
+                        // Exception: user_profile.id is the canonical identity referenced by
+                        // many tables (e.g. playlist.user_ref). If a local user_profile row was
+                        // created pre-sync (same supabase_user_id, different id), we must adopt
+                        // the server-provided `id` so downstream rows match and FK inserts succeed.
+                        set:
+                          change.table === "user_profile" &&
+                          compositeKeys.length === 1 &&
+                          compositeKeys[0] === "supabase_user_id"
+                            ? sanitizedData
+                            : ((): Record<string, unknown> => {
+                                const { id: _ignoredId, ...rest } =
+                                  sanitizedData as Record<string, unknown>;
+                                return rest;
+                              })(),
                       })
                       .run();
                   }
@@ -636,7 +653,9 @@ export class SyncEngine {
       // 6c. Retry any remote changes that failed FK constraints on first pass.
       // This resolves cross-page dependency ordering problems.
       if (deferredForeignKeyChanges.length > 0) {
-        let remaining = deferredForeignKeyChanges;
+        // IMPORTANT: copy before clearing. `remaining = deferredForeignKeyChanges` would
+        // alias the same array, and `length = 0` would wipe the retry set.
+        let remaining = [...deferredForeignKeyChanges];
         deferredForeignKeyChanges.length = 0;
 
         // Keep passes small; most cases resolve in 1-2 passes.

@@ -246,7 +246,12 @@ const LogoDropdown: Component<{
 const PlaylistDropdown: Component<{
   onOpenPlaylistManager: () => void;
 }> = (props) => {
-  const { user, localDb, repertoireListChanged } = useAuth();
+  const {
+    user,
+    localDb,
+    repertoireListChanged,
+    remoteSyncDownCompletionVersion,
+  } = useAuth();
   const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
   const [showDropdown, setShowDropdown] = createSignal(false);
   let dropdownContainerRef: HTMLDivElement | undefined;
@@ -268,7 +273,7 @@ const PlaylistDropdown: Component<{
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = repertoireListChanged(); // Triggers refetch when playlists change
+      const version = `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`; // Triggers refetch when playlists change or sync completes
 
       console.log("🔍 [TopNav] Playlists dependency check:", {
         hasDb: !!db,

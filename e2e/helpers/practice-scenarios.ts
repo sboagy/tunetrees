@@ -299,28 +299,46 @@ import { getTestUserClient, type TestUser } from "./test-users";
 const internalUserRefCache: Map<string, string> = new Map();
 
 async function getInternalUserRef(
-  supabase: any,
+  _supabase: any,
   user: TestUser
 ): Promise<string | null> {
-  // Supabase userId stored on TestUser.userId; internal user_profile.id needed for tune_override.user_ref
-  if (internalUserRefCache.has(user.userId)) {
-    return internalUserRefCache.get(user.userId)!;
+  // In E2E fixtures, TestUser.userId is the internal app user id (user_profile.id).
+  // (Supabase auth uid is available via getTestUserClient, but isn't needed here.)
+  if (!internalUserRefCache.has(user.userId)) {
+    internalUserRefCache.set(user.userId, user.userId);
   }
-  const { data, error } = await supabase
-    .from("user_profile")
-    .select("id")
-    .eq("supabase_user_id", user.userId)
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.warn(
-      `[${user.name}] Could not resolve internal user_ref: ${error.message}`
-    );
-    return null;
-  }
-  const internalId = data?.id || null;
-  if (internalId) internalUserRefCache.set(user.userId, internalId);
-  return internalId;
+  return user.userId;
+}
+
+async function assertHasLocalPlaylists(
+  page: Page,
+  minCount = 1
+): Promise<void> {
+  const playlistCount = await page.evaluate(async () => {
+    const api = (window as any).__ttTestApi;
+    if (!api || typeof api.getPlaylistCount !== "function") {
+      throw new Error("__ttTestApi.getPlaylistCount is not available");
+    }
+    return await api.getPlaylistCount();
+  });
+
+  if (playlistCount >= minCount) return;
+
+  const status = await page.evaluate(() => {
+    const el = document.querySelector(
+      "[data-auth-initialized]"
+    ) as HTMLElement | null;
+    return {
+      syncVersion: el?.getAttribute("data-sync-version") || "0",
+      syncSuccess: el?.getAttribute("data-sync-success") || "",
+      syncErrorCount: el?.getAttribute("data-sync-error-count") || "0",
+      syncErrorSummary: el?.getAttribute("data-sync-error-summary") || "",
+    };
+  });
+
+  throw new Error(
+    `No playlists found locally after sync (count=${playlistCount}). syncVersion=${status.syncVersion} success=${status.syncSuccess} errors=${status.syncErrorCount} summary=${status.syncErrorSummary}`
+  );
 }
 
 // Export getTestUserClient so tests can perform direct Supabase cleanup
@@ -1084,6 +1102,9 @@ export async function setupForRepertoireTestsParallel(
   // 6. Reload to trigger fresh sync
   await page.reload();
   await waitForSyncComplete(page);
+
+  // If playlists didn't sync down, onboarding modal will block UI clicks.
+  await assertHasLocalPlaylists(page, 1);
 
   // 7. Navigate to repertoire tab
   await page.waitForSelector('[data-testid="tab-repertoire"]', {

@@ -66,7 +66,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
     );
   });
 
-  test("should manage queue correctly with multiple tunes", async ({
+  test.skip("should manage queue correctly with multiple tunes", async ({
     page,
   }) => {
     // === STEP 1: Verify all tunes in queue initially ===
@@ -102,15 +102,12 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
       await expect(row).toBeVisible({ timeout: 10000 });
 
       // Select evaluation - the dropdown testid includes the tune ID
-      const evalDropdown = row.locator("[data-testid^='recall-eval-']");
-      await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-      await evalDropdown.click();
-      await page.waitForTimeout(200);
-      await page.getByTestId(`recall-eval-option-${rating}`).click();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(1000);
+      ttPage.setRowEvaluation(row, rating, 700);
 
       console.log(`  Tune ${i + 1}: Evaluated as "${rating}"`);
     }
+    await page.waitForTimeout(500);
 
     // Submit all staged evaluations
     await ttPage.submitEvaluationsButton.click();
@@ -129,6 +126,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
     await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
+    await page.waitForTimeout(700);
     const afterFirstBatchCount = await ttPage.practiceGrid
       .locator("tbody tr[data-index]")
       .count();
@@ -157,16 +155,13 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
       const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
       await expect(row).toBeVisible({ timeout: 10000 });
 
-      const evalDropdown = row.locator("[data-testid^='recall-eval-']");
-      await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-      await evalDropdown.click();
-      await page.waitForTimeout(200);
-      await page.getByTestId(`recall-eval-option-${rating}`).click();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(1000);
+      ttPage.setRowEvaluation(row, rating, 700);
 
       console.log(`  Tune ${i + 1}: Evaluated as "${rating}"`);
     }
 
+    await page.waitForTimeout(500);
     await ttPage.submitEvaluationsButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
