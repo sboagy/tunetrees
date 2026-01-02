@@ -13,6 +13,7 @@
     "baseUrl": ".",
     "paths": {
       "@oosync/*": ["../oosync/src/*"],
+      "@oosync-worker/*": ["../oosync/worker/src/*"],
       "@shared-generated/*": ["../shared/generated/*"],
       "@sync-schema/*": ["../shared/sync-schema/*"]
     }

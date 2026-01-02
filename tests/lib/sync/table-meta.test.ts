@@ -39,8 +39,8 @@ describe("TABLE_REGISTRY completeness", () => {
 
   it("has the expected number of tables", () => {
     // Update this if adding/removing tables
-    expect(SYNCABLE_TABLES.length).toBe(19);
-    expect(Object.keys(TABLE_REGISTRY).length).toBe(19);
+    expect(SYNCABLE_TABLES.length).toBe(20);
+    expect(Object.keys(TABLE_REGISTRY).length).toBe(20);
   });
 });
 
@@ -68,7 +68,6 @@ describe("COMPOSITE_PK_TABLES", () => {
 describe("NON_STANDARD_PK_TABLES", () => {
   it("correctly maps non-standard PK column names", () => {
     expect(NON_STANDARD_PK_TABLES.playlist).toBe("playlist_id");
-    expect(NON_STANDARD_PK_TABLES.user_profile).toBe("supabase_user_id");
     expect(NON_STANDARD_PK_TABLES.prefs_scheduling_options).toBe("user_id");
   });
 
@@ -90,7 +89,7 @@ describe("getPrimaryKey", () => {
   it("returns string for single-column PK tables", () => {
     expect(getPrimaryKey("tune")).toBe("id");
     expect(getPrimaryKey("playlist")).toBe("playlist_id");
-    expect(getPrimaryKey("user_profile")).toBe("supabase_user_id");
+    expect(getPrimaryKey("user_profile")).toBe("id");
   });
 
   it("returns array for composite PK tables", () => {
@@ -99,8 +98,8 @@ describe("getPrimaryKey", () => {
       "tune_type_id",
     ]);
     expect(getPrimaryKey("table_transient_data")).toEqual([
-      "user_id",
       "tune_id",
+      "user_id",
       "playlist_id",
     ]);
     expect(getPrimaryKey("table_state")).toEqual([
@@ -218,10 +217,8 @@ describe("getBooleanColumns", () => {
       "favorite",
       "deleted",
     ]);
-    expect(getBooleanColumns("tab_group_main_state")).toEqual([
-      "practice_show_submitted",
-      "practice_mode_flashcard",
-    ]);
+    // tab_group_main_state stores these as integer flags in Postgres
+    expect(getBooleanColumns("tab_group_main_state")).toEqual([]);
   });
 });
 
@@ -369,6 +366,6 @@ describe("specific table metadata correctness", () => {
 
   it("user_profile uses supabase_user_id as PK", () => {
     const meta = TABLE_REGISTRY.user_profile;
-    expect(meta.primaryKey).toBe("supabase_user_id");
+    expect(meta.primaryKey).toBe("id");
   });
 });

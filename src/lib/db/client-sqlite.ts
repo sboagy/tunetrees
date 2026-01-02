@@ -362,6 +362,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0005_add_display_order.sql",
           "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
           "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
+          "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
@@ -393,6 +394,28 @@ export async function initializeDb(
       ensureNotCleared();
       try {
         ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
+
+        // Required for trigger install and server-side incremental sync.
+        // Older local DBs may be missing this table because it's not part of the historical
+        // sqlite migration set that seeded IndexedDB.
+        sqliteDb.run(`
+          CREATE TABLE IF NOT EXISTS sync_change_log (
+            table_name TEXT PRIMARY KEY NOT NULL,
+            changed_at TEXT NOT NULL
+          )
+        `);
+        sqliteDb.run(
+          "CREATE INDEX IF NOT EXISTS idx_sync_change_log_changed_at ON sync_change_log(changed_at)"
+        );
+
+        // Some historical SQLite schemas used supabase_user_id as PK and did not include an `id` column.
+        // Ensure `id` exists so synced rows (which reference user_profile.id) can be inserted.
+        // Do NOT backfill id = supabase_user_id: server user_profile.id is not the auth UID.
+        ensureColumnExists("user_profile", "id", "id text");
+        // Keep a best-effort uniqueness index; multiple NULLs are allowed in SQLite.
+        sqliteDb.run(
+          "CREATE UNIQUE INDEX IF NOT EXISTS user_profile_id_unique ON user_profile(id)"
+        );
 
         // Backward-compatible adds for hybrid tune fields.
         // Some existing IndexedDB DBs were created before these columns existed,

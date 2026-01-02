@@ -5,13 +5,10 @@
 
 /**
  * Category of change for UI signaling (optional; consumers may ignore).
+ *
+ * Schema-agnostic by design: consumers can define any category labels.
  */
-export type ChangeCategory =
-  | "repertoire"
-  | "practice"
-  | "catalog"
-  | "user"
-  | null;
+export type ChangeCategory = string | null;
 
 /**
  * Minimal metadata `oosync` needs to reason about row identity.
