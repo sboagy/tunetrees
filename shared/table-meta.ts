@@ -28,10 +28,7 @@ export interface TableMeta {
 
 export const SYNCABLE_TABLES = SYNCABLE_TABLES_GENERATED;
 
-function normalizeDatetimeFields(
-  row: Record<string, unknown>,
-  fields: string[]
-): Record<string, unknown> {
+function normalizeDatetimeFields(row: Record<string, unknown>, fields: string[]): Record<string, unknown> {
   const normalized = { ...row };
   for (const field of fields) {
     const value = normalized[field];
@@ -50,89 +47,77 @@ function normalizeDatetimeFields(
   return normalized;
 }
 
-const TABLE_EXTRAS: Record<
-  SyncableTableName,
-  Pick<TableMeta, "changeCategory" | "normalize">
-> = {
-  daily_practice_queue: {
+const TABLE_EXTRAS: Record<SyncableTableName, Pick<TableMeta, "changeCategory" | "normalize">> = {
+  "daily_practice_queue": {
     changeCategory: "practice",
-    normalize: (row) =>
-      normalizeDatetimeFields(row, [
-        "window_start_utc",
-        "window_end_utc",
-        "generated_at",
-        "completed_at",
-        "snapshot_coalesced_ts",
-      ]),
+    normalize: (row) => normalizeDatetimeFields(row, ["window_start_utc", "window_end_utc", "generated_at", "completed_at", "snapshot_coalesced_ts"]),
   },
-  genre: {
+  "genre": {
     changeCategory: "catalog",
   },
-  genre_tune_type: {
+  "genre_tune_type": {
     changeCategory: "catalog",
   },
-  instrument: {
+  "instrument": {
     changeCategory: "catalog",
   },
-  note: {
+  "note": {
     changeCategory: "repertoire",
   },
-  playlist: {
+  "playlist": {
     changeCategory: "repertoire",
   },
-  playlist_tune: {
+  "playlist_tune": {
     changeCategory: "repertoire",
   },
-  practice_record: {
+  "practice_record": {
     changeCategory: "practice",
-    normalize: (row) =>
-      normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]),
+    normalize: (row) => normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]),
   },
-  prefs_scheduling_options: {
+  "prefs_scheduling_options": {
     changeCategory: "user",
   },
-  prefs_spaced_repetition: {
+  "prefs_spaced_repetition": {
     changeCategory: "user",
   },
-  reference: {
+  "reference": {
     changeCategory: "repertoire",
   },
-  sync_change_log: {
+  "sync_change_log": {
     changeCategory: null,
   },
-  tab_group_main_state: {
+  "tab_group_main_state": {
     changeCategory: null,
   },
-  table_state: {
+  "table_state": {
     changeCategory: null,
   },
-  table_transient_data: {
+  "table_transient_data": {
     changeCategory: "practice",
   },
-  tag: {
+  "tag": {
     changeCategory: "repertoire",
   },
-  tune: {
+  "tune": {
     changeCategory: "catalog",
   },
-  tune_override: {
+  "tune_override": {
     changeCategory: "repertoire",
   },
-  tune_type: {
+  "tune_type": {
     changeCategory: "catalog",
   },
-  user_profile: {
+  "user_profile": {
     changeCategory: "user",
   },
 };
 
-export const TABLE_REGISTRY_MERGED: Record<SyncableTableName, TableMeta> =
-  Object.fromEntries(
-    Object.entries(TABLE_REGISTRY_CORE).map(([tableName, core]) => {
-      const extras = TABLE_EXTRAS[tableName as SyncableTableName];
-      return [tableName, { ...(core as TableMetaCore), ...extras }];
-    })
-  ) as Record<SyncableTableName, TableMeta>;
+export const TABLE_REGISTRY_MERGED: Record<SyncableTableName, TableMeta> = Object.fromEntries(
+  Object.entries(TABLE_REGISTRY_CORE).map(([tableName, core]) => {
+    const extras = TABLE_EXTRAS[tableName as SyncableTableName];
+    return [tableName, { ...(core as TableMetaCore), ...extras }];
+  })
+) as Record<SyncableTableName, TableMeta>;
 
 export const TABLE_REGISTRY: Record<string, TableMeta> = TABLE_REGISTRY_MERGED;
 
@@ -155,9 +140,7 @@ export const COMPOSITE_PK_TABLES: SyncableTableName[] = (() => {
   return tables;
 })();
 
-export const NON_STANDARD_PK_TABLES: Partial<
-  Record<SyncableTableName, string>
-> = (() => {
+export const NON_STANDARD_PK_TABLES: Partial<Record<SyncableTableName, string>> = (() => {
   const map: Partial<Record<SyncableTableName, string>> = {};
   for (const tableName of SYNCABLE_TABLES) {
     const pk = TABLE_REGISTRY_MERGED[tableName].primaryKey;
@@ -198,15 +181,11 @@ export function getBooleanColumns(tableName: string): string[] {
   return [...(TABLE_REGISTRY[tableName]?.booleanColumns ?? [])];
 }
 
-export function getNormalizer(
-  tableName: string
-):
+export function getNormalizer(tableName: string):
   | ((row: Readonly<Record<string, unknown>>) => Record<string, unknown>)
   | undefined {
   const normalize = TABLE_REGISTRY[tableName]?.normalize;
-  return normalize
-    ? (row) => normalize(row as Record<string, unknown>)
-    : undefined;
+  return normalize ? (row) => normalize(row as Record<string, unknown>) : undefined;
 }
 
 export function isRegisteredTable(tableName: string): boolean {
@@ -241,56 +220,54 @@ export function parseOutboxRowId(
     try {
       return JSON.parse(rowId) as Record<string, unknown>;
     } catch {
-      throw new Error(
-        `Invalid JSON row_id for composite key table ${tableName}: ${rowId}`
-      );
+      throw new Error(`Invalid JSON row_id for composite key table ${tableName}: ${rowId}`);
     }
   }
   return rowId;
 }
 
 export const TABLE_SYNC_ORDER: Record<string, number> = {
-  daily_practice_queue: 1,
-  genre: 2,
-  genre_tune_type: 5,
-  instrument: 7,
-  note: 14,
-  playlist: 8,
-  playlist_tune: 15,
-  practice_record: 16,
-  prefs_scheduling_options: 9,
-  prefs_spaced_repetition: 10,
-  reference: 17,
-  sync_change_log: 3,
-  tab_group_main_state: 11,
-  table_state: 12,
-  table_transient_data: 18,
-  tag: 19,
-  tune: 13,
-  tune_override: 20,
-  tune_type: 4,
-  user_profile: 6,
+  "daily_practice_queue": 1,
+  "genre": 2,
+  "genre_tune_type": 5,
+  "instrument": 7,
+  "note": 14,
+  "playlist": 8,
+  "playlist_tune": 15,
+  "practice_record": 16,
+  "prefs_scheduling_options": 9,
+  "prefs_spaced_repetition": 10,
+  "reference": 17,
+  "sync_change_log": 3,
+  "tab_group_main_state": 11,
+  "table_state": 12,
+  "table_transient_data": 18,
+  "tag": 19,
+  "tune": 13,
+  "tune_override": 20,
+  "tune_type": 4,
+  "user_profile": 6,
 };
 
 export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
-  daily_practice_queue: "dailyPracticeQueue",
-  genre: "genre",
-  genre_tune_type: "genreTuneType",
-  instrument: "instrument",
-  note: "note",
-  playlist: "playlist",
-  playlist_tune: "playlistTune",
-  practice_record: "practiceRecord",
-  prefs_scheduling_options: "prefsSchedulingOptions",
-  prefs_spaced_repetition: "prefsSpacedRepetition",
-  reference: "reference",
-  sync_change_log: "syncChangeLog",
-  tab_group_main_state: "tabGroupMainState",
-  table_state: "tableState",
-  table_transient_data: "tableTransientData",
-  tag: "tag",
-  tune: "tune",
-  tune_override: "tuneOverride",
-  tune_type: "tuneType",
-  user_profile: "userProfile",
+  "daily_practice_queue": "dailyPracticeQueue",
+  "genre": "genre",
+  "genre_tune_type": "genreTuneType",
+  "instrument": "instrument",
+  "note": "note",
+  "playlist": "playlist",
+  "playlist_tune": "playlistTune",
+  "practice_record": "practiceRecord",
+  "prefs_scheduling_options": "prefsSchedulingOptions",
+  "prefs_spaced_repetition": "prefsSpacedRepetition",
+  "reference": "reference",
+  "sync_change_log": "syncChangeLog",
+  "tab_group_main_state": "tabGroupMainState",
+  "table_state": "tableState",
+  "table_transient_data": "tableTransientData",
+  "tag": "tag",
+  "tune": "tune",
+  "tune_override": "tuneOverride",
+  "tune_type": "tuneType",
+  "user_profile": "userProfile",
 };
