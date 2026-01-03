@@ -103,7 +103,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
 
       // Select evaluation - the dropdown testid includes the tune ID
       await page.waitForTimeout(1000);
-      ttPage.setRowEvaluation(row, rating, 700);
+      await ttPage.setRowEvaluation(row, rating, 700);
 
       console.log(`  Tune ${i + 1}: Evaluated as "${rating}"`);
     }
@@ -156,7 +156,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
       await expect(row).toBeVisible({ timeout: 10000 });
 
       await page.waitForTimeout(1000);
-      ttPage.setRowEvaluation(row, rating, 700);
+      await ttPage.setRowEvaluation(row, rating, 700);
 
       console.log(`  Tune ${i + 1}: Evaluated as "${rating}"`);
     }
