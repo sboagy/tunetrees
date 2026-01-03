@@ -1038,10 +1038,27 @@ async function handleSync(
   diagnosticsEnabled: boolean
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
+  const diag: string[] = [];
   let responseChanges: SyncChange[] = [];
   let nextCursor: string | undefined;
   let syncStartedAt: string | undefined;
   const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
+
+  if (diagnosticsEnabled) {
+    const cursorSummary = payload.pullCursor
+      ? (() => {
+          try {
+            const c = decodeCursor(payload.pullCursor);
+            return `tableIndex=${c.tableIndex} offset=${c.offset}`;
+          } catch {
+            return "cursor=invalid";
+          }
+        })()
+      : "cursor=none";
+    diag.push(
+      `[WorkerSyncDiag] type=${syncType} changesIn=${payload.changes.length} lastSyncAt=${payload.lastSyncAt ?? "null"} pageSize=${payload.pageSize ?? "null"} ${cursorSummary}`
+    );
+  }
 
   console.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
   console.log(
@@ -1116,6 +1133,21 @@ async function handleSync(
       syncStartedAt = page.syncStartedAt;
     }
 
+    if (diagnosticsEnabled) {
+      const tableCounts: Record<string, number> = {};
+      for (const change of responseChanges) {
+        tableCounts[change.table] = (tableCounts[change.table] ?? 0) + 1;
+      }
+      const top = Object.entries(tableCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([t, n]) => `${t}:${n}`)
+        .join(",");
+      diag.push(
+        `[WorkerSyncDiag] changesOut=${responseChanges.length} nextCursor=${nextCursor ? "yes" : "no"} syncStartedAt=${syncStartedAt ?? "null"} topTables=${top || "(none)"}`
+      );
+    }
+
     // NO GARBAGE COLLECTION NEEDED!
     // sync_change_log now has at most ~20 rows (one per table)
   });
@@ -1129,6 +1161,7 @@ async function handleSync(
     syncedAt: now,
     nextCursor,
     syncStartedAt,
+    debug: diagnosticsEnabled ? diag : undefined,
   };
 }
 

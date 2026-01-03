@@ -7,7 +7,7 @@
     "workerConfigFile": "worker/src/generated/worker-config.generated.ts"
   },
   "tableMeta": {
-    "excludeTables": [],
+    "excludeTables": ["sync_change_log"],
     "changeCategoryByTable": {
       "genre": "catalog",
       "tune_type": "catalog",

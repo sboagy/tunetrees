@@ -26,7 +26,6 @@ export const SYNCABLE_TABLES = [
   "prefs_scheduling_options",
   "prefs_spaced_repetition",
   "reference",
-  "sync_change_log",
   "tab_group_main_state",
   "table_state",
   "table_transient_data",
@@ -127,14 +126,6 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     booleanColumns: ["public", "favorite", "deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
-  },
-  "sync_change_log": {
-    primaryKey: "table_name",
-    uniqueKeys: null,
-    timestamps: [],
-    booleanColumns: [],
-    supportsIncremental: false,
-    hasDeletedFlag: false,
   },
   "tab_group_main_state": {
     primaryKey: "id",

@@ -359,9 +359,6 @@ export const WORKER_SYNC_CONFIG =
           ]
         }
       },
-      "sync_change_log": {
-        "denyDelete": true
-      },
       "tab_group_main_state": {
         "denyDelete": true,
         "sanitize": {

@@ -42,6 +42,9 @@ const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
 const syncLog = (...args: any[]) =>
   SYNC_DEBUG && log.debug("[SyncEngine]", ...args);
 
+// Diagnostics flag for collecting sync performance stats (set VITE_SYNC_DIAGNOSTICS=true).
+const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+
 /** LocalStorage key prefix for persisting last sync timestamp across app restarts */
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
 
@@ -600,6 +603,11 @@ export class SyncEngine {
       let pullCursor: string | undefined;
       let syncStartedAt: string | undefined;
 
+      const diagStartedAtMs = SYNC_DIAGNOSTICS ? performance.now() : 0;
+      let diagPullPages = 0;
+      let diagPulledChanges = 0;
+      const diagTableCounts: Record<string, number> = {};
+
       // 3. Call Worker (Push + first Pull page)
       const firstResponse = await workerClient.sync(
         changes,
@@ -608,6 +616,14 @@ export class SyncEngine {
           pageSize: 200,
         }
       );
+
+      if (SYNC_DIAGNOSTICS) {
+        diagPullPages += 1;
+        diagPulledChanges += firstResponse.changes.length;
+        for (const change of firstResponse.changes) {
+          diagTableCounts[change.table] = (diagTableCounts[change.table] ?? 0) + 1;
+        }
+      }
 
       if (SYNC_DEBUG && firstResponse.debug) {
         syncLog("Worker Debug Logs:", JSON.stringify(firstResponse.debug));
@@ -646,7 +662,34 @@ export class SyncEngine {
           pullCursor = pageResponse.nextCursor;
           syncStartedAt = pageResponse.syncStartedAt ?? syncStartedAt;
 
+          if (SYNC_DIAGNOSTICS) {
+            diagPullPages += 1;
+            diagPulledChanges += pageResponse.changes.length;
+            for (const change of pageResponse.changes) {
+              diagTableCounts[change.table] =
+                (diagTableCounts[change.table] ?? 0) + 1;
+            }
+          }
+
           await applyRemoteChanges(pageResponse.changes);
+        }
+      }
+
+      if (SYNC_DIAGNOSTICS) {
+        const diagDurationMs = Math.round(performance.now() - diagStartedAtMs);
+        const type = isInitialSync ? "INITIAL" : "INCREMENTAL";
+        log.info(
+          `[SyncDiag] type=${type} pushed=${changes.length} pulled=${diagPulledChanges} pages=${diagPullPages} durationMs=${diagDurationMs}`
+        );
+
+        // Log top tables to keep noise low.
+        const topTables = Object.entries(diagTableCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8);
+        if (topTables.length > 0) {
+          log.info(
+            `[SyncDiag] topTables=${topTables.map(([t, n]) => `${t}:${n}`).join(",")}`
+          );
         }
       }
 
