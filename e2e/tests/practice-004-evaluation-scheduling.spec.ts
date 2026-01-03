@@ -142,14 +142,30 @@ test.describe
       await expect(page.getByText(/Successfully submitted/i)).toBeVisible({
         timeout: 5000,
       });
-      await page.waitForTimeout(500);
 
       // Verify tune disappeared from grid
       const afterRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
-      const afterCount = await afterRows.count();
-      console.log(`After submission count: ${afterCount}`);
 
-      expect(afterCount).toBe(initialCount - 1);
+      const expectedCount = initialCount - 1;
+      const maxAttempts = 6;
+      const retryDelayMs = 250;
+
+      let afterCount = await afterRows.count();
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        afterCount = await afterRows.count();
+        console.log(
+          `After submission count (attempt ${attempt}/${maxAttempts}): ${afterCount}`
+        );
+
+        if (afterCount === expectedCount) break;
+
+        if (attempt < maxAttempts) {
+          await page.waitForTimeout(retryDelayMs);
+        }
+      }
+
+      expect(afterCount).toBe(expectedCount);
     });
 
     test("should allow changing evaluation before submission", async () => {

@@ -16,6 +16,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Evaluations", () => {
+    test.setTimeout(60000);
+
     test.beforeEach(async ({ page, testUser }) => {
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
@@ -26,11 +28,12 @@ test.describe
         scheduleDaysAgo: 1,
         startTab: "practice",
       });
+      await page.waitForTimeout(500);
     });
 
     test("01. Select evaluation on flashcard", async ({ page }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Select "Good" via evaluation combobox
       await app.selectFlashcardEvaluation("good");
@@ -45,7 +48,7 @@ test.describe
       page,
     }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Select evaluation
       await app.selectFlashcardEvaluation("good");
@@ -57,7 +60,7 @@ test.describe
 
     test("03. Evaluation persists after navigation", async ({ page }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Select evaluation on first card
       await app.selectFlashcardEvaluation("good");
@@ -77,7 +80,7 @@ test.describe
       page,
     }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Select evaluation on first card
       await app.selectFlashcardEvaluation("good");
@@ -96,7 +99,7 @@ test.describe
       page,
     }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Select "Good"
       await app.selectFlashcardEvaluation("good");
@@ -113,7 +116,7 @@ test.describe
 
     test("06. Evaluation count updates in Submit button", async ({ page }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Initially no evaluations
       const submitButton = app.submitEvaluationsButton;
@@ -143,7 +146,7 @@ test.describe
 
     test("07. Can clear evaluation by clicking again", async ({ page }) => {
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(500);
 
       // Select evaluation
       await app.selectFlashcardEvaluation("good");

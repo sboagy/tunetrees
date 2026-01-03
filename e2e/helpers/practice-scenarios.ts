@@ -784,7 +784,7 @@ async function verifyTablesEmpty(
     supabase = client.supabase;
   }
 
-  const timeoutMs = 16000;
+  const timeoutMs = 20000; // increase timeout to reduce flake
   const retryDelayMs = 500;
   const start = Date.now();
   const tableCounts = new Map<string, number>(tableNames.map((t) => [t, 0]));

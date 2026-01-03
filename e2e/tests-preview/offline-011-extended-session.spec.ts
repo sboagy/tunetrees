@@ -259,12 +259,25 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     console.log("Reloading page");
     await page.goto(`${BASE_URL}`);
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
-    await page.waitForTimeout(1000);
 
     // Verify all changes persisted locally
     console.log("🔍 Verifying pending changes in sync_outbox...");
-    const pendingCount = await getSyncOutboxCount(page);
-    console.log(`📦 Pending sync items: ${pendingCount}`);
+    let pendingCount = await getSyncOutboxCount(page);
+    const targetPendingCount = 22;
+    const maxRetries = 6;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(
+        `📦 Pending sync items (attempt ${attempt}/${maxRetries}): ${pendingCount}`
+      );
+
+      if (pendingCount === targetPendingCount) break;
+
+      await page.waitForTimeout(500);
+      pendingCount = await getSyncOutboxCount(page);
+    }
+
+    console.log(`📦 Pending sync items (final): ${pendingCount}`);
     expect(pendingCount).toBeGreaterThanOrEqual(22); // 20 practice + deletions + additions + notes + settings
 
     await ttPage.navigateToTab("repertoire");

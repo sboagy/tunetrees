@@ -930,11 +930,29 @@ export class TuneTreesPage {
   }
 
   /**
-   * Find a tune row by ID in a specific grid
-   * Useful for checking private tunes (UUIDs)
+   * Find a tune row by ID in a specific grid.
+   * Useful for finding rows by tune ID, but not so useful
+   * when the ID column isn't showing (except for "scheduled" can use the
+   * evaluation control to locate)
    */
-  async getTuneRowById(tuneId: string, grid: Locator): Promise<Locator> {
+  getTuneRowById(tuneId: string, grid: Locator): Locator {
+    if (grid === this.practiceGrid) {
+      return this.getRowInPracticeGridByTuneId(tuneId);
+    }
     return grid.locator(`tr:has-text("${tuneId}")`);
+  }
+
+  /**
+   * Find a tune row by ID in the practice grid.
+   * Useful for locating a row when the ID column is not showing.
+   */
+  getRowInPracticeGridByTuneId(tuneId: string): Locator {
+    const row = this.page
+      .getByTestId(`recall-eval-${tuneId}`) // RecallEvalComboBox DropdownMenu.Trigger
+      .locator("..") // div?
+      .locator("..") // cell
+      .locator(".."); // row
+    return row;
   }
 
   getRows(gridId: string): Locator {
@@ -1218,9 +1236,13 @@ export class TuneTreesPage {
 
   // ===== Flashcard helpers =====
 
-  async enableFlashcardMode() {
+  async enableFlashcardMode(timeoutAfter?: number) {
     await this.flashcardModeSwitch.click();
     await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
+
+    if (typeof timeoutAfter === "number") {
+      await this.page.waitForTimeout(timeoutAfter);
+    }
   }
 
   async disableFlashcardMode() {
@@ -1417,8 +1439,48 @@ export class TuneTreesPage {
       await this.ensureReveal(true);
     }
     await evalButton.click();
+    await this.page.waitForTimeout(200);
     const optionTestId = `recall-eval-option-${value}`;
+    const option = this.page.getByTestId(optionTestId);
+
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try {
+        await expect(option).toBeAttached({ timeout: 800 });
+        await expect(option).toBeVisible({ timeout: 800 });
+        await expect(option).toBeEnabled({ timeout: 800 });
+        lastError = undefined;
+        break;
+      } catch (err) {
+        lastError = err;
+        if (attempt === 11) throw err;
+        await this.page.waitForTimeout(150);
+      }
+    }
+
+    if (lastError) throw lastError;
+    await option.scrollIntoViewIfNeeded();
+
+    // "Definitely clickable": do a trial click first (verifies hit-target, not covered, etc.)
+    await option.click({ trial: true, timeout: 5000 });
     await this.page.getByTestId(optionTestId).click();
+    for (let i = 0; i < 40; i++) {
+      const stillVisible = await option.isVisible().catch(() => false);
+      if (!stillVisible) break;
+      await this.page.waitForTimeout(50);
+    }
+
+    const stillVisible = await option.isVisible().catch(() => false);
+    if (stillVisible) {
+      await this.page.screenshot({
+        path: `test-results/flashcard-eval-option-still-visible-${Date.now()}.png`,
+      });
+      throw new Error(
+        `Evaluation option "${optionTestId}" did not disappear after selection`
+      );
+    }
+    await this.page.waitForTimeout(200);
   }
 
   async openFlashcardFieldsMenu() {

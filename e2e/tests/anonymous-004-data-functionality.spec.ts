@@ -93,8 +93,8 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.signInAnonymouslyWithPlaylist("Anon Persist Test");
 
     // Navigate to Catalog tab and add a tune
-    await ttPage.catalogTab.click();
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    await ttPage.navigateToTab("catalog");
+
     await page.waitForTimeout(1000);
 
     // Select and add first tune
@@ -140,8 +140,7 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.signInAnonymously();
 
     // Navigate to Catalog tab
-    await ttPage.catalogTab.click();
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    await ttPage.navigateToTab("catalog");
 
     // Wait for grid to fully load
     await page.waitForTimeout(1000);

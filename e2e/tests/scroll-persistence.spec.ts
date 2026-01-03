@@ -323,9 +323,19 @@ test.describe("Scroll Position Persistence", () => {
     // Set up console listener early
     const consoleLogs: string[] = [];
     page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        console.error(`[BROWSER ERROR] ${msg.text()}`);
+        return;
+      }
+
       if (msg.text().includes("TunesGridCatalog")) {
         consoleLogs.push(msg.text());
-        console.log(`[BROWSER CONSOLE] ${msg.text()}`);
+        if (
+          process.env.E2E_TEST_SETUP_DEBUG === "true" ||
+          process.env.E2E_TEST_SETUP_DEBUG === "1"
+        ) {
+          console.log(`[BROWSER CONSOLE] ${msg.text()}`);
+        }
       }
     });
 
