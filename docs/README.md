@@ -42,6 +42,7 @@ docs/
 - [Database](development/database.md) - Database schema and sync architecture
 - [Testing](development/testing.md) - Run and write tests
 - [Deployment](development/deployment.md) - Deploy to production
+- [Sync Diagnostics](development/setup.md) - Enable `VITE_SYNC_DIAGNOSTICS` and optional worker `SYNC_DIAGNOSTICS`
 
 ### Technical Reference
 - [PWA Details](reference/pwa.md) - Service worker, caching, offline

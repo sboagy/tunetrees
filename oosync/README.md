@@ -56,6 +56,19 @@ The codegen script prefers a safe local default.
 - `--databaseUrl=postgresql://...`: override DB url
 - `--config=path/to/oosync.codegen.config.json`: override config location
 
+## Sync diagnostics (consumer-facing)
+
+The schema-agnostic worker can optionally emit extra diagnostic lines for troubleshooting sync performance.
+
+- Client (consumer app): set `VITE_SYNC_DIAGNOSTICS=true` to log compact per-sync summaries and (when present) worker `debug[]` lines.
+- Worker (this package): set `SYNC_DIAGNOSTICS=true` to include `debug[]` lines in sync responses.
+- Optional: set `SYNC_DIAGNOSTICS_USER_ID=<supabase auth uid>` to restrict worker diagnostics to one user.
+
+For TuneTrees-specific setup and deployment examples, see:
+
+- `docs/development/setup.md`
+- `docs/development/deployment.md`
+
 ## `oosync.codegen.config.json` (developer-facing)
 
 This file is **developer-authored**. It defines:

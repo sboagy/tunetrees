@@ -39,7 +39,14 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 # Optional: Worker URL for sync (production only)
 VITE_WORKER_URL=https://tunetrees-sync-worker.workers.dev
+
+# Optional: Sync debugging / diagnostics
+# VITE_SYNC_DEBUG=true
+# VITE_SYNC_DIAGNOSTICS=true
 ```
+
+If you enable `VITE_SYNC_DIAGNOSTICS=true`, you’ll get compact `[SyncDiag]` logs in the browser console.
+To include worker-side diagnostics in those logs, also set `SYNC_DIAGNOSTICS=true` for the worker (see deployment guide).
 
 ### Getting Supabase Credentials
 
