@@ -621,7 +621,8 @@ export class SyncEngine {
         diagPullPages += 1;
         diagPulledChanges += firstResponse.changes.length;
         for (const change of firstResponse.changes) {
-          diagTableCounts[change.table] = (diagTableCounts[change.table] ?? 0) + 1;
+          diagTableCounts[change.table] =
+            (diagTableCounts[change.table] ?? 0) + 1;
         }
       }
 

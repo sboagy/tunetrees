@@ -1082,7 +1082,12 @@ export async function setupForRepertoireTestsParallel(
     if (msg.type() === "error") {
       console.error(`[Browser Error] ${msg.text()}`);
     } else {
-      console.log(`[Browser] ${msg.text()}`);
+      if (
+        process.env.E2E_TEST_SETUP_DEBUG === "true" ||
+        process.env.E2E_TEST_SETUP_DEBUG === "1"
+      ) {
+        console.log(`[Browser] ${msg.text()}`);
+      }
     }
   });
 
