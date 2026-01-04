@@ -18,7 +18,12 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   let currentTestUser: TestUser;
 
   test.beforeEach(async ({ page, testUser }) => {
-    page.on("console", (msg) => console.log(`[BROWSER] ${msg.text()}`));
+    if (
+      process.env.E2E_TEST_SETUP_DEBUG === "true" ||
+      process.env.E2E_TEST_SETUP_DEBUG === "1"
+    ) {
+      page.on("console", (msg) => console.log(`[BROWSER] ${msg.text()}`));
+    }
     ttPage = new TuneTreesPage(page);
     currentTestUser = testUser;
 

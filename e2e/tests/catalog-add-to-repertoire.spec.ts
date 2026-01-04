@@ -94,8 +94,20 @@ test.describe
     test("should add selected tunes to repertoire @side-effects", async ({
       page,
     }) => {
-      // Capture console messages
-      page.on("console", (msg) => console.log(`🖥️  BROWSER: ${msg.text()}`));
+      // Capture browser console messages (quiet by default)
+      page.on("console", (msg) => {
+        if (msg.type() === "error") {
+          console.error(`❌ BROWSER ERROR: ${msg.text()}`);
+          return;
+        }
+
+        if (
+          process.env.E2E_TEST_SETUP_DEBUG === "true" ||
+          process.env.E2E_TEST_SETUP_DEBUG === "1"
+        ) {
+          console.log(`🖥️  BROWSER: ${msg.text()}`);
+        }
+      });
       page.on("pageerror", (err) =>
         console.error(`❌ PAGE ERROR: ${err.message}`)
       );

@@ -20,7 +20,7 @@ import {
   getUniqueKeys,
   type SyncableTableName,
   TABLE_REGISTRY,
-} from "@oosync/shared/table-meta";
+} from "@sync-schema/table-meta";
 import { camelizeKeys, snakifyKeys } from "./casing";
 
 // Re-export for convenience

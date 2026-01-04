@@ -330,8 +330,14 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_DISABLE_SYNC=true           # Disable sync (testing only)
 VITE_REALTIME_ENABLED=true       # Enable live sync
 VITE_SYNC_DEBUG=true             # Enable detailed sync logs
+VITE_SYNC_DIAGNOSTICS=true       # Enable compact per-sync diagnostics logs
 VITE_WORKBOX_DEBUG=true          # Enable PWA debug logs
 ```
+
+**Worker diagnostics (optional):**
+
+- `SYNC_DIAGNOSTICS=true` enables worker-side `debug[]` lines in sync responses.
+- `SYNC_DIAGNOSTICS_USER_ID=<supabase auth uid>` restricts diagnostics to a single user.
 
 ## Testing
 

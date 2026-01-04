@@ -55,9 +55,7 @@ export default defineConfig(() => {
               console.log("[Vite Proxy] Error:", err);
             });
             proxy.on("proxyReq", (proxyReq, req) => {
-              console.log(
-                `[Vite Proxy] Proxying: ${req.method} ${req.url}`
-              );
+              console.log(`[Vite Proxy] Proxying: ${req.method} ${req.url}`);
               proxyReq.setHeader("Accept", "application/json");
               proxyReq.setHeader("User-Agent", "TuneTrees-PWA-Dev/1.0");
             });
@@ -173,6 +171,7 @@ export default defineConfig(() => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
         "@oosync": path.resolve(__dirname, "./oosync/src"),
+        "@sync-schema": path.resolve(__dirname, "./shared/sync-schema"),
         "@shared-generated": path.resolve(__dirname, "./shared/generated"),
       },
     },

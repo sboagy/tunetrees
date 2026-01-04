@@ -36,6 +36,46 @@ import type {
   PlaylistWithSummary,
 } from "../types";
 
+async function resolveUserRef(
+  db: SqliteDatabase,
+  userId: string,
+  options?: { waitForMs?: number; pollEveryMs?: number }
+): Promise<string | null> {
+  const waitForMs = options?.waitForMs ?? 0;
+  const pollEveryMs = options?.pollEveryMs ?? 100;
+  const startedAt = Date.now();
+
+  // On first login, the UI can query before initial syncDown has applied user_profile.
+  // Poll briefly to avoid treating this transient state as “no playlists”.
+  while (true) {
+    // First: treat input as Supabase auth user id (user_profile.supabase_user_id)
+    const bySupabaseId = await db
+      .select({ id: userProfile.id })
+      .from(userProfile)
+      .where(eq(userProfile.supabaseUserId, userId))
+      .limit(1);
+
+    if (bySupabaseId.length > 0) return bySupabaseId[0].id;
+
+    // Fallback: some call sites (e.g. onboarding) already have the internal user_profile.id.
+    const byInternalId = await db
+      .select({ id: userProfile.id })
+      .from(userProfile)
+      .where(eq(userProfile.id, userId))
+      .limit(1);
+
+    if (byInternalId.length > 0) return byInternalId[0].id;
+
+    if (Date.now() - startedAt >= waitForMs) {
+      return null;
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(() => resolve(), pollEveryMs);
+    });
+  }
+}
+
 /**
  * Get all playlists for a user
  *
@@ -58,23 +98,17 @@ export async function getUserPlaylists(
   userId: string,
   includeDeleted = false
 ): Promise<PlaylistWithSummary[]> {
-  // First, get the user_profile id from supabase_user_id
-  const userRecord = await db
-    .select({ id: userProfile.supabaseUserId })
-    .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, userId))
-    .limit(1);
+  const userRef = await resolveUserRef(db, userId, {
+    waitForMs: 2_000,
+    pollEveryMs: 100,
+  });
 
-  // Return empty array if user_profile not found yet (before initial sync completes)
-  // This is normal on first login before syncDown populates the table
-  if (!userRecord || userRecord.length === 0) {
+  if (!userRef) {
     console.log(
       `⚠️ User profile not found yet for ${userId}, returning empty playlists`
     );
     return [];
   }
-
-  const userRef = userRecord[0].id;
 
   // Build query conditions
   const conditions = [eq(playlist.userRef, userRef)];
@@ -150,7 +184,7 @@ export async function getPlaylistById(
 ): Promise<Playlist | null> {
   // Get user_ref from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.supabaseUserId })
+    .select({ id: userProfile.id })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
@@ -206,7 +240,7 @@ export async function createPlaylist(
 ): Promise<Playlist> {
   // Get user_ref from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.supabaseUserId })
+    .select({ id: userProfile.id })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);
@@ -634,7 +668,7 @@ export async function getPlaylistTunesStaged(
 
   // Get user_ref from supabase_user_id
   const userRecord = await db
-    .select({ id: userProfile.supabaseUserId })
+    .select({ id: userProfile.id })
     .from(userProfile)
     .where(eq(userProfile.supabaseUserId, userId))
     .limit(1);

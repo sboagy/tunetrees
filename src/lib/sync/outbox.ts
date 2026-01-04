@@ -8,14 +8,14 @@
  * @module lib/sync/outbox
  */
 
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
-import * as localSchema from "../../../drizzle/schema-sqlite";
 import {
   getPrimaryKey,
   type SyncableTableName,
   TABLE_REGISTRY,
-} from "@oosync/shared/table-meta";
+} from "@sync-schema/table-meta";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
+import * as localSchema from "../../../drizzle/schema-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { toCamelCase } from "./casing";
 

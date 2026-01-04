@@ -16,8 +16,8 @@
  * @module install-triggers
  */
 
+import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import type { Database as SqlJsDatabase } from "sql.js";
-import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 
 /**
  * Create the sync trigger control table.

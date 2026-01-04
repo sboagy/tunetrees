@@ -4,9 +4,9 @@
  * @module tests/lib/db/install-triggers.test
  */
 
+import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import initSqlJs, { type Database } from "sql.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 import {
   areSyncTriggersInstalled,
   areSyncTriggersSuppressed,

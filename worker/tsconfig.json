@@ -13,7 +13,9 @@
     "baseUrl": ".",
     "paths": {
       "@oosync/*": ["../oosync/src/*"],
-      "@shared-generated/*": ["../shared/generated/*"]
+      "@oosync-worker/*": ["../oosync/worker/src/*"],
+      "@shared-generated/*": ["../shared/generated/*"],
+      "@sync-schema/*": ["../shared/sync-schema/*"]
     }
   },
   "include": [

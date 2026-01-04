@@ -7,13 +7,13 @@
  * Usage: Navigate to /debug/db
  */
 
+import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import type { Component } from "solid-js";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { getFailedOutboxItems, retryOutboxItem } from "@/lib/sync/outbox";
-import { TABLE_REGISTRY } from "@oosync/shared/table-meta";
 
 interface QueryResult {
   columns: string[];

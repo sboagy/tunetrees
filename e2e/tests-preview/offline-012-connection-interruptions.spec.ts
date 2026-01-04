@@ -74,9 +74,19 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Create 3 practice records while online
     for (let i = 0; i < 3; i++) {
+      await page.waitForTimeout(100); // reduce flake hopefull
       const row = ttPage.getRows("scheduled").first();
-      await ttPage.setRowEvaluation(row, "good");
+      await ttPage.setRowEvaluation(row, "good", 500);
+      await page.waitForTimeout(100); // reduce flake hopefull
+      const rowCountBeforeSubmit = await ttPage.getRows("scheduled").count();
+
       await ttPage.submitEvaluationsButton.click();
+
+      await expect
+        .poll(async () => ttPage.getRows("scheduled").count(), {
+          timeout: 15_000,
+        })
+        .toBe(Math.max(0, rowCountBeforeSubmit - 1));
     }
 
     // Wait for sync
@@ -95,9 +105,17 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Create 2 more practice records offline
     for (let i = 0; i < 2; i++) {
+      page.waitForTimeout(100); // reduce flake hopefull
       const row = ttPage.getRows("scheduled").first();
-      await ttPage.setRowEvaluation(row, "easy");
+      await ttPage.setRowEvaluation(row, "easy", 500);
+      await page.waitForTimeout(100); // reduce flake hopefull
+      const rowCountBeforeSubmit = await ttPage.getRows("scheduled").count();
       await ttPage.submitEvaluationsButton.click();
+      await expect
+        .poll(async () => ttPage.getRows("scheduled").count(), {
+          timeout: 15_000,
+        })
+        .toBe(Math.max(0, rowCountBeforeSubmit - 1));
     }
 
     // Verify pending changes

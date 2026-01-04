@@ -1,8 +1,8 @@
-import type { Database as SqlJsDatabase } from "sql.js";
 import {
   type SyncableTableName,
   TABLE_REGISTRY,
-} from "@oosync/shared/table-meta";
+} from "@sync-schema/table-meta";
+import type { Database as SqlJsDatabase } from "sql.js";
 
 export interface IOutboxBackupItem {
   tableName: SyncableTableName;

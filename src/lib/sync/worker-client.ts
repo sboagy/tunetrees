@@ -5,6 +5,7 @@ import type {
 } from "@oosync/shared/protocol";
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
+const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
 
 export class WorkerClient {
   private token: string;
@@ -47,12 +48,15 @@ export class WorkerClient {
 
     const json = await response.json();
 
-    // DEBUG: Check tune count in raw response
-    const tuneChanges =
-      json.changes?.filter((c: SyncChange) => c.table === "tune") || [];
-    console.log(
-      `[WorkerClient] Raw response tune count: ${tuneChanges.length}, total changes: ${json.changes?.length || 0}`
-    );
+    if (SYNC_DIAGNOSTICS) {
+      const total = Array.isArray(json.changes) ? json.changes.length : 0;
+      console.log(`[WorkerClientDiag] response totalChanges=${total}`);
+      if (Array.isArray(json.debug) && json.debug.length > 0) {
+        for (const line of json.debug.slice(0, 50)) {
+          console.log(`[WorkerClientDiag] worker: ${String(line)}`);
+        }
+      }
+    }
 
     return json;
   }
