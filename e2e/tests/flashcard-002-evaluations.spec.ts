@@ -151,19 +151,17 @@ test.describe
     });
 
     test("07. Can clear evaluation by clicking again", async ({ page }) => {
-      await ttPage.enableFlashcardMode(500);
+      await ttPage.enableFlashcardMode();
 
       // Select evaluation
-      await ttPage.selectFlashcardEvaluation("good");
-      await page.waitForTimeout(300);
+      await ttPage.selectFlashcardEvaluation("good", 800);
 
       // Clear by selecting "Not set"
       await ttPage.selectFlashcardEvaluation("not-set");
-      await page.waitForTimeout(300);
 
       // Verify deselected (combobox shows Not set)
-      const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
-      await expect(evalButton).toContainText(/Not set|Select/i);
+      const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
+      await expect(evalButton).toContainText(/Not Set|Select/i);
 
       // Verify Submit button count back to 0
       const submitButton = ttPage.submitEvaluationsButton;

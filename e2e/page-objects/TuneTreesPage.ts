@@ -1236,7 +1236,7 @@ export class TuneTreesPage {
 
   // ===== Flashcard helpers =====
 
-  async enableFlashcardMode(timeoutAfter?: number) {
+  async enableFlashcardMode(timeoutAfter: number = 800) {
     await this.flashcardModeSwitch.click();
     await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
 
@@ -1448,22 +1448,28 @@ export class TuneTreesPage {
    * - Verifies the final selected value by matching the evaluation button text (e.g., `"good:"` or `"(Not Set)"`).
    */
   async selectFlashcardEvaluation(
-    value: "again" | "hard" | "good" | "easy" | "not-set" = "good"
+    value: "again" | "hard" | "good" | "easy" | "not-set" = "good",
+    timeoutAfter: number = 500
   ) {
     const nOuterAttempts = 6;
     for (let outerAttempt = 0; outerAttempt < nOuterAttempts; outerAttempt++) {
       // Open the first (and only) evaluation combobox in the card
-      const evalButton = this.page
-        .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-        .first();
+      const evalButton = this.page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
       // If not immediately clickable, ensure the back of the card is revealed
-      const clickable = await evalButton
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
-      if (!clickable) {
-        await this.ensureReveal(true);
-      }
-      await evalButton.click();
+      // const clickable = await evalButton
+      //   .isVisible({ timeout: 500 })
+      //   .catch(() => false);
+      // if (!clickable) {
+      //   await this.ensureReveal(true);
+      // }
+      await evalButton.scrollIntoViewIfNeeded();
+      await expect(evalButton).toBeAttached({ timeout: 2000 });
+      await expect(evalButton).toBeVisible({ timeout: 2000 });
+      await expect(evalButton).toBeEnabled({ timeout: 2000 });
+
+      // Verify it is actually clickable (hit target not covered, etc.) before clicking for real.
+      await evalButton.click({ trial: true, timeout: 5000 });
+      await evalButton.click({ timeout: 5000 });
       await this.page.waitForTimeout(200);
       const optionTestId = `recall-eval-option-${value}`;
       const option = this.page.getByTestId(optionTestId);
@@ -1527,6 +1533,9 @@ export class TuneTreesPage {
           `Could not set  "recall-eval-${value}" option after ${nOuterAttempts} attempts`
         );
       }
+    }
+    if (typeof timeoutAfter === "number") {
+      await this.page.waitForTimeout(timeoutAfter);
     }
   }
 
