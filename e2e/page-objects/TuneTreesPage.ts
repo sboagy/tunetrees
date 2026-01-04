@@ -1284,14 +1284,16 @@ export class TuneTreesPage {
     throw new Error("Previous button did not become enabled within timeout");
   }
 
-  async goNextCard() {
+  async goNextCard(waitAfter: number = 800) {
     await this.waitForNextCardButtonToBeEnabled();
     await this.flashcardNextButton.click();
+    await this.page.waitForTimeout(waitAfter);
   }
 
-  async goPrevCard() {
+  async goPrevCard(waitAfter: number = 800) {
     await this.waitForPrevCardButtonToBeEnabled();
     await this.flashcardPrevButton.click();
+    await this.page.waitForTimeout(waitAfter);
   }
 
   async revealCard() {

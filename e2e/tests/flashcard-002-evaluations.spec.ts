@@ -97,7 +97,6 @@ test.describe
 
       // Navigate to second card
       await ttPage.goNextCard();
-      await page.waitForTimeout(300);
 
       // Verify no evaluation selected on second card
       const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
@@ -143,7 +142,7 @@ test.describe
 
       // Navigate to second card and select evaluation
       await ttPage.goNextCard();
-      await page.waitForTimeout(300);
+
       await ttPage.selectFlashcardEvaluation("easy");
       await page.waitForTimeout(300);
 
