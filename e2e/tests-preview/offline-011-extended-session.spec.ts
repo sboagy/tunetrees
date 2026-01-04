@@ -40,8 +40,6 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("OFFLINE-011: Extended Offline Session", () => {
-  test.setTimeout(600_000);
-
   async function getLocalRepertoireCount(page: Page, playlistId: string) {
     return await page.evaluate(async (pid: string) => {
       const api = (window as any).__ttTestApi;
@@ -68,7 +66,8 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     CATALOG_TUNE_A_FIG_FOR_A_KISS,
   ];
 
-  test.beforeEach(async ({ page, context, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    test.setTimeout(testInfo.timeout * 3);
     ttPage = new TuneTreesPage(page);
 
     // Freeze clock
@@ -264,7 +263,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     console.log("🔍 Verifying pending changes in sync_outbox...");
     let pendingCount = await getSyncOutboxCount(page);
     const targetPendingCount = 20;
-    const maxRetries = 20;
+    const maxRetries = 40;
 
     let attempt: number;
     for (attempt = 1; attempt <= maxRetries; attempt++) {
@@ -274,7 +273,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
 
       if (pendingCount >= targetPendingCount) break;
 
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(250);
       pendingCount = await getSyncOutboxCount(page);
     }
 

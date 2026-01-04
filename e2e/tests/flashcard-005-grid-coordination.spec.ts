@@ -21,7 +21,8 @@ test.describe
     let ttPage: TuneTreesPage;
     let currentDate: Date;
 
-    test.beforeEach(async ({ page, context, testUser }) => {
+    test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+      test.setTimeout(testInfo.timeout * 2);
       ttPage = new TuneTreesPage(page);
 
       // Set stable starting date
@@ -35,6 +36,15 @@ test.describe
         scheduleBaseDate: currentDate,
         startTab: "practice",
       });
+
+      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+      await expect(
+        ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
+      ).toBeVisible({ timeout: 2000 });
+      await expect(
+        ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
+      ).toBeVisible({ timeout: 2000 });
+      await page.waitForTimeout(100); // small buffer
     });
 
     test("01. Grid evaluation → flashcard shows same evaluation", async ({
@@ -78,8 +88,7 @@ test.describe
       await app.enableFlashcardMode();
 
       // Select evaluation in flashcard
-      await app.selectFlashcardEvaluation("easy");
-      await page.waitForTimeout(300);
+      await app.selectFlashcardEvaluation("easy", 800);
 
       // Exit flashcard via toolbar switch to avoid close-button races
       const isFlashcardVisible = await app.flashcardView

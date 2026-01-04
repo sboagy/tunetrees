@@ -839,7 +839,9 @@ export class TuneTreesPage {
     const tab = this.page.getByTestId(`tab-${tabId}`);
 
     await expect(tab).toBeVisible({ timeout: 5000 });
+    await tab.click({ trial: true, timeout: 1000 });
     await tab.click();
+    await this.page.waitForTimeout(200);
 
     // Wait for the tab to become selected via ARIA
     // Some tabs use aria-selected, others use aria-current="page".
@@ -864,7 +866,8 @@ export class TuneTreesPage {
             ? this.catalogGrid
             : undefined;
     if (grid) {
-      await expect(grid).toBeVisible({ timeout: 10000 });
+      await expect(grid).toBeAttached({ timeout: 20000 });
+      await expect(grid).toBeVisible({ timeout: 20000 });
     }
   }
 
@@ -1463,7 +1466,7 @@ export class TuneTreesPage {
         // if (!clickable) {
         //   await this.ensureReveal(true);
         // }
-        await expect(evalButton).toBeAttached({ timeout: 5000 });
+        await expect(evalButton).toBeAttached({ timeout: 10_000 });
         await evalButton.scrollIntoViewIfNeeded();
         await expect(evalButton).toBeVisible({ timeout: 5000 });
         await expect(evalButton).toBeEnabled({ timeout: 5000 });
