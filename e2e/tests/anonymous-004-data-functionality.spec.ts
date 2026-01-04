@@ -53,33 +53,47 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.signInAnonymouslyWithPlaylist("Anon Test Playlist");
 
     // Navigate to Catalog tab
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
 
-    // Wait for tunes to load
-    await page.waitForTimeout(1000);
+    await ttPage.searchForTune("Alexander's", ttPage.catalogGrid);
 
     // Select first tune in catalog
-    const firstTuneCheckbox = ttPage.catalogGrid
-      .locator("tbody tr[data-index]")
+    const catalogRows = ttPage.getRows("catalog");
+
+    await expect
+      .poll(async () => catalogRows.count(), {
+        timeout: 10_000,
+        intervals: [100, 200, 500, 1000],
+      })
+      .toBe(1);
+
+    const firstTuneCheckbox = catalogRows
       .first()
       .locator('input[type="checkbox"]');
     await firstTuneCheckbox.click();
 
+    // Ensure "Add to Repertoire" is enabled/clickable after selecting a tune
+    await expect(ttPage.catalogAddToRepertoireButton).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(ttPage.catalogAddToRepertoireButton).toBeEnabled({
+      timeout: 10000,
+    });
     // Click "Add to Repertoire" button
     await ttPage.catalogAddToRepertoireButton.click();
 
     // Wait for success indication
-    await page.waitForTimeout(1000);
+    // Wait until selection is cleared (checkbox becomes unchecked)
+    await expect(firstTuneCheckbox).not.toBeChecked({ timeout: 10000 });
+    await page.waitForTimeout(100); // just a little buffer
 
     // Navigate to Repertoire tab
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
 
     // Verify the tune appears in repertoire
-    const repertoireRows = ttPage.repertoireGrid.locator(
-      "tbody tr[data-index]"
-    );
+    const repertoireRows = ttPage.getRows("repertoire");
     const repertoireCount = await repertoireRows.count();
     expect(repertoireCount).toBeGreaterThan(0);
   });

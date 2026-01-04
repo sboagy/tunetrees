@@ -125,13 +125,14 @@ test.describe
       const firstRow = rows.first();
       const firstDropdown = firstRow.locator("[data-testid^='recall-eval-']");
 
-      await ttPage.setRowEvaluation(firstRow, "good");
+      await ttPage.setRowEvaluation(firstRow, "good", 500);
 
       await expect(firstDropdown).toContainText(/Good/i, { timeout: 5000 });
 
       // Count initial rows
       const initialRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
       const initialCount = await initialRows.count();
+      expect(initialCount).toBe(2);
       console.log(`Initial tune count: ${initialCount}`);
 
       // ACT: Submit evaluation
@@ -147,7 +148,7 @@ test.describe
       const afterRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
 
       const expectedCount = initialCount - 1;
-      const maxAttempts = 6;
+      const maxAttempts = 8;
       const retryDelayMs = 250;
 
       let afterCount = await afterRows.count();

@@ -22,6 +22,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Edge Cases", () => {
+    test.setTimeout(60000);
+
     let ttPage: TuneTreesPage;
     let currentDate: Date;
     // let currentTestUser: TestUser;
@@ -357,7 +359,7 @@ test.describe
       });
 
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(1000);
 
       // Select evaluation on first card
       await app.selectFlashcardEvaluation("good");

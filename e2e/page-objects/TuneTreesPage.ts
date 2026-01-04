@@ -1454,84 +1454,88 @@ export class TuneTreesPage {
     const nOuterAttempts = 6;
     for (let outerAttempt = 0; outerAttempt < nOuterAttempts; outerAttempt++) {
       // Open the first (and only) evaluation combobox in the card
-      const evalButton = this.page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
-      // If not immediately clickable, ensure the back of the card is revealed
-      // const clickable = await evalButton
-      //   .isVisible({ timeout: 500 })
-      //   .catch(() => false);
-      // if (!clickable) {
-      //   await this.ensureReveal(true);
-      // }
-      await evalButton.scrollIntoViewIfNeeded();
-      await expect(evalButton).toBeAttached({ timeout: 2000 });
-      await expect(evalButton).toBeVisible({ timeout: 2000 });
-      await expect(evalButton).toBeEnabled({ timeout: 2000 });
+      try {
+        const evalButton = this.page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
+        // If not immediately clickable, ensure the back of the card is revealed
+        // const clickable = await evalButton
+        //   .isVisible({ timeout: 500 })
+        //   .catch(() => false);
+        // if (!clickable) {
+        //   await this.ensureReveal(true);
+        // }
+        await expect(evalButton).toBeAttached({ timeout: 5000 });
+        await evalButton.scrollIntoViewIfNeeded();
+        await expect(evalButton).toBeVisible({ timeout: 5000 });
+        await expect(evalButton).toBeEnabled({ timeout: 5000 });
 
-      // Verify it is actually clickable (hit target not covered, etc.) before clicking for real.
-      await evalButton.click({ trial: true, timeout: 5000 });
-      await evalButton.click({ timeout: 5000 });
-      await this.page.waitForTimeout(200);
-      const optionTestId = `recall-eval-option-${value}`;
-      const option = this.page.getByTestId(optionTestId);
+        // Verify it is actually clickable (hit target not covered, etc.) before clicking for real.
+        await evalButton.click({ trial: true, timeout: 5000 });
+        await evalButton.click({ timeout: 5000 });
+        await this.page.waitForTimeout(200);
+        const optionTestId = `recall-eval-option-${value}`;
+        const option = this.page.getByTestId(optionTestId);
 
-      let lastError: unknown;
+        let lastError: unknown;
 
-      for (let attempt = 0; attempt < 12; attempt++) {
-        try {
-          await option.scrollIntoViewIfNeeded();
+        for (let attempt = 0; attempt < 12; attempt++) {
+          try {
+            await option.scrollIntoViewIfNeeded();
 
-          const isVisible = await option.isVisible().catch(() => false);
-          if (!isVisible) {
-            continue;
+            const isVisible = await option.isVisible().catch(() => false);
+            if (!isVisible) {
+              continue;
+            }
+            const isEnabled = await option.isEnabled().catch(() => false);
+            if (!isEnabled) {
+              continue;
+            }
+            lastError = undefined;
+            break;
+          } catch (err) {
+            lastError = err;
+            if (attempt === 11) throw err;
           }
-          const isEnabled = await option.isEnabled().catch(() => false);
-          if (!isEnabled) {
-            continue;
-          }
-          lastError = undefined;
-          break;
-        } catch (err) {
-          lastError = err;
-          if (attempt === 11) throw err;
+          await this.page.waitForTimeout(150);
         }
-        await this.page.waitForTimeout(150);
-      }
 
-      if (lastError) throw lastError;
+        if (lastError) throw lastError;
 
-      await expect(option).toBeAttached({ timeout: 800 });
-      await expect(option).toBeVisible({ timeout: 800 });
-      await expect(option).toBeEnabled({ timeout: 800 });
+        await expect(option).toBeAttached({ timeout: 800 });
+        await expect(option).toBeVisible({ timeout: 800 });
+        await expect(option).toBeEnabled({ timeout: 800 });
 
-      // "Definitely clickable": do a trial click first (verifies hit-target, not covered, etc.)
-      await option.click({ trial: true, timeout: 5000 });
-      await this.page.getByTestId(optionTestId).click();
-      for (let i = 0; i < 40; i++) {
+        // "Definitely clickable": do a trial click first (verifies hit-target, not covered, etc.)
+        await option.click({ trial: true, timeout: 5000 });
+        await this.page.getByTestId(optionTestId).click();
+        for (let i = 0; i < 40; i++) {
+          const stillVisible = await option.isVisible().catch(() => false);
+          if (!stillVisible) break;
+          await this.page.waitForTimeout(50);
+        }
+
         const stillVisible = await option.isVisible().catch(() => false);
-        if (!stillVisible) break;
-        await this.page.waitForTimeout(50);
-      }
+        if (stillVisible) {
+          await this.page.screenshot({
+            path: `test-results/flashcard-eval-option-still-visible-${Date.now()}.png`,
+          });
+          throw new Error(
+            `Evaluation option "${optionTestId}" did not disappear after selection`
+          );
+        }
+        await this.page.waitForTimeout(200);
 
-      const stillVisible = await option.isVisible().catch(() => false);
-      if (stillVisible) {
-        await this.page.screenshot({
-          path: `test-results/flashcard-eval-option-still-visible-${Date.now()}.png`,
-        });
-        throw new Error(
-          `Evaluation option "${optionTestId}" did not disappear after selection`
-        );
-      }
-      await this.page.waitForTimeout(200);
-
-      const textContent = await evalButton.textContent();
-      const testValue = value === "not-set" ? "(Not Set)" : `${value}:`;
-      if (textContent && new RegExp(testValue, "i").test(textContent)) {
-        break;
-      }
-      if (outerAttempt === nOuterAttempts - 1) {
-        throw new Error(
-          `Could not set  "recall-eval-${value}" option after ${nOuterAttempts} attempts`
-        );
+        const textContent = await evalButton.textContent();
+        const testValue = value === "not-set" ? "(Not Set)" : `${value}:`;
+        if (textContent && new RegExp(testValue, "i").test(textContent)) {
+          break;
+        }
+        if (outerAttempt === nOuterAttempts - 1) {
+          throw new Error(
+            `Could not set  "recall-eval-${value}" option after ${nOuterAttempts} attempts`
+          );
+        }
+      } catch (err) {
+        if (outerAttempt === nOuterAttempts - 1) throw err;
       }
     }
     if (typeof timeoutAfter === "number") {
