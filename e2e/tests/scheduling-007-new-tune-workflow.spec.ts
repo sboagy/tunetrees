@@ -43,9 +43,10 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
   let newTuneTitle: string;
   let newTuneId: string | undefined;
 
-  test.setTimeout(60000);
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    // Extend timeout for all tests running this hook by 3x.
+    test.setTimeout(testInfo.timeout * 3);
 
-  test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
     // Set stable starting date

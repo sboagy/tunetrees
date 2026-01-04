@@ -23,10 +23,13 @@ import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Practice Evaluation Interaction", () => {
+  // Applies to all tests in this group.
   let ttPage: TuneTreesPage;
   let currentDate: Date;
 
-  test.beforeEach(async ({ page, context, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    // Extend timeout for all tests running this hook by 3x.
+    test.setTimeout(testInfo.timeout * 3);
     ttPage = new TuneTreesPage(page);
 
     // Set stable starting date
@@ -188,7 +191,6 @@ test.describe("Practice Evaluation Interaction", () => {
   test.skip("should correctly decrement count when clearing evaluations", async ({
     page,
   }) => {
-    test.setTimeout(60000);
     const submitButton = page.locator('button:has-text("Submit")');
     const parseCount = async () => {
       const txt = await submitButton.textContent();

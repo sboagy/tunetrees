@@ -3,6 +3,7 @@ import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -23,24 +24,39 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * - Verifies evaluation dropdowns reflect correct state before/after submission
  */
 
-let ttPage: TuneTreesPage;
-
 test.describe
   .serial("PRACTICE-004: Evaluation Scheduling", () => {
-    test.setTimeout(45000);
+    let ttPage: TuneTreesPage;
+    let currentDate: Date;
 
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+      // Extend timeout for all tests running this hook by 2x.
+      test.setTimeout(testInfo.timeout * 2);
+
       ttPage = new TuneTreesPage(page);
+
+      // Set stable starting date
+      currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
 
       // Set up clean test state with 2 unscheduled tunes
       const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID],
         startTab: "practice",
+        scheduleDaysAgo: 1,
+        scheduleBaseDate: currentDate,
       });
 
       // Wait for practice grid to load
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+      await expect(
+        ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
+      ).toBeVisible({ timeout: 2000 });
+      await expect(
+        ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
+      ).toBeVisible({ timeout: 2000 });
+      await page.waitForTimeout(100); // small buffer
     });
 
     test("should schedule 'Again' rating for tomorrow (not today)", async () => {
@@ -148,16 +164,16 @@ test.describe
       const afterRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
 
       const expectedCount = initialCount - 1;
-      const maxAttempts = 8;
-      const retryDelayMs = 250;
+      const maxAttempts = 16;
+      const retryDelayMs = 150;
 
       let afterCount = await afterRows.count();
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         afterCount = await afterRows.count();
-        console.log(
-          `After submission count (attempt ${attempt}/${maxAttempts}): ${afterCount}`
-        );
+        // console.log(
+        //   `After submission count (attempt ${attempt}/${maxAttempts}): ${afterCount}`
+        // );
 
         if (afterCount === expectedCount) break;
 

@@ -66,9 +66,9 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
-  test.setTimeout(220_000);
-
-  test.beforeEach(async ({ page, context, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    // Extend timeout for all tests running this hook by 3x.
+    test.setTimeout(testInfo.timeout * 3);
     ttPage = new TuneTreesPage(page);
 
     // Set stable starting date
@@ -145,17 +145,10 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       // Get the rating for this tune ID
       const rating = tuneRatings.get(tuneId);
       if (!rating) {
-        console.log(
-          `  WARNING: Tune ${tuneId} not in our rating map, skipping`
-        );
-        continue;
+        throw new Error("Expected tuneId to be present in tuneRatings");
       }
 
-      await ttPage.setRowEvaluation(row, rating);
-
-      console.log(
-        `  Row ${i + 1}: ${rating.toUpperCase()} (tune: ${tuneId.substring(0, 8)}...)`
-      );
+      await ttPage.setRowEvaluation(row, rating, 500);
     }
 
     // Submit all evaluations
