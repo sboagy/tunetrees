@@ -36,11 +36,11 @@ const TEST_TUNES = [
   CATALOG_TUNE_ID_MAP[89]!, // Ash Plant
 ];
 
-let ttPage: TuneTreesPage;
-let currentDate: Date;
-
 test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
   test.setTimeout(180000); // Multi-tune test
+
+  let ttPage: TuneTreesPage;
+  let currentDate: Date;
 
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
