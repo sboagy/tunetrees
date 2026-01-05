@@ -50,6 +50,15 @@ export async function getPracticeCountLocally(page: Page, playlistId: string) {
  * This ensures tests start with a clean slate matching Supabase state
  */
 export async function clearTunetreesStorageDB(page: Page) {
+  // Ensure the browser test API is available so we can close in-memory DB handles
+  // before attempting IndexedDB deletion (prevents blocked/hanging deletes on CI).
+  await page.waitForFunction(
+    () =>
+      !!(window as any).__ttTestApi &&
+      typeof (window as any).__ttTestApi.dispose === "function",
+    { timeout: 20000 }
+  );
+
   await page.evaluate(async () => {
     const dbName = "tunetrees-storage";
     // First, ask the app to dispose in-memory DB to avoid re-persisting
@@ -62,8 +71,13 @@ export async function clearTunetreesStorageDB(page: Page) {
       }
     } catch (err) {
       console.warn("dispose() failed before IndexedDB delete:", err);
+      throw err;
     }
-    await new Promise<void>((resolve, reject) => {
+
+    // NOTE: After dispose(), the local DB keys are already deleted via clearDb().
+    // Deleting the entire IndexedDB database is best-effort (it can be blocked)
+    // and should not hang the test suite.
+    await new Promise<void>((resolve) => {
       const maxAttempts = 5;
       let attempt = 0;
 
@@ -83,7 +97,11 @@ export async function clearTunetreesStorageDB(page: Page) {
             );
             setTimeout(tryDelete, delay);
           } else {
-            reject(req.error);
+            console.warn(
+              "IndexedDB delete error after retries; continuing (dispose already cleared user keys)",
+              req.error
+            );
+            resolve();
           }
         };
 
@@ -97,8 +115,10 @@ export async function clearTunetreesStorageDB(page: Page) {
             setTimeout(tryDelete, delay);
           } else {
             // eslint-disable-next-line no-console
-            console.error("IndexedDB delete blocked after retries");
-            reject(new Error("IndexedDB delete blocked"));
+            console.error(
+              "IndexedDB delete blocked after retries; continuing (dispose already cleared user keys)"
+            );
+            resolve();
           }
         };
       }
@@ -287,6 +307,14 @@ async function waitForSyncComplete(
   );
 }
 
+/**
+ * Wait until the app has initialized auth + local DB enough that clearing the
+ * local DB won't abort initialization (observed flake on CI under load).
+ */
+async function waitForAuthInitialized(page: Page, timeoutMs = 20000) {
+  await page.waitForSelector("[data-auth-initialized]", { timeout: timeoutMs });
+}
+
 // ============================================================================
 // PARALLEL-SAFE SETUP FUNCTIONS (support multiple test users)
 // ============================================================================
@@ -361,15 +389,14 @@ export async function setupDeterministicTestParallel(
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
 
-  // Step 0: Navigate to page if not already (needed for IndexedDB access)
+  // IMPORTANT: Avoid racing the running app's sync engine while clearing remote tables.
+  // If the app is already loaded, temporarily force offline so it can't re-upload rows
+  // while we clear/verify deterministic state.
   const currentUrl = page.url();
-  if (
-    !currentUrl ||
-    currentUrl === "about:blank" ||
-    currentUrl.startsWith("data:")
-  ) {
-    await page.goto(`${BASE_URL}`);
-    await waitForSyncComplete(page);
+  const shouldIsolateSync =
+    !!currentUrl && currentUrl !== "about:blank" && !currentUrl.startsWith("data:");
+  if (shouldIsolateSync) {
+    await page.context().setOffline(true);
   }
 
   // Optional purge of tunes by title prefix (handles leftover test-created tunes)
@@ -534,6 +561,19 @@ export async function setupDeterministicTestParallel(
   }
 
   // Step 4: Clear local cache
+  if (
+    !currentUrl ||
+    currentUrl === "about:blank" ||
+    currentUrl.startsWith("data:")
+  ) {
+    await page.goto(`${BASE_URL}`);
+    await page.waitForLoadState("domcontentloaded");
+  }
+
+  if (shouldIsolateSync) {
+    await page.context().setOffline(false);
+  }
+  await waitForAuthInitialized(page);
   await clearTunetreesStorageDB(page);
 
   // Step 5: Reload page to trigger fresh sync
@@ -818,6 +858,10 @@ async function verifyTablesEmpty(
       tableCounts.set(tableName, c);
       if (c > 0) {
         allEmpty = false;
+
+        // If something re-inserted rows (e.g. a still-running client sync), try clearing again.
+        // This is safe because RLS prevents us from touching other users' rows.
+        await clearUserTable(user, tableName);
       }
     }
     if (allEmpty) break;
@@ -974,10 +1018,11 @@ export async function setupForPracticeTestsParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto(`${BASE_URL}`);
-    await waitForSyncComplete(page);
+    await page.waitForLoadState("domcontentloaded");
   }
 
   // 4. Clear IndexedDB cache
+  await waitForAuthInitialized(page);
   await clearTunetreesStorageDB(page);
 
   // 5. Reload to trigger fresh sync
@@ -1098,10 +1143,11 @@ export async function setupForRepertoireTestsParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto(`${BASE_URL}`);
-    await waitForSyncComplete(page);
+    await page.waitForLoadState("domcontentloaded");
   }
 
   // 5. Clear IndexedDB cache
+  await waitForAuthInitialized(page);
   await clearTunetreesStorageDB(page);
 
   // 6. Reload to trigger fresh sync

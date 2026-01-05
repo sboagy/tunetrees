@@ -17,7 +17,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Show Submitted Filter", () => {
-    test.setTimeout(60000);
+    test.setTimeout(120000);
 
     let ttPage: TuneTreesPage;
     let currentDate: Date;

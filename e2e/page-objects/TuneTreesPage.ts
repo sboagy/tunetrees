@@ -843,18 +843,20 @@ export class TuneTreesPage {
     await tab.click();
     await this.page.waitForTimeout(200);
 
-    // Wait for the tab to become selected via ARIA
-    // Some tabs use aria-selected, others use aria-current="page".
-    const hasAriaSelected = (await tab.getAttribute("aria-selected")) !== null;
-    if (hasAriaSelected) {
-      await expect(tab).toHaveAttribute("aria-selected", "true", {
-        timeout: 5000,
-      });
-    } else {
-      await expect(tab).toHaveAttribute("aria-current", "page", {
-        timeout: 5000,
-      });
-    }
+    // Wait for the tab to become active.
+    // Tabs may indicate this via `aria-selected="true"` or `aria-current="page"`.
+    await expect
+      .poll(
+        async () => {
+          const [selected, current] = await Promise.all([
+            tab.getAttribute("aria-selected"),
+            tab.getAttribute("aria-current"),
+          ]);
+          return selected === "true" || current === "page";
+        },
+        { timeout: 10_000, intervals: [100, 250, 500, 1000] }
+      )
+      .toBe(true);
 
     // Then wait for the corresponding grid/content to be visible
     const grid =
@@ -1412,7 +1414,20 @@ export class TuneTreesPage {
       const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
       await expect(whichOption).toBeVisible({ timeout: 3000 });
 
-      await whichOption.click({ timeout: 3000 });
+      try {
+        await whichOption.click({ trial: true, timeout: 3000 });
+        await whichOption.click({ timeout: 3000 });
+      } catch {
+        // Menu items can detach during quick re-renders; back out and retry.
+        try {
+          await this.page.keyboard.press("Escape");
+        } catch {}
+        if (doTimeouts) {
+          const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
+          await this.page.waitForTimeout(delay);
+        }
+        continue;
+      }
       await expect(menu)
         .toBeHidden({ timeout: 3000 })
         .catch(() => undefined);
@@ -1486,10 +1501,12 @@ export class TuneTreesPage {
 
             const isVisible = await option.isVisible().catch(() => false);
             if (!isVisible) {
+              await this.page.waitForTimeout(150);
               continue;
             }
             const isEnabled = await option.isEnabled().catch(() => false);
             if (!isEnabled) {
+              await this.page.waitForTimeout(150);
               continue;
             }
             lastError = undefined;

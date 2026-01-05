@@ -991,6 +991,15 @@ if (typeof window !== "undefined") {
         return version ? Number.parseInt(version, 10) >= 1 : false;
       },
       dispose: async () => {
+        // Avoid CI flake where clearDb aborts an in-flight initializeDb,
+        // leaving callers racing against partially torn-down global state.
+        try {
+          await ensureDb();
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn("[TestApi] dispose ensureDb error:", e);
+        }
+
         try {
           await clearDb();
         } catch (e) {

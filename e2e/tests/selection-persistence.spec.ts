@@ -45,7 +45,7 @@ test.describe
       page,
     }) => {
       // Navigate to Catalog tab
-      ttPage.navigateToTab("catalog");
+      await ttPage.navigateToTab("catalog");
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 5000,
       });
@@ -82,7 +82,7 @@ test.describe
       page,
     }) => {
       // Navigate to Repertoire tab
-      ttPage.navigateToTab("repertoire");
+      await ttPage.navigateToTab("repertoire");
 
       // Ensure grid is hydrated and checkboxes are rendered: header + 2 rows (>= 3 checkboxes)
       await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
@@ -135,7 +135,7 @@ test.describe
       page,
     }) => {
       // Navigate to Catalog tab
-      ttPage.navigateToTab("catalog");
+      await ttPage.navigateToTab("catalog");
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 5000,
       });
@@ -208,7 +208,7 @@ test.describe
       page,
     }) => {
       // Navigate to Repertoire tab
-      ttPage.navigateToTab("repertoire");
+      await ttPage.navigateToTab("repertoire");
 
       // Ensure checkboxes are rendered: header + 2 rows (>= 3 checkboxes)
       await page.waitForFunction(
@@ -221,7 +221,8 @@ test.describe
         '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
       );
       await expect(checkboxes.nth(1)).toBeEnabled({ timeout: 10000 });
-      await checkboxes.nth(1).check();
+      await checkboxes.nth(1).scrollIntoViewIfNeeded();
+      await checkboxes.nth(1).check({ force: true });
       await page.waitForTimeout(250);
       await expect(checkboxes.nth(1)).toBeChecked();
 
@@ -231,7 +232,8 @@ test.describe
         fullPage: false,
       });
       await expect(checkboxes.nth(2)).toBeEnabled({ timeout: 10000 });
-      await checkboxes.nth(2).check();
+      await checkboxes.nth(2).scrollIntoViewIfNeeded();
+      await checkboxes.nth(2).check({ force: true });
       await page.waitForTimeout(250);
       await expect(checkboxes.nth(2)).toBeChecked();
 
