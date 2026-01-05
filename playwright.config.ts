@@ -148,6 +148,8 @@ export default defineConfig({
 
     {
       name: "firefox",
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/,
       use: {
         ...devices["Desktop Firefox"],
         // storageState: "e2e/.auth/alice.json",
@@ -157,6 +159,8 @@ export default defineConfig({
 
     {
       name: "webkit",
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/,
       use: {
         ...devices["Desktop Safari"],
         // storageState: "e2e/.auth/alice.json",

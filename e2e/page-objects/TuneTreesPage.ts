@@ -1887,4 +1887,40 @@ export class TuneTreesPage {
       await this.page.waitForTimeout(500);
     }
   }
+
+  async getSyncOutboxCount(): Promise<number> {
+    return await this.page.evaluate(async () => {
+      const api = (window as any).__ttTestApi;
+      if (!api) throw new Error("__ttTestApi not available");
+      return await api.getSyncOutboxCount();
+    });
+  }
+
+  async getStableSyncOutboxCount(opts?: {
+    timeoutMs?: number;
+    stableForMs?: number;
+    pollIntervalMs?: number;
+  }): Promise<number> {
+    const timeoutMs = opts?.timeoutMs ?? 5_000;
+    const stableForMs = opts?.stableForMs ?? 1_000;
+    const pollIntervalMs = opts?.pollIntervalMs ?? 250;
+
+    const startMs = Date.now();
+    let last = await this.getSyncOutboxCount();
+    let stableMs = 0;
+
+    while (Date.now() - startMs < timeoutMs) {
+      await this.page.waitForTimeout(pollIntervalMs);
+      const current = await this.getSyncOutboxCount();
+      if (current === last) {
+        stableMs += pollIntervalMs;
+        if (stableMs >= stableForMs) return current;
+      } else {
+        last = current;
+        stableMs = 0;
+      }
+    }
+
+    return last;
+  }
 }

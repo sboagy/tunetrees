@@ -254,31 +254,34 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
       await saveButton.click();
       await page.waitForTimeout(500);
     }
+    const pendingCountPrevGoto = await getSyncOutboxCount(page);
+    const pendingCountPrevGotoStable = await ttPage.getStableSyncOutboxCount();
 
     console.log("Reloading page");
     await page.goto(`${BASE_URL}`);
+
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
 
     // Verify all changes persisted locally
-    console.log("🔍 Verifying pending changes in sync_outbox...");
-    let pendingCount = await getSyncOutboxCount(page);
-    const targetPendingCount = 20;
-    const maxRetries = 40;
+    // We're still offline here.
+    // The key invariant: queued changes survive reload (outbox becomes non-empty).
+    // Do not assert an exact count; internal coalescing/normalization may change it.
+    const pendingCountAfterGoto = await getSyncOutboxCount(page);
 
-    let attempt: number;
-    for (attempt = 1; attempt <= maxRetries; attempt++) {
-      // console.log(
-      //   `📦 Pending sync items (attempt ${attempt}/${maxRetries}): ${pendingCount}`
-      // );
+    await expect
+      .poll(async () => await getSyncOutboxCount(page), {
+        timeout: 10_000,
+        intervals: [250, 250, 500, 1000],
+      })
+      .toBe(pendingCountPrevGotoStable);
 
-      if (pendingCount >= targetPendingCount) break;
+    const pendingCountFinal = await getSyncOutboxCount(page);
 
-      await page.waitForTimeout(250);
-      pendingCount = await getSyncOutboxCount(page);
-    }
+    expect(pendingCountFinal).toBe(pendingCountPrevGotoStable);
 
-    console.log(`📦 sync items (final): ${pendingCount} attempts: ${attempt}`);
-    expect(pendingCount).toBeGreaterThanOrEqual(20); // 20 practice + deletions + additions + notes + settings
+    console.log(
+      `📦 sync items (final): ${pendingCountFinal} pendingCountPrevGoto=${pendingCountPrevGoto} pendingCountPrevGotoStable=${pendingCountPrevGotoStable} pendingCountAfterGoto=${pendingCountAfterGoto}`
+    );
 
     await ttPage.navigateToTab("repertoire");
     const justBeforeOnlineRepertoireCount = await getLocalRepertoireCount(

@@ -99,12 +99,12 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await expect(confirmButton).toBeVisible({ timeout: 5000 });
     await confirmButton.click();
 
-    // Wait for UI update
-    await page.waitForTimeout(1000);
-
-    // Verify tunes disappeared from grid
-    const afterDeleteCount = await ttPage.getRows("repertoire").count();
-    expect(afterDeleteCount).toBe(8);
+    await expect
+      .poll(async () => ttPage.getRows("repertoire").count(), {
+        timeout: 15_000,
+        intervals: [250, 500, 1000],
+      })
+      .toBe(8);
 
     // Go back online
     await goOnline(page);
@@ -128,52 +128,50 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     // Go offline
     await goOffline(page);
 
-    // Get first tune title before sorting
-    const firstTitleBefore = await ttPage
-      .getRows("repertoire")
-      .first()
-      .locator("td")
-      .nth(1) // Title column
-      .textContent();
+    const getTitles = async (): Promise<string[]> => {
+      return await ttPage.getRows("repertoire").evaluateAll((rows) =>
+        rows.map((row) => {
+          const cells = row.querySelectorAll("td");
+          return (cells[1]?.textContent ?? "").trim();
+        })
+      );
+    };
 
     // Click on title column header to sort
     const titleHeader = page.locator(
       '[data-testid="tunes-grid-repertoire"] thead th:has-text("Title")'
     );
-    await titleHeader.click();
+    const titlesBefore = await getTitles();
+    await titleHeader.locator("button").first().click();
+    await expect
+      .poll(async () => getTitles(), {
+        timeout: 10_000,
+        intervals: [250, 500, 1000],
+      })
+      .not.toEqual(titlesBefore);
 
-    // Wait for sort to apply
-    await page.waitForTimeout(1000);
-
-    // Get first tune title after sorting
-    const firstTitleAfter = await ttPage
-      .getRows("repertoire")
-      .first()
-      .locator("td")
-      .nth(1)
-      .textContent();
-
-    // Verify sorting changed order (or confirm alphabetical)
-    // Title after sort should be different (unless already sorted)
-    if (firstTitleBefore !== firstTitleAfter) {
-      expect(firstTitleAfter).not.toBe(firstTitleBefore);
-    }
+    const titlesAfterFirstClick = await getTitles();
+    const expectedAsc = [...titlesAfterFirstClick].sort((a, b) =>
+      a.localeCompare(b)
+    );
+    const expectedDesc = [...expectedAsc].reverse();
+    // The UI's first Title sort click produces descending order.
+    expect(titlesAfterFirstClick).toEqual(expectedDesc);
 
     // Go back online
     await goOnline(page);
 
-    // Verify sorting still works after going online
-    await titleHeader.click(); // Re-sort
-    await page.waitForTimeout(1000);
+    // Verify sorting still works after going online (toggle to ascending)
+    await titleHeader.locator("button").first().click();
+    await expect
+      .poll(async () => getTitles(), {
+        timeout: 10_000,
+        intervals: [250, 500, 1000],
+      })
+      .not.toEqual(titlesAfterFirstClick);
 
-    const firstTitleFinal = await ttPage
-      .getRows("repertoire")
-      .first()
-      .locator("td")
-      .nth(1)
-      .textContent();
-
-    expect(firstTitleFinal).toBeTruthy();
+    const titlesAfterSecondClick = await getTitles();
+    expect(titlesAfterSecondClick).toEqual(expectedAsc);
   });
 
   test("should filter repertoire by tune type offline", async ({ page }) => {
@@ -196,13 +194,12 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     // Close the filters
     await ttPage.filtersButton.click();
 
-    // Wait for filter to apply
-    await page.waitForTimeout(1000);
-
-    // Verify only jigs are shown (count should be less than 10)
-    const filteredCount = await ttPage.getRows("repertoire").count();
-
-    expect(filteredCount).toBeLessThan(10);
+    await expect
+      .poll(async () => ttPage.getRows("repertoire").count(), {
+        timeout: 15_000,
+        intervals: [250, 500, 1000],
+      })
+      .toBeLessThan(10);
 
     // Verify filtered tunes contain "Jig" in type column
     const typeCell = await ttPage
@@ -220,12 +217,12 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     // Close the filters panel
     await ttPage.filtersButton.click();
 
-    // Wait for reset
-    await page.waitForTimeout(1000);
-
-    // Verify all tunes shown again
-    const unfilteredCount = await ttPage.getRows("repertoire").count();
-    expect(unfilteredCount).toBe(10);
+    await expect
+      .poll(async () => ttPage.getRows("repertoire").count(), {
+        timeout: 15_000,
+        intervals: [250, 500, 1000],
+      })
+      .toBe(10);
 
     // Go back online
     await goOnline(page);
@@ -252,13 +249,14 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
       });
       await expect(confirmButton).toBeVisible({ timeout: 5000 });
       await confirmButton.click();
-
-      await page.waitForTimeout(500);
     }
 
-    // Verify 7 tunes remain
-    const afterDeleteCount = await ttPage.getRows("repertoire").count();
-    expect(afterDeleteCount).toBe(7);
+    await expect
+      .poll(async () => ttPage.getRows("repertoire").count(), {
+        timeout: 15_000,
+        intervals: [250, 500, 1000],
+      })
+      .toBe(7);
 
     // Go online and sync
     await goOnline(page);
