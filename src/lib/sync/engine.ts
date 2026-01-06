@@ -608,6 +608,14 @@ export class SyncEngine {
       let diagPulledChanges = 0;
       const diagTableCounts: Record<string, number> = {};
 
+      if (SYNC_DIAGNOSTICS) {
+        const type = isInitialSync ? "INITIAL" : "INCREMENTAL";
+        const userShort = this.userId.slice(0, 8);
+        console.log(
+          `[SyncDiag] begin user=${userShort} type=${type} lastSync=${this.lastSyncTimestamp ? "set" : "null"} pendingOutbox=${changes.length}`
+        );
+      }
+
       // 3. Call Worker (Push + first Pull page)
       const firstResponse = await workerClient.sync(
         changes,
@@ -679,17 +687,52 @@ export class SyncEngine {
       if (SYNC_DIAGNOSTICS) {
         const diagDurationMs = Math.round(performance.now() - diagStartedAtMs);
         const type = isInitialSync ? "INITIAL" : "INCREMENTAL";
-        log.info(
-          `[SyncDiag] type=${type} pushed=${changes.length} pulled=${diagPulledChanges} pages=${diagPullPages} durationMs=${diagDurationMs}`
+        const userShort = this.userId.slice(0, 8);
+
+        // Use console.log to ensure visibility in E2E logs without "[Browser Error]" prefix
+        console.log(
+          `[SyncDiag] user=${userShort} type=${type} pushed=${changes.length} pulled=${diagPulledChanges} pages=${diagPullPages} durationMs=${diagDurationMs}`
         );
 
-        // Log top tables to keep noise low.
-        const topTables = Object.entries(diagTableCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 8);
-        if (topTables.length > 0) {
-          log.info(
-            `[SyncDiag] topTables=${topTables.map(([t, n]) => `${t}:${n}`).join(",")}`
+        // Log per-table counts with local SQLite row counts
+        const sortedTables = Object.entries(diagTableCounts).sort(
+          (a, b) => b[1] - a[1]
+        );
+
+        // Get SQLite row counts for synced tables
+        const sqliteDb = await getSqliteInstance();
+        const localCounts: Record<string, number> = {};
+        const localCountErrorsLogged = new Set<string>();
+        if (sqliteDb) {
+          for (const [table] of sortedTables) {
+            if (!SYNCABLE_TABLES.includes(table as SyncableTableName)) {
+              continue;
+            }
+            try {
+              const result = sqliteDb.exec(
+                `SELECT COUNT(*) as count FROM "${table}"`
+              );
+              const count = (result[0]?.values[0]?.[0] as number) || 0;
+              localCounts[table] = count;
+            } catch (e) {
+              // Best-effort diagnostics; don't fail sync.
+              // Log once per table per sync so we can spot issues like OOM.
+              if (!localCountErrorsLogged.has(table)) {
+                localCountErrorsLogged.add(table);
+                const msg = e instanceof Error ? e.message : String(e);
+                console.log(
+                  `[SyncDiag] user=${userShort} localCountError table=${table} msg=${msg}`
+                );
+              }
+            }
+          }
+        }
+
+        // Log each table with synced count and local total
+        for (const [table, syncedCount] of sortedTables) {
+          const localTotal = localCounts[table] ?? "?";
+          console.log(
+            `[SyncDiag] user=${userShort} table=${table} synced=${syncedCount} localTotal=${localTotal}`
           );
         }
       }

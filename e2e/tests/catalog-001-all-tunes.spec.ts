@@ -87,10 +87,14 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
 
     // Verify the row exists
     if (await userPrivateTune.isVisible({ timeout: 2000 })) {
-      // Check status column (6th column, index 5)
-      const statusCell = userPrivateTune.locator("td").nth(5);
+      const whichColumn = await ttPage.getColumnIndexByHeaderText(
+        "tunes-grid-catalog",
+        "Ownership"
+      );
+      const statusCell = userPrivateTune.locator("td").nth(whichColumn);
       const statusText = await statusCell.textContent();
       console.log(`Tune ${currentTestUser.userId} status: ${statusText}`);
+      expect(statusText).toBe("🔒 Private");
 
       // For now, just verify the row exists - status badge display is separate issue
       await expect(userPrivateTune).toBeVisible();

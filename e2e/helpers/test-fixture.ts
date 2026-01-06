@@ -4,8 +4,10 @@
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
+import type { Page } from "@playwright/test";
 import { test as base } from "@playwright/test";
 import log from "loglevel";
+import { clearTunetreesStorageDB } from "./practice-scenarios";
 import {
   getTestUserByWorkerIndex,
   TEST_USERS,
@@ -15,6 +17,17 @@ import {
 export interface TestUserFixture {
   testUser: TestUser;
   testUserKey: string;
+}
+
+const E2E_CLEANUP_DIAGNOSTICS = process.env.E2E_CLEANUP_DIAGNOSTICS === "true";
+
+function isExpectedPlaywrightTeardownError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes("Test ended") ||
+    msg.includes("Target closed") ||
+    msg.includes("Execution context was destroyed")
+  );
 }
 
 const AUTH_EXPIRY_MINUTES = 10080; // 7 days in minutes (matches jwt_expiry = 604800 seconds)
@@ -70,12 +83,61 @@ export interface TestUserFixture {
   testUserKey: string;
 }
 
+type ITuneTreesFixtures = TestUserFixture & {
+  consoleLogs: string[];
+  autoCleanupDb: undefined;
+};
+
 /**
  * Extended test with automatic user assignment based on worker index
  * Each worker gets a dedicated test user to avoid database conflicts
  * Also sets the correct auth state for the assigned user
  */
-export const test = base.extend<TestUserFixture & { consoleLogs: string[] }>({
+export const test = base.extend<ITuneTreesFixtures>({
+  // Auto-cleanup: ensure we clear local IndexedDB/sql.js state after every test.
+  // This reduces cross-test leakage and prevents unbounded IndexedDB growth.
+  autoCleanupDb: [
+    async (
+      { page }: { page: Page },
+      use: (value: undefined) => Promise<void>
+    ) => {
+      await use(undefined);
+
+      // If the test never loaded the app, skip cleanup quickly.
+      try {
+        if (page.isClosed()) return;
+
+        // Signal teardown intent early to prevent app-side DB init/sync while we clear.
+        // This may fail if the page is mid-navigation; ignore and proceed.
+        try {
+          await page.evaluate(() => {
+            (window as any).__ttE2eIsClearing = true;
+          });
+        } catch {
+          /* ignore */
+        }
+
+        // Avoid long hangs on failures that happen before the app boots.
+        await page.waitForFunction(() => !!(window as any).__ttTestApi, {
+          timeout: 2000,
+        });
+
+        await clearTunetreesStorageDB(page);
+      } catch (e) {
+        // This fixture runs during teardown, when Playwright may already be
+        // closing the page/context due to timeouts or failures.
+        // Treat these errors as expected unless diagnostics are explicitly enabled.
+        if (!isExpectedPlaywrightTeardownError(e) || E2E_CLEANUP_DIAGNOSTICS) {
+          console.warn("[E2E] auto cleanup skipped/failed:", e);
+          if (E2E_CLEANUP_DIAGNOSTICS && e instanceof Error && e.stack) {
+            console.warn("[E2E] auto cleanup stack:\n" + e.stack);
+          }
+        }
+      }
+    },
+    { auto: true },
+  ],
+
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture pattern requires empty object
   testUser: async ({}, use, testInfo) => {
     const user = getTestUserByWorkerIndex(testInfo.parallelIndex);
@@ -135,10 +197,32 @@ export const test = base.extend<TestUserFixture & { consoleLogs: string[] }>({
   // Capture browser console logs and attach to test report
   consoleLogs: async ({ page }, use, testInfo) => {
     const buffer: string[] = [];
+    const prefix = `[Browser][${testInfo.project.name}][w${testInfo.parallelIndex}]`;
     page.on("console", (msg) => {
       try {
         const type = msg.type();
         const text = msg.text();
+
+        // Always surface sync diagnostics in stdout for easy log scraping.
+        if (text.startsWith("[SyncDiag]")) {
+          console.log(`${prefix} ${text}`);
+        }
+
+        // Always surface TopNav DB diagnostics in stdout for easy log scraping.
+        if (text.startsWith("[TopNavDiag]")) {
+          console.log(`${prefix} ${text}`);
+        }
+
+        // Always surface DB-init diagnostics in stdout for easy log scraping.
+        if (text.startsWith("[DbInitDiag]")) {
+          console.log(`${prefix} ${text}`);
+        }
+
+        // Always surface E2E persistence telemetry in stdout (informational).
+        if (text.startsWith("🔬 [E2E Persist")) {
+          console.log(`${prefix} ${text}`);
+        }
+
         // Skip extremely noisy low-level logs if desired
         if (text && !text.startsWith("Downloaded DevTools")) {
           buffer.push(`[${type}] ${text}`);

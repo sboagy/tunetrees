@@ -991,16 +991,22 @@ if (typeof window !== "undefined") {
         return version ? Number.parseInt(version, 10) >= 1 : false;
       },
       dispose: async () => {
-        // Avoid CI flake where clearDb aborts an in-flight initializeDb,
-        // leaving callers racing against partially torn-down global state.
         try {
-          await ensureDb();
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn("[TestApi] dispose ensureDb error:", e);
-        }
-
-        try {
+          // Best-effort: stop background sync before clearing the local DB.
+          // Background auto sync timers can race with clearDb() during E2E teardown.
+          const ctrl = (window as any).__ttSyncControl;
+          if (ctrl?.stop) {
+            await ctrl.stop();
+          }
+          if (ctrl?.waitForIdle) {
+            const ok = await ctrl.waitForIdle(2000);
+            if (!ok) {
+              // eslint-disable-next-line no-console
+              console.warn(
+                "[TestApi] Sync still in progress after timeout; proceeding with clearDb()"
+              );
+            }
+          }
           await clearDb();
         } catch (e) {
           // eslint-disable-next-line no-console

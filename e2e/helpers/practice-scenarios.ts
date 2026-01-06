@@ -61,174 +61,185 @@ export async function clearTunetreesStorageDB(page: Page) {
 
   await page.evaluate(async () => {
     const dbName = "tunetrees-storage";
-    // First, ask the app to dispose in-memory DB to avoid re-persisting
+    // Signal to the app that E2E teardown is actively clearing storage.
+    // App code can use this to avoid re-initializing DB/sync while IndexedDB is being deleted.
+    (window as any).__ttE2eIsClearing = true;
+
     try {
-      if (
-        (window as any).__ttTestApi &&
-        typeof (window as any).__ttTestApi.dispose === "function"
-      ) {
-        await (window as any).__ttTestApi.dispose();
-      }
-    } catch (err) {
-      console.warn("dispose() failed before IndexedDB delete:", err);
-      throw err;
-    }
-
-    // NOTE: After dispose(), the local DB keys are already deleted via clearDb().
-    // Deleting the entire IndexedDB database is best-effort (it can be blocked)
-    // and should not hang the test suite.
-    await new Promise<void>((resolve) => {
-      const maxAttempts = 5;
-      let attempt = 0;
-
-      function tryDelete() {
-        attempt++;
-        const req = indexedDB.deleteDatabase(dbName);
-
-        req.onsuccess = () => resolve();
-
-        req.onerror = () => {
-          if (attempt < maxAttempts) {
-            const delay = 200 * attempt; // backoff: 200ms, 400ms, ...
-            // eslint-disable-next-line no-console
-            console.warn(
-              `IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
-              req.error
-            );
-            setTimeout(tryDelete, delay);
-          } else {
-            console.warn(
-              "IndexedDB delete error after retries; continuing (dispose already cleared user keys)",
-              req.error
-            );
-            resolve();
-          }
-        };
-
-        req.onblocked = () => {
-          if (attempt < maxAttempts) {
-            const delay = 500 * attempt; // longer wait for blocked case
-            // eslint-disable-next-line no-console
-            console.warn(
-              `IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
-            );
-            setTimeout(tryDelete, delay);
-          } else {
-            // eslint-disable-next-line no-console
-            console.error(
-              "IndexedDB delete blocked after retries; continuing (dispose already cleared user keys)"
-            );
-            resolve();
-          }
-        };
-      }
-
-      tryDelete();
-    });
-    // eslint-disable-next-line no-console
-    console.log("✅ Cleared local IndexedDB cache");
-
-    // Clear app caches (but preserve auth state for parallel workers)
-
-    // 1) Clear sessionStorage only (non-persistent storage)
-    try {
-      sessionStorage.clear();
-      // eslint-disable-next-line no-console
-      console.log("✅ Cleared sessionStorage");
-    } catch (err) {
-      console.warn("Failed to clear sessionStorage:", err);
-    }
-
-    // 1a) Clear Practice queue-date keys.
-    // These can leak in via Playwright storageState and cause Practice to render
-    // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
-    try {
-      localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
-      localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
-      // eslint-disable-next-line no-console
-      console.log("✅ Cleared practice queue date keys from localStorage");
-    } catch (err) {
-      console.warn("Failed to clear practice queue date keys:", err);
-    }
-
-    // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
-    // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
-          keysToRemove.push(key);
-        }
-      }
-      for (const key of keysToRemove) {
-        localStorage.removeItem(key);
-      }
-      if (keysToRemove.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log(
-          `✅ Cleared ${keysToRemove.length} sync timestamp key(s) from localStorage`
-        );
-      }
-    } catch (err) {
-      console.warn("Failed to clear sync timestamp keys:", err);
-    }
-
-    // 2) Clear CacheStorage (service-worker / workbox caches for app code)
-    if (typeof caches !== "undefined") {
+      // First, ask the app to dispose in-memory DB to avoid re-persisting
       try {
-        const cacheNames = await caches.keys();
-        // IMPORTANT: Preserve Workbox precache so offline SPA navigations (e.g. /?tab=practice)
-        // can still be fulfilled by cached app-shell HTML.
-        const preserved = cacheNames.filter((n) =>
-          n.startsWith("workbox-precache-")
-        );
-        const toDelete = cacheNames.filter(
-          (n) => !n.startsWith("workbox-precache-")
-        );
-
-        await Promise.all(toDelete.map((n) => caches.delete(n)));
-        // eslint-disable-next-line no-console
-        console.log("✅ Cleared CacheStorage caches:", toDelete);
-        // eslint-disable-next-line no-console
-        console.log("🛡️ Preserved Workbox precache:", preserved);
+        if (
+          (window as any).__ttTestApi &&
+          typeof (window as any).__ttTestApi.dispose === "function"
+        ) {
+          await (window as any).__ttTestApi.dispose();
+        }
       } catch (err) {
-        console.warn("Failed to clear CacheStorage:", err);
+        console.warn("dispose() failed before IndexedDB delete:", err);
+        throw err;
       }
-    }
 
-    // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
-    try {
-      if ((window as any).__ttTestApi) {
-        if (typeof (window as any).__ttTestApi.dispose === "function") {
-          try {
-            await (window as any).__ttTestApi.dispose();
-          } catch {
-            /* ignore disposal errors */
+      // NOTE: After dispose(), the local DB keys are already deleted via clearDb().
+      // Deleting the entire IndexedDB database must succeed to prevent unbounded growth
+      // across tests (which can cause OOM in sql.js WASM).
+      await new Promise<void>((resolve, reject) => {
+        const maxAttempts = 5;
+        let attempt = 0;
+
+        function tryDelete() {
+          attempt++;
+          const req = indexedDB.deleteDatabase(dbName);
+
+          req.onsuccess = () => resolve();
+
+          req.onerror = () => {
+            if (attempt < maxAttempts) {
+              const delay = 200 * attempt; // backoff: 200ms, 400ms, ...
+              // eslint-disable-next-line no-console
+              console.warn(
+                `IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
+                req.error
+              );
+              setTimeout(tryDelete, delay);
+            } else {
+              const msg = `IndexedDB delete failed after ${maxAttempts} attempts: ${req.error}`;
+              // eslint-disable-next-line no-console
+              console.error(msg);
+              reject(new Error(msg));
+            }
+          };
+
+          req.onblocked = () => {
+            if (attempt < maxAttempts) {
+              const delay = 500 * attempt; // longer wait for blocked case
+              // eslint-disable-next-line no-console
+              console.warn(
+                `IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
+              );
+              setTimeout(tryDelete, delay);
+            } else {
+              const msg = `IndexedDB delete blocked after ${maxAttempts} attempts`;
+              // eslint-disable-next-line no-console
+              console.error(msg);
+              reject(new Error(msg));
+            }
+          };
+        }
+
+        tryDelete();
+      });
+      // eslint-disable-next-line no-console
+      console.log("✅ Cleared local IndexedDB cache");
+
+      // Clear app caches (but preserve auth state for parallel workers)
+
+      // 1) Clear sessionStorage only (non-persistent storage)
+      try {
+        sessionStorage.clear();
+        // eslint-disable-next-line no-console
+        console.log("✅ Cleared sessionStorage");
+      } catch (err) {
+        console.warn("Failed to clear sessionStorage:", err);
+      }
+
+      // 1a) Clear Practice queue-date keys.
+      // These can leak in via Playwright storageState and cause Practice to render
+      // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
+      try {
+        localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+        localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+        // eslint-disable-next-line no-console
+        console.log("✅ Cleared practice queue date keys from localStorage");
+      } catch (err) {
+        console.warn("Failed to clear practice queue date keys:", err);
+      }
+
+      // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
+      // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
+            keysToRemove.push(key);
           }
         }
-        delete (window as any).__ttTestApi;
+        for (const key of keysToRemove) {
+          localStorage.removeItem(key);
+        }
+        if (keysToRemove.length > 0) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `✅ Cleared ${keysToRemove.length} sync timestamp key(s) from localStorage`
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to clear sync timestamp keys:", err);
       }
 
-      // If app exposes other global caches, try clearing a few common ones
-      if ((window as any).__tunetreesCache) {
+      // 2) Clear CacheStorage (service-worker / workbox caches for app code)
+      if (typeof caches !== "undefined") {
         try {
-          (window as any).__tunetreesCache = null;
-          delete (window as any).__tunetreesCache;
-        } catch {
-          /* ignore */
+          const cacheNames = await caches.keys();
+          // IMPORTANT: Preserve Workbox precache so offline SPA navigations (e.g. /?tab=practice)
+          // can still be fulfilled by cached app-shell HTML.
+          const preserved = cacheNames.filter((n) =>
+            n.startsWith("workbox-precache-")
+          );
+          const toDelete = cacheNames.filter(
+            (n) => !n.startsWith("workbox-precache-")
+          );
+
+          await Promise.all(toDelete.map((n) => caches.delete(n)));
+          // eslint-disable-next-line no-console
+          console.log("✅ Cleared CacheStorage caches:", toDelete);
+          // eslint-disable-next-line no-console
+          console.log("🛡️ Preserved Workbox precache:", preserved);
+        } catch (err) {
+          console.warn("Failed to clear CacheStorage:", err);
         }
       }
 
-      // eslint-disable-next-line no-console
-      console.log("✅ Cleared in-memory globals/test hooks");
-    } catch (err) {
-      console.warn("Failed to clear in-memory globals:", err);
-    }
+      // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
+      try {
+        if ((window as any).__ttTestApi) {
+          if (typeof (window as any).__ttTestApi.dispose === "function") {
+            try {
+              await (window as any).__ttTestApi.dispose();
+            } catch {
+              /* ignore disposal errors */
+            }
+          }
+          delete (window as any).__ttTestApi;
+        }
 
-    // Return so page.evaluate resolves
-    return;
+        // If app exposes other global caches, try clearing a few common ones
+        if ((window as any).__tunetreesCache) {
+          try {
+            (window as any).__tunetreesCache = null;
+            delete (window as any).__tunetreesCache;
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // eslint-disable-next-line no-console
+        console.log("✅ Cleared in-memory globals/test hooks");
+      } catch (err) {
+        console.warn("Failed to clear in-memory globals:", err);
+      }
+
+      // Return so page.evaluate resolves
+      return;
+    } finally {
+      // Always clear the flag so subsequent navigations in the same test can boot normally.
+      (window as any).__ttE2eIsClearing = false;
+    }
   });
+
+  // Important: after tearing down storage, leave the app origin so it cannot
+  // immediately re-initialize and race with teardown cleanup.
+  await page.goto("about:blank");
 }
 
 /**
@@ -394,7 +405,9 @@ export async function setupDeterministicTestParallel(
   // while we clear/verify deterministic state.
   const currentUrl = page.url();
   const shouldIsolateSync =
-    !!currentUrl && currentUrl !== "about:blank" && !currentUrl.startsWith("data:");
+    !!currentUrl &&
+    currentUrl !== "about:blank" &&
+    !currentUrl.startsWith("data:");
   if (shouldIsolateSync) {
     await page.context().setOffline(true);
   }
@@ -1124,14 +1137,39 @@ export async function setupForRepertoireTestsParallel(
 
   // 4. Navigate if needed
   page.on("console", (msg) => {
+    const text = msg.text();
+    // Always surface sync diagnostics in CI/local logs.
+    if (text.startsWith("[SyncDiag]")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
+    // Always surface TopNav DB diagnostics in CI/local logs.
+    if (text.startsWith("[TopNavDiag]")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
+    // Always surface DB-init diagnostics in CI/local logs.
+    if (text.startsWith("[DbInitDiag]")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
+    // E2E-only DB persistence telemetry should be visible, but not treated as an error.
+    if (text.startsWith("🔬 [E2E Persist")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
     if (msg.type() === "error") {
-      console.error(`[Browser Error] ${msg.text()}`);
+      console.error(`[Browser Error] ${text}`);
     } else {
       if (
         process.env.E2E_TEST_SETUP_DEBUG === "true" ||
         process.env.E2E_TEST_SETUP_DEBUG === "1"
       ) {
-        console.log(`[Browser] ${msg.text()}`);
+        console.log(`[Browser] ${text}`);
       }
     }
   });

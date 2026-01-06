@@ -20,6 +20,7 @@ import {
 import { toast } from "solid-sonner";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { getSqliteInstance } from "../../lib/db/client-sqlite";
 import { getUserPlaylists } from "../../lib/db/queries/playlists";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 import { useClickOutside } from "../../lib/hooks/useClickOutside";
@@ -269,6 +270,7 @@ const PlaylistDropdown: Component<{
   // Fetch user playlists
   // Fetch immediately if data exists in SQLite, don't wait for sync
   // repertoireListChanged is tracked as a dependency to trigger refetch after playlist changes
+  let lastTopNavDiagKey: string | null = null;
   const [playlists] = createResource(
     () => {
       const db = localDb();
@@ -300,16 +302,200 @@ const PlaylistDropdown: Component<{
       });
       if (!params) return [];
 
+      const shouldTopNavDump =
+        import.meta.env.VITE_SYNC_DIAGNOSTICS === "true" ||
+        (typeof window !== "undefined" && !!(window as any).__ttTestApi);
+
+      const userShort = params.userId.slice(0, 8);
+      const diagKey = `${params.userId}:${params.version}`;
+
+      type ITopNavDbSnapshot = {
+        phase: "before" | "after" | "afterError";
+        user: string;
+        version: string;
+        at: string;
+        hasSqliteInstance?: boolean;
+        jsHeap?: {
+          usedBytes: number;
+          totalBytes: number;
+          limitBytes: number;
+        };
+        wasmHeapBytes?: number;
+        dbApproxBytes?: number;
+        pageCount?: number;
+        pageSize?: number;
+        freelistCount?: number;
+        tableCounts?: Record<string, number>;
+        errors?: string[];
+      };
+
+      const collectTopNavDbSnapshot = async (
+        phase: ITopNavDbSnapshot["phase"],
+        opts?: { always?: boolean; error?: unknown }
+      ): Promise<ITopNavDbSnapshot | null> => {
+        if (!shouldTopNavDump) return null;
+        if (!opts?.always && lastTopNavDiagKey === diagKey) return null;
+
+        const snapshot: ITopNavDbSnapshot = {
+          phase,
+          user: userShort,
+          version: params.version,
+          at: new Date().toISOString(),
+        };
+
+        const errors: string[] = [];
+        try {
+          const perfAny = performance as any;
+          if (perfAny?.memory) {
+            snapshot.jsHeap = {
+              usedBytes: Number(perfAny.memory.usedJSHeapSize ?? 0),
+              totalBytes: Number(perfAny.memory.totalJSHeapSize ?? 0),
+              limitBytes: Number(perfAny.memory.jsHeapSizeLimit ?? 0),
+            };
+          }
+        } catch (e) {
+          errors.push(`jsHeap: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        try {
+          const sqliteDb = await getSqliteInstance();
+          snapshot.hasSqliteInstance = !!sqliteDb;
+          if (!sqliteDb) {
+            errors.push(
+              "sqliteInstance: null (db not initialized yet or init failed)"
+            );
+          }
+          if (sqliteDb) {
+            // WASM heap size is per sql.js Module, not per Database.
+            try {
+              const { getSqlJsDebugInfo } = await import(
+                "../../lib/db/client-sqlite"
+              );
+              const dbg = getSqlJsDebugInfo();
+              if (dbg.wasmHeapBytes) snapshot.wasmHeapBytes = dbg.wasmHeapBytes;
+            } catch (e) {
+              errors.push(
+                `wasmHeap: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+
+            // DB size approximation + free pages (cheap pragmas).
+            try {
+              const pageSizeRes = sqliteDb.exec("PRAGMA page_size;");
+              const pageCountRes = sqliteDb.exec("PRAGMA page_count;");
+              const freelistRes = sqliteDb.exec("PRAGMA freelist_count;");
+
+              const pageSize = Number(pageSizeRes?.[0]?.values?.[0]?.[0] ?? 0);
+              const pageCount = Number(
+                pageCountRes?.[0]?.values?.[0]?.[0] ?? 0
+              );
+              const freelistCount = Number(
+                freelistRes?.[0]?.values?.[0]?.[0] ?? 0
+              );
+
+              if (pageSize > 0) snapshot.pageSize = pageSize;
+              if (pageCount > 0) snapshot.pageCount = pageCount;
+              snapshot.freelistCount = freelistCount;
+              if (pageSize > 0 && pageCount > 0) {
+                snapshot.dbApproxBytes = pageSize * pageCount;
+              }
+            } catch (e) {
+              errors.push(
+                `pragma: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+
+            // Complete table row counts (tables only; excludes views).
+            try {
+              const master = sqliteDb.exec(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+              );
+              const names: string[] = (master?.[0]?.values ?? []).map(
+                (row: unknown) => String((row as any)[0])
+              );
+
+              const counts: Record<string, number> = {};
+              for (const name of names) {
+                try {
+                  const res = sqliteDb.exec(
+                    `SELECT COUNT(*) as c FROM "${name.replaceAll('"', '""')}";`
+                  );
+                  counts[name] = Number(res?.[0]?.values?.[0]?.[0] ?? 0);
+                } catch (e) {
+                  // Keep going; don't hide the failure.
+                  counts[name] = -1;
+                  errors.push(
+                    `count:${name}: ${e instanceof Error ? e.message : String(e)}`
+                  );
+                }
+              }
+              snapshot.tableCounts = counts;
+            } catch (e) {
+              errors.push(
+                `sqlite_master: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+          }
+        } catch (e) {
+          errors.push(`sqlite: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        if (opts?.error) {
+          const msg =
+            opts.error instanceof Error
+              ? opts.error.message
+              : String(opts.error);
+          errors.push(`error: ${msg}`);
+        }
+
+        if (errors.length > 0) snapshot.errors = errors;
+
+        // Emit as two lines: header + optional tableCounts payload.
+        try {
+          const header = {
+            phase: snapshot.phase,
+            user: snapshot.user,
+            version: snapshot.version,
+            at: snapshot.at,
+            hasSqliteInstance: snapshot.hasSqliteInstance,
+            jsHeap: snapshot.jsHeap,
+            wasmHeapBytes: snapshot.wasmHeapBytes,
+            pageSize: snapshot.pageSize,
+            pageCount: snapshot.pageCount,
+            freelistCount: snapshot.freelistCount,
+            dbApproxBytes: snapshot.dbApproxBytes,
+            errors: snapshot.errors,
+          };
+          console.log(`[TopNavDiag] ${JSON.stringify(header)}`);
+
+          if (snapshot.tableCounts) {
+            console.log(
+              `[TopNavDiag] tables user=${snapshot.user} ${JSON.stringify(snapshot.tableCounts)}`
+            );
+          }
+        } catch (e) {
+          console.log(
+            `[TopNavDiag] failed to emit snapshot: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
+
+        lastTopNavDiagKey = diagKey;
+        return snapshot;
+      };
+
       try {
+        await collectTopNavDbSnapshot("before");
         console.log(
           "🔄 [TopNav] Calling getUserPlaylists with userId:",
           params.userId
         );
         const result = await getUserPlaylists(params.db, params.userId);
         console.log("✅ [TopNav] Got playlists:", result.length, result);
+        await collectTopNavDbSnapshot("after");
         log.debug("TOPNAV playlists result:", result.length, "playlists");
         return result;
       } catch (error) {
+        await collectTopNavDbSnapshot("afterError", { always: true, error });
         console.error("❌ [TopNav] Playlist fetch error:", error);
         log.error("TOPNAV playlists fetch error:", error);
         return [];

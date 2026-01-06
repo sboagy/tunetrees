@@ -36,45 +36,68 @@ import type {
   PlaylistWithSummary,
 } from "../types";
 
-async function resolveUserRef(
-  db: SqliteDatabase,
-  userId: string,
-  options?: { waitForMs?: number; pollEveryMs?: number }
-): Promise<string | null> {
-  const waitForMs = options?.waitForMs ?? 0;
-  const pollEveryMs = options?.pollEveryMs ?? 100;
-  const startedAt = Date.now();
+// const userRefCache = new Map<string, string>();
+// const warnedUserIdMismatch = new Set<string>();
 
-  // On first login, the UI can query before initial syncDown has applied user_profile.
-  // Poll briefly to avoid treating this transient state as “no playlists”.
-  while (true) {
-    // First: treat input as Supabase auth user id (user_profile.supabase_user_id)
-    const bySupabaseId = await db
-      .select({ id: userProfile.id })
-      .from(userProfile)
-      .where(eq(userProfile.supabaseUserId, userId))
-      .limit(1);
+// async function resolveUserRef(
+//   db: SqliteDatabase,
+//   userId: string,
+//   options?: { waitForMs?: number; pollEveryMs?: number }
+// ): Promise<string | null> {
+//   const cached = userRefCache.get(userId);
+//   if (cached) return cached;
 
-    if (bySupabaseId.length > 0) return bySupabaseId[0].id;
+//   const waitForMs = options?.waitForMs ?? 0;
+//   const pollEveryMs = options?.pollEveryMs ?? 100;
+//   const startedAt = Date.now();
 
-    // Fallback: some call sites (e.g. onboarding) already have the internal user_profile.id.
-    const byInternalId = await db
-      .select({ id: userProfile.id })
-      .from(userProfile)
-      .where(eq(userProfile.id, userId))
-      .limit(1);
+//   // On first login, the UI can query before initial syncDown has applied user_profile.
+//   // Poll briefly to avoid treating this transient state as “no playlists”.
+//   //
+//   // Note: In production we currently expect `user_profile.id` and
+//   // `user_profile.supabase_user_id` to be equal. This function is therefore
+//   // effectively a cached assertion + short poll for row existence.
+//   while (true) {
+//     const match = await db
+//       .select({
+//         id: userProfile.id,
+//         supabaseUserId: userProfile.supabaseUserId,
+//       })
+//       .from(userProfile)
+//       .where(
+//         or(eq(userProfile.supabaseUserId, userId), eq(userProfile.id, userId))
+//       )
+//       .limit(1);
 
-    if (byInternalId.length > 0) return byInternalId[0].id;
+//     if (match.length > 0) {
+//       const resolved = match[0];
+//       if (
+//         resolved.supabaseUserId &&
+//         resolved.id &&
+//         resolved.supabaseUserId !== resolved.id &&
+//         !warnedUserIdMismatch.has(resolved.id)
+//       ) {
+//         warnedUserIdMismatch.add(resolved.id);
+//         console.warn(
+//           `[resolveUserRef] Invariant violated: user_profile.id (${resolved.id}) != user_profile.supabase_user_id (${resolved.supabaseUserId})`
+//         );
+//       }
 
-    if (Date.now() - startedAt >= waitForMs) {
-      return null;
-    }
+//       userRefCache.set(userId, resolved.id);
+//       if (resolved.supabaseUserId)
+//         userRefCache.set(resolved.supabaseUserId, resolved.id);
+//       return resolved.id;
+//     }
 
-    await new Promise<void>((resolve) => {
-      setTimeout(() => resolve(), pollEveryMs);
-    });
-  }
-}
+//     if (Date.now() - startedAt >= waitForMs) {
+//       return null;
+//     }
+
+//     await new Promise<void>((resolve) => {
+//       setTimeout(() => resolve(), pollEveryMs);
+//     });
+//   }
+// }
 
 /**
  * Get all playlists for a user
@@ -98,17 +121,18 @@ export async function getUserPlaylists(
   userId: string,
   includeDeleted = false
 ): Promise<PlaylistWithSummary[]> {
-  const userRef = await resolveUserRef(db, userId, {
-    waitForMs: 2_000,
-    pollEveryMs: 100,
-  });
+  // const userRef = await resolveUserRef(db, userId, {
+  //   waitForMs: 2_000,
+  //   pollEveryMs: 100,
+  // });
 
-  if (!userRef) {
-    console.log(
-      `⚠️ User profile not found yet for ${userId}, returning empty playlists`
-    );
-    return [];
-  }
+  // if (!userRef) {
+  //   console.log(
+  //     `⚠️ User profile not found yet for ${userId}, returning empty playlists`
+  //   );
+  //   return [];
+  // }
+  const userRef = userId;
 
   // Build query conditions
   const conditions = [eq(playlist.userRef, userRef)];

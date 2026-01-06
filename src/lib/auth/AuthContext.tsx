@@ -22,6 +22,9 @@ import {
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
+  getClientSqliteDebugState,
+  getSqliteInstance,
+  getSqlJsDebugInfo,
   initializeDb as initializeSqliteDb,
   type SqliteDatabase,
   setupAutoPersist,
@@ -240,6 +243,10 @@ export const AuthProvider: ParentComponent = (props) => {
   const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
   let syncDiagnosticsRan = false;
 
+  const diagLog = (...args: unknown[]): void => {
+    if (SYNC_DIAGNOSTICS) console.log(...args);
+  };
+
   async function runSyncDiagnostics(db: SqliteDatabase): Promise<void> {
     try {
       const now = new Date().toISOString();
@@ -320,27 +327,28 @@ export const AuthProvider: ParentComponent = (props) => {
    * Used after initial sync to get the internal ID for FK relationships.
    */
   async function getUserInternalIdFromLocalDb(
-    db: SqliteDatabase,
+    _db: SqliteDatabase,
     authUserId: string
   ): Promise<string | null> {
-    try {
-      const { userProfile } = await import("@/lib/db/schema");
-      const { eq } = await import("drizzle-orm");
+    return authUserId;
+    // try {
+    //   const { userProfile } = await import("@/lib/db/schema");
+    //   const { eq } = await import("drizzle-orm");
 
-      const result = await db
-        .select({ id: userProfile.id })
-        .from(userProfile)
-        .where(eq(userProfile.supabaseUserId, authUserId))
-        .limit(1);
+    //   const result = await db
+    //     .select({ id: userProfile.id })
+    //     .from(userProfile)
+    //     .where(eq(userProfile.supabaseUserId, authUserId))
+    //     .limit(1);
 
-      if (result && result.length > 0) {
-        return result[0].id;
-      }
-      return null;
-    } catch (error) {
-      log.error("Failed to get user internal ID from local DB:", error);
-      return null;
-    }
+    //   if (result && result.length > 0) {
+    //     return result[0].id;
+    //   }
+    //   return null;
+    // } catch (error) {
+    //   log.error("Failed to get user internal ID from local DB:", error);
+    //   return null;
+    // }
   }
 
   /**
@@ -359,7 +367,7 @@ export const AuthProvider: ParentComponent = (props) => {
         !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
       syncIntervalMs: isAnonymousUser ? 30000 : 5000, // Anonymous: less frequent sync
       onSyncComplete: async (result) => {
-        console.log("[AuthContext] onSyncComplete called", result);
+        diagLog("[AuthContext] onSyncComplete called", result);
         log.debug(
           "Sync completed, incrementing remote sync down completion version"
         );
@@ -402,20 +410,19 @@ export const AuthProvider: ParentComponent = (props) => {
         } else if (result?.timestamp) {
           setLastSyncTimestamp(result.timestamp);
         }
-
         // On first sync, set userIdInt from local SQLite and mark sync complete
         if (!initialSyncComplete()) {
           // Get user's internal ID from local SQLite (now available after sync)
           const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
           if (internalId) {
             setUserIdInt(internalId);
-            console.log(
+            diagLog(
               `✅ [AuthContext] User internal ID set from local DB: ${internalId}`
             );
           } else if (isAnonymousUser) {
             // For anonymous users, internal ID equals auth ID (we set it that way)
             setUserIdInt(authUserId);
-            console.log(
+            diagLog(
               `✅ [AuthContext] Anonymous user - using auth ID as internal ID`
             );
           } else {
@@ -425,10 +432,10 @@ export const AuthProvider: ParentComponent = (props) => {
           }
 
           setInitialSyncComplete(true);
-          console.log(
+          diagLog(
             "✅ [AuthContext] Initial sync complete, UI can now load data"
           );
-          console.log("🔍 [AuthContext] Sync result:", {
+          diagLog("🔍 [AuthContext] Sync result:", {
             success: result?.success,
             itemsSynced: result?.itemsSynced,
             errors: result?.errors?.length || 0,
@@ -438,7 +445,7 @@ export const AuthProvider: ParentComponent = (props) => {
           import("@/lib/db/client-sqlite").then(({ persistDb }) => {
             persistDb()
               .then(() => {
-                console.log(
+                diagLog(
                   "💾 [AuthContext] Database persisted after initial sync"
                 );
               })
@@ -453,7 +460,7 @@ export const AuthProvider: ParentComponent = (props) => {
           // CRITICAL FIX: On initial sync, always trigger all view signals
           // even if affectedTables is empty (first login may have no data to sync)
           // This ensures UI components waiting for these signals will render
-          console.log(
+          diagLog(
             "🔔 [AuthContext] Initial sync - triggering all view signals"
           );
           triggerAllViewSignals();
@@ -501,7 +508,47 @@ export const AuthProvider: ParentComponent = (props) => {
       },
     });
 
+    // E2E-only: expose a minimal sync control surface so Playwright can safely
+    // stop background sync before clearing IndexedDB/local DB.
+    if (typeof window !== "undefined" && !!(window as any).__ttTestApi) {
+      (window as any).__ttSyncControl = {
+        stop: async () => {
+          try {
+            await syncWorker.service.destroy();
+          } catch (e) {
+            console.warn("[E2E] Failed to destroy SyncService:", e);
+          }
+        },
+        isSyncing: () => syncWorker.service.syncing,
+        waitForIdle: async (timeoutMs: number = 2000) => {
+          const start = performance.now();
+          while (
+            syncWorker.service.syncing &&
+            performance.now() - start < timeoutMs
+          ) {
+            await new Promise((r) => setTimeout(r, 50));
+          }
+          return !syncWorker.service.syncing;
+        },
+      };
+    }
+
     return syncWorker;
+  }
+
+  function isDbInitAbortError(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error);
+    return (
+      msg.includes("Database initialization aborted") ||
+      msg.includes("clearDb() was called during initialization")
+    );
+  }
+
+  function isE2eDbClearInProgress(): boolean {
+    return (
+      typeof window !== "undefined" &&
+      (window as any).__ttE2eIsClearing === true
+    );
   }
 
   /**
@@ -509,6 +556,15 @@ export const AuthProvider: ParentComponent = (props) => {
    * Creates a user_profile in local SQLite and starts sync worker to get reference data.
    */
   async function initializeAnonymousDatabase(anonymousUserId: string) {
+    // E2E teardown may clear IndexedDB while the app is still running.
+    // If cleanup is in progress, do not attempt initialization or retries.
+    if (isE2eDbClearInProgress()) {
+      log.debug(
+        "Skipping anonymous database initialization (E2E clear in progress)"
+      );
+      return;
+    }
+
     // Check if we're already initializing
     if (isInitializing) {
       log.debug(
@@ -529,7 +585,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
     // If switching to a DIFFERENT user, reset sync state so UI waits for new user's data
     if (currentUserId && currentUserId !== anonymousUserId) {
-      console.log("🔄 Switching anonymous users - resetting sync state");
+      diagLog("🔄 Switching anonymous users - resetting sync state");
       setInitialSyncComplete(false);
       setUserIdInt(null);
     }
@@ -542,9 +598,40 @@ export const AuthProvider: ParentComponent = (props) => {
       );
 
       // Initialize user-namespaced database (handles switching automatically)
-      const db = await initializeSqliteDb(anonymousUserId);
+      let db: SqliteDatabase;
+      {
+        const maxAttempts = 3;
+        let attempt = 0;
+        // E2E can clear IndexedDB/DB while the app is booting.
+        // Treat "init aborted" as transient and retry briefly.
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          attempt += 1;
+          try {
+            db = await initializeSqliteDb(anonymousUserId);
+            break;
+          } catch (e) {
+            if (isE2eDbClearInProgress()) {
+              console.warn(
+                "[AuthContext] Anonymous DB init aborted during E2E clear; not retrying"
+              );
+              return;
+            }
+            if (!isDbInitAbortError(e) || attempt >= maxAttempts) throw e;
+            const delayMs = 50 * attempt;
+            console.warn(
+              `[AuthContext] Anonymous DB init aborted (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms`
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+          }
+        }
+      }
       setLocalDb(db);
-      // Set up auto-persistence (store cleanup for later)
+      // Set up auto-persistence (ensure we don't leak handlers across re-inits)
+      if (autoPersistCleanup) {
+        autoPersistCleanup();
+        autoPersistCleanup = null;
+      }
       autoPersistCleanup = setupAutoPersist();
 
       const now = new Date().toISOString();
@@ -574,7 +661,7 @@ export const AuthProvider: ParentComponent = (props) => {
             lastModifiedAt: now,
             deviceId: "local",
           });
-          console.log(
+          diagLog(
             "✅ Created local user_profile for anonymous user:",
             anonymousUserId
           );
@@ -595,7 +682,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // is deferred while offline.
       setUserIdInt(anonymousUserId);
       setInitialSyncComplete(true);
-      console.log(
+      diagLog(
         `✅ [AuthContext] Anonymous local DB ready (offline-safe). userIdInt=${anonymousUserId}`
       );
 
@@ -603,7 +690,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // The sync worker pulls system/shared reference rows (user_ref NULL) plus user-owned rows.
       // This replaces the old direct Supabase queries for reference data.
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
-        console.log("📥 Starting sync worker for anonymous user...");
+        diagLog("📥 Starting sync worker for anonymous user...");
         const syncWorker = await startSyncWorkerForUser(
           db,
           anonymousUserId,
@@ -612,7 +699,7 @@ export const AuthProvider: ParentComponent = (props) => {
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started for anonymous user");
-        console.log(
+        diagLog(
           "⏳ [AuthContext] Anonymous sync worker started, waiting for initial sync..."
         );
         // Note: userIdInt will be set in onSyncComplete callback
@@ -621,7 +708,7 @@ export const AuthProvider: ParentComponent = (props) => {
         // When sync is disabled, set userIdInt immediately and mark sync as complete
         setUserIdInt(anonymousUserId);
         setInitialSyncComplete(true);
-        console.log(
+        diagLog(
           "✅ [AuthContext] Anonymous mode - sync disabled, using local data only"
         );
       }
@@ -638,6 +725,13 @@ export const AuthProvider: ParentComponent = (props) => {
    * Initialize local database for authenticated user
    */
   async function initializeLocalDatabase(userId: string) {
+    // E2E teardown may clear IndexedDB while the app is still running.
+    // If cleanup is in progress, do not attempt initialization or retries.
+    if (isE2eDbClearInProgress()) {
+      log.debug("Skipping database initialization (E2E clear in progress)");
+      return;
+    }
+
     // Check if we're already initializing or already initialized FOR THIS SAME USER
     const currentUserId = userIdInt();
     if (isInitializing) {
@@ -656,11 +750,11 @@ export const AuthProvider: ParentComponent = (props) => {
     isInitializing = true;
     try {
       log.info("Initializing local database for user", userId);
-      console.log(
+      diagLog(
         "🔍 [initializeLocalDatabase] Starting for user:",
         userId.substring(0, 8)
       );
-      console.log("🔍 [initializeLocalDatabase] Current state:", {
+      diagLog("🔍 [initializeLocalDatabase] Current state:", {
         isInitializing,
         hasLocalDb: !!localDb(),
         currentUserId,
@@ -672,10 +766,37 @@ export const AuthProvider: ParentComponent = (props) => {
       // until the new user's data is synced
       setInitialSyncComplete(false);
       setUserIdInt(null);
-      console.log("🔄 [initializeLocalDatabase] Reset sync state for new user");
+      diagLog("🔄 [initializeLocalDatabase] Reset sync state for new user");
 
       // Initialize user-namespaced database (handles user switching automatically)
-      const db = await initializeSqliteDb(userId);
+      let db: SqliteDatabase;
+      {
+        const maxAttempts = 3;
+        let attempt = 0;
+        // E2E can clear IndexedDB/DB while the app is booting.
+        // Treat "init aborted" as transient and retry briefly.
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          attempt += 1;
+          try {
+            db = await initializeSqliteDb(userId);
+            break;
+          } catch (e) {
+            if (isE2eDbClearInProgress()) {
+              console.warn(
+                "[AuthContext] DB init aborted during E2E clear; not retrying"
+              );
+              return;
+            }
+            if (!isDbInitAbortError(e) || attempt >= maxAttempts) throw e;
+            const delayMs = 50 * attempt;
+            console.warn(
+              `[AuthContext] DB init aborted (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms`
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+          }
+        }
+      }
       setLocalDb(db);
 
       // Offline-first: if we can resolve the internal user ID from local SQLite,
@@ -685,26 +806,225 @@ export const AuthProvider: ParentComponent = (props) => {
       if (internalId) {
         setUserIdInt(internalId);
         setInitialSyncComplete(true);
-        console.log(
+        diagLog(
           `✅ [AuthContext] Local DB ready (offline-safe). userIdInt=${internalId}`
         );
       }
-      console.log(
+      diagLog(
         "✅ [initializeLocalDatabase] Database initialized and signal set"
       );
 
       // Keep pending offline changes across reloads.
       // Only clear old failed outbox items to avoid long-term buildup.
-      await clearOldOutboxItems(db);
+      const shouldDbInitDump = SYNC_DIAGNOSTICS;
 
-      // Set up auto-persistence (store cleanup for later)
+      type IDbInitDiagPhase =
+        | "beforeClearOldOutboxItems"
+        | "afterClearOldOutboxItems"
+        | "afterErrorClearOldOutboxItems";
+
+      type IDbInitSnapshot = {
+        phase: IDbInitDiagPhase;
+        user: string;
+        at: string;
+        clientState?: unknown;
+        sqlJs?: { hasModule: boolean; wasmHeapBytes?: number };
+        hasSqliteInstance?: boolean;
+        jsHeap?: {
+          usedBytes: number;
+          totalBytes: number;
+          limitBytes: number;
+        };
+        wasmHeapBytes?: number;
+        dbApproxBytes?: number;
+        pageCount?: number;
+        pageSize?: number;
+        freelistCount?: number;
+        tableCounts?: Record<string, number>;
+        errors?: string[];
+      };
+
+      const collectDbInitSnapshot = async (
+        phase: IDbInitDiagPhase,
+        opts?: { includeTables?: boolean; error?: unknown }
+      ): Promise<IDbInitSnapshot | null> => {
+        if (!shouldDbInitDump) return null;
+
+        const userShort = userId.substring(0, 8);
+        const snapshot: IDbInitSnapshot = {
+          phase,
+          user: userShort,
+          at: new Date().toISOString(),
+        };
+
+        const errors: string[] = [];
+
+        try {
+          const perfAny = performance as any;
+          if (perfAny?.memory) {
+            snapshot.jsHeap = {
+              usedBytes: Number(perfAny.memory.usedJSHeapSize ?? 0),
+              totalBytes: Number(perfAny.memory.totalJSHeapSize ?? 0),
+              limitBytes: Number(perfAny.memory.jsHeapSizeLimit ?? 0),
+            };
+          }
+        } catch (e) {
+          errors.push(`jsHeap: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        try {
+          try {
+            snapshot.clientState = getClientSqliteDebugState();
+          } catch {
+            // ignore
+          }
+
+          try {
+            snapshot.sqlJs = getSqlJsDebugInfo();
+            if (snapshot.sqlJs?.wasmHeapBytes) {
+              snapshot.wasmHeapBytes = snapshot.sqlJs.wasmHeapBytes;
+            }
+          } catch {
+            // ignore
+          }
+
+          const sqliteDb = await getSqliteInstance();
+          snapshot.hasSqliteInstance = !!sqliteDb;
+          if (!sqliteDb) {
+            errors.push(
+              "sqliteInstance: null (db not initialized yet or init failed)"
+            );
+          }
+
+          if (sqliteDb) {
+            try {
+              const pageSizeRes = sqliteDb.exec("PRAGMA page_size;");
+              const pageCountRes = sqliteDb.exec("PRAGMA page_count;");
+              const freelistRes = sqliteDb.exec("PRAGMA freelist_count;");
+
+              const pageSize = Number(pageSizeRes?.[0]?.values?.[0]?.[0] ?? 0);
+              const pageCount = Number(
+                pageCountRes?.[0]?.values?.[0]?.[0] ?? 0
+              );
+              const freelistCount = Number(
+                freelistRes?.[0]?.values?.[0]?.[0] ?? 0
+              );
+
+              if (pageSize > 0) snapshot.pageSize = pageSize;
+              if (pageCount > 0) snapshot.pageCount = pageCount;
+              snapshot.freelistCount = freelistCount;
+              if (pageSize > 0 && pageCount > 0) {
+                snapshot.dbApproxBytes = pageSize * pageCount;
+              }
+            } catch (e) {
+              errors.push(
+                `pragma: ${e instanceof Error ? e.message : String(e)}`
+              );
+            }
+
+            if (opts?.includeTables) {
+              try {
+                const master = sqliteDb.exec(
+                  "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+                );
+                const names: string[] = (master?.[0]?.values ?? []).map((row) =>
+                  String((row as unknown as any)[0])
+                );
+
+                const counts: Record<string, number> = {};
+                for (const name of names) {
+                  try {
+                    const res = sqliteDb.exec(
+                      `SELECT COUNT(*) as c FROM "${name.replaceAll('"', '""')}";`
+                    );
+                    counts[name] = Number(res?.[0]?.values?.[0]?.[0] ?? 0);
+                  } catch (e) {
+                    counts[name] = -1;
+                    errors.push(
+                      `count:${name}: ${e instanceof Error ? e.message : String(e)}`
+                    );
+                  }
+                }
+                snapshot.tableCounts = counts;
+              } catch (e) {
+                errors.push(
+                  `sqlite_master: ${e instanceof Error ? e.message : String(e)}`
+                );
+              }
+            }
+          }
+        } catch (e) {
+          errors.push(`sqlite: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        if (opts?.error) {
+          const msg =
+            opts.error instanceof Error
+              ? opts.error.message
+              : String(opts.error);
+          errors.push(`error: ${msg}`);
+        }
+
+        if (errors.length > 0) snapshot.errors = errors;
+
+        try {
+          const header = {
+            phase: snapshot.phase,
+            user: snapshot.user,
+            at: snapshot.at,
+            clientState: snapshot.clientState,
+            sqlJs: snapshot.sqlJs,
+            hasSqliteInstance: snapshot.hasSqliteInstance,
+            jsHeap: snapshot.jsHeap,
+            wasmHeapBytes: snapshot.wasmHeapBytes,
+            pageSize: snapshot.pageSize,
+            pageCount: snapshot.pageCount,
+            freelistCount: snapshot.freelistCount,
+            dbApproxBytes: snapshot.dbApproxBytes,
+            errors: snapshot.errors,
+          };
+          diagLog(`[DbInitDiag] ${JSON.stringify(header)}`);
+          if (snapshot.tableCounts) {
+            diagLog(
+              `[DbInitDiag] tables user=${snapshot.user} ${JSON.stringify(snapshot.tableCounts)}`
+            );
+          }
+        } catch (e) {
+          diagLog(
+            `[DbInitDiag] failed to emit snapshot: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
+
+        return snapshot;
+      };
+
+      const includeTables = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+      await collectDbInitSnapshot("beforeClearOldOutboxItems", {
+        includeTables,
+      });
+      try {
+        await clearOldOutboxItems(db);
+        await collectDbInitSnapshot("afterClearOldOutboxItems");
+      } catch (error) {
+        await collectDbInitSnapshot("afterErrorClearOldOutboxItems", {
+          includeTables: true,
+          error,
+        });
+        throw error;
+      }
+
+      // Set up auto-persistence (ensure we don't leak handlers across re-inits)
+      if (autoPersistCleanup) {
+        autoPersistCleanup();
+        autoPersistCleanup = null;
+      }
       autoPersistCleanup = setupAutoPersist();
 
       // Start sync worker (now uses Supabase JS client, browser-compatible)
       // The user's internal ID will be set in onSyncComplete callback after initial sync
       // This avoids querying Supabase directly for user_profile
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
-        console.log("📥 Starting sync worker for authenticated user...");
+        diagLog("📥 Starting sync worker for authenticated user...");
         const syncWorker = await startSyncWorkerForUser(
           db,
           userId,
@@ -713,7 +1033,7 @@ export const AuthProvider: ParentComponent = (props) => {
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started");
-        console.log(
+        diagLog(
           "⏳ [AuthContext] Sync worker started, waiting for initial sync..."
         );
         // Note: userIdInt will be set in onSyncComplete callback after initial sync
@@ -788,7 +1108,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
         if (isLegacyAnonymousMode && legacyAnonymousUserId) {
           // Clear legacy flags and sign in with Supabase anonymous auth
-          console.log(
+          diagLog(
             "🔄 Migrating legacy anonymous user to Supabase anonymous auth"
           );
           localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
@@ -803,7 +1123,7 @@ export const AuthProvider: ParentComponent = (props) => {
           }
 
           // The onAuthStateChange handler will pick up the new session
-          console.log(
+          diagLog(
             "✅ Legacy anonymous user migrated to Supabase:",
             data.user?.id
           );
@@ -828,7 +1148,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
           if (isAnon) {
             // Anonymous Supabase user - initialize local database
-            console.log(
+            diagLog(
               "🔄 Restoring Supabase anonymous session:",
               existingSession.user.id
             );
@@ -871,7 +1191,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // Initialize database on sign in (in background, don't block)
       if (event === "SIGNED_IN" && newSession?.user) {
         const isAnon = isUserAnonymous(newSession.user);
-        console.log("🔍 SIGNED_IN user details:", {
+        diagLog("🔍 SIGNED_IN user details:", {
           email: newSession.user.email,
           app_metadata: newSession.user.app_metadata,
           identities: newSession.user.identities,
@@ -893,7 +1213,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
         if (wasAnonymous && !isNowAnonymous) {
           // User just converted from anonymous to registered
-          console.log("🔄 User converted from anonymous to registered");
+          diagLog("🔄 User converted from anonymous to registered");
           setIsAnonymous(false);
         }
       }
@@ -914,16 +1234,16 @@ export const AuthProvider: ParentComponent = (props) => {
    */
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    console.log("🔐 SignIn attempt:", {
+    diagLog("🔐 SignIn attempt:", {
       email,
       passwordLength: password.length,
     });
-    console.log("🔐 Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
+    diagLog("🔐 Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
     const result = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    console.log("🔐 SignIn result:", {
+    diagLog("🔐 SignIn result:", {
       success: !result.error,
       error: result.error,
       user: result.data?.user?.email,
@@ -975,12 +1295,12 @@ export const AuthProvider: ParentComponent = (props) => {
    */
   const signInAnonymously = async () => {
     setLoading(true);
-    console.log("🔐 Anonymous sign-in attempt (Supabase native)");
+    diagLog("🔐 Anonymous sign-in attempt (Supabase native)");
 
     try {
       // Check if there's a saved anonymous session to restore
       const savedSession = localStorage.getItem(ANONYMOUS_SESSION_KEY);
-      console.log(
+      diagLog(
         "🔍 Checking for saved anonymous session:",
         savedSession ? "FOUND" : "NOT FOUND"
       );
@@ -988,20 +1308,20 @@ export const AuthProvider: ParentComponent = (props) => {
         try {
           const parsed = JSON.parse(savedSession);
           const { refresh_token, user_id } = parsed;
-          console.log(
+          diagLog(
             "🔍 Parsed saved session - user_id:",
             user_id,
             "has refresh_token:",
             !!refresh_token
           );
           if (refresh_token) {
-            console.log("🔄 Restoring previous anonymous session...");
+            diagLog("🔄 Restoring previous anonymous session...");
             const { data: refreshData, error: refreshError } =
               await supabase.auth.refreshSession({
                 refresh_token,
               });
 
-            console.log(
+            diagLog(
               "🔍 Refresh result - error:",
               refreshError,
               "has session:",
@@ -1010,7 +1330,7 @@ export const AuthProvider: ParentComponent = (props) => {
             if (!refreshError && refreshData.session) {
               // Successfully restored session - clear saved session
               localStorage.removeItem(ANONYMOUS_SESSION_KEY);
-              console.log(
+              diagLog(
                 "✅ Restored anonymous session for user:",
                 refreshData.user?.id
               );
@@ -1024,7 +1344,7 @@ export const AuthProvider: ParentComponent = (props) => {
               return { error: null };
             } else {
               // Refresh failed - session expired, create new anonymous user
-              console.log(
+              diagLog(
                 "⚠️ Could not restore anonymous session, creating new one. Error:",
                 refreshError?.message
               );
@@ -1062,7 +1382,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // Initialize local database for anonymous user
       await initializeAnonymousDatabase(anonymousUserId);
 
-      console.log("✅ Supabase anonymous sign-in successful:", anonymousUserId);
+      diagLog("✅ Supabase anonymous sign-in successful:", anonymousUserId);
       setLoading(false);
       return { error: null };
     } catch (error) {
@@ -1083,7 +1403,7 @@ export const AuthProvider: ParentComponent = (props) => {
     name: string
   ) => {
     setLoading(true);
-    console.log("🔄 Converting anonymous user to registered account");
+    diagLog("🔄 Converting anonymous user to registered account");
 
     try {
       if (!isAnonymous()) {
@@ -1123,8 +1443,8 @@ export const AuthProvider: ParentComponent = (props) => {
         return { error: updateError };
       }
 
-      console.log("✅ Email/password linked to anonymous account");
-      console.log("👤 User ID preserved:", updateData.user?.id);
+      diagLog("✅ Email/password linked to anonymous account");
+      diagLog("👤 User ID preserved:", updateData.user?.id);
 
       // Update user_profile in LOCAL SQLite - sync will push it to Supabase
       // This avoids direct Supabase queries which can race with sync
@@ -1144,7 +1464,7 @@ export const AuthProvider: ParentComponent = (props) => {
             })
             .where(eq(userProfile.supabaseUserId, anonymousUserId));
 
-          console.log("✅ Local user_profile updated with email:", email);
+          diagLog("✅ Local user_profile updated with email:", email);
         }
       } catch (profileError) {
         // Non-fatal - the account is still converted, sync will eventually catch up
@@ -1161,8 +1481,8 @@ export const AuthProvider: ParentComponent = (props) => {
       localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
       localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
-      console.log("✅ Account conversion complete - UUID preserved!");
-      console.log("🔄 Local data with user_ref FK references remain valid");
+      diagLog("✅ Account conversion complete - UUID preserved!");
+      diagLog("🔄 Local data with user_ref FK references remain valid");
 
       // Note: is_anonymous in auth.users is automatically set to false by Supabase
       // when the user is linked to an email identity
@@ -1173,7 +1493,7 @@ export const AuthProvider: ParentComponent = (props) => {
       const db = localDb();
       const currentUser = user();
       if (db && currentUser && !stopSyncWorker) {
-        console.log("⏳ Starting sync with Supabase for converted user...");
+        diagLog("⏳ Starting sync with Supabase for converted user...");
         const syncWorker = await startSyncWorkerForUser(
           db,
           currentUser.id,
@@ -1183,7 +1503,7 @@ export const AuthProvider: ParentComponent = (props) => {
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started after anonymous conversion");
       } else if (stopSyncWorker) {
-        console.log(
+        diagLog(
           "✅ Sync worker already running - will push updated user_profile"
         );
       }
@@ -1209,9 +1529,9 @@ export const AuthProvider: ParentComponent = (props) => {
     // Supabase signOut() invalidates the refresh token, making restoration impossible
     if (isAnonymous()) {
       const currentSession = session();
-      console.log("🔍 Sign out (anonymous) - preserving Supabase session");
+      diagLog("🔍 Sign out (anonymous) - preserving Supabase session");
       if (currentSession?.refresh_token) {
-        console.log(
+        diagLog(
           "💾 Saving anonymous session for later restoration, user:",
           currentSession.user?.id
         );
@@ -1224,7 +1544,7 @@ export const AuthProvider: ParentComponent = (props) => {
         );
         // Verify it was saved
         const saved = localStorage.getItem(ANONYMOUS_SESSION_KEY);
-        console.log("💾 Verified saved session:", saved ? "YES" : "NO");
+        diagLog("💾 Verified saved session:", saved ? "YES" : "NO");
       } else {
         console.warn("⚠️ No refresh token available to save");
       }
@@ -1249,7 +1569,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // For registered users, do a full sign out
       // IMPORTANT: Do NOT clear ANONYMOUS_SESSION_KEY - the user may want to return
       // to their anonymous session after logging out of their registered account
-      console.log(
+      diagLog(
         "🔍 Sign out - registered user, full sign out (preserving any saved anonymous session)"
       );
 
@@ -1258,7 +1578,7 @@ export const AuthProvider: ParentComponent = (props) => {
         stopSyncWorker();
         stopSyncWorker = null;
         syncServiceInstance = null;
-        console.log("🛑 Stopped sync worker");
+        diagLog("🛑 Stopped sync worker");
       }
 
       // Close database properly (persists and resets module state)
@@ -1303,13 +1623,13 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     try {
-      console.log("🔄 [ForceSyncDown] Starting sync down from Supabase...");
+      diagLog("🔄 [ForceSyncDown] Starting sync down from Supabase...");
       log.info("Forcing sync down from Supabase...");
       const result = opts?.full
         ? await syncServiceInstance.forceFullSyncDown()
         : await syncServiceInstance.syncDown();
 
-      console.log(
+      diagLog(
         `✅ [ForceSyncDown] ${opts?.full ? "Full" : "Incremental"} sync down completed:`,
         {
           success: result.success,
@@ -1327,7 +1647,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // Increment remote sync down completion version to trigger UI updates
       setRemoteSyncDownCompletionVersion((prev) => {
         const newVersion = prev + 1;
-        console.log(
+        diagLog(
           `🔄 [ForceSyncDown] Remote sync down completion version updated: ${prev} → ${newVersion}`
         );
         log.debug(
@@ -1360,7 +1680,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const incrementRemoteSyncDownCompletion = () => {
     setRemoteSyncDownCompletionVersion((prev) => {
       const newVersion = prev + 1;
-      console.log(
+      diagLog(
         `🔄 [incrementRemoteSyncDownCompletion] Remote sync down completion version updated: ${prev} → ${newVersion}`
       );
       return newVersion;
@@ -1390,7 +1710,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const incrementPracticeListStagedChanged = () => {
     setPracticeListStagedChanged((prev) => {
       const newVersion = prev + 1;
-      console.log(
+      diagLog(
         `🔄 [incrementPracticeListStagedChanged] Practice list version: ${prev} → ${newVersion}`
       );
       return newVersion;
@@ -1405,7 +1725,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const incrementCatalogListChanged = () => {
     setCatalogListChanged((prev) => {
       const newVersion = prev + 1;
-      console.log(
+      diagLog(
         `🔄 [incrementCatalogListChanged] Catalog list version: ${prev} → ${newVersion}`
       );
       return newVersion;
@@ -1420,7 +1740,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const incrementRepertoireListChanged = () => {
     setRepertoireListChanged((prev) => {
       const newVersion = prev + 1;
-      console.log(
+      diagLog(
         `🔄 [incrementRepertoireListChanged] Repertoire list version: ${prev} → ${newVersion}`
       );
       return newVersion;
@@ -1448,7 +1768,7 @@ export const AuthProvider: ParentComponent = (props) => {
     };
 
     try {
-      console.log("🔄 [ForceSyncUp] Starting sync up to Supabase...");
+      diagLog("🔄 [ForceSyncUp] Starting sync up to Supabase...");
       log.info("Forcing sync up to Supabase...");
 
       let result: Awaited<ReturnType<SyncService["syncUp"]>>;
@@ -1469,7 +1789,7 @@ export const AuthProvider: ParentComponent = (props) => {
         }
       }
 
-      console.log("✅ [ForceSyncUp] Sync up completed:", {
+      diagLog("✅ [ForceSyncUp] Sync up completed:", {
         success: result.success,
         itemsSynced: result.itemsSynced,
         itemsFailed: result.itemsFailed,
@@ -1481,7 +1801,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // Increment remote sync down completion version to trigger UI updates
       setRemoteSyncDownCompletionVersion((prev) => {
         const newVersion = prev + 1;
-        console.log(
+        diagLog(
           `🔄 [ForceSyncUp] Remote sync down completion version updated: ${prev} → ${newVersion}`
         );
         log.debug(
@@ -1511,14 +1831,12 @@ export const AuthProvider: ParentComponent = (props) => {
 
     // Skip sync if offline (browser reports no connectivity)
     if (!navigator.onLine) {
-      console.log("⚠️ [syncPracticeScope] Skipping - browser is offline");
+      diagLog("⚠️ [syncPracticeScope] Skipping - browser is offline");
       return;
     }
 
     try {
-      console.log(
-        "🔄 [syncPracticeScope] Starting scoped practice syncDown..."
-      );
+      diagLog("🔄 [syncPracticeScope] Starting scoped practice syncDown...");
       const tables = [
         "playlist_tune",
         "practice_record",
@@ -1526,7 +1844,7 @@ export const AuthProvider: ParentComponent = (props) => {
         "table_transient_data",
       ] as const;
       const result = await (syncServiceInstance as any).syncDownTables(tables);
-      console.log(
+      diagLog(
         "✅ [syncPracticeScope] Scoped practice syncDown complete",
         result
       );
@@ -1621,7 +1939,7 @@ export const AuthProvider: ParentComponent = (props) => {
           // Use console.log so Playwright captures it in CI run output.
           // Prefix makes grepping easy: AUTH DIAG
           // NOTE: Avoid JSON.stringify circular refs by logging plain object.
-          console.log("AUTH DIAG", diag);
+          diagLog("AUTH DIAG", diag);
           // Store last hasSession for quick page.evaluate access in diagnostics-only spec
           w.__lastAuthDiagHasSession = diag.hasSession;
           return diag;
