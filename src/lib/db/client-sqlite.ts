@@ -272,7 +272,10 @@ export async function initializeDb(
   const ensureNotCleared = () => {
     if (initEpoch !== myInitEpoch) {
       throw new Error(
-        "Database initialization aborted: clearDb() was called during initialization."
+        "Database initialization aborted: clearDb() was called during initialization. " +
+          `initEpoch=${initEpoch} myInitEpoch=${myInitEpoch} ` +
+          `isClearing=${isClearing} isInitializingDb=${isInitializingDb} ` +
+          `e2eClearing=${isE2eClearInProgress()}`
       );
     }
   };

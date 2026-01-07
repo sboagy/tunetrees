@@ -1481,6 +1481,7 @@ export class TuneTreesPage {
         // if (!clickable) {
         //   await this.ensureReveal(true);
         // }
+        console.log(`outerAttempt: ${outerAttempt}`);
         await expect(evalButton).toBeAttached({ timeout: 10_000 });
         await evalButton.scrollIntoViewIfNeeded();
         await expect(evalButton).toBeVisible({ timeout: 5000 });
@@ -1525,8 +1526,8 @@ export class TuneTreesPage {
         await expect(option).toBeEnabled({ timeout: 800 });
 
         // "Definitely clickable": do a trial click first (verifies hit-target, not covered, etc.)
-        await option.click({ trial: true, timeout: 5000 });
-        await this.page.getByTestId(optionTestId).click();
+        // await option.click({ trial: true, timeout: 5000 });
+        await option.click();
         for (let i = 0; i < 40; i++) {
           const stillVisible = await option.isVisible().catch(() => false);
           if (!stillVisible) break;

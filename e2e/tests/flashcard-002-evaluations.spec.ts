@@ -156,6 +156,21 @@ test.describe
       // Select evaluation
       await ttPage.selectFlashcardEvaluation("good", 800);
 
+      const submitEvaluationsButton = page.getByTestId(
+        "submit-evaluations-button"
+      );
+      // const submitEvaluationsTest = await submitEvaluationsButton.textContent();
+      await expect
+        .poll(
+          async () =>
+            (await submitEvaluationsButton.textContent())
+              ?.trim()
+              .toLowerCase() ?? "",
+          { timeout: 5000 }
+        )
+        .toBe("submit1");
+      page.waitForTimeout(200);
+
       // Clear by selecting "Not set"
       await ttPage.selectFlashcardEvaluation("not-set");
 

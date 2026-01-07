@@ -422,7 +422,9 @@ export const AuthProvider: ParentComponent = (props) => {
           } else if (isAnonymousUser) {
             // For anonymous users, internal ID equals auth ID (we set it that way)
             setUserIdInt(authUserId);
-            diagLog(
+
+            // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
+            console.log(
               `✅ [AuthContext] Anonymous user - using auth ID as internal ID`
             );
           } else {
@@ -661,7 +663,8 @@ export const AuthProvider: ParentComponent = (props) => {
             lastModifiedAt: now,
             deviceId: "local",
           });
-          diagLog(
+          // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
+          console.log(
             "✅ Created local user_profile for anonymous user:",
             anonymousUserId
           );
@@ -1382,7 +1385,8 @@ export const AuthProvider: ParentComponent = (props) => {
       // Initialize local database for anonymous user
       await initializeAnonymousDatabase(anonymousUserId);
 
-      diagLog("✅ Supabase anonymous sign-in successful:", anonymousUserId);
+      // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
+      console.log("✅ Supabase anonymous sign-in successful:", anonymousUserId);
       setLoading(false);
       return { error: null };
     } catch (error) {
@@ -1403,7 +1407,9 @@ export const AuthProvider: ParentComponent = (props) => {
     name: string
   ) => {
     setLoading(true);
-    diagLog("🔄 Converting anonymous user to registered account");
+
+    // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
+    console.log("🔄 Converting anonymous user to registered account");
 
     try {
       if (!isAnonymous()) {
@@ -1443,8 +1449,11 @@ export const AuthProvider: ParentComponent = (props) => {
         return { error: updateError };
       }
 
-      diagLog("✅ Email/password linked to anonymous account");
-      diagLog("👤 User ID preserved:", updateData.user?.id);
+      // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
+      console.log("✅ Email/password linked to anonymous account");
+
+      // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
+      console.log("👤 User ID preserved:", updateData.user?.id);
 
       // Update user_profile in LOCAL SQLite - sync will push it to Supabase
       // This avoids direct Supabase queries which can race with sync

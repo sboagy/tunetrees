@@ -7,7 +7,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { test as base } from "@playwright/test";
 import log from "loglevel";
-import { clearTunetreesStorageDB } from "./practice-scenarios";
+// import { clearTunetreesStorageDB } from "./practice-scenarios";
 import {
   getTestUserByWorkerIndex,
   TEST_USERS,
@@ -109,20 +109,22 @@ export const test = base.extend<ITuneTreesFixtures>({
 
         // Signal teardown intent early to prevent app-side DB init/sync while we clear.
         // This may fail if the page is mid-navigation; ignore and proceed.
-        try {
-          await page.evaluate(() => {
-            (window as any).__ttE2eIsClearing = true;
-          });
-        } catch {
-          /* ignore */
-        }
+        // try {
+        //   await page.evaluate(() => {
+        //     (window as any).__ttE2eIsClearing = true;
+        //   });
+        // } catch {
+        //   /* ignore */
+        // }
 
         // Avoid long hangs on failures that happen before the app boots.
-        await page.waitForFunction(() => !!(window as any).__ttTestApi, {
-          timeout: 2000,
-        });
+        // (But we don't need this because the equivelent is done inside clearTunetreesStorageDB.)
+        // await page.waitForFunction(() => !!(window as any).__ttTestApi, {
+        //   timeout: 2000,
+        // });
 
-        await clearTunetreesStorageDB(page);
+        // await clearTunetreesStorageDB(page);
+        await page.goto("about:blank");
       } catch (e) {
         // This fixture runs during teardown, when Playwright may already be
         // closing the page/context due to timeouts or failures.
@@ -130,7 +132,7 @@ export const test = base.extend<ITuneTreesFixtures>({
         if (!isExpectedPlaywrightTeardownError(e) || E2E_CLEANUP_DIAGNOSTICS) {
           console.warn("[E2E] auto cleanup skipped/failed:", e);
           if (E2E_CLEANUP_DIAGNOSTICS && e instanceof Error && e.stack) {
-            console.warn("[E2E] auto cleanup stack:\n" + e.stack);
+            console.warn(`[E2E] auto cleanup stack:\n${e.stack}`);
           }
         }
       }
@@ -204,6 +206,7 @@ export const test = base.extend<ITuneTreesFixtures>({
         const text = msg.text();
 
         // Always surface sync diagnostics in stdout for easy log scraping.
+
         if (text.startsWith("[SyncDiag]")) {
           console.log(`${prefix} ${text}`);
         }

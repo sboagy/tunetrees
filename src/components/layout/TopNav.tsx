@@ -257,6 +257,8 @@ const PlaylistDropdown: Component<{
   const [showDropdown, setShowDropdown] = createSignal(false);
   let dropdownContainerRef: HTMLDivElement | undefined;
 
+  const shouldTopNavDiag = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+
   // Close dropdown when clicking outside
   useClickOutside(
     () => dropdownContainerRef,
@@ -277,34 +279,36 @@ const PlaylistDropdown: Component<{
       const userId = user()?.id;
       const version = `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`; // Triggers refetch when playlists change or sync completes
 
-      console.log("🔍 [TopNav] Playlists dependency check:", {
-        hasDb: !!db,
-        userId,
-        userObject: user(),
-        repertoireListChanged: version,
-        shouldFetch: !!(db && userId),
-      });
-      log.debug("TOPNAV playlists dependency:", {
-        hasDb: !!db,
-        userId,
-        repertoireListChanged: version,
-      });
+      if (shouldTopNavDiag) {
+        console.log("🔍 [TopNav] Playlists dependency check:", {
+          hasDb: !!db,
+          userId,
+          userObject: user(),
+          repertoireListChanged: version,
+          shouldFetch: !!(db && userId),
+        });
+        log.debug("TOPNAV playlists dependency:", {
+          hasDb: !!db,
+          userId,
+          repertoireListChanged: version,
+        });
+      }
 
       // Fetch if database and user are ready
       // Don't wait for sync - playlists exist in local DB
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      console.log("📋 [TopNav] Fetching playlists with params:", params);
-      log.debug("TOPNAV playlists fetcher:", {
-        hasParams: !!params,
-        repertoireListChanged: params?.version,
-      });
+      if (shouldTopNavDiag) {
+        console.log("📋 [TopNav] Fetching playlists with params:", params);
+        log.debug("TOPNAV playlists fetcher:", {
+          hasParams: !!params,
+          repertoireListChanged: params?.version,
+        });
+      }
       if (!params) return [];
 
-      const shouldTopNavDump =
-        import.meta.env.VITE_SYNC_DIAGNOSTICS === "true" ||
-        (typeof window !== "undefined" && !!(window as any).__ttTestApi);
+      const shouldTopNavDump = shouldTopNavDiag;
 
       const userShort = params.userId.slice(0, 8);
       const diagKey = `${params.userId}:${params.version}`;
@@ -484,18 +488,32 @@ const PlaylistDropdown: Component<{
       };
 
       try {
-        await collectTopNavDbSnapshot("before");
-        console.log(
-          "🔄 [TopNav] Calling getUserPlaylists with userId:",
-          params.userId
-        );
+        if (shouldTopNavDump) {
+          await collectTopNavDbSnapshot("before");
+        }
+
+        if (shouldTopNavDiag) {
+          console.log(
+            "🔄 [TopNav] Calling getUserPlaylists with userId:",
+            params.userId
+          );
+        }
         const result = await getUserPlaylists(params.db, params.userId);
-        console.log("✅ [TopNav] Got playlists:", result.length, result);
-        await collectTopNavDbSnapshot("after");
-        log.debug("TOPNAV playlists result:", result.length, "playlists");
+
+        if (shouldTopNavDiag) {
+          console.log("✅ [TopNav] Got playlists:", result.length, result);
+        }
+        if (shouldTopNavDump) {
+          await collectTopNavDbSnapshot("after");
+        }
+        if (shouldTopNavDiag) {
+          log.debug("TOPNAV playlists result:", result.length, "playlists");
+        }
         return result;
       } catch (error) {
-        await collectTopNavDbSnapshot("afterError", { always: true, error });
+        if (shouldTopNavDump) {
+          await collectTopNavDbSnapshot("afterError", { always: true, error });
+        }
         console.error("❌ [TopNav] Playlist fetch error:", error);
         log.error("TOPNAV playlists fetch error:", error);
         return [];
