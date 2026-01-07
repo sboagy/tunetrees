@@ -270,89 +270,7 @@ export async function clearTunetreesStorageDB(
   }
 }
 
-/**
- * Wait for SyncEngine to complete initial sync after page reload
- * Sets up listener, then caller should reload, then wait completes
- */
-async function waitForSyncComplete(
-  page: Page,
-  timeoutMs = 30000
-): Promise<void> {
-  const startTime = Date.now();
-  let didRetryAfterFetchFailure = false;
-
-  log.debug("⏳ Waiting for initial sync to complete...");
-
-  const isTransientFetchFailure = (summary: string): boolean => {
-    const s = summary.toLowerCase();
-    return (
-      s.includes("failed to fetch") ||
-      // Some browsers / consoles truncate the final character in this message.
-      s.includes("failed to fet") ||
-      s.includes("networkerror") ||
-      s.includes("load failed") ||
-      s.includes("fetch")
-    );
-  };
-
-  // Poll for sync completion by checking if initial syncDown has finished
-  while (Date.now() - startTime < timeoutMs) {
-    const status = await page.evaluate(() => {
-      const el = document.querySelector(
-        "[data-auth-initialized]"
-      ) as HTMLElement | null;
-      const versionStr = el?.getAttribute("data-sync-version") || "0";
-      const successStr = el?.getAttribute("data-sync-success") || "";
-      const errorCountStr = el?.getAttribute("data-sync-error-count") || "0";
-      const errorSummary = el?.getAttribute("data-sync-error-summary") || "";
-
-      const version = Number.parseInt(versionStr, 10) || 0;
-      const errorCount = Number.parseInt(errorCountStr, 10) || 0;
-      const success = successStr === "true";
-
-      return { version, successStr, success, errorCount, errorSummary };
-    });
-
-    // If initial sync completed but failed, fail fast with the underlying error.
-    if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
-      if (
-        !didRetryAfterFetchFailure &&
-        isTransientFetchFailure(status.errorSummary)
-      ) {
-        didRetryAfterFetchFailure = true;
-        log.debug(
-          `⚠️ Initial sync failed with transient fetch error; reloading once to retry. ${status.errorSummary}`
-        );
-        await page.waitForTimeout(500);
-        await page.reload({ waitUntil: "domcontentloaded" });
-        continue;
-      }
-      throw new Error(
-        `⚠️ Initial sync completed but failed (success='${status.successStr}', errors=${status.errorCount}). ${status.errorSummary}`
-      );
-    }
-
-    if (status.version >= 1 && status.success && status.errorCount === 0) {
-      log.debug("✅ Initial sync complete (success) detected");
-      return;
-    }
-
-    await page.waitForTimeout(200);
-  }
-
-  // Timeout - throw error since sync is critical
-  throw new Error(
-    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail`
-  );
-}
-
-/**
- * Wait until the app has initialized auth + local DB enough that clearing the
- * local DB won't abort initialization (observed flake on CI under load).
- */
-async function waitForAuthInitialized(page: Page, timeoutMs = 20000) {
-  await page.waitForSelector("[data-auth-initialized]", { timeout: timeoutMs });
-}
+// NOTE: E2E lifecycle helpers (sync wait + local DB reset) live in `./local-db-lifecycle`.
 
 // ============================================================================
 // PARALLEL-SAFE SETUP FUNCTIONS (support multiple test users)
@@ -360,6 +278,10 @@ async function waitForAuthInitialized(page: Page, timeoutMs = 20000) {
 
 import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 import { BASE_URL } from "../test-config";
+import {
+  resetLocalDbAndResync,
+  waitForSyncComplete,
+} from "./local-db-lifecycle";
 import { getTestUserClient, type TestUser } from "./test-users";
 
 // Cache mapping from Supabase user UUID -> internal user_profile.id (user_ref)
@@ -614,12 +536,7 @@ export async function setupDeterministicTestParallel(
   if (shouldIsolateSync) {
     await page.context().setOffline(false);
   }
-  await waitForAuthInitialized(page);
-  await clearTunetreesStorageDB(page);
-
-  // Step 5: Reload page to trigger fresh sync
-  await page.reload();
-  await waitForSyncComplete(page);
+  await resetLocalDbAndResync(page);
 
   log.debug(`✅ [${user.name}] Deterministic test state ready`);
 }
@@ -1062,13 +979,8 @@ export async function setupForPracticeTestsParallel(
     await page.waitForLoadState("domcontentloaded");
   }
 
-  // 4. Clear IndexedDB cache
-  await waitForAuthInitialized(page);
-  await clearTunetreesStorageDB(page);
-
-  // 5. Reload to trigger fresh sync
-  await page.reload();
-  await waitForSyncComplete(page);
+  // 4-5) Reset local DB and trigger a fresh sync from Supabase.
+  await resetLocalDbAndResync(page);
 
   // 6. Navigate to starting tab (skip if already active)
   const tabSelector = `[data-testid="tab-${startTab}"]`;
@@ -1212,13 +1124,8 @@ export async function setupForRepertoireTestsParallel(
     await page.waitForLoadState("domcontentloaded");
   }
 
-  // 5. Clear IndexedDB cache
-  await waitForAuthInitialized(page);
-  await clearTunetreesStorageDB(page);
-
-  // 6. Reload to trigger fresh sync
-  await page.reload();
-  await waitForSyncComplete(page);
+  // 5-6) Reset local DB and trigger a fresh sync from Supabase.
+  await resetLocalDbAndResync(page);
 
   // If playlists didn't sync down, onboarding modal will block UI clicks.
   await assertHasLocalPlaylists(page, 1);
@@ -1342,13 +1249,8 @@ export async function setupForCatalogTestsParallel(
     await waitForSyncComplete(page);
   }
 
-  // 4. Clear ONLY IndexedDB cache (keep auth in localStorage!)
-  await clearTunetreesStorageDB(page);
-  await page.waitForTimeout(2000);
-
-  // 5. Reload to trigger fresh sync from Supabase
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await waitForSyncComplete(page);
+  // 4-5) Reset local DB and trigger a fresh sync from Supabase.
+  await resetLocalDbAndResync(page);
 
   // 6. Wait for playlist dropdown to show correct data
   const playlistLocator = page.getByTestId("playlist-dropdown-button");

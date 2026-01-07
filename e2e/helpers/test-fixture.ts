@@ -7,7 +7,10 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { test as base } from "@playwright/test";
 import log from "loglevel";
-// import { clearTunetreesStorageDB } from "./practice-scenarios";
+import {
+  clearTunetreesClientStorage,
+  gotoE2eOrigin,
+} from "./local-db-lifecycle";
 import {
   getTestUserByWorkerIndex,
   TEST_USERS,
@@ -107,24 +110,10 @@ export const test = base.extend<ITuneTreesFixtures>({
       try {
         if (page.isClosed()) return;
 
-        // Signal teardown intent early to prevent app-side DB init/sync while we clear.
-        // This may fail if the page is mid-navigation; ignore and proceed.
-        // try {
-        //   await page.evaluate(() => {
-        //     (window as any).__ttE2eIsClearing = true;
-        //   });
-        // } catch {
-        //   /* ignore */
-        // }
-
-        // Avoid long hangs on failures that happen before the app boots.
-        // (But we don't need this because the equivelent is done inside clearTunetreesStorageDB.)
-        // await page.waitForFunction(() => !!(window as any).__ttTestApi, {
-        //   timeout: 2000,
-        // });
-
-        // await clearTunetreesStorageDB(page);
-        await page.goto("about:blank");
+        // Canonical cleanup: hop to a same-origin static page (unloads the SPA),
+        // then clear IndexedDB/sql.js persistence and other transient storage.
+        await gotoE2eOrigin(page);
+        await clearTunetreesClientStorage(page);
       } catch (e) {
         // This fixture runs during teardown, when Playwright may already be
         // closing the page/context due to timeouts or failures.

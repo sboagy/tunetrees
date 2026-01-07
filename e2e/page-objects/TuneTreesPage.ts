@@ -1,4 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  clearTunetreesClientStorage,
+  gotoE2eOrigin,
+} from "../helpers/local-db-lifecycle";
 import { BASE_URL } from "../test-config";
 
 declare global {
@@ -428,23 +432,16 @@ export class TuneTreesPage {
     // Clear cookies first (this works without a page)
     await this.page.context().clearCookies();
 
-    // Navigate to login page first (required before accessing localStorage)
-    await this.page.goto(`${BASE_URL}/login`);
-    await this.page.waitForLoadState("domcontentloaded");
-
-    // Now clear localStorage and IndexedDB (page must be loaded first)
-    await this.page.evaluate(async () => {
-      localStorage.clear();
-      // Clear IndexedDB
-      const dbs = await indexedDB.databases();
-      for (const db of dbs) {
-        if (db.name) indexedDB.deleteDatabase(db.name);
-      }
+    // Use a same-origin static page so we can clear storage without booting the SPA.
+    await gotoE2eOrigin(this.page);
+    await clearTunetreesClientStorage(this.page, {
+      preserveAuth: false,
+      deleteAllIndexedDbs: true,
     });
 
-    // Reload the page to apply cleared state
-    await this.page.reload();
-    await this.page.waitForLoadState("domcontentloaded");
+    await this.page.goto(`${BASE_URL}/login`, {
+      waitUntil: "domcontentloaded",
+    });
   }
 
   /**
