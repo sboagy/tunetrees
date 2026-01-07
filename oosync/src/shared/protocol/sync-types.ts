@@ -5,20 +5,19 @@
  * These types ensure that both sides agree on the structure of the sync payload
  * and response, preventing protocol mismatches.
  */
-import type { SyncableTableName } from "../../../../shared/generated/sync";
 
-export type TableName = SyncableTableName;
+export type TableName = string;
 
-export interface SyncChange {
-  table: TableName;
+export interface SyncChange<TTableName extends string = TableName> {
+  table: TTableName;
   rowId: string; // UUID or JSON composite key
   data: Record<string, unknown>; // The full row data
   deleted: boolean;
   lastModifiedAt: string; // ISO timestamp from client
 }
 
-export interface SyncRequest {
-  changes: SyncChange[];
+export interface SyncRequest<TTableName extends string = TableName> {
+  changes: Array<SyncChange<TTableName>>;
   lastSyncAt?: string; // ISO timestamp of last successful sync
   schemaVersion: number;
 
@@ -41,8 +40,8 @@ export interface SyncRequest {
   pageSize?: number;
 }
 
-export interface SyncResponse {
-  changes: SyncChange[];
+export interface SyncResponse<TTableName extends string = TableName> {
+  changes: Array<SyncChange<TTableName>>;
   syncedAt: string; // ISO timestamp of this sync
   error?: string;
   debug?: string[];

@@ -59,11 +59,11 @@ const ALL_TUNES = [
   ...TUNES_OLD_LAPSED,
 ];
 
-let ttPage: TuneTreesPage;
-let currentDate: Date;
-
 test.describe
   .serial("SCHEDULING-005: Queue Bucket Distribution", () => {
+    let ttPage: TuneTreesPage;
+    let currentDate: Date;
+
     // Fixed: Include last_modified_at in Supabase updates so incremental sync picks them up
     test.setTimeout(120000);
 

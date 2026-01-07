@@ -40,8 +40,6 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("OFFLINE-011: Extended Offline Session", () => {
-  test.setTimeout(600_000);
-
   async function getLocalRepertoireCount(page: Page, playlistId: string) {
     return await page.evaluate(async (pid: string) => {
       const api = (window as any).__ttTestApi;
@@ -68,7 +66,8 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     CATALOG_TUNE_A_FIG_FOR_A_KISS,
   ];
 
-  test.beforeEach(async ({ page, context, testUser }) => {
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    test.setTimeout(testInfo.timeout * 3);
     ttPage = new TuneTreesPage(page);
 
     // Freeze clock
@@ -255,17 +254,34 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
       await saveButton.click();
       await page.waitForTimeout(500);
     }
+    const pendingCountPrevGoto = await getSyncOutboxCount(page);
+    const pendingCountPrevGotoStable = await ttPage.getStableSyncOutboxCount();
 
     console.log("Reloading page");
     await page.goto(`${BASE_URL}`);
+
     await page.waitForLoadState("domcontentloaded", { timeout: 10000 });
-    await page.waitForTimeout(1000);
 
     // Verify all changes persisted locally
-    console.log("🔍 Verifying pending changes in sync_outbox...");
-    const pendingCount = await getSyncOutboxCount(page);
-    console.log(`📦 Pending sync items: ${pendingCount}`);
-    expect(pendingCount).toBeGreaterThanOrEqual(22); // 20 practice + deletions + additions + notes + settings
+    // We're still offline here.
+    // The key invariant: queued changes survive reload (outbox becomes non-empty).
+    // Do not assert an exact count; internal coalescing/normalization may change it.
+    const pendingCountAfterGoto = await getSyncOutboxCount(page);
+
+    await expect
+      .poll(async () => await getSyncOutboxCount(page), {
+        timeout: 10_000,
+        intervals: [250, 250, 500, 1000],
+      })
+      .toBe(pendingCountPrevGotoStable);
+
+    const pendingCountFinal = await getSyncOutboxCount(page);
+
+    expect(pendingCountFinal).toBe(pendingCountPrevGotoStable);
+
+    console.log(
+      `📦 sync items (final): ${pendingCountFinal} pendingCountPrevGoto=${pendingCountPrevGoto} pendingCountPrevGotoStable=${pendingCountPrevGotoStable} pendingCountAfterGoto=${pendingCountAfterGoto}`
+    );
 
     await ttPage.navigateToTab("repertoire");
     const justBeforeOnlineRepertoireCount = await getLocalRepertoireCount(

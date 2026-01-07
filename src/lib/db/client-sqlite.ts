@@ -44,6 +44,10 @@ let dbReady = false;
 let isClearing = false; // set while clearDb executes
 let isInitializingDb = false; // guard flag for abort logic
 
+// Promise for an in-progress clearDb(). Used to gate initialization and avoid
+// using a DB while it is being torn down.
+let clearDbPromise: Promise<void> | null = null;
+
 // Monotonic cancellation token for async initialization.
 // Each `clearDb()` increments this value, invalidating any in-flight `initializeDb()`.
 let initEpoch = 0;
@@ -57,12 +61,38 @@ let cachedWasmBinary: ArrayBuffer | null = null;
 // Guard for overall database initialization (prevents overlapping initializeDb calls)
 let initializeDbPromise: Promise<ReturnType<typeof drizzle>> | null = null;
 
+// E2E diagnostic: track persist/export activity to debug OOM
+let e2ePersistCount = 0;
+let e2eCumulativeExportBytes = 0;
+
+// Optional diagnostics (off by default).
+// Enable via `VITE_SYNC_DIAGNOSTICS=true`.
+const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+
+function diagLog(...args: unknown[]): void {
+  if (SYNC_DIAGNOSTICS) console.log(...args);
+}
+
+function isE2eClearInProgress(): boolean {
+  return (
+    typeof window !== "undefined" && (window as any).__ttE2eIsClearing === true
+  );
+}
+
+function isDbInitAbortedError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("Database initialization aborted") ||
+    msg.includes("clearDb() was called during initialization")
+  );
+}
+
 async function getSqlJs(): Promise<SqlJsStatic> {
   if (sqlJsModule) return Promise.resolve(sqlJsModule);
   if (sqlJsInitPromise) return sqlJsInitPromise;
 
   sqlJsInitAttempts += 1;
-  console.log("⚙️ initSqlJs attempt", sqlJsInitAttempts);
+  diagLog("⚙️ initSqlJs attempt", sqlJsInitAttempts);
   // Manually fetch wasm binary to avoid race with locateFile callback disposal under HMR
   if (!cachedWasmBinary) {
     try {
@@ -70,7 +100,7 @@ async function getSqlJs(): Promise<SqlJsStatic> {
       if (!resp.ok)
         throw new Error(`Failed to fetch sql.js wasm binary ${resp.status}`);
       cachedWasmBinary = await resp.arrayBuffer();
-      console.log(
+      diagLog(
         `📦 sql.js wasm binary fetched (${cachedWasmBinary.byteLength} bytes)`
       );
     } catch (e) {
@@ -205,7 +235,7 @@ async function backupPendingOutboxBestEffort(
     const backup = createOutboxBackup(db);
     if (backup.items.length === 0) return;
     await saveOutboxBackupForUser(userId, backup);
-    console.log(
+    diagLog(
       `💾 Backed up ${backup.items.length} outbox item(s) for migration/recreate replay`
     );
   } catch (e) {
@@ -228,28 +258,37 @@ export async function initializeDb(
   userId: string
 ): Promise<ReturnType<typeof drizzle>> {
   initializeDbCalls += 1;
-  console.log(
+  diagLog(
     `🔁 initializeDb call #${initializeDbCalls} for user: ${userId.substring(0, 8)}...`
   );
+
+  // E2E can trigger async clears; never initialize while a clear is in-flight.
+  if (isClearing && clearDbPromise) {
+    diagLog("⏳ Waiting for clearDb() to finish before initializeDb...");
+    await clearDbPromise;
+  }
 
   const myInitEpoch = initEpoch;
   const ensureNotCleared = () => {
     if (initEpoch !== myInitEpoch) {
       throw new Error(
-        "Database initialization aborted: clearDb() was called during initialization."
+        "Database initialization aborted: clearDb() was called during initialization. " +
+          `initEpoch=${initEpoch} myInitEpoch=${myInitEpoch} ` +
+          `isClearing=${isClearing} isInitializingDb=${isInitializingDb} ` +
+          `e2eClearing=${isE2eClearInProgress()}`
       );
     }
   };
 
   // If we have an existing DB for a DIFFERENT user, persist and close it
   if (drizzleDb && currentUserId && currentUserId !== userId) {
-    console.log(
+    diagLog(
       `🔄 Switching users: ${currentUserId.substring(0, 8)}... → ${userId.substring(0, 8)}...`
     );
     // Persist current user's data before switching
     try {
       await persistDb();
-      console.log(`💾 Persisted previous user's database before switching`);
+      diagLog(`💾 Persisted previous user's database before switching`);
     } catch (e) {
       console.warn("⚠️ Failed to persist previous user's DB:", e);
     }
@@ -273,7 +312,7 @@ export async function initializeDb(
     return initializeDbPromise;
   }
 
-  console.log(
+  diagLog(
     `🔧 Initializing SQLite WASM database (call #${initializeDbCalls})...`
   );
   isInitializingDb = true;
@@ -283,6 +322,16 @@ export async function initializeDb(
       // Load sql.js WASM module via singleton
       const SQL = await getSqlJs();
       ensureNotCleared();
+
+      const requireSqliteDb = (): SqlJsDatabase => {
+        ensureNotCleared();
+        if (!sqliteDb) {
+          throw new Error(
+            "Database initialization aborted: sqliteDb was cleared during initialization."
+          );
+        }
+        return sqliteDb;
+      };
       // (Rest of original body moved inside try below)
       // Check if schema migration is needed (e.g., integer IDs → UUIDs)
       const migrationNeeded = needsMigration();
@@ -323,13 +372,13 @@ export async function initializeDb(
 
       if (existingData && storedVersionNum === CURRENT_DB_VERSION) {
         sqliteDb = new SQL.Database(existingData);
-        console.log(
+        diagLog(
           `✅ Loaded existing SQLite database from IndexedDB (v${CURRENT_DB_VERSION})`
         );
         drizzleDb = drizzle(sqliteDb, { schema: { ...schema, ...relations } });
-        console.log("🔄 Recreating views with latest definitions...");
+        diagLog("🔄 Recreating views with latest definitions...");
         await recreateViews(drizzleDb);
-        console.log("✅ Views recreated successfully");
+        diagLog("✅ Views recreated successfully");
       } else {
         if (existingData) {
           // If we're about to drop/recreate the DB due to a serialized-version mismatch,
@@ -341,7 +390,7 @@ export async function initializeDb(
           } catch (e) {
             console.warn("⚠️ Failed to inspect old DB for outbox backup:", e);
           }
-          console.log(
+          diagLog(
             `🔄 Database version mismatch (stored: ${storedVersionNum}, current: ${CURRENT_DB_VERSION}). Recreating...`
           );
           await deleteFromIndexedDB(dbKey);
@@ -352,7 +401,7 @@ export async function initializeDb(
         clearLastSyncTimestampForUser(userId);
 
         sqliteDb = new SQL.Database();
-        console.log("📋 Applying SQLite schema migrations...");
+        diagLog("📋 Applying SQLite schema migrations...");
         const migrations = [
           "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
           "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -362,6 +411,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0005_add_display_order.sql",
           "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
           "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
+          "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
@@ -377,22 +427,46 @@ export async function initializeDb(
             .filter((s) => s.length > 0);
           for (const statement of statements) {
             if (statement && !statement.startsWith("--")) {
-              sqliteDb.run(statement);
+              requireSqliteDb().run(statement);
             }
           }
-          console.log(
+          diagLog(
             `✅ Applied ${statements.length} statements from ${migrationPath.split("/").pop()}`
           );
         }
-        console.log("✅ Applied all migrations");
-        console.log("✅ Created new SQLite database with schema");
-        drizzleDb = drizzle(sqliteDb, { schema: { ...schema, ...relations } });
+        diagLog("✅ Applied all migrations");
+        diagLog("✅ Created new SQLite database with schema");
+        drizzleDb = drizzle(requireSqliteDb(), {
+          schema: { ...schema, ...relations },
+        });
       }
 
       await initializeViews(drizzleDb);
       ensureNotCleared();
       try {
         ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
+
+        // Required for trigger install and server-side incremental sync.
+        // Older local DBs may be missing this table because it's not part of the historical
+        // sqlite migration set that seeded IndexedDB.
+        requireSqliteDb().run(`
+          CREATE TABLE IF NOT EXISTS sync_change_log (
+            table_name TEXT PRIMARY KEY NOT NULL,
+            changed_at TEXT NOT NULL
+          )
+        `);
+        requireSqliteDb().run(
+          "CREATE INDEX IF NOT EXISTS idx_sync_change_log_changed_at ON sync_change_log(changed_at)"
+        );
+
+        // Some historical SQLite schemas used supabase_user_id as PK and did not include an `id` column.
+        // Ensure `id` exists so synced rows (which reference user_profile.id) can be inserted.
+        // Do NOT backfill id = supabase_user_id: server user_profile.id is not the auth UID.
+        ensureColumnExists("user_profile", "id", "id text");
+        // Keep a best-effort uniqueness index; multiple NULLs are allowed in SQLite.
+        requireSqliteDb().run(
+          "CREATE UNIQUE INDEX IF NOT EXISTS user_profile_id_unique ON user_profile(id)"
+        );
 
         // Backward-compatible adds for hybrid tune fields.
         // Some existing IndexedDB DBs were created before these columns existed,
@@ -417,13 +491,14 @@ export async function initializeDb(
       // Install sync push queue and triggers for automatic change tracking
       // The sync_push_queue table and triggers are used for the trigger-based sync architecture
       try {
-        createSyncPushQueueTable(sqliteDb);
-        installSyncTriggers(sqliteDb);
+        const db = requireSqliteDb();
+        createSyncPushQueueTable(db);
+        installSyncTriggers(db);
       } catch (error) {
         console.error("❌ Failed to install sync triggers:", error);
       }
 
-      console.log(
+      diagLog(
         `✅ SQLite WASM database ready for user: ${userId.substring(0, 8)}...`
       );
 
@@ -433,7 +508,7 @@ export async function initializeDb(
       dbReady = true;
 
       if (migrationNeeded) {
-        console.log("🔄 Executing schema migration...");
+        diagLog("🔄 Executing schema migration...");
         try {
           // Local data will be cleared; force next syncDown to run as a full sync.
           clearLastSyncTimestampForUser(userId);
@@ -453,7 +528,7 @@ export async function initializeDb(
             sqliteDb?.run(
               "UPDATE sync_trigger_control SET disabled = 0 WHERE id = 1"
             );
-            console.log("✅ Cleared sync outbox after migration");
+            diagLog("✅ Cleared sync outbox after migration");
           } catch (e) {
             console.warn("⚠️ Failed to clear sync outbox after migration:", e);
           }
@@ -461,9 +536,9 @@ export async function initializeDb(
           setLocalSchemaVersion(getCurrentSchemaVersion());
           clearMigrationParams();
           if (forcedReset) {
-            console.log("✅ Forced reset complete. Local database cleared.");
+            diagLog("✅ Forced reset complete. Local database cleared.");
           } else {
-            console.log(
+            diagLog(
               "✅ Schema migration complete. Ready for re-sync from Supabase."
             );
           }
@@ -480,20 +555,29 @@ export async function initializeDb(
         }
       }
 
-      const tuneCount = sqliteDb.exec("SELECT COUNT(*) as count FROM tune");
+      const tuneCount = requireSqliteDb().exec(
+        "SELECT COUNT(*) as count FROM tune"
+      );
       const count = Number(tuneCount[0]?.values[0]?.[0] || 0);
-      console.log(
+      diagLog(
         `🔍 DEBUG: Found ${count} tunes in database after initialization`
       );
       if (count > 0) {
-        const sampleTunes = sqliteDb.exec(
+        const sampleTunes = requireSqliteDb().exec(
           "SELECT id, title, genre FROM tune LIMIT 5"
         );
-        console.log("🔍 DEBUG: Sample tunes:", sampleTunes[0]?.values || []);
+        diagLog("🔍 DEBUG: Sample tunes:", sampleTunes[0]?.values || []);
       }
       return drizzleDb;
     } catch (err) {
-      console.error("❌ initializeDb failed", err);
+      // During Playwright teardown we intentionally clear IndexedDB / the in-memory
+      // sql.js handle. That can abort an in-flight initializeDb(). Avoid emitting
+      // noisy console errors for this expected E2E-only race.
+      if (isDbInitAbortedError(err) && (isClearing || isE2eClearInProgress())) {
+        console.warn("⚠️ initializeDb aborted during clear", err);
+      } else {
+        console.error("❌ initializeDb failed", err);
+      }
       // Reset promise only on failure to allow retry; keep it for successful resolution
       initializeDbPromise = null;
       throw err;
@@ -524,6 +608,11 @@ export async function initializeDb(
  * @returns Drizzle ORM instance
  */
 export function getDb(): ReturnType<typeof drizzle> {
+  if (isClearing) {
+    throw new Error(
+      "SQLite database is clearing. Wait for clearDb() to finish before using the database."
+    );
+  }
   if (!drizzleDb) {
     throw new Error(
       "SQLite database not initialized. Call initializeDb() first."
@@ -570,10 +659,20 @@ export async function persistDb(): Promise<void> {
   const dbKey = getDbKey(currentUserId);
   const dbVersionKey = getDbVersionKey(currentUserId);
   const data = dbToPersist.export();
+
+  const isE2E = typeof window !== "undefined" && !!(window as any).__ttTestApi;
+  if (isE2E && SYNC_DIAGNOSTICS) {
+    e2ePersistCount++;
+    e2eCumulativeExportBytes += data.byteLength;
+    diagLog(
+      `🔬 [E2E Persist #${e2ePersistCount}] Export size: ${(data.byteLength / 1024).toFixed(1)}KB, cumulative: ${(e2eCumulativeExportBytes / 1024 / 1024).toFixed(2)}MB`
+    );
+  }
+
   await saveToIndexedDB(dbKey, data);
   // Save version number
   await saveToIndexedDB(dbVersionKey, new Uint8Array([CURRENT_DB_VERSION]));
-  console.log("💾 Database persisted to IndexedDB");
+  diagLog("💾 Database persisted to IndexedDB");
 
   // DEV VERIFICATION: load saved blob and verify critical table counts match
   try {
@@ -608,7 +707,7 @@ export async function persistDb(): Promise<void> {
             `Persist verification failed: in-memory table_transient_data=${inMemCount}, saved=${savedCount}`
           );
         } else {
-          console.log(
+          diagLog(
             `✅ Persist verification OK - table_transient_data count=${inMemCount}`
           );
         }
@@ -650,7 +749,7 @@ export async function closeDb(): Promise<void> {
   if (sqliteDb && dbReady) {
     try {
       await persistDb();
-      console.log("💾 Persisted database before closing");
+      diagLog("💾 Persisted database before closing");
     } catch (e) {
       console.warn("⚠️ Failed to persist before close:", e);
     }
@@ -664,7 +763,7 @@ export async function closeDb(): Promise<void> {
   currentUserId = null;
   dbReady = false;
   initializeDbPromise = null;
-  console.log("🔒 Database closed (data preserved in IndexedDB)");
+  diagLog("🔒 Database closed (data preserved in IndexedDB)");
 }
 
 /**
@@ -674,7 +773,12 @@ export async function closeDb(): Promise<void> {
  * Useful for logout or data reset scenarios.
  */
 export async function clearDb(): Promise<void> {
+  if (clearDbPromise) return clearDbPromise;
+
+  // Mark clearing immediately so callers can gate.
   isClearing = true;
+  dbReady = false;
+
   // Invalidate any in-flight initializeDb() ASAP.
   initEpoch += 1;
   if (isInitializingDb) {
@@ -683,33 +787,43 @@ export async function clearDb(): Promise<void> {
 
   // Allow a subsequent initializeDb() call to start fresh.
   initializeDbPromise = null;
-  if (sqliteDb) {
-    sqliteDb.close();
-    sqliteDb = null;
-    drizzleDb = null;
-  }
 
-  // Playwright E2E: fully reset the sql.js module so its WASM linear memory
-  // can be reclaimed by GC. sql.js grows memory but does not shrink it, so
-  // long, highly-parallel E2E runs can hit `Error: out of memory` even after
-  // closing individual Database instances.
-  const isE2E =
-    typeof window !== "undefined" && !!(window as unknown as any).__ttTestApi;
-  if (isE2E) {
-    sqlJsModule = null;
-    sqlJsInitPromise = null;
-    sqlJsInitAttempts = 0;
-  }
-
-  if (currentUserId) {
-    await deleteFromIndexedDB(getDbKey(currentUserId));
-    await deleteFromIndexedDB(getDbVersionKey(currentUserId));
-    clearLastSyncTimestampForUser(currentUserId);
-  }
+  const userIdToClear = currentUserId;
   currentUserId = null;
-  dbReady = false;
-  isClearing = false;
-  console.log("🗑️  Local database cleared");
+
+  clearDbPromise = (async () => {
+    if (sqliteDb) {
+      sqliteDb.close();
+      diagLog(
+        `🧹 [E2E ClearDb] Resetting database instance (${e2ePersistCount} persists, ${(e2eCumulativeExportBytes / 1024 / 1024).toFixed(2)}MB exported)`
+      );
+      // Reset per-test diagnostic counters
+      e2ePersistCount = 0;
+      e2eCumulativeExportBytes = 0;
+      sqliteDb = null;
+      drizzleDb = null;
+    } else {
+      drizzleDb = null;
+    }
+
+    // NOTE: DO NOT reset sqlJsModule or sqlJsInitPromise in E2E
+    // Resetting causes reallocation of wasm memory, which can exhaust heap across many tests.
+    // Instead, reuse the same sql.js Module instance and let each test get a fresh Database.
+    // sql.js memory is allocated per-Module, not per-Database, so reusing is more efficient.
+
+    if (userIdToClear) {
+      await deleteFromIndexedDB(getDbKey(userIdToClear));
+      await deleteFromIndexedDB(getDbVersionKey(userIdToClear));
+      clearLastSyncTimestampForUser(userIdToClear);
+    }
+
+    diagLog("🗑️  Local database cleared");
+  })().finally(() => {
+    isClearing = false;
+    clearDbPromise = null;
+  });
+
+  return clearDbPromise;
 }
 
 /**
@@ -721,6 +835,14 @@ export async function clearDb(): Promise<void> {
  * - Periodic interval (every 30 seconds)
  */
 export function setupAutoPersist(): () => void {
+  // Skip auto-persist in E2E tests - reduces memory pressure and GC burden
+  const isE2E =
+    typeof window !== "undefined" && !!(window as unknown as any).__ttTestApi;
+  if (isE2E) {
+    diagLog("⏸️  Auto-persist disabled in E2E mode");
+    return () => {}; // Return empty cleanup function
+  }
+
   const persistHandler = () => {
     if (drizzleDb) {
       persistDb().catch(console.error);
@@ -731,11 +853,12 @@ export function setupAutoPersist(): () => void {
   window.addEventListener("beforeunload", persistHandler);
 
   // Persist when tab becomes hidden
-  document.addEventListener("visibilitychange", () => {
+  const visibilityHandler = () => {
     if (document.hidden) {
       persistHandler();
     }
-  });
+  };
+  document.addEventListener("visibilitychange", visibilityHandler);
 
   // Periodic persistence (every 30 seconds)
   const intervalId = setInterval(persistHandler, 30_000);
@@ -743,6 +866,7 @@ export function setupAutoPersist(): () => void {
   // Return cleanup function
   return () => {
     window.removeEventListener("beforeunload", persistHandler);
+    document.removeEventListener("visibilitychange", visibilityHandler);
     clearInterval(intervalId);
   };
 }
@@ -766,11 +890,11 @@ function ensureColumnExists(
     const values = result[0]?.values ?? [];
     const hasColumn = values.some((row) => row?.[1] === column);
     if (!hasColumn) {
-      console.log(
+      diagLog(
         `🛠️  Missing column '${column}' on '${table}'. Adding via ALTER TABLE...`
       );
       sqliteDb.run(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
-      console.log(`✅ Added column '${column}' to '${table}'`);
+      diagLog(`✅ Added column '${column}' to '${table}'`);
     }
   } catch (e) {
     console.error(
@@ -933,6 +1057,46 @@ async function deleteFromIndexedDB(key: string): Promise<void> {
  */
 export async function getSqliteInstance(): Promise<SqlJsDatabase | null> {
   return sqliteDb;
+}
+
+export type ISqlJsDebugInfo = {
+  hasModule: boolean;
+  wasmHeapBytes?: number;
+};
+
+export function getSqlJsDebugInfo(): ISqlJsDebugInfo {
+  try {
+    const modAny = sqlJsModule as any;
+    const heapBytes = Number(modAny?.HEAP8?.buffer?.byteLength ?? 0);
+    return {
+      hasModule: !!sqlJsModule,
+      wasmHeapBytes: heapBytes > 0 ? heapBytes : undefined,
+    };
+  } catch {
+    return { hasModule: !!sqlJsModule };
+  }
+}
+
+export type IClientSqliteDebugState = {
+  initEpoch: number;
+  isClearing: boolean;
+  isInitializingDb: boolean;
+  dbReady: boolean;
+  hasSqliteDb: boolean;
+  hasDrizzleDb: boolean;
+  currentUser?: string | null;
+};
+
+export function getClientSqliteDebugState(): IClientSqliteDebugState {
+  return {
+    initEpoch,
+    isClearing,
+    isInitializingDb,
+    dbReady,
+    hasSqliteDb: !!sqliteDb,
+    hasDrizzleDb: !!drizzleDb,
+    currentUser: currentUserId,
+  };
 }
 
 /**

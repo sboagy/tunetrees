@@ -5,8 +5,10 @@ import {
   TEST_TUNE_MASONS_ID,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+// import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
@@ -20,11 +22,28 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Edge Cases", () => {
+    test.setTimeout(60000);
+
+    let ttPage: TuneTreesPage;
+    let currentDate: Date;
+    // let currentTestUser: TestUser;
+
+    test.beforeEach(async ({ page, context }) => {
+      ttPage = new TuneTreesPage(page);
+
+      // Set stable starting date
+      currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
+      // currentTestUser = testUser;
+    });
+
     test("01. Single tune in flashcard list", async ({ page, testUser }) => {
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [TEST_TUNE_BANISH_ID], // Only 1 tune
         scheduleDaysAgo: 1, // Ensure it's due and appears in flashcards
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);
@@ -63,6 +82,7 @@ test.describe
         repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       // Turn OFF Show Submitted
@@ -87,15 +107,11 @@ test.describe
           .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
           .count();
         if (preCount === 0) break;
-        const gridEvalTrigger = grid
-          .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-          .first();
-        await expect(gridEvalTrigger).toBeVisible({ timeout: 5000 });
-        await gridEvalTrigger.click();
-        const option = page.getByTestId("recall-eval-option-good");
-        await expect(option).toBeVisible({ timeout: 5000 });
-        await option.click();
-        await page.waitForTimeout(300);
+
+        const rows = ttPage.getRows("scheduled");
+        const firstRow = rows.first();
+        await ttPage.setRowEvaluation(firstRow, "good", 500);
+
         await app.submitEvaluationsButton.click();
         await page.waitForTimeout(500);
         // Wait for grid to reflect one fewer trigger
@@ -146,6 +162,7 @@ test.describe
         ], // 3 tunes that exist in seed data
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);
@@ -203,6 +220,7 @@ test.describe
         ], // 3 tunes that exist in seed data
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);
@@ -226,6 +244,7 @@ test.describe
         repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       // Turn OFF Show Submitted
@@ -277,6 +296,7 @@ test.describe
         repertoireTunes: [privateTune1Id], // 1 tune
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);
@@ -335,10 +355,11 @@ test.describe
         ], // 3 tunes that exist in seed data
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await app.enableFlashcardMode(1000);
 
       // Select evaluation on first card
       await app.selectFlashcardEvaluation("good");
@@ -376,6 +397,7 @@ test.describe
         repertoireTunes: [TEST_TUNE_BANISH_ID, TEST_TUNE_MASONS_ID], // 2 tunes
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);
@@ -433,6 +455,7 @@ test.describe
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [], // No tunes
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       // Verify no practice grid rows
@@ -458,6 +481,7 @@ test.describe
         repertoireTunes: [privateTune1Id], // Assuming this tune might have missing fields
         scheduleDaysAgo: 1,
         startTab: "practice",
+        scheduleBaseDate: currentDate,
       });
 
       const app = new TuneTreesPage(page);

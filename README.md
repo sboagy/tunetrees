@@ -51,6 +51,15 @@ npm run dev
 
 Open http://localhost:5173
 
+### Sync Diagnostics (Optional)
+
+To help debug sync performance and E2E flakiness, you can enable compact per-sync diagnostics logs:
+
+- Client (browser): set `VITE_SYNC_DIAGNOSTICS=true`
+- Worker (optional): set `SYNC_DIAGNOSTICS=true` (and optionally `SYNC_DIAGNOSTICS_USER_ID=<supabase auth uid>`)
+
+See [Developer Setup](docs/development/setup.md) and [Deployment](docs/development/deployment.md) for details.
+
 ## Tech Stack
 
 | Layer | Technology |

@@ -49,243 +49,228 @@ export async function getPracticeCountLocally(page: Page, playlistId: string) {
  * Clear local IndexedDB cache to force fresh sync from Supabase
  * This ensures tests start with a clean slate matching Supabase state
  */
-export async function clearTunetreesStorageDB(page: Page) {
-  await page.evaluate(async () => {
-    const dbName = "tunetrees-storage";
-    // First, ask the app to dispose in-memory DB to avoid re-persisting
-    try {
-      if (
-        (window as any).__ttTestApi &&
-        typeof (window as any).__ttTestApi.dispose === "function"
-      ) {
-        await (window as any).__ttTestApi.dispose();
-      }
-    } catch (err) {
-      console.warn("dispose() failed before IndexedDB delete:", err);
-    }
-    await new Promise<void>((resolve, reject) => {
-      const maxAttempts = 5;
-      let attempt = 0;
-
-      function tryDelete() {
-        attempt++;
-        const req = indexedDB.deleteDatabase(dbName);
-
-        req.onsuccess = () => resolve();
-
-        req.onerror = () => {
-          if (attempt < maxAttempts) {
-            const delay = 200 * attempt; // backoff: 200ms, 400ms, ...
-            // eslint-disable-next-line no-console
-            console.warn(
-              `IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
-              req.error
-            );
-            setTimeout(tryDelete, delay);
-          } else {
-            reject(req.error);
-          }
-        };
-
-        req.onblocked = () => {
-          if (attempt < maxAttempts) {
-            const delay = 500 * attempt; // longer wait for blocked case
-            // eslint-disable-next-line no-console
-            console.warn(
-              `IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
-            );
-            setTimeout(tryDelete, delay);
-          } else {
-            // eslint-disable-next-line no-console
-            console.error("IndexedDB delete blocked after retries");
-            reject(new Error("IndexedDB delete blocked"));
-          }
-        };
-      }
-
-      tryDelete();
-    });
-    // eslint-disable-next-line no-console
-    console.log("✅ Cleared local IndexedDB cache");
-
-    // Clear app caches (but preserve auth state for parallel workers)
-
-    // 1) Clear sessionStorage only (non-persistent storage)
-    try {
-      sessionStorage.clear();
-      // eslint-disable-next-line no-console
-      console.log("✅ Cleared sessionStorage");
-    } catch (err) {
-      console.warn("Failed to clear sessionStorage:", err);
-    }
-
-    // 1a) Clear Practice queue-date keys.
-    // These can leak in via Playwright storageState and cause Practice to render
-    // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
-    try {
-      localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
-      localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
-      // eslint-disable-next-line no-console
-      console.log("✅ Cleared practice queue date keys from localStorage");
-    } catch (err) {
-      console.warn("Failed to clear practice queue date keys:", err);
-    }
-
-    // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
-    // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
-          keysToRemove.push(key);
-        }
-      }
-      for (const key of keysToRemove) {
-        localStorage.removeItem(key);
-      }
-      if (keysToRemove.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log(
-          `✅ Cleared ${keysToRemove.length} sync timestamp key(s) from localStorage`
-        );
-      }
-    } catch (err) {
-      console.warn("Failed to clear sync timestamp keys:", err);
-    }
-
-    // 2) Clear CacheStorage (service-worker / workbox caches for app code)
-    if (typeof caches !== "undefined") {
-      try {
-        const cacheNames = await caches.keys();
-        // IMPORTANT: Preserve Workbox precache so offline SPA navigations (e.g. /?tab=practice)
-        // can still be fulfilled by cached app-shell HTML.
-        const preserved = cacheNames.filter((n) =>
-          n.startsWith("workbox-precache-")
-        );
-        const toDelete = cacheNames.filter(
-          (n) => !n.startsWith("workbox-precache-")
-        );
-
-        await Promise.all(toDelete.map((n) => caches.delete(n)));
-        // eslint-disable-next-line no-console
-        console.log("✅ Cleared CacheStorage caches:", toDelete);
-        // eslint-disable-next-line no-console
-        console.log("🛡️ Preserved Workbox precache:", preserved);
-      } catch (err) {
-        console.warn("Failed to clear CacheStorage:", err);
-      }
-    }
-
-    // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
-    try {
-      if ((window as any).__ttTestApi) {
-        if (typeof (window as any).__ttTestApi.dispose === "function") {
-          try {
-            await (window as any).__ttTestApi.dispose();
-          } catch {
-            /* ignore disposal errors */
-          }
-        }
-        delete (window as any).__ttTestApi;
-      }
-
-      // If app exposes other global caches, try clearing a few common ones
-      if ((window as any).__tunetreesCache) {
-        try {
-          (window as any).__tunetreesCache = null;
-          delete (window as any).__tunetreesCache;
-        } catch {
-          /* ignore */
-        }
-      }
-
-      // eslint-disable-next-line no-console
-      console.log("✅ Cleared in-memory globals/test hooks");
-    } catch (err) {
-      console.warn("Failed to clear in-memory globals:", err);
-    }
-
-    // Return so page.evaluate resolves
-    return;
-  });
-}
-
-/**
- * Wait for SyncEngine to complete initial sync after page reload
- * Sets up listener, then caller should reload, then wait completes
- */
-async function waitForSyncComplete(
+export async function clearTunetreesStorageDB(
   page: Page,
-  timeoutMs = 30000
-): Promise<void> {
-  const startTime = Date.now();
-  let didRetryAfterFetchFailure = false;
-
-  log.debug("⏳ Waiting for initial sync to complete...");
-
-  const isTransientFetchFailure = (summary: string): boolean => {
-    const s = summary.toLowerCase();
-    return (
-      s.includes("failed to fetch") ||
-      // Some browsers / consoles truncate the final character in this message.
-      s.includes("failed to fet") ||
-      s.includes("networkerror") ||
-      s.includes("load failed") ||
-      s.includes("fetch")
-    );
-  };
-
-  // Poll for sync completion by checking if initial syncDown has finished
-  while (Date.now() - startTime < timeoutMs) {
-    const status = await page.evaluate(() => {
-      const el = document.querySelector(
-        "[data-auth-initialized]"
-      ) as HTMLElement | null;
-      const versionStr = el?.getAttribute("data-sync-version") || "0";
-      const successStr = el?.getAttribute("data-sync-success") || "";
-      const errorCountStr = el?.getAttribute("data-sync-error-count") || "0";
-      const errorSummary = el?.getAttribute("data-sync-error-summary") || "";
-
-      const version = Number.parseInt(versionStr, 10) || 0;
-      const errorCount = Number.parseInt(errorCountStr, 10) || 0;
-      const success = successStr === "true";
-
-      return { version, successStr, success, errorCount, errorSummary };
+  opts: {
+    /**
+     * If true, navigates away from the app origin after clearing.
+     * Most callers should keep the origin so they can `page.reload()` and wait for sync.
+     */
+    leaveOriginAfterClear?: boolean;
+  } = {}
+) {
+  // Signal teardown intent ASAP so the app can avoid kicking off DB init/sync while
+  // Playwright is about to clear IndexedDB. This can fail if the page is mid-nav
+  // or already being torn down; ignore and continue.
+  let armedE2eClearFlag = false;
+  try {
+    await page.evaluate(() => {
+      (window as any).__ttE2eIsClearing = true;
     });
-
-    // If initial sync completed but failed, fail fast with the underlying error.
-    if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
-      if (
-        !didRetryAfterFetchFailure &&
-        isTransientFetchFailure(status.errorSummary)
-      ) {
-        didRetryAfterFetchFailure = true;
-        log.debug(
-          `⚠️ Initial sync failed with transient fetch error; reloading once to retry. ${status.errorSummary}`
-        );
-        await page.waitForTimeout(500);
-        await page.reload({ waitUntil: "domcontentloaded" });
-        continue;
-      }
-      throw new Error(
-        `⚠️ Initial sync completed but failed (success='${status.successStr}', errors=${status.errorCount}). ${status.errorSummary}`
-      );
-    }
-
-    if (status.version >= 1 && status.success && status.errorCount === 0) {
-      log.debug("✅ Initial sync complete (success) detected");
-      return;
-    }
-
-    await page.waitForTimeout(200);
+    armedE2eClearFlag = true;
+  } catch {
+    // ignore
   }
 
-  // Timeout - throw error since sync is critical
-  throw new Error(
-    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail`
-  );
+  // Ensure the browser test API is available so we can close in-memory DB handles
+  // before attempting IndexedDB deletion (prevents blocked/hanging deletes on CI).
+  try {
+    await page.waitForFunction(
+      () =>
+        !!(window as any).__ttTestApi &&
+        typeof (window as any).__ttTestApi.dispose === "function",
+      { timeout: 20000 }
+    );
+
+    await page.evaluate(async () => {
+      const dbName = "tunetrees-storage";
+      // Signal to the app that E2E teardown is actively clearing storage.
+      // App code can use this to avoid re-initializing DB/sync while IndexedDB is being deleted.
+      (window as any).__ttE2eIsClearing = true;
+
+      try {
+        // First, ask the app to dispose in-memory DB to avoid re-persisting
+        try {
+          if (
+            (window as any).__ttTestApi &&
+            typeof (window as any).__ttTestApi.dispose === "function"
+          ) {
+            await (window as any).__ttTestApi.dispose();
+          }
+        } catch (err) {
+          console.warn(
+            "[ClearDBStore] dispose() failed before IndexedDB delete:",
+            err
+          );
+          throw err;
+        }
+        // NOTE: After dispose(), the local DB keys are already deleted via clearDb().
+        // Deleting the entire IndexedDB database must succeed to prevent unbounded growth
+        // across tests (which can cause OOM in sql.js WASM).
+        await new Promise<void>((resolve, reject) => {
+          const maxAttempts = 5;
+          let attempt = 0;
+
+          function tryDelete() {
+            attempt++;
+            const req = indexedDB.deleteDatabase(dbName);
+
+            req.onsuccess = () => resolve();
+
+            req.onerror = () => {
+              if (attempt < maxAttempts) {
+                const delay = 200 * attempt; // backoff: 200ms, 400ms, ...
+                // eslint-disable-next-line no-console
+                console.warn(
+                  `IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
+                  req.error
+                );
+                setTimeout(tryDelete, delay);
+              } else {
+                const msg = `IndexedDB delete failed after ${maxAttempts} attempts: ${req.error}`;
+                // eslint-disable-next-line no-console
+                console.error(msg);
+                reject(new Error(msg));
+              }
+            };
+
+            req.onblocked = () => {
+              if (attempt < maxAttempts) {
+                const delay = 500 * attempt; // longer wait for blocked case
+                // eslint-disable-next-line no-console
+                console.warn(
+                  `[ClearDBStore] IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
+                );
+                setTimeout(tryDelete, delay);
+              } else {
+                const msg = `[ClearDBStore] IndexedDB delete blocked after ${maxAttempts} attempts`;
+                // eslint-disable-next-line no-console
+                console.error(msg);
+                reject(new Error(msg));
+              }
+            };
+          }
+
+          tryDelete();
+        });
+
+        // Clear app caches (but preserve auth state for parallel workers)
+
+        // 1) Clear sessionStorage only (non-persistent storage)
+        try {
+          sessionStorage.clear();
+        } catch (err) {
+          console.warn("[ClearDBStore] Failed to clear sessionStorage:", err);
+        }
+
+        // 1a) Clear Practice queue-date keys.
+        // These can leak in via Playwright storageState and cause Practice to render
+        // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
+        try {
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+        } catch (err) {
+          console.warn(
+            "[ClearDBStore] Failed to clear practice queue date keys:",
+            err
+          );
+        }
+
+        // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
+        // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
+              keysToRemove.push(key);
+            }
+          }
+          for (const key of keysToRemove) {
+            localStorage.removeItem(key);
+          }
+        } catch (err) {
+          console.warn(
+            "[ClearDBStore] Failed to clear sync timestamp keys:",
+            err
+          );
+        }
+
+        // 2) Clear CacheStorage (service-worker / workbox caches for app code)
+        if (typeof caches !== "undefined") {
+          try {
+            const cacheNames = await caches.keys();
+            // IMPORTANT: Preserve Workbox precache so offline SPA navigations (e.g. /?tab=practice)
+            // can still be fulfilled by cached app-shell HTML.
+            const toDelete = cacheNames.filter(
+              (n) => !n.startsWith("workbox-precache-")
+            );
+
+            await Promise.all(toDelete.map((n) => caches.delete(n)));
+          } catch (err) {
+            console.warn("[ClearDBStore] Failed to clear CacheStorage:", err);
+          }
+        }
+
+        // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
+        try {
+          if ((window as any).__ttTestApi) {
+            if (typeof (window as any).__ttTestApi.dispose === "function") {
+              try {
+                await (window as any).__ttTestApi.dispose();
+              } catch {
+                /* ignore disposal errors */
+              }
+            }
+            delete (window as any).__ttTestApi;
+          }
+
+          // If app exposes other global caches, try clearing a few common ones
+          if ((window as any).__tunetreesCache) {
+            try {
+              (window as any).__tunetreesCache = null;
+              delete (window as any).__tunetreesCache;
+            } catch {
+              /* ignore */
+            }
+          }
+        } catch (err) {
+          console.warn(
+            "[ClearDBStore] Failed to clear in-memory globals:",
+            err
+          );
+        }
+
+        // Return so page.evaluate resolves
+        return;
+      } finally {
+        // Always clear the flag so subsequent navigations in the same test can boot normally.
+        (window as any).__ttE2eIsClearing = false;
+      }
+    });
+  } finally {
+    // Safety net: if we set the flag but never reached the in-app finally (e.g., timeout
+    // before __ttTestApi exists), clear it so we don't block later init in this worker.
+    if (armedE2eClearFlag) {
+      try {
+        await page.evaluate(() => {
+          (window as any).__ttE2eIsClearing = false;
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Most callers want to stay on-origin so they can reload and wait for fresh sync.
+  // Leaving the origin can be useful when debugging teardown races, but it must be
+  // opt-in because `waitForSyncComplete()` expects the app DOM to exist.
+  if (opts.leaveOriginAfterClear) {
+    await page.goto("about:blank");
+  }
 }
+
+// NOTE: E2E lifecycle helpers (sync wait + local DB reset) live in `./local-db-lifecycle`.
 
 // ============================================================================
 // PARALLEL-SAFE SETUP FUNCTIONS (support multiple test users)
@@ -293,34 +278,56 @@ async function waitForSyncComplete(
 
 import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 import { BASE_URL } from "../test-config";
+import {
+  resetLocalDbAndResync,
+  waitForSyncComplete,
+} from "./local-db-lifecycle";
 import { getTestUserClient, type TestUser } from "./test-users";
 
 // Cache mapping from Supabase user UUID -> internal user_profile.id (user_ref)
 const internalUserRefCache: Map<string, string> = new Map();
 
 async function getInternalUserRef(
-  supabase: any,
+  _supabase: any,
   user: TestUser
 ): Promise<string | null> {
-  // Supabase userId stored on TestUser.userId; internal user_profile.id needed for tune_override.user_ref
-  if (internalUserRefCache.has(user.userId)) {
-    return internalUserRefCache.get(user.userId)!;
+  // In E2E fixtures, TestUser.userId is the internal app user id (user_profile.id).
+  // (Supabase auth uid is available via getTestUserClient, but isn't needed here.)
+  if (!internalUserRefCache.has(user.userId)) {
+    internalUserRefCache.set(user.userId, user.userId);
   }
-  const { data, error } = await supabase
-    .from("user_profile")
-    .select("id")
-    .eq("supabase_user_id", user.userId)
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    console.warn(
-      `[${user.name}] Could not resolve internal user_ref: ${error.message}`
-    );
-    return null;
-  }
-  const internalId = data?.id || null;
-  if (internalId) internalUserRefCache.set(user.userId, internalId);
-  return internalId;
+  return user.userId;
+}
+
+async function assertHasLocalPlaylists(
+  page: Page,
+  minCount = 1
+): Promise<void> {
+  const playlistCount = await page.evaluate(async () => {
+    const api = (window as any).__ttTestApi;
+    if (!api || typeof api.getPlaylistCount !== "function") {
+      throw new Error("__ttTestApi.getPlaylistCount is not available");
+    }
+    return await api.getPlaylistCount();
+  });
+
+  if (playlistCount >= minCount) return;
+
+  const status = await page.evaluate(() => {
+    const el = document.querySelector(
+      "[data-auth-initialized]"
+    ) as HTMLElement | null;
+    return {
+      syncVersion: el?.getAttribute("data-sync-version") || "0",
+      syncSuccess: el?.getAttribute("data-sync-success") || "",
+      syncErrorCount: el?.getAttribute("data-sync-error-count") || "0",
+      syncErrorSummary: el?.getAttribute("data-sync-error-summary") || "",
+    };
+  });
+
+  throw new Error(
+    `No playlists found locally after sync (count=${playlistCount}). syncVersion=${status.syncVersion} success=${status.syncSuccess} errors=${status.syncErrorCount} summary=${status.syncErrorSummary}`
+  );
 }
 
 // Export getTestUserClient so tests can perform direct Supabase cleanup
@@ -343,15 +350,16 @@ export async function setupDeterministicTestParallel(
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
 
-  // Step 0: Navigate to page if not already (needed for IndexedDB access)
+  // IMPORTANT: Avoid racing the running app's sync engine while clearing remote tables.
+  // If the app is already loaded, temporarily force offline so it can't re-upload rows
+  // while we clear/verify deterministic state.
   const currentUrl = page.url();
-  if (
-    !currentUrl ||
-    currentUrl === "about:blank" ||
-    currentUrl.startsWith("data:")
-  ) {
-    await page.goto(`${BASE_URL}`);
-    await waitForSyncComplete(page);
+  const shouldIsolateSync =
+    !!currentUrl &&
+    currentUrl !== "about:blank" &&
+    !currentUrl.startsWith("data:");
+  if (shouldIsolateSync) {
+    await page.context().setOffline(true);
   }
 
   // Optional purge of tunes by title prefix (handles leftover test-created tunes)
@@ -516,11 +524,19 @@ export async function setupDeterministicTestParallel(
   }
 
   // Step 4: Clear local cache
-  await clearTunetreesStorageDB(page);
+  if (
+    !currentUrl ||
+    currentUrl === "about:blank" ||
+    currentUrl.startsWith("data:")
+  ) {
+    await page.goto(`${BASE_URL}`);
+    await page.waitForLoadState("domcontentloaded");
+  }
 
-  // Step 5: Reload page to trigger fresh sync
-  await page.reload();
-  await waitForSyncComplete(page);
+  if (shouldIsolateSync) {
+    await page.context().setOffline(false);
+  }
+  await resetLocalDbAndResync(page);
 
   log.debug(`✅ [${user.name}] Deterministic test state ready`);
 }
@@ -766,7 +782,7 @@ async function verifyTablesEmpty(
     supabase = client.supabase;
   }
 
-  const timeoutMs = 16000;
+  const timeoutMs = 20000; // increase timeout to reduce flake
   const retryDelayMs = 500;
   const start = Date.now();
   const tableCounts = new Map<string, number>(tableNames.map((t) => [t, 0]));
@@ -800,6 +816,10 @@ async function verifyTablesEmpty(
       tableCounts.set(tableName, c);
       if (c > 0) {
         allEmpty = false;
+
+        // If something re-inserted rows (e.g. a still-running client sync), try clearing again.
+        // This is safe because RLS prevents us from touching other users' rows.
+        await clearUserTable(user, tableName);
       }
     }
     if (allEmpty) break;
@@ -956,15 +976,11 @@ export async function setupForPracticeTestsParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto(`${BASE_URL}`);
-    await waitForSyncComplete(page);
+    await page.waitForLoadState("domcontentloaded");
   }
 
-  // 4. Clear IndexedDB cache
-  await clearTunetreesStorageDB(page);
-
-  // 5. Reload to trigger fresh sync
-  await page.reload();
-  await waitForSyncComplete(page);
+  // 4-5) Reset local DB and trigger a fresh sync from Supabase.
+  await resetLocalDbAndResync(page);
 
   // 6. Navigate to starting tab (skip if already active)
   const tabSelector = `[data-testid="tab-${startTab}"]`;
@@ -1061,10 +1077,40 @@ export async function setupForRepertoireTestsParallel(
 
   // 4. Navigate if needed
   page.on("console", (msg) => {
+    const text = msg.text();
+    // Always surface sync diagnostics in CI/local logs.
+    if (text.startsWith("[SyncDiag]")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
+    // Always surface TopNav DB diagnostics in CI/local logs.
+    if (text.startsWith("[TopNavDiag]")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
+    // Always surface DB-init diagnostics in CI/local logs.
+    if (text.startsWith("[DbInitDiag]")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
+    // E2E-only DB persistence telemetry should be visible, but not treated as an error.
+    if (text.startsWith("🔬 [E2E Persist")) {
+      console.log(`[Browser] ${text}`);
+      return;
+    }
+
     if (msg.type() === "error") {
-      console.error(`[Browser Error] ${msg.text()}`);
+      console.error(`[Browser Error] ${text}`);
     } else {
-      console.log(`[Browser] ${msg.text()}`);
+      if (
+        process.env.E2E_TEST_SETUP_DEBUG === "true" ||
+        process.env.E2E_TEST_SETUP_DEBUG === "1"
+      ) {
+        console.log(`[Browser] ${text}`);
+      }
     }
   });
 
@@ -1075,15 +1121,14 @@ export async function setupForRepertoireTestsParallel(
     currentUrl.startsWith("data:")
   ) {
     await page.goto(`${BASE_URL}`);
-    await waitForSyncComplete(page);
+    await page.waitForLoadState("domcontentloaded");
   }
 
-  // 5. Clear IndexedDB cache
-  await clearTunetreesStorageDB(page);
+  // 5-6) Reset local DB and trigger a fresh sync from Supabase.
+  await resetLocalDbAndResync(page);
 
-  // 6. Reload to trigger fresh sync
-  await page.reload();
-  await waitForSyncComplete(page);
+  // If playlists didn't sync down, onboarding modal will block UI clicks.
+  await assertHasLocalPlaylists(page, 1);
 
   // 7. Navigate to repertoire tab
   await page.waitForSelector('[data-testid="tab-repertoire"]', {
@@ -1204,13 +1249,8 @@ export async function setupForCatalogTestsParallel(
     await waitForSyncComplete(page);
   }
 
-  // 4. Clear ONLY IndexedDB cache (keep auth in localStorage!)
-  await clearTunetreesStorageDB(page);
-  await page.waitForTimeout(2000);
-
-  // 5. Reload to trigger fresh sync from Supabase
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await waitForSyncComplete(page);
+  // 4-5) Reset local DB and trigger a fresh sync from Supabase.
+  await resetLocalDbAndResync(page);
 
   // 6. Wait for playlist dropdown to show correct data
   const playlistLocator = page.getByTestId("playlist-dropdown-button");

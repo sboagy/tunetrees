@@ -130,6 +130,7 @@ test.describe("Anonymous User Account Conversion", () => {
         log.includes("Anonymous user") ||
         log.includes("user_profile for anonymous")
     );
+    expect(_anonymousUuidLog).toBeDefined();
     console.log("Anonymous UUID log:", _anonymousUuidLog || "(not found)");
 
     // Navigate to conversion page

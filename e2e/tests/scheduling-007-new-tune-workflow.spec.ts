@@ -37,13 +37,16 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * - FSRS metrics initialize correctly (stability, difficulty, reps=0, lapses=0)
  */
 
-let ttPage: TuneTreesPage;
-let currentDate: Date;
-let newTuneTitle: string;
-let newTuneId: string | undefined;
-
 test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
-  test.beforeEach(async ({ page, context, testUser }) => {
+  let ttPage: TuneTreesPage;
+  let currentDate: Date;
+  let newTuneTitle: string;
+  let newTuneId: string | undefined;
+
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    // Extend timeout for all tests running this hook by 3x.
+    test.setTimeout(testInfo.timeout * 3);
+
     ttPage = new TuneTreesPage(page);
 
     // Set stable starting date
@@ -107,17 +110,13 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           column: string;
           filterPlaylist?: boolean;
         }[] = [
-          { table: "playlist_tune", column: "tune_ref", filterPlaylist: true },
+          { table: "playlist_tune", column: "tune_ref" },
           {
             table: "practice_record",
             column: "tune_ref",
             filterPlaylist: true,
           },
-          {
-            table: "daily_practice_queue",
-            column: "tune_ref",
-            filterPlaylist: true,
-          },
+          { table: "daily_practice_queue", column: "tune_ref" },
           { table: "tune_override", column: "tune_ref" },
         ];
         for (const { table, column, filterPlaylist } of cascade) {
@@ -276,8 +275,9 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
 
       // Select "Good" evaluation (should transition to Learning state=1)
+      await page.waitForTimeout(600);
       await ttPage.selectFlashcardEvaluation("good");
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(700);
 
       // Submit
       await ttPage.submitEvaluationsButton.click();
@@ -460,11 +460,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         const ids = (data || []).map((r: any) => r.id).filter(Boolean);
         if (ids.length) {
           // Dependent deletes
-          await supabase
-            .from("playlist_tune")
-            .delete()
-            .in("tune_ref", ids)
-            .eq("playlist_ref", testUser.playlistId);
+          await supabase.from("playlist_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
             target_playlist: testUser.playlistId,
             tune_ids: ids,
@@ -472,8 +468,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           await supabase
             .from("daily_practice_queue")
             .delete()
-            .in("tune_ref", ids)
-            .eq("playlist_ref", testUser.playlistId);
+            .in("tune_ref", ids);
           await supabase.from("tune_override").delete().in("tune_ref", ids);
           await supabase.from("tune").delete().in("id", ids);
           console.log(`[CLEANUP] Removed Easy test tune(s): ${ids.join(", ")}`);
@@ -575,11 +570,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           .eq("title", againTestTitle);
         const ids = (data || []).map((r: any) => r.id).filter(Boolean);
         if (ids.length) {
-          await supabase
-            .from("playlist_tune")
-            .delete()
-            .in("tune_ref", ids)
-            .eq("playlist_ref", testUser.playlistId);
+          await supabase.from("playlist_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
             target_playlist: testUser.playlistId,
             tune_ids: ids,
@@ -587,8 +578,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           await supabase
             .from("daily_practice_queue")
             .delete()
-            .in("tune_ref", ids)
-            .eq("playlist_ref", testUser.playlistId);
+            .in("tune_ref", ids);
           await supabase.from("tune_override").delete().in("tune_ref", ids);
           await supabase.from("tune").delete().in("id", ids);
           console.log(

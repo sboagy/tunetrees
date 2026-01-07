@@ -17,57 +17,42 @@ import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Practice Evaluation Interaction", () => {
-  test.beforeEach(async ({ page, testUser }) => {
+  // Applies to all tests in this group.
+  let ttPage: TuneTreesPage;
+  let currentDate: Date;
+
+  test.beforeEach(async ({ page, context, testUser }, testInfo) => {
+    // Extend timeout for all tests running this hook by 3x.
+    test.setTimeout(testInfo.timeout * 3);
+    ttPage = new TuneTreesPage(page);
+
+    // Set stable starting date
+    currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
+
     // Fast setup: seed 2 tunes, start on practice tab
     const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID],
       startTab: "practice",
+      scheduleBaseDate: currentDate,
+      scheduleDaysAgo: 1,
     });
   });
 
   async function selectEvalFor(
-    page: import("@playwright/test").Page,
     tuneId: string,
     optionKey: "not-set" | "again" | "hard" | "good" | "easy"
   ) {
-    const trigger = page.getByTestId(`recall-eval-${tuneId}`);
-    const menu = page.getByTestId(`recall-eval-menu-${tuneId}`);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      // Ensure trigger is in view before clicking
-      try {
-        await trigger.scrollIntoViewIfNeeded();
-      } catch {}
-
-      await trigger.click({ delay: 50 });
-
-      await menu.waitFor({ state: "visible" });
-      await expect(menu).toBeVisible();
-      const option = menu.getByTestId(`recall-eval-option-${optionKey}`);
-      await expect(option).toBeVisible();
-      try {
-        await option.click();
-        // Give things a tiny chance to calm down a bit before proceeding
-        await page.waitForTimeout(250);
-        return;
-      } catch {
-        // menu may have detached due to re-render; retry once
-        // Check if page is still alive before waiting
-        if (page.isClosed()) {
-          throw new Error(
-            `Page closed during eval selection for tune ${tuneId}`
-          );
-        }
-        await page.waitForTimeout(150);
-      }
-    }
-    throw new Error(
-      `Failed to select option ${optionKey} for tune ${tuneId} after retries`
-    );
+    const row = ttPage.getRowInPracticeGridByTuneId(tuneId);
+    console.log(row.toString());
+    await ttPage.setRowEvaluation(row, optionKey, 500);
   }
 
   async function getNotSetIds(
@@ -123,7 +108,7 @@ test.describe("Practice Evaluation Interaction", () => {
     const targetId = ids[0];
     const trigger = page.getByTestId(`recall-eval-${targetId}`);
     await trigger.scrollIntoViewIfNeeded();
-    await selectEvalFor(page, targetId, "good");
+    await selectEvalFor(targetId, "good");
 
     // Verify dropdown now shows Good and Submit is enabled
     await expect(page.getByTestId(`recall-eval-${targetId}`)).toContainText(
@@ -149,7 +134,7 @@ test.describe("Practice Evaluation Interaction", () => {
     const targetId = ids[0] ?? CATALOG_TUNE_54_ID; // Fallback to catalog tune 54
     const trigger = page.getByTestId(`recall-eval-${targetId}`);
     await trigger.scrollIntoViewIfNeeded();
-    await selectEvalFor(page, targetId, "good");
+    await selectEvalFor(targetId, "good");
 
     // Verify the UI reflects the change (row no longer shows "(Not Set)")
     await expect(submitButton).toBeEnabled();
@@ -162,7 +147,7 @@ test.describe("Practice Evaluation Interaction", () => {
     expect(afterAdd).toBe(baseline + 1);
 
     // Change to "(Not Set)"
-    await selectEvalFor(page, targetId, "not-set");
+    await selectEvalFor(targetId, "not-set");
 
     // Verify count returned to baseline
     const afterClear = await parseCount();
@@ -186,13 +171,13 @@ test.describe("Practice Evaluation Interaction", () => {
     // Pick two (Not Set) rows to ensure count increases
     const ids = Array.from(new Set(await getNotSetIds(page, 2)));
     if (ids.length >= 1) {
-      await selectEvalFor(page, ids[0], "good");
+      await selectEvalFor(ids[0], "good");
       await expect(page.getByTestId(`recall-eval-${ids[0]}`)).not.toContainText(
         "(Not Set)"
       );
     }
     if (ids.length >= 2) {
-      await selectEvalFor(page, ids[1], "easy");
+      await selectEvalFor(ids[1], "easy");
       await expect(page.getByTestId(`recall-eval-${ids[1]}`)).not.toContainText(
         "(Not Set)"
       );
@@ -206,7 +191,6 @@ test.describe("Practice Evaluation Interaction", () => {
   test.skip("should correctly decrement count when clearing evaluations", async ({
     page,
   }) => {
-    test.setTimeout(60000);
     const submitButton = page.locator('button:has-text("Submit")');
     const parseCount = async () => {
       const txt = await submitButton.textContent();
@@ -220,10 +204,10 @@ test.describe("Practice Evaluation Interaction", () => {
     const numToAdd = ids.length;
 
     if (ids.length >= 1) {
-      await selectEvalFor(page, ids[0], "good");
+      await selectEvalFor(ids[0], "good");
     }
     if (ids.length >= 2) {
-      await selectEvalFor(page, ids[1], "easy");
+      await selectEvalFor(ids[1], "easy");
     }
 
     // Verify count increased
@@ -232,10 +216,10 @@ test.describe("Practice Evaluation Interaction", () => {
 
     // Clear evaluations for the same two rows
     if (ids.length >= 1) {
-      await selectEvalFor(page, ids[0], "not-set");
+      await selectEvalFor(ids[0], "not-set");
     }
     if (ids.length >= 2) {
-      await selectEvalFor(page, ids[1], "not-set");
+      await selectEvalFor(ids[1], "not-set");
     }
 
     // Verify count returned to baseline

@@ -6,11 +6,10 @@
  */
 
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { generateId } from "../src/lib/utils/uuid";
 import { sqliteSyncColumns } from "./sync-columns";
 
 export const dailyPracticeQueue = sqliteTable("daily_practice_queue", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref").notNull(),
   playlistRef: text("playlist_ref").notNull(),
   mode: text("mode"),
@@ -60,7 +59,7 @@ export const genreTuneType = sqliteTable("genre_tune_type", {
 );
 
 export const instrument = sqliteTable("instrument", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   privateToUser: text("private_to_user").references(() => userProfile.id),
   instrument: text("instrument"),
   description: text("description"),
@@ -76,7 +75,7 @@ export const instrument = sqliteTable("instrument", {
 );
 
 export const note = sqliteTable("note", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref").references(() => userProfile.id),
   tuneRef: text("tune_ref").notNull().references(() => tune.id),
   playlistRef: text("playlist_ref").references(() => playlist.playlistId),
@@ -96,7 +95,7 @@ export const note = sqliteTable("note", {
 );
 
 export const playlist = sqliteTable("playlist", {
-  playlistId: text("playlist_id").notNull().primaryKey().$defaultFn(() => generateId()),
+  playlistId: text("playlist_id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref").notNull().references(() => userProfile.id),
   name: text("name"),
   instrumentRef: text("instrument_ref"),
@@ -123,7 +122,7 @@ export const playlistTune = sqliteTable("playlist_tune", {
 );
 
 export const practiceRecord = sqliteTable("practice_record", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   playlistRef: text("playlist_ref").notNull().references(() => playlist.playlistId),
   tuneRef: text("tune_ref").notNull().references(() => tune.id),
   practiced: text("practiced"),
@@ -181,7 +180,7 @@ export const prefsSpacedRepetition = sqliteTable("prefs_spaced_repetition", {
 );
 
 export const reference = sqliteTable("reference", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   url: text("url").notNull(),
   refType: text("ref_type"),
   tuneRef: text("tune_ref").notNull().references(() => tune.id),
@@ -211,7 +210,7 @@ export const syncChangeLog = sqliteTable("sync_change_log", {
 );
 
 export const tabGroupMainState = sqliteTable("tab_group_main_state", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => userProfile.id),
   whichTab: text("which_tab").default("practice"),
   playlistId: text("playlist_id"),
@@ -266,7 +265,7 @@ export const tableTransientData = sqliteTable("table_transient_data", {
 );
 
 export const tag = sqliteTable("tag", {
-  tagId: text("tag_id").notNull().primaryKey().$defaultFn(() => generateId()),
+  tagId: text("tag_id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref").notNull().references(() => userProfile.id),
   tuneRef: text("tune_ref").notNull().references(() => tune.id),
   tagText: text("tag_text").notNull(),
@@ -280,7 +279,7 @@ export const tag = sqliteTable("tag", {
 );
 
 export const tune = sqliteTable("tune", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   idForeign: text("id_foreign"),
   primaryOrigin: text("primary_origin").default("irishtune.info"),
   title: text("title"),
@@ -299,7 +298,7 @@ export const tune = sqliteTable("tune", {
 );
 
 export const tuneOverride = sqliteTable("tune_override", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   tuneRef: text("tune_ref").notNull().references(() => tune.id),
   userRef: text("user_ref").notNull().references(() => userProfile.id),
   title: text("title"),
@@ -326,7 +325,7 @@ export const tuneType = sqliteTable("tune_type", {
 );
 
 export const userProfile = sqliteTable("user_profile", {
-  id: text("id").notNull().primaryKey().$defaultFn(() => generateId()),
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   supabaseUserId: text("supabase_user_id").notNull(),
   name: text("name"),
   email: text("email"),

@@ -28,6 +28,7 @@ import {
   waitForSync,
 } from "../helpers/sync-verification";
 import { test } from "../helpers/test-fixture";
+import { waitForServiceWorker } from "../helpers/wait-for-service-worker";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
@@ -74,9 +75,19 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Create 3 practice records while online
     for (let i = 0; i < 3; i++) {
+      await page.waitForTimeout(100); // reduce flake hopefull
       const row = ttPage.getRows("scheduled").first();
-      await ttPage.setRowEvaluation(row, "good");
+      await ttPage.setRowEvaluation(row, "good", 500);
+      await page.waitForTimeout(100); // reduce flake hopefull
+      const rowCountBeforeSubmit = await ttPage.getRows("scheduled").count();
+
       await ttPage.submitEvaluationsButton.click();
+
+      await expect
+        .poll(async () => ttPage.getRows("scheduled").count(), {
+          timeout: 15_000,
+        })
+        .toBe(Math.max(0, rowCountBeforeSubmit - 1));
     }
 
     // Wait for sync
@@ -95,9 +106,17 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Create 2 more practice records offline
     for (let i = 0; i < 2; i++) {
+      await page.waitForTimeout(100); // reduce flake hopefull
       const row = ttPage.getRows("scheduled").first();
-      await ttPage.setRowEvaluation(row, "easy");
+      await ttPage.setRowEvaluation(row, "easy", 500);
+      await page.waitForTimeout(100); // reduce flake hopefull
+      const rowCountBeforeSubmit = await ttPage.getRows("scheduled").count();
       await ttPage.submitEvaluationsButton.click();
+      await expect
+        .poll(async () => ttPage.getRows("scheduled").count(), {
+          timeout: 15_000,
+        })
+        .toBe(Math.max(0, rowCountBeforeSubmit - 1));
     }
 
     // Verify pending changes
@@ -196,6 +215,10 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
   test("should preserve sync state across page reloads during offline", async ({
     page,
   }) => {
+    const currentUrl = page.url();
+    await page.context().setOffline(false);
+    await waitForServiceWorker(page.context(), currentUrl);
+
     // Go offline
     await goOffline(page);
 
@@ -209,17 +232,26 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Check pending before reload
     const beforeReload = await getSyncOutboxCount(page);
+    const beforeReloadStable = await ttPage.getStableSyncOutboxCount();
     expect(beforeReload).toBeGreaterThanOrEqual(3);
-    console.log(`📦 Before reload: ${beforeReload} pending`);
+    console.log(
+      `📦 Before reload: ${beforeReload} pending (stable=${beforeReloadStable})`
+    );
 
     // Reload page (still offline)
-    await page.reload();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await page.goto(currentUrl);
+    await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
 
     // Check pending after reload
     const afterReload = await getSyncOutboxCount(page);
     console.log(`📦 After reload: ${afterReload} pending`);
-    expect(afterReload).toBe(beforeReload);
+    await expect
+      .poll(async () => await getSyncOutboxCount(page), {
+        timeout: 10_000,
+        intervals: [250, 250, 500, 1000],
+      })
+      .toBe(beforeReloadStable);
+    expect(afterReload).toBe(beforeReloadStable);
 
     // Go online
     await goOnline(page);

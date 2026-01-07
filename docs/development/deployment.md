@@ -46,6 +46,9 @@ Add in Cloudflare Pages settings:
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_WORKER_URL=https://tunetrees-sync-worker.your-subdomain.workers.dev
+
+# Optional: enable client-side sync diagnostics logging (debug only)
+# VITE_SYNC_DIAGNOSTICS=true
 ```
 
 ### 4. Deploy
@@ -74,6 +77,18 @@ npx wrangler secret put DATABASE_URL
 
 - `SUPABASE_JWT_SECRET`: From Supabase Dashboard → Settings → API → JWT Secret
 - `DATABASE_URL`: Supabase connection string (use "Session pooler" for Workers)
+
+### Worker Diagnostics (Optional)
+
+The sync worker can emit extra diagnostics into the sync response when enabled.
+
+- `SYNC_DIAGNOSTICS=true` enables worker-side `debug[]` lines.
+- `SYNC_DIAGNOSTICS_USER_ID=<supabase auth uid>` optionally restricts diagnostics to a single user.
+
+To see these worker diagnostics in your browser console, enable both:
+
+- `VITE_SYNC_DIAGNOSTICS=true` (client)
+- `SYNC_DIAGNOSTICS=true` (worker)
 
 **Verify secrets are set**:
 ```bash

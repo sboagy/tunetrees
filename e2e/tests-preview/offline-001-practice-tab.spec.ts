@@ -32,6 +32,10 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
+  // This suite's setup can legitimately take >30s on slower browsers because it
+  // clears/seed data, clears IndexedDB, and waits for initial sync after reload.
+  test.describe.configure({ timeout: 90_000 });
+
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
@@ -53,26 +57,18 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
       startTab: "practice",
     });
 
-    // Verify initial data loads correctly
-    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
-
-    // Wait for at least one tune to appear in the grid (data-index is set by virtual table)
-    // Retry a few times since queue population might be async
-    let attempts = 0;
-    while (attempts < 10) {
-      const count = await ttPage.practiceGrid
-        .locator("tbody tr[data-index]")
-        .count();
-      if (count > 0) break;
-      await page.waitForTimeout(1000);
-      attempts++;
-    }
-
+    // Ensure we're on the Practice tab and data loads correctly.
+    await ttPage.practiceTab.click();
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(
+        async () => ttPage.practiceGrid.locator("tbody tr[data-index]").count(),
+        { timeout: 30_000 }
+      )
+      .toBeGreaterThan(0);
     await expect(
       ttPage.practiceGrid.locator("tbody tr[data-index='0']")
-    ).toBeVisible({
-      timeout: 5000,
-    });
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test("should save practice evaluations offline and sync when online", async ({
@@ -251,8 +247,11 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
 
     // Check pending count before reload
     const beforeReload = await getSyncOutboxCount(page);
-    console.log(`Pending sync count before reload: ${beforeReload}`);
-    expect(beforeReload).toBeGreaterThanOrEqual(2);
+    const beforeReloadStable = await ttPage.getStableSyncOutboxCount();
+    console.log(
+      `Pending sync count before reload: ${beforeReload} (stable=${beforeReloadStable})`
+    );
+    expect(beforeReloadStable).toBeGreaterThanOrEqual(2);
 
     // Reload page (still offline)
 
@@ -262,14 +261,20 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     const immediatelyBeforeReload = await getSyncOutboxCount(page);
     await page.goto(currentUrl);
     // await page.reload();
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
 
     // Verify pending changes still queued
     const afterReload = await getSyncOutboxCount(page);
     console.log(
       `Pending sync count after reload: ${afterReload}, immediatelyBeforeReload: ${immediatelyBeforeReload}`
     );
-    expect(afterReload).toBe(beforeReload);
+    await expect
+      .poll(async () => await getSyncOutboxCount(page), {
+        timeout: 10_000,
+        intervals: [250, 250, 500, 1000],
+      })
+      .toBe(beforeReloadStable);
+    expect(afterReload).toBe(beforeReloadStable);
 
     // Go online and wait for automatic sync
     await goOnline(page);

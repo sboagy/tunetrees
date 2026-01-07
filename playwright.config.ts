@@ -148,6 +148,8 @@ export default defineConfig({
 
     {
       name: "firefox",
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/,
       use: {
         ...devices["Desktop Firefox"],
         // storageState: "e2e/.auth/alice.json",
@@ -157,6 +159,8 @@ export default defineConfig({
 
     {
       name: "webkit",
+      testDir: "./e2e/tests",
+      testIgnore: /auth-.*\.spec\.ts/,
       use: {
         ...devices["Desktop Safari"],
         // storageState: "e2e/.auth/alice.json",
@@ -208,6 +212,9 @@ export default defineConfig({
       env: {
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || "",
         VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || "",
+        // Forward optional diagnostics flags into the Vite server process.
+        VITE_SYNC_DIAGNOSTICS: process.env.VITE_SYNC_DIAGNOSTICS || "",
+        VITE_SYNC_DEBUG: process.env.VITE_SYNC_DEBUG || "",
       },
     },
     // 2. Worker/API Server

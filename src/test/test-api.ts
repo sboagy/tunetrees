@@ -570,6 +570,18 @@ async function getSyncOutboxCount(): Promise<number> {
 }
 
 /**
+ * Get count of playlists in local SQLite.
+ * Used by E2E to assert repertoire data is present after sync.
+ */
+async function getPlaylistCount(): Promise<number> {
+  const db = await ensureDb();
+  const rows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count FROM playlist WHERE deleted = 0
+  `);
+  return rows[0]?.count ?? 0;
+}
+
+/**
  * Check if sync is currently in progress
  * Returns false when offline tests can proceed
  */
@@ -788,6 +800,7 @@ declare global {
         titles: string[]
       ) => Promise<Array<{ id: string; title: string }>>;
       getSyncOutboxCount: () => Promise<number>;
+      getPlaylistCount: () => Promise<number>;
       isSyncComplete: () => boolean;
       getSyncErrors: () => Promise<string[]>;
       getSupabaseRecord: (
@@ -979,6 +992,21 @@ if (typeof window !== "undefined") {
       },
       dispose: async () => {
         try {
+          // Best-effort: stop background sync before clearing the local DB.
+          // Background auto sync timers can race with clearDb() during E2E teardown.
+          const ctrl = (window as any).__ttSyncControl;
+          if (ctrl?.stop) {
+            await ctrl.stop();
+          }
+          if (ctrl?.waitForIdle) {
+            const ok = await ctrl.waitForIdle(2000);
+            if (!ok) {
+              // eslint-disable-next-line no-console
+              console.warn(
+                "[TestApi] Sync still in progress after timeout; proceeding with clearDb()"
+              );
+            }
+          }
           await clearDb();
         } catch (e) {
           // eslint-disable-next-line no-console
@@ -987,6 +1015,9 @@ if (typeof window !== "undefined") {
       },
       getSyncOutboxCount: async () => {
         return await getSyncOutboxCount();
+      },
+      getPlaylistCount: async () => {
+        return await getPlaylistCount();
       },
       isSyncComplete: () => {
         return isSyncComplete();

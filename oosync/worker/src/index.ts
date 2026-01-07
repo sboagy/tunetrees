@@ -7,39 +7,115 @@
  *
  * @module worker/index
  */
-import {
-  and,
-  count,
-  eq,
-  gt,
-  inArray,
-  isNull,
-  lte,
-  max,
-  min,
-  or,
-} from "drizzle-orm";
+import { and, count, eq, gt, inArray, lte, max, min } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
 import postgres from "postgres";
-import { COL } from "../../src/shared/protocol";
 import type {
   SyncChange,
   SyncRequest,
   SyncResponse,
 } from "../../src/shared/protocol";
-import {
-  getBooleanColumns,
-  getConflictTarget,
-  getNormalizer,
-  getPrimaryKey,
-  hasDeletedFlag,
-  SYNCABLE_TABLES,
-  type SyncableTableName,
-  TABLE_REGISTRY,
-} from "../../src/shared/table-meta";
-import * as schema from "./schema-postgres";
+import type { IPushTableRule, SyncSchemaDeps } from "./sync-schema";
+import { createSyncSchema } from "./sync-schema";
+
+const CORE_COL_DELETED = "deleted";
+const CORE_COL_LAST_MODIFIED_AT = "last_modified_at";
+
+type SyncableTableName = string;
+
+export interface WorkerArtifacts extends SyncSchemaDeps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schemaTables: Record<string, any>;
+}
+
+function notInitialized(name: string): never {
+  throw new Error(
+    `oosync worker not initialized: missing ${name}. ` +
+      "Call createWorker({ schemaTables, syncableTables, tableRegistryCore, workerSyncConfig }) in the consumer worker package."
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let schemaTables: Record<string, any> | null = null;
+let SYNCABLE_TABLES: readonly string[] = [];
+let TABLE_REGISTRY: Record<string, unknown> = {};
+
+let getPrimaryKey: (tableName: string) => string | string[] = () =>
+  notInitialized("getPrimaryKey");
+let getConflictTarget: (tableName: string) => string[] = () =>
+  notInitialized("getConflictTarget");
+let getBooleanColumns: (tableName: string) => string[] = () =>
+  notInitialized("getBooleanColumns");
+let hasDeletedFlag: (tableName: string) => boolean = () =>
+  notInitialized("hasDeletedFlag");
+let buildUserFilter: (params: {
+  tableName: string;
+  table: any;
+  userId: string;
+  collections: Record<string, Set<string>>;
+}) => unknown[] | null = () => notInitialized("buildUserFilter");
+let loadUserCollections: (params: {
+  tx: PgTransaction<any, any, any>;
+  userId: string;
+  tables: Record<string, any>;
+}) => Promise<Record<string, Set<string>>> = async () =>
+  notInitialized("loadUserCollections");
+let minimalPayload: (
+  data: Record<string, unknown>,
+  keep: string[]
+) => Record<string, unknown> = () => notInitialized("minimalPayload");
+let normalizeRowForSync: (
+  tableName: string,
+  row: Record<string, unknown>
+) => Record<string, unknown> = () => notInitialized("normalizeRowForSync");
+let snakeToCamel: (snake: string) => string = () =>
+  notInitialized("snakeToCamel");
+let sanitizeForPush: (params: {
+  tableName: string;
+  changeLastModifiedAt: string;
+  data: Record<string, unknown>;
+}) => { data: Record<string, unknown>; changed: string[] } = () =>
+  notInitialized("sanitizeForPush");
+let getPushRule: (tableName: string) => IPushTableRule | undefined = () =>
+  notInitialized("getPushRule");
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSchemaTables(): Record<string, any> {
+  if (!schemaTables) {
+    notInitialized("schemaTables");
+  }
+  return schemaTables;
+}
+
+export function createWorker(artifacts: WorkerArtifacts) {
+  schemaTables = artifacts.schemaTables;
+
+  const schema = createSyncSchema({
+    syncableTables: artifacts.syncableTables,
+    tableRegistryCore: artifacts.tableRegistryCore,
+    workerSyncConfig: artifacts.workerSyncConfig,
+  });
+
+  SYNCABLE_TABLES = schema.SYNCABLE_TABLES;
+  TABLE_REGISTRY = schema.TABLE_REGISTRY;
+  getPrimaryKey = schema.getPrimaryKey;
+  getConflictTarget = schema.getConflictTarget;
+  getBooleanColumns = schema.getBooleanColumns;
+  hasDeletedFlag = schema.hasDeletedFlag;
+  buildUserFilter = schema.buildUserFilter;
+  loadUserCollections = schema.loadUserCollections;
+  minimalPayload = schema.minimalPayload;
+  normalizeRowForSync = schema.normalizeRowForSync;
+  snakeToCamel = schema.snakeToCamel;
+  sanitizeForPush = schema.sanitizeForPush;
+  getPushRule = schema.getPushRule;
+
+  return { fetch };
+}
+
+export default createWorker;
 
 // ============================================================================
 // DB CONNECTION
@@ -138,7 +214,7 @@ function createDb(env: Env): {
 } {
   const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
   if (!connectionString) {
-    const msg = env.HYPERDRIVE 
+    const msg = env.HYPERDRIVE
       ? "HYPERDRIVE binding has no connectionString"
       : "DATABASE_URL not configured";
     throw new Error(`Database configuration error: ${msg}`);
@@ -148,7 +224,7 @@ function createDb(env: Env): {
   // Newer Workers runtimes enforce request-scoped I/O; reusing a client can trigger:
   // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
   const client = postgres(connectionString);
-  const db = drizzle(client, { schema });
+  const db = drizzle(client, { schema: getSchemaTables() });
 
   const close = async () => {
     try {
@@ -172,11 +248,16 @@ type Hyperdrive = {
   connectionString?: string;
 };
 
-type IncomingSyncTableName = SyncableTableName | "sync_push_queue" | "sync_change_log";
-type IncomingSyncChange = Omit<SyncChange, "table"> & { table: IncomingSyncTableName };
+type IncomingSyncTableName =
+  | SyncableTableName
+  | "sync_push_queue"
+  | "sync_change_log";
+type IncomingSyncChange = SyncChange<IncomingSyncTableName>;
 
-function isClientSyncChange(change: IncomingSyncChange): change is SyncChange {
-  return change.table !== "sync_push_queue" && change.table !== "sync_change_log";
+function isClientSyncChange(change: IncomingSyncChange): boolean {
+  return (
+    change.table !== "sync_push_queue" && change.table !== "sync_change_log"
+  );
 }
 
 export interface Env {
@@ -192,8 +273,11 @@ export interface Env {
 
 /** Context passed through sync operations */
 interface SyncContext {
+  /** Internal TuneTrees user id (user_profile.id). */
   userId: string;
-  userPlaylistIds: Set<string>;
+  /** Supabase auth uid (JWT sub). */
+  authUserId: string;
+  collections: Record<string, Set<string>>;
   now: string;
   diagnosticsEnabled: boolean;
 }
@@ -203,39 +287,33 @@ async function logPlaylistTuneInitialSyncDiagnostics(
   ctx: SyncContext,
   syncStartedAt: string
 ): Promise<void> {
-  const playlistIds = Array.from(ctx.userPlaylistIds);
+  const playlistIds = Array.from(ctx.collections.playlistIds ?? []);
   if (playlistIds.length === 0) return;
 
-  const baseWhere = inArray(schema.playlistTune.playlistRef, playlistIds);
+  const playlistTune = (getSchemaTables().playlist_tune as any) ?? null;
+  if (!playlistTune?.playlistRef || !playlistTune?.lastModifiedAt) return;
+
+  const baseWhere = inArray(playlistTune.playlistRef, playlistIds as any);
   const snapshotWhere = and(
     baseWhere,
-    lte(schema.playlistTune.lastModifiedAt, syncStartedAt)
+    lte(playlistTune.lastModifiedAt, syncStartedAt)
   );
 
   const [totalAll] = await tx
     .select({ n: count() })
-    .from(schema.playlistTune)
+    .from(playlistTune)
     .where(baseWhere);
   const [totalSnapshot] = await tx
     .select({ n: count() })
-    .from(schema.playlistTune)
+    .from(playlistTune)
     .where(snapshotWhere);
-
-  const [snapshotDeleted0] = await tx
-    .select({ n: count() })
-    .from(schema.playlistTune)
-    .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 0)));
-  const [snapshotDeleted1] = await tx
-    .select({ n: count() })
-    .from(schema.playlistTune)
-    .where(and(snapshotWhere, eq(schema.playlistTune.deleted, 1)));
 
   const [minMax] = await tx
     .select({
-      min: min(schema.playlistTune.lastModifiedAt),
-      max: max(schema.playlistTune.lastModifiedAt),
+      min: min(playlistTune.lastModifiedAt),
+      max: max(playlistTune.lastModifiedAt),
     })
-    .from(schema.playlistTune)
+    .from(playlistTune)
     .where(baseWhere);
 
   console.log("[SYNC_DIAG] playlist_tune initial-sync snapshot", {
@@ -245,8 +323,6 @@ async function logPlaylistTuneInitialSyncDiagnostics(
     totals: {
       all: Number(totalAll?.n ?? 0),
       snapshot: Number(totalSnapshot?.n ?? 0),
-      snapshotDeleted0: Number(snapshotDeleted0?.n ?? 0),
-      snapshotDeleted1: Number(snapshotDeleted1?.n ?? 0),
     },
     lastModifiedAt: {
       min: minMax?.min ?? null,
@@ -303,14 +379,6 @@ type DrizzleTable = any;
 type DrizzleColumn = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Transaction = PgTransaction<any, any, any>;
-
-// ============================================================================
-// UTILITY: Case Conversion
-// ============================================================================
-
-function snakeToCamel(s: string): string {
-  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-}
 
 // ============================================================================
 // UTILITY: Primary Key Helpers
@@ -404,156 +472,6 @@ function sqliteToPostgres(
   return result;
 }
 
-function coerceEmptyStringNumericFieldsToNull(
-  tableName: string,
-  data: Record<string, unknown>
-): { data: Record<string, unknown>; coerced: string[] } {
-  // Self-healing for older/local SQLite data that may contain empty strings
-  // in numeric fields (e.g. "" for REAL/INTEGER). Postgres rejects these.
-  // Keep this intentionally narrow to avoid changing meaning for text columns.
-  const numericPropsByTable: Partial<Record<SyncableTableName, string[]>> = {
-    practice_record: [
-      "quality",
-      "easiness",
-      "difficulty",
-      "stability",
-      "interval",
-      "step",
-      "repetitions",
-      "lapses",
-      "elapsedDays",
-      "state",
-    ],
-  };
-
-  const props =
-    numericPropsByTable[tableName as SyncableTableName] ?? ([] as string[]);
-  if (props.length === 0) return { data, coerced: [] };
-
-  const result = { ...data };
-  const coerced: string[] = [];
-  for (const prop of props) {
-    const value = result[prop];
-    if (typeof value === "string" && value.trim() === "") {
-      result[prop] = null;
-      coerced.push(prop);
-    }
-  }
-  return { data: result, coerced };
-}
-
-function sanitizePracticeRecordForPostgres(
-  change: SyncChange,
-  data: Record<string, unknown>
-): { data: Record<string, unknown>; changed: string[] } {
-  if (change.table !== "practice_record") return { data, changed: [] };
-
-  const changed: string[] = [];
-  const result: Record<string, unknown> = { ...data };
-
-  // Ensure required sync metadata is always present.
-  if (
-    typeof result.lastModifiedAt !== "string" ||
-    result.lastModifiedAt === ""
-  ) {
-    result.lastModifiedAt = change.lastModifiedAt;
-    changed.push("lastModifiedAt");
-  }
-  if (
-    typeof result.syncVersion !== "number" &&
-    !(
-      typeof result.syncVersion === "string" && result.syncVersion.trim() !== ""
-    )
-  ) {
-    result.syncVersion = 1;
-    changed.push("syncVersion");
-  }
-
-  const numericFields: Array<{ prop: string; kind: "int" | "float" }> = [
-    { prop: "quality", kind: "int" },
-    { prop: "easiness", kind: "float" },
-    { prop: "difficulty", kind: "float" },
-    { prop: "stability", kind: "float" },
-    { prop: "interval", kind: "int" },
-    { prop: "step", kind: "int" },
-    { prop: "repetitions", kind: "int" },
-    { prop: "lapses", kind: "int" },
-    { prop: "elapsedDays", kind: "int" },
-    { prop: "state", kind: "int" },
-  ];
-
-  for (const field of numericFields) {
-    const value = result[field.prop];
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed === "") {
-        result[field.prop] = null;
-        changed.push(field.prop);
-        continue;
-      }
-
-      const parsed =
-        field.kind === "int" ? Number.parseInt(trimmed, 10) : Number(trimmed);
-      if (!Number.isFinite(parsed)) {
-        result[field.prop] = null;
-        changed.push(field.prop);
-        continue;
-      }
-
-      result[field.prop] = field.kind === "int" ? Math.trunc(parsed) : parsed;
-      changed.push(field.prop);
-    } else if (typeof value === "number" && !Number.isFinite(value)) {
-      result[field.prop] = null;
-      changed.push(field.prop);
-    }
-  }
-
-  // Timestamp columns in Postgres are nullable. Empty strings are not valid.
-  const timestampProps = ["practiced", "due", "backupPracticed"] as const;
-  for (const prop of timestampProps) {
-    const value = result[prop];
-    if (typeof value === "string" && value.trim() === "") {
-      result[prop] = null;
-      changed.push(prop);
-    }
-  }
-
-  // deviceId may exist as empty string in older clients; prefer NULL.
-  if (typeof result.deviceId === "string" && result.deviceId.trim() === "") {
-    result.deviceId = null;
-    changed.push("deviceId");
-  }
-
-  return { data: result, changed };
-}
-
-function minimalPracticeRecordPayload(
-  data: Record<string, unknown>
-): Record<string, unknown> {
-  // Keep the smallest useful subset. This is only used as a fallback retry
-  // when the full upsert fails (to avoid stranding practice history).
-  const keep = [
-    "id",
-    "playlistRef",
-    "tuneRef",
-    "practiced",
-    "quality",
-    "due",
-    "backupPracticed",
-    "goal",
-    "technique",
-    "syncVersion",
-    "lastModifiedAt",
-    "deviceId",
-  ];
-
-  const result: Record<string, unknown> = {};
-  for (const k of keep) {
-    if (k in data) result[k] = data[k];
-  }
-  return result;
-}
-
 /**
  * Convert Postgres booleans to SQLite integers (0/1).
  */
@@ -619,16 +537,15 @@ async function applyChange(
     return;
   }
 
-  // Historical invariants: practice records are append-only.
-  // Do not allow deletes from clients (even if they attempt one).
-  if (change.table === "practice_record" && change.deleted) {
+  const pushRule = getPushRule(change.table);
+  if (pushRule?.denyDelete && change.deleted) {
     console.warn(
-      `[PUSH] Refusing DELETE for practice_record rowId=${change.rowId}`
+      `[PUSH] Refusing DELETE for ${change.table} rowId=${change.rowId}`
     );
     return;
   }
 
-  const table = schema.tables[change.table as keyof typeof schema.tables];
+  const table = getSchemaTables()[change.table];
   if (!table) {
     console.log(`[PUSH] Unknown table: ${change.table}`);
     return;
@@ -648,11 +565,16 @@ async function applyChange(
     change.table,
     change.data as Record<string, unknown>
   );
-  const coerced = coerceEmptyStringNumericFieldsToNull(change.table, data);
-  data = coerced.data;
-  if (coerced.coerced.length > 0) {
+
+  const sanitized = sanitizeForPush({
+    tableName: change.table,
+    changeLastModifiedAt: change.lastModifiedAt,
+    data,
+  });
+  data = sanitized.data;
+  if (sanitized.changed.length > 0) {
     console.warn(
-      `[PUSH] Coerced empty-string numeric fields to NULL for ${change.table} rowId=${change.rowId}: ${coerced.coerced.join(", ")}`
+      `[PUSH] Sanitized ${change.table} rowId=${change.rowId}: ${sanitized.changed.join(", ")}`
     );
   }
 
@@ -670,124 +592,27 @@ async function applyChange(
       change
     );
   } else {
-    if (change.table === "practice_record") {
-      const sanitized = sanitizePracticeRecordForPostgres(change, data);
-      if (sanitized.changed.length > 0) {
-        console.warn(
-          `[PUSH] Sanitized practice_record rowId=${change.rowId}: ${sanitized.changed.join(", ")}`
-        );
-      }
+    const omitSetProps = pushRule?.upsert?.omitSetProps;
+    const keepProps = pushRule?.upsert?.retryMinimalPayloadKeepProps;
+    const upsertOpts = omitSetProps ? ({ omitSetProps } as const) : undefined;
 
-      // practice_record is keyed by a natural composite key in Postgres
-      // (tune_ref, playlist_ref, practiced). When we UPSERT by that key,
-      // we must NOT update the primary key `id`, otherwise we can create
-      // PK collisions across devices / retries.
-      const compositeUpsertOpts = { omitSetProps: ["id"] } as const;
+    try {
+      // Use a savepoint so a failed statement doesn't abort the outer transaction.
+      await tx.transaction(async (sp) => {
+        await applyUpsert(sp, table, upsertKeyCols, data, upsertOpts);
+      });
+    } catch (e) {
+      if (!keepProps || keepProps.length === 0) throw e;
 
-      try {
-        // IMPORTANT: A failed statement inside a Postgres transaction marks the
-        // transaction as aborted, and all subsequent statements will fail with
-        // code=25P02. Use a savepoint so we can retry with a sanitized/minimal
-        // payload without poisoning the outer transaction.
-        await tx.transaction(async (sp) => {
-          await applyUpsert(
-            sp,
-            table,
-            upsertKeyCols,
-            sanitized.data,
-            compositeUpsertOpts
-          );
-        });
-      } catch (e) {
-        // Retry once with a minimal payload. This trades some optional FSRS
-        // fields for resilience, while still preserving the practice event.
-        console.warn(
-          `[PUSH] practice_record upsert retry (minimal payload) rowId=${change.rowId}: ${formatDbError(
-            e
-          )}`
-        );
-        const minimal = minimalPracticeRecordPayload(sanitized.data);
-
-        try {
-          // Use a savepoint so a failed minimal upsert doesn't abort the outer transaction.
-          await tx.transaction(async (sp) => {
-            await applyUpsert(
-              sp,
-              table,
-              upsertKeyCols,
-              minimal,
-              compositeUpsertOpts
-            );
-          });
-        } catch (e2) {
-          const pgErr = findPostgresErrorLike(e2);
-          const code = typeof pgErr?.code === "string" ? pgErr.code : undefined;
-          const constraint =
-            typeof pgErr?.constraint_name === "string"
-              ? pgErr.constraint_name
-              : undefined;
-
-          // If the row already exists by primary key, we can safely upsert on id.
-          // This can happen if the composite conflict target doesn't match
-          // (e.g., practiced is NULL/changed), but the id is already present.
-          if (code === "23505" && constraint === "practice_record_pkey") {
-            console.warn(
-              `[PUSH] practice_record minimal upsert hit PK conflict; retrying by id rowId=${change.rowId}: ${formatDbError(
-                e2
-              )}`
-            );
-
-            try {
-              // Retry by primary key inside its own savepoint for the same reason.
-              await tx.transaction(async (sp) => {
-                await applyUpsert(sp, table, deleteKeyCols, minimal, {
-                  omitSetProps: ["id"],
-                });
-              });
-              return;
-            } catch (e3) {
-              const pgErr3 = findPostgresErrorLike(e3);
-              const code3 =
-                typeof pgErr3?.code === "string" ? pgErr3.code : undefined;
-              const constraint3 =
-                typeof pgErr3?.constraint_name === "string"
-                  ? pgErr3.constraint_name
-                  : undefined;
-
-              // If updating by id would violate the composite unique key, we
-              // treat this as a duplicate practice event already present.
-              // Heal by updating the existing composite-key row (without touching id).
-              if (
-                code3 === "23505" &&
-                constraint3 ===
-                  "practice_record_tune_ref_playlist_ref_practiced_key"
-              ) {
-                console.warn(
-                  `[PUSH] practice_record by-id retry hit composite unique; healing by composite upsert rowId=${change.rowId}: ${formatDbError(
-                    e3
-                  )}`
-                );
-                await tx.transaction(async (sp) => {
-                  await applyUpsert(
-                    sp,
-                    table,
-                    upsertKeyCols,
-                    minimal,
-                    compositeUpsertOpts
-                  );
-                });
-                return;
-              }
-
-              throw e3;
-            }
-          }
-
-          throw e2;
-        }
-      }
-    } else {
-      await applyUpsert(tx, table, upsertKeyCols, data);
+      console.warn(
+        `[PUSH] ${change.table} upsert retry (minimal payload) rowId=${change.rowId}: ${formatDbError(
+          e
+        )}`
+      );
+      const minimal = minimalPayload(data, keepProps);
+      await tx.transaction(async (sp) => {
+        await applyUpsert(sp, table, upsertKeyCols, minimal, upsertOpts);
+      });
     }
   }
 }
@@ -835,8 +660,8 @@ async function applyDelete(
     await tx
       .update(table)
       .set({
-        [COL.DELETED]: true,
-        [COL.LAST_MODIFIED_AT]: change.lastModifiedAt,
+        [CORE_COL_DELETED]: true,
+        [CORE_COL_LAST_MODIFIED_AT]: change.lastModifiedAt,
       })
       .where(and(...whereConditions));
   } else {
@@ -884,7 +709,7 @@ async function applyUpsert(
  */
 async function processPushChanges(
   tx: Transaction,
-  changes: SyncChange[]
+  changes: IncomingSyncChange[]
 ): Promise<void> {
   console.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
@@ -911,9 +736,8 @@ function rowToSyncChange(
   rowId: string,
   row: Record<string, unknown>
 ): SyncChange {
-  // Apply any table-specific normalization
-  const normalizer = getNormalizer(tableName);
-  let data = normalizer ? normalizer(row) : row;
+  // Normalize timestamps generically (schema-driven).
+  let data = normalizeRowForSync(tableName, row);
 
   // Convert booleans for SQLite
   data = postgresToSqlite(tableName, data);
@@ -932,62 +756,6 @@ function rowToSyncChange(
 // PULL: Initial Sync (Full Table Scan)
 // ============================================================================
 
-/**
- * Build WHERE conditions for user-filtered table access.
- * Returns null if the table should be skipped entirely.
- */
-function buildUserFilter(
-  tableName: SyncableTableName,
-  table: DrizzleTable,
-  ctx: SyncContext
-): unknown[] | null {
-  const conditions: unknown[] = [];
-
-  // `user_profile` must never sync other users' rows into the client.
-  // The JWT subject is the Supabase Auth user ID, which matches `supabase_user_id`.
-  if (tableName === "user_profile" && table.supabaseUserId) {
-    conditions.push(eq(table.supabaseUserId, ctx.userId));
-    return conditions;
-  }
-
-  // Special case: references are "system" when `user_ref` is NULL.
-  // IMPORTANT: `reference.user_ref` FK's to `user_profile.id` (internal ID).
-  // We *do not* sync other users' `user_profile` rows.
-  // Therefore, syncing any reference row owned by another user would violate
-  // the client's FK constraint and could abort initial sync.
-  //
-  // Visibility semantics (ignore `reference.public`):
-  // - system/legacy references: user_ref IS NULL
-  // - private references: user_ref = ctx.userId
-  if (tableName === "reference" && table.userRef) {
-    conditions.push(or(isNull(table.userRef), eq(table.userRef, ctx.userId)));
-    return conditions;
-  }
-
-  if (table.userId) {
-    conditions.push(eq(table.userId, ctx.userId));
-  } else if (table.userRef) {
-    conditions.push(eq(table.userRef, ctx.userId));
-  } else if (table.privateFor) {
-    conditions.push(
-      or(isNull(table.privateFor), eq(table.privateFor, ctx.userId))
-    );
-  } else if (table.privateToUser) {
-    conditions.push(
-      or(isNull(table.privateToUser), eq(table.privateToUser, ctx.userId))
-    );
-  } else if (table.playlistRef) {
-    const playlistIds = Array.from(ctx.userPlaylistIds);
-    if (playlistIds.length === 0) {
-      return null; // No playlists = skip this table
-    }
-    conditions.push(inArray(table.playlistRef, playlistIds));
-  }
-  // Static tables (genre, tune_type) have no conditions
-
-  return conditions;
-}
-
 async function fetchTableForInitialSyncPage(
   tx: Transaction,
   tableName: SyncableTableName,
@@ -996,14 +764,19 @@ async function fetchTableForInitialSyncPage(
   offset: number,
   limit: number
 ): Promise<SyncChange[]> {
-  const table = schema.tables[tableName];
+  const table = getSchemaTables()[tableName];
   if (!table) return [];
 
   const t = table as DrizzleTable;
   const meta = TABLE_REGISTRY[tableName];
   if (!meta) return [];
 
-  const conditions = buildUserFilter(tableName, t, ctx);
+  const conditions = buildUserFilter({
+    tableName,
+    table: t,
+    userId: tableName === "user_profile" ? ctx.authUserId : ctx.userId,
+    collections: ctx.collections,
+  });
   if (conditions === null) {
     console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
     return [];
@@ -1143,10 +916,13 @@ async function getChangedTables(
   tx: Transaction,
   lastSyncAt: string
 ): Promise<string[]> {
+  const syncChangeLog = getSchemaTables().sync_change_log as any;
   const entries = await tx
-    .select({ tableName: schema.syncChangeLog.tableName })
-    .from(schema.syncChangeLog)
-    .where(gt(schema.syncChangeLog.changedAt, lastSyncAt));
+    .select({
+      tableName: syncChangeLog.tableName,
+    })
+    .from(syncChangeLog)
+    .where(gt(syncChangeLog.changedAt, lastSyncAt));
 
   const tables = entries.map((e) => e.tableName);
   console.log(
@@ -1165,7 +941,7 @@ async function fetchChangedRowsFromTable(
   lastSyncAt: string,
   ctx: SyncContext
 ): Promise<SyncChange[]> {
-  const table = schema.tables[tableName];
+  const table = getSchemaTables()[tableName];
   if (!table) return [];
 
   const t = table as DrizzleTable;
@@ -1175,7 +951,12 @@ async function fetchChangedRowsFromTable(
   }
 
   // Build conditions: last_modified_at > lastSyncAt AND user_filter
-  const userConditions = buildUserFilter(tableName, t, ctx);
+  const userConditions = buildUserFilter({
+    tableName,
+    table: t,
+    userId: tableName === "user_profile" ? ctx.authUserId : ctx.userId,
+    collections: ctx.collections,
+  });
   if (userConditions === null) {
     console.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
     return []; // Skip table (e.g., no playlists)
@@ -1257,10 +1038,27 @@ async function handleSync(
   diagnosticsEnabled: boolean
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
+  const diag: string[] = [];
   let responseChanges: SyncChange[] = [];
   let nextCursor: string | undefined;
   let syncStartedAt: string | undefined;
   const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
+
+  if (diagnosticsEnabled) {
+    const cursorSummary = payload.pullCursor
+      ? (() => {
+          try {
+            const c = decodeCursor(payload.pullCursor);
+            return `tableIndex=${c.tableIndex} offset=${c.offset}`;
+          } catch {
+            return "cursor=invalid";
+          }
+        })()
+      : "cursor=none";
+    diag.push(
+      `[WorkerSyncDiag] type=${syncType} changesIn=${payload.changes.length} lastSyncAt=${payload.lastSyncAt ?? "null"} pageSize=${payload.pageSize ?? "null"} ${cursorSummary}`
+    );
+  }
 
   console.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
   console.log(
@@ -1268,23 +1066,51 @@ async function handleSync(
   );
 
   await db.transaction(async (tx) => {
-    // Get user's playlist IDs for ownership filtering
-    const userPlaylists = await tx
-      .select({ id: schema.playlist.playlistId })
-      .from(schema.playlist)
-      .where(eq(schema.playlist.userRef, userId));
+    const authUserId = userId;
 
-    console.log(`[SYNC] User has ${userPlaylists.length} playlists`);
+    // Map Supabase auth uid -> internal user_profile.id.
+    // Most user-owned tables reference user_profile.id (e.g. user_ref/user_id), not auth uid.
+    let internalUserId = authUserId;
+    try {
+      const userProfile = getSchemaTables().user_profile as any;
+      if (userProfile?.id && userProfile?.supabaseUserId) {
+        const rows = await tx
+          .select({ id: userProfile.id })
+          .from(userProfile)
+          .where(eq(userProfile.supabaseUserId, authUserId))
+          .limit(1);
+
+        if (rows.length > 0 && rows[0]?.id) {
+          internalUserId = String(rows[0].id);
+        } else {
+          console.warn(
+            `[SYNC] No user_profile row found for auth uid ${authUserId}; using auth uid for scoping (may yield empty user-owned pulls).`
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[SYNC] Failed to resolve internal user id for auth uid ${authUserId}; using auth uid for scoping`,
+        err
+      );
+    }
+
+    const collections = await loadUserCollections({
+      tx,
+      userId: internalUserId,
+      tables: getSchemaTables(),
+    });
 
     const ctx: SyncContext = {
-      userId,
-      userPlaylistIds: new Set(userPlaylists.map((p) => p.id)),
+      userId: internalUserId,
+      authUserId,
+      collections,
       now,
       diagnosticsEnabled,
     };
 
     // PUSH: Apply client changes
-    await processPushChanges(tx, payload.changes);
+    await processPushChanges(tx, payload.changes as IncomingSyncChange[]);
 
     // PULL: Gather changes for client
     if (payload.lastSyncAt) {
@@ -1307,6 +1133,21 @@ async function handleSync(
       syncStartedAt = page.syncStartedAt;
     }
 
+    if (diagnosticsEnabled) {
+      const tableCounts: Record<string, number> = {};
+      for (const change of responseChanges) {
+        tableCounts[change.table] = (tableCounts[change.table] ?? 0) + 1;
+      }
+      const top = Object.entries(tableCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([t, n]) => `${t}:${n}`)
+        .join(",");
+      diag.push(
+        `[WorkerSyncDiag] changesOut=${responseChanges.length} nextCursor=${nextCursor ? "yes" : "no"} syncStartedAt=${syncStartedAt ?? "null"} topTables=${top || "(none)"}`
+      );
+    }
+
     // NO GARBAGE COLLECTION NEEDED!
     // sync_change_log now has at most ~20 rows (one per table)
   });
@@ -1320,6 +1161,7 @@ async function handleSync(
     syncedAt: now,
     nextCursor,
     syncStartedAt,
+    debug: diagnosticsEnabled ? diag : undefined,
   };
 }
 
@@ -1336,7 +1178,10 @@ function getCorsHeaders(request: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, apikey, x-client-info",
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
     "Access-Control-Max-Age": "86400", // 24 hours
   };
 }
@@ -1360,77 +1205,75 @@ function errorResponse(
   return jsonResponse({ error: message }, status, corsHeaders);
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    // Get CORS headers for this request (needed for all responses)
-    const corsHeaders = getCorsHeaders(request);
+async function fetch(request: Request, env: Env): Promise<Response> {
+  // Get CORS headers for this request (needed for all responses)
+  const corsHeaders = getCorsHeaders(request);
 
-    try {
-      const url = new URL(request.url);
+  try {
+    const url = new URL(request.url);
 
-      // CORS preflight - handle immediately
-      if (request.method === "OPTIONS") {
-        return new Response(null, { 
-          status: 204,
-          headers: corsHeaders 
-        });
-      }
-
-      // Health check
-      if (request.method === "GET" && url.pathname === "/health") {
-        return new Response("OK", { status: 200, headers: corsHeaders });
-      }
-
-      // Sync endpoint
-      if (request.method === "POST" && url.pathname === "/api/sync") {
-        console.log(`[HTTP] POST /api/sync received`);
-
-        // Validate environment configuration
-        if (!env.SUPABASE_JWT_SECRET) {
-          console.error("[HTTP] SUPABASE_JWT_SECRET not configured");
-          return errorResponse("Server configuration error", 500, corsHeaders);
-        }
-
-        // Authenticate
-        const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
-        if (!userId) {
-          console.log(`[HTTP] Unauthorized - JWT verification failed`);
-          return errorResponse("Unauthorized", 401, corsHeaders);
-        }
-
-        const diagnosticsEnabled =
-          env.SYNC_DIAGNOSTICS === "true" &&
-          (!env.SYNC_DIAGNOSTICS_USER_ID ||
-            env.SYNC_DIAGNOSTICS_USER_ID === userId);
-
-        // Connect to database
-        try {
-          const { db, close } = createDb(env);
-          const payload = (await request.json()) as SyncRequest;
-
-          try {
-            console.log(`[HTTP] Sync request parsed, calling handleSync`);
-            const response = await handleSync(
-              db,
-              payload,
-              userId,
-              diagnosticsEnabled
-            );
-            console.log(`[HTTP] Sync completed successfully`);
-            return jsonResponse(response, 200, corsHeaders);
-          } finally {
-            await close();
-          }
-        } catch (error) {
-          console.error("[HTTP] Sync error:", error);
-          return errorResponse(formatDbError(error), 500, corsHeaders);
-        }
-      }
-
-      return new Response("Not Found", { status: 404, headers: corsHeaders });
-    } catch (error) {
-      console.error("[HTTP] Unhandled error:", error);
-      return errorResponse("Internal Server Error", 500, corsHeaders);
+    // CORS preflight - handle immediately
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders,
+      });
     }
-  },
-};
+
+    // Health check
+    if (request.method === "GET" && url.pathname === "/health") {
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // Sync endpoint
+    if (request.method === "POST" && url.pathname === "/api/sync") {
+      console.log(`[HTTP] POST /api/sync received`);
+
+      // Validate environment configuration
+      if (!env.SUPABASE_JWT_SECRET) {
+        console.error("[HTTP] SUPABASE_JWT_SECRET not configured");
+        return errorResponse("Server configuration error", 500, corsHeaders);
+      }
+
+      // Authenticate
+      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
+      if (!userId) {
+        console.log(`[HTTP] Unauthorized - JWT verification failed`);
+        return errorResponse("Unauthorized", 401, corsHeaders);
+      }
+
+      const diagnosticsEnabled =
+        env.SYNC_DIAGNOSTICS === "true" &&
+        (!env.SYNC_DIAGNOSTICS_USER_ID ||
+          env.SYNC_DIAGNOSTICS_USER_ID === userId);
+
+      // Connect to database
+      try {
+        const { db, close } = createDb(env);
+        const payload = (await request.json()) as SyncRequest;
+
+        try {
+          console.log(`[HTTP] Sync request parsed, calling handleSync`);
+          const response = await handleSync(
+            db,
+            payload,
+            userId,
+            diagnosticsEnabled
+          );
+          console.log(`[HTTP] Sync completed successfully`);
+          return jsonResponse(response, 200, corsHeaders);
+        } finally {
+          await close();
+        }
+      } catch (error) {
+        console.error("[HTTP] Sync error:", error);
+        return errorResponse(formatDbError(error), 500, corsHeaders);
+      }
+    }
+
+    return new Response("Not Found", { status: 404, headers: corsHeaders });
+  } catch (error) {
+    console.error("[HTTP] Unhandled error:", error);
+    return errorResponse("Internal Server Error", 500, corsHeaders);
+  }
+}

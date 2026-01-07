@@ -10,9 +10,6 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * Tests that the database status indicator in TopNav shows correct
  * sync state and allows force sync operations.
  */
-
-test.use({ storageState: "e2e/.auth/alice.json" });
-
 let ttPage: TuneTreesPage;
 
 test.describe("TOPNAV-002: Database Status Dropdown", () => {

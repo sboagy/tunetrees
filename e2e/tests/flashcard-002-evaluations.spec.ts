@@ -4,6 +4,7 @@ import {
   TEST_TUNE_MASONS_ID,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
+import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -16,24 +17,38 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Evaluations", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    test.setTimeout(60000);
+
+    let ttPage: TuneTreesPage;
+    let currentDate: Date;
+
+    test.beforeEach(async ({ page, context, testUser }) => {
+      ttPage = new TuneTreesPage(page);
+
+      // Set stable starting date
+      currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
+      // Set up 10 tunes, all scheduled as "overdue" so they appear in queue
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
           TEST_TUNE_MORRISON_ID,
           TEST_TUNE_MASONS_ID,
         ], // 3 tunes that exist in seed data
-        scheduleDaysAgo: 1,
+        scheduleDaysAgo: 1, // Due yesterday (overdue)
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
+
+      await page.waitForTimeout(500);
     });
 
     test("01. Select evaluation on flashcard", async ({ page }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode(500);
 
       // Select "Good" via evaluation combobox
-      await app.selectFlashcardEvaluation("good");
+      await ttPage.selectFlashcardEvaluation("good");
 
       // Verify the combobox now shows "Good"
       // page.getByTestId(/^recall-eval-[0-9a-f-]+$/i)
@@ -44,29 +59,27 @@ test.describe
     test("02. Evaluation staging reflected in submit count", async ({
       page,
     }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode(500);
 
       // Select evaluation
-      await app.selectFlashcardEvaluation("good");
+      await ttPage.selectFlashcardEvaluation("good");
       await page.waitForTimeout(500); // Allow time for staging
 
       // Verify evaluation reflected in Submit count (acts as staging indicator)
-      await expect(app.submitEvaluationsButton).toContainText("1");
+      await expect(ttPage.submitEvaluationsButton).toContainText("1");
     });
 
     test("03. Evaluation persists after navigation", async ({ page }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode(500);
 
       // Select evaluation on first card
-      await app.selectFlashcardEvaluation("good");
+      await ttPage.selectFlashcardEvaluation("good");
 
       // Navigate to next card
-      await app.goNextCard();
+      await ttPage.goNextCard();
 
       // Navigate back to first card
-      await app.goPrevCard();
+      await ttPage.goPrevCard();
 
       // Verify combobox still shows "Good"
       const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
@@ -76,16 +89,14 @@ test.describe
     test("04. Evaluation clears when selecting different tune", async ({
       page,
     }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode(500);
 
       // Select evaluation on first card
-      await app.selectFlashcardEvaluation("good");
+      await ttPage.selectFlashcardEvaluation("good");
       await page.waitForTimeout(300);
 
       // Navigate to second card
-      await app.goNextCard();
-      await page.waitForTimeout(300);
+      await ttPage.goNextCard();
 
       // Verify no evaluation selected on second card
       const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
@@ -95,15 +106,14 @@ test.describe
     test("05. Multiple evaluations on same card - last one wins", async ({
       page,
     }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode(500);
 
       // Select "Good"
-      await app.selectFlashcardEvaluation("good");
+      await ttPage.selectFlashcardEvaluation("good");
       await page.waitForTimeout(300);
 
       // Change to "Easy"
-      await app.selectFlashcardEvaluation("easy");
+      await ttPage.selectFlashcardEvaluation("easy");
       await page.waitForTimeout(300);
 
       // Verify only "Easy" is shown
@@ -112,11 +122,10 @@ test.describe
     });
 
     test("06. Evaluation count updates in Submit button", async ({ page }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode(500);
 
       // Initially no evaluations
-      const submitButton = app.submitEvaluationsButton;
+      const submitButton = ttPage.submitEvaluationsButton;
       // New UX: button shows label "Submit" and badge appears only when count > 0
       await expect(submitButton).toHaveAttribute(
         "title",
@@ -125,16 +134,16 @@ test.describe
       await expect(submitButton).toContainText(/Submit/i);
 
       // Select evaluation on first card
-      await app.selectFlashcardEvaluation("good");
+      await ttPage.selectFlashcardEvaluation("good");
       await page.waitForTimeout(300);
 
       // Verify count updated to 1
       await expect(submitButton).toContainText("1");
 
       // Navigate to second card and select evaluation
-      await app.goNextCard();
-      await page.waitForTimeout(300);
-      await app.selectFlashcardEvaluation("easy");
+      await ttPage.goNextCard();
+
+      await ttPage.selectFlashcardEvaluation("easy");
       await page.waitForTimeout(300);
 
       // Verify count updated to 2
@@ -142,23 +151,35 @@ test.describe
     });
 
     test("07. Can clear evaluation by clicking again", async ({ page }) => {
-      const app = new TuneTreesPage(page);
-      await app.enableFlashcardMode();
+      await ttPage.enableFlashcardMode();
 
       // Select evaluation
-      await app.selectFlashcardEvaluation("good");
-      await page.waitForTimeout(300);
+      await ttPage.selectFlashcardEvaluation("good", 800);
+
+      const submitEvaluationsButton = page.getByTestId(
+        "submit-evaluations-button"
+      );
+      // const submitEvaluationsTest = await submitEvaluationsButton.textContent();
+      await expect
+        .poll(
+          async () =>
+            (await submitEvaluationsButton.textContent())
+              ?.trim()
+              .toLowerCase() ?? "",
+          { timeout: 5000 }
+        )
+        .toBe("submit1");
+      page.waitForTimeout(200);
 
       // Clear by selecting "Not set"
-      await app.selectFlashcardEvaluation("not-set");
-      await page.waitForTimeout(300);
+      await ttPage.selectFlashcardEvaluation("not-set");
 
       // Verify deselected (combobox shows Not set)
-      const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
-      await expect(evalButton).toContainText(/Not set|Select/i);
+      const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
+      await expect(evalButton).toContainText(/Not Set|Select/i);
 
       // Verify Submit button count back to 0
-      const submitButton = app.submitEvaluationsButton;
+      const submitButton = ttPage.submitEvaluationsButton;
       await expect(submitButton).toHaveAttribute(
         "title",
         /Submit 0 practice evaluations/

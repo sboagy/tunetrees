@@ -127,7 +127,7 @@ test.describe("Anonymous User Edge Cases", () => {
     await ttPage.signInAnonymouslyWithPlaylist("Sign Out Test Playlist");
 
     // Add some data - navigate to catalog
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(1000);
 

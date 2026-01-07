@@ -9,10 +9,10 @@
  * @module lib/sync/engine
  */
 
+import type { SyncChange } from "@oosync/shared/protocol";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import * as localSchema from "../../../drizzle/schema-sqlite";
-import type { SyncChange } from "@oosync/shared/protocol";
 import {
   clearOutboxBackupForUser,
   getSqliteInstance,
@@ -41,6 +41,9 @@ import { WorkerClient } from "./worker-client";
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
 const syncLog = (...args: any[]) =>
   SYNC_DEBUG && log.debug("[SyncEngine]", ...args);
+
+// Diagnostics flag for collecting sync performance stats (set VITE_SYNC_DIAGNOSTICS=true).
+const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
 
 /** LocalStorage key prefix for persisting last sync timestamp across app restarts */
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -89,7 +92,7 @@ import {
   SYNCABLE_TABLES,
   TABLE_SYNC_ORDER,
   TABLE_TO_SCHEMA_KEY,
-} from "@oosync/shared/table-meta";
+} from "@sync-schema/table-meta";
 
 function sqliteTableHasAnyRows(
   sqliteInstance: { exec: (sql: string) => any[] },
@@ -105,7 +108,12 @@ function sqliteTableHasAnyRows(
 
 async function hasAnyLocalSyncData(): Promise<boolean> {
   const sqliteInstance = await getSqliteInstance();
-  if (!sqliteInstance) return true;
+  // If sql.js isn't initialized yet, we cannot reliably inspect the DB.
+  // In the specific scenario where we have a persisted lastSyncTimestamp but the
+  // local DB was cleared/reset (common in E2E), treating this as "has data"
+  // causes us to incorrectly do an incremental sync against an empty DB.
+  // Safer default: assume empty so the caller can force a full sync.
+  if (!sqliteInstance) return false;
 
   for (const tableName of SYNCABLE_TABLES) {
     try {
@@ -507,9 +515,6 @@ export class SyncEngine {
                       throw e;
                     }
 
-                    const { id: _ignoredId, ...sanitizedDataWithoutId } =
-                      sanitizedData as Record<string, unknown>;
-
                     await this.localDb
                       .insert(table)
                       .values(sanitizedData)
@@ -517,7 +522,22 @@ export class SyncEngine {
                         target: compositeKeys.map(
                           (k) => (table as any)[toCamelCase(k)]
                         ),
-                        set: sanitizedDataWithoutId,
+                        // Default behavior: do not update synthetic PK `id` when resolving
+                        // a natural unique-key conflict (prevents rewiring local foreign keys).
+                        // Exception: user_profile.id is the canonical identity referenced by
+                        // many tables (e.g. playlist.user_ref). If a local user_profile row was
+                        // created pre-sync (same supabase_user_id, different id), we must adopt
+                        // the server-provided `id` so downstream rows match and FK inserts succeed.
+                        set:
+                          change.table === "user_profile" &&
+                          compositeKeys.length === 1 &&
+                          compositeKeys[0] === "supabase_user_id"
+                            ? sanitizedData
+                            : ((): Record<string, unknown> => {
+                                const { id: _ignoredId, ...rest } =
+                                  sanitizedData as Record<string, unknown>;
+                                return rest;
+                              })(),
                       })
                       .run();
                   }
@@ -583,6 +603,19 @@ export class SyncEngine {
       let pullCursor: string | undefined;
       let syncStartedAt: string | undefined;
 
+      const diagStartedAtMs = SYNC_DIAGNOSTICS ? performance.now() : 0;
+      let diagPullPages = 0;
+      let diagPulledChanges = 0;
+      const diagTableCounts: Record<string, number> = {};
+
+      if (SYNC_DIAGNOSTICS) {
+        const type = isInitialSync ? "INITIAL" : "INCREMENTAL";
+        const userShort = this.userId.slice(0, 8);
+        console.log(
+          `[SyncDiag] begin user=${userShort} type=${type} lastSync=${this.lastSyncTimestamp ? "set" : "null"} pendingOutbox=${changes.length}`
+        );
+      }
+
       // 3. Call Worker (Push + first Pull page)
       const firstResponse = await workerClient.sync(
         changes,
@@ -591,6 +624,15 @@ export class SyncEngine {
           pageSize: 200,
         }
       );
+
+      if (SYNC_DIAGNOSTICS) {
+        diagPullPages += 1;
+        diagPulledChanges += firstResponse.changes.length;
+        for (const change of firstResponse.changes) {
+          diagTableCounts[change.table] =
+            (diagTableCounts[change.table] ?? 0) + 1;
+        }
+      }
 
       if (SYNC_DEBUG && firstResponse.debug) {
         syncLog("Worker Debug Logs:", JSON.stringify(firstResponse.debug));
@@ -629,14 +671,78 @@ export class SyncEngine {
           pullCursor = pageResponse.nextCursor;
           syncStartedAt = pageResponse.syncStartedAt ?? syncStartedAt;
 
+          if (SYNC_DIAGNOSTICS) {
+            diagPullPages += 1;
+            diagPulledChanges += pageResponse.changes.length;
+            for (const change of pageResponse.changes) {
+              diagTableCounts[change.table] =
+                (diagTableCounts[change.table] ?? 0) + 1;
+            }
+          }
+
           await applyRemoteChanges(pageResponse.changes);
+        }
+      }
+
+      if (SYNC_DIAGNOSTICS) {
+        const diagDurationMs = Math.round(performance.now() - diagStartedAtMs);
+        const type = isInitialSync ? "INITIAL" : "INCREMENTAL";
+        const userShort = this.userId.slice(0, 8);
+
+        // Use console.log to ensure visibility in E2E logs without "[Browser Error]" prefix
+        console.log(
+          `[SyncDiag] user=${userShort} type=${type} pushed=${changes.length} pulled=${diagPulledChanges} pages=${diagPullPages} durationMs=${diagDurationMs}`
+        );
+
+        // Log per-table counts with local SQLite row counts
+        const sortedTables = Object.entries(diagTableCounts).sort(
+          (a, b) => b[1] - a[1]
+        );
+
+        // Get SQLite row counts for synced tables
+        const sqliteDb = await getSqliteInstance();
+        const localCounts: Record<string, number> = {};
+        const localCountErrorsLogged = new Set<string>();
+        if (sqliteDb) {
+          for (const [table] of sortedTables) {
+            if (!SYNCABLE_TABLES.includes(table as SyncableTableName)) {
+              continue;
+            }
+            try {
+              const result = sqliteDb.exec(
+                `SELECT COUNT(*) as count FROM "${table}"`
+              );
+              const count = (result[0]?.values[0]?.[0] as number) || 0;
+              localCounts[table] = count;
+            } catch (e) {
+              // Best-effort diagnostics; don't fail sync.
+              // Log once per table per sync so we can spot issues like OOM.
+              if (!localCountErrorsLogged.has(table)) {
+                localCountErrorsLogged.add(table);
+                const msg = e instanceof Error ? e.message : String(e);
+                console.log(
+                  `[SyncDiag] user=${userShort} localCountError table=${table} msg=${msg}`
+                );
+              }
+            }
+          }
+        }
+
+        // Log each table with synced count and local total
+        for (const [table, syncedCount] of sortedTables) {
+          const localTotal = localCounts[table] ?? "?";
+          console.log(
+            `[SyncDiag] user=${userShort} table=${table} synced=${syncedCount} localTotal=${localTotal}`
+          );
         }
       }
 
       // 6c. Retry any remote changes that failed FK constraints on first pass.
       // This resolves cross-page dependency ordering problems.
       if (deferredForeignKeyChanges.length > 0) {
-        let remaining = deferredForeignKeyChanges;
+        // IMPORTANT: copy before clearing. `remaining = deferredForeignKeyChanges` would
+        // alias the same array, and `length = 0` would wipe the retry set.
+        let remaining = [...deferredForeignKeyChanges];
         deferredForeignKeyChanges.length = 0;
 
         // Keep passes small; most cases resolve in 1-2 passes.
