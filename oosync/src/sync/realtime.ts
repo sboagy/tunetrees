@@ -15,7 +15,7 @@ import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
 } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SyncableTable } from "./queue";
 import type { SyncService } from "./service";
 
@@ -28,6 +28,7 @@ export interface RealtimeConfig {
   tables: SyncableTable[];
   // Supabase Auth user id (UUID string)
   userId: string | null;
+  supabase: SupabaseClient;
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (error: Error) => void;
@@ -55,10 +56,12 @@ export class RealtimeManager {
   private config: RealtimeConfig;
   private state: RealtimeState;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private supabase: SupabaseClient;
 
   constructor(syncService: SyncService, config: RealtimeConfig) {
     this.syncService = syncService;
     this.config = config;
+    this.supabase = config.supabase;
     this.state = {
       status: "disconnected",
       channels: new Map(),
@@ -111,7 +114,7 @@ export class RealtimeManager {
     realtimeLog("[Realtime Stopping all subscriptions");
 
     for (const [tableName, channel] of this.state.channels.entries()) {
-      await supabase.removeChannel(channel);
+      await this.supabase.removeChannel(channel);
       console.log(`[Realtime] Unsubscribed from ${tableName}`);
     }
 
@@ -132,7 +135,7 @@ export class RealtimeManager {
     );
 
     // Create channel
-    const channel = supabase.channel(channelName);
+    const channel = this.supabase.channel(channelName);
 
     // Subscribe to PostgreSQL changes with user_ref filter
     channel

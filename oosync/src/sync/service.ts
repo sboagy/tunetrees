@@ -13,10 +13,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "solid-sonner";
-import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
 import { SyncEngine } from "./engine";
 import type { SyncableTable } from "./queue";
 import { type RealtimeConfig, RealtimeManager } from "./realtime";
+import { getSyncRuntime, type SqliteDatabase } from "./runtime-context";
 
 /**
  * Error thrown when sync is already in progress
@@ -130,22 +130,13 @@ export class SyncService {
    * Initialize Supabase Realtime subscriptions
    */
   private initializeRealtime(): void {
-    const tables: SyncableTable[] = [
-      "tune",
-      "playlist",
-      "playlist_tune",
-      "note",
-      "reference",
-      "tag",
-      "practice_record",
-      "daily_practice_queue",
-      "tune_override",
-    ];
+    const tables = getSyncRuntime().schema.syncableTables as SyncableTable[];
 
     const realtimeConfig: RealtimeConfig = {
       enabled: true,
       tables,
       userId: this.config.userId,
+      supabase: this.config.supabase,
       onConnected: this.config.onRealtimeConnected,
       onDisconnected: this.config.onRealtimeDisconnected,
       onError: this.config.onRealtimeError,
@@ -296,7 +287,7 @@ export class SyncService {
       // Relying solely on `beforeunload`/interval persistence is unreliable because
       // async work may be aborted during navigation.
       try {
-        await persistDb();
+        await getSyncRuntime().persistDb?.();
       } catch (error) {
         console.warn(
           "[SyncService] Failed to persist DB after syncDown:",
@@ -356,7 +347,7 @@ export class SyncService {
       const result: SyncResult = await engine.syncDownTables(tables);
 
       try {
-        await persistDb();
+        await getSyncRuntime().persistDb?.();
       } catch (error) {
         console.warn(
           "[SyncService] Failed to persist DB after scoped syncDown:",

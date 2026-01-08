@@ -20,12 +20,12 @@ import type {
 
 /**
  * Get the CORS proxy URL for TheSession.org API calls
- * 
+ *
  * In both development and production, the proxy is at the same origin
  * to avoid CORS and mixed content issues:
  * - Development: Vite dev server proxies /api/proxy/thesession to thesession.org
  * - Production: Cloudflare Pages Function at /api/proxy/thesession
- * 
+ *
  * This eliminates the need for VITE_WORKER_URL environment variable
  */
 function getProxyUrl(targetUrl: string): string {

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("sync-core table-specific hack guard", () => {
   it("does not special-case practice_record in SyncEngine apply logic", () => {
-    const enginePath = resolve(process.cwd(), "src/lib/sync/engine.ts");
+    const enginePath = resolve(process.cwd(), "oosync/src/sync/engine.ts");
     const text = readFileSync(enginePath, "utf-8");
 
     expect(text).not.toContain('change.table === "practice_record"');

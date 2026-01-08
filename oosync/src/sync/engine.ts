@@ -12,19 +12,6 @@
 import type { SyncChange } from "@oosync/shared/protocol";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
-import * as localSchema from "../../../drizzle/schema-sqlite";
-import {
-  clearOutboxBackupForUser,
-  getSqliteInstance,
-  loadOutboxBackupForUser,
-  type SqliteDatabase,
-} from "../db/client-sqlite";
-import {
-  enableSyncTriggers,
-  suppressSyncTriggers,
-} from "../db/install-triggers";
-import { replayOutboxBackup } from "../db/outbox-backup";
-import { log } from "../logger";
 import { getAdapter, type SyncableTableName } from "./adapters";
 import { toCamelCase } from "./casing";
 import {
@@ -36,11 +23,40 @@ import {
   type OutboxItem,
 } from "./outbox";
 import { WorkerClient } from "./worker-client";
+import { getSyncRuntime, type SqliteDatabase } from "./runtime-context";
 
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
-const syncLog = (...args: any[]) =>
-  SYNC_DEBUG && log.debug("[SyncEngine]", ...args);
+const syncLog = (...args: unknown[]) => {
+  if (!SYNC_DEBUG) return false;
+  const logger = getSyncRuntime().logger;
+  logger.debug("[SyncEngine]", ...args);
+  return true;
+};
+
+function getLogger() {
+  return getSyncRuntime().logger;
+}
+
+function getRuntimeState() {
+  const runtime = getSyncRuntime();
+  const { schema } = runtime;
+  return {
+    runtime,
+    schema,
+    tableRegistry: schema.tableRegistry,
+    tableSyncOrder: schema.tableSyncOrder,
+    tableToSchemaKey: schema.tableToSchemaKey,
+    syncableTables: schema.syncableTables,
+    localSchema: runtime.localSchema,
+    getSqliteInstance: runtime.getSqliteInstance,
+    loadOutboxBackupForUser: runtime.loadOutboxBackupForUser,
+    clearOutboxBackupForUser: runtime.clearOutboxBackupForUser,
+    replayOutboxBackup: runtime.replayOutboxBackup,
+    enableSyncTriggers: runtime.enableSyncTriggers,
+    suppressSyncTriggers: runtime.suppressSyncTriggers,
+  } as const;
+}
 
 // Diagnostics flag for collecting sync performance stats (set VITE_SYNC_DIAGNOSTICS=true).
 const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
@@ -76,29 +92,11 @@ const DEFAULT_CONFIG: SyncConfig = {
   timeoutMs: 30000, // 30 seconds
 };
 
-/**
- * Table dependency order for sync operations.
- * Parent tables (lower numbers) must be synced before child tables (higher numbers)
- * to avoid foreign key constraint violations.
- *
- * Order rationale:
- * - Reference data tables (genre, tune_type) come first (no dependencies)
- * - User profile comes next (referenced by many tables)
- * - Tunes before playlist_tune (FK: tune_ref)
- * - Playlists before playlist_tune, practice_record (FK: playlist_ref)
- * - playlist_tune before practice_record (implicit practice dependency)
- */
-import {
-  SYNCABLE_TABLES,
-  TABLE_SYNC_ORDER,
-  TABLE_TO_SCHEMA_KEY,
-} from "@sync-schema/table-meta";
-
 function sqliteTableHasAnyRows(
   sqliteInstance: { exec: (sql: string) => any[] },
   tableName: string
 ): boolean {
-  // Table names are trusted constants from SYNCABLE_TABLES.
+  // Table names are trusted constants from the runtime schema description.
   const result = sqliteInstance.exec(`SELECT 1 FROM "${tableName}" LIMIT 1`);
   const first = result[0];
   return Boolean(
@@ -107,6 +105,7 @@ function sqliteTableHasAnyRows(
 }
 
 async function hasAnyLocalSyncData(): Promise<boolean> {
+  const { getSqliteInstance, syncableTables } = getRuntimeState();
   const sqliteInstance = await getSqliteInstance();
   // If sql.js isn't initialized yet, we cannot reliably inspect the DB.
   // In the specific scenario where we have a persisted lastSyncTimestamp but the
@@ -115,7 +114,7 @@ async function hasAnyLocalSyncData(): Promise<boolean> {
   // Safer default: assume empty so the caller can force a full sync.
   if (!sqliteInstance) return false;
 
-  for (const tableName of SYNCABLE_TABLES) {
+  for (const tableName of syncableTables) {
     try {
       if (sqliteTableHasAnyRows(sqliteInstance, tableName)) return true;
     } catch {}
@@ -135,9 +134,10 @@ async function hasAnyLocalSyncData(): Promise<boolean> {
  * @returns Sorted array of outbox items
  */
 function sortOutboxItemsByDependency(items: OutboxItem[]): OutboxItem[] {
+  const { tableSyncOrder } = getRuntimeState();
   return [...items].sort((a, b) => {
-    const orderA = TABLE_SYNC_ORDER[a.tableName] ?? 100;
-    const orderB = TABLE_SYNC_ORDER[b.tableName] ?? 100;
+    const orderA = tableSyncOrder[a.tableName] ?? 100;
+    const orderB = tableSyncOrder[b.tableName] ?? 100;
 
     // For DELETE operations, reverse the order (children first)
     if (
@@ -217,7 +217,7 @@ export class SyncEngine {
     // Load persisted timestamp from localStorage (enables incremental sync after app restart)
     this.lastSyncTimestamp = localStorage.getItem(this.syncTimestampKey);
     if (this.lastSyncTimestamp) {
-      log.info(
+      getLogger().info(
         `[SyncEngine] Loaded persisted lastSyncTimestamp for user ${userId}: ${this.lastSyncTimestamp}`
       );
     }
@@ -241,7 +241,7 @@ export class SyncEngine {
       return await this.syncWithWorker();
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      log.error("[SyncEngine] Sync failed:", errorMsg);
+      getLogger().error("[SyncEngine] Sync failed:", errorMsg);
 
       return {
         success: false,
@@ -267,11 +267,24 @@ export class SyncEngine {
     let failed = 0;
     const affectedTablesSet = new Set<string>();
 
+    const {
+      tableSyncOrder,
+      tableToSchemaKey,
+      localSchema,
+      getSqliteInstance,
+      suppressSyncTriggers,
+      enableSyncTriggers,
+      loadOutboxBackupForUser,
+      clearOutboxBackupForUser,
+      replayOutboxBackup,
+      syncableTables,
+    } = getRuntimeState();
+
     let isInitialSync = !this.lastSyncTimestamp;
     if (!isInitialSync) {
       const hasAnyData = await hasAnyLocalSyncData();
       if (!hasAnyData) {
-        log.warn(
+        getLogger().warn(
           `[SyncEngine] Local DB appears empty but lastSyncTimestamp exists for user ${this.userId}; forcing full sync`
         );
         this.clearLastSyncTimestamp();
@@ -356,7 +369,7 @@ export class SyncEngine {
             });
             outboxItemsToComplete.push(item);
           } else {
-            log.warn(
+            getLogger().warn(
               `[SyncEngine] Local row missing for ${item.tableName}:${item.rowId}`
             );
             // Mark as failed or skip? Skip for now.
@@ -397,8 +410,8 @@ export class SyncEngine {
           // Sort changes by dependency to avoid FK violations.
           // Inserts/updates: parent tables first. Deletes: child tables first.
           const sortedChanges = [...remoteChanges].sort((a, b) => {
-            const orderA = TABLE_SYNC_ORDER[a.table] ?? 100;
-            const orderB = TABLE_SYNC_ORDER[b.table] ?? 100;
+            const orderA = tableSyncOrder[a.table] ?? 100;
+            const orderB = tableSyncOrder[b.table] ?? 100;
 
             if (a.deleted && b.deleted) return orderB - orderA;
             if (!a.deleted && !b.deleted) return orderA - orderB;
@@ -411,12 +424,12 @@ export class SyncEngine {
             affectedTablesSet.add(change.table);
             const adapter = getAdapter(change.table as SyncableTableName);
 
-            const schemaKey = TABLE_TO_SCHEMA_KEY[change.table] || change.table;
+            const schemaKey = tableToSchemaKey[change.table] || change.table;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const table = (localSchema as any)[schemaKey];
 
             if (!table) {
-              log.warn(
+              getLogger().warn(
                 `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
               );
               continue;
@@ -434,7 +447,7 @@ export class SyncEngine {
                       const columnKey = toCamelCase(k);
                       const value = localKeyData[columnKey];
                       if (typeof value === "undefined") {
-                        log.warn(
+                        getLogger().warn(
                           `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
                           { rowId: change.rowId }
                         );
@@ -452,11 +465,11 @@ export class SyncEngine {
                     .delete(table)
                     .where(and(...conditions))
                     .run();
-                } else {
+                } else if (typeof pk === "string") {
                   const columnKey = toCamelCase(pk);
                   const value = localKeyData[columnKey];
                   if (typeof value === "undefined") {
-                    log.warn(
+                    getLogger().warn(
                       `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
                       { rowId: change.rowId }
                     );
@@ -472,11 +485,10 @@ export class SyncEngine {
                 // Upsert local
                 const sanitizedData = sanitizeData(change.data);
 
-                const conflictTarget = Array.isArray(adapter.primaryKey)
-                  ? adapter.primaryKey.map(
-                      (k) => (table as any)[toCamelCase(k)]
-                    )
-                  : (table as any)[toCamelCase(adapter.primaryKey as string)];
+                const adapterPk = adapter.primaryKey;
+                const conflictTarget = Array.isArray(adapterPk)
+                  ? adapterPk.map((k) => (table as any)[toCamelCase(k)])
+                  : (table as any)[toCamelCase(adapterPk as string)];
 
                 // Some tables have a natural composite unique key (adapter.conflictKeys)
                 // in addition to a synthetic PK (id). If we only upsert by id, an insert
@@ -567,7 +579,7 @@ export class SyncEngine {
               failed++;
               const errorMsg = e instanceof Error ? e.message : "Unknown error";
               errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
-              log.error(
+              getLogger().error(
                 `[SyncEngine] Failed to apply change to ${change.table} rowId=${change.rowId}:`,
                 e
               );
@@ -587,13 +599,13 @@ export class SyncEngine {
               this.deviceId
             );
             if (backfilled > 0) {
-              log.warn(
+              getLogger().warn(
                 `[SyncEngine] Backfilled ${backfilled} outbox entries written during trigger suppression`
               );
             }
           } catch (e) {
             // Never fail sync because of best-effort backfill.
-            log.warn(
+            getLogger().warn(
               "[SyncEngine] Outbox backfill after trigger suppression failed",
               e
             );
@@ -705,7 +717,7 @@ export class SyncEngine {
         const localCountErrorsLogged = new Set<string>();
         if (sqliteDb) {
           for (const [table] of sortedTables) {
-            if (!SYNCABLE_TABLES.includes(table as SyncableTableName)) {
+            if (!syncableTables.includes(table as SyncableTableName)) {
               continue;
             }
             try {
@@ -780,22 +792,22 @@ export class SyncEngine {
               sqliteInstance,
               pendingOutboxBackup
             );
-            log.info(
+            getLogger().info(
               `[SyncEngine] Replayed outbox backup: applied=${result.applied} skipped=${result.skipped} errors=${result.errors.length}`
             );
             if (result.errors.length > 0) {
-              log.warn(
+              getLogger().warn(
                 "[SyncEngine] Outbox backup replay had errors",
                 result.errors.slice(0, 5)
               );
             }
           } catch (e) {
-            log.warn("[SyncEngine] Outbox backup replay failed", e);
+            getLogger().warn("[SyncEngine] Outbox backup replay failed", e);
           } finally {
             try {
               await clearOutboxBackupForUser(this.userId);
             } catch (e) {
-              log.warn("[SyncEngine] Failed to clear outbox backup", e);
+              getLogger().warn("[SyncEngine] Failed to clear outbox backup", e);
             }
           }
         }
@@ -833,7 +845,7 @@ export class SyncEngine {
         errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
         errorMsg.includes("NetworkError");
       if (!isNetworkError) {
-        log.error("[SyncEngine] syncWithWorker failed:", errorMsg);
+        getLogger().error("[SyncEngine] syncWithWorker failed:", errorMsg);
       }
       errors.push(errorMsg);
       return {
