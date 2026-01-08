@@ -66,8 +66,8 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   const handleSelect = (value: string) => {
     // Call onChange with the new value
     props.onChange(value);
-    // Explicitly close the menu after selection if using controlled state
-    props.onOpenChange?.(false);
+    // Note: closeOnSelect={true} on DropdownMenu.Item handles closing
+    // No need to explicitly call onOpenChange here to avoid race conditions
   };
 
   return (
