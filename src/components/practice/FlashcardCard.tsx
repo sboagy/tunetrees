@@ -33,7 +33,9 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
   // Close dropdown when tune changes to prevent stale state
   createEffect(() => {
-    // Close the dropdown whenever the tune changes
+    // Track tune id so this runs when the tune actually changes.
+    props.tune.id;
+    // Close the dropdown whenever the tune changes.
     setIsEvalDropdownOpen(false);
   });
 

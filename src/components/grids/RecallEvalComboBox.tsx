@@ -63,11 +63,29 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   const selectedOption = () =>
     options.find((opt) => opt.value === props.value) || options[0];
 
+  // If we handle selection on pointerdown (to avoid click races), Kobalte may still
+  // emit onSelect as part of its internal interaction handling. Guard against
+  // double-firing onChange.
+  let ignoreNextSelect = false;
+
   const handleSelect = (value: string) => {
     // Call onChange with the new value
     props.onChange(value);
-    // Note: closeOnSelect={true} on DropdownMenu.Item handles closing
-    // No need to explicitly call onOpenChange here to avoid race conditions
+    // If the dropdown is controlled, ensure it closes deterministically.
+    // (In uncontrolled mode, Kobalte will manage open state.)
+    props.onOpenChange?.(false);
+  };
+
+  const handlePointerDownSelect = (e: PointerEvent, value: string) => {
+    // Commit selection on pointerdown so Playwright's click delay or fast
+    // re-renders don't prevent onSelect from firing.
+    e.preventDefault();
+    e.stopPropagation();
+    ignoreNextSelect = true;
+    handleSelect(value);
+    queueMicrotask(() => {
+      ignoreNextSelect = false;
+    });
   };
 
   return (
@@ -104,7 +122,13 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
                 <DropdownMenu.Item
                   data-testid={`recall-eval-option-${option.value || "not-set"}`}
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                  onSelect={() => handleSelect(option.value)}
+                  onPointerDown={(e) =>
+                    handlePointerDownSelect(e, option.value)
+                  }
+                  onSelect={() => {
+                    if (ignoreNextSelect) return;
+                    handleSelect(option.value);
+                  }}
                   closeOnSelect={true}
                 >
                   <span class={option.color}>{option.label}</span>
