@@ -10,7 +10,7 @@
 
 import { FlipVertical2 } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createMemo, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { RecallEvalComboBox } from "../grids/RecallEvalComboBox";
 import type { ITuneOverview } from "../grids/types";
 import type {
@@ -28,6 +28,16 @@ export interface FlashcardCardProps {
 }
 
 export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
+  // Track dropdown open state to preserve it across re-renders
+  const [isEvalDropdownOpen, setIsEvalDropdownOpen] = createSignal(false);
+
+  // Close dropdown when tune changes to prevent stale state
+  createEffect(() => {
+    const tuneId = props.tune.id;
+    // Close the dropdown whenever the tune changes
+    setIsEvalDropdownOpen(false);
+  });
+
   const handleEvalChange = (newValue: string) => {
     if (props.onRecallEvalChange) {
       props.onRecallEvalChange(newValue);
@@ -152,6 +162,8 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
       <RecallEvalComboBox
         tuneId={props.tune.id}
         value={props.currentEvaluation}
+        open={isEvalDropdownOpen()}
+        onOpenChange={setIsEvalDropdownOpen}
         onChange={handleEvalChange}
       />
     );

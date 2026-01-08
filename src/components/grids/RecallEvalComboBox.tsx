@@ -63,6 +63,13 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   const selectedOption = () =>
     options.find((opt) => opt.value === props.value) || options[0];
 
+  const handleSelect = (value: string) => {
+    // Call onChange with the new value
+    props.onChange(value);
+    // Explicitly close the menu after selection if using controlled state
+    props.onOpenChange?.(false);
+  };
+
   return (
     <div class="relative inline-block w-full">
       <DropdownMenu
@@ -75,7 +82,13 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
         <DropdownMenu.Trigger
           data-testid={`recall-eval-${props.tuneId}`}
           class="w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
+            // Prevent event bubbling that could interfere with dropdown behavior
+            e.stopPropagation();
+          }}
         >
           <span class={selectedOption().color}>{selectedOption().label}</span>
           <ChevronDown class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
@@ -91,7 +104,8 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
                 <DropdownMenu.Item
                   data-testid={`recall-eval-option-${option.value || "not-set"}`}
                   class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                  onSelect={() => props.onChange(option.value)}
+                  onSelect={() => handleSelect(option.value)}
+                  closeOnSelect={true}
                 >
                   <span class={option.color}>{option.label}</span>
                 </DropdownMenu.Item>
