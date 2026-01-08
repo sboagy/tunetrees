@@ -29,6 +29,8 @@ import {
   getDefaultFieldVisibility,
   PracticeControlBanner,
 } from "../../components/practice";
+import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
+import { RepertoireEmptyState } from "../../components/repertoire";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { dailyPracticeQueue } from "../../lib/db/schema";
@@ -71,8 +73,10 @@ const PracticeIndex: Component = () => {
     remoteSyncDownCompletionVersion,
     initialSyncComplete,
     syncPracticeScope,
+    incrementRepertoireListChanged,
   } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
+  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
 
   // Get current user's local database ID from user_profile
   const [userId] = createResource(
@@ -701,6 +705,33 @@ const PracticeIndex: Component = () => {
     navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
+  const renderPracticeFallback = () => {
+    if (initialSyncComplete() && !currentPlaylistId()) {
+      return (
+        <RepertoireEmptyState
+          title="Practice needs a repertoire"
+          description="Create or select a repertoire to build your daily practice queue."
+          primaryAction={{
+            label: "Create repertoire",
+            onClick: () => setShowPlaylistDialog(true),
+          }}
+          secondaryAction={{
+            label: "Open Repertoire tab",
+            onClick: () => navigate("/?tab=repertoire"),
+          }}
+        />
+      );
+    }
+
+    return (
+      <div class="flex items-center justify-center h-full">
+        <p class="text-gray-500 dark:text-gray-400">
+          Loading practice queue...
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* Date Rollover Banner - appears when practice date changes */}
@@ -734,13 +765,7 @@ const PracticeIndex: Component = () => {
             !userId.loading &&
             userId()
           }
-          fallback={
-            <div class="flex items-center justify-center h-full">
-              <p class="text-gray-500 dark:text-gray-400">
-                Loading practice queue... (top)
-              </p>
-            </div>
-          }
+          fallback={renderPracticeFallback()}
         >
           <Show
             when={!flashcardMode()}
@@ -770,6 +795,17 @@ const PracticeIndex: Component = () => {
           </Show>
         </Show>
       </div>
+
+      <Show when={showPlaylistDialog()}>
+        <PlaylistEditorDialog
+          isOpen={showPlaylistDialog()}
+          onClose={() => setShowPlaylistDialog(false)}
+          onSaved={() => {
+            incrementRepertoireListChanged();
+            setShowPlaylistDialog(false);
+          }}
+        />
+      </Show>
     </div>
   );
 };
