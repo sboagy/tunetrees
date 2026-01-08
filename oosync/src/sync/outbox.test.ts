@@ -11,7 +11,8 @@ import {
   drizzle,
 } from "drizzle-orm/better-sqlite3";
 import { beforeEach, describe, expect, it } from "vitest";
-import { applyMigrations } from "../services/test-schema-loader";
+import { applyMigrations } from "../../../src/lib/services/test-schema-loader";
+import { ensureSyncRuntimeConfigured } from "../../../src/lib/sync/runtime-config";
 import {
   backfillOutboxForTable,
   clearOldOutboxItems,
@@ -25,6 +26,8 @@ import {
   markOutboxPermanentlyFailed,
   parseRowId,
 } from "./outbox";
+
+ensureSyncRuntimeConfigured();
 
 // Test database setup
 let db: BetterSQLite3Database;

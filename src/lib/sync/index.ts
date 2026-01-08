@@ -1,22 +1,36 @@
 /**
- * Sync Module
+ * Sync Module - Re-export Layer
  *
- * Exports sync-related functions and types.
- * NOTE: sync_queue is deprecated. Use sync_push_queue (trigger-based) instead.
+ * Temporary re-export layer for backward compatibility.
+ * All sync functionality has been moved to oosync/src/sync/.
+ *
+ * TODO: Remove this re-export layer after all imports have been migrated to use
+ * `import { ... } from "@oosync"` or `import { ... } from "oosync/src/sync/..."`
  *
  * @module lib/sync
  */
 
-export { clearOldOutboxItems, clearSyncOutbox, getOutboxStats } from "./outbox";
+import "./runtime-config";
+
+// Re-export everything from the new oosync location
+export {
+  SyncEngine,
+  SyncService,
+  SyncInProgressError,
+  startSyncWorker,
+  RealtimeManager,
+  clearOldOutboxItems,
+  clearSyncOutbox,
+  getOutboxStats,
+  getFailedOutboxItems,
+  retryOutboxItem,
+} from "@oosync/sync";
+
 export type {
   SyncableTable,
   SyncOperation,
   SyncStatus,
-} from "./queue";
+  SyncResult,
+} from "@oosync/sync";
 
-export {
-  SyncInProgressError,
-  type SyncResult,
-  SyncService,
-  startSyncWorker,
-} from "./service";
+export { ensureSyncRuntimeConfigured } from "./runtime-config";

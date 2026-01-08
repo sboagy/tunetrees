@@ -26,7 +26,7 @@ The `legacy/` and `archive/` directories are reference only—never modify for n
 ## Architecture & Stack Overview (Condensed)
 
 Frontend: SolidJS 1.8+, Vite 5, Tailwind, TanStack Solid Table, Kobalte, shadcn-solid, Lucide icons.
-Backend/Auth: Supabase Postgres + Auth + Realtime; local offline DB: SQLite WASM + Drizzle. Sync layer: local writes → queue → Supabase; Supabase Realtime pushes remote changes back into local DB.
+Backend/Auth: Supabase Postgres + Auth + Realtime; local offline DB: SQLite WASM + Drizzle. **Sync layer** (`oosync/src/sync/`): local writes → queue → Supabase; Supabase Realtime pushes remote changes back into local DB.
 Scheduling: FSRS (client) with SM2 fallback.
 PWA: vite-plugin-pwa + Workbox; deploy via Cloudflare Pages.
 External libs: abcjs (notation wrapper), jodit (rich text editor wrapper).
@@ -56,6 +56,7 @@ Auth context (see frontend for UI binding): maintain `user` signal; subscribe to
 - UI specifics (navigation, theming, layout density, responsive tables): `src/AGENTS.md`.
 - Unit testing guidance (Vitest): `tests/AGENTS.md`.
 - E2E testing guidance (Playwright): `e2e/AGENTS.md`.
+- Sync engine & infrastructure (schema-agnostic library): `oosync/AGENTS.md`.
 - Schema & invariants (PracticeRecord uniqueness, view sync): `tunetrees/models/AGENTS.md`.
 - Backend query/service rules (SQLAlchemy 2.0 style, avoiding N+1, integration with scheduling): `tunetrees/app/AGENTS.md`.
 - SQL view maintenance & migrations: `sql_scripts/AGENTS.md`.

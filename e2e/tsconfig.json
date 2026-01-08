@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.app.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node", "@playwright/test"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "./**/*.ts",
+    "../src/**/*.ts",
+    "../shared/**/*.ts",
+    "../oosync/src/**/*.ts"
+  ]
+}

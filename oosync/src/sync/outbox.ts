@@ -8,18 +8,43 @@
  * @module lib/sync/outbox
  */
 
-import {
-  getPrimaryKey,
-  type SyncableTableName,
-  TABLE_REGISTRY,
-} from "@sync-schema/table-meta";
+import { getPrimaryKey } from "../shared/table-meta";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import type { SQLiteTableWithColumns } from "drizzle-orm/sqlite-core";
-import * as localSchema from "../../../drizzle/schema-sqlite";
-import type { SqliteDatabase } from "../db/client-sqlite";
+import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import { toCamelCase } from "./casing";
+import {
+  getSyncRuntime,
+  type SqliteDatabase,
+  type SyncPushQueueTable,
+  type SyncableTableName,
+} from "./runtime-context";
 
-const { syncPushQueue } = localSchema;
+function getRuntime() {
+  const runtime = getSyncRuntime();
+  const { schema, syncPushQueue, localSchema } = runtime;
+  const { tableToSchemaKey } = schema;
+  return {
+    runtime,
+    schema,
+    tableRegistry: schema.tableRegistry,
+    syncPushQueue,
+    localSchema,
+    tableToSchemaKey,
+  } as const;
+}
+
+function getSyncPushQueueTable(): SyncPushQueueTable {
+  return getRuntime().syncPushQueue;
+}
+
+function getDrizzleTableFromSchema(
+  tableName: string
+): AnySQLiteTable | undefined {
+  const { localSchema, tableToSchemaKey } = getRuntime();
+  const schemaKey = tableToSchemaKey[tableName];
+  if (!schemaKey) return undefined;
+  return (localSchema as Record<string, AnySQLiteTable>)[schemaKey];
+}
 
 function randomHexId(bytesLength = 16): string {
   const bytes = new Uint8Array(bytesLength);
@@ -65,18 +90,20 @@ export async function getPendingOutboxItems(
   db: SqliteDatabase,
   limit = 100
 ): Promise<OutboxItem[]> {
+  const queue = getSyncPushQueueTable();
   const items = await db
     .select()
-    .from(syncPushQueue)
-    .where(eq(syncPushQueue.status, "pending"))
-    .orderBy(asc(syncPushQueue.changedAt))
+    .from(queue)
+    .where(eq(queue.status, "pending"))
+    .orderBy(asc(queue.changedAt))
     .limit(limit);
 
-  return items;
+  return items as OutboxItem[];
 }
 
 function isSyncableTableName(value: string): value is SyncableTableName {
-  return value in TABLE_REGISTRY;
+  const { tableRegistry } = getRuntime();
+  return value in tableRegistry;
 }
 
 function buildCompositeRowId(
@@ -106,7 +133,9 @@ export async function backfillOutboxForTable(
   sinceIso: string,
   deviceId?: string
 ): Promise<number> {
-  const meta = TABLE_REGISTRY[tableName];
+  const { tableRegistry } = getRuntime();
+  const queue = getSyncPushQueueTable();
+  const meta = tableRegistry[tableName];
   if (!meta?.supportsIncremental) {
     return 0;
   }
@@ -116,7 +145,7 @@ export async function backfillOutboxForTable(
     return 0;
   }
 
-  const primaryKey = getPrimaryKey(tableName);
+  const primaryKey = getPrimaryKey(tableRegistry, tableName);
   const pkCols = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
   const selectCols = pkCols.map((c) => `"${c}"`).join(", ");
 
@@ -148,33 +177,31 @@ export async function backfillOutboxForTable(
   const rowIds = rows
     .map((row) => {
       if (Array.isArray(primaryKey)) {
-        return buildCompositeRowId(primaryKey, row);
+        return buildCompositeRowId([...primaryKey], row);
       }
-      const value = row[primaryKey];
-      return typeof value === "undefined" || value === null
-        ? ""
-        : String(value);
+      if (typeof primaryKey === "string") {
+        const value = row[primaryKey];
+        return typeof value === "undefined" || value === null
+          ? ""
+          : String(value);
+      }
+      return "";
     })
     .filter((id) => id.length > 0);
 
   if (rowIds.length === 0) return 0;
 
   const existing = await db
-    .select({ rowId: syncPushQueue.rowId })
-    .from(syncPushQueue)
-    .where(
-      and(
-        eq(syncPushQueue.tableName, tableName),
-        inArray(syncPushQueue.rowId, rowIds)
-      )
-    );
+    .select({ rowId: queue.rowId })
+    .from(queue)
+    .where(and(eq(queue.tableName, tableName), inArray(queue.rowId, rowIds)));
 
   const existingIds = new Set(existing.map((e) => e.rowId));
   const missingIds = rowIds.filter((id) => !existingIds.has(id));
   if (missingIds.length === 0) return 0;
 
   const nowIso = new Date().toISOString();
-  await db.insert(syncPushQueue).values(
+  await db.insert(queue).values(
     missingIds.map((rowId) => ({
       id: randomHexId(),
       tableName,
@@ -197,11 +224,12 @@ export async function backfillOutboxSince(
   tableNames?: string[],
   deviceId?: string
 ): Promise<number> {
+  const { tableRegistry } = getRuntime();
   const targets: SyncableTableName[] = (
-    tableNames ?? Object.keys(TABLE_REGISTRY)
+    tableNames ?? Object.keys(tableRegistry)
   )
     .filter(isSyncableTableName)
-    .filter((t) => TABLE_REGISTRY[t]?.supportsIncremental);
+    .filter((t) => tableRegistry[t]?.supportsIncremental);
 
   let total = 0;
   for (const tableName of targets) {
@@ -220,10 +248,11 @@ export async function markOutboxInProgress(
   db: SqliteDatabase,
   id: string
 ): Promise<void> {
+  const queue = getSyncPushQueueTable();
   await db
-    .update(syncPushQueue)
+    .update(queue)
     .set({ status: "in_progress" })
-    .where(eq(syncPushQueue.id, id));
+    .where(eq(queue.id, id));
 }
 
 /**
@@ -237,7 +266,8 @@ export async function markOutboxCompleted(
   db: SqliteDatabase,
   id: string
 ): Promise<void> {
-  await db.delete(syncPushQueue).where(eq(syncPushQueue.id, id));
+  const queue = getSyncPushQueueTable();
+  await db.delete(queue).where(eq(queue.id, id));
 }
 
 /**
@@ -254,14 +284,15 @@ export async function markOutboxFailed(
   errorMessage: string,
   currentAttempts: number
 ): Promise<void> {
+  const queue = getSyncPushQueueTable();
   await db
-    .update(syncPushQueue)
+    .update(queue)
     .set({
       status: "pending", // Back to pending for retry
       attempts: currentAttempts + 1,
       lastError: errorMessage,
     })
-    .where(eq(syncPushQueue.id, id));
+    .where(eq(queue.id, id));
 }
 
 /**
@@ -276,14 +307,15 @@ export async function markOutboxPermanentlyFailed(
   id: string,
   errorMessage: string
 ): Promise<void> {
+  const queue = getSyncPushQueueTable();
   await db
-    .update(syncPushQueue)
+    .update(queue)
     .set({
       status: "failed",
       lastError: errorMessage,
       syncedAt: new Date().toISOString(),
     })
-    .where(eq(syncPushQueue.id, id));
+    .where(eq(queue.id, id));
 }
 
 /**
@@ -298,14 +330,15 @@ export async function getFailedOutboxItems(
   limit = 100
 ): Promise<OutboxItem[]> {
   const { desc } = await import("drizzle-orm");
+  const queue = getSyncPushQueueTable();
   const items = await db
     .select()
-    .from(syncPushQueue)
-    .where(eq(syncPushQueue.status, "failed"))
-    .orderBy(desc(syncPushQueue.changedAt))
+    .from(queue)
+    .where(eq(queue.status, "failed"))
+    .orderBy(desc(queue.changedAt))
     .limit(limit);
 
-  return items;
+  return items as OutboxItem[];
 }
 
 /**
@@ -318,13 +351,14 @@ export async function retryOutboxItem(
   db: SqliteDatabase,
   id: string
 ): Promise<void> {
+  const queue = getSyncPushQueueTable();
   await db
-    .update(syncPushQueue)
+    .update(queue)
     .set({
       status: "pending",
       lastError: null,
     })
-    .where(eq(syncPushQueue.id, id));
+    .where(eq(queue.id, id));
 }
 
 /**
@@ -405,23 +439,24 @@ export async function clearOldOutboxItems(
   db: SqliteDatabase,
   olderThanMs: number = 7 * 24 * 60 * 60 * 1000 // 7 days default
 ): Promise<void> {
+  const queue = getSyncPushQueueTable();
   const cutoff = new Date(Date.now() - olderThanMs).toISOString();
 
   // Get failed items older than cutoff and delete them
   const failedItems = await db
-    .select({ id: syncPushQueue.id })
-    .from(syncPushQueue)
-    .where(eq(syncPushQueue.status, "failed"));
+    .select({ id: queue.id })
+    .from(queue)
+    .where(eq(queue.status, "failed"));
 
   for (const item of failedItems) {
     // Check timestamp manually since Drizzle lt() can be tricky with strings
     const fullItem = await db
       .select()
-      .from(syncPushQueue)
-      .where(eq(syncPushQueue.id, item.id))
+      .from(queue)
+      .where(eq(queue.id, item.id))
       .limit(1);
     if (fullItem[0] && fullItem[0].changedAt < cutoff) {
-      await db.delete(syncPushQueue).where(eq(syncPushQueue.id, item.id));
+      await db.delete(queue).where(eq(queue.id, item.id));
     }
   }
 }
@@ -436,37 +471,12 @@ export async function clearOldOutboxItems(
  * @param db - SQLite database instance
  */
 export async function clearSyncOutbox(db: SqliteDatabase): Promise<void> {
-  await db.delete(syncPushQueue);
+  const queue = getSyncPushQueueTable();
+  await db.delete(queue);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyDrizzleTable = SQLiteTableWithColumns<any>;
-
-/**
- * Map from snake_case table name to Drizzle table object.
- * Only includes syncable tables (not sync_queue, sync_push_queue, or local-only tables).
- */
-const TABLE_MAP: Record<string, AnyDrizzleTable> = {
-  daily_practice_queue: localSchema.dailyPracticeQueue,
-  genre: localSchema.genre,
-  genre_tune_type: localSchema.genreTuneType,
-  instrument: localSchema.instrument,
-  note: localSchema.note,
-  playlist: localSchema.playlist,
-  playlist_tune: localSchema.playlistTune,
-  practice_record: localSchema.practiceRecord,
-  prefs_scheduling_options: localSchema.prefsSchedulingOptions,
-  prefs_spaced_repetition: localSchema.prefsSpacedRepetition,
-  reference: localSchema.reference,
-  tab_group_main_state: localSchema.tabGroupMainState,
-  table_state: localSchema.tableState,
-  table_transient_data: localSchema.tableTransientData,
-  tag: localSchema.tag,
-  tune: localSchema.tune,
-  tune_override: localSchema.tuneOverride,
-  tune_type: localSchema.tuneType,
-  user_profile: localSchema.userProfile,
-};
+type AnyDrizzleTable = AnySQLiteTable;
 
 /**
  * Get the Drizzle table object for a table name.
@@ -477,7 +487,7 @@ const TABLE_MAP: Record<string, AnyDrizzleTable> = {
 export function getDrizzleTable(
   tableName: string
 ): AnyDrizzleTable | undefined {
-  return TABLE_MAP[tableName];
+  return getDrizzleTableFromSchema(tableName);
 }
 
 /**
@@ -502,7 +512,8 @@ export async function fetchLocalRowByPrimaryKey(
     throw new Error(`Unknown table: ${tableName}`);
   }
 
-  const primaryKey = getPrimaryKey(tableName);
+  const { tableRegistry } = getRuntime();
+  const primaryKey = getPrimaryKey(tableRegistry, tableName);
   const parsedRowId = parseRowId(rowId);
 
   // Fetch all rows from table and filter in memory.

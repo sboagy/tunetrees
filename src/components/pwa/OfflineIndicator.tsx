@@ -19,7 +19,7 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getOutboxStats } from "@/lib/sync/outbox";
+import { getOutboxStats } from "@/lib/sync";
 
 export const OfflineIndicator: Component = () => {
   const { localDb, isAnonymous } = useAuth();

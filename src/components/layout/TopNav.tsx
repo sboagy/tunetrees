@@ -29,7 +29,7 @@ import {
   getSelectedPlaylistId,
   setSelectedPlaylistId,
 } from "../../lib/services/playlist-service";
-import { getOutboxStats } from "../../lib/sync/outbox";
+import { getOutboxStats } from "@/lib/sync";
 import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
 import {
   AlertDialog,

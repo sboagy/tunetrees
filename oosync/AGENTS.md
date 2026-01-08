@@ -9,8 +9,7 @@ This file inherits global policies from `AGENTS.md`. Do not duplicate global rul
 `oosync` = **Opinionated Offline Sync**:
 
 - Opinionated PWA sync library for (Supabase, Drizzle, SQLite, Cloudflare Worker)
-- Source of truth is the **local Postgres database** (typically a local Supabase instance during dev)
-- Provides a code generator that produces:
+- Source of truth is the **local Postgres database** (typically a local Supabase instance during dev)- **Core sync engine** (`oosync/src/sync/`) handles bidirectional sync between local SQLite and Supabase- Provides a code generator that produces:
   - SQLite WASM + Drizzle schemas
   - shared sync metadata infrastructure (table registry/meta)
   - worker-side schema/config artifacts

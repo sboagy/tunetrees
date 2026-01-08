@@ -14,7 +14,7 @@ import {
   snakifyKeysFast,
   toCamelCase,
   toSnakeCase,
-} from "../../../src/lib/sync/casing";
+} from "../../../oosync/src/sync/casing";
 
 describe("toCamelCase", () => {
   it("converts simple snake_case to camelCase", () => {
