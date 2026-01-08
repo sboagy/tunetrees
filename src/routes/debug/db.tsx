@@ -13,7 +13,7 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { supabase } from "@/lib/supabase/client";
-import { getFailedOutboxItems, retryOutboxItem } from "@/lib/sync/outbox";
+import { getFailedOutboxItems, retryOutboxItem } from "@/lib/sync";
 
 interface QueryResult {
   columns: string[];

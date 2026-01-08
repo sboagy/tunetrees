@@ -1,0 +1,51 @@
+[
+	{
+		"resource": "/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/engine.ts",
+		"owner": "typescript",
+		"code": "2345",
+		"severity": 8,
+		"message": "Argument of type 'string | readonly string[]' is not assignable to parameter of type 'string'.\n  Type 'readonly string[]' is not assignable to type 'string'.",
+		"source": "ts",
+		"startLineNumber": 469,
+		"startColumn": 49,
+		"endLineNumber": 469,
+		"endColumn": 51,
+		"origin": "extHost1"
+	},
+	{
+		"resource": "/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/engine.ts",
+		"owner": "typescript",
+		"code": "2345",
+		"severity": 8,
+		"message": "Argument of type 'string | readonly string[]' is not assignable to parameter of type 'string'.\n  Type 'readonly string[]' is not assignable to type 'string'.",
+		"source": "ts",
+		"startLineNumber": 491,
+		"startColumn": 48,
+		"endLineNumber": 491,
+		"endColumn": 57,
+		"origin": "extHost1"
+	},
+	{
+		"resource": "/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/src/lib/sync/runtime-config.ts",
+		"owner": "typescript",
+		"code": "2322",
+		"severity": 8,
+		"message": "Type '(db: Database, backup: import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/src/lib/db/outbox-backup\").IOutboxBackup) => { applied: number; skipped: number; errors: string[]; }' is not assignable to type '(db: Database, backup: import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/runtime-context\").IOutboxBackup) => { applied: number; skipped: number; errors: string[]; }'.\n  Types of parameters 'backup' and 'backup' are incompatible.\n    Type 'import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/runtime-context\").IOutboxBackup' is not assignable to type 'import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/src/lib/db/outbox-backup\").IOutboxBackup'.\n      Types of property 'items' are incompatible.\n        Type 'import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/runtime-context\").IOutboxBackupItem[]' is not assignable to type 'import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/src/lib/db/outbox-backup\").IOutboxBackupItem[]'.\n          Type 'import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/runtime-context\").IOutboxBackupItem' is not assignable to type 'import(\"/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/src/lib/db/outbox-backup\").IOutboxBackupItem'.\n            Types of property 'tableName' are incompatible.\n              Type 'string' is not assignable to type '\"user_profile\" | \"practice_record\" | \"playlist_tune\" | \"tune\" | \"genre_tune_type\" | \"daily_practice_queue\" | \"genre\" | \"instrument\" | \"note\" | \"playlist\" | \"prefs_scheduling_options\" | ... 7 more ... | \"tune_type\"'.",
+		"source": "ts",
+		"startLineNumber": 49,
+		"startColumn": 5,
+		"endLineNumber": 49,
+		"endColumn": 23,
+		"relatedInformation": [
+			{
+				"startLineNumber": 60,
+				"startColumn": 3,
+				"endLineNumber": 60,
+				"endColumn": 21,
+				"message": "The expected type comes from property 'replayOutboxBackup' which is declared here on type 'SyncRuntime'",
+				"resource": "/Users/sboag/gittt/tunetrees.worktrees/iss-358-sync-to-oosync/oosync/src/sync/runtime-context.ts"
+			}
+		],
+		"origin": "extHost1"
+	}
+]

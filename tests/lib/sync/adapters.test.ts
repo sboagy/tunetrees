@@ -6,6 +6,7 @@
 
 import { SYNCABLE_TABLES } from "@sync-schema/table-meta";
 import { beforeEach, describe, expect, it } from "vitest";
+import { ensureSyncRuntimeConfigured } from "../../../src/lib/sync/runtime-config";
 import {
   batchToLocal,
   batchToRemote,
@@ -14,7 +15,9 @@ import {
   getAdapter,
   getRegisteredTables,
   hasAdapter,
-} from "../../../src/lib/sync/adapters";
+} from "../../../oosync/src/sync/adapters";
+
+ensureSyncRuntimeConfigured();
 
 beforeEach(() => {
   clearAdapterCache();
