@@ -109,7 +109,9 @@ test.describe("Anonymous User Data Functionality", () => {
     // Navigate to Catalog tab and add a tune
     await ttPage.navigateToTab("catalog");
 
-    await page.waitForTimeout(1000);
+    // Wait for catalog grid to be ready
+    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Select and add first tune
     const firstTuneCheckbox = ttPage.catalogGrid
@@ -117,32 +119,52 @@ test.describe("Anonymous User Data Functionality", () => {
       .first()
       .locator('input[type="checkbox"]');
     await firstTuneCheckbox.click();
+
+    await expect(ttPage.catalogAddToRepertoireButton).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(ttPage.catalogAddToRepertoireButton).toBeEnabled({
+      timeout: 10000,
+    });
     await ttPage.catalogAddToRepertoireButton.click();
-    await page.waitForTimeout(1000);
+
+    // Wait until selection is cleared (checkbox becomes unchecked)
+    await expect(firstTuneCheckbox).not.toBeChecked({ timeout: 15000 });
 
     // Navigate to Repertoire to verify
     await ttPage.repertoireTab.click();
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
 
-    const countBefore = await ttPage.repertoireGrid
-      .locator("tbody tr[data-index]")
-      .count();
+    const repertoireRows = ttPage.repertoireGrid.locator("tbody tr[data-index]");
+    await expect.poll(async () => repertoireRows.count(), {
+      timeout: 15000,
+      intervals: [100, 200, 500, 1000],
+    }).toBeGreaterThan(0);
+
+    const countBefore = await repertoireRows.count();
     expect(countBefore).toBeGreaterThan(0);
 
     // Refresh the page
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+
+    // Onboarding can appear with a delayed check; dismiss if it does.
+    await ttPage.dismissOnboardingIfPresent();
 
     // Navigate back to Repertoire
     await ttPage.repertoireTab.click();
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
 
+    // Wait for the grid to rehydrate from local DB
+    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
+
     // Verify count is preserved
-    const countAfter = await ttPage.repertoireGrid
-      .locator("tbody tr[data-index]")
-      .count();
-    expect(countAfter).toBe(countBefore);
+    await expect
+      .poll(async () => repertoireRows.count(), {
+        timeout: 20000,
+        intervals: [200, 500, 1000],
+      })
+      .toBe(countBefore);
   });
 
   test("4.4 Reference data (genres, types) available for anonymous users", async ({

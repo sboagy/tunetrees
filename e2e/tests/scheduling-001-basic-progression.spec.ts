@@ -98,12 +98,8 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
         row.getByRole("cell", { name: TEST_TUNE_BANISH_TITLE })
       ).toBeVisible({ timeout: 10000 });
 
-      const evalDropdown = row.locator("[data-testid^='recall-eval-']");
-      await expect(evalDropdown).toBeVisible({ timeout: 5000 });
-      await evalDropdown.click();
-      await page.waitForTimeout(200);
-      await page.getByTestId(`recall-eval-option-${rating}`).click();
-      await page.waitForTimeout(300);
+      // Use the page-object helper to avoid menu detachment races during rerenders.
+      await ttPage.setRowEvaluation(row, rating);
       await ttPage.submitEvaluationsButton.click();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(1200); // allow sync & view update

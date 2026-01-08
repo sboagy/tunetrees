@@ -1562,8 +1562,27 @@ export class TuneTreesPage {
   }
 
   async openFlashcardFieldsMenu() {
-    await this.practiceColumnsButton.click();
-    await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 2000 });
+    // Mobile Chrome can be slow to attach/render the menu; retry a couple times.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await this.practiceColumnsButton.scrollIntoViewIfNeeded();
+      await expect(this.practiceColumnsButton).toBeVisible({ timeout: 5000 });
+      await expect(this.practiceColumnsButton).toBeEnabled({ timeout: 5000 });
+      await this.practiceColumnsButton.click();
+
+      try {
+        await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });
+        return;
+      } catch {
+        // Back out and retry.
+        try {
+          await this.page.keyboard.press("Escape");
+        } catch {}
+        await this.page.waitForTimeout(300);
+      }
+    }
+
+    // Last attempt: throw a useful assertion error.
+    await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });
   }
 
   async toggleFlashcardField(
@@ -1580,9 +1599,17 @@ export class TuneTreesPage {
       if (isChecked !== desired) {
         await checkbox.click();
       }
+      if (desired) {
+        await expect(checkbox).toBeChecked({ timeout: 3000 });
+      } else {
+        await expect(checkbox).not.toBeChecked({ timeout: 3000 });
+      }
     }
     // Click outside to close menu (click Columns/Fields button again)
     await this.practiceColumnsButton.click();
+    await expect(this.flashcardFieldsMenu)
+      .toBeHidden({ timeout: 5000 })
+      .catch(() => undefined);
   }
 
   async getFlashcardCounterText(): Promise<string> {
