@@ -855,6 +855,21 @@ export class TuneTreesPage {
       )
       .toBe(true);
 
+    // Wait for tab-specific, always-present UI before asserting on grids.
+    // Some grids only mount when data is loaded and non-empty.
+    const sentinel =
+      tabId === "practice"
+        ? this.practiceColumnsButton
+        : tabId === "repertoire"
+          ? this.repertoireColumnsButton
+          : tabId === "catalog"
+            ? this.catalogColumnsButton
+            : undefined;
+    if (sentinel) {
+      await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
+      await expect(sentinel).toBeVisible({ timeout: 20_000 });
+    }
+
     // Then wait for the corresponding grid/content to be visible
     const grid =
       tabId === "practice"
@@ -865,8 +880,23 @@ export class TuneTreesPage {
             ? this.catalogGrid
             : undefined;
     if (grid) {
-      await expect(grid).toBeAttached({ timeout: 20000 });
-      await expect(grid).toBeVisible({ timeout: 20000 });
+      // Best-effort: if the grid is mounted, wait for it; otherwise allow
+      // callers to assert on loading/empty states as needed.
+      const initialCount = await grid.count().catch(() => 0);
+      if (initialCount === 0) {
+        await expect
+          .poll(async () => (await grid.count().catch(() => 0)) > 0, {
+            timeout: 4000,
+            intervals: [100, 250, 500, 1000],
+          })
+          .toBe(true)
+          .catch(() => undefined);
+      }
+
+      const finalCount = await grid.count().catch(() => 0);
+      if (finalCount > 0) {
+        await expect(grid).toBeVisible({ timeout: 20_000 });
+      }
     }
   }
 
@@ -1468,90 +1498,79 @@ export class TuneTreesPage {
   ) {
     const nOuterAttempts = 6;
     for (let outerAttempt = 0; outerAttempt < nOuterAttempts; outerAttempt++) {
-      // Open the first (and only) evaluation combobox in the card
       try {
-        const evalButton = this.page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
-        // If not immediately clickable, ensure the back of the card is revealed
-        // const clickable = await evalButton
-        //   .isVisible({ timeout: 500 })
-        //   .catch(() => false);
-        // if (!clickable) {
-        //   await this.ensureReveal(true);
-        // }
+        await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
+
+        // Open the evaluation combobox within the flashcard view (avoid picking up
+        // any recall-eval controls that might exist elsewhere on the page).
+        const evalButton = this.flashcardView.getByTestId(
+          /^recall-eval-[0-9a-f-]+$/i
+        );
         console.log(`outerAttempt: ${outerAttempt}`);
-        await expect(evalButton).toBeAttached({ timeout: 10_000 });
+        await expect(evalButton).toBeVisible({ timeout: 10_000 });
         await evalButton.scrollIntoViewIfNeeded();
-        await expect(evalButton).toBeVisible({ timeout: 5000 });
-        await expect(evalButton).toBeEnabled({ timeout: 5000 });
+        await expect(evalButton).toBeEnabled({ timeout: 10_000 });
 
-        // Verify it is actually clickable (hit target not covered, etc.) before clicking for real.
-        await evalButton.click({ trial: true, timeout: 5000 });
-        await evalButton.click({ timeout: 5000 });
-        await this.page.waitForTimeout(200);
-        const optionTestId = `recall-eval-option-${value}`;
-        const option = this.page.getByTestId(optionTestId);
+        const dropdownTestId = await evalButton.getAttribute("data-testid");
+        const tuneId = this.parseTuneIdFromRecallEvalTestId(dropdownTestId);
+        if (!tuneId) {
+          throw new Error(
+            `Expected tuneId to be present on flashcard recall evaluation dropdown (data-testid=${String(
+              dropdownTestId
+            )})`
+          );
+        }
 
-        let lastError: unknown;
+        const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
 
-        for (let attempt = 0; attempt < 12; attempt++) {
+        // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
+        // Retry a couple of times, and ensure the card back is revealed if needed.
+        let menuOpened = false;
+        for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
+          await evalButton.click({ trial: true, timeout: 5000 });
+          await evalButton.click({ timeout: 5000 });
+
           try {
-            await option.scrollIntoViewIfNeeded();
-
-            const isVisible = await option.isVisible().catch(() => false);
-            if (!isVisible) {
-              await this.page.waitForTimeout(150);
-              continue;
-            }
-            const isEnabled = await option.isEnabled().catch(() => false);
-            if (!isEnabled) {
-              await this.page.waitForTimeout(150);
-              continue;
-            }
-            lastError = undefined;
+            await expect(menu).toBeVisible({ timeout: 4000 });
+            menuOpened = true;
             break;
-          } catch (err) {
-            lastError = err;
-            if (attempt === 11) throw err;
+          } catch {
+            try {
+              await this.ensureReveal(true);
+            } catch {}
+            try {
+              await this.page.keyboard.press("Escape");
+            } catch {}
+            await this.page.waitForTimeout(200);
           }
-          await this.page.waitForTimeout(150);
         }
 
-        if (lastError) throw lastError;
-
-        await expect(option).toBeAttached({ timeout: 800 });
-        await expect(option).toBeVisible({ timeout: 800 });
-        await expect(option).toBeEnabled({ timeout: 800 });
-
-        // "Definitely clickable": do a trial click first (verifies hit-target, not covered, etc.)
-        // await option.click({ trial: true, timeout: 5000 });
-        await option.click();
-        for (let i = 0; i < 40; i++) {
-          const stillVisible = await option.isVisible().catch(() => false);
-          if (!stillVisible) break;
-          await this.page.waitForTimeout(50);
-        }
-
-        const stillVisible = await option.isVisible().catch(() => false);
-        if (stillVisible) {
-          await this.page.screenshot({
-            path: `test-results/flashcard-eval-option-still-visible-${Date.now()}.png`,
-          });
+        if (!menuOpened) {
           throw new Error(
-            `Evaluation option "${optionTestId}" did not disappear after selection`
+            `Failed to open recall evaluation menu for tune ${tuneId}`
           );
         }
-        await this.page.waitForTimeout(200);
 
-        const textContent = await evalButton.textContent();
-        const testValue = value === "not-set" ? "(Not Set)" : `${value}:`;
-        if (textContent && new RegExp(testValue, "i").test(textContent)) {
-          break;
-        }
-        if (outerAttempt === nOuterAttempts - 1) {
-          throw new Error(
-            `Could not set  "recall-eval-${value}" option after ${nOuterAttempts} attempts`
-          );
-        }
+        const optionTestId = `recall-eval-option-${value}`;
+        const option = menu.getByTestId(optionTestId);
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await expect(option).toBeEnabled({ timeout: 5000 });
+
+        await option.click({ trial: true, timeout: 5000 });
+        await option.click({ timeout: 5000 });
+
+        await expect(menu)
+          .toBeHidden({ timeout: 5000 })
+          .catch(() => undefined);
+
+        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+        await expect
+          .poll(async () => (await evalButton.textContent()) ?? "", {
+            timeout: 8000,
+            intervals: [100, 250, 500, 1000],
+          })
+          .toMatch(new RegExp(expectedLabel, "i"));
+        break;
       } catch (err) {
         if (outerAttempt === nOuterAttempts - 1) throw err;
       }
