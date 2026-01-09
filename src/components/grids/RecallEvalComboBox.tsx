@@ -14,10 +14,14 @@
  * @module components/grids/RecallEvalComboBox
  */
 
-import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import { ChevronDown } from "lucide-solid";
 import type { Component } from "solid-js";
-import { For } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxTrigger,
+} from "../ui/combobox";
 
 interface RecallEvalComboBoxProps {
   tuneId: string;
@@ -32,6 +36,25 @@ interface RecallEvalComboBoxProps {
 export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   props
 ) => {
+  // NOTE: In the virtualized grid, the TanStack cell renderer does not
+  // necessarily re-run when the external open-state map updates.
+  // If we rely on a fully controlled `open={props.open}`, the Combobox may never
+  // visibly open (aria-expanded stays false) because the prop doesn't update
+  // synchronously.
+  //
+  // We therefore keep an internal open signal that updates immediately on
+  // `onOpenChange`, while still syncing to/from `props.open` when provided.
+  const [localOpen, setLocalOpen] = createSignal(props.open ?? false);
+
+  createEffect(() => {
+    // If the virtualized grid reuses this cell for a different tune, ensure we
+    // don't carry over any prior open state.
+    void props.tuneId;
+
+    if (props.open !== undefined) setLocalOpen(props.open);
+    else setLocalOpen(false);
+  });
+
   const options = [
     {
       value: "",
@@ -60,84 +83,96 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
     },
   ];
 
-  const selectedOption = () =>
-    options.find((opt) => opt.value === props.value) || options[0];
+  const selected = () =>
+    options.find((o) => o.value === props.value) ?? options[0];
 
-  // If we handle selection on pointerdown (to avoid click races), Kobalte may still
-  // emit onSelect as part of its internal interaction handling. Guard against
-  // double-firing onChange.
-  let ignoreNextSelect = false;
+  const selectedOption = () => selected();
 
-  const handleSelect = (value: string) => {
-    // Call onChange with the new value
-    props.onChange(value);
-    // If the dropdown is controlled, ensure it closes deterministically.
-    // (In uncontrolled mode, Kobalte will manage open state.)
-    props.onOpenChange?.(false);
-  };
+  const scrollSelectedIntoView = () => {
+    const content = document.querySelector(
+      `[data-testid="recall-eval-menu-${props.tuneId}"]`
+    ) as HTMLElement | null;
+    if (!content) return;
 
-  const handlePointerDownSelect = (e: PointerEvent, value: string) => {
-    // Commit selection on pointerdown so Playwright's click delay or fast
-    // re-renders don't prevent onSelect from firing.
-    e.preventDefault();
-    e.stopPropagation();
-    ignoreNextSelect = true;
-    handleSelect(value);
-    queueMicrotask(() => {
-      ignoreNextSelect = false;
-    });
+    const selectedItem = content.querySelector(
+      "[data-selected]"
+    ) as HTMLElement | null;
+
+    selectedItem?.scrollIntoView({ block: "center" });
   };
 
   return (
     <div class="relative inline-block w-full">
-      <DropdownMenu
-        // Control open state if provided to avoid unexpected closes on grid refresh
-        open={props.open}
-        onOpenChange={props.onOpenChange}
-        // Non-modal prevents aggressive focus stealing which can contribute to closes
-        modal={false}
-      >
-        <DropdownMenu.Trigger
-          data-testid={`recall-eval-${props.tuneId}`}
-          class="w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          onPointerDown={(e) => {
-            // Prevent event bubbling that could interfere with dropdown behavior
-            e.stopPropagation();
-          }}
-        >
-          <span class={selectedOption().color}>{selectedOption().label}</span>
-          <ChevronDown class="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" />
-        </DropdownMenu.Trigger>
+      <Combobox
+        options={options}
+        optionValue="value"
+        optionTextValue="label"
+        optionLabel="label"
+        value={selectedOption()}
+        onChange={(option) => {
+          const next = option?.value ?? "";
+          // Kobalte Combobox may emit the current value during open/close
+          // transitions; avoid staging/clearing unless it truly changed.
+          if (next === props.value) return;
+          props.onChange(next);
+        }}
+        open={localOpen()}
+        onOpenChange={(isOpen) => {
+          setLocalOpen(isOpen);
+          props.onOpenChange?.(isOpen);
 
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            data-testid={`recall-eval-menu-${props.tuneId}`}
-            class="z-50 mt-1 w-[var(--kb-dropdown-menu-trigger-width, var(--tt-ev-width, 100%))] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-72 overflow-auto"
-          >
-            <For each={options}>
-              {(option) => (
-                <DropdownMenu.Item
-                  data-testid={`recall-eval-option-${option.value || "not-set"}`}
-                  class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                  onPointerDown={(e) =>
-                    handlePointerDownSelect(e, option.value)
-                  }
-                  onSelect={() => {
-                    if (ignoreNextSelect) return;
-                    handleSelect(option.value);
-                  }}
-                  closeOnSelect={true}
-                >
-                  <span class={option.color}>{option.label}</span>
-                </DropdownMenu.Item>
-              )}
-            </For>
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu>
+          if (isOpen) {
+            queueMicrotask(() => {
+              requestAnimationFrame(() => {
+                scrollSelectedIntoView();
+              });
+            });
+          }
+        }}
+        // Non-modal prevents aggressive focus stealing (important in the grid).
+        modal={false}
+        closeOnSelection={true}
+        placement="bottom-start"
+        gutter={0}
+        sameWidth={true}
+        itemComponent={(itemProps) => {
+          const raw = itemProps.item.rawValue as unknown;
+
+          const option =
+            raw &&
+            typeof raw === "object" &&
+            "value" in raw &&
+            "label" in raw &&
+            "color" in raw
+              ? (raw as (typeof options)[number])
+              : (options.find((o) => o.value === String(raw ?? "")) ??
+                options[0]);
+
+          const optionValue = option.value;
+
+          return (
+            <ComboboxItem
+              item={itemProps.item}
+              data-testid={`recall-eval-option-${optionValue === "" ? "not-set" : optionValue}`}
+              class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            >
+              <span class={option.color}>{option.label}</span>
+            </ComboboxItem>
+          );
+        }}
+      >
+        <ComboboxTrigger
+          data-testid={`recall-eval-${props.tuneId}`}
+          class="h-auto w-full flex items-center justify-between px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+        >
+          <span class={selected().color}>{selected().label}</span>
+        </ComboboxTrigger>
+
+        <ComboboxContent
+          data-testid={`recall-eval-menu-${props.tuneId}`}
+          class="z-50 w-[var(--kb-popper-anchor-width, var(--tt-ev-width, 100%))] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-72 overflow-auto"
+        />
+      </Combobox>
     </div>
   );
 };
