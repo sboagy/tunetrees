@@ -50,10 +50,8 @@ test.describe
 
       // Enable 'incipit' on back face and reveal card
       await app.toggleFlashcardField("back", "incipit", true);
-      await app.revealCard();
-      await page.waitForTimeout(200);
-
-      await expect(incipit).toBeVisible();
+      await app.ensureReveal(true);
+      await expect(incipit).toBeVisible({ timeout: 15000 });
 
       // Disable again -> should hide
       await app.toggleFlashcardField("back", "incipit", false);

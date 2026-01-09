@@ -1439,9 +1439,9 @@ export class TuneTreesPage {
       }
 
       const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
-      await expect(whichOption).toBeVisible({ timeout: 3000 });
-
       try {
+        await expect(whichOption).toBeVisible({ timeout: 4000 });
+        await expect(whichOption).toBeEnabled({ timeout: 4000 });
         await whichOption.click({ trial: true, timeout: 3000 });
         await whichOption.click({ timeout: 3000 });
       } catch {

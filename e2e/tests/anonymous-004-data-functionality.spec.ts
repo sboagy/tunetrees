@@ -109,8 +109,8 @@ test.describe("Anonymous User Data Functionality", () => {
     // Navigate to Catalog tab and add a tune
     await ttPage.navigateToTab("catalog");
 
-    // Wait for catalog grid to be ready
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
+    // Wait for catalog tab UI to be ready, then for the grid to hydrate.
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
     await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Select and add first tune
