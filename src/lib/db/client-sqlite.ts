@@ -16,7 +16,6 @@ import initSqlJs from "sql.js";
 // Falls back to locateFile default for ancillary files if any.
 // eslint-disable-next-line import/no-unresolved
 import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
-import * as relations from "../../../drizzle/relations";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews, recreateViews } from "./init-views";
 import {
@@ -375,7 +374,7 @@ export async function initializeDb(
         diagLog(
           `✅ Loaded existing SQLite database from IndexedDB (v${CURRENT_DB_VERSION})`
         );
-        drizzleDb = drizzle(sqliteDb, { schema: { ...schema, ...relations } });
+        drizzleDb = drizzle(sqliteDb, { schema: { ...schema } });
         diagLog("🔄 Recreating views with latest definitions...");
         await recreateViews(drizzleDb);
         diagLog("✅ Views recreated successfully");
@@ -437,7 +436,7 @@ export async function initializeDb(
         diagLog("✅ Applied all migrations");
         diagLog("✅ Created new SQLite database with schema");
         drizzleDb = drizzle(requireSqliteDb(), {
-          schema: { ...schema, ...relations },
+          schema: { ...schema },
         });
       }
 
@@ -1102,7 +1101,7 @@ export function getClientSqliteDebugState(): IClientSqliteDebugState {
 /**
  * Export schema for convenient imports
  */
-export { schema, relations };
+export { schema };
 
 /**
  * Type exports

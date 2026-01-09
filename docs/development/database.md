@@ -76,7 +76,9 @@ Persistence triggered by `persistDb()` after writes.
 
 ### Schema
 
-Defined in `drizzle/schema-postgres.ts` with identical structure to SQLite.
+The Supabase Postgres schema is the source of truth and is managed via SQL migrations in `supabase/migrations/`.
+
+The sync worker uses a generated Drizzle schema at `worker/src/generated/schema-postgres.generated.ts` (do not hand-edit).
 
 Key differences:
 - Uses native UUID type
@@ -184,18 +186,17 @@ SQL
 
 ### Add a New Table
 
-1. Add to `drizzle/schema-sqlite.ts`
-2. Add to `drizzle/schema-postgres.ts`
-3. Run `npm run db:generate`
+1. Create a Supabase migration under `supabase/migrations/`
+2. Apply locally with `supabase db reset`
+3. Regenerate schema artifacts with `npm run codegen:schema`
 4. Add to sync table list in `src/lib/sync/types.ts`
-5. Create Supabase migration
 
 ### Add a New Column
 
-1. Update schema files
-2. Run `npm run db:generate`
-3. Update VIEW definitions if affected
-4. Handle migration for existing data
+1. Create/update a Supabase migration
+2. Apply locally with `supabase db reset`
+3. Regenerate schema artifacts with `npm run codegen:schema`
+4. Update VIEW definitions if affected
 
 ---
 

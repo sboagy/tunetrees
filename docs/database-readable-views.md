@@ -100,7 +100,7 @@ tableTransientData.userId → userProfile.supabaseUserId
 
 ### PostgreSQL Schema
 ```typescript
-// drizzle/schema-postgres.ts
+// worker/src/generated/schema-postgres.generated.ts (generated)
 tableTransientData.userId → userProfile.id
 ```
 
@@ -144,5 +144,6 @@ When adding/modifying tables referenced by these views:
 - **PostgreSQL Views**: `supabase/migrations/20250112000001_create_readable_views.sql`
 - **SQLite Views**: `src/lib/db/init-views.ts`
 - **SQLite Schema**: `drizzle/schema-sqlite.ts`
-- **PostgreSQL Schema**: `drizzle/schema-postgres.ts`
+- **PostgreSQL Schema (source of truth)**: `supabase/migrations/`
+- **Worker Postgres Schema (generated)**: `worker/src/generated/schema-postgres.generated.ts`
 - **Base Migration**: `supabase/migrations/20241101000000_initial_schema.sql`

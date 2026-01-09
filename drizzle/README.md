@@ -2,22 +2,24 @@
 
 This directory contains the database schema definitions and migrations for the TuneTrees SolidJS PWA.
 
+> ⚠️ Note: TuneTrees no longer maintains a hand-authored Postgres Drizzle schema/config in this folder.
+> The Supabase Postgres schema is managed via `supabase/migrations/`, and the sync worker uses a generated
+> Drizzle schema at `worker/src/generated/schema-postgres.generated.ts` (generated via `npm run codegen:schema`).
+
 ## Directory Structure
 
 ```
 drizzle/
-├── schema-postgres.ts      # PostgreSQL schema (Supabase cloud)
-├── schema-sqlite.ts        # SQLite schema (local offline)
+├── schema-sqlite.ts        # SQLite schema (local offline) wrapper
+├── schema-sqlite.generated.ts # Generated SQLite schema (do not hand-edit)
 ├── sync-columns.ts         # Shared sync column definitions
-├── relations.ts            # Table relationships for type-safe queries
 ├── migrations/
-│   ├── postgres/           # PostgreSQL migration files
+│   ├── postgres/           # Historical/legacy Drizzle migrations (not source-of-truth)
 │   └── sqlite/             # SQLite migration files
 ```
 
 ## Configuration Files
 
-- **`drizzle.config.ts`** - PostgreSQL/Supabase configuration (default)
 - **`drizzle.config.sqlite.ts`** - SQLite configuration (local dev)
 
 ## Environment Variables
@@ -25,9 +27,6 @@ drizzle/
 Required in `.env`:
 
 ```bash
-# Supabase PostgreSQL connection
-DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-
 # Supabase API (for client-side)
 VITE_SUPABASE_URL=https://[PROJECT-REF].supabase.co
 VITE_SUPABASE_ANON_KEY=[ANON-KEY]
@@ -35,55 +34,32 @@ VITE_SUPABASE_ANON_KEY=[ANON-KEY]
 
 ## Common Commands
 
-### Generate Migrations
+### Generate Schema Artifacts
 
 ```bash
-# PostgreSQL (Supabase)
-npx drizzle-kit generate
+# Regenerate sync/DB artifacts (includes SQLite schema + worker Postgres schema)
+npm run codegen:schema
 
-# SQLite (local)
-npx drizzle-kit generate --config=drizzle.config.sqlite.ts
+# Check generated artifacts are up-to-date
+npm run codegen:schema:check
 ```
 
-### Push Schema (without migrations)
+### View SQLite (Drizzle Studio)
 
 ```bash
-# Push to Supabase
-npx drizzle-kit push
-
-# Push to local SQLite
-npx drizzle-kit push --config=drizzle.config.sqlite.ts
-```
-
-### View Database (Drizzle Studio)
-
-```bash
-# PostgreSQL
-npx drizzle-kit studio
-
-# SQLite
 npx drizzle-kit studio --config=drizzle.config.sqlite.ts
 ```
 
-### Introspect Existing Database
+### Manage Supabase Schema
+
+Supabase is managed via the Supabase CLI and SQL migrations:
 
 ```bash
-# Pull schema from Supabase
-npx drizzle-kit introspect
-
-# Pull schema from SQLite
-npx drizzle-kit introspect --config=drizzle.config.sqlite.ts
+# Reset local Supabase stack (applies supabase/migrations + seed)
+supabase db reset
 ```
 
 ## Schema Files
-
-### schema-postgres.ts
-
-PostgreSQL schema for Supabase cloud database:
-
-- Uses `serial`, `uuid`, `timestamp`, `boolean` types
-- Includes all indexes and constraints
-- Uses `pgSyncColumns` for multi-device sync
 
 ### schema-sqlite.ts
 
@@ -103,54 +79,20 @@ Shared sync column definitions:
 - `last_modified_at` - Last update timestamp
 - `device_id` - Device identifier for conflict resolution
 
-### relations.ts
-
-Defines table relationships for type-safe queries:
-
-```typescript
-// Example: Get user with playlists and tunes
-const user = await db.query.userProfile.findFirst({
-  where: eq(userProfile.email, "user@example.com"),
-  with: {
-    playlists: {
-      with: {
-        tunes: {
-          with: { tune: true },
-        },
-      },
-    },
-  },
-});
-```
-
 ## Migration Workflow
 
 ### Initial Setup (Supabase)
 
 1. Create Supabase project
-2. Get connection string from Supabase dashboard
-3. Add `DATABASE_URL` to `.env`
-4. Generate initial migration:
-   ```bash
-   npx drizzle-kit generate
-   ```
-5. Push to Supabase:
-   ```bash
-   npx drizzle-kit push
-   ```
+2. Use Supabase migrations in `supabase/migrations/`
+3. Reset/apply locally via `supabase db reset`
+4. Regenerate local artifacts via `npm run codegen:schema`
 
 ### Schema Changes
 
-1. Edit schema file (`schema-postgres.ts` or `schema-sqlite.ts`)
-2. Generate migration:
-   ```bash
-   npx drizzle-kit generate
-   ```
-3. Review migration in `drizzle/migrations/`
-4. Push to database:
-   ```bash
-   npx drizzle-kit push
-   ```
+1. Make Postgres changes via Supabase migrations (`supabase/migrations/`)
+2. Apply them locally (`supabase db reset`) and/or in Supabase
+3. Regenerate SQLite + worker schema artifacts (`npm run codegen:schema`)
 
 ### Data Migration from Legacy SQLite
 
@@ -203,11 +145,12 @@ Both schemas include sync columns for offline-first architecture:
 Drizzle provides full TypeScript type inference:
 
 ```typescript
-import { db } from "./lib/db/client";
-import { playlist } from "./drizzle/schema-postgres";
+import { getSqliteDb } from "@/lib/db";
+import { playlist } from "@/drizzle/schema-sqlite";
 import { eq } from "drizzle-orm";
 
 // Fully typed query
+const db = getSqliteDb();
 const userPlaylists = await db
   .select()
   .from(playlist)
