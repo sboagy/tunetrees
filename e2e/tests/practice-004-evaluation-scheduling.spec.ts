@@ -209,9 +209,7 @@ test.describe
       await expect(badgeSpan).toHaveText("1");
     });
 
-    test("should clear evaluation when selecting '(Not Set)'", async ({
-      page,
-    }) => {
+    test("should clear evaluation when selecting '(Not Set)'", async () => {
       const rows = ttPage.getRows("scheduled");
       const firstRow = rows.first();
 
@@ -226,15 +224,17 @@ test.describe
 
       await ttPage.setRowEvaluation(firstRow, "not-set", 500);
 
-      const evalNotSetDropdown = page
-        .getByRole("cell", { name: "(Not Set)" })
+      const firstRecallEvalTrigger = firstRow
+        .locator("[data-testid^='recall-eval-']")
         .first();
-
-      await expect(evalNotSetDropdown).toBeVisible();
+      await expect(firstRecallEvalTrigger).toContainText("(Not Set)", {
+        timeout: 5000,
+      });
 
       // Evaluations count should be 0
       await expect(ttPage.submitEvaluationsButton.locator("span")).toHaveCount(
         1
       );
+
     });
   });

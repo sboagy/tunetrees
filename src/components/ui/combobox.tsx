@@ -62,10 +62,14 @@ export const ComboboxTrigger = <T extends ValidComponent = "button">(
         {...rest}
       >
         {local.children}
-        <ComboboxPrimitive.Icon class="flex h-3.5 w-3.5 items-center justify-center">
+        <ComboboxPrimitive.Icon
+          aria-hidden="true"
+          class="flex h-3.5 w-3.5 items-center justify-center"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
+            aria-hidden="true"
             class="h-4 w-4 opacity-50"
           >
             <path
@@ -76,7 +80,6 @@ export const ComboboxTrigger = <T extends ValidComponent = "button">(
               stroke-width="2"
               d="m8 9l4-4l4 4m0 6l-4 4l-4-4"
             />
-            <title>Arrow</title>
           </svg>
         </ComboboxPrimitive.Icon>
       </ComboboxPrimitive.Trigger>
@@ -131,10 +134,14 @@ export const ComboboxItem = <T extends ValidComponent = "li">(
       )}
       {...rest}
     >
-      <ComboboxPrimitive.ItemIndicator class="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+      <ComboboxPrimitive.ItemIndicator
+        aria-hidden="true"
+        class="absolute right-2 flex h-3.5 w-3.5 items-center justify-center"
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
+          aria-hidden="true"
           class="h-4 w-4"
         >
           <path
@@ -145,7 +152,6 @@ export const ComboboxItem = <T extends ValidComponent = "li">(
             stroke-width="2"
             d="m5 12l5 5L20 7"
           />
-          <title>Checked</title>
         </svg>
       </ComboboxPrimitive.ItemIndicator>
       <ComboboxPrimitive.ItemLabel>
