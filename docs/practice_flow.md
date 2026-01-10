@@ -1222,8 +1222,8 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 
 ### daily_practice_queue Schema
 
-**File:** `drizzle/schema-postgres.ts`  
-**Lines:** 286-346
+**Source of truth:** `supabase/migrations/` (search for `CREATE TABLE daily_practice_queue`)  
+**Generated worker schema:** `worker/src/generated/schema-postgres.generated.ts` (search for `dailyPracticeQueue`)
 
 **Fields:**
 - `id` (UUID, primary key)
@@ -1247,8 +1247,8 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 
 ### practice_record Schema
 
-**File:** `drizzle/schema-postgres.ts`  
-**Lines:** 242-285
+**Source of truth:** `supabase/migrations/` (search for `CREATE TABLE practice_record`)  
+**Generated worker schema:** `worker/src/generated/schema-postgres.generated.ts` (search for `practiceRecord`)
 
 **Fields:**
 - `id` (UUID, primary key)

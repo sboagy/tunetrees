@@ -4,9 +4,8 @@
  * This module provides convenient exports for the browser database client:
  * - SQLite WASM - Local offline storage
  *
- * Note: PostgreSQL client (client-postgres.ts) is NOT exported here.
- * It uses Node.js-only dependencies and is only for server-side scripts.
- * For browser Supabase access, use @/lib/supabase/client directly.
+ * Note: This module is browser-focused; it does not export a Postgres Drizzle client.
+ * Browser network access uses the Supabase JS client; server-side Postgres access happens in the sync worker.
  *
  * @module db
  */
@@ -19,7 +18,6 @@ export {
   getDb as getSqliteDb,
   initializeDb as initializeSqliteDb,
   persistDb as persistSqliteDb,
-  relations as sqliteRelations,
   schema as sqliteSchema,
   setupAutoPersist,
 } from "./client-sqlite";

@@ -27,41 +27,18 @@ TuneTrees uses a **dual-database architecture**:
                                │   Supabase Cloud      │
                                ├───────────────────────┤
                                │ PostgreSQL            │
-                               │ (client-postgres.ts)  │
                                │ Auth + Realtime       │
                                └───────────────────────┘
 ```
 
 ## Files
 
-### `client-postgres.ts`
+### Cloud Database Access
 
-PostgreSQL client for Supabase cloud database.
+There is no Postgres Drizzle client in `src/lib/db/`.
 
-**Features:**
-
-- Type-safe queries with Drizzle ORM
-- Connection pooling
-- Used for cloud sync and initial data fetch
-
-**Usage:**
-
-```typescript
-import { postgresDb } from "@/lib/db";
-import { userProfile } from "@/drizzle/schema-postgres";
-import { eq } from "drizzle-orm";
-
-// Fetch user profile
-const users = await postgresDb
-  .select()
-  .from(userProfile)
-  .where(eq(userProfile.supabaseUserId, userId))
-  .limit(1);
-```
-
-**Environment Variables:**
-
-- `DATABASE_URL` - PostgreSQL connection string
+- **Browser → Supabase:** Use `@/lib/supabase/client` for network access.
+- **Server-side Postgres:** The sync worker talks to Supabase Postgres and uses its own generated Drizzle schema.
 
 ### `client-sqlite.ts`
 
@@ -135,13 +112,11 @@ Convenient re-exports of both clients.
 
 ## Type Safety
 
-Both clients use the same Drizzle schema definitions:
+The browser uses the SQLite Drizzle schema definitions:
 
-- **PostgreSQL:** `drizzle/schema-postgres.ts`
 - **SQLite:** `drizzle/schema-sqlite.ts`
-- **Relations:** `drizzle/relations.ts`
 
-This ensures type-safe queries and consistent data structures across both databases.
+The sync worker uses a generated Postgres schema at `worker/src/generated/schema-postgres.generated.ts`.
 
 ## Schema Differences
 
@@ -158,18 +133,6 @@ The schemas are nearly identical, with these adaptations:
 Drizzle ORM handles these differences automatically.
 
 ## Testing
-
-### PostgreSQL Client
-
-```typescript
-import { postgresDb, closePostgresConnection } from "@/lib/db";
-
-// Run queries
-const result = await postgresDb.select().from(userProfile).limit(1);
-
-// Clean up (important in tests!)
-await closePostgresConnection();
-```
 
 ### SQLite WASM Client
 
@@ -189,13 +152,9 @@ await clearSqliteDb();
 
 ## Troubleshooting
 
-### "DATABASE_URL environment variable is required"
+### "Supabase env vars missing"
 
-**Solution:** Add `DATABASE_URL` to your `.env.local` file:
-
-```bash
-DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-```
+**Solution:** Ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set.
 
 ### "SQLite database not initialized"
 

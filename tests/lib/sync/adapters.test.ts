@@ -6,7 +6,6 @@
 
 import { SYNCABLE_TABLES } from "@sync-schema/table-meta";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ensureSyncRuntimeConfigured } from "../../../src/lib/sync/runtime-config";
 import {
   batchToLocal,
   batchToRemote,
@@ -16,6 +15,7 @@ import {
   getRegisteredTables,
   hasAdapter,
 } from "../../../oosync/src/sync/adapters";
+import { ensureSyncRuntimeConfigured } from "../../../src/lib/sync/runtime-config";
 
 ensureSyncRuntimeConfigured();
 
