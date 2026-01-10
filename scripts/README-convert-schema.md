@@ -56,7 +56,7 @@ npx drizzle-kit pull
 # 3. Convert
 npx tsx scripts/convert-postgres-to-sqlite-schema.ts
 # → Updates drizzle/schema-sqlite.ts
-# → Creates backup: drizzle/schema-sqlite.backup.ts
+# → Creates backup: drizzle/schema-sqlite.ts.bak
 
 # 4. Review changes
 git diff drizzle/schema-sqlite.ts
@@ -109,7 +109,7 @@ These are automatically removed from SQLite schema:
 The script generates:
 
 1. **Updated SQLite schema**: `drizzle/schema-sqlite.ts`
-2. **Backup of old schema**: `drizzle/schema-sqlite.backup.ts`
+2. **Backup of old schema**: `drizzle/schema-sqlite.ts.bak`
 3. **Conversion statistics**:
 
    ```
@@ -214,7 +214,7 @@ npx drizzle-kit pull
 npx tsx scripts/convert-postgres-to-sqlite-schema.ts
 
 # Compare with backup
-diff drizzle/schema-sqlite.backup.ts drizzle/schema-sqlite.ts
+diff drizzle/schema-sqlite.ts.bak drizzle/schema-sqlite.ts
 ```
 
 ## Integration with Git
@@ -223,7 +223,7 @@ Recommended `.gitignore` entry:
 
 ```gitignore
 # Keep backups out of version control
-drizzle/schema-sqlite.backup.ts
+drizzle/schema-sqlite.ts.bak
 ```
 
 Commit workflow:

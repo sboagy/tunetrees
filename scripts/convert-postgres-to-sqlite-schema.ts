@@ -35,7 +35,7 @@ const INPUT_FILE = path.join(
   "../drizzle/migrations/postgres/schema.ts"
 );
 const OUTPUT_FILE = path.join(__dirname, "../drizzle/schema-sqlite.ts");
-const BACKUP_FILE = path.join(__dirname, "../drizzle/schema-sqlite.backup.ts");
+const BACKUP_FILE = path.join(__dirname, "../drizzle/schema-sqlite.ts.bak");
 
 function convert(): void {
   console.log("🔄 PostgreSQL → SQLite Schema Converter (V3 - Full Text)\n");

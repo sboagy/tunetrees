@@ -18,6 +18,7 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { getSqliteInstance } from "../../lib/db/client-sqlite";
@@ -29,7 +30,6 @@ import {
   getSelectedPlaylistId,
   setSelectedPlaylistId,
 } from "../../lib/services/playlist-service";
-import { getOutboxStats } from "@/lib/sync";
 import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
 import {
   AlertDialog,

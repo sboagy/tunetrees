@@ -92,8 +92,9 @@ Duration   2.22s
 
 **Schema:**
 - `drizzle/schema-sqlite.ts` - Complete SQLite schema (506 lines)
-- `drizzle/schema-postgres.ts` - PostgreSQL/Supabase schema
-- `drizzle/relations.ts` - Type-safe table relationships
+- `drizzle/schema-sqlite.generated.ts` - Generated SQLite schema (do not hand-edit)
+- `supabase/migrations/` - PostgreSQL/Supabase schema (source of truth)
+- `worker/src/generated/schema-postgres.generated.ts` - Generated worker Postgres schema
 - All tables properly typed with strict TypeScript
 
 **Database Client:**

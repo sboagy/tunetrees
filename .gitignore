@@ -89,6 +89,9 @@ iti_import_output
 *.sqlite3-shm
 *.sqlite3-wal
 
+# Generated schema backups
+drizzle/schema-sqlite.ts.bak
+
 # Workspace-specific linter configs
 scripts/.eslintrc.json
 .playwright-mcp/**/*
