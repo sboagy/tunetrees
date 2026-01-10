@@ -33,10 +33,11 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.signInAnonymously();
 
     // Navigate to Catalog tab
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
 
-    // Wait for catalog grid to load
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    // Wait for catalog tab UI to be ready, then for the grid to hydrate.
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Verify there are tunes in the catalog (public tunes from reference data)
     const rows = ttPage.catalogGrid.locator("tbody tr[data-index]");
@@ -54,7 +55,8 @@ test.describe("Anonymous User Data Functionality", () => {
 
     // Navigate to Catalog tab
     await ttPage.navigateToTab("catalog");
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     await ttPage.searchForTune("Alexander's", ttPage.catalogGrid);
 
@@ -101,6 +103,7 @@ test.describe("Anonymous User Data Functionality", () => {
   test("4.3 Anonymous user data persists after page refresh", async ({
     page,
   }) => {
+    test.setTimeout(60_000);
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously WITH a playlist (needed for repertoire functionality)
     await ttPage.gotoLogin();
@@ -152,8 +155,9 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.dismissOnboardingIfPresent();
 
     // Navigate back to Repertoire
-    await ttPage.repertoireTab.click();
-    await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
+    await ttPage.navigateToTab("repertoire");
+    await expect(ttPage.repertoireColumnsButton).toBeVisible({ timeout: 20000 });
+    await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 20000 });
 
     // Wait for the grid to rehydrate from local DB
     await ttPage.expectGridHasContent(ttPage.repertoireGrid);
@@ -178,8 +182,9 @@ test.describe("Anonymous User Data Functionality", () => {
     // Navigate to Catalog tab
     await ttPage.navigateToTab("catalog");
 
-    // Wait for grid to fully load
-    await page.waitForTimeout(1000);
+    // Wait for catalog tab UI to be ready, then for the grid to hydrate.
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Look for the Type column header with sort functionality
     // Use a more specific selector to avoid matching drag handle and resize buttons
@@ -197,7 +202,7 @@ test.describe("Anonymous User Data Functionality", () => {
         .locator("tbody tr[data-index]")
         .first();
       const typeCell = firstRow.locator("td").nth(2); // Type is typically the 3rd column
-      await expect(typeCell).toBeVisible({ timeout: 5000 });
+      await expect(typeCell).toBeVisible({ timeout: 10000 });
       // If we can see data in the type column, reference data is loaded
       return;
     }

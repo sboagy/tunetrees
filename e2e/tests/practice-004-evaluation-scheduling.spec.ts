@@ -48,14 +48,15 @@ test.describe
         scheduleBaseDate: currentDate,
       });
 
-      // Wait for practice grid to load
-      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+      // Wait for practice grid to load (can mount late under full-suite parallel load)
+      await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
+      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 10000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(100); // small buffer
     });
 

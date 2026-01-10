@@ -128,8 +128,8 @@ test.describe("Anonymous User Edge Cases", () => {
 
     // Add some data - navigate to catalog
     await ttPage.navigateToTab("catalog");
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(1000);
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Select and add first tune to repertoire
     const firstTuneCheckbox = ttPage.catalogGrid
@@ -143,8 +143,9 @@ test.describe("Anonymous User Edge Cases", () => {
       await page.waitForTimeout(1000);
 
       // Verify in repertoire
-      await ttPage.repertoireTab.click();
-      await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
+      await ttPage.navigateToTab("repertoire");
+      await expect(ttPage.repertoireColumnsButton).toBeVisible({ timeout: 20000 });
+      await ttPage.expectGridHasContent(ttPage.repertoireGrid);
 
       const beforeCount = await ttPage.repertoireGrid
         .locator("tbody tr[data-index]")

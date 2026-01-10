@@ -85,7 +85,9 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
     context,
     testUser,
   }) => {
-    // Ensure practice grid visible (single overdue tune seeded)
+    // Ensure practice view is ready (single overdue tune seeded)
+    await ttPage.navigateToTab("practice");
+    await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
     // Helper to select evaluation from grid & submit
