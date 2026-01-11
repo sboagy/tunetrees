@@ -37,13 +37,16 @@ test.describe
         startTab: "practice",
       });
 
-      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+      // Under full-suite parallel load, the practice grid can mount late.
+      // Wait on the tab sentinel, then for the grid + seed rows.
+      await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
+      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 10000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(100); // small buffer
     });
 

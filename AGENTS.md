@@ -1,94 +1,80 @@
-# TuneTrees Global AGENTS Instructions
+# TuneTrees Project AGENTS Instructions
 
-> Hierarchical instruction root. Directory‑scoped AGENTS.md files inherit these global rules and add local specifics. Do not duplicate global content in PRs—reference this file instead.
+Scope: repository-specific architecture, patterns, and invariants for TuneTrees.
 
-## Scope Hierarchy
+Global execution guardrails (loop prevention, patch hygiene, type-safety defaults) live in `.github/copilot-instructions.md`. Treat this file as the canonical source for “how TuneTrees works”.
 
-Global (this file) → src/AGENTS.md (UI) → tests/AGENTS.md (unit) → e2e/AGENTS.md (E2E) → tunetrees/models/AGENTS.md (schema + invariants) → tunetrees/app/AGENTS.md (backend query & service layer) → sql_scripts/AGENTS.md (views & migrations).
+## Instruction Hierarchy
 
-The `legacy/` and `archive/` directories are reference only—never modify for new features. UI docs may still reference legacy screenshots; keep those references intact.
+Root (this file) → `src/AGENTS.md` (UI) → `tests/AGENTS.md` (unit) → `e2e/AGENTS.md` (E2E) → `oosync/AGENTS.md` (sync codegen + worker boundaries) → `sql_scripts/AGENTS.md` (views/migrations).
 
-## Top 12 Global Rules
+The `legacy/` directory is reference-only. Do not modify legacy code for new work.
 
-1. Ask before committing/pushing; follow branch + PR process.
-2. Strict TypeScript (no `any`); interface names prefix `I*`.
-3. SolidJS reactivity: use `createSignal`, `createEffect`, `createMemo`; avoid React patterns (`useState`, `useEffect`, etc.).
-4. Offline‑first: all reads from local SQLite WASM; writes queue for Supabase sync (background).
-5. Supabase Auth only; SolidJS Context for user/session state.
-6. Drizzle ORM for TypeScript data access; raw SQL only in vetted edge cases.
-7. UI components: shadcn-solid + @kobalte/core primitives; table‑centric design (TanStack Solid Table).
-8. Scheduling logic: `ts-fsrs` primary, SM2 fallback—never overload `due` semantics.
-9. Quality gates before merge: `npm run typecheck && npm run lint && npm run format && npm run test` (unit) + E2E passing.
-10. Zero TypeScript errors / ESLint warnings / failing tests at merge time.
-11. Database invariants (PracticeRecord uniqueness etc.) must not be broken by feature work—see models/app/sql_scripts AGENTS files.
-12. Legacy code consulted for business logic only; never port framework patterns.
+## Tech Stack (Actual)
 
-## Architecture & Stack Overview (Condensed)
-
-Frontend: SolidJS 1.8+, Vite 5, Tailwind, TanStack Solid Table, Kobalte, shadcn-solid, Lucide icons.
-Backend/Auth: Supabase Postgres + Auth + Realtime; local offline DB: SQLite WASM + Drizzle. **Sync layer** (`oosync/src/sync/`): local writes → queue → Supabase; Supabase Realtime pushes remote changes back into local DB.
-Scheduling: FSRS (client) with SM2 fallback.
-PWA: vite-plugin-pwa + Workbox; deploy via Cloudflare Pages.
-External libs: abcjs (notation wrapper), jodit (rich text editor wrapper).
+- Frontend: SolidJS + TypeScript (Vite)
+- Styling/UI: Tailwind + shadcn-solid + `@kobalte/core` primitives
+- Data grids: `@tanstack/solid-table` + `@tanstack/solid-virtual`
+- Local DB: SQLite WASM via `sql.js` with IndexedDB persistence (Drizzle ORM)
+- Remote DB access (browser): Supabase JS wrapped by Drizzle (see `src/lib/db/client-postgres-browser.ts`)
+- Remote: Supabase (Auth + Postgres + Realtime)
+- Sync: outbox-driven, bidirectional sync via Cloudflare Worker + `oosync`
+- Scheduling: `ts-fsrs` (FSRS)
+- Music notation: `abcjs`
+- PWA: `vite-plugin-pwa` + Workbox; deploy via Cloudflare Pages (`wrangler pages deploy`)
+- Lint/format: Biome (`npm run lint`, `npm run format`)
+- Tests: Vitest (`npm run test` / `npm run test:unit`) + Playwright (`npm run test:e2e`)
 
 ## Offline-First Data Flow
 
-```
-User Action → Local SQLite (immediate) → Sync Queue → Supabase (async)
-                         ↓
-                 Supabase Realtime → Local SQLite (remote updates)
-```
-Conflict resolution: last-write-wins with user override UI planned; never block local write for network failure.
+1) User action writes to local SQLite immediately.
+2) Writes enqueue into outbox; sync engine pushes to Supabase via worker.
+3) Remote changes flow back via worker (and/or Realtime) and are applied to local SQLite.
 
-## Global Code Patterns (Exemplars)
+Default conflict policy is last-write-wins, with explicit conflict tracking in the sync layer.
 
-Solid Resource read:
-```ts
-const [tunes] = createResource(async () => db.select().from(tunesTable).all());
-<Show when={!tunes.loading()} fallback={<p>Loading...</p>}>
-  <For each={tunes()}>{t => <div>{t.title}</div>}</For>
-</Show>
-```
-Auth context (see frontend for UI binding): maintain `user` signal; subscribe to `supabase.auth.onAuthStateChange`.
+## Local SQLite (sql.js) + Drizzle Patterns
 
-## Directory Delegations
+- Browser SQLite client + initialization/migration logic live in `src/lib/db/client-sqlite.ts`.
+- Local schema and relations come from Drizzle artifacts under `drizzle/`.
+- The local DB is per-user (namespaced keys in IndexedDB/localStorage).
+- Sync triggers/outbox tables are installed as part of DB initialization.
 
-- UI specifics (navigation, theming, layout density, responsive tables): `src/AGENTS.md`.
-- Unit testing guidance (Vitest): `tests/AGENTS.md`.
-- E2E testing guidance (Playwright): `e2e/AGENTS.md`.
-- Sync engine & infrastructure (schema-agnostic library): `oosync/AGENTS.md`.
-- Schema & invariants (PracticeRecord uniqueness, view sync): `tunetrees/models/AGENTS.md`.
-- Backend query/service rules (SQLAlchemy 2.0 style, avoiding N+1, integration with scheduling): `tunetrees/app/AGENTS.md`.
-- SQL view maintenance & migrations: `sql_scripts/AGENTS.md`.
+## Sync System Overview
 
-## Quality Gates (Global)
+Primary components:
 
-Pre-commit: typecheck, lint, format, unit tests.
-Pre-push: build, E2E (Playwright). No warnings permitted. Large refactors require explicit migration notes in `_notes/`.
+- `src/lib/sync/engine.ts`: orchestrates push/pull, retries, ordering, conflict handling.
+- `src/lib/sync/outbox.ts`: durable local outbox queue.
+- `src/lib/sync/adapters.ts`: per-table transformation rules (camelCase local ↔ snake_case remote).
+- `src/lib/sync/worker-client.ts`: client for the worker endpoint.
+- `worker/`: app-facing Cloudflare Worker package that imports worker implementation from `oosync/worker/*`.
 
-## Commit & Branch Conventions
+### Adapter Pattern (Per-Table, Cached)
 
-Gitmoji + Conventional style (e.g. `✨ feat: Add user authentication with Supabase`). Branch naming: `feat/…`, `fix/…`, `refactor/…`, `docs/…`. Include issue/ticket reference when applicable.
+- Adapters are the single place for casing conversions and special-case normalization.
+- Use `getAdapter(tableName)` from `src/lib/sync/adapters.ts` instead of re-implementing casing rules.
+- Table metadata comes from `@sync-schema/table-meta` (generated contract).
 
-## Testing Summary (High-Level)
+### Generated Contract / Codegen
 
-Unit: Vitest + @solidjs/testing-library for components/utilities. E2E: Playwright across Chromium/Firefox/WebKit + mobile. Single input state per test, explicit timeouts, page objects. See `tests/AGENTS.md` for full detail.
+- `oosync` is an opinionated offline sync library with a code generator (`npm run codegen:schema`).
+- Generated outputs are write-only. If generated schema/metadata is wrong, fix the generator or inputs — do not hand-edit generated files.
+- Boundary rules are enforced in `oosync/AGENTS.md` (core must not import app `src/**`; worker must not import app `src/**`; shared/generated is contract-only).
 
-## When Details Are Missing
+## UI Principles (Pointers)
 
-1. Prefer existing non-legacy project patterns. 2. If unavoidable, inspect legacy for business rules only. 3. Ask for clarification before speculative implementation. 4. Document assumptions inline (minimal) or in `_notes/`.
+- UI is table-centric and performance-oriented; see `src/AGENTS.md`.
+- Do not introduce React patterns (no React hooks, no React-only libraries in app code paths).
 
-## Current Phase
+## Testing & Local Dev Conventions
 
-Phase 0 (Project Setup) → Next: Phase 1 (Core Authentication). Keep new instructions aligned with migration plan in `_notes/solidjs-pwa-migration-plan.md`.
+- Prefer deterministic tests: one input state, one expected output state; no branching logic.
+- Reset local Supabase + auth fixtures with `npm run db:local:reset`.
+- Copilot/agents should not start the dev server unless explicitly requested; ask if you need a restart.
 
-## Danger Zones (Global)
+## What To Read First For Changes
 
-- Introducing React patterns. - Raw SQL bypassing Drizzle without justification. - Mutating signal values directly (must reassign). - Expanding scope of `due` field semantics. - Ignoring view updates when schema changes. - Adding conditional logic branches inside E2E tests.
-
-## References
-
-Docs: SolidJS, Supabase, Drizzle ORM, ts-fsrs, TanStack Table, Kobalte. Project notes in `_notes/`. Legacy for screenshots/workflows only.
-
----
-Maintained by GitHub Copilot (per @sboagy). Update this file for global policy changes; do NOT embed directory-specific minutiae here.
+- Sync changes: start with `oosync/AGENTS.md`, then `src/lib/sync/*`, then generated artifacts.
+- DB schema changes: check `drizzle/` + regenerate schema contract, then verify sync + views.
+- UI changes: follow `src/AGENTS.md` and ensure E2E selectors remain stable.

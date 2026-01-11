@@ -29,6 +29,7 @@ import {
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
+import { enableSyncTriggers, suppressSyncTriggers } from "../db/install-triggers";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 import {
@@ -360,6 +361,11 @@ export const AuthProvider: ParentComponent = (props) => {
     authUserId: string,
     isAnonymousUser: boolean
   ): Promise<{ stop: () => void; service: SyncService }> {
+    // `initialSyncComplete` is used as a UI gate for "DB ready" in some flows (anonymous/offline-safe),
+    // so we can't rely on it to infer whether this is the first sync completion.
+    // Track first completion per worker to ensure view signals fire at least once.
+    let firstSyncCompletionHandled = false;
+
     const syncWorker = startSyncWorker(db, {
       supabase,
       userId: authUserId,
@@ -368,6 +374,9 @@ export const AuthProvider: ParentComponent = (props) => {
       syncIntervalMs: isAnonymousUser ? 30000 : 5000, // Anonymous: less frequent sync
       onSyncComplete: async (result) => {
         diagLog("[AuthContext] onSyncComplete called", result);
+
+        const isFirstSyncCompletion = !firstSyncCompletionHandled;
+        if (isFirstSyncCompletion) firstSyncCompletionHandled = true;
         log.debug(
           "Sync completed, incrementing remote sync down completion version"
         );
@@ -458,12 +467,14 @@ export const AuthProvider: ParentComponent = (props) => {
                 );
               });
           });
+        }
 
-          // CRITICAL FIX: On initial sync, always trigger all view signals
-          // even if affectedTables is empty (first login may have no data to sync)
-          // This ensures UI components waiting for these signals will render
+        // CRITICAL FIX: On the first sync completion for a worker, always trigger all view signals
+        // even if `affectedTables` is empty. This covers anonymous mode where `initialSyncComplete`
+        // may already be true before the first syncDown finishes.
+        if (isFirstSyncCompletion) {
           diagLog(
-            "🔔 [AuthContext] Initial sync - triggering all view signals"
+            "🔔 [AuthContext] First sync completion - triggering all view signals"
           );
           triggerAllViewSignals();
         }
@@ -652,17 +663,40 @@ export const AuthProvider: ParentComponent = (props) => {
           .limit(1);
 
         if (!existingLocal || existingLocal.length === 0) {
-          await db.insert(userProfile).values({
-            id: anonymousUserId, // Use Supabase UUID as internal ID
-            supabaseUserId: anonymousUserId,
-            name: "Anonymous User",
-            email: null,
-            srAlgType: "fsrs",
-            deleted: 0,
-            syncVersion: 1,
-            lastModifiedAt: now,
-            deviceId: "local",
-          });
+          // Creating a local-only `user_profile` row is required for FK relationships,
+          // but it should not enqueue an outbox item that can block the initial syncDown.
+          const rawDb = await getSqliteInstance();
+          try {
+            if (rawDb) suppressSyncTriggers(rawDb);
+          } catch (e) {
+            console.warn(
+              "[AuthContext] Failed to suppress sync triggers for anonymous local profile insert:",
+              e
+            );
+          }
+
+          try {
+            await db.insert(userProfile).values({
+              id: anonymousUserId, // Use Supabase UUID as internal ID
+              supabaseUserId: anonymousUserId,
+              name: "Anonymous User",
+              email: null,
+              srAlgType: "fsrs",
+              deleted: 0,
+              syncVersion: 1,
+              lastModifiedAt: now,
+              deviceId: "local",
+            });
+          } finally {
+            try {
+              if (rawDb) enableSyncTriggers(rawDb);
+            } catch (e) {
+              console.warn(
+                "[AuthContext] Failed to re-enable sync triggers after anonymous local profile insert:",
+                e
+              );
+            }
+          }
           // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
           console.log(
             "✅ Created local user_profile for anonymous user:",

@@ -1,6 +1,8 @@
 # src/AGENTS Instructions
 
-Scope: UI implementation under `src/**` for the SolidJS PWA. Supplements root `AGENTS.md` with design + interaction rules.
+Scope: UI implementation under `src/**` for the SolidJS PWA.
+
+Inherits global execution guardrails from `.github/copilot-instructions.md` and repository domain context from root `AGENTS.md`.
 
 ## Mission
 

@@ -1,6 +1,8 @@
 # sql_scripts/AGENTS Instructions
 
-Scope: SQL view definitions & migration scripts. Keep views aligned with models & scheduling semantics.
+Scope: SQL view definitions & migration scripts.
+
+Inherits global execution guardrails from `.github/copilot-instructions.md` and repository domain context from root `AGENTS.md`.
 
 ## Purpose of Views
 

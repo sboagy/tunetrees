@@ -38,28 +38,23 @@ test.describe("Anonymous User Edge Cases", () => {
     await ttPage.signInAnonymously();
 
     // Verify we're on home page
-    await expect(ttPage.practiceTab).toBeVisible({ timeout: 10000 });
+    await ttPage.waitForHome({ timeoutMs: 30_000 });
 
     // Try to navigate back to login manually
     await page.goto(`${BASE_URL}/login`);
     await page.waitForLoadState("domcontentloaded");
 
-    // Should either:
-    // 1. Redirect back to home (already authenticated)
-    // 2. Show login but clicking anonymous again doesn't create duplicate
-    const currentUrl = page.url();
-
-    if (currentUrl.includes("/login")) {
-      // If we're on login, try clicking anonymous again
-      const anonymousButton = ttPage.anonymousSignInButton;
-      if (await anonymousButton.isVisible()) {
-        await anonymousButton.click();
-        await page.waitForTimeout(2000);
-      }
+    // Give the app a chance to auto-redirect if it's already authenticated.
+    // If it doesn't, perform the second anonymous sign-in attempt.
+    const redirectedHome = await ttPage.practiceTab
+      .isVisible()
+      .catch(() => false);
+    if (!redirectedHome) {
+      await ttPage.signInAnonymously();
     }
 
     // Should end up on home page
-    await expect(ttPage.practiceTab).toBeVisible({ timeout: 10000 });
+    await ttPage.waitForHome({ timeoutMs: 30_000 });
   });
 
   test("5.2 Regular sign-up flow still works (no anonymous)", async ({
@@ -128,8 +123,8 @@ test.describe("Anonymous User Edge Cases", () => {
 
     // Add some data - navigate to catalog
     await ttPage.navigateToTab("catalog");
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(1000);
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Select and add first tune to repertoire
     const firstTuneCheckbox = ttPage.catalogGrid
@@ -143,8 +138,9 @@ test.describe("Anonymous User Edge Cases", () => {
       await page.waitForTimeout(1000);
 
       // Verify in repertoire
-      await ttPage.repertoireTab.click();
-      await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
+      await ttPage.navigateToTab("repertoire");
+      await expect(ttPage.repertoireColumnsButton).toBeVisible({ timeout: 20000 });
+      await ttPage.expectGridHasContent(ttPage.repertoireGrid);
 
       const beforeCount = await ttPage.repertoireGrid
         .locator("tbody tr[data-index]")

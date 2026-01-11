@@ -1,6 +1,8 @@
 # tests/AGENTS Instructions
 
-Scope: Unit tests under `tests/**` (Vitest + @solidjs/testing-library). E2E guidance moved to `e2e/AGENTS.md`.
+Scope: Unit tests under `tests/**` (Vitest + @solidjs/testing-library).
+
+Inherits global execution guardrails from `.github/copilot-instructions.md` and repository domain context from root `AGENTS.md`.
 
 ## Philosophy
 

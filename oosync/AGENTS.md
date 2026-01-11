@@ -2,7 +2,7 @@
 
 Scope: code under `oosync/**` (library + worker implementation) and the **contract** that is generated/consumed by app + worker.
 
-This file inherits global policies from `AGENTS.md`. Do not duplicate global rules here; treat this file as **oosync-specific constraints**.
+Inherits global execution guardrails from `.github/copilot-instructions.md` and repository domain context from root `AGENTS.md`. Do not duplicate global rules here; treat this file as **oosync-specific constraints**.
 
 ## What “oosync” is
 

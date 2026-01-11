@@ -48,14 +48,15 @@ test.describe
         scheduleBaseDate: currentDate,
       });
 
-      // Wait for practice grid to load
-      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+      // Wait for practice grid to load (can mount late under full-suite parallel load)
+      await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
+      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 10000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
-      ).toBeVisible({ timeout: 2000 });
+      ).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(100); // small buffer
     });
 
@@ -209,9 +210,7 @@ test.describe
       await expect(badgeSpan).toHaveText("1");
     });
 
-    test("should clear evaluation when selecting '(Not Set)'", async ({
-      page,
-    }) => {
+    test("should clear evaluation when selecting '(Not Set)'", async () => {
       const rows = ttPage.getRows("scheduled");
       const firstRow = rows.first();
 
@@ -226,15 +225,17 @@ test.describe
 
       await ttPage.setRowEvaluation(firstRow, "not-set", 500);
 
-      const evalNotSetDropdown = page
-        .getByRole("cell", { name: "(Not Set)" })
+      const firstRecallEvalTrigger = firstRow
+        .locator("[data-testid^='recall-eval-']")
         .first();
-
-      await expect(evalNotSetDropdown).toBeVisible();
+      await expect(firstRecallEvalTrigger).toContainText("(Not Set)", {
+        timeout: 5000,
+      });
 
       // Evaluations count should be 0
       await expect(ttPage.submitEvaluationsButton.locator("span")).toHaveCount(
         1
       );
+
     });
   });

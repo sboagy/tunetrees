@@ -118,7 +118,9 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     const stabilities: number[] = [];
 
     // Ensure practice queue has loaded
-    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+    await ttPage.navigateToTab("practice");
+    await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
     // Enable flashcard mode for easier evaluation
     await ttPage.enableFlashcardMode();
@@ -159,13 +161,35 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
       // Query latest practice record to get FSRS metrics
       const playlistId = testUser.playlistId;
+
+      // Under full-suite load, the due date update can lag behind submit/sync by a few seconds.
+      // Poll until the latest record reflects a due date at least 1 day in the future.
+      await expect
+        .poll(
+          async () => {
+            const maybe = await queryLatestPracticeRecord(
+              page,
+              TEST_TUNE_BANISH_ID,
+              playlistId
+            );
+            if (!maybe) return -1;
+            const due = new Date(maybe.due);
+            return Math.floor(
+              (due.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+          },
+          { timeout: 15_000, intervals: [200, 500, 1000] }
+        )
+        .toBeGreaterThanOrEqual(1);
+
       const record = await queryLatestPracticeRecord(
         page,
         TEST_TUNE_BANISH_ID,
         playlistId
       );
-      if (!record)
+      if (!record) {
         throw new Error("Practice record not found after Easy evaluation");
+      }
 
       console.log(`  Interval: ${record.interval} days`);
       console.log(`  Scheduled: ${record.due}`);
