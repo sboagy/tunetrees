@@ -3,4 +3,3 @@
 -- "Anonymous sign-ins are disabled" for the anonymous CTA.
 UPDATE auth.config
 SET enable_anonymous_sign_ins = TRUE;
-
