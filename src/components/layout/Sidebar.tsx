@@ -250,7 +250,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
   return (
     <aside
-      class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex select-none ${
+      class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex ${
         isHorizontal()
           ? "flex-row border-t border-gray-200/20 dark:border-gray-700/20"
           : "flex-col border-r border-gray-200/20 dark:border-gray-700/20"
@@ -305,7 +305,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       <div class={`${props.collapsed ? "hidden" : ""}`}>
         <button
           type="button"
-          class={`absolute z-20 ${
+          class={`absolute z-20 select-none ${
             isHorizontal()
               ? "top-0 left-12 right-0 h-4 md:h-1 cursor-row-resize hover:bg-blue-500 md:hover:h-1.5"
               : props.dockPosition === "right"
@@ -339,7 +339,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Edit button - only visible when collapsed and tune is selected - positioned at top (vertical) or far right (horizontal) */}
       <Show when={props.collapsed && currentTuneId()}>
         <div
-          class={`absolute z-30 ${
+          class={`absolute z-30 select-none ${
             isHorizontal()
               ? "top-0.5 right-3.5 flex items-center"
               : props.dockPosition === "right"
@@ -362,7 +362,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       {/* Collapse Toggle Button and Drag Handle - positioned based on dock position */}
       <div
-        class={`absolute flex items-center justify-center z-30 ${
+        class={`absolute flex items-center justify-center z-30 select-none ${
           isHorizontal()
             ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
             : props.dockPosition === "right"
