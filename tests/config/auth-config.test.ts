@@ -18,10 +18,17 @@ describe("Supabase auth configuration", () => {
       .readdirSync(migrationsDir)
       .filter((file) => file.endsWith(".sql"));
 
-    const hasEnablingMigration = migrationFiles.some((file) => {
+    const enablePattern =
+      /UPDATE\s+auth\.config\s+SET\s+enable_anonymous_sign_ins\s*=\s*TRUE/i;
+
+    let hasEnablingMigration = false;
+    for (const file of migrationFiles) {
       const contents = fs.readFileSync(path.join(migrationsDir, file), "utf8");
-      return contents.includes("enable_anonymous_sign_ins");
-    });
+      if (enablePattern.test(contents)) {
+        hasEnablingMigration = true;
+        break;
+      }
+    }
 
     expect(hasEnablingMigration).toBe(true);
   });
