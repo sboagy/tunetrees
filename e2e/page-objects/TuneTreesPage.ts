@@ -799,15 +799,42 @@ export class TuneTreesPage {
    * On desktop, the sidebar is always expanded, so this is a no-op.
    * On mobile, after clicking a row the sidebar is collapsed and needs to be expanded.
    */
-  async ensureSidebarExpanded() {
-    const isExpandVisible = await this.sidebarExpandButton
-      .isVisible({ timeout: 1000 })
-      .catch(() => false);
+  async ensureSidebarExpanded(opts?: { timeoutMs?: number }) {
+    const timeoutMs = opts?.timeoutMs ?? 8000;
 
-    if (isExpandVisible) {
-      await this.sidebarExpandButton.click();
-      // Wait for sidebar to expand and content to be visible
-      await this.page.waitForTimeout(500);
+    // Desktop often has no expand/collapse buttons.
+    const [expandVisibleInitial, collapseVisibleInitial] = await Promise.all([
+      this.sidebarExpandButton.isVisible({ timeout: 500 }).catch(() => false),
+      this.sidebarCollapseButton.isVisible({ timeout: 500 }).catch(() => false),
+    ]);
+    if (!expandVisibleInitial && !collapseVisibleInitial) return;
+
+    // Already expanded.
+    if (collapseVisibleInitial) return;
+
+    // On mobile, the expand button can appear a bit after a row is clicked.
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const collapseVisible = await this.sidebarCollapseButton
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (collapseVisible) return;
+
+      const expandVisible = await this.sidebarExpandButton
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (expandVisible) {
+        const expandEnabled = await this.sidebarExpandButton
+          .isEnabled()
+          .catch(() => true);
+        if (expandEnabled) {
+          await this.sidebarExpandButton.click({ timeout: 5000 });
+          await this.page.waitForTimeout(300);
+          return;
+        }
+      }
+
+      await this.page.waitForTimeout(100);
     }
   }
 
@@ -850,10 +877,22 @@ export class TuneTreesPage {
   ) {
     const tab = this.page.getByTestId(`tab-${tabId}`);
 
-    await expect(tab).toBeVisible({ timeout: 5000 });
-    await tab.click({ trial: true, timeout: 1000 });
-    await tab.click();
-    await this.page.waitForTimeout(200);
+    await expect(tab).toBeVisible({ timeout: 20_000 });
+    await expect(tab).toBeEnabled({ timeout: 20_000 });
+
+    // Avoid short "trial" clicks: they can flake under CI load.
+    // Let Playwright's normal click retry within a reasonable timeout.
+    const [selectedBefore, currentBefore] = await Promise.all([
+      tab.getAttribute("aria-selected"),
+      tab.getAttribute("aria-current"),
+    ]);
+    const isActiveBefore =
+      selectedBefore === "true" || currentBefore === "page";
+
+    if (!isActiveBefore) {
+      await tab.scrollIntoViewIfNeeded().catch(() => undefined);
+      await tab.click({ timeout: 10_000 });
+    }
 
     // Wait for the tab to become active.
     // Tabs may indicate this via `aria-selected="true"` or `aria-current="page"`.
@@ -946,8 +985,13 @@ export class TuneTreesPage {
 
       await this.searchBoxPanel.fill(tuneTitle);
       await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
-      // Close the panel if we opened it (toggle Filters button) or try Esc as a fallback
-      if (!isPanelSearchVisible) {
+
+      // Ensure the filter panel is closed so the grid is interactable.
+      // (The panel may already be open from earlier steps.)
+      const panelStillVisible = await this.searchBoxPanel
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+      if (panelStillVisible) {
         const filtersVisible = await this.filtersButton
           .isVisible({ timeout: 1000 })
           .catch(() => false);
@@ -961,9 +1005,33 @@ export class TuneTreesPage {
       }
     }
 
-    // Verify grid is visible after search
-    if (!this.page.getByText("No tunes found").isVisible()) {
-      await expect(grid).toBeVisible({ timeout: 5000 });
+    // Wait for the search results to settle: either empty state appears or
+    // at least one row is present.
+    const noTunesFound = this.page.getByText("No tunes found");
+    const dataRows = grid.locator("tbody tr[data-index], tbody tr");
+
+    await expect
+      .poll(
+        async () => {
+          const emptyVisible = await noTunesFound
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (emptyVisible) return "empty";
+
+          const rowCount = await dataRows.count().catch(() => 0);
+          if (rowCount > 0) return "rows";
+
+          return "pending";
+        },
+        { timeout: 15_000, intervals: [100, 250, 500, 1000] }
+      )
+      .not.toBe("pending");
+
+    const noTunesVisible = await noTunesFound
+      .isVisible({ timeout: 250 })
+      .catch(() => false);
+    if (!noTunesVisible) {
+      await expect(grid).toBeVisible({ timeout: 10_000 });
     }
   }
 

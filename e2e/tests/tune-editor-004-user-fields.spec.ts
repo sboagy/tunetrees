@@ -62,7 +62,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
       return;
     }
     // ARRANGE: Find a tune in repertoire grid
-    await ttPage.searchForTune("Banish Misfortune", ttPage.practiceGrid);
+    await ttPage.searchForTune("Banish Misfortune", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -115,7 +115,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     }
 
     // ARRANGE: Find a tune
-    await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
+    await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -166,7 +166,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     }
 
     // ARRANGE: Find a tune
-    await ttPage.searchForTune("Kesh Jig", ttPage.practiceGrid);
+    await ttPage.searchForTune("Kesh Jig", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -218,7 +218,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     }
 
     // ARRANGE: Find a tune
-    await ttPage.searchForTune("Dancingmaster", ttPage.practiceGrid);
+    await ttPage.searchForTune("Dancingmaster", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -250,7 +250,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     }
 
     // ARRANGE: Find a tune
-    await ttPage.searchForTune("Banish Misfortune", ttPage.practiceGrid);
+    await ttPage.searchForTune("Banish Misfortune", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -294,7 +294,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     }
 
     // ARRANGE: Find a tune (no need to open editor)
-    await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
+    await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -331,7 +331,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     }
 
     // ARRANGE: Find a tune
-    await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
+    await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
