@@ -22,6 +22,7 @@ import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../../components/grids/types";
+import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
 import {
   DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
@@ -29,7 +30,6 @@ import {
   getDefaultFieldVisibility,
   PracticeControlBanner,
 } from "../../components/practice";
-import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
 import { RepertoireEmptyState } from "../../components/repertoire";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
@@ -709,15 +709,16 @@ const PracticeIndex: Component = () => {
     if (initialSyncComplete() && !currentPlaylistId()) {
       return (
         <RepertoireEmptyState
-          title="Practice needs a repertoire"
-          description="Create or select a repertoire to build your daily practice queue."
+          title="No current repertoire"
+          description={
+            `Repertoires group tunes by instrument, genre, or goal. ` +
+            `Create a new repertoire to start practicing, or select ` +
+            `an existing repertoire, if one exists, from the Repertoire ` +
+            `menu in the top banner.`
+          }
           primaryAction={{
             label: "Create repertoire",
             onClick: () => setShowPlaylistDialog(true),
-          }}
-          secondaryAction={{
-            label: "Open Repertoire tab",
-            onClick: () => navigate("/?tab=repertoire"),
           }}
         />
       );

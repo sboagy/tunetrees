@@ -18,15 +18,18 @@ import {
   createResource,
   createSignal,
   Match,
-  Switch,
   on,
   Show,
+  Switch,
 } from "solid-js";
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { PlaylistEditorDialog } from "../components/playlists/PlaylistEditorDialog";
-import { RepertoireEmptyState, RepertoireToolbar } from "../components/repertoire";
+import {
+  RepertoireEmptyState,
+  RepertoireToolbar,
+} from "../components/repertoire";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
 import { getPlaylistTunes } from "../lib/db/queries/playlists";
@@ -376,8 +379,13 @@ const RepertoirePage: Component = () => {
         {/* No playlist selected message */}
         <Show when={!currentPlaylistId()}>
           <RepertoireEmptyState
-            title="No repertoire selected"
-            description="Repertoires group tunes by instrument, genre, or goal. Create one to start organizing your music."
+            title="No current repertoire"
+            description={
+              `Repertoires group tunes by instrument, genre, or goal. ` +
+              `Create a new repertoire and add tunes from the Catalog ` +
+              `tab, or select an existing repertoire, if available, from the ` +
+              `Repertoire menu in the top banner.`
+            }
             primaryAction={{
               label: "Create repertoire",
               onClick: () => setShowPlaylistDialog(true),
