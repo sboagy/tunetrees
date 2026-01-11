@@ -1,93 +1,146 @@
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=733558
-    // for the documentation about the tasks.json format
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "clean_test_db",
-            "type": "shell",
-            "command": "cp tunetrees_test_clean.sqlite3 tunetrees_test.sqlite3"
-        },
-        {
-            "label": "stop_server",
-            "type": "shell",
-            "command": "pkill -f 'uvicorn tunetrees.api.main:app' || true",
-            "problemMatcher": []
-        },
-        {
-            "label": "start_server",
-            "type": "shell",
-            "command": "uvicorn tunetrees.api.main:app --reload",
-            "problemMatcher": []
-        },
-        {
-            "label": "clean_and_stop",
-            "dependsOn": [
-                "stop_server",
-                "clean_test_db"
-            ]
-        },
-        {
-            "label": "stop_clean_start_server",
-            "dependsOn": [
-                "stop_server",
-                "clean_test_db",
-                "start_server"
-            ]
-        },
-        {
-            "label": "playwright:headless",
-            "type": "shell",
-            "command": "npm run test:e2e",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "playwright:headed",
-            "type": "shell",
-            "command": "npm run test:e2e:headed",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "playwright:debug",
-            "type": "shell",
-            "command": "npm run test:e2e:debug",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "playwright:report",
-            "type": "shell",
-            "command": "npm run test:e2e:report",
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "git status",
-            "type": "shell",
-            "command": "git status",
-            "problemMatcher": []
-        },
-        {
-            "label": "check backend health",
-            "type": "shell",
-            "command": "curl -s \"http://localhost:8000/hello/me\" || echo \"Backend not running\"",
-            "problemMatcher": []
-        },
-        {
-            "label": "Wait for server to start and then check backendhealth",
-            "type": "shell",
-            "command": "sleep 3 && curl -s \"http://localhost:8000/hello/me\"",
-            "problemMatcher": []
-        }
-    ]
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "clean_test_db",
+			"type": "shell",
+			"command": "cp tunetrees_test_clean.sqlite3 tunetrees_test.sqlite3"
+		},
+		{
+			"label": "stop_server",
+			"type": "shell",
+			"command": "pkill -f 'uvicorn tunetrees.api.main:app' || true",
+			"problemMatcher": []
+		},
+		{
+			"label": "start_server",
+			"type": "shell",
+			"command": "uvicorn tunetrees.api.main:app --reload",
+			"problemMatcher": []
+		},
+		{
+			"label": "clean_and_stop",
+			"dependsOn": ["stop_server", "clean_test_db"]
+		},
+		{
+			"label": "stop_clean_start_server",
+			"dependsOn": ["stop_server", "clean_test_db", "start_server"]
+		},
+		{
+			"label": "playwright:headless",
+			"type": "shell",
+			"command": "npm run test:e2e",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "playwright:headed",
+			"type": "shell",
+			"command": "npm run test:e2e:headed",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "playwright:debug",
+			"type": "shell",
+			"command": "npm run test:e2e:debug",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "playwright:report",
+			"type": "shell",
+			"command": "npm run test:e2e:report",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "git status",
+			"type": "shell",
+			"command": "git status",
+			"problemMatcher": []
+		},
+		{
+			"label": "check backend health",
+			"type": "shell",
+			"command": "curl -s \"http://localhost:8000/hello/me\" || echo \"Backend not running\"",
+			"problemMatcher": []
+		},
+		{
+			"label": "Wait for server to start and then check backendhealth",
+			"type": "shell",
+			"command": "sleep 3 && curl -s \"http://localhost:8000/hello/me\"",
+			"problemMatcher": []
+		},
+		{
+			"label": "dev:web",
+			"type": "shell",
+			"command": "npm run dev",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "always",
+				"focus": false,
+				"clear": true,
+				"close": false,
+				"showReuseMessage": false
+			}
+		},
+		{
+			"label": "dev:worker",
+			"type": "shell",
+			"command": "npm run dev",
+			"options": {
+				"cwd": "${workspaceFolder}/worker"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"panel": "new",
+				"reveal": "always",
+				"focus": false,
+				"clear": true,
+				"close": false,
+				"showReuseMessage": false
+			}
+		},
+		{
+			"label": "preview:local",
+			"type": "shell",
+			"command": "npm run build:preview-local && npm run preview:local",
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],
+			"presentation": {
+				"panel": "dedicated",
+				"reveal": "always",
+				"focus": false,
+				"clear": true,
+				"close": false,
+				"showReuseMessage": false
+			}
+		},
+		{
+			"label": "dev:all",
+			"dependsOn": ["dev:web", "dev:worker", "preview:local"],
+			"dependsOrder": "parallel",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
 }

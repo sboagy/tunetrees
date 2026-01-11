@@ -17,13 +17,19 @@ import {
   createMemo,
   createResource,
   createSignal,
+  Match,
   on,
   Show,
+  Switch,
 } from "solid-js";
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
-import { RepertoireToolbar } from "../components/repertoire";
+import { PlaylistEditorDialog } from "../components/playlists/PlaylistEditorDialog";
+import {
+  RepertoireEmptyState,
+  RepertoireToolbar,
+} from "../components/repertoire";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
 import { getPlaylistTunes } from "../lib/db/queries/playlists";
@@ -50,10 +56,16 @@ const arraysEqual = (a: string[], b: string[]) =>
 const RepertoirePage: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, localDb, repertoireListChanged, catalogListChanged } =
-    useAuth();
+  const {
+    user,
+    localDb,
+    repertoireListChanged,
+    catalogListChanged,
+    incrementRepertoireListChanged,
+  } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
 
   // Get current user ID (supabase UUID)
   const userId = createMemo(() => user()?.id || null);
@@ -216,6 +228,10 @@ const RepertoirePage: Component = () => {
     }
   );
 
+  const repertoireIsEmpty = createMemo(
+    () => !playlistTunes.loading && (playlistTunes()?.length ?? 0) === 0
+  );
+
   // Fetch all genres for proper genre names
   const [allGenres] = createResource(
     () => {
@@ -324,35 +340,70 @@ const RepertoirePage: Component = () => {
       {/* Grid wrapper - overflow-hidden constrains grid height */}
       <div class={GRID_CONTENT_CONTAINER}>
         <Show when={userId() && currentPlaylistId()}>
-          <TunesGridRepertoire
-            userId={userId()!}
-            playlistId={currentPlaylistId()!}
-            tablePurpose="repertoire"
-            searchQuery={searchQuery()}
-            selectedTypes={selectedTypes()}
-            selectedModes={selectedModes()}
-            selectedGenreNames={selectedGenres()}
-            allGenres={allGenres() || []}
-            onTuneSelect={handleTuneSelect}
-            onSelectionChange={setSelectedRowsCount}
-            onTableReady={setTableInstance}
-          />
+          <Switch>
+            <Match when={playlistTunes.loading}>
+              <div class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                Loading repertoire...
+              </div>
+            </Match>
+
+            <Match when={repertoireIsEmpty()}>
+              <RepertoireEmptyState
+                title="This repertoire is empty"
+                description="Add tunes from the Catalog tab to start practicing or import from another repertoire."
+                primaryAction={{
+                  label: "Browse catalog",
+                  onClick: () => navigate("/?tab=catalog"),
+                }}
+              />
+            </Match>
+
+            <Match when={!repertoireIsEmpty()}>
+              <TunesGridRepertoire
+                userId={userId()!}
+                playlistId={currentPlaylistId()!}
+                tablePurpose="repertoire"
+                searchQuery={searchQuery()}
+                selectedTypes={selectedTypes()}
+                selectedModes={selectedModes()}
+                selectedGenreNames={selectedGenres()}
+                allGenres={allGenres() || []}
+                onTuneSelect={handleTuneSelect}
+                onSelectionChange={setSelectedRowsCount}
+                onTableReady={setTableInstance}
+              />
+            </Match>
+          </Switch>
         </Show>
 
         {/* No playlist selected message */}
         <Show when={!currentPlaylistId()}>
-          <div class="flex-1 flex items-center justify-center">
-            <div class="text-center">
-              <p class="text-lg text-gray-600 dark:text-gray-400">
-                No playlist selected
-              </p>
-              <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                Please select a playlist to view your repertoire
-              </p>
-            </div>
-          </div>
+          <RepertoireEmptyState
+            title="No current repertoire"
+            description={
+              `Repertoires group tunes by instrument, genre, or goal. ` +
+              `Create a new repertoire and add tunes from the Catalog ` +
+              `tab, or select an existing repertoire, if available, from the ` +
+              `Repertoire menu in the top banner.`
+            }
+            primaryAction={{
+              label: "Create repertoire",
+              onClick: () => setShowPlaylistDialog(true),
+            }}
+          />
         </Show>
       </div>
+
+      <Show when={showPlaylistDialog()}>
+        <PlaylistEditorDialog
+          isOpen={showPlaylistDialog()}
+          onClose={() => setShowPlaylistDialog(false)}
+          onSaved={() => {
+            incrementRepertoireListChanged();
+            setShowPlaylistDialog(false);
+          }}
+        />
+      </Show>
     </div>
   );
 };
