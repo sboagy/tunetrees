@@ -150,7 +150,7 @@ Update your OAuth app configurations with production URLs:
 
 ### Local Development
 
-1. Start Supabase: `npm run supabase:start`
+1. Start Supabase: `npx supabase start`
 2. Start dev server: `npm run dev`
 3. Navigate to `http://localhost:5173/login`
 4. Click "Continue with Google" or "Continue with GitHub"

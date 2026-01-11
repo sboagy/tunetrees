@@ -8,7 +8,6 @@
  * 
  * Usage:
  *   node scripts/verify-oauth-config.js
- *   npm run verify:oauth
  */
 
 import fs from 'fs';

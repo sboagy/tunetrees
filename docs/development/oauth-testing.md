@@ -271,7 +271,12 @@ test.skip('OAuth sign-in with Google', async ({ page }) => {
 2. Check Supabase Dashboard → Table Editor → user_profile
 3. Verify user_profile row created with correct supabase_user_id
 4. Check sync logs in console (enable with VITE_SYNC_DEBUG=true)
-5. Manually trigger sync: Open DevTools → Console → `await window.__forceSyncDownForTest()`
+5. Manually trigger sync via browser console (development only):
+   ```javascript
+   // NOTE: This debug function is only available in development builds
+   // when the test API is enabled (e.g., in E2E tests)
+   await window.__forceSyncDownForTest()
+   ```
 
 ---
 
