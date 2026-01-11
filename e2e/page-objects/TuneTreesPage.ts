@@ -426,6 +426,15 @@ export class TuneTreesPage {
   // ===== Authentication Helper Methods =====
 
   /**
+   * Wait for the authenticated "home" UI to be available.
+   * In practice, the presence of the top nav tabs indicates the SPA is mounted and auth has resolved.
+   */
+  async waitForHome(opts?: { timeoutMs?: number }) {
+    const timeoutMs = opts?.timeoutMs ?? 30_000;
+    await expect(this.practiceTab).toBeVisible({ timeout: timeoutMs });
+  }
+
+  /**
    * Navigate to login page and clear any existing auth state
    */
   async gotoLogin() {
@@ -459,6 +468,9 @@ export class TuneTreesPage {
 
     // Dismiss onboarding overlay if it appears (for new users)
     await this.dismissOnboardingIfPresent();
+
+    // Ensure the app shell is actually ready before returning to the test.
+    await this.waitForHome({ timeoutMs: 30_000 });
   }
 
   /**
@@ -478,6 +490,9 @@ export class TuneTreesPage {
 
     // Complete onboarding by creating a playlist (instead of skipping)
     await this.completeOnboardingWithPlaylist(playlistName);
+
+    // Ensure the app shell is actually ready before returning to the test.
+    await this.waitForHome({ timeoutMs: 30_000 });
   }
 
   /**
