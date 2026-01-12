@@ -22,6 +22,7 @@ import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../../components/grids/types";
+import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
 import {
   DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
@@ -29,6 +30,7 @@ import {
   getDefaultFieldVisibility,
   PracticeControlBanner,
 } from "../../components/practice";
+import { RepertoireEmptyState } from "../../components/repertoire";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { dailyPracticeQueue } from "../../lib/db/schema";
@@ -71,8 +73,10 @@ const PracticeIndex: Component = () => {
     remoteSyncDownCompletionVersion,
     initialSyncComplete,
     syncPracticeScope,
+    incrementRepertoireListChanged,
   } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
+  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
 
   // Get current user's local database ID from user_profile
   const [userId] = createResource(
@@ -733,6 +737,34 @@ const PracticeIndex: Component = () => {
     navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
+  const renderPracticeFallback = () => {
+    if (initialSyncComplete() && !currentPlaylistId()) {
+      return (
+        <RepertoireEmptyState
+          title="No current repertoire"
+          description={
+            `Repertoires group tunes by instrument, genre, or goal. ` +
+            `Create a new repertoire to start practicing, or select ` +
+            `an existing repertoire, if one exists, from the Repertoire ` +
+            `menu in the top banner.`
+          }
+          primaryAction={{
+            label: "Create repertoire",
+            onClick: () => setShowPlaylistDialog(true),
+          }}
+        />
+      );
+    }
+
+    return (
+      <div class="flex items-center justify-center h-full">
+        <p class="text-gray-500 dark:text-gray-400">
+          Loading practice queue...
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* Date Rollover Banner - appears when practice date changes */}
@@ -766,13 +798,7 @@ const PracticeIndex: Component = () => {
             !userId.loading &&
             userId()
           }
-          fallback={
-            <div class="flex items-center justify-center h-full">
-              <p class="text-gray-500 dark:text-gray-400">
-                Loading practice queue... (top)
-              </p>
-            </div>
-          }
+          fallback={renderPracticeFallback()}
         >
           <Show
             when={!flashcardMode()}
@@ -802,6 +828,17 @@ const PracticeIndex: Component = () => {
           </Show>
         </Show>
       </div>
+
+      <Show when={showPlaylistDialog()}>
+        <PlaylistEditorDialog
+          isOpen={showPlaylistDialog()}
+          onClose={() => setShowPlaylistDialog(false)}
+          onSaved={() => {
+            incrementRepertoireListChanged();
+            setShowPlaylistDialog(false);
+          }}
+        />
+      </Show>
     </div>
   );
 };

@@ -120,17 +120,18 @@ test.describe("Anonymous User Sign-In Flow", () => {
     await expect(ttPage.practiceTab).toBeVisible({ timeout: 10000 });
     await ttPage.practiceTab.click();
     // Check that the practice tab content area exists (may show loading or empty state)
-    const practiceContent = ttPage.page
-      .getByTestId("tunes-grid-scheduled")
-      .or(ttPage.page.getByText("Loading practice queue"))
-      .or(ttPage.page.getByText("No tunes are due"));
+    const practiceContent = ttPage.page.getByRole("heading", {
+      name: "No current repertoire",
+    });
     await expect(practiceContent).toBeVisible({ timeout: 10000 });
+    const createRepertoireButton = ttPage.page.getByTestId("tab-repertoire");
+    await expect(createRepertoireButton).toBeVisible();
 
     // Verify Repertoire tab accessible (new users see "No playlist selected")
     await ttPage.repertoireTab.click();
-    const repertoireContent = ttPage.page
-      .getByTestId("tunes-grid-repertoire")
-      .or(ttPage.page.getByText("No playlist selected"));
+    const repertoireContent = ttPage.page.getByRole("heading", {
+      name: "No current repertoire",
+    });
     await expect(repertoireContent).toBeVisible({ timeout: 10000 });
 
     // Verify Catalog tab accessible (always has public tunes, but needs loading time)

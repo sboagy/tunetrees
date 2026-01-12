@@ -90,9 +90,8 @@ export const OnboardingOverlay: Component = () => {
                       What's a repertoire?
                     </h3>
                     <p class="text-sm text-blue-800 dark:text-blue-200">
-                      A repertoire provides the context for specific
-                      instruments, genres, or practice goals. You can manage
-                      multiple repertoires or maintain a single one.
+                      Repertoires group tunes by instrument, genre, or goal. You
+                      can manage multiple repertoires or maintain a single one.
                     </p>
                   </div>
 
