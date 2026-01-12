@@ -15,7 +15,7 @@
  */
 
 import { ChevronLeft, ChevronRight } from "lucide-solid";
-import type { Component } from "solid-js";
+import type { Accessor, Component } from "solid-js";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
@@ -24,7 +24,7 @@ import { FlashcardCard } from "./FlashcardCard";
 import type { FlashcardFieldVisibilityByFace } from "./flashcard-fields";
 
 export interface FlashcardViewProps {
-  tunes: ITuneOverview[];
+  tunes: Accessor<ITuneOverview[]>;
   onRecallEvalChange?: (tuneId: string, value: string) => void;
   fieldVisibility?: FlashcardFieldVisibilityByFace;
   // Shared evaluation state (same as TunesGridScheduled)
@@ -44,20 +44,22 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   // (evaluation staging now centralized in parent PracticeIndex)
   // const { incrementPracticeListStagedChanged } = useAuth();
 
+  const tunes = () => props.tunes();
+
   // Use shared evaluations from parent (single source of truth)
   const evaluations = () => props.evaluations || {};
 
   // Get current tune
   const currentTune = () => {
-    const tunes = props.tunes;
+    const list = tunes();
     const index = currentIndex();
-    return tunes[index] || null;
+    return list[index] || null;
   };
 
   // When tunes list changes (e.g., after submit with showSubmitted=false),
   // adjust currentIndex if it's now out of bounds
   createEffect(() => {
-    const tunesLength = props.tunes.length;
+    const tunesLength = tunes().length;
     const index = currentIndex();
 
     console.log(
@@ -82,11 +84,11 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   createEffect(() => {
     if (didInitFromSelection()) return;
     const selectedId = currentTuneId?.() ?? null;
-    const tunes = props.tunes;
-    if (!tunes || tunes.length === 0) return; // wait until tunes are ready
+    const list = tunes();
+    if (!list || list.length === 0) return; // wait until tunes are ready
 
     if (selectedId !== null) {
-      const idx = tunes.findIndex((t) => t.id === selectedId);
+      const idx = list.findIndex((t) => t.id === selectedId);
       if (idx >= 0) {
         setCurrentIndex(idx);
       }
@@ -111,7 +113,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   };
 
   const goToNext = () => {
-    if (currentIndex() < props.tunes.length - 1) {
+    if (currentIndex() < tunes().length - 1) {
       setCurrentIndex(currentIndex() + 1);
       setIsRevealed(false); // Reset reveal state
     }
@@ -235,7 +237,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
             </span>{" "}
             of{" "}
             <span class="font-semibold text-gray-900 dark:text-gray-100">
-              {props.tunes.length}
+              {tunes().length}
             </span>
           </div>
 
@@ -299,7 +301,7 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
               <button
                 type="button"
                 onClick={goToNext}
-                disabled={currentIndex() === props.tunes.length - 1}
+                disabled={currentIndex() === tunes().length - 1}
                 class="absolute right-2 top-20 p-3 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm shadow-lg border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all z-10"
                 aria-label="Next tune"
                 data-testid="flashcard-next-button"

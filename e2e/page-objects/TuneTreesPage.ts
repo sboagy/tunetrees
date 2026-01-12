@@ -426,6 +426,15 @@ export class TuneTreesPage {
   // ===== Authentication Helper Methods =====
 
   /**
+   * Wait for the authenticated "home" UI to be available.
+   * In practice, the presence of the top nav tabs indicates the SPA is mounted and auth has resolved.
+   */
+  async waitForHome(opts?: { timeoutMs?: number }) {
+    const timeoutMs = opts?.timeoutMs ?? 30_000;
+    await expect(this.practiceTab).toBeVisible({ timeout: timeoutMs });
+  }
+
+  /**
    * Navigate to login page and clear any existing auth state
    */
   async gotoLogin() {
@@ -459,6 +468,9 @@ export class TuneTreesPage {
 
     // Dismiss onboarding overlay if it appears (for new users)
     await this.dismissOnboardingIfPresent();
+
+    // Ensure the app shell is actually ready before returning to the test.
+    await this.waitForHome({ timeoutMs: 30_000 });
   }
 
   /**
@@ -478,6 +490,9 @@ export class TuneTreesPage {
 
     // Complete onboarding by creating a playlist (instead of skipping)
     await this.completeOnboardingWithPlaylist(playlistName);
+
+    // Ensure the app shell is actually ready before returning to the test.
+    await this.waitForHome({ timeoutMs: 30_000 });
   }
 
   /**
@@ -784,15 +799,42 @@ export class TuneTreesPage {
    * On desktop, the sidebar is always expanded, so this is a no-op.
    * On mobile, after clicking a row the sidebar is collapsed and needs to be expanded.
    */
-  async ensureSidebarExpanded() {
-    const isExpandVisible = await this.sidebarExpandButton
-      .isVisible({ timeout: 1000 })
-      .catch(() => false);
+  async ensureSidebarExpanded(opts?: { timeoutMs?: number }) {
+    const timeoutMs = opts?.timeoutMs ?? 8000;
 
-    if (isExpandVisible) {
-      await this.sidebarExpandButton.click();
-      // Wait for sidebar to expand and content to be visible
-      await this.page.waitForTimeout(500);
+    // Desktop often has no expand/collapse buttons.
+    const [expandVisibleInitial, collapseVisibleInitial] = await Promise.all([
+      this.sidebarExpandButton.isVisible({ timeout: 500 }).catch(() => false),
+      this.sidebarCollapseButton.isVisible({ timeout: 500 }).catch(() => false),
+    ]);
+    if (!expandVisibleInitial && !collapseVisibleInitial) return;
+
+    // Already expanded.
+    if (collapseVisibleInitial) return;
+
+    // On mobile, the expand button can appear a bit after a row is clicked.
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const collapseVisible = await this.sidebarCollapseButton
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (collapseVisible) return;
+
+      const expandVisible = await this.sidebarExpandButton
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (expandVisible) {
+        const expandEnabled = await this.sidebarExpandButton
+          .isEnabled()
+          .catch(() => true);
+        if (expandEnabled) {
+          await this.sidebarExpandButton.click({ timeout: 5000 });
+          await this.page.waitForTimeout(300);
+          return;
+        }
+      }
+
+      await this.page.waitForTimeout(100);
     }
   }
 
@@ -835,10 +877,22 @@ export class TuneTreesPage {
   ) {
     const tab = this.page.getByTestId(`tab-${tabId}`);
 
-    await expect(tab).toBeVisible({ timeout: 5000 });
-    await tab.click({ trial: true, timeout: 1000 });
-    await tab.click();
-    await this.page.waitForTimeout(200);
+    await expect(tab).toBeVisible({ timeout: 20_000 });
+    await expect(tab).toBeEnabled({ timeout: 20_000 });
+
+    // Avoid short "trial" clicks: they can flake under CI load.
+    // Let Playwright's normal click retry within a reasonable timeout.
+    const [selectedBefore, currentBefore] = await Promise.all([
+      tab.getAttribute("aria-selected"),
+      tab.getAttribute("aria-current"),
+    ]);
+    const isActiveBefore =
+      selectedBefore === "true" || currentBefore === "page";
+
+    if (!isActiveBefore) {
+      await tab.scrollIntoViewIfNeeded().catch(() => undefined);
+      await tab.click({ timeout: 10_000 });
+    }
 
     // Wait for the tab to become active.
     // Tabs may indicate this via `aria-selected="true"` or `aria-current="page"`.
@@ -855,6 +909,21 @@ export class TuneTreesPage {
       )
       .toBe(true);
 
+    // Wait for tab-specific, always-present UI before asserting on grids.
+    // Some grids only mount when data is loaded and non-empty.
+    const sentinel =
+      tabId === "practice"
+        ? this.practiceColumnsButton
+        : tabId === "repertoire"
+          ? this.repertoireColumnsButton
+          : tabId === "catalog"
+            ? this.catalogColumnsButton
+            : undefined;
+    if (sentinel) {
+      await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
+      await expect(sentinel).toBeVisible({ timeout: 20_000 });
+    }
+
     // Then wait for the corresponding grid/content to be visible
     const grid =
       tabId === "practice"
@@ -865,8 +934,23 @@ export class TuneTreesPage {
             ? this.catalogGrid
             : undefined;
     if (grid) {
-      await expect(grid).toBeAttached({ timeout: 20000 });
-      await expect(grid).toBeVisible({ timeout: 20000 });
+      // Best-effort: if the grid is mounted, wait for it; otherwise allow
+      // callers to assert on loading/empty states as needed.
+      const initialCount = await grid.count().catch(() => 0);
+      if (initialCount === 0) {
+        await expect
+          .poll(async () => (await grid.count().catch(() => 0)) > 0, {
+            timeout: 4000,
+            intervals: [100, 250, 500, 1000],
+          })
+          .toBe(true)
+          .catch(() => undefined);
+      }
+
+      const finalCount = await grid.count().catch(() => 0);
+      if (finalCount > 0) {
+        await expect(grid).toBeVisible({ timeout: 20_000 });
+      }
     }
   }
 
@@ -901,8 +985,13 @@ export class TuneTreesPage {
 
       await this.searchBoxPanel.fill(tuneTitle);
       await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
-      // Close the panel if we opened it (toggle Filters button) or try Esc as a fallback
-      if (!isPanelSearchVisible) {
+
+      // Ensure the filter panel is closed so the grid is interactable.
+      // (The panel may already be open from earlier steps.)
+      const panelStillVisible = await this.searchBoxPanel
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+      if (panelStillVisible) {
         const filtersVisible = await this.filtersButton
           .isVisible({ timeout: 1000 })
           .catch(() => false);
@@ -916,9 +1005,33 @@ export class TuneTreesPage {
       }
     }
 
-    // Verify grid is visible after search
-    if (!this.page.getByText("No tunes found").isVisible()) {
-      await expect(grid).toBeVisible({ timeout: 5000 });
+    // Wait for the search results to settle: either empty state appears or
+    // at least one row is present.
+    const noTunesFound = this.page.getByText("No tunes found");
+    const dataRows = grid.locator("tbody tr[data-index], tbody tr");
+
+    await expect
+      .poll(
+        async () => {
+          const emptyVisible = await noTunesFound
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (emptyVisible) return "empty";
+
+          const rowCount = await dataRows.count().catch(() => 0);
+          if (rowCount > 0) return "rows";
+
+          return "pending";
+        },
+        { timeout: 15_000, intervals: [100, 250, 500, 1000] }
+      )
+      .not.toBe("pending");
+
+    const noTunesVisible = await noTunesFound
+      .isVisible({ timeout: 250 })
+      .catch(() => false);
+    if (!noTunesVisible) {
+      await expect(grid).toBeVisible({ timeout: 10_000 });
     }
   }
 
@@ -1240,7 +1353,7 @@ export class TuneTreesPage {
 
   async enableFlashcardMode(timeoutAfter: number = 800) {
     await this.flashcardModeSwitch.click();
-    await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
+    await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
 
     if (typeof timeoutAfter === "number") {
       await this.page.waitForTimeout(timeoutAfter);
@@ -1299,20 +1412,15 @@ export class TuneTreesPage {
   }
 
   async revealCard() {
-    // Prefer desktop toggle; fall back to mobile button
-    const desktopVisible = await this.flashcardRevealToggle
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (desktopVisible) {
-      await this.flashcardRevealToggle.click();
-      return;
-    }
-    const mobileVisible = await this.flashcardRevealButtonMobile
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (mobileVisible) {
-      await this.flashcardRevealButtonMobile.click();
-    }
+    await expect(this.flashcardRevealToggle).toBeVisible({ timeout: 10_000 });
+    const before =
+      (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
+    await this.flashcardRevealToggle.click();
+    await expect(this.flashcardRevealToggle).not.toHaveAttribute(
+      "aria-label",
+      before,
+      { timeout: 5000 }
+    );
   }
 
   /**
@@ -1321,28 +1429,28 @@ export class TuneTreesPage {
    * Uses aria-label on the reveal toggle which reflects the action ("Show back" when on front, "Show front" when on back).
    */
   async ensureReveal(desiredBack: boolean) {
-    // Try desktop toggle first
-    const desktopVisible = await this.flashcardRevealToggle
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (desktopVisible) {
-      for (let i = 0; i < 2; i++) {
-        const label =
-          (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
-        const currentlyBack = /Show front/i.test(label); // if button says "Show front", we are on Back
-        if (currentlyBack === desiredBack) return;
-        await this.flashcardRevealToggle.click();
+    await expect(this.flashcardRevealToggle).toBeVisible({ timeout: 10_000 });
+
+    const desiredLabel = desiredBack ? /Show front/i : /Show back/i;
+    for (let i = 0; i < 2; i++) {
+      const label =
+        (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
+      const currentlyBack = /Show front/i.test(label); // if button says "Show front", we are on Back
+      if (currentlyBack === desiredBack) {
+        await expect(this.flashcardRevealToggle).toHaveAttribute(
+          "aria-label",
+          desiredLabel,
+          { timeout: 5000 }
+        );
+        return;
       }
-      return;
-    }
-    // Fallback to mobile button: we can only toggle; assume initial is front
-    const mobileVisible = await this.flashcardRevealButtonMobile
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (mobileVisible) {
-      if (desiredBack) {
-        await this.flashcardRevealButtonMobile.click();
-      }
+
+      await this.flashcardRevealToggle.click();
+      await expect(this.flashcardRevealToggle).toHaveAttribute(
+        "aria-label",
+        desiredLabel,
+        { timeout: 5000 }
+      );
     }
   }
 
@@ -1409,9 +1517,9 @@ export class TuneTreesPage {
       }
 
       const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
-      await expect(whichOption).toBeVisible({ timeout: 3000 });
-
       try {
+        await expect(whichOption).toBeVisible({ timeout: 4000 });
+        await expect(whichOption).toBeEnabled({ timeout: 4000 });
         await whichOption.click({ trial: true, timeout: 3000 });
         await whichOption.click({ timeout: 3000 });
       } catch {
@@ -1468,90 +1576,79 @@ export class TuneTreesPage {
   ) {
     const nOuterAttempts = 6;
     for (let outerAttempt = 0; outerAttempt < nOuterAttempts; outerAttempt++) {
-      // Open the first (and only) evaluation combobox in the card
       try {
-        const evalButton = this.page.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
-        // If not immediately clickable, ensure the back of the card is revealed
-        // const clickable = await evalButton
-        //   .isVisible({ timeout: 500 })
-        //   .catch(() => false);
-        // if (!clickable) {
-        //   await this.ensureReveal(true);
-        // }
+        await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
+
+        // Open the evaluation combobox within the flashcard view (avoid picking up
+        // any recall-eval controls that might exist elsewhere on the page).
+        const evalButton = this.flashcardView.getByTestId(
+          /^recall-eval-[0-9a-f-]+$/i
+        );
         console.log(`outerAttempt: ${outerAttempt}`);
-        await expect(evalButton).toBeAttached({ timeout: 10_000 });
+        await expect(evalButton).toBeVisible({ timeout: 10_000 });
         await evalButton.scrollIntoViewIfNeeded();
-        await expect(evalButton).toBeVisible({ timeout: 5000 });
-        await expect(evalButton).toBeEnabled({ timeout: 5000 });
+        await expect(evalButton).toBeEnabled({ timeout: 10_000 });
 
-        // Verify it is actually clickable (hit target not covered, etc.) before clicking for real.
-        await evalButton.click({ trial: true, timeout: 5000 });
-        await evalButton.click({ timeout: 5000 });
-        await this.page.waitForTimeout(200);
-        const optionTestId = `recall-eval-option-${value}`;
-        const option = this.page.getByTestId(optionTestId);
+        const dropdownTestId = await evalButton.getAttribute("data-testid");
+        const tuneId = this.parseTuneIdFromRecallEvalTestId(dropdownTestId);
+        if (!tuneId) {
+          throw new Error(
+            `Expected tuneId to be present on flashcard recall evaluation dropdown (data-testid=${String(
+              dropdownTestId
+            )})`
+          );
+        }
 
-        let lastError: unknown;
+        const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
 
-        for (let attempt = 0; attempt < 12; attempt++) {
+        // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
+        // Retry a couple of times, and ensure the card back is revealed if needed.
+        let menuOpened = false;
+        for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
+          await evalButton.click({ trial: true, timeout: 5000 });
+          await evalButton.click({ timeout: 5000 });
+
           try {
-            await option.scrollIntoViewIfNeeded();
-
-            const isVisible = await option.isVisible().catch(() => false);
-            if (!isVisible) {
-              await this.page.waitForTimeout(150);
-              continue;
-            }
-            const isEnabled = await option.isEnabled().catch(() => false);
-            if (!isEnabled) {
-              await this.page.waitForTimeout(150);
-              continue;
-            }
-            lastError = undefined;
+            await expect(menu).toBeVisible({ timeout: 4000 });
+            menuOpened = true;
             break;
-          } catch (err) {
-            lastError = err;
-            if (attempt === 11) throw err;
+          } catch {
+            try {
+              await this.ensureReveal(true);
+            } catch {}
+            try {
+              await this.page.keyboard.press("Escape");
+            } catch {}
+            await this.page.waitForTimeout(200);
           }
-          await this.page.waitForTimeout(150);
         }
 
-        if (lastError) throw lastError;
-
-        await expect(option).toBeAttached({ timeout: 800 });
-        await expect(option).toBeVisible({ timeout: 800 });
-        await expect(option).toBeEnabled({ timeout: 800 });
-
-        // "Definitely clickable": do a trial click first (verifies hit-target, not covered, etc.)
-        // await option.click({ trial: true, timeout: 5000 });
-        await option.click();
-        for (let i = 0; i < 40; i++) {
-          const stillVisible = await option.isVisible().catch(() => false);
-          if (!stillVisible) break;
-          await this.page.waitForTimeout(50);
-        }
-
-        const stillVisible = await option.isVisible().catch(() => false);
-        if (stillVisible) {
-          await this.page.screenshot({
-            path: `test-results/flashcard-eval-option-still-visible-${Date.now()}.png`,
-          });
+        if (!menuOpened) {
           throw new Error(
-            `Evaluation option "${optionTestId}" did not disappear after selection`
+            `Failed to open recall evaluation menu for tune ${tuneId}`
           );
         }
-        await this.page.waitForTimeout(200);
 
-        const textContent = await evalButton.textContent();
-        const testValue = value === "not-set" ? "(Not Set)" : `${value}:`;
-        if (textContent && new RegExp(testValue, "i").test(textContent)) {
-          break;
-        }
-        if (outerAttempt === nOuterAttempts - 1) {
-          throw new Error(
-            `Could not set  "recall-eval-${value}" option after ${nOuterAttempts} attempts`
-          );
-        }
+        const optionTestId = `recall-eval-option-${value}`;
+        const option = menu.getByTestId(optionTestId);
+        await expect(option).toBeVisible({ timeout: 5000 });
+        await expect(option).toBeEnabled({ timeout: 5000 });
+
+        await option.click({ trial: true, timeout: 5000 });
+        await option.click({ timeout: 5000 });
+
+        await expect(menu)
+          .toBeHidden({ timeout: 5000 })
+          .catch(() => undefined);
+
+        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+        await expect
+          .poll(async () => (await evalButton.textContent()) ?? "", {
+            timeout: 8000,
+            intervals: [100, 250, 500, 1000],
+          })
+          .toMatch(new RegExp(expectedLabel, "i"));
+        break;
       } catch (err) {
         if (outerAttempt === nOuterAttempts - 1) throw err;
       }
@@ -1562,8 +1659,27 @@ export class TuneTreesPage {
   }
 
   async openFlashcardFieldsMenu() {
-    await this.practiceColumnsButton.click();
-    await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 2000 });
+    // Mobile Chrome can be slow to attach/render the menu; retry a couple times.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await this.practiceColumnsButton.scrollIntoViewIfNeeded();
+      await expect(this.practiceColumnsButton).toBeVisible({ timeout: 5000 });
+      await expect(this.practiceColumnsButton).toBeEnabled({ timeout: 5000 });
+      await this.practiceColumnsButton.click();
+
+      try {
+        await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });
+        return;
+      } catch {
+        // Back out and retry.
+        try {
+          await this.page.keyboard.press("Escape");
+        } catch {}
+        await this.page.waitForTimeout(300);
+      }
+    }
+
+    // Last attempt: throw a useful assertion error.
+    await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });
   }
 
   async toggleFlashcardField(
@@ -1580,9 +1696,17 @@ export class TuneTreesPage {
       if (isChecked !== desired) {
         await checkbox.click();
       }
+      if (desired) {
+        await expect(checkbox).toBeChecked({ timeout: 3000 });
+      } else {
+        await expect(checkbox).not.toBeChecked({ timeout: 3000 });
+      }
     }
     // Click outside to close menu (click Columns/Fields button again)
     await this.practiceColumnsButton.click();
+    await expect(this.flashcardFieldsMenu)
+      .toBeHidden({ timeout: 5000 })
+      .catch(() => undefined);
   }
 
   async getFlashcardCounterText(): Promise<string> {

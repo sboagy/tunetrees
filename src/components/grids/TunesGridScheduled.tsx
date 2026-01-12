@@ -67,15 +67,10 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         ...entry,
         tune_id: entry.id, // PracticeListStagedRow uses 'id' field
         bucket: bucketNames[entry.bucket] || "Due Today",
-        // Override recall_eval with local state if user has made a selection
-        // CRITICAL: If evaluations object is empty (after clear), show empty string
-        // not the stale database value. This ensures controls update immediately.
+        // Override recall_eval with local state if user has made a selection.
+        // Otherwise, fall back to DB-staged value from the joined VIEW (table_transient_data).
         recall_eval:
-          entry.id in evals
-            ? evals[entry.id] // User has selected something (including "")
-            : Object.keys(evals).length === 0
-              ? "" // Evaluations were just cleared - show empty
-              : entry.recall_eval || "", // Fallback to DB value only if evals not cleared
+          entry.id in evals ? evals[entry.id] : entry.recall_eval || "",
         // All latest_* fields already provided by VIEW via COALESCE
       };
     });
