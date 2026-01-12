@@ -48,12 +48,19 @@ export const UIPreferencesProvider: ParentComponent = (props) => {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const prefs = JSON.parse(stored) as UIPreferences;
-        if (prefs.sidebarFontSize) {
+        // Validate the font size value
+        if (
+          prefs.sidebarFontSize === "small" ||
+          prefs.sidebarFontSize === "medium" ||
+          prefs.sidebarFontSize === "large"
+        ) {
           setSidebarFontSizeSignal(prefs.sidebarFontSize);
         }
       }
     } catch (error) {
       console.error("Failed to load UI preferences from localStorage:", error);
+      // Fall back to default preferences
+      setSidebarFontSizeSignal(DEFAULT_PREFERENCES.sidebarFontSize);
     }
   });
 

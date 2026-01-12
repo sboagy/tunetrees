@@ -75,6 +75,7 @@ const AppearancePage: Component = () => {
               {fontSizeOptions.map((option) => {
                 const isSelected = () => sidebarFontSize() === option.value;
                 const fontClasses = getSidebarFontClasses(option.value);
+                const radioId = `font-size-${option.value}`;
 
                 return (
                   <div
@@ -85,42 +86,48 @@ const AppearancePage: Component = () => {
                     }`}
                     data-testid={`font-size-option-${option.value}`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleFontSizeChange(option.value)}
-                      class="w-full text-left"
+                    <label
+                      for={radioId}
+                      class="w-full cursor-pointer flex items-start justify-between"
                     >
-                      <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                          <div class="flex items-center gap-2 mb-1">
-                            <span class="font-semibold text-gray-900 dark:text-gray-100">
-                              {option.label}
+                      <input
+                        type="radio"
+                        id={radioId}
+                        name="sidebar-font-size"
+                        value={option.value}
+                        checked={isSelected()}
+                        onChange={() => handleFontSizeChange(option.value)}
+                        class="sr-only"
+                      />
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="font-semibold text-gray-900 dark:text-gray-100">
+                            {option.label}
+                          </span>
+                          {isSelected() && (
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                              Current
                             </span>
-                            {isSelected() && (
-                              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                                Current
-                              </span>
-                            )}
-                          </div>
-                          <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            {option.description}
+                          )}
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          {option.description}
+                        </p>
+                        {/* Preview */}
+                        <div class="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+                          <p
+                            class={`${fontClasses.text} text-gray-700 dark:text-gray-300`}
+                          >
+                            Sample sidebar text
                           </p>
-                          {/* Preview */}
-                          <div class="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
-                            <p
-                              class={`${fontClasses.text} text-gray-700 dark:text-gray-300`}
-                            >
-                              Sample sidebar text
-                            </p>
-                            <p
-                              class={`${fontClasses.textSmall} text-gray-500 dark:text-gray-400 mt-1`}
-                            >
-                              Sample smaller text (dates, labels)
-                            </p>
-                          </div>
+                          <p
+                            class={`${fontClasses.textSmall} text-gray-500 dark:text-gray-400 mt-1`}
+                          >
+                            Sample smaller text (dates, labels)
+                          </p>
                         </div>
                       </div>
-                    </button>
+                    </label>
                   </div>
                 );
               })}
