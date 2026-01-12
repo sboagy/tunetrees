@@ -1353,7 +1353,7 @@ export class TuneTreesPage {
 
   async enableFlashcardMode(timeoutAfter: number = 800) {
     await this.flashcardModeSwitch.click();
-    await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
+    await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
 
     if (typeof timeoutAfter === "number") {
       await this.page.waitForTimeout(timeoutAfter);
@@ -1412,20 +1412,15 @@ export class TuneTreesPage {
   }
 
   async revealCard() {
-    // Prefer desktop toggle; fall back to mobile button
-    const desktopVisible = await this.flashcardRevealToggle
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (desktopVisible) {
-      await this.flashcardRevealToggle.click();
-      return;
-    }
-    const mobileVisible = await this.flashcardRevealButtonMobile
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (mobileVisible) {
-      await this.flashcardRevealButtonMobile.click();
-    }
+    await expect(this.flashcardRevealToggle).toBeVisible({ timeout: 10_000 });
+    const before =
+      (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
+    await this.flashcardRevealToggle.click();
+    await expect(this.flashcardRevealToggle).not.toHaveAttribute(
+      "aria-label",
+      before,
+      { timeout: 5000 }
+    );
   }
 
   /**
@@ -1434,28 +1429,28 @@ export class TuneTreesPage {
    * Uses aria-label on the reveal toggle which reflects the action ("Show back" when on front, "Show front" when on back).
    */
   async ensureReveal(desiredBack: boolean) {
-    // Try desktop toggle first
-    const desktopVisible = await this.flashcardRevealToggle
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (desktopVisible) {
-      for (let i = 0; i < 2; i++) {
-        const label =
-          (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
-        const currentlyBack = /Show front/i.test(label); // if button says "Show front", we are on Back
-        if (currentlyBack === desiredBack) return;
-        await this.flashcardRevealToggle.click();
+    await expect(this.flashcardRevealToggle).toBeVisible({ timeout: 10_000 });
+
+    const desiredLabel = desiredBack ? /Show front/i : /Show back/i;
+    for (let i = 0; i < 2; i++) {
+      const label =
+        (await this.flashcardRevealToggle.getAttribute("aria-label")) || "";
+      const currentlyBack = /Show front/i.test(label); // if button says "Show front", we are on Back
+      if (currentlyBack === desiredBack) {
+        await expect(this.flashcardRevealToggle).toHaveAttribute(
+          "aria-label",
+          desiredLabel,
+          { timeout: 5000 }
+        );
+        return;
       }
-      return;
-    }
-    // Fallback to mobile button: we can only toggle; assume initial is front
-    const mobileVisible = await this.flashcardRevealButtonMobile
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (mobileVisible) {
-      if (desiredBack) {
-        await this.flashcardRevealButtonMobile.click();
-      }
+
+      await this.flashcardRevealToggle.click();
+      await expect(this.flashcardRevealToggle).toHaveAttribute(
+        "aria-label",
+        desiredLabel,
+        { timeout: 5000 }
+      );
     }
   }
 

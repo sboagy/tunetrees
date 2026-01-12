@@ -920,51 +920,71 @@ export async function setupForPracticeTestsParallel(
 
   log.debug(`🔧 [${user.name}] setupForPracticeTests Starting...`);
 
-  // 1. Clear practice-specific tables
-  await clearUserTable(user, "practice_record");
-  await clearUserTable(user, "daily_practice_queue");
-  await clearUserTable(user, "table_transient_data");
-  await clearUserTable(user, "tune_override");
-  await clearUserTable(user, "prefs_scheduling_options");
+  // Always ensure we're online at the start of setup.
+  // Browser-context offline state is sticky across tests within a worker.
+  await page.context().setOffline(false);
 
-  // 2. Reset repertoire
-  await clearUserTable(user, "playlist_tune");
-
-  await verifyTablesEmpty(user, [
-    "practice_record",
-    "daily_practice_queue",
-    "table_transient_data",
-    "tune_override",
-    "prefs_scheduling_options",
-    "playlist_tune",
-  ]);
-
-  if (repertoireTunes.length > 0) {
-    await seedUserRepertoire(user, repertoireTunes, true);
+  // Avoid racing the app's sync engine while we clear/seed remote tables.
+  const currentUrlBeforeSetup = page.url();
+  const shouldIsolateSync =
+    !!currentUrlBeforeSetup &&
+    currentUrlBeforeSetup !== "about:blank" &&
+    !currentUrlBeforeSetup.startsWith("data:");
+  if (shouldIsolateSync) {
+    await page.context().setOffline(true);
   }
 
-  // 2b. Optionally schedule tunes so they're due today
-  if (scheduleDaysAgo !== undefined) {
-    const userKey = user.email.split(".")[0];
-    const { supabase } = await getTestUserClient(userKey);
-    // Use provided frozen test date base if available; otherwise default to host time.
-    const base = scheduleBaseDate ? new Date(scheduleBaseDate) : new Date();
-    // Subtract daysAgo to get original scheduled date (past due to force inclusion in queue)
-    base.setDate(base.getDate() - scheduleDaysAgo);
-    const scheduleDateStr = base.toISOString();
+  try {
+    // 1. Clear practice-specific tables
+    await clearUserTable(user, "practice_record");
+    await clearUserTable(user, "daily_practice_queue");
+    await clearUserTable(user, "table_transient_data");
+    await clearUserTable(user, "tune_override");
+    await clearUserTable(user, "prefs_scheduling_options");
 
-    for (const tuneId of repertoireTunes) {
-      const { error } = await supabase
-        .from("playlist_tune")
-        .update({ scheduled: scheduleDateStr })
-        .eq("playlist_ref", user.playlistId)
-        .eq("tune_ref", tuneId);
+    // 2. Reset repertoire
+    await clearUserTable(user, "playlist_tune");
 
-      if (error) {
-        console.warn(
-          `[${user.name}] Failed to schedule tune ${tuneId}: ${error.message}`
-        );
+    await verifyTablesEmpty(user, [
+      "practice_record",
+      "daily_practice_queue",
+      "table_transient_data",
+      "tune_override",
+      "prefs_scheduling_options",
+      "playlist_tune",
+    ]);
+
+    if (repertoireTunes.length > 0) {
+      await seedUserRepertoire(user, repertoireTunes, true);
+    }
+
+    // 2b. Optionally schedule tunes so they're due today
+    if (scheduleDaysAgo !== undefined) {
+      const userKey = user.email.split(".")[0];
+      const { supabase } = await getTestUserClient(userKey);
+      // Use provided frozen test date base if available; otherwise default to host time.
+      const base = scheduleBaseDate ? new Date(scheduleBaseDate) : new Date();
+      // Subtract daysAgo to get original scheduled date (past due to force inclusion in queue)
+      base.setDate(base.getDate() - scheduleDaysAgo);
+      const scheduleDateStr = base.toISOString();
+
+      for (const tuneId of repertoireTunes) {
+        const { error } = await supabase
+          .from("playlist_tune")
+          .update({ scheduled: scheduleDateStr })
+          .eq("playlist_ref", user.playlistId)
+          .eq("tune_ref", tuneId);
+
+        if (error) {
+          console.warn(
+            `[${user.name}] Failed to schedule tune ${tuneId}: ${error.message}`
+          );
+        }
       }
+    }
+  } finally {
+    if (shouldIsolateSync) {
+      await page.context().setOffline(false);
     }
   }
 
@@ -988,6 +1008,7 @@ export async function setupForPracticeTestsParallel(
 
   const isActive = await tabLocator.evaluate(
     (el) =>
+      el.getAttribute("aria-current") === "page" ||
       el.getAttribute("aria-selected") === "true" ||
       el.classList.contains("active")
   );
@@ -995,7 +1016,47 @@ export async function setupForPracticeTestsParallel(
   if (!isActive) {
     await page.waitForSelector(tabSelector, { timeout: 10000 });
     await tabLocator.click();
-    await page.waitForTimeout(500);
+    await expect
+      .poll(
+        async () => {
+          const ariaCurrent = await tabLocator.getAttribute("aria-current");
+          const ariaSelected = await tabLocator.getAttribute("aria-selected");
+          const classActive = await tabLocator.evaluate((el) =>
+            el.classList.contains("active")
+          );
+          return (
+            ariaCurrent === "page" || ariaSelected === "true" || classActive
+          );
+        },
+        { timeout: 10000, intervals: [100, 250, 500] }
+      )
+      .toBe(true);
+  }
+
+  // 7. Ensure Practice tab is rendered before tests start interacting.
+  // NOTE: When there are no tunes due (or repertoire is empty), the app shows an empty-state
+  // message and does not render the scheduled grid table.
+  if (startTab === "practice") {
+    await expect(page.getByTestId("practice-columns-button")).toBeVisible({
+      timeout: 15000,
+    });
+
+    if (repertoireTunes.length > 0) {
+      // For practice-driven scenarios we expect at least one scheduled tune row (and thus at least
+      // one recall-eval control) to exist.
+      const practiceGrid = page.getByTestId("tunes-grid-scheduled");
+      await expect(practiceGrid).toBeVisible({ timeout: 15000 });
+      await expect
+        .poll(
+          async () => {
+            return await practiceGrid
+              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+              .count();
+          },
+          { timeout: 15000, intervals: [200, 500, 1000] }
+        )
+        .toBeGreaterThan(0);
+    }
   }
 
   log.debug(
