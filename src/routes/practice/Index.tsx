@@ -124,10 +124,42 @@ const PracticeIndex: Component = () => {
   // Track evaluations count and table instance for toolbar
   const [evaluationsCount, setEvaluationsCount] = createSignal(0);
 
-  // Shared evaluation state between grid and flashcard views
-  const [evaluations, setEvaluations] = createSignal<Record<number, string>>(
+  // Shared evaluation state between grid and flashcard views.
+  // Keys are tune IDs (UUID strings).
+  const [evaluations, setEvaluations] = createSignal<Record<string, string>>(
     {}
   );
+
+  // Hydrate once from DB-staged values (table_transient_data via practice list VIEW).
+  // This ensures the submit badge and selected values survive tab switches/unmounts.
+  const [didHydrateEvaluations, setDidHydrateEvaluations] = createSignal(false);
+  createEffect(() => {
+    const playlistId = currentPlaylistId();
+    if (!playlistId) return;
+    // Reset hydration when playlist changes.
+    setDidHydrateEvaluations(false);
+    setEvaluations({});
+  });
+
+  createEffect(() => {
+    if (didHydrateEvaluations()) return;
+    const list = filteredPracticeList();
+    if (!list || list.length === 0) return;
+
+    const hydrated: Record<string, string> = {};
+    for (const tune of list) {
+      const id = String(tune.id);
+      const recallEval = tune.recall_eval;
+      if (typeof recallEval === "string" && recallEval.length > 0) {
+        hydrated[id] = recallEval;
+      }
+    }
+
+    if (Object.keys(hydrated).length > 0) {
+      setEvaluations(hydrated);
+    }
+    setDidHydrateEvaluations(true);
+  });
 
   // Update count when evaluations change
   createEffect(() => {
@@ -332,9 +364,10 @@ const PracticeIndex: Component = () => {
       const playlistId = currentPlaylistId();
       const version = practiceListStagedChanged(); // Refetch when practice list changes
       const initialized = queueInitialized(); // Wait for queue to be ready
+      const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
-        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}`
+        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}, window=${windowStartUtc}`
       );
 
       // Only proceed if ALL dependencies are ready (including queue)
@@ -345,6 +378,7 @@ const PracticeIndex: Component = () => {
             playlistId,
             version,
             queueReady: initialized,
+            windowStartUtc,
           }
         : null;
     },
@@ -360,15 +394,16 @@ const PracticeIndex: Component = () => {
         params.db,
         params.userId,
         params.playlistId,
-        delinquencyWindowDays
+        delinquencyWindowDays,
+        params.windowStartUtc
       );
     }
   );
 
   // Filtered practice list - applies showSubmitted filter
   // This is the single source of truth for both grid and flashcard views
-  const filteredPracticeList = createMemo(() => {
-    const data = practiceListData() || [];
+  const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
+    const data: ITuneOverview[] = practiceListData() || [];
     const shouldShow = showSubmitted();
 
     console.log(
@@ -379,7 +414,7 @@ const PracticeIndex: Component = () => {
     // When showSubmitted is false, hide completed tunes (where completed_at is not null)
     const filtered = shouldShow
       ? data
-      : data.filter((tune: any) => !tune.completed_at);
+      : data.filter((tune) => !tune.completed_at);
 
     console.log(`[PracticeIndex] After filtering: ${filtered.length} tunes`);
     return filtered;
@@ -512,9 +547,6 @@ const PracticeIndex: Component = () => {
         setEvaluations({});
 
         // Grid reacts via shared evaluations signal; no per-grid callback needed
-
-        // Reset count
-        setEvaluationsCount(0);
 
         // Trigger grid refresh using view-specific signal
         incrementPracticeListStagedChanged();
@@ -746,7 +778,7 @@ const PracticeIndex: Component = () => {
             when={!flashcardMode()}
             fallback={
               <FlashcardView
-                tunes={filteredPracticeList() as any}
+                tunes={filteredPracticeList}
                 fieldVisibility={flashcardFieldVisibility()}
                 evaluations={evaluations()}
                 onRecallEvalChange={handleRecallEvalChange}

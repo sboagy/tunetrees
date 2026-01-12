@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import {
   CATALOG_TUNE_BANISH_MISFORTUNE,
   CATALOG_TUNE_COOLEYS_ID,
@@ -7,6 +7,7 @@ import {
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 /**
  * PRACTICE-HISTORY: View and Manage Practice Records
@@ -25,6 +26,22 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
+async function gotoPracticeHistory(page: Page, tuneId: string) {
+  await page.goto(`${BASE_URL}/tunes/${tuneId}/practice-history`, {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.getByTestId("practice-history-container")).toBeVisible({
+    timeout: 20_000,
+  });
+
+  // Wait for initial practice history query to resolve.
+  // The header (incl. Add button) renders immediately, but actions can no-op until
+  // local DB + playlist context are ready.
+  const container = page.getByTestId("practice-history-container");
+  const loading = container.getByText("Loading practice history...");
+  await expect(loading).toHaveCount(0, { timeout: 20_000 });
+}
+
 test.describe("PRACTICE-HISTORY: Viewing Records", () => {
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
@@ -40,16 +57,14 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
     });
 
     // Navigate to repertoire tab
-    await ttPage.repertoireTab.click();
-    await expect(ttPage.repertoireTab).toBeVisible({ timeout: 10000 });
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.navigateToTab("repertoire");
   });
 
   test("should display empty state when tune has no practice records", async ({
     page,
   }) => {
     // ARRANGE: Find a tune with no practice history
-    await ttPage.searchForTune("Banish Misfortune", ttPage.practiceGrid);
+    await ttPage.searchForTune("Banish Misfortune", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     // On mobile: expand sidebar BEFORE clicking tune
@@ -75,7 +90,9 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
     );
     await expect(practiceHistoryLink).toBeVisible({ timeout: 5000 });
     await practiceHistoryLink.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-history-container")).toBeVisible({
+      timeout: 20_000,
+    });
 
     // ASSERT: Empty state is displayed
     const container = page.getByTestId("practice-history-container");
@@ -96,7 +113,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
 
   test("should display existing practice records in grid", async ({ page }) => {
     // ARRANGE: Find a tune and create some practice records first
-    await ttPage.searchForTune("Cooley's", ttPage.practiceGrid);
+    await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     const firstRow = ttPage.getRows("repertoire").first();
@@ -118,7 +135,9 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
       "sidebar-practice-history-link"
     );
     await practiceHistoryLink.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-history-container")).toBeVisible({
+      timeout: 20_000,
+    });
 
     const container = page.getByTestId("practice-history-container");
     await expect(container).toBeVisible({ timeout: 10000 });
@@ -177,31 +196,7 @@ test.describe("PRACTICE-HISTORY: Adding Records", () => {
       seedRepertoire: [CATALOG_TUNE_KESH_ID],
     });
 
-    await ttPage.repertoireTab.click();
-    await expect(ttPage.repertoireTab).toBeVisible({ timeout: 10000 });
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-
-    // Navigate directly to practice history
-    await ttPage.searchForTune("Kesh", ttPage.practiceGrid);
-    await page.waitForTimeout(500);
-    const firstRow = ttPage.getRows("repertoire").first();
-    await firstRow.click();
-    await page.waitForTimeout(500);
-
-    // Expand sidebar on mobile
-    const expandSidebarButton = page.getByRole("button", {
-      name: /expand sidebar/i,
-    });
-    if (await expandSidebarButton.isVisible({ timeout: 1000 })) {
-      await expandSidebarButton.click();
-      await page.waitForTimeout(300);
-    }
-
-    const practiceHistoryLink = page.getByTestId(
-      "sidebar-practice-history-link"
-    );
-    await practiceHistoryLink.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await gotoPracticeHistory(page, CATALOG_TUNE_KESH_ID);
   });
 
   test("should add new practice record with valid data", async ({ page }) => {
@@ -211,39 +206,34 @@ test.describe("PRACTICE-HISTORY: Adding Records", () => {
     // ACT: Click Add button
     const addButton = page.getByTestId("practice-history-add-button");
     await expect(addButton).toBeVisible({ timeout: 5000 });
-    await addButton.click();
-    await page.waitForTimeout(500);
+    await expect(addButton).toBeEnabled({ timeout: 20_000 });
+    await addButton.click({ timeout: 10_000 });
 
     // Fill in new record
     const grid = container.locator("table, [role='grid']").first();
-    await expect(grid).toBeVisible({ timeout: 5000 });
+    await expect(grid).toBeVisible({ timeout: 20_000 });
 
     // Find and fill practiced date
     const practicedInput = grid.locator("input[type='datetime-local']").first();
-    if (await practicedInput.isVisible()) {
-      await practicedInput.fill("2024-12-01T10:00");
-      // Note: Browser may adjust timezone, so we don't assert exact match
-      await page.waitForTimeout(500);
-    }
+    await expect(practicedInput).toBeVisible({ timeout: 10_000 });
+    await practicedInput.fill("2024-12-01T10:00");
+    // Note: Browser may adjust timezone, so we don't assert exact match
 
     // Select quality (Good = 3)
     const qualitySelect = grid.locator("select").first();
-    if (await qualitySelect.isVisible()) {
-      await qualitySelect.selectOption("3");
-      await expect(qualitySelect).toHaveValue("3");
-    }
+    await expect(qualitySelect).toBeVisible({ timeout: 10_000 });
+    await qualitySelect.selectOption("3");
+    await expect(qualitySelect).toHaveValue("3");
 
     // Save using global save button (batch save pattern)
-    await page.waitForTimeout(500);
     const globalSaveButton = page.getByTestId("practice-history-save-button");
-    if (await globalSaveButton.isVisible({ timeout: 2000 })) {
-      await globalSaveButton.click();
-      await page.waitForTimeout(1000); // Wait for save to process
-    }
+    await expect(globalSaveButton).toBeVisible({ timeout: 10_000 });
+    await expect(globalSaveButton).toBeEnabled({ timeout: 10_000 });
+    await globalSaveButton.click({ timeout: 10_000 });
 
     // ASSERT: Record appears in grid
     const dataRows = grid.locator("tbody tr");
-    await expect(dataRows.first()).toBeVisible({ timeout: 5000 });
+    await expect(dataRows.first()).toBeVisible({ timeout: 10_000 });
 
     // Verify the record contains our data (check the input value which may still be in edit mode)
     const dateInputValue = await practicedInput.inputValue();
@@ -333,30 +323,25 @@ test.describe("PRACTICE-HISTORY: Editing Records", () => {
       seedRepertoire: [CATALOG_TUNE_COOLEYS_ID],
     });
 
-    await ttPage.repertoireTab.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.navigateToTab("repertoire");
 
     // Navigate to practice history and add a record first
-    await ttPage.searchForTune("Cooley", ttPage.practiceGrid);
+    await ttPage.searchForTune("Cooley", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
     const firstRow = ttPage.getRows("repertoire").first();
     await firstRow.click();
     await page.waitForTimeout(500);
 
     // Expand sidebar on mobile
-    const expandSidebarButton = page.getByRole("button", {
-      name: /expand sidebar/i,
-    });
-    if (await expandSidebarButton.isVisible({ timeout: 1000 })) {
-      await expandSidebarButton.click();
-      await page.waitForTimeout(300);
-    }
+    await ttPage.ensureSidebarExpanded({ timeoutMs: 10_000 });
 
     const practiceHistoryLink = page.getByTestId(
       "sidebar-practice-history-link"
     );
     await practiceHistoryLink.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-history-container")).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   test("should edit existing practice record", async ({ page }) => {
@@ -459,11 +444,10 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
       seedRepertoire: [CATALOG_TUNE_BANISH_MISFORTUNE],
     });
 
-    await ttPage.repertoireTab.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.navigateToTab("repertoire");
 
     // Navigate to practice history
-    await ttPage.searchForTune("Banish", ttPage.practiceGrid);
+    await ttPage.searchForTune("Banish", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
     // On mobile: expand sidebar BEFORE clicking tune
@@ -486,7 +470,9 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
       "sidebar-practice-history-link"
     );
     await practiceHistoryLink.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-history-container")).toBeVisible({
+      timeout: 20_000,
+    });
   });
 
   test("should delete practice record with confirmation", async ({ page }) => {
@@ -611,34 +597,28 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
       seedRepertoire: [CATALOG_TUNE_KESH_ID],
     });
 
-    await ttPage.repertoireTab.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.navigateToTab("repertoire");
   });
 
   test("should navigate back to tune editor from practice history", async ({
     page,
   }) => {
     // Navigate to practice history
-    await ttPage.searchForTune("Kesh", ttPage.practiceGrid);
+    await ttPage.searchForTune("Kesh", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
     const firstRow = ttPage.getRows("repertoire").first();
     await firstRow.click();
     await page.waitForTimeout(500);
 
-    // Expand sidebar on mobile
-    const expandSidebarButton = page.getByRole("button", {
-      name: /expand sidebar/i,
-    });
-    if (await expandSidebarButton.isVisible({ timeout: 1000 })) {
-      await expandSidebarButton.click();
-      await page.waitForTimeout(300);
-    }
+    await ttPage.ensureSidebarExpanded({ timeoutMs: 10_000 });
 
     const practiceHistoryLink = page.getByTestId(
       "sidebar-practice-history-link"
     );
     await practiceHistoryLink.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page.getByTestId("practice-history-container")).toBeVisible({
+      timeout: 20_000,
+    });
 
     // Verify we're on practice history page
     await expect(page).toHaveURL(/\/tunes\/[^/]+\/practice-history/);
@@ -647,7 +627,7 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
     const cancelButton = page.getByRole("button", { name: /cancel|back/i });
     await expect(cancelButton).toBeVisible({ timeout: 5000 });
     await cancelButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(page).not.toHaveURL(/practice-history/, { timeout: 20_000 });
 
     // ASSERT: Navigated back (either to editor or previous page)
     // URL should no longer contain practice-history

@@ -105,7 +105,8 @@ export async function getPracticeList(
   db: SqliteDatabase,
   userId: string,
   playlistId: string,
-  _delinquencyWindowDays: number = 7 // Kept for API compatibility
+  _delinquencyWindowDays: number = 7, // Kept for API compatibility
+  windowStartUtc?: string
 ): Promise<PracticeListStagedWithQueue[]> {
   // Query practice_list_staged INNER JOIN daily_practice_queue
   // Queue determines which tunes to practice and their ordering
@@ -149,29 +150,44 @@ export async function getPracticeList(
   `);
   console.log(`[getPracticeList] Available windows:`, windowCheck);
 
-  // CRITICAL: There are TWO window formats in the database for the same date:
-  // '2025-11-08T00:00:00' (ISO with T) and '2025-11-08 00:00:00' (space format)
-  // We need to query BOTH to get all items for today
-  const maxWindow = await db.get<{ max_window: string }>(sql`
-    SELECT MAX(window_start_utc) as max_window
-    FROM daily_practice_queue
-    WHERE user_ref = ${userId}
-      AND playlist_ref = ${playlistId}
-      AND active = 1
-  `);
-  console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
+  // Determine which queue window to query.
+  // Prefer the caller-provided window (matches UI-selected queue date),
+  // falling back to "most recent active" for backward compatibility.
+  //
+  // NOTE: There are TWO window formats in the DB for the same date:
+  // 'YYYY-MM-DDTHH:MM:SS' (ISO with T) and 'YYYY-MM-DD HH:MM:SS' (space format).
+  // Match BOTH to avoid split-window mismatches.
+  let isoFormat: string | undefined;
+  let spaceFormat: string | undefined;
 
-  // Generate both format variants for the same date
-  const isoFormat = maxWindow?.max_window; // e.g., '2025-11-08T00:00:00'
-  const spaceFormat = isoFormat?.replace("T", " "); // e.g., '2025-11-08 00:00:00'
-  console.log(
-    `[getPracticeList] Matching both formats: ISO='${isoFormat}', Space='${spaceFormat}'`
-  );
+  const requestedWindow = windowStartUtc?.trim();
+  if (requestedWindow) {
+    isoFormat = requestedWindow.includes("T")
+      ? requestedWindow
+      : requestedWindow.replace(" ", "T");
+    spaceFormat = isoFormat.replace("T", " ");
+    console.log(`[getPracticeList] Using requested window: ${isoFormat}`);
+  } else {
+    const maxWindow = await db.get<{ max_window: string }>(sql`
+      SELECT MAX(window_start_utc) as max_window
+      FROM daily_practice_queue
+      WHERE user_ref = ${userId}
+        AND playlist_ref = ${playlistId}
+        AND active = 1
+    `);
+    console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
 
-  // If no active queue windows exist, return empty array
+    isoFormat = maxWindow?.max_window; // e.g., '2025-11-08T00:00:00'
+    spaceFormat = isoFormat?.replace("T", " "); // e.g., '2025-11-08 00:00:00'
+    console.log(
+      `[getPracticeList] Matching both formats: ISO='${isoFormat}', Space='${spaceFormat}'`
+    );
+  }
+
+  // If no window exists, return empty array
   if (!isoFormat) {
     console.log(
-      `[getPracticeList] No active queue windows found, returning empty list`
+      `[getPracticeList] No queue window found, returning empty list`
     );
     return [];
   }

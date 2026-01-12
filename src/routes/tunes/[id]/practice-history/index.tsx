@@ -189,6 +189,13 @@ const PracticeHistoryPage: Component = () => {
     }
   };
 
+  const canAddRecord = () => {
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+    const tuneId = params.id;
+    return !!db && !!playlistId && !!tuneId && !practiceRecords.loading;
+  };
+
   // Navigate back
   const handleBack = () => {
     navigate(returnPath());
@@ -260,7 +267,8 @@ const PracticeHistoryPage: Component = () => {
               <button
                 type="button"
                 onClick={handleAddRecord}
-                class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:underline"
+                disabled={!canAddRecord()}
+                class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:underline disabled:opacity-50"
                 aria-label="Add practice record"
                 data-testid="practice-history-add-button"
               >

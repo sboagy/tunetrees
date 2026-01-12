@@ -9,6 +9,7 @@
  */
 
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
@@ -17,11 +18,16 @@ import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 
 test.describe("Evaluation Column Sorting Disabled", () => {
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, testUser, context }) => {
+    const currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
+
     // Fast setup: seed 2 tunes, start on practice tab
     const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID],
+      scheduleDaysAgo: 1,
+      scheduleBaseDate: currentDate,
       startTab: "practice",
     });
     await page.waitForTimeout(200);
