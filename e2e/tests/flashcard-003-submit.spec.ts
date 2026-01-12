@@ -22,6 +22,8 @@ test.describe
     test.setTimeout(60_000);
 
     test.beforeEach(async ({ page, testUser }) => {
+      await page.context().clock.install({ time: new Date() });
+      await page.context().clock.resume();
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
