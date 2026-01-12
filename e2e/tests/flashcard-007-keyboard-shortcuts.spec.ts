@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MASONS_ID,
@@ -18,7 +19,10 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Keyboard Shortcuts", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
@@ -26,6 +30,7 @@ test.describe
           TEST_TUNE_MASONS_ID,
         ], // 3 tunes that exist in seed data
         scheduleDaysAgo: 1, // Ensure all are due
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
     });

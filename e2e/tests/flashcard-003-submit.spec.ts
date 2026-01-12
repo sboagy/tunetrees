@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MASONS_ID,
@@ -21,7 +22,10 @@ test.describe
     // timeout to avoid spurious failures that are just setup latency.
     test.setTimeout(60_000);
 
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
@@ -29,6 +33,7 @@ test.describe
           TEST_TUNE_MASONS_ID,
         ], // 3 tunes that exist in seed data
         scheduleDaysAgo: 1,
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
     });

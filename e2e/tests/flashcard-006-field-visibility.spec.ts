@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MASONS_ID,
@@ -16,7 +17,10 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Field Visibility", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
@@ -24,6 +28,7 @@ test.describe
           TEST_TUNE_MORRISON_ID,
         ], // ensure >= 2 cards available
         scheduleDaysAgo: 1, // Ensure multiple cards are available
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
     });
