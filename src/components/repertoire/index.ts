@@ -5,3 +5,4 @@
  */
 
 export { RepertoireToolbar } from "./RepertoireToolbar";
+export { RepertoireEmptyState } from "./EmptyState";

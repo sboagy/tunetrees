@@ -178,9 +178,19 @@ jobs:
 
       - name: Run Playwright Single Test (Shard ${{ matrix.shard }}/4)
         run: |
+          set -o pipefail
+          mkdir -p playwright-logs
           echo "🎬 Running sharded test suite"
           # NOTE: Excluding PWA project from main shards
-          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome"
+          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome" 2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
+
+      - name: Upload Playwright log (Shard ${{ matrix.shard }}/4)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-log-${{ matrix.shard }}
+          path: playwright-logs/playwright-shard-${{ matrix.shard }}.log
+          retention-days: 7
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: always()
@@ -345,25 +355,38 @@ jobs:
 
       - name: Run PWA Offline Tests
         run: |
-          echo "🚀 Starting Preview Server on port 4173..."
-          npm run preview:local &
-          PREVIEW_PID=$!
-          sleep 10
+          set -o pipefail
+          mkdir -p playwright-logs
+          {
+            echo "🚀 Starting Preview Server on port 4173..."
+            npm run preview:local &
+            PREVIEW_PID=$!
+            sleep 10
 
-          # 1. Run Setup (Uses Preview Server via preview-setup project)
-          echo "🔐 Running Authentication Setup for Preview..."
-          npx playwright test e2e/setup/auth.setup.ts --project=preview-setup
+            # 1. Run Setup (Uses Preview Server via preview-setup project)
+            echo "🔐 Running Authentication Setup for Preview..."
+            npx playwright test e2e/setup/auth.setup.ts --project=preview-setup
 
-          # 2. Run Offline Tests (Uses Preview Server)
-          echo "🎭 Running PWA Offline Tests..."
-          npx playwright test --project=chromium-pwa-offline
+            # 2. Run Offline Tests (Uses Preview Server)
+            echo "🎭 Running PWA Offline Tests..."
+            npx playwright test --project=chromium-pwa-offline
 
-          echo "🛑 Stopping Preview Server..."
-          kill $PREVIEW_PID || true
-          pkill -f "vite" || true
+            echo "🛑 Stopping Preview Server..."
+            kill $PREVIEW_PID || true
+            pkill -f "vite" || true
+          } 2>&1 | tee "playwright-logs/playwright-pwa.log"
+        shell: bash
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+
+      - name: Upload Playwright log (PWA)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-log-pwa
+          path: playwright-logs/
+          retention-days: 7
 
       - name: Upload PWA blob report
         if: always()
@@ -412,6 +435,26 @@ jobs:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
+
+      - name: Download Playwright logs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-log-*
+          path: all-playwright-logs
+          merge-multiple: true
+
+      - name: Assemble combined Playwright log
+        run: |
+          set -o pipefail
+          find all-playwright-logs -type f -print | sort | xargs cat > playwright-run.log
+
+      - name: Upload combined Playwright log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-run-log
+          path: playwright-run.log
+          retention-days: 30
 
       - name: Merge into HTML Report
         run: npx playwright merge-reports --reporter html ./all-blob-reports

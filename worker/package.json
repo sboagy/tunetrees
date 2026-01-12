@@ -6,6 +6,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "dev:local": "WRANGLER_SEND_METRICS=false DO_NOT_TRACK=1 wrangler dev --local",
     "start": "wrangler dev"
   },
   "devDependencies": {
