@@ -147,7 +147,7 @@ const PracticeIndex: Component = () => {
     if (!list || list.length === 0) return;
 
     const hydrated: Record<string, string> = {};
-    for (const tune of list as any[]) {
+    for (const tune of list) {
       const id = String(tune.id);
       const recallEval = tune.recall_eval;
       if (typeof recallEval === "string" && recallEval.length > 0) {
@@ -364,9 +364,10 @@ const PracticeIndex: Component = () => {
       const playlistId = currentPlaylistId();
       const version = practiceListStagedChanged(); // Refetch when practice list changes
       const initialized = queueInitialized(); // Wait for queue to be ready
+      const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
-        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}`
+        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}, window=${windowStartUtc}`
       );
 
       // Only proceed if ALL dependencies are ready (including queue)
@@ -377,6 +378,7 @@ const PracticeIndex: Component = () => {
             playlistId,
             version,
             queueReady: initialized,
+            windowStartUtc,
           }
         : null;
     },
@@ -392,15 +394,16 @@ const PracticeIndex: Component = () => {
         params.db,
         params.userId,
         params.playlistId,
-        delinquencyWindowDays
+        delinquencyWindowDays,
+        params.windowStartUtc
       );
     }
   );
 
   // Filtered practice list - applies showSubmitted filter
   // This is the single source of truth for both grid and flashcard views
-  const filteredPracticeList = createMemo(() => {
-    const data = practiceListData() || [];
+  const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
+    const data: ITuneOverview[] = practiceListData() || [];
     const shouldShow = showSubmitted();
 
     console.log(
@@ -411,7 +414,7 @@ const PracticeIndex: Component = () => {
     // When showSubmitted is false, hide completed tunes (where completed_at is not null)
     const filtered = shouldShow
       ? data
-      : data.filter((tune: any) => !tune.completed_at);
+      : data.filter((tune) => !tune.completed_at);
 
     console.log(`[PracticeIndex] After filtering: ${filtered.length} tunes`);
     return filtered;
@@ -775,7 +778,7 @@ const PracticeIndex: Component = () => {
             when={!flashcardMode()}
             fallback={
               <FlashcardView
-                tunes={filteredPracticeList() as any}
+                tunes={filteredPracticeList}
                 fieldVisibility={flashcardFieldVisibility()}
                 evaluations={evaluations()}
                 onRecallEvalChange={handleRecallEvalChange}
