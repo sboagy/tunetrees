@@ -362,20 +362,25 @@ const PracticeIndex: Component = () => {
 
   // Fetch practice list (shared between grid and flashcard views)
   // CRITICAL: Must wait for queueInitialized() to complete before fetching
+  // Also check queueInitialized.loading to prevent race condition where
+  // practiceListData fetches while queue is being re-initialized
   const [practiceListData] = createResource(
     () => {
       const db = localDb();
       const playlistId = currentPlaylistId();
       const version = practiceListStagedChanged(); // Refetch when practice list changes
       const initialized = queueInitialized(); // Wait for queue to be ready
+      const isQueueLoading = queueInitialized.loading; // Check if queue is currently loading/re-loading
       const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
-        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}, window=${windowStartUtc}`
+        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
       );
 
       // Only proceed if ALL dependencies are ready (including queue)
-      return db && userId() && playlistId && initialized
+      // CRITICAL: Also check that queue is not currently loading to prevent race condition
+      // where we fetch practice list while ensureDailyQueue is still running
+      return db && userId() && playlistId && initialized && !isQueueLoading
         ? {
             db,
             userId: userId()!,
