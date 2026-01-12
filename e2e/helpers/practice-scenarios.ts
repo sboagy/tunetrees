@@ -1046,6 +1046,8 @@ export async function setupForPracticeTestsParallel(
       // one recall-eval control) to exist.
       const practiceGrid = page.getByTestId("tunes-grid-scheduled");
       await expect(practiceGrid).toBeVisible({ timeout: 15000 });
+
+      // Wait for at least one recall-eval control to appear
       await expect
         .poll(
           async () => {
@@ -1056,6 +1058,36 @@ export async function setupForPracticeTestsParallel(
           { timeout: 15000, intervals: [200, 500, 1000] }
         )
         .toBeGreaterThan(0);
+
+      // CRITICAL: Additional wait for queue generation resource to complete.
+      // The grid renders when practice_list_staged has data, but the daily_practice_queue
+      // table is populated asynchronously via a SolidJS createResource (ensureDailyQueue).
+      // In slow CI environments, the queue resource may still be initializing when the grid appears.
+      // Without this wait, flashcard tests proceed with an empty queue and fail with "element(s) not found".
+      // Wait for count to stabilize (same value twice in a row = queue ready)
+      let lastCount = 0;
+      let stableCount = 0;
+      await expect
+        .poll(
+          async () => {
+            const currentCount = await practiceGrid
+              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+              .count();
+            if (currentCount === lastCount && currentCount > 0) {
+              stableCount++;
+            } else {
+              stableCount = 0;
+            }
+            lastCount = currentCount;
+            return stableCount >= 2; // Same count twice = stable
+          },
+          { timeout: 25000, intervals: [500, 1000, 2000] }
+        )
+        .toBeTruthy();
+
+      log.debug(
+        `[${user.name}] Queue ready: ${lastCount} tunes in practice grid`
+      );
     }
   }
 

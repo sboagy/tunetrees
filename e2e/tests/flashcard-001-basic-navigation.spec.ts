@@ -16,8 +16,6 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 test.describe
   .serial("Flashcard Feature: Basic Navigation", () => {
     test.beforeEach(async ({ page, testUser }) => {
-      await page.context().clock.install({ time: new Date() });
-      await page.context().clock.resume();
       const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // 2 tunes for navigation testing
