@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
@@ -29,13 +30,18 @@ test.describe
   .serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
     // let currentTestUser: TestUser;
 
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+      //
       // currentTestUser = testUser;
       // Fast setup: clear practice state, seed 2 unscheduled tunes
       const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // User's private tune, Morrison's Jig
         startTab: "practice",
+        scheduleBaseDate: currentDate,
+        scheduleDaysAgo: 1,
       });
     });
 
