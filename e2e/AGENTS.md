@@ -1,6 +1,8 @@
 # e2e/AGENTS Instructions
 
-Scope: Playwright end-to-end tests under `e2e/**`. Complements root `AGENTS.md` and unit guidance in `tests/AGENTS.md`.
+Scope: Playwright end-to-end tests under `e2e/**`.
+
+Inherits global execution guardrails from `.github/copilot-instructions.md` and repository domain context from root `AGENTS.md`.
 
 ## Philosophy
 

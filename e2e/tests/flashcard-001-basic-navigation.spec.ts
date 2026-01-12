@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
@@ -15,10 +16,15 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Basic Navigation", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
       const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [privateTune1Id, TEST_TUNE_MORRISON_ID], // 2 tunes for navigation testing
+        scheduleBaseDate: currentDate,
+        scheduleDaysAgo: 1,
         startTab: "practice",
       });
     });

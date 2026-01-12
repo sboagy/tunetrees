@@ -393,16 +393,63 @@ export class SyncService {
     // - In offline mode, syncDown() may try to syncUp first.
     // - syncUp can legitimately prune outbox entries when it can't find the local row.
     // Deferring avoids unexpected outbox mutation during offline reload flows.
+    let initialSyncDownInFlight = false;
+    let initialSyncDownCompleted = false;
+
     const runInitialSyncDown = () => {
-      console.log("[SyncService] Running initial syncDown...");
-      void this.syncDown().catch((error) => {
-        console.error("[SyncService] Initial syncDown failed:", error);
-        toast.error(
-          "Failed to sync data from server on startup. You may be seeing outdated data.",
-          {
-            duration: 8000,
+      if (initialSyncDownInFlight || initialSyncDownCompleted) return;
+      if (!navigator.onLine) return;
+
+      initialSyncDownInFlight = true;
+      void (async () => {
+        const maxAttempts = 3;
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+          if (!navigator.onLine) {
+            console.log(
+              "[SyncService] Went offline during initial syncDown; deferring until online"
+            );
+            window.addEventListener("online", runInitialSyncDown, { once: true });
+            return;
           }
-        );
+
+          try {
+            console.log(
+              `[SyncService] Running initial syncDown (attempt ${attempt}/${maxAttempts})...`
+            );
+            await this.syncDown();
+            initialSyncDownCompleted = true;
+            return;
+          } catch (error) {
+            if (error instanceof SyncInProgressError) {
+              // Expected when other sync activity is running; retry shortly without toasting.
+              await new Promise((r) => setTimeout(r, 250));
+              attempt -= 1;
+              continue;
+            }
+
+            const delayMs = 500 * attempt;
+            const isLastAttempt = attempt === maxAttempts;
+
+            if (!isLastAttempt) {
+              console.warn(
+                `[SyncService] Initial syncDown failed (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms:`,
+                error
+              );
+              await new Promise((r) => setTimeout(r, delayMs));
+              continue;
+            }
+
+            console.error("[SyncService] Initial syncDown failed:", error);
+            toast.error(
+              "Failed to sync data from server on startup. You may be seeing outdated data.",
+              {
+                duration: 8000,
+              }
+            );
+          }
+        }
+      })().finally(() => {
+        initialSyncDownInFlight = false;
       });
     };
 

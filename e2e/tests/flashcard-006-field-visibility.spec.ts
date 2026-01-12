@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MASONS_ID,
@@ -16,7 +17,10 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Field Visibility", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
@@ -24,6 +28,7 @@ test.describe
           TEST_TUNE_MORRISON_ID,
         ], // ensure >= 2 cards available
         scheduleDaysAgo: 1, // Ensure multiple cards are available
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
     });
@@ -50,10 +55,8 @@ test.describe
 
       // Enable 'incipit' on back face and reveal card
       await app.toggleFlashcardField("back", "incipit", true);
-      await app.revealCard();
-      await page.waitForTimeout(200);
-
-      await expect(incipit).toBeVisible();
+      await app.ensureReveal(true);
+      await expect(incipit).toBeVisible({ timeout: 15000 });
 
       // Disable again -> should hide
       await app.toggleFlashcardField("back", "incipit", false);
@@ -69,9 +72,8 @@ test.describe
       await expect(links).toBeHidden();
 
       await app.toggleFlashcardField("back", "favorite_url", true);
-      await app.revealCard();
-      await page.waitForTimeout(200);
-      await expect(links).toBeVisible();
+      await app.ensureReveal(true);
+      await expect(links).toBeVisible({ timeout: 15000 });
 
       await app.toggleFlashcardField("back", "favorite_url", false);
       await page.waitForTimeout(200);
@@ -84,36 +86,24 @@ test.describe
       const app = new TuneTreesPage(page);
       await app.enableFlashcardMode();
 
-      // Ensure we have at least 2 cards before navigating (total >= 2)
-      const counter = app.flashcardHeaderCounter;
-      const counterText = (await counter.textContent())?.trim() || "";
-      const totalMatch = /of\s+(\d+)/.exec(counterText);
-      const total = totalMatch ? parseInt(totalMatch[1], 10) : 0;
-      if (total < 2) {
-        test.fixme(
-          true,
-          `Only ${total} card(s) available; skipping multi-card persistence test.`
-        );
-        return;
-      }
+      // Ensure we have at least 2 cards before navigating.
+      await app.waitForCounterValue(100, 200, 2);
 
       // Enable incipit and favorite_url on back
       await app.toggleFlashcardField("back", "incipit", true);
       await app.toggleFlashcardField("back", "favorite_url", true);
-      await app.revealCard();
-      await page.waitForTimeout(200);
+      await app.ensureReveal(true);
 
       const incipit = page.getByTestId("flashcard-field-incipit");
       const links = page.getByTestId("flashcard-field-favorite_url");
-      await expect(incipit).toBeVisible();
-      await expect(links).toBeVisible();
+      await expect(incipit).toBeVisible({ timeout: 15000 });
+      await expect(links).toBeVisible({ timeout: 15000 });
 
       // Navigate next and verify still visible (reveal back again)
       await app.goNextCard();
-      await page.waitForTimeout(200);
-      await app.revealCard();
-      await expect(incipit).toBeVisible();
-      await expect(links).toBeVisible();
+      await app.ensureReveal(true);
+      await expect(incipit).toBeVisible({ timeout: 15000 });
+      await expect(links).toBeVisible({ timeout: 15000 });
     });
 
     test("05. Field visibility independent from grid", async ({ page }) => {
@@ -133,15 +123,14 @@ test.describe
       await expect(incipit).toBeHidden();
 
       await app.toggleFlashcardField("back", "incipit", true);
-      await app.revealCard();
-      await expect(incipit).toBeVisible();
+      await app.ensureReveal(true);
+      await expect(incipit).toBeVisible({ timeout: 15000 });
 
       // Close and reopen to verify persistence
       await app.disableFlashcardMode();
-      await page.waitForTimeout(500);
       await app.enableFlashcardMode();
-      await app.revealCard();
-      await expect(incipit).toBeVisible();
+      await app.ensureReveal(true);
+      await expect(incipit).toBeVisible({ timeout: 15000 });
     });
     // Note: Persistence across open/close covered above
   });

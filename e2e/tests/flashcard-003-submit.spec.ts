@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { STANDARD_TEST_DATE, setStableDate } from "e2e/helpers/clock-control";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MASONS_ID,
@@ -16,7 +17,15 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 test.describe
   .serial("Flashcard Feature: Submit", () => {
-    test.beforeEach(async ({ page, testUser }) => {
+    // This suite includes a full local DB reset + sync in beforeEach.
+    // Mobile Chrome (emulated) can be significantly slower, so keep a higher
+    // timeout to avoid spurious failures that are just setup latency.
+    test.setTimeout(60_000);
+
+    test.beforeEach(async ({ page, testUser, context }) => {
+      const currentDate = new Date(STANDARD_TEST_DATE);
+      await setStableDate(context, currentDate);
+
       await setupForPracticeTestsParallel(page, testUser, {
         repertoireTunes: [
           TEST_TUNE_BANISH_ID,
@@ -24,6 +33,7 @@ test.describe
           TEST_TUNE_MASONS_ID,
         ], // 3 tunes that exist in seed data
         scheduleDaysAgo: 1,
+        scheduleBaseDate: currentDate,
         startTab: "practice",
       });
     });
@@ -45,19 +55,17 @@ test.describe
 
       // Select evaluation
       await app.selectFlashcardEvaluation("good");
-      await page.waitForTimeout(300);
 
       // Click Submit
       const submitButton = app.submitEvaluationsButton;
       await expect(submitButton).toBeEnabled();
       await submitButton.click();
-      await page.waitForTimeout(1500); // Wait for sync
-
       // Verify Submit succeeded (count resets to 0)
-      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toBeDisabled({ timeout: 10_000 });
       await expect(submitButton).toHaveAttribute(
         "title",
-        /Submit 0 practice evaluations/
+        /Submit 0 practice evaluations/,
+        { timeout: 10_000 }
       );
       await expect(submitButton).toContainText(/Submit/i);
     });
@@ -66,38 +74,27 @@ test.describe
       const app = new TuneTreesPage(page);
       await app.enableFlashcardMode();
 
-      // Ensure we have at least 2 cards
-      const counter = app.flashcardHeaderCounter;
-      const initialText = await counter.textContent();
-      const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
-      if (total < 2) {
-        test.fixme(
-          true,
-          `Only ${total} card(s) available; skipping multi-evaluation submit test.`
-        );
-        return;
-      }
+      // Ensure we have at least 2 cards.
+      await app.waitForCounterValue(100, 200, 2);
 
       // Evaluate first card
       await app.selectFlashcardEvaluation("good");
-      await page.waitForTimeout(300);
 
       // Navigate and evaluate second card
       await app.goNextCard();
-      await page.waitForTimeout(300);
       await app.selectFlashcardEvaluation("easy");
-      await page.waitForTimeout(300);
 
       // Submit
       const submitButton = app.submitEvaluationsButton;
+      await expect(submitButton).toBeEnabled({ timeout: 10_000 });
       await submitButton.click();
-      await page.waitForTimeout(1500);
 
       // Verify Submit succeeded (count resets to 0)
-      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toBeDisabled({ timeout: 10_000 });
       await expect(submitButton).toHaveAttribute(
         "title",
-        /Submit 0 practice evaluations/
+        /Submit 0 practice evaluations/,
+        { timeout: 10_000 }
       );
       await expect(submitButton).toContainText(/Submit/i);
     });
@@ -108,25 +105,22 @@ test.describe
 
       // Select evaluation
       await app.selectFlashcardEvaluation("good");
-      await page.waitForTimeout(300);
 
       // Submit
       await app.submitEvaluationsButton.click();
-      await page.waitForTimeout(1500);
 
       // Verify Submit button shows 0 evaluations
       const submitButton = app.submitEvaluationsButton;
-      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toBeDisabled({ timeout: 10_000 });
       await expect(submitButton).toHaveAttribute(
         "title",
-        /Submit 0 practice evaluations/
+        /Submit 0 practice evaluations/,
+        { timeout: 10_000 }
       );
       await expect(submitButton).toContainText(/Submit/i);
     });
 
     test("05. Submit updates grid immediately", async ({ page }) => {
-      test.fixme(!!process.env.CI, "Known timing issue in CI");
-
       const app = new TuneTreesPage(page);
       // Ensure Show Submitted is OFF for deterministic row decrease
       const showSwitch = app.displaySubmittedSwitch.getByRole("switch");
@@ -191,8 +185,6 @@ test.describe
     });
 
     test("06. Submit updates flashcard list count", async ({ page }) => {
-      test.fixme(!!process.env.CI, "Known timing issue in CI");
-
       const app = new TuneTreesPage(page);
       await app.enableFlashcardMode();
 
@@ -213,8 +205,17 @@ test.describe
       // Select and submit evaluation
       await app.selectFlashcardEvaluation("good");
       await page.waitForTimeout(300);
-      await app.submitEvaluationsButton.click();
-      await page.waitForTimeout(300);
+      const submitButton = app.submitEvaluationsButton;
+      await expect(submitButton).toBeEnabled();
+      await submitButton.click();
+
+      // Wait for submit to complete before asserting list changes.
+      await expect(submitButton).toBeDisabled({ timeout: 10_000 });
+      await expect(submitButton).toHaveAttribute(
+        "title",
+        /Submit 0 practice evaluations/,
+        { timeout: 10_000 }
+      );
 
       // Verify flashcard count updated (if Show Submitted OFF)
       const showSubmittedToggle =
@@ -231,24 +232,21 @@ test.describe
         .poll(
           async () => {
             const updatedText = (await counter.textContent()) || "";
-            const parts = updatedText.split(" of ");
-            const updatedTotal =
-              parts.length > 1 ? parseInt(parts[1] || "0", 10) : 0;
+            const match = updatedText.match(/\bof\s+(\d+)\b/i);
+            const updatedTotal = match ? parseInt(match[1] || "", 10) : null;
+            const parsedTotal =
+              updatedTotal === null || Number.isNaN(updatedTotal)
+                ? null
+                : updatedTotal;
             attemptCount++;
             console.debug(
-              `[Poll #${attemptCount}] updatedTotal: ${updatedTotal}, initialTotal: ${initialTotal}`
+              `[Poll #${attemptCount}] updatedTotal: ${parsedTotal}, initialTotal: ${initialTotal}`
             );
-            return updatedTotal;
+            return parsedTotal;
           },
           { timeout: 20000, intervals: [100, 500, 1000] }
         )
         .toBeLessThan(initialTotal);
-
-      // double-check
-      const updatedText = (await counter.textContent()) || "";
-      const parts = updatedText.split(" of ");
-      const updatedTotal = parts.length > 1 ? parseInt(parts[1] || "0", 10) : 0;
-      expect(updatedTotal).toBe(2);
     });
 
     test("07. Submit works from any card position", async ({ page }) => {

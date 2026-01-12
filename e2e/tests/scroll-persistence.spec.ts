@@ -4,6 +4,7 @@ import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { setStableDate, STANDARD_TEST_DATE } from "e2e/helpers/clock-control";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -26,7 +27,10 @@ test.describe("Scroll Position Persistence", () => {
   let currentTestUser: TestUser;
   let ttPage: TuneTreesPage;
 
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, testUser, context }) => {
+    const currentDate = new Date(STANDARD_TEST_DATE);
+    await setStableDate(context, currentDate);
+
     currentTestUser = testUser;
     // Add 30 tunes to playlist for scrollable content
     addedTuneIds = await addScrollTestTunes(testUser);
@@ -35,6 +39,8 @@ test.describe("Scroll Position Persistence", () => {
     await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: addedTuneIds,
       startTab: "practice",
+      scheduleDaysAgo: 1,
+      scheduleBaseDate: currentDate,
     });
 
     ttPage = new TuneTreesPage(page);
