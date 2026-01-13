@@ -17,6 +17,7 @@ import { AuthProvider } from "./lib/auth/AuthContext";
 import { CurrentPlaylistProvider } from "./lib/context/CurrentPlaylistContext";
 import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
 import { OnboardingProvider } from "./lib/context/OnboardingContext";
+import { UIPreferencesProvider } from "./lib/context/UIPreferencesContext";
 import DatabaseBrowser from "./routes/debug/db";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
@@ -28,6 +29,7 @@ import NewTunePage from "./routes/tunes/new";
 
 // Lazy load settings pages
 const UserSettingsLayout = lazy(() => import("./routes/user-settings"));
+const AppearancePage = lazy(() => import("./routes/user-settings/appearance"));
 const AvatarPage = lazy(() => import("./routes/user-settings/avatar"));
 const AccountPage = lazy(() => import("./routes/user-settings/account"));
 const SchedulingOptionsPage = lazy(
@@ -69,15 +71,16 @@ function App() {
   return (
     <AuthProvider>
       <OnboardingProvider>
-        <CurrentPlaylistProvider>
-          <CurrentTuneProvider>
-            <SidebarDockProvider>
-              {/* Toast notification provider */}
-              <Toaster position="top-right" richColors closeButton />
-              {/* PWA Update Prompt */}
-              <UpdatePrompt />
-              {/* <ThemeDebugger /> */}
-              <Router>
+        <UIPreferencesProvider>
+          <CurrentPlaylistProvider>
+            <CurrentTuneProvider>
+              <SidebarDockProvider>
+                {/* Toast notification provider */}
+                <Toaster position="top-right" richColors closeButton />
+                {/* PWA Update Prompt */}
+                <UpdatePrompt />
+                {/* <ThemeDebugger /> */}
+                <Router>
                 {/* Public Routes */}
                 <Route path="/login" component={Login} />
                 <Route path="/auth/callback" component={AuthCallback} />
@@ -88,6 +91,7 @@ function App() {
 
                 {/* User Settings Routes (Modal) */}
                 <Route path="/user-settings" component={UserSettingsLayout}>
+                  <Route path="/appearance" component={AppearancePage} />
                   <Route path="/avatar" component={AvatarPage} />
                   <Route
                     path="/scheduling-options"
@@ -199,8 +203,9 @@ function App() {
             </SidebarDockProvider>
           </CurrentTuneProvider>
         </CurrentPlaylistProvider>
-      </OnboardingProvider>
-    </AuthProvider>
+      </UIPreferencesProvider>
+    </OnboardingProvider>
+  </AuthProvider>
   );
 }
 

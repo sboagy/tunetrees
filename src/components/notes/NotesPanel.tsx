@@ -8,6 +8,10 @@ import {
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
+import {
+  getSidebarFontClasses,
+  useUIPreferences,
+} from "@/lib/context/UIPreferencesContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
   createNote,
@@ -34,6 +38,10 @@ import { NotesEditor } from "./NotesEditor";
 export const NotesPanel: Component = () => {
   const { currentTuneId } = useCurrentTune();
   const { user } = useAuth();
+  const { sidebarFontSize } = useUIPreferences();
+
+  // Get dynamic font classes
+  const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
 
   const [isAdding, setIsAdding] = createSignal(false);
   const [editingNoteId, setEditingNoteId] = createSignal<string | null>(null); // UUID
@@ -198,9 +206,9 @@ export const NotesPanel: Component = () => {
       {/* Header with icon and Add Note button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
-          <StickyNote class="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+          <StickyNote class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`} />
           <h4
-            class="text-xs font-medium text-gray-700 dark:text-gray-300"
+            class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
             data-testid="notes-count"
           >
             {notes()?.length || 0} {notes()?.length === 1 ? "note" : "notes"}
@@ -210,11 +218,11 @@ export const NotesPanel: Component = () => {
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+            class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
             title="Add new note"
             data-testid="notes-add-button"
           >
-            <Plus class="w-2.5 h-2.5" />
+            <Plus class={fontClasses().iconSmall} />
             Add
           </button>
         </Show>
@@ -236,7 +244,7 @@ export const NotesPanel: Component = () => {
             <button
               type="button"
               onClick={handleCreateNote}
-              class="px-2 py-0.5 text-xs text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+              class={`px-2 py-0.5 ${fontClasses().text} text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
               disabled={!newNoteContent().trim()}
               data-testid="notes-save-button"
             >
@@ -248,7 +256,7 @@ export const NotesPanel: Component = () => {
                 setIsAdding(false);
                 setNewNoteContent("");
               }}
-              class="px-2 py-0.5 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+              class={`px-2 py-0.5 ${fontClasses().text} text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
               data-testid="notes-cancel-button"
             >
               Cancel
@@ -260,7 +268,7 @@ export const NotesPanel: Component = () => {
       {/* No tune selected */}
       <Show when={!currentTuneId()}>
         <p
-          class="text-xs italic text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
           data-testid="notes-no-tune-message"
         >
           Select a tune to view notes
@@ -270,7 +278,7 @@ export const NotesPanel: Component = () => {
       {/* Loading state */}
       <Show when={notes.loading}>
         <p
-          class="text-xs text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
           data-testid="notes-loading"
         >
           Loading notes...
@@ -280,7 +288,7 @@ export const NotesPanel: Component = () => {
       {/* Empty state */}
       <Show when={currentTuneId() && !notes.loading && notes()?.length === 0}>
         <p
-          class="text-xs italic text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
           data-testid="notes-empty-message"
         >
           No notes yet. Click "+ Add Note" to create one.
@@ -322,10 +330,10 @@ export const NotesPanel: Component = () => {
                     aria-label="Drag to reorder note"
                     data-testid={`note-drag-handle-${note.id}`}
                   >
-                    <GripVertical class="w-3 h-3" />
+                    <GripVertical class={fontClasses().iconSmall} />
                   </button>
                   <span
-                    class="text-[10px] text-gray-500 dark:text-gray-400"
+                    class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400`}
                     data-testid={`note-date-${note.id}`}
                   >
                     {formatDate(note.createdDate)}
@@ -339,23 +347,23 @@ export const NotesPanel: Component = () => {
                         editingNoteId() === note.id ? null : note.id
                       )
                     }
-                    class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors"
+                    class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
                     title={
                       editingNoteId() === note.id ? "Cancel edit" : "Edit note"
                     }
                     data-testid={`note-edit-button-${note.id}`}
                   >
-                    <Edit class="w-2.5 h-2.5" />
+                    <Edit class={fontClasses().iconSmall} />
                     {editingNoteId() === note.id ? "Cancel" : "Edit"}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteNote(note.id)}
-                    class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors"
+                    class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
                     title="Delete note"
                     data-testid={`note-delete-button-${note.id}`}
                   >
-                    <Trash2 class="w-2.5 h-2.5" />
+                    <Trash2 class={fontClasses().iconSmall} />
                     Delete
                   </button>
                 </div>
@@ -366,7 +374,7 @@ export const NotesPanel: Component = () => {
                 when={editingNoteId() === note.id}
                 fallback={
                   <div
-                    class="text-xs text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none"
+                    class={`${fontClasses().text} text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none`}
                     innerHTML={note.noteText || ""}
                     data-testid={`note-content-${note.id}`}
                   />

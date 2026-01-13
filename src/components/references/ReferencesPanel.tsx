@@ -12,6 +12,10 @@ import { Link, Plus } from "lucide-solid";
 import { type Component, createResource, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
+import {
+  getSidebarFontClasses,
+  useUIPreferences,
+} from "@/lib/context/UIPreferencesContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
   type CreateReferenceData,
@@ -28,6 +32,10 @@ import { ReferenceList } from "./ReferenceList";
 export const ReferencesPanel: Component = () => {
   const { currentTuneId } = useCurrentTune();
   const { user } = useAuth();
+  const { sidebarFontSize } = useUIPreferences();
+
+  // Get dynamic font classes
+  const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
 
   const [isAdding, setIsAdding] = createSignal(false);
   const [editingReference, setEditingReference] =
@@ -148,9 +156,9 @@ export const ReferencesPanel: Component = () => {
       {/* Header with icon and Add Reference button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
-          <Link class="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+          <Link class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`} />
           <h4
-            class="text-xs font-medium text-gray-700 dark:text-gray-300"
+            class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
             data-testid="references-count"
           >
             {references()?.length || 0}{" "}
@@ -161,11 +169,11 @@ export const ReferencesPanel: Component = () => {
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+            class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
             title="Add new reference"
             data-testid="references-add-button"
           >
-            <Plus class="w-2.5 h-2.5" />
+            <Plus class={fontClasses().iconSmall} />
             Add
           </button>
         </Show>
@@ -177,7 +185,7 @@ export const ReferencesPanel: Component = () => {
           class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
           data-testid="references-add-form"
         >
-          <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+          <h5 class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}>
             Add New Reference
           </h5>
           <ReferenceForm
@@ -194,7 +202,7 @@ export const ReferencesPanel: Component = () => {
             class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
             data-testid="references-edit-form"
           >
-            <h5 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            <h5 class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}>
               Edit Reference
             </h5>
             <ReferenceForm
@@ -209,7 +217,7 @@ export const ReferencesPanel: Component = () => {
       {/* No tune selected */}
       <Show when={!currentTuneId()}>
         <p
-          class="text-xs italic text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
           data-testid="references-no-tune-message"
         >
           Select a tune to view references
@@ -219,7 +227,7 @@ export const ReferencesPanel: Component = () => {
       {/* Loading state */}
       <Show when={references.loading}>
         <p
-          class="text-xs text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
           data-testid="references-loading"
         >
           Loading references...
