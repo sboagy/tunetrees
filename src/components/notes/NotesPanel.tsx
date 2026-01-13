@@ -16,6 +16,10 @@ import {
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
+import {
+  getSidebarFontClasses,
+  useUIPreferences,
+} from "@/lib/context/UIPreferencesContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
   createNote,
@@ -51,6 +55,10 @@ import { NotesEditor } from "./NotesEditor";
 export const NotesPanel: Component = () => {
   const { currentTuneId } = useCurrentTune();
   const { user } = useAuth();
+  const { sidebarFontSize } = useUIPreferences();
+
+  // Get dynamic font classes
+  const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
 
   const [isAdding, setIsAdding] = createSignal(false);
   const [editingNoteId, setEditingNoteId] = createSignal<string | null>(null); // UUID
@@ -264,9 +272,9 @@ export const NotesPanel: Component = () => {
       {/* Header with icon and Add Note button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
-          <StickyNote class="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+          <StickyNote class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`} />
           <h4
-            class="text-xs font-medium text-gray-700 dark:text-gray-300"
+            class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
             data-testid="notes-count"
           >
             {notes()?.length || 0} {notes()?.length === 1 ? "note" : "notes"}
@@ -276,12 +284,12 @@ export const NotesPanel: Component = () => {
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+            class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
             title="Add new note"
             data-testid="notes-add-button"
           >
             Add
-            <Plus class="w-2.5 h-2.5" />
+            <Plus class={fontClasses().iconSmall} />
           </button>
         </Show>
       </div>
@@ -293,19 +301,21 @@ export const NotesPanel: Component = () => {
           data-testid="notes-new-editor"
         >
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            <span
+              class={`${fontClasses().textSmall} font-semibold text-gray-700 dark:text-gray-300`}
+            >
               New note
             </span>
             <div class="flex gap-1.5">
               <button
                 type="button"
                 onClick={handleCreateNote}
-                class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+                class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
                 disabled={!newNoteContent().trim()}
                 data-testid="notes-save-button"
               >
                 Save
-                <Save class="w-2.5 h-2.5" />
+                <Save class={fontClasses().iconSmall} />
               </button>
               <button
                 type="button"
@@ -313,11 +323,11 @@ export const NotesPanel: Component = () => {
                   setIsAdding(false);
                   setNewNoteContent("");
                 }}
-                class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50"
+                class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
                 data-testid="notes-cancel-button"
               >
                 Cancel
-                <X class="w-2.5 h-2.5" />
+                <X class={fontClasses().iconSmall} />
               </button>
             </div>
           </div>
@@ -333,7 +343,7 @@ export const NotesPanel: Component = () => {
       {/* No tune selected */}
       <Show when={!currentTuneId()}>
         <p
-          class="text-xs italic text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
           data-testid="notes-no-tune-message"
         >
           Select a tune to view notes
@@ -343,7 +353,7 @@ export const NotesPanel: Component = () => {
       {/* Loading state */}
       <Show when={notes.loading}>
         <p
-          class="text-xs text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
           data-testid="notes-loading"
         >
           Loading notes...
@@ -353,7 +363,7 @@ export const NotesPanel: Component = () => {
       {/* Empty state */}
       <Show when={currentTuneId() && !notes.loading && notes()?.length === 0}>
         <p
-          class="text-xs italic text-gray-500 dark:text-gray-400"
+          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
           data-testid="notes-empty-message"
         >
           No notes yet. Click "+ Add Note" to create one.
@@ -398,10 +408,10 @@ export const NotesPanel: Component = () => {
                       aria-label="Drag to reorder note"
                       data-testid={`note-drag-handle-${note.id}`}
                     >
-                      <GripVertical class="w-3 h-3" />
+                      <GripVertical class={fontClasses().iconSmall} />
                     </button>
                     <span
-                      class="text-[10px] text-gray-500 dark:text-gray-400"
+                      class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400`}
                       data-testid={`note-date-${note.id}`}
                     >
                       {formatDate(note.createdDate)}
@@ -418,23 +428,23 @@ export const NotesPanel: Component = () => {
                             setEditingNoteId(note.id);
                             setEditingContent(note.noteText || "");
                           }}
-                          class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors"
+                          class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
                           title="Edit note"
                           data-testid={`note-edit-button-${note.id}`}
                         >
                           Edit
-                          <Edit class="w-2.5 h-2.5" />
+                          <Edit class={fontClasses().iconSmall} />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => requestDeleteNote(note.id)}
-                          class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors"
+                          class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
                           title="Delete note"
                           data-testid={`note-delete-button-${note.id}`}
                         >
                           Delete
-                          <Trash2 class="w-2.5 h-2.5" />
+                          <Trash2 class={fontClasses().iconSmall} />
                         </button>
                       </div>
                     }
@@ -443,34 +453,32 @@ export const NotesPanel: Component = () => {
                       <button
                         type="button"
                         onClick={handleSaveEditedNote}
-                        class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-green-700 dark:text-green-400 hover:bg-green-50/50 dark:hover:bg-green-900/30 rounded-sm transition-colors"
+                        class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 hover:bg-green-50/50 dark:hover:bg-green-900/30 rounded-sm transition-colors`}
                         title="Save note"
                         data-testid={`note-save-button-${note.id}`}
                       >
                         Save
-                        <Save class="w-2.5 h-2.5" />
+                        <Save class={fontClasses().iconSmall} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          handleCancelEdit();
-                        }}
-                        class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/30 rounded-sm transition-colors"
+                        onClick={handleCancelEdit}
+                        class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/30 rounded-sm transition-colors`}
                         title="Cancel editing"
                         data-testid={`note-cancel-button-${note.id}`}
                       >
                         Cancel
-                        <X class="w-2.5 h-2.5" />
+                        <X class={fontClasses().iconSmall} />
                       </button>
                       <button
                         type="button"
                         onClick={() => requestDeleteNote(note.id)}
-                        class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors"
+                        class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
                         title="Delete note"
                         data-testid={`note-delete-button-${note.id}`}
                       >
                         Delete
-                        <Trash2 class="w-2.5 h-2.5" />
+                        <Trash2 class={fontClasses().iconSmall} />
                       </button>
                     </div>
                   </Show>
@@ -481,7 +489,7 @@ export const NotesPanel: Component = () => {
                   when={isEditing()}
                   fallback={
                     <div
-                      class="text-xs text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none"
+                      class={`${fontClasses().text} text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none`}
                       innerHTML={note.noteText || ""}
                       data-testid={`note-content-${note.id}`}
                     />
