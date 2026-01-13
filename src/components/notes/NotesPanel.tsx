@@ -272,7 +272,9 @@ export const NotesPanel: Component = () => {
       {/* Header with icon and Add Note button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
-          <StickyNote class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`} />
+          <StickyNote
+            class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
+          />
           <h4
             class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
             data-testid="notes-count"

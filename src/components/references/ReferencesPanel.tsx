@@ -156,7 +156,9 @@ export const ReferencesPanel: Component = () => {
       {/* Header with icon and Add Reference button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
-          <Link class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`} />
+          <Link
+            class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
+          />
           <h4
             class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
             data-testid="references-count"
@@ -185,7 +187,9 @@ export const ReferencesPanel: Component = () => {
           class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
           data-testid="references-add-form"
         >
-          <h5 class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}>
+          <h5
+            class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}
+          >
             Add New Reference
           </h5>
           <ReferenceForm
@@ -202,7 +206,9 @@ export const ReferencesPanel: Component = () => {
             class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
             data-testid="references-edit-form"
           >
-            <h5 class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}>
+            <h5
+              class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}
+            >
               Edit Reference
             </h5>
             <ReferenceForm
