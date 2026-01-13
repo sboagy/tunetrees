@@ -13,13 +13,16 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 let ttPage: TuneTreesPage;
+const REFS_TEST_TUNE_PREFIX = "E2E-REFS-001";
 
 test.describe("REFS-001: References CRUD Operations", () => {
   // Run tests serially to avoid database conflicts on shared tune
   test.describe.configure({ mode: "serial" });
 
-  test.beforeEach(async ({ page, testUser }) => {
+  test.beforeEach(async ({ page, testUser }, testInfo) => {
     ttPage = new TuneTreesPage(page);
+
+    const testTuneTitle = `${REFS_TEST_TUNE_PREFIX}-${testInfo.project.name.replace(/\s+/g, "-")}`;
 
     // Setup deterministic test environment
     await setupDeterministicTestParallel(page, testUser, {
@@ -28,35 +31,58 @@ test.describe("REFS-001: References CRUD Operations", () => {
       clearNotesAndReferences: true,
     });
 
-    // Navigate to Catalog tab to find and select a tune
+    // Navigate to Catalog tab to find (or create) and select a tune
     await ttPage.catalogTab.click();
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
 
-    // Search for and select Banish Misfortune tune
-    await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
-    await page.waitForTimeout(500); // Wait for filter to apply
+    // Some public catalog tunes may include system/legacy references (user_ref IS NULL),
+    // which makes "0 references" impossible even after clearing user tables.
+    // Use a user-created test tune to guarantee an empty reference state.
+    await ttPage.searchForTune(testTuneTitle, ttPage.catalogGrid);
+    await page.waitForTimeout(250);
+    const matchingRow = ttPage.getRows("catalog").filter({ hasText: testTuneTitle }).first();
+    const existingTuneVisible = await matchingRow
+      .isVisible({ timeout: 1500 })
+      .catch(() => false);
 
-    const tuneRow = ttPage.getRows("catalog").first();
-    await expect(tuneRow).toBeVisible({ timeout: 5000 });
-    await tuneRow.click();
+    if (!existingTuneVisible) {
+      await ttPage.catalogAddTuneButton.click();
+      const newButton = page.getByRole("button", { name: /^new$/i });
+      await newButton.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+      const titleField = ttPage.tuneEditorForm.getByTestId(
+        "tune-editor-input-title"
+      );
+      await expect(titleField).toBeVisible({ timeout: 10000 });
+      await titleField.fill(testTuneTitle);
+      await ttPage.selectTypeInTuneEditor("Reel (4/4)");
+
+      const saveButton = page.getByRole("button", { name: /save/i });
+      await saveButton.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+    }
+
+    await ttPage.searchForTune(testTuneTitle, ttPage.catalogGrid);
+    await page.waitForTimeout(250);
+    await expect(matchingRow).toBeVisible({ timeout: 10000 });
+    await matchingRow.click();
 
     // On mobile, expand the sidebar (collapsed by default)
     await ttPage.ensureSidebarExpanded();
 
     // Wait for sidebar to show tune details
-    await expect(
-      page.getByRole("heading", { name: "Banish Misfortune" })
-    ).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByRole("heading", { name: testTuneTitle })).toBeVisible(
+      {
+        timeout: 10000,
+      }
+    );
   });
 
   test("should display references panel with empty state", async ({ page }) => {
     // Verify references panel shows 0 references
     await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole("heading", { name: "0 references" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^0\s+references$/i, {
       timeout: 5000,
     });
 
@@ -94,9 +120,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await ttPage.referenceSubmitButton.click();
 
     // Verify reference appears in list
-    await expect(
-      page.getByRole("heading", { name: "1 reference" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^1\s+reference$/i, {
       timeout: 15000,
     });
   });
@@ -139,9 +163,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await expect(ttPage.referenceForm).not.toBeVisible();
 
     // Verify no reference was created
-    await expect(
-      page.getByRole("heading", { name: "0 references" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^0\s+references$/i, {
       timeout: 5000,
     });
   });
@@ -174,9 +196,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await ttPage.referenceSubmitButton.click();
 
     // Verify reference appears in list
-    await expect(
-      page.getByRole("heading", { name: "1 reference" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^1\s+reference$/i, {
       timeout: 15000,
     });
 
