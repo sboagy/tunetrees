@@ -1,4 +1,12 @@
-import { Edit, GripVertical, Plus, StickyNote, Trash2 } from "lucide-solid";
+import {
+  Edit,
+  GripVertical,
+  Plus,
+  Save,
+  StickyNote,
+  Trash2,
+  X,
+} from "lucide-solid";
 import {
   type Component,
   createResource,
@@ -20,6 +28,15 @@ import {
   updateNote,
   updateNoteOrder,
 } from "@/lib/db/queries/notes";
+import {
+  AlertDialog,
+  AlertDialogCloseButton,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 import { NotesEditor } from "./NotesEditor";
 
 /**
@@ -30,7 +47,7 @@ import { NotesEditor } from "./NotesEditor";
  * - Create new notes
  * - Edit existing notes
  * - Delete notes
- * - Auto-save with debounce
+ * - Explicit save/cancel when editing existing notes
  * - Drag-and-drop reordering
  *
  * Note: Uses CurrentTuneContext to track which tune's notes to display
@@ -46,6 +63,11 @@ export const NotesPanel: Component = () => {
   const [isAdding, setIsAdding] = createSignal(false);
   const [editingNoteId, setEditingNoteId] = createSignal<string | null>(null); // UUID
   const [newNoteContent, setNewNoteContent] = createSignal("");
+  const [editingContent, setEditingContent] = createSignal("");
+  const [deleteConfirmId, setDeleteConfirmId] = createSignal<string | null>(
+    null
+  );
+  const [isDeleting, setIsDeleting] = createSignal(false);
 
   // Drag-and-drop state
   const [draggedNoteId, setDraggedNoteId] = createSignal<string | null>(null);
@@ -113,19 +135,63 @@ export const NotesPanel: Component = () => {
     }
   };
 
+  const handleSaveEditedNote = async () => {
+    const noteId = editingNoteId();
+    if (!noteId) return;
+
+    await handleUpdateNote(noteId, editingContent());
+    setEditingNoteId(null);
+    setEditingContent("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditingContent("");
+  };
+
   // Handle deleting a note
   const handleDeleteNote = async (noteId: string) => {
-    // UUID
-    if (!confirm("Delete this note?")) return;
-
     try {
       const db = getDb();
       await deleteNote(db, noteId);
+
+      if (editingNoteId() === noteId) {
+        setEditingNoteId(null);
+        setEditingContent("");
+      }
 
       // Reload notes
       refetch();
     } catch (error) {
       console.error("Failed to delete note:", error);
+    }
+  };
+
+  const requestDeleteNote = (noteId: string) => {
+    setDeleteConfirmId(noteId);
+  };
+
+  const cancelDeleteNote = () => {
+    setIsDeleting(false);
+    setDeleteConfirmId(null);
+  };
+
+  const confirmDeleteNote = async () => {
+    const noteId = deleteConfirmId();
+    if (!noteId) return;
+
+    setIsDeleting(true);
+    try {
+      await handleDeleteNote(noteId);
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const handleDeleteDialogChange = (open: boolean) => {
+    if (!open) {
+      cancelDeleteNote();
     }
   };
 
@@ -206,7 +272,9 @@ export const NotesPanel: Component = () => {
       {/* Header with icon and Add Note button */}
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5">
-          <StickyNote class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`} />
+          <StickyNote
+            class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
+          />
           <h4
             class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
             data-testid="notes-count"
@@ -222,8 +290,8 @@ export const NotesPanel: Component = () => {
             title="Add new note"
             data-testid="notes-add-button"
           >
-            <Plus class={fontClasses().iconSmall} />
             Add
+            <Plus class={fontClasses().iconSmall} />
           </button>
         </Show>
       </div>
@@ -234,34 +302,43 @@ export const NotesPanel: Component = () => {
           class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
           data-testid="notes-new-editor"
         >
+          <div class="flex items-center justify-between mb-1">
+            <span
+              class={`${fontClasses().textSmall} font-semibold text-gray-700 dark:text-gray-300`}
+            >
+              New note
+            </span>
+            <div class="flex gap-1.5">
+              <button
+                type="button"
+                onClick={handleCreateNote}
+                class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
+                disabled={!newNoteContent().trim()}
+                data-testid="notes-save-button"
+              >
+                Save
+                <Save class={fontClasses().iconSmall} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdding(false);
+                  setNewNoteContent("");
+                }}
+                class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
+                data-testid="notes-cancel-button"
+              >
+                Cancel
+                <X class={fontClasses().iconSmall} />
+              </button>
+            </div>
+          </div>
           <NotesEditor
             content={newNoteContent()}
             onContentChange={setNewNoteContent}
             placeholder="Write your note..."
             autofocus={true}
           />
-          <div class="flex gap-1.5 mt-1.5">
-            <button
-              type="button"
-              onClick={handleCreateNote}
-              class={`px-2 py-0.5 ${fontClasses().text} text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
-              disabled={!newNoteContent().trim()}
-              data-testid="notes-save-button"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding(false);
-                setNewNoteContent("");
-              }}
-              class={`px-2 py-0.5 ${fontClasses().text} text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
-              data-testid="notes-cancel-button"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       </Show>
 
@@ -298,102 +375,177 @@ export const NotesPanel: Component = () => {
       {/* Notes list with drag-and-drop */}
       <ul class="space-y-2 list-none" data-testid="notes-list">
         <For each={notes()}>
-          {(note) => (
-            <li
-              class={`p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all ${
-                draggedNoteId() === note.id
-                  ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
-                  : dragOverNoteId() === note.id
-                    ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
-                    : "border-gray-200/30 dark:border-gray-700/30"
-              }`}
-              data-testid={`note-item-${note.id}`}
-              onDragOver={(e) =>
-                handleDragOver(e as unknown as DragEvent, note.id)
-              }
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e as unknown as DragEvent, note.id)}
-            >
-              {/* Note metadata */}
-              <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-1">
-                  {/* Drag handle */}
-                  <button
-                    type="button"
-                    draggable={true}
-                    onDragStart={(e) =>
-                      handleDragStart(e as unknown as DragEvent, note.id)
-                    }
-                    onDragEnd={handleDragEnd}
-                    class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                    title="Drag to reorder"
-                    aria-label="Drag to reorder note"
-                    data-testid={`note-drag-handle-${note.id}`}
-                  >
-                    <GripVertical class={fontClasses().iconSmall} />
-                  </button>
-                  <span
-                    class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400`}
-                    data-testid={`note-date-${note.id}`}
-                  >
-                    {formatDate(note.createdDate)}
-                  </span>
-                </div>
-                <div class="flex gap-0.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditingNoteId(
-                        editingNoteId() === note.id ? null : note.id
-                      )
-                    }
-                    class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
-                    title={
-                      editingNoteId() === note.id ? "Cancel edit" : "Edit note"
-                    }
-                    data-testid={`note-edit-button-${note.id}`}
-                  >
-                    <Edit class={fontClasses().iconSmall} />
-                    {editingNoteId() === note.id ? "Cancel" : "Edit"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteNote(note.id)}
-                    class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
-                    title="Delete note"
-                    data-testid={`note-delete-button-${note.id}`}
-                  >
-                    <Trash2 class={fontClasses().iconSmall} />
-                    Delete
-                  </button>
-                </div>
-              </div>
+          {(note) => {
+            const isEditing = () => editingNoteId() === note.id;
 
-              {/* Note content */}
-              <Show
-                when={editingNoteId() === note.id}
-                fallback={
-                  <div
-                    class={`${fontClasses().text} text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none`}
-                    innerHTML={note.noteText || ""}
-                    data-testid={`note-content-${note.id}`}
-                  />
+            return (
+              <li
+                class={`p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all ${
+                  draggedNoteId() === note.id
+                    ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
+                    : dragOverNoteId() === note.id
+                      ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
+                      : "border-gray-200/30 dark:border-gray-700/30"
+                }`}
+                data-testid={`note-item-${note.id}`}
+                onDragOver={(e) =>
+                  handleDragOver(e as unknown as DragEvent, note.id)
                 }
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e as unknown as DragEvent, note.id)}
               >
-                <div data-testid={`note-editor-${note.id}`}>
-                  <NotesEditor
-                    content={note.noteText || ""}
-                    onContentChange={(content) =>
-                      handleUpdateNote(note.id, content)
+                {/* Note metadata */}
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="flex items-center gap-1">
+                    {/* Drag handle */}
+                    <button
+                      type="button"
+                      draggable={true}
+                      onDragStart={(e) =>
+                        handleDragStart(e as unknown as DragEvent, note.id)
+                      }
+                      onDragEnd={handleDragEnd}
+                      class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      title="Drag to reorder"
+                      aria-label="Drag to reorder note"
+                      data-testid={`note-drag-handle-${note.id}`}
+                    >
+                      <GripVertical class={fontClasses().iconSmall} />
+                    </button>
+                    <span
+                      class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400`}
+                      data-testid={`note-date-${note.id}`}
+                    >
+                      {formatDate(note.createdDate)}
+                    </span>
+                  </div>
+
+                  <Show
+                    when={isEditing()}
+                    fallback={
+                      <div class="flex gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingNoteId(note.id);
+                            setEditingContent(note.noteText || "");
+                          }}
+                          class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
+                          title="Edit note"
+                          data-testid={`note-edit-button-${note.id}`}
+                        >
+                          Edit
+                          <Edit class={fontClasses().iconSmall} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => requestDeleteNote(note.id)}
+                          class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
+                          title="Delete note"
+                          data-testid={`note-delete-button-${note.id}`}
+                        >
+                          Delete
+                          <Trash2 class={fontClasses().iconSmall} />
+                        </button>
+                      </div>
                     }
-                    placeholder="Edit your note..."
-                  />
+                  >
+                    <div class="flex gap-0.5">
+                      <button
+                        type="button"
+                        onClick={handleSaveEditedNote}
+                        class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 hover:bg-green-50/50 dark:hover:bg-green-900/30 rounded-sm transition-colors`}
+                        title="Save note"
+                        data-testid={`note-save-button-${note.id}`}
+                      >
+                        Save
+                        <Save class={fontClasses().iconSmall} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/30 rounded-sm transition-colors`}
+                        title="Cancel editing"
+                        data-testid={`note-cancel-button-${note.id}`}
+                      >
+                        Cancel
+                        <X class={fontClasses().iconSmall} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => requestDeleteNote(note.id)}
+                        class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
+                        title="Delete note"
+                        data-testid={`note-delete-button-${note.id}`}
+                      >
+                        Delete
+                        <Trash2 class={fontClasses().iconSmall} />
+                      </button>
+                    </div>
+                  </Show>
                 </div>
-              </Show>
-            </li>
-          )}
+
+                {/* Note content */}
+                <Show
+                  when={isEditing()}
+                  fallback={
+                    <div
+                      class={`${fontClasses().text} text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none`}
+                      innerHTML={note.noteText || ""}
+                      data-testid={`note-content-${note.id}`}
+                    />
+                  }
+                >
+                  <div data-testid={`note-editor-${note.id}`}>
+                    <NotesEditor
+                      content={editingContent()}
+                      onContentChange={setEditingContent}
+                      placeholder="Edit your note..."
+                    />
+                  </div>
+                </Show>
+              </li>
+            );
+          }}
         </For>
       </ul>
+
+      <AlertDialog
+        open={!!deleteConfirmId()}
+        onOpenChange={handleDeleteDialogChange}
+      >
+        <AlertDialogContent data-testid="note-delete-confirm-dialog">
+          <AlertDialogCloseButton />
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <button
+              type="button"
+              onClick={cancelDeleteNote}
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-sm border border-gray-300 dark:border-gray-700"
+              data-testid="note-delete-confirm-cancel"
+            >
+              Cancel
+              <X class="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteNote}
+              disabled={isDeleting()}
+              class="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 disabled:opacity-70 rounded-sm border border-red-700"
+              data-testid="note-delete-confirm-submit"
+            >
+              Delete
+              <Trash2 class="w-3.5 h-3.5" />
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

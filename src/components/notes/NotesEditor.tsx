@@ -36,7 +36,7 @@ const getCurrentTheme = (): "light" | "dark" => {
 export const NotesEditor: Component<NotesEditorProps> = (props) => {
   let editorRef: HTMLTextAreaElement | undefined;
   let joditInstance: Jodit | undefined;
-  let saveTimeout: ReturnType<typeof setTimeout> | undefined;
+  let lastContent = props.content || "";
   const [currentTheme, setCurrentTheme] = createSignal<"light" | "dark">(
     getCurrentTheme()
   );
@@ -82,14 +82,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     // Events
     events: {
       change: (newContent: string) => {
-        // Debounce auto-save (2 seconds)
-        if (saveTimeout) {
-          clearTimeout(saveTimeout);
-        }
-
-        saveTimeout = setTimeout(() => {
-          props.onContentChange(newContent);
-        }, 2000);
+        if (newContent === lastContent) return;
+        lastContent = newContent;
+        props.onContentChange(newContent);
       },
     },
   });
@@ -107,7 +102,8 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       joditInstance = Jodit.make(editorRef, createEditorConfig(currentTheme()));
 
       // Set initial content
-      joditInstance.value = props.content || "";
+      lastContent = props.content || "";
+      joditInstance.value = lastContent;
     }
   };
 
@@ -151,20 +147,12 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   // Update editor content when prop changes (external update)
   createEffect(() => {
     if (joditInstance && props.content !== joditInstance.value) {
-      joditInstance.value = props.content || "";
+      lastContent = props.content || "";
+      joditInstance.value = lastContent;
     }
   });
 
   onCleanup(() => {
-    // Clear any pending save
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
-      // Trigger immediate save on unmount
-      if (joditInstance) {
-        props.onContentChange(joditInstance.value);
-      }
-    }
-
     // Destroy Jodit instance
     if (joditInstance) {
       joditInstance.destruct();

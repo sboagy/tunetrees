@@ -26,6 +26,7 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [],
+      clearNotesAndReferences: true,
     });
 
     // Navigate to Catalog tab to find and select a tune
@@ -49,9 +50,6 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
     ).toBeVisible({
       timeout: 10000,
     });
-
-    // Clean up any existing notes from previous test runs
-    await ttPage.deleteAllNotes();
 
     // Create first note
     await ttPage.notesAddButton.click();
