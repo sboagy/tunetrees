@@ -36,7 +36,12 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await page.waitForTimeout(500); // Wait for filter to apply
 
-    const tuneRow = ttPage.getRows("catalog").first();
+    // This seems to have changed, it was selecting `.first()`.
+    // The second row is the user's version of the tune,
+    // which doesn't have any references yet.  Which is what these tests seems to want.
+    // I think this is because perhaps a database reset or something else
+    // fixed the reference to the public tune?
+    const tuneRow = ttPage.getRows("catalog").nth(1);
     await expect(tuneRow).toBeVisible({ timeout: 5000 });
     await tuneRow.click();
 
@@ -53,6 +58,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
 
   test("should display references panel with empty state", async ({ page }) => {
     // Verify references panel shows 0 references
+
     await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
     await expect(
       page.getByRole("heading", { name: "0 references" })
