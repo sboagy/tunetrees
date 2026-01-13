@@ -25,6 +25,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [],
+      clearNotesAndReferences: true,
     });
 
     // Navigate to Catalog tab to find and select a tune
@@ -48,9 +49,6 @@ test.describe("REFS-001: References CRUD Operations", () => {
     ).toBeVisible({
       timeout: 10000,
     });
-
-    // Clean up any existing references from previous test runs
-    await ttPage.deleteAllReferences();
   });
 
   test("should display references panel with empty state", async ({ page }) => {

@@ -26,6 +26,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [],
+      clearNotesAndReferences: true,
     });
 
     // Navigate to Catalog tab to find and select a tune
@@ -49,9 +50,6 @@ test.describe("REFS-002: References Drag Reorder", () => {
     ).toBeVisible({
       timeout: 10000,
     });
-
-    // Clean up any existing references from previous test runs
-    await ttPage.deleteAllReferences();
 
     // Create first reference
     await ttPage.referencesAddButton.click();

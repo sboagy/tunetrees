@@ -165,8 +165,8 @@ export const ReferencesPanel: Component = () => {
             title="Add new reference"
             data-testid="references-add-button"
           >
-            <Plus class="w-2.5 h-2.5" />
             Add
+            <Plus class="w-2.5 h-2.5" />
           </button>
         </Show>
       </div>
