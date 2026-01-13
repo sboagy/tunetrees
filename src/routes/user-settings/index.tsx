@@ -22,6 +22,10 @@ interface SidebarNavItem {
 
 const sidebarNavItems: SidebarNavItem[] = [
   {
+    title: "Appearance",
+    href: "/user-settings/appearance",
+  },
+  {
     title: "Scheduling Options",
     href: "/user-settings/scheduling-options",
   },

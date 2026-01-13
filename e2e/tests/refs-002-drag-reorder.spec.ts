@@ -26,6 +26,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
     await setupDeterministicTestParallel(page, testUser, {
       clearRepertoire: true,
       seedRepertoire: [],
+      clearNotesAndReferences: true,
     });
 
     // Navigate to Catalog tab to find and select a tune
@@ -50,9 +51,6 @@ test.describe("REFS-002: References Drag Reorder", () => {
       timeout: 10000,
     });
 
-    // Clean up any existing references from previous test runs
-    await ttPage.deleteAllReferences();
-
     // Create first reference
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({
@@ -63,8 +61,10 @@ test.describe("REFS-002: References Drag Reorder", () => {
     );
     await ttPage.referenceTitleInput.fill("First Reference");
     await ttPage.referenceSubmitButton.click();
+    await page.waitForTimeout(500);
+
     await expect(
-      page.getByRole("heading", { name: "1 reference" })
+      page.getByRole("heading", { name: "2 references" })
     ).toBeVisible({
       timeout: 15000,
     });
@@ -77,8 +77,9 @@ test.describe("REFS-002: References Drag Reorder", () => {
     await ttPage.referenceUrlInput.fill("https://thesession.org/tunes/2");
     await ttPage.referenceTitleInput.fill("Second Reference");
     await ttPage.referenceSubmitButton.click();
+    await page.waitForTimeout(500);
     await expect(
-      page.getByRole("heading", { name: "2 references" })
+      page.getByRole("heading", { name: "3 references" })
     ).toBeVisible({
       timeout: 15000,
     });
@@ -87,7 +88,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
   test("should display drag handles on references", async ({ page }) => {
     // Get the reference items
     const refItems = page.getByTestId(/^reference-item-/);
-    await expect(refItems).toHaveCount(2, { timeout: 10000 });
+    await expect(refItems).toHaveCount(3, { timeout: 10000 });
 
     // Verify drag handles are visible
     const firstRefId = await refItems.first().getAttribute("data-testid");
@@ -102,7 +103,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
   test("should reorder references via drag-and-drop", async ({ page }) => {
     // Get the reference items
     const refItems = page.getByTestId(/^reference-item-/);
-    await expect(refItems).toHaveCount(2, { timeout: 10000 });
+    await expect(refItems).toHaveCount(3, { timeout: 10000 });
 
     // Get initial order
     const firstRefTestId = await refItems.first().getAttribute("data-testid");

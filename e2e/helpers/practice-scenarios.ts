@@ -346,6 +346,8 @@ export async function setupDeterministicTestParallel(
     scheduleTunes?: { tuneIds: string[]; daysAgo: number };
     /** Optional list of title prefixes to purge (cascade delete) before setup */
     purgeTitlePrefixes?: string[];
+    /** When true, clears user-created notes and references before syncing */
+    clearNotesAndReferences?: boolean;
   } = {}
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
@@ -481,11 +483,19 @@ export async function setupDeterministicTestParallel(
     "prefs_scheduling_options",
   ];
 
+  if (opts.clearNotesAndReferences) {
+    whichTables = [...whichTables, "note", "reference"];
+  }
+
   // Step 1: Clear user's state
   if (opts.clearRepertoire) {
     // Clear user's repertoire via generic table helper and verify
     await clearUserTable(user, "playlist_tune");
     whichTables = [...whichTables, "playlist_tune"];
+  }
+  if (opts.clearNotesAndReferences) {
+    await clearUserTable(user, "note");
+    await clearUserTable(user, "reference");
   }
   await clearUserTable(user, "daily_practice_queue");
   await clearUserTable(user, "practice_record");

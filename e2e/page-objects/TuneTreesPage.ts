@@ -1974,21 +1974,41 @@ export class TuneTreesPage {
       maxIterations--;
 
       // Find all delete buttons in notes panel
-      const deleteButtons = notesPanel.getByRole("button", { name: "Delete" });
+      const deleteButtons = notesPanel.locator(
+        '[data-testid^="note-delete-button-"]'
+      );
       const count = await deleteButtons.count();
 
       if (count === 0) {
         break; // No more notes to delete
       }
 
-      // Set up dialog handler BEFORE clicking delete
-      this.page.once("dialog", (dialog) => dialog.accept());
+      const nativeDialog = this.page
+        .waitForEvent("dialog", { timeout: 1000 })
+        .catch(() => null);
 
       // Click the first delete button
       await deleteButtons.first().click();
 
-      // Wait for deletion to complete (UI update)
-      await this.page.waitForTimeout(500);
+      // Prefer the native dialog if it appears; otherwise use the in-app confirm dialog
+      const dialog = await nativeDialog;
+      if (dialog) {
+        await dialog.accept();
+      } else {
+        const confirmDialog = this.page.getByTestId(
+          "note-delete-confirm-dialog"
+        );
+        const confirmButton = this.page.getByTestId(
+          "note-delete-confirm-submit"
+        );
+
+        await confirmDialog.waitFor({ state: "visible", timeout: 5000 });
+        await confirmButton.click();
+        await confirmDialog.waitFor({ state: "hidden", timeout: 5000 });
+      }
+
+      // Wait briefly for UI to settle
+      await this.page.waitForTimeout(300);
     }
   }
 
@@ -2009,21 +2029,52 @@ export class TuneTreesPage {
       maxIterations--;
 
       // Find all delete buttons in references panel
-      const deleteButtons = refsPanel.getByRole("button", { name: "Delete" });
+      const deleteButtons = refsPanel.locator(
+        '[data-testid^="reference-delete-button-"]'
+      );
       const count = await deleteButtons.count();
 
       if (count === 0) {
         break; // No more references to delete
       }
 
-      // Set up dialog handler BEFORE clicking delete
-      this.page.once("dialog", (dialog) => dialog.accept());
+      const nativeDialog = this.page
+        .waitForEvent("dialog", { timeout: 1000 })
+        .catch(() => null);
 
       // Click the first delete button
       await deleteButtons.first().click();
 
-      // Wait for deletion to complete (UI update)
-      await this.page.waitForTimeout(500);
+      const dialog = await nativeDialog;
+      if (dialog) {
+        await dialog.accept();
+      } else {
+        // Fallback if a custom dialog is introduced in the future
+        const confirmButton = this.page
+          .getByTestId("reference-delete-confirm-submit")
+          .first();
+        const confirmDialog = this.page.getByTestId(
+          "reference-delete-confirm-dialog"
+        );
+
+        await Promise.all([
+          confirmDialog
+            .waitFor({ state: "visible", timeout: 5000 })
+            .catch(() => {}),
+          confirmButton
+            .waitFor({ state: "visible", timeout: 5000 })
+            .catch(() => {}),
+        ]);
+
+        if (await confirmButton.isVisible()) {
+          await confirmButton.click();
+          await confirmDialog
+            .waitFor({ state: "hidden", timeout: 5000 })
+            .catch(() => {});
+        }
+      }
+
+      await this.page.waitForTimeout(300);
     }
   }
 
