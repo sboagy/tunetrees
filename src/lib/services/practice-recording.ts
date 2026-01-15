@@ -373,14 +373,9 @@ export async function commitStagedEvaluations(
 
 		// Normalize window start to support both ISO "T" and space-separated formats
 		// Also normalize away milliseconds/timezone suffixes for robust matching.
-		const startSpace = activeWindowStart.includes("T")
-			? activeWindowStart.replace("T", " ")
-			: activeWindowStart;
 		const startISO = activeWindowStart.includes(" ")
 			? activeWindowStart.replace(" ", "T")
 			: activeWindowStart;
-		const startA = startSpace; // prefer space form for storage lookup
-		const startB = startISO; // ISO form for callers passing ISO
 		const windowStartIso19 = startISO.replace(" ", "T").substring(0, 19);
 
 		// DEBUG: Check what's actually in table_transient_data
@@ -494,14 +489,6 @@ export async function commitStagedEvaluations(
 		console.log("Starting to commit evaluations...");
 		for (const staged of evaluationsToCommit) {
 			console.log(`Processing tune ${staged.tune_id}...`);
-
-			const derivedIntervalDays = Math.floor(
-				(new Date(staged.due).getTime() -
-					new Date(staged.practiced).getTime()) /
-					(1000 * 60 * 60 * 24),
-			);
-
-
 
 			// Ensure unique practiced timestamp (check if already exists)
 			let practicedTimestamp = staged.practiced;

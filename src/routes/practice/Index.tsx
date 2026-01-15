@@ -45,7 +45,6 @@ import {
 	getPracticeDate,
 } from "../../lib/utils/practice-date";
 
-
 /**
  * Practice Index Page Component
  *

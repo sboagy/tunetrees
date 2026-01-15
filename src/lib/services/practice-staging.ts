@@ -112,7 +112,6 @@ export async function stagePracticeEvaluation(
 		Math.round((adjustedDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
 	);
 
-
 	const preview: FSRSPreviewMetrics = {
 		quality: input.quality,
 		easiness: null,
