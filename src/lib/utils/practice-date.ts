@@ -27,31 +27,31 @@
  * ```
  */
 export function getPracticeDate(): Date {
-  // Check for URL override (testing mode only in development/test)
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const testDate = params.get("practiceDate");
+	// Check for URL override (testing mode only in development/test)
+	if (typeof window !== "undefined") {
+		const params = new URLSearchParams(window.location.search);
+		const testDate = params.get("practiceDate");
 
-    if (testDate) {
-      const parsed = new Date(testDate);
-      if (!Number.isNaN(parsed.getTime())) {
-        // Set to noon UTC to avoid timezone issues
-        parsed.setUTCHours(12, 0, 0, 0);
-        console.log(
-          `🧪 [PracticeDate] Using URL override: ${testDate} (${parsed.toISOString()})`
-        );
-        return parsed;
-      }
-      console.warn(
-        `⚠️ [PracticeDate] Invalid practiceDate URL param: ${testDate}`
-      );
-    }
-  }
+		if (testDate) {
+			const parsed = new Date(testDate);
+			if (!Number.isNaN(parsed.getTime())) {
+				// Set to local noon to avoid timezone drift when comparing dates
+				parsed.setHours(12, 0, 0, 0);
+				console.log(
+					`🧪 [PracticeDate] Using URL override: ${testDate} (${parsed.toISOString()})`,
+				);
+				return parsed;
+			}
+			console.warn(
+				`⚠️ [PracticeDate] Invalid practiceDate URL param: ${testDate}`,
+			);
+		}
+	}
 
-  // Production: current date at noon UTC
-  const now = new Date();
-  now.setUTCHours(12, 0, 0, 0);
-  return now;
+	// Production: current date at local noon
+	const now = new Date();
+	now.setHours(12, 0, 0, 0);
+	return now;
 }
 
 /**
@@ -77,10 +77,10 @@ export function getPracticeDate(): Date {
  * ```
  */
 export function formatAsWindowStart(date: Date): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(date.getUTCDate()).padStart(2, "0")}T00:00:00`;
+	return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+		2,
+		"0",
+	)}-${String(date.getUTCDate()).padStart(2, "0")}T00:00:00`;
 }
 
 /**
@@ -102,16 +102,16 @@ export function formatAsWindowStart(date: Date): string {
  * ```
  */
 export function hasPracticeDateChanged(referenceDate: Date): boolean {
-  const current = getPracticeDate();
+	const current = getPracticeDate();
 
-  // Compare dates at midnight (ignore time)
-  const currentDay = new Date(current);
-  currentDay.setHours(0, 0, 0, 0);
+	// Compare dates at midnight (ignore time)
+	const currentDay = new Date(current);
+	currentDay.setHours(0, 0, 0, 0);
 
-  const refDay = new Date(referenceDate);
-  refDay.setHours(0, 0, 0, 0);
+	const refDay = new Date(referenceDate);
+	refDay.setHours(0, 0, 0, 0);
 
-  return currentDay.getTime() !== refDay.getTime();
+	return currentDay.getTime() !== refDay.getTime();
 }
 
 /**
@@ -122,11 +122,11 @@ export function hasPracticeDateChanged(referenceDate: Date): boolean {
  * @returns Test date string or null if not in test mode
  */
 export function getTestDateFromUrl(): string | null {
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("practiceDate");
-  }
-  return null;
+	if (typeof window !== "undefined") {
+		const params = new URLSearchParams(window.location.search);
+		return params.get("practiceDate");
+	}
+	return null;
 }
 
 /**
@@ -135,7 +135,7 @@ export function getTestDateFromUrl(): string | null {
  * @returns True if practiceDate URL param is present and valid
  */
 export function isTestMode(): boolean {
-  return getTestDateFromUrl() !== null;
+	return getTestDateFromUrl() !== null;
 }
 
 /**
@@ -162,31 +162,31 @@ export function isTestMode(): boolean {
  * ```
  */
 export function ensureMinimumNextDay(
-  dueDate: Date,
-  referenceDate: Date = getPracticeDate()
+	dueDate: Date,
+	referenceDate: Date = getPracticeDate(),
 ): Date {
-  // Calculate days difference using the SAME logic as the UI
-  // UI uses: Math.floor((date - now) / (1000 * 60 * 60 * 24))
-  // We need to ensure this results in at least 1 (to show "Tomorrow" not "Today")
+	// Calculate days difference using the SAME logic as the UI
+	// UI uses: Math.floor((date - now) / (1000 * 60 * 60 * 24))
+	// We need to ensure this results in at least 1 (to show "Tomorrow" not "Today")
 
-  const millisPerDay = 1000 * 60 * 60 * 24;
-  const daysDiff = Math.floor(
-    (dueDate.getTime() - referenceDate.getTime()) / millisPerDay
-  );
+	const millisPerDay = 1000 * 60 * 60 * 24;
+	const daysDiff = Math.floor(
+		(dueDate.getTime() - referenceDate.getTime()) / millisPerDay,
+	);
 
-  // If difference is less than 1 day, we need to ensure at least 1 full day
-  // CRITICAL: The UI will render at a later time with a fresh new Date(),
-  // so we must ensure the due date remains at least 1 day away even after
-  // delays. Adding exactly 24 hours isn't enough because of render delays.
-  // Solution: Add 25 hours (24h + 1h buffer) to guarantee it stays >= 1 day.
-  if (daysDiff < 1) {
-    // Add 25 hours (1 day + 1 hour buffer for render delays)
-    const twentyFiveHoursLater = new Date(
-      referenceDate.getTime() + millisPerDay + 60 * 60 * 1000
-    );
-    return twentyFiveHoursLater;
-  }
+	// If difference is less than 1 day, we need to ensure at least 1 full day
+	// CRITICAL: The UI will render at a later time with a fresh new Date(),
+	// so we must ensure the due date remains at least 1 day away even after
+	// delays. Adding exactly 24 hours isn't enough because of render delays.
+	// Solution: Add 25 hours (24h + 1h buffer) to guarantee it stays >= 1 day.
+	if (daysDiff < 1) {
+		// Add 25 hours (1 day + 1 hour buffer for render delays)
+		const twentyFiveHoursLater = new Date(
+			referenceDate.getTime() + millisPerDay + 60 * 60 * 1000,
+		);
+		return twentyFiveHoursLater;
+	}
 
-  // Due date is already at least 1 day away, keep it as-is
-  return dueDate;
+	// Due date is already at least 1 day away, keep it as-is
+	return dueDate;
 }

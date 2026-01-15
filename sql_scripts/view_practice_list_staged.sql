@@ -86,5 +86,5 @@ AS SELECT tune.id,
            FROM practice_record pr_1
           ORDER BY pr_1.tune_ref, pr_1.playlist_ref, pr_1.id DESC) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
      LEFT JOIN tag ON tag.tune_ref = tune.id
-     LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref
+    LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref AND td.user_id = playlist.user_ref
   WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref;

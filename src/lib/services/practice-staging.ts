@@ -25,31 +25,31 @@ import { evaluatePractice } from "./practice-recording";
  * These get inserted into table_transient_data for grid preview
  */
 export interface FSRSPreviewMetrics {
-  quality: number;
-  easiness: number | null;
-  difficulty: number | null;
-  stability: number | null;
-  interval: number;
-  step: number | null;
-  repetitions: number;
-  practiced: string;
-  due: string;
-  state: number;
-  goal: string;
-  technique: string;
+	quality: number;
+	easiness: number | null;
+	difficulty: number | null;
+	stability: number | null;
+	interval: number;
+	step: number | null;
+	repetitions: number;
+	practiced: string;
+	due: string;
+	state: number;
+	goal: string;
+	technique: string;
 }
 
 /**
  * Map recall evaluation text to FSRS Rating
  */
 function mapEvaluationToRating(evaluation: string): Rating {
-  const map: Record<string, Rating> = {
-    again: Rating.Again,
-    hard: Rating.Hard,
-    good: Rating.Good,
-    easy: Rating.Easy,
-  };
-  return map[evaluation.toLowerCase()] ?? Rating.Good;
+	const map: Record<string, Rating> = {
+		again: Rating.Again,
+		hard: Rating.Hard,
+		good: Rating.Good,
+		easy: Rating.Easy,
+	};
+	return map[evaluation.toLowerCase()] ?? Rating.Good;
 }
 
 /**
@@ -80,56 +80,56 @@ function mapEvaluationToRating(evaluation: string): Rating {
  * ```
  */
 export async function stagePracticeEvaluation(
-  db: SqliteDatabase,
-  userId: string,
-  playlistId: string,
-  tuneId: string,
-  evaluation: string,
-  goal: string = "recall",
-  technique: string = ""
+	db: SqliteDatabase,
+	userId: string,
+	playlistId: string,
+	tuneId: string,
+	evaluation: string,
+	goal: string = "recall",
+	technique: string = "",
 ): Promise<FSRSPreviewMetrics> {
-  const now = new Date();
-  // Make practiced timestamps deterministic across devices by removing
-  // millisecond precision. This reduces near-duplicate practice events
-  // that differ only by fractional seconds.
-  now.setMilliseconds(0);
-  // Build RecordPracticeInput for evaluatePractice
-  const input: RecordPracticeInput = {
-    tuneRef: tuneId,
-    playlistRef: playlistId,
-    practiced: now,
-    // Use FSRS Rating values (Again=1, Hard=2, Good=3, Easy=4) – Manual (0) not used here
-    quality: mapEvaluationToRating(evaluation),
-    goal,
-    technique,
-  };
-  const { schedule } = await evaluatePractice(db, userId, input);
+	const now = new Date();
+	// Make practiced timestamps deterministic across devices by removing
+	// millisecond precision. This reduces near-duplicate practice events
+	// that differ only by fractional seconds.
+	now.setMilliseconds(0);
+	// Build RecordPracticeInput for evaluatePractice
+	const input: RecordPracticeInput = {
+		tuneRef: tuneId,
+		playlistRef: playlistId,
+		practiced: now,
+		// Use FSRS Rating values (Again=1, Hard=2, Good=3, Easy=4) – Manual (0) not used here
+		quality: mapEvaluationToRating(evaluation),
+		goal,
+		technique,
+	};
+	const { schedule } = await evaluatePractice(db, userId, input);
 
-  // Enforce minimum next-day due date (business rule)
-  const adjustedDue = ensureMinimumNextDay(schedule.nextDue, now);
-  const intervalDays = Math.max(
-    1,
-    Math.round((adjustedDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  );
+	// Enforce minimum next-day due date (business rule)
+	const adjustedDue = ensureMinimumNextDay(schedule.nextDue, now);
+	const intervalDays = Math.max(
+		1,
+		Math.round((adjustedDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+	);
 
-  const preview: FSRSPreviewMetrics = {
-    quality: input.quality,
-    easiness: null,
-    difficulty: schedule.difficulty,
-    stability: schedule.stability,
-    interval: intervalDays,
-    step: schedule.state,
-    repetitions: schedule.reps,
-    practiced: now.toISOString(),
-    due: adjustedDue.toISOString(),
-    state: schedule.state,
-    goal,
-    technique,
-  };
+	const preview: FSRSPreviewMetrics = {
+		quality: input.quality,
+		easiness: null,
+		difficulty: schedule.difficulty,
+		stability: schedule.stability,
+		interval: intervalDays,
+		step: schedule.state,
+		repetitions: schedule.reps,
+		practiced: now.toISOString(),
+		due: adjustedDue.toISOString(),
+		state: schedule.state,
+		goal,
+		technique,
+	};
 
-  // UPSERT to table_transient_data
-  const lastModifiedAt = now.toISOString();
-  await db.run(sql`
+	// UPSERT to table_transient_data
+	const lastModifiedAt = now.toISOString();
+	await db.run(sql`
     INSERT INTO table_transient_data (
       user_id,
       tune_id,
@@ -184,18 +184,18 @@ export async function stagePracticeEvaluation(
       last_modified_at = excluded.last_modified_at
   `);
 
-  // Sync is handled automatically by SQL triggers populating sync_outbox
+	// Sync is handled automatically by SQL triggers populating sync_outbox
 
-  // Persist database to IndexedDB immediately so page refresh shows staged data
-  await persistDb();
+	// Persist database to IndexedDB immediately so page refresh shows staged data
+	await persistDb();
 
-  console.log(
-    `✅ Staged evaluation for tune ${tuneId}: ${evaluation} (stability: ${preview.stability?.toFixed(
-      2
-    )}, due: ${preview.due})`
-  );
+	console.log(
+		`✅ Staged evaluation for tune ${tuneId}: ${evaluation} (stability: ${preview.stability?.toFixed(
+			2,
+		)}, due: ${preview.due})`,
+	);
 
-  return preview;
+	return preview;
 }
 
 /**
@@ -210,24 +210,24 @@ export async function stagePracticeEvaluation(
  * @param playlistId - Playlist ID
  */
 export async function clearStagedEvaluation(
-  db: SqliteDatabase,
-  userId: string,
-  tuneId: string,
-  playlistId: string
+	db: SqliteDatabase,
+	userId: string,
+	tuneId: string,
+	playlistId: string,
 ): Promise<void> {
-  await db.run(sql`
+	await db.run(sql`
     DELETE FROM table_transient_data
     WHERE user_id = ${userId}
       AND tune_id = ${tuneId}
       AND playlist_id = ${playlistId}
   `);
 
-  // Sync is handled automatically by SQL triggers populating sync_outbox
+	// Sync is handled automatically by SQL triggers populating sync_outbox
 
-  // Persist database to IndexedDB immediately
-  await persistDb();
+	// Persist database to IndexedDB immediately
+	await persistDb();
 
-  console.log(`🗑️  Cleared staged evaluation for tune ${tuneId}`);
+	console.log(`🗑️  Cleared staged evaluation for tune ${tuneId}`);
 }
 
 /**
@@ -239,13 +239,13 @@ export async function clearStagedEvaluation(
  * @param playlistId - Playlist ID
  */
 export async function clearAllStagedForPlaylist(
-  db: SqliteDatabase,
-  playlistId: string
+	db: SqliteDatabase,
+	playlistId: string,
 ): Promise<void> {
-  await db.run(sql`
+	await db.run(sql`
     DELETE FROM table_transient_data
     WHERE playlist_id = ${playlistId}
   `);
 
-  console.log(`🗑️  Cleared all staged evaluations for playlist ${playlistId}`);
+	console.log(`🗑️  Cleared all staged evaluations for playlist ${playlistId}`);
 }
