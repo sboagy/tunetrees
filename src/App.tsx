@@ -21,7 +21,9 @@ import { UIPreferencesProvider } from "./lib/context/UIPreferencesContext";
 import DatabaseBrowser from "./routes/debug/db";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
+import PrivacyPolicy from "./routes/Privacy";
 import PracticeHistory from "./routes/practice/history";
+import TermsOfService from "./routes/Terms";
 import TuneDetailsPage from "./routes/tunes/[id]";
 import EditTunePage from "./routes/tunes/[id]/edit";
 import TunePracticeHistoryPage from "./routes/tunes/[id]/practice-history";
@@ -81,131 +83,133 @@ function App() {
                 <UpdatePrompt />
                 {/* <ThemeDebugger /> */}
                 <Router>
-                {/* Public Routes */}
-                <Route path="/login" component={Login} />
-                <Route path="/auth/callback" component={AuthCallback} />
-                <Route path="/reset-password" component={ResetPassword} />
+                  {/* Public Routes */}
+                  <Route path="/login" component={Login} />
+                  <Route path="/privacy" component={PrivacyPolicy} />
+                  <Route path="/terms" component={TermsOfService} />
+                  <Route path="/auth/callback" component={AuthCallback} />
+                  <Route path="/reset-password" component={ResetPassword} />
 
-                {/* Main App - Home with MainLayout + tabs */}
-                <Route path="/" component={Home} />
+                  {/* Main App - Home with MainLayout + tabs */}
+                  <Route path="/" component={Home} />
 
-                {/* User Settings Routes (Modal) */}
-                <Route path="/user-settings" component={UserSettingsLayout}>
-                  <Route path="/appearance" component={AppearancePage} />
-                  <Route path="/avatar" component={AvatarPage} />
+                  {/* User Settings Routes (Modal) */}
+                  <Route path="/user-settings" component={UserSettingsLayout}>
+                    <Route path="/appearance" component={AppearancePage} />
+                    <Route path="/avatar" component={AvatarPage} />
+                    <Route
+                      path="/scheduling-options"
+                      component={SchedulingOptionsPage}
+                    />
+                    <Route
+                      path="/spaced-repetition"
+                      component={SpacedRepetitionPage}
+                    />
+                    <Route path="/account" component={AccountPage} />
+                  </Route>
+
+                  {/* Tab Route Redirects - Redirect to home with tab parameter */}
                   <Route
-                    path="/scheduling-options"
-                    component={SchedulingOptionsPage}
+                    path="/practice"
+                    component={() => {
+                      const navigate = useNavigate();
+                      navigate("/?tab=practice", { replace: true });
+                      return null;
+                    }}
                   />
                   <Route
-                    path="/spaced-repetition"
-                    component={SpacedRepetitionPage}
+                    path="/repertoire"
+                    component={() => {
+                      const navigate = useNavigate();
+                      navigate("/?tab=repertoire", { replace: true });
+                      return null;
+                    }}
                   />
-                  <Route path="/account" component={AccountPage} />
-                </Route>
+                  <Route
+                    path="/catalog"
+                    component={() => {
+                      const navigate = useNavigate();
+                      navigate("/?tab=catalog", { replace: true });
+                      return null;
+                    }}
+                  />
+                  <Route
+                    path="/analysis"
+                    component={() => {
+                      const navigate = useNavigate();
+                      navigate("/?tab=analysis", { replace: true });
+                      return null;
+                    }}
+                  />
 
-                {/* Tab Route Redirects - Redirect to home with tab parameter */}
-                <Route
-                  path="/practice"
-                  component={() => {
-                    const navigate = useNavigate();
-                    navigate("/?tab=practice", { replace: true });
-                    return null;
-                  }}
-                />
-                <Route
-                  path="/repertoire"
-                  component={() => {
-                    const navigate = useNavigate();
-                    navigate("/?tab=repertoire", { replace: true });
-                    return null;
-                  }}
-                />
-                <Route
-                  path="/catalog"
-                  component={() => {
-                    const navigate = useNavigate();
-                    navigate("/?tab=catalog", { replace: true });
-                    return null;
-                  }}
-                />
-                <Route
-                  path="/analysis"
-                  component={() => {
-                    const navigate = useNavigate();
-                    navigate("/?tab=analysis", { replace: true });
-                    return null;
-                  }}
-                />
+                  {/* Debug/Admin Routes */}
+                  <Route
+                    path="/debug/db"
+                    component={() => (
+                      <ProtectedRoute>
+                        <DatabaseBrowser />
+                      </ProtectedRoute>
+                    )}
+                  />
 
-                {/* Debug/Admin Routes */}
-                <Route
-                  path="/debug/db"
-                  component={() => (
-                    <ProtectedRoute>
-                      <DatabaseBrowser />
-                    </ProtectedRoute>
-                  )}
-                />
-
-                {/* Protected Sub-routes - Wrapped in MainLayout */}
-                <Route
-                  path="/practice/history"
-                  component={() => (
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <PracticeHistory />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/tunes/new"
-                  component={() => (
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <NewTunePage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/tunes/:id/edit"
-                  component={() => (
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <EditTunePage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/tunes/:id/practice-history"
-                  component={() => (
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <TunePracticeHistoryPage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  )}
-                />
-                <Route
-                  path="/tunes/:id"
-                  component={() => (
-                    <ProtectedRoute>
-                      <MainLayout>
-                        <TuneDetailsPage />
-                      </MainLayout>
-                    </ProtectedRoute>
-                  )}
-                />
-              </Router>
-            </SidebarDockProvider>
-          </CurrentTuneProvider>
-        </CurrentPlaylistProvider>
-      </UIPreferencesProvider>
-    </OnboardingProvider>
-  </AuthProvider>
+                  {/* Protected Sub-routes - Wrapped in MainLayout */}
+                  <Route
+                    path="/practice/history"
+                    component={() => (
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <PracticeHistory />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route
+                    path="/tunes/new"
+                    component={() => (
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <NewTunePage />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route
+                    path="/tunes/:id/edit"
+                    component={() => (
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <EditTunePage />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route
+                    path="/tunes/:id/practice-history"
+                    component={() => (
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <TunePracticeHistoryPage />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    )}
+                  />
+                  <Route
+                    path="/tunes/:id"
+                    component={() => (
+                      <ProtectedRoute>
+                        <MainLayout>
+                          <TuneDetailsPage />
+                        </MainLayout>
+                      </ProtectedRoute>
+                    )}
+                  />
+                </Router>
+              </SidebarDockProvider>
+            </CurrentTuneProvider>
+          </CurrentPlaylistProvider>
+        </UIPreferencesProvider>
+      </OnboardingProvider>
+    </AuthProvider>
   );
 }
 

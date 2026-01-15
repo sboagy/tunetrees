@@ -16,23 +16,25 @@ OAuth providers require configuration in both the provider's developer console a
 
 ### 1. Create Google OAuth Credentials
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Create a new project or select an existing one
-3. Click **Create Credentials** → **OAuth 2.0 Client ID**
-4. Configure the consent screen:
-   - Application name: TuneTrees
-   - User support email: your email
-   - Authorized domains: your domain (e.g., `tunetrees.com`)
-5. Create OAuth client ID:
-   - Application type: **Web application**
-   - Name: TuneTrees
-   - Authorized JavaScript origins:
-     - `http://localhost:5173` (for local dev)
-     - `https://tunetrees.com` (for production)
-   - Authorized redirect URIs:
-     - `http://localhost:54321/auth/v1/callback` (for local Supabase)
-     - `https://[your-project-ref].supabase.co/auth/v1/callback` (for production)
-6. Copy the **Client ID** and **Client Secret**
+3. Open **Google Auth Platform** → **Clients** (or **APIs & Services** → **Credentials**)
+4. Click **Create Client** (or **Create Credentials** → **OAuth client ID**)
+5. If prompted, configure the consent screen in **Branding**/**Audience**:
+    - Application name: TuneTrees
+    - User support email: your email
+    - Authorized domains: your domain (e.g., `tunetrees.com`)
+       - Note: Google may auto-add domains based on the URIs you enter below
+6. Create OAuth client ID:
+    - Application type: **Web application**
+    - Name: TuneTrees
+    - Authorized JavaScript origins:
+       - `http://localhost:5173` (for local dev)
+       - `https://tunetrees.com` (for production)
+    - Authorized redirect URIs:
+       - `http://localhost:54321/auth/v1/callback` (for local Supabase)
+       - `https://[your-project-ref].supabase.co/auth/v1/callback` (for production)
+7. Click **Create**, then copy the **Client ID** and **Client Secret**
 
 ### 2. Configure Environment Variables
 
