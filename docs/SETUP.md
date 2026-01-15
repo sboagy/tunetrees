@@ -115,6 +115,12 @@ Enable email/password auth in Supabase dashboard:
 - Configure email templates
 - Set site URL to http://localhost:5173
 
+For OAuth providers (Google, GitHub):
+- See [OAuth Setup Guide](development/oauth-setup.md) for detailed configuration
+- OAuth requires client credentials from Google/GitHub developer consoles
+- Configuration is in `supabase/config.toml` for local dev
+- For production, configure in Supabase Dashboard → Authentication → Providers
+
 ---
 
 ## Troubleshooting
