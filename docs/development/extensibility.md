@@ -1,0 +1,48 @@
+# Extensibility Proposals (Imports + Goal Scheduling)
+
+This document outlines **three minimal, secure extension approaches** for TuneTrees that keep complexity low while enabling new import sources and goal-specific scheduling logic.
+
+## Constraints & Goals
+
+- **PWA + offline-first:** Avoid runtime downloads of arbitrary code.
+- **Security first:** No untrusted code execution in the browser.
+- **Simple configuration:** Avoid a complex DSL; prefer small JSON config or curated code.
+- **Two extension points:**
+  1. **Importers** (catalogs/tunes)
+  2. **Goal → scheduling algorithm** when a goal is set
+
+## Proposal A: Declarative “Adapter” Config (No Code)
+
+**Summary:** Allow plugins as **JSON config** that describe mappings and simple scheduling rules. The app provides a **fixed set of import parsers** (CSV/JSON/ABC) and a **simple rule evaluator** for goals.
+
+- **Imports:** Config selects a built-in parser and maps columns/fields to TuneTrees schema.
+- **Scheduling:** Config uses basic rule primitives like `intervalDays: [1, 3, 7, 14]` or `baseIntervalDays` per goal.
+- **Security:** No executable code; only validated data.
+- **Pros:** Safest, easiest for users, works offline.
+- **Cons:** Limited flexibility for niche formats or complex algorithms.
+
+## Proposal B: Build-Time Plugin Registry (Trusted Code Only)
+
+**Summary:** Support a **plugin registry** compiled into the app build (e.g., local `src/plugins/*`). Plugins are trusted code, registered via a typed interface.
+
+- **Imports:** Plugin implements `ImportProvider` and returns normalized tunes.
+- **Scheduling:** Plugin implements `GoalScheduler` to compute next due dates.
+- **Security:** No remote code loading; only code shipped with the app.
+- **Pros:** Flexible, type-safe, no runtime risks.
+- **Cons:** Requires rebuild/deploy for new plugins; not user-installable at runtime.
+
+## Proposal C: Server-Side Extension Hooks (Worker/Edge)
+
+**Summary:** Run custom import and scheduling logic **server-side** (Cloudflare Worker / Supabase Edge Function). The client calls a trusted endpoint for parsing or scheduling.
+
+- **Imports:** Upload data → server parses/normalizes → returns tunes.
+- **Scheduling:** Client sends goal + tune state → server returns next due.
+- **Security:** Keeps code off the client; server can sandbox and audit.
+- **Pros:** Maximum flexibility without exposing client to untrusted code.
+- **Cons:** Requires network and hosting; weaker offline story.
+
+## Notes for Selection
+
+- **If security + simplicity are top priority:** Proposal A.
+- **If developer flexibility is top priority (and rebuilds are ok):** Proposal B.
+- **If you want user-specific code without client risk:** Proposal C.
