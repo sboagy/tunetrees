@@ -45,6 +45,7 @@ import {
 	getPracticeDate,
 } from "../../lib/utils/practice-date";
 
+
 /**
  * Practice Index Page Component
  *
@@ -102,10 +103,10 @@ const PracticeIndex: Component = () => {
 		},
 		async (params) => {
 			if (!params) return null;
-			const result = await params.db.all<{ supabase_user_id: string }>(
-				sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`,
+			const result = await params.db.all<{ id: string }>(
+				sql`SELECT id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`,
 			);
-			return result[0]?.supabase_user_id ?? null;
+			return result[0]?.id ?? null;
 		},
 	);
 
@@ -119,10 +120,10 @@ const PracticeIndex: Component = () => {
 		const db = localDb();
 		if (!db || !user()) return null;
 
-		const result = await db.all<{ supabase_user_id: string }>(
-			sql`SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ${user()!.id} LIMIT 1`,
+		const result = await db.all<{ id: string }>(
+			sql`SELECT id FROM user_profile WHERE supabase_user_id = ${user()!.id} LIMIT 1`,
 		);
-		return result[0]?.supabase_user_id ?? null;
+		return result[0]?.id ?? null;
 	};
 
 	// Track evaluations count and table instance for toolbar
@@ -195,6 +196,7 @@ const PracticeIndex: Component = () => {
 	const QUEUE_DATE_STORAGE_KEY = "TT_PRACTICE_QUEUE_DATE";
 	const QUEUE_DATE_MANUAL_FLAG_KEY = "TT_PRACTICE_QUEUE_DATE_MANUAL";
 	const [queueDate, setQueueDate] = createSignal<Date>(getPracticeDate());
+	const [isManualQueueDate, setIsManualQueueDate] = createSignal(false);
 
 	// Store initial practice date for rollover detection
 	const [initialPracticeDate, setInitialPracticeDate] = createSignal<Date>(
@@ -213,20 +215,24 @@ const PracticeIndex: Component = () => {
 		const storedDateValue = localStorage.getItem(QUEUE_DATE_STORAGE_KEY);
 		const persistedManualFlag =
 			localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
+		setIsManualQueueDate(persistedManualFlag);
 
 		const applyQueueDate = (date: Date) => {
 			setQueueDate(date);
 			setInitialPracticeDate(date);
 		};
 
-		const markAsAutoDate = () =>
+		const markAsAutoDate = () => {
+			setIsManualQueueDate(false);
 			localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
+		};
 
 		if (storedDateValue) {
 			const parsedDate = new Date(storedDateValue);
 			if (!Number.isNaN(parsedDate.getTime())) {
 				if (persistedManualFlag) {
 					applyQueueDate(parsedDate);
+					setIsManualQueueDate(true);
 					console.log(
 						`[PracticeIndex] Using manual queue date: ${parsedDate.toLocaleDateString()}`,
 					);
@@ -237,10 +243,14 @@ const PracticeIndex: Component = () => {
 				const practiceDay = normalizeToLocalDay(practiceDate);
 
 				if (storedDay.getTime() !== practiceDay.getTime()) {
-					applyQueueDate(parsedDate);
+					applyQueueDate(practiceDate);
 					markAsAutoDate();
+					localStorage.setItem(
+						QUEUE_DATE_STORAGE_KEY,
+						practiceDate.toISOString(),
+					);
 					console.log(
-						`[PracticeIndex] Practice date rolled over to ${practiceDate.toLocaleDateString()} but queue remains on ${parsedDate.toLocaleDateString()} until refresh`,
+						`[PracticeIndex] Auto queue date reset to practice date: ${practiceDate.toLocaleDateString()}`,
 					);
 					return;
 				}
@@ -440,6 +450,20 @@ const PracticeIndex: Component = () => {
 		},
 	);
 
+	const [isQueueCompleted, setIsQueueCompleted] = createSignal(false);
+
+	createEffect(() => {
+		const data = practiceListData();
+
+		if (!data || data.length === 0) {
+			setIsQueueCompleted(false);
+			return;
+		}
+
+		const allCompleted = data.every((tune) => !!tune.completed_at);
+		setIsQueueCompleted(allCompleted);
+	});
+
 	// Filtered practice list - applies showSubmitted filter
 	// This is the single source of truth for both grid and flashcard views
 	const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
@@ -470,7 +494,8 @@ const PracticeIndex: Component = () => {
 		console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
 
 		// 1) Optimistic shared-state update (drives both grid and flashcard)
-		setEvaluations((prev) => ({ ...prev, [tuneId]: evaluation }));
+		const nextEvaluations = { ...evaluations(), [tuneId]: evaluation };
+		setEvaluations(nextEvaluations);
 
 		// 2) Stage/clear in local DB
 		const db = localDb();
@@ -697,6 +722,7 @@ const PracticeIndex: Component = () => {
 			QUEUE_DATE_MANUAL_FLAG_KEY,
 			isToday ? "false" : "true",
 		);
+		setIsManualQueueDate(!isToday);
 
 		// Trigger grid refresh using view-specific signal
 		incrementPracticeListStagedChanged();
@@ -718,10 +744,24 @@ const PracticeIndex: Component = () => {
 		setInitialPracticeDate(practiceDate);
 		localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
 		localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
+		setIsManualQueueDate(false);
 		console.log(
 			`[PracticeIndex] Refreshing queue for ${practiceDate.toLocaleDateString()}`,
 		);
 		incrementPracticeListStagedChanged();
+	};
+
+	const handleDateRolloverDetection = () => {
+		if (isManualQueueDate()) {
+			return true;
+		}
+
+		if (isQueueCompleted()) {
+			handlePracticeDateRefresh();
+			return false;
+		}
+
+		return true;
 	};
 
 	// Handle queue reset
@@ -820,6 +860,7 @@ const PracticeIndex: Component = () => {
 			<DateRolloverBanner
 				initialDate={initialPracticeDate()}
 				onRefresh={handlePracticeDateRefresh}
+				onDateChange={handleDateRolloverDetection}
 			/>
 
 			{/* Sticky Control Banner */}

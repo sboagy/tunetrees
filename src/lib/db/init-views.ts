@@ -241,6 +241,7 @@ FROM
     AND pr.playlist_ref = playlist_tune.playlist_ref
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
     AND td.playlist_id = playlist_tune.playlist_ref
+    AND td.user_id = playlist.user_ref
 WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref
 `;
 
@@ -328,7 +329,7 @@ SELECT
   ttd.device_id
 FROM
   table_transient_data ttd
-  LEFT JOIN user_profile up ON up.supabase_user_id = ttd.user_id
+  LEFT JOIN user_profile up ON up.id = ttd.user_id
   LEFT JOIN tune ON tune.id = ttd.tune_id
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = ttd.user_id
@@ -389,7 +390,7 @@ SELECT
 FROM
   practice_record pr
   LEFT JOIN playlist p ON p.playlist_id = pr.playlist_ref
-  LEFT JOIN user_profile up ON up.supabase_user_id = p.user_ref
+  LEFT JOIN user_profile up ON up.id = p.user_ref
   LEFT JOIN tune ON tune.id = pr.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = p.user_ref
@@ -465,42 +466,42 @@ ORDER BY
  * ```
  */
 export async function initializeViews(db: SqliteDatabase): Promise<void> {
-  console.log("📊 Initializing SQLite database views...");
+	console.log("📊 Initializing SQLite database views...");
 
-  try {
-    // Create view_playlist_joined
-    await db.run(VIEW_PLAYLIST_JOINED);
-    console.log("✅ Created view: view_playlist_joined");
+	try {
+		// Create view_playlist_joined
+		await db.run(VIEW_PLAYLIST_JOINED);
+		console.log("✅ Created view: view_playlist_joined");
 
-    // Create practice_list_joined
-    await db.run(PRACTICE_LIST_JOINED);
-    console.log("✅ Created view: practice_list_joined");
+		// Create practice_list_joined
+		await db.run(PRACTICE_LIST_JOINED);
+		console.log("✅ Created view: practice_list_joined");
 
-    // Create practice_list_staged
-    await db.run(PRACTICE_LIST_STAGED);
-    console.log("✅ Created view: practice_list_staged");
+		// Create practice_list_staged
+		await db.run(PRACTICE_LIST_STAGED);
+		console.log("✅ Created view: practice_list_staged");
 
-    // Create view_daily_practice_queue_readable
-    await db.run(VIEW_DAILY_PRACTICE_QUEUE_READABLE);
-    console.log("✅ Created view: view_daily_practice_queue_readable");
+		// Create view_daily_practice_queue_readable
+		await db.run(VIEW_DAILY_PRACTICE_QUEUE_READABLE);
+		console.log("✅ Created view: view_daily_practice_queue_readable");
 
-    // Create view_transient_data_readable
-    await db.run(VIEW_TRANSIENT_DATA_READABLE);
-    console.log("✅ Created view: view_transient_data_readable");
+		// Create view_transient_data_readable
+		await db.run(VIEW_TRANSIENT_DATA_READABLE);
+		console.log("✅ Created view: view_transient_data_readable");
 
-    // Create view_practice_record_readable
-    await db.run(VIEW_PRACTICE_RECORD_READABLE);
-    console.log("✅ Created view: view_practice_record_readable");
+		// Create view_practice_record_readable
+		await db.run(VIEW_PRACTICE_RECORD_READABLE);
+		console.log("✅ Created view: view_practice_record_readable");
 
-    // Create view_tune_override_readable
-    await db.run(VIEW_TUNE_OVERRIDE_READABLE);
-    console.log("✅ Created view: view_tune_override_readable");
+		// Create view_tune_override_readable
+		await db.run(VIEW_TUNE_OVERRIDE_READABLE);
+		console.log("✅ Created view: view_tune_override_readable");
 
-    console.log("✅ All database views initialized successfully");
-  } catch (error) {
-    console.error("❌ Error initializing database views:", error);
-    throw error;
-  }
+		console.log("✅ All database views initialized successfully");
+	} catch (error) {
+		console.error("❌ Error initializing database views:", error);
+		throw error;
+	}
 }
 
 /**
@@ -509,22 +510,22 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
  * @param db - SQLite database instance
  */
 export async function dropViews(db: SqliteDatabase): Promise<void> {
-  console.log("🗑️  Dropping SQLite database views...");
+	console.log("🗑️  Dropping SQLite database views...");
 
-  try {
-    await db.run("DROP VIEW IF EXISTS view_practice_record_readable");
-    await db.run("DROP VIEW IF EXISTS view_tune_override_readable");
-    await db.run("DROP VIEW IF EXISTS view_transient_data_readable");
-    await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
-    await db.run("DROP VIEW IF EXISTS practice_list_staged");
-    await db.run("DROP VIEW IF EXISTS practice_list_joined");
-    await db.run("DROP VIEW IF EXISTS view_playlist_joined");
+	try {
+		await db.run("DROP VIEW IF EXISTS view_practice_record_readable");
+		await db.run("DROP VIEW IF EXISTS view_tune_override_readable");
+		await db.run("DROP VIEW IF EXISTS view_transient_data_readable");
+		await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
+		await db.run("DROP VIEW IF EXISTS practice_list_staged");
+		await db.run("DROP VIEW IF EXISTS practice_list_joined");
+		await db.run("DROP VIEW IF EXISTS view_playlist_joined");
 
-    console.log("✅ All views dropped");
-  } catch (error) {
-    console.error("❌ Error dropping views:", error);
-    throw error;
-  }
+		console.log("✅ All views dropped");
+	} catch (error) {
+		console.error("❌ Error dropping views:", error);
+		throw error;
+	}
 }
 
 /**
@@ -533,6 +534,6 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
  * @param db - SQLite database instance
  */
 export async function recreateViews(db: SqliteDatabase): Promise<void> {
-  await dropViews(db);
-  await initializeViews(db);
+	await dropViews(db);
+	await initializeViews(db);
 }
