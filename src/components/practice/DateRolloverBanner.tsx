@@ -81,7 +81,7 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
 		<>
 			{showBanner() && (
 				<div
-					class="fixed top-0 left-0 right-0 z-50 bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white px-4 py-3 shadow-lg"
+					class="w-full bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white px-4 py-3 shadow-lg"
 					role="alert"
 				>
 					<div class="flex items-center justify-between max-w-7xl mx-auto">
