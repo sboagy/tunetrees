@@ -41,8 +41,20 @@ This document outlines **three minimal, secure extension approaches** for TuneTr
 - **Pros:** Maximum flexibility without exposing client to untrusted code.
 - **Cons:** Requires network and hosting; weaker offline story.
 
+## Proposal D: Sandboxed Runtime Scripting (Limited Capabilities)
+
+**Summary:** Allow user-provided scripts in a **restricted language** that runs in a sandboxed worker with an explicit host API (no DOM, no network). Use it for goal rules and import parsing while controlling security and resource usage.
+
+- **Candidate languages:** CEL or JSONLogic for simple rules; Starlark, Lua (Fengari), or WASM (e.g., AssemblyScript/Rust) for richer parsing logic.
+- **Imports:** Script receives a file payload (CSV/HTML/JSON) and emits normalized tunes via a host callback.
+- **Scheduling:** Script receives tune state + goal and returns a next-due date or interval.
+- **Security:** Deterministic runtimes + explicit API surface; enforce timeouts and memory limits in a Web Worker.
+- **Pros:** More flexible than pure config; still avoids arbitrary JS.
+- **Cons:** More engineering effort; still needs guardrails against runaway scripts.
+
 ## Notes for Selection
 
 - **If security + simplicity are top priority:** Proposal A.
 - **If developer flexibility is top priority (and rebuilds are ok):** Proposal B.
 - **If you want user-specific code without client risk:** Proposal C.
+- **If you want runtime plugins with guardrails:** Proposal D.
