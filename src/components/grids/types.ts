@@ -95,6 +95,9 @@ export interface IGridBaseProps {
     description: string | null;
   }>;
   selectedPlaylistIds?: string[];
+  // Loading/error state for grid data
+  isLoading?: boolean;
+  loadError?: unknown;
   // Practice-specific props
   practiceListData?: any[]; // Pre-fetched practice list data (required for TunesGridScheduled)
   // Evaluation state management (for flashcard/grid coordination)

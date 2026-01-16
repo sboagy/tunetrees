@@ -20,6 +20,7 @@ import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPlaylistTunesStaged } from "../../lib/db/queries/playlists";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
+import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
@@ -136,22 +137,33 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     );
   });
 
+  const loadError = createMemo(() => playlistTunesData.error);
+  const hasTunes = createMemo(() => filteredTunes().length > 0);
+
   return (
     <div class="h-full flex flex-col">
+      {/* Error */}
+      <Show when={!!loadError()}>
+        <GridStatusMessage
+          variant="error"
+          title="Unable to load repertoire"
+          description="There was a problem loading your repertoire tunes."
+          hint="Refresh the page. If this keeps happening, open the Sync menu and run Force Full Sync Down."
+          error={loadError()}
+        />
+      </Show>
+
       {/* Loading */}
-      <Show when={playlistTunesData.loading}>
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
-            <p class="mt-4 text-gray-600 dark:text-gray-400">
-              Loading repertoire...
-            </p>
-          </div>
-        </div>
+      <Show when={!loadError() && playlistTunesData.loading}>
+        <GridStatusMessage
+          variant="loading"
+          title="Loading repertoire..."
+          description="Syncing your repertoire tunes."
+        />
       </Show>
 
       {/* Grid */}
-      <Show when={!playlistTunesData.loading && filteredTunes().length > 0}>
+      <Show when={!loadError() && !playlistTunesData.loading && hasTunes()}>
         <div class="flex-1 overflow-hidden">
           <TunesGrid
             tablePurpose="repertoire"
@@ -184,19 +196,16 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Empty state */}
-      <Show when={!playlistTunesData.loading && filteredTunes().length === 0}>
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <p class="text-lg text-gray-600 dark:text-gray-400">
-              No tunes in repertoire
-            </p>
-            <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              {tunes().length > 0
-                ? "No tunes match your filters"
-                : "Add tunes to your repertoire from the Catalog tab"}
-            </p>
-          </div>
-        </div>
+      <Show when={!loadError() && !playlistTunesData.loading && !hasTunes()}>
+        <GridStatusMessage
+          variant="empty"
+          title="No tunes in repertoire"
+          description={
+            tunes().length > 0
+              ? "No tunes match your filters"
+              : "Add tunes to your repertoire from the Catalog tab"
+          }
+        />
       </Show>
 
       {/* Footer with tune count and selection info - Always visible */}

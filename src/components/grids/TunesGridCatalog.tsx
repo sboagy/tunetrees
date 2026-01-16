@@ -30,6 +30,7 @@ import { getPlaylistTunes } from "../../lib/db/queries/playlists";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
+import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 // Table state persistence is handled inside TunesGrid
 import type { IGridBaseProps, ITuneOverview } from "./types";
@@ -219,34 +220,40 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     );
   });
 
+  const isPlaylistFilterActive = createMemo(
+    () => !!props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
+  );
+  const isLoading = createMemo(
+    () => tunes.loading || (isPlaylistFilterActive() && playlistTunes.loading)
+  );
+  const loadError = createMemo(() => tunes.error || playlistTunes.error);
+  const hasTunes = createMemo(() => filteredTunes().length > 0);
+
   return (
     <div class="h-full flex flex-col">
+      {/* Error */}
+      <Show when={!!loadError()}>
+        <GridStatusMessage
+          variant="error"
+          title="Unable to load catalog"
+          description="There was a problem loading your catalog tunes."
+          hint="Refresh the page. If this keeps happening, open the Sync menu and run Force Full Sync Down."
+          error={loadError()}
+        />
+      </Show>
+
       {/* Loading state */}
-      <Show
-        when={
-          tunes.loading ||
-          (props.selectedPlaylistIds &&
-            props.selectedPlaylistIds.length > 0 &&
-            playlistTunes.loading)
-        }
-      >
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
-            <p class="mt-4 text-gray-600 dark:text-gray-400">
-              Loading catalog...
-            </p>
-          </div>
-        </div>
+      <Show when={!loadError() && isLoading()}>
+        <GridStatusMessage
+          variant="loading"
+          title="Loading catalog..."
+          description="Syncing your catalog tunes."
+        />
       </Show>
       {/* Table container with virtualization */}
       <Show
         when={
-          !tunes.loading &&
-          (!props.selectedPlaylistIds ||
-            props.selectedPlaylistIds.length === 0 ||
-            !playlistTunes.loading) &&
-          filteredTunes().length > 0
+          !loadError() && !isLoading() && hasTunes()
         }
       >
         <div class="flex-1 overflow-hidden">
@@ -282,25 +289,18 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       {/* Empty state */}
       <Show
         when={
-          !tunes.loading &&
-          (!props.selectedPlaylistIds ||
-            props.selectedPlaylistIds.length === 0 ||
-            !playlistTunes.loading) &&
-          filteredTunes().length === 0
+          !loadError() && !isLoading() && !hasTunes()
         }
       >
-        <div class="flex-1 flex items-center justify-center">
-          <div class="text-center">
-            <p class="text-lg text-gray-600 dark:text-gray-400">
-              No tunes found
-            </p>
-            <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              {props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
-                ? "No tunes in selected playlists match your filters"
-                : "The catalog is empty"}
-            </p>
-          </div>
-        </div>
+        <GridStatusMessage
+          variant="empty"
+          title="No tunes found"
+          description={
+            isPlaylistFilterActive()
+              ? "No tunes in selected playlists match your filters"
+              : "The catalog is empty"
+          }
+        />
       </Show>
       {/* Footer with tune count and selection info - Always visible */}
       <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">

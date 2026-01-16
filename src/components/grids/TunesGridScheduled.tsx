@@ -18,6 +18,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
+import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
@@ -111,23 +112,41 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     props.onTuneSelect?.(row as any);
   };
 
+  const isLoading = createMemo(() => props.isLoading ?? false);
+  const loadError = createMemo(() => props.loadError);
+  const hasTunes = createMemo(() => tunes().length > 0);
+
   return (
     <div class="h-full flex flex-col">
       {/* Show grid when data is available */}
       <Show
-        when={tunes().length > 0}
+        when={!isLoading() && !loadError() && hasTunes()}
         fallback={
-          <div class="flex items-center justify-center h-full">
-            <div class="text-center py-12">
-              <div class="text-6xl mb-4">🎉</div>
-              <h3 class="text-xl font-semibold text-green-900 dark:text-green-300 mb-2">
-                All Caught Up!
-              </h3>
-              <p class="text-green-700 dark:text-green-400">
-                No tunes are due for practice right now.
-              </p>
-            </div>
-          </div>
+          <GridStatusMessage
+            variant={
+              loadError() ? "error" : isLoading() ? "loading" : "success"
+            }
+            title={
+              loadError()
+                ? "Unable to load practice queue"
+                : isLoading()
+                  ? "Loading practice queue..."
+                  : "All Caught Up!"
+            }
+            description={
+              loadError()
+                ? "There was a problem syncing your scheduled tunes."
+                : isLoading()
+                  ? "Syncing your scheduled tunes."
+                  : "No tunes are due for practice right now."
+            }
+            hint={
+              loadError()
+                ? "Refresh the page. If this keeps happening, open the Sync menu and run Force Full Sync Down."
+                : undefined
+            }
+            error={loadError()}
+          />
         }
       >
         <TunesGrid
