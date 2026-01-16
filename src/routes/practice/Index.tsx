@@ -483,6 +483,14 @@ const PracticeIndex: Component = () => {
 		return filtered;
 	});
 
+	const practiceListLoading = () =>
+		practiceListData.loading || queueInitialized.loading;
+	const practiceListError = () =>
+		practiceListData.error ||
+		(queueInitialized() === false
+			? "Practice queue failed to initialize."
+			: undefined);
+
 	// Grid no longer provides a clear-evaluations callback; parent clears evaluations directly
 
 	// Handle recall evaluation changes (single source of truth)
@@ -916,6 +924,8 @@ const PracticeIndex: Component = () => {
 							evaluations={evaluations()}
 							onTableInstanceChange={setTableInstance}
 							practiceListData={filteredPracticeList()}
+							isLoading={practiceListLoading()}
+							loadError={practiceListError()}
 						/>
 					</Show>
 				</Show>
