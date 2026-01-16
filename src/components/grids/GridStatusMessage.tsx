@@ -1,4 +1,4 @@
-import { type Component, Show } from "solid-js";
+import { type Component, Show, createMemo } from "solid-js";
 
 export type GridStatusVariant = "loading" | "empty" | "success" | "error";
 
@@ -22,7 +22,7 @@ const getErrorMessage = (error: unknown): string | null => {
 };
 
 export const GridStatusMessage: Component<GridStatusMessageProps> = (props) => {
-  const errorMessage = () => getErrorMessage(props.error);
+  const errorMessage = createMemo(() => getErrorMessage(props.error));
   const icon = () => {
     if (props.variant === "success") return "🎉";
     if (props.variant === "error") return "⚠️";

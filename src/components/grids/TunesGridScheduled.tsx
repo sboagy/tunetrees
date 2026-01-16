@@ -112,9 +112,9 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     props.onTuneSelect?.(row as any);
   };
 
-  const isLoading = () => props.isLoading ?? false;
-  const loadError = () => props.loadError;
-  const hasTunes = () => tunes().length > 0;
+  const isLoading = createMemo(() => props.isLoading ?? false);
+  const loadError = createMemo(() => props.loadError);
+  const hasTunes = createMemo(() => tunes().length > 0);
 
   return (
     <div class="h-full flex flex-col">

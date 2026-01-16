@@ -220,12 +220,14 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     );
   });
 
-  const isPlaylistFilterActive = () =>
-    !!props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0;
-  const isLoading = () =>
-    tunes.loading || (isPlaylistFilterActive() && playlistTunes.loading);
-  const loadError = () => tunes.error || playlistTunes.error;
-  const hasTunes = () => filteredTunes().length > 0;
+  const isPlaylistFilterActive = createMemo(
+    () => !!props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
+  );
+  const isLoading = createMemo(
+    () => tunes.loading || (isPlaylistFilterActive() && playlistTunes.loading)
+  );
+  const loadError = createMemo(() => tunes.error || playlistTunes.error);
+  const hasTunes = createMemo(() => filteredTunes().length > 0);
 
   return (
     <div class="h-full flex flex-col">

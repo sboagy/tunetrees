@@ -137,8 +137,8 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     );
   });
 
-  const loadError = () => playlistTunesData.error;
-  const hasTunes = () => filteredTunes().length > 0;
+  const loadError = createMemo(() => playlistTunesData.error);
+  const hasTunes = createMemo(() => filteredTunes().length > 0);
 
   return (
     <div class="h-full flex flex-col">
