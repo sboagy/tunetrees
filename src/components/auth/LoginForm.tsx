@@ -9,7 +9,7 @@
  * @module components/auth/LoginForm
  */
 
-import { useSearchParams } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { Eye, EyeOff } from "lucide-solid";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -49,6 +49,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     loading,
   } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Check if user is converting from anonymous mode
   const isConverting = () => searchParams.convert === "true" && isAnonymous();
@@ -68,7 +69,12 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
   createEffect(() => {
     if (isConverting()) {
       setIsSignUp(true);
+      return;
     }
+
+    const isSignUpFromUrl =
+      searchParams.mode === "signup" || searchParams.signup === "true";
+    setIsSignUp(isSignUpFromUrl || (props.defaultToSignUp ?? false));
   });
 
   /**
@@ -186,12 +192,19 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
    * Toggle between sign in and sign up
    */
   const toggleMode = () => {
-    setIsSignUp(!isSignUp());
+    const nextIsSignUp = !isSignUp();
+    setIsSignUp(nextIsSignUp);
     setError(null);
     setPassword("");
     setName("");
     setShowForgotPassword(false);
     setResetSuccess(false);
+
+    if (!isConverting()) {
+      navigate(nextIsSignUp ? "/login?mode=signup" : "/login", {
+        replace: false,
+      });
+    }
   };
 
   /**
@@ -341,10 +354,10 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
       </Show>
 
       {/* Main Login Form */}
-      <div class="w-full max-w-md mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+      <div class="w-full max-w-md mx-auto p-5 sm:p-6 [@media(max-height:760px)]:p-4 [@media(max-height:760px)]:text-sm bg-white dark:bg-gray-800 rounded-lg shadow-lg">
         {/* Header - Only shown when converting */}
         <Show when={isConverting()}>
-          <div class="mb-6 text-center">
+          <div class="mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4 text-center">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Backup Your Data
             </h1>
@@ -362,76 +375,79 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
         {/* Anonymous Sign In Option - at top when not converting */}
         <Show when={!isConverting()}>
-          <div class="relative mb-3">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-gray-300 dark:border-gray-600" />
-            </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                Run local only, as anonymous
-              </span>
-            </div>
-          </div>{" "}
-          <div class="mb-6">
-            <button
-              type="button"
-              onClick={handleAnonymousSignIn}
-              disabled={isSubmitting() || loading()}
-              class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            >
-              <Show
-                when={!isSubmitting() && !loading()}
-                fallback={<span>Loading...</span>}
-              >
-                Use on this Device Only
-              </Show>
-            </button>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-              Try TuneTrees without an account. Your data will only be stored on
-              this device and won't sync to other devices.
-            </p>
-          </div>
-          {/* Divider - "Or (sign up)" */}
-          <div class="relative mb-3">
-            <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-gray-300 dark:border-gray-600" />
-            </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                Or sign up
-              </span>
-            </div>
-          </div>
-          {/* Toggle Sign Up/Sign In - only show when not converting */}
-          <Show when={!isConverting()}>
-            <div class="text-center">
+          <Show when={!isSignUp()}>
+            <div class="relative mb-3">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                  Run local only, as anonymous
+                </span>
+              </div>
+            </div>{" "}
+            <div class="mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4">
               <button
                 type="button"
-                onClick={toggleMode}
-                class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                onClick={handleAnonymousSignIn}
+                disabled={isSubmitting() || loading()}
+                class="w-full py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
               >
-                {isSignUp() ? (
-                  <>
-                    Already have an account?{" "}
-                    <span class="underline">Sign in</span>
-                  </>
-                ) : (
-                  <>
-                    Don't have an account?{" "}
-                    <span class="underline">Sign up</span>
-                  </>
-                )}
+                <Show
+                  when={!isSubmitting() && !loading()}
+                  fallback={<span>Loading...</span>}
+                >
+                  Use on this Device Only
+                </Show>
               </button>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                Try TuneTrees without an account. Your data will only be stored
+                on this device and won't sync to other devices.
+              </p>
+            </div>
+            {/* Divider - "Or (sign up)" */}
+            <div class="relative mb-3">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                  Or sign up
+                </span>
+              </div>
             </div>
           </Show>
+
+          {/* Toggle Sign Up/Sign In - only show when not converting */}
+          <div class="text-center">
+            <button
+              type="button"
+              onClick={toggleMode}
+              class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+            >
+              {isSignUp() ? (
+                <>
+                  Already have an account?{" "}
+                  <span class="underline">Sign in</span>
+                </>
+              ) : (
+                <>
+                  Don't have an account? <span class="underline">Sign up</span>
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Divider - "Or sign in" */}
-          <div class="relative mb-6 mt-6">
+          <div
+            class={`relative ${isSignUp() ? "mb-4 mt-4" : "mb-5 mt-5 sm:mb-6 sm:mt-6 [@media(max-height:760px)]:mb-4 [@media(max-height:760px)]:mt-4"}`}
+          >
             <div class="absolute inset-0 flex items-center">
               <div class="w-full border-t border-gray-300 dark:border-gray-600" />
             </div>
             <div class="relative flex justify-center text-sm">
               <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                Or sign in with password
+                {isSignUp() ? "Sign up with email" : "Or sign in with password"}
               </span>
             </div>
           </div>
@@ -445,7 +461,10 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         </Show>
 
         {/* Email/Password Form */}
-        <form onSubmit={handleSubmit} class="space-y-4 mb-6">
+        <form
+          onSubmit={handleSubmit}
+          class="space-y-3 sm:space-y-4 [@media(max-height:760px)]:space-y-2 mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4"
+        >
           {/* Name Field (Sign Up Only) */}
           <Show when={isSignUp()}>
             <div>
@@ -461,7 +480,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 value={name()}
                 onInput={(e) => setName(e.currentTarget.value)}
                 placeholder="Your name"
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 disabled={isSubmitting() || loading()}
               />
             </div>
@@ -481,7 +500,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
               value={email()}
               onInput={(e) => setEmail(e.currentTarget.value)}
               placeholder="you@example.com"
-              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               disabled={isSubmitting() || loading()}
               required
             />
@@ -503,7 +522,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 onInput={(e) => setPassword(e.currentTarget.value)}
                 autocomplete={isSignUp() ? "new-password" : "current-password"}
                 placeholder="••••••••"
-                class="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 disabled={isSubmitting() || loading()}
                 required
                 minlength="6"
@@ -538,7 +557,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           <button
             type="submit"
             disabled={isSubmitting() || loading()}
-            class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            class="w-full py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
           >
             <Show
               when={!isSubmitting() && !loading()}
@@ -550,7 +569,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         </form>
 
         {/* Divider */}
-        <div class="relative mb-6">
+        <div class="relative mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4">
           <div class="absolute inset-0 flex items-center">
             <div class="w-full border-t border-gray-300 dark:border-gray-600" />
           </div>
@@ -562,13 +581,13 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
         </div>
 
         {/* OAuth Buttons */}
-        <div class="space-y-3 mb-6">
+        <div class="space-y-3 mb-4 sm:mb-6 [@media(max-height:760px)]:mb-3">
           {/* Google Sign In */}
           <button
             type="button"
             onClick={() => handleOAuthSignIn("google")}
             disabled={isSubmitting() || loading()}
-            class="w-full flex items-center justify-center gap-3 py-2 px-4 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full flex items-center justify-center gap-3 py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg class="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -596,7 +615,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             type="button"
             onClick={() => handleOAuthSignIn("github")}
             disabled={isSubmitting() || loading()}
-            class="w-full flex items-center justify-center gap-3 py-2 px-4 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full flex items-center justify-center gap-3 py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg
               class="w-5 h-5"
@@ -608,6 +627,16 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             </svg>
             <span>Continue with GitHub</span>
           </button>
+        </div>
+
+        <div class="flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+          <A class="hover:underline" href="/privacy">
+            Privacy Policy
+          </A>
+          <span aria-hidden="true">•</span>
+          <A class="hover:underline" href="/terms">
+            Terms of Service
+          </A>
         </div>
       </div>
     </>
