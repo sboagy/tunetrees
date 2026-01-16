@@ -19,7 +19,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { computeSchedulingWindows } from "../../services/practice-queue";
 import { generateId } from "../../utils/uuid";
-import type { SqliteDatabase } from "../client-sqlite";
+import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
 	dailyPracticeQueue,
 	playlist,
@@ -60,6 +60,60 @@ export type PracticeListStagedWithQueue = PracticeListStagedRow & {
 	order_index: number;
 	completed_at: string | null;
 };
+
+export async function clearStaleStagedEvaluations(
+	db: SqliteDatabase,
+	userId: string,
+	playlistId: string,
+	windowStartIso19: string,
+): Promise<number> {
+	const staleWhereClause = sql`
+    (
+      NOT EXISTS (
+        SELECT 1
+        FROM daily_practice_queue dpq
+        WHERE dpq.tune_ref = table_transient_data.tune_id
+          AND dpq.user_ref = ${userId}
+          AND dpq.playlist_ref = ${playlistId}
+          AND dpq.active = 1
+          AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
+      )
+      OR substr(replace(table_transient_data.last_modified_at, ' ', 'T'), 1, 19) < ${windowStartIso19}
+    )
+  `;
+	const result = await db.get<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM table_transient_data
+    WHERE table_transient_data.user_id = ${userId}
+      AND table_transient_data.playlist_id = ${playlistId}
+      AND ${staleWhereClause}
+  `);
+	const countValue = result?.count;
+	const count =
+		typeof countValue === "number"
+			? countValue
+			: Number.parseInt(String(countValue ?? 0), 10);
+	if (!Number.isFinite(count) || count <= 0) {
+		return 0;
+	}
+
+	await db.run(sql`
+    DELETE FROM table_transient_data
+    WHERE table_transient_data.user_id = ${userId}
+      AND table_transient_data.playlist_id = ${playlistId}
+      AND ${staleWhereClause}
+  `);
+
+	if (typeof indexedDB !== "undefined") {
+		await persistDb();
+	}
+
+	console.log(
+		`[clearStaleStagedEvaluations] Removed ${count} stale staged row(s) for user=${userId}, playlist=${playlistId}, window=${windowStartIso19}`,
+	);
+
+	return count;
+}
 
 /**
  * DEPRECATED: Old interface - remove after migration
@@ -193,6 +247,7 @@ export async function getPracticeList(
 	}
 
 	const windowStartIso19 = isoFormat.replace(" ", "T").substring(0, 19);
+	await clearStaleStagedEvaluations(db, userId, playlistId, windowStartIso19);
 
 	// Select from the MOST RECENT active queue snapshot
 	// Match BOTH '2025-11-08T00:00:00' AND '2025-11-08 00:00:00' formats
