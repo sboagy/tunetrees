@@ -39,8 +39,8 @@ const Login: Component = () => {
   };
 
   return (
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
-      <div class="max-w-md w-full space-y-8">
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-start sm:items-center justify-center px-4 sm:px-6 lg:px-8 py-6 sm:py-10 [@media(max-height:760px)]:py-4">
+      <div class="max-w-md w-full space-y-6 sm:space-y-8 [@media(max-height:760px)]:space-y-4">
         {/* Logo/Branding */}
         <div class="flex items-center justify-center gap-4">
           <img
@@ -48,13 +48,13 @@ const Login: Component = () => {
             alt="TuneTrees Logo"
             width="48"
             height="48"
-            class="h-24 w-24 object-contain"
+            class="h-16 w-16 sm:h-24 sm:w-24 [@media(max-height:760px)]:h-14 [@media(max-height:760px)]:w-14 object-contain"
           />
           <div class="text-left">
-            <span class="text-5xl font-bold leading-tight dark:text-blue-400">
+            <span class="text-4xl sm:text-5xl [@media(max-height:760px)]:text-3xl font-bold leading-tight dark:text-blue-400">
               TuneTrees
             </span>
-            <p class="m-2 text-2xl text-gray-600 dark:text-gray-400">
+            <p class="m-1 sm:m-2 [@media(max-height:760px)]:m-0.5 text-lg sm:text-2xl [@media(max-height:760px)]:text-base text-gray-600 dark:text-gray-400">
               Practice manager
             </p>
           </div>
