@@ -232,6 +232,57 @@ const LogoDropdown: Component<{
               </svg>
               What's New
             </a>
+
+            {/* Divider */}
+            <div class="border-t border-gray-200 dark:border-gray-700 my-2" />
+
+            {/* Privacy Policy */}
+            <a
+              href="/privacy"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={() => setShowDropdown(false)}
+              data-testid="logo-dropdown-privacy-link"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 11c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm7 6a7 7 0 10-14 0v1h14v-1z"
+                />
+              </svg>
+              Privacy Policy
+            </a>
+
+            {/* Terms of Service */}
+            <a
+              href="/terms"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={() => setShowDropdown(false)}
+              data-testid="logo-dropdown-terms-link"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V4a2 2 0 012-2h6l4 4v12a2 2 0 01-2 2z"
+                />
+              </svg>
+              Terms of Service
+            </a>
           </div>
         </div>
       </Show>
