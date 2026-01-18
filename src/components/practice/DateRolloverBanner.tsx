@@ -22,7 +22,7 @@ export interface DateRolloverBannerProps {
 	/** Initial practice date to compare against */
 	initialDate: Date;
 	/** Callback when user clicks refresh button */
-	onRefresh?: () => void;
+	onRefresh?: () => void | Promise<void>;
 	/** Optional hook to decide whether to show the banner when a change is detected */
 	onDateChange?: (newDate: Date) => boolean | void;
 }
@@ -47,8 +47,25 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
 	const [showBanner, setShowBanner] = createSignal(false);
 	const [newDate, setNewDate] = createSignal<string>("");
 
+	const getRolloverIntervalMs = () => {
+		if (typeof window !== "undefined") {
+			const override = (
+				window as unknown as {
+					__TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__?: number;
+				}
+			).__TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__;
+			const parsed = Number(override);
+			if (Number.isFinite(parsed) && parsed > 0) {
+				return parsed;
+			}
+		}
+
+		return 60000;
+	};
+
 	// Check for date change every minute
 	createEffect(() => {
+		const intervalMs = getRolloverIntervalMs();
 		const checkInterval = setInterval(() => {
 			if (hasPracticeDateChanged(props.initialDate)) {
 				const current = getPracticeDate();
@@ -64,17 +81,21 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
 					`🔄 [DateRollover] Practice date changed from ${props.initialDate.toLocaleDateString()} to ${current.toLocaleDateString()}`,
 				);
 			}
-		}, 60000); // Check every minute
+		}, intervalMs);
 
 		onCleanup(() => clearInterval(checkInterval));
 	});
 
-	const handleRefresh = () => {
+	const handleRefresh = async () => {
 		if (props.onRefresh) {
-			props.onRefresh();
-		} else {
-			window.location.reload();
+			try {
+				await props.onRefresh();
+			} finally {
+				setShowBanner(false);
+			}
+			return;
 		}
+		window.location.reload();
 	};
 
 	return (
@@ -82,6 +103,7 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
 			{showBanner() && (
 				<div
 					class="w-full bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white px-4 py-3 shadow-lg"
+					data-testid="date-rollover-banner"
 					role="alert"
 				>
 					<div class="flex items-center justify-between max-w-7xl mx-auto">
@@ -113,6 +135,7 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
 							type="button"
 							onClick={handleRefresh}
 							class="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-md font-medium hover:opacity-90 transition-opacity"
+							data-testid="date-rollover-refresh-button"
 						>
 							Refresh Now
 						</button>
