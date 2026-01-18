@@ -737,8 +737,40 @@ const PracticeIndex: Component = () => {
 		}
 	};
 
-	const handlePracticeDateRefresh = () => {
+	const handlePracticeDateRefresh = async () => {
 		const practiceDate = getPracticeDate();
+		const db = localDb();
+		const playlistId = currentPlaylistId();
+
+		if (db && playlistId) {
+			const userId = await getUserId();
+			if (userId) {
+				const dayStart = new Date(practiceDate);
+				dayStart.setHours(0, 0, 0, 0);
+				const nextDay = new Date(dayStart);
+				nextDay.setDate(nextDay.getDate() + 1);
+
+				try {
+					await db
+						.delete(dailyPracticeQueue)
+						.where(
+							and(
+								eq(dailyPracticeQueue.userRef, userId),
+								eq(dailyPracticeQueue.playlistRef, playlistId),
+								gte(dailyPracticeQueue.windowStartUtc, dayStart.toISOString()),
+								lt(dailyPracticeQueue.windowStartUtc, nextDay.toISOString()),
+							),
+						)
+						.run();
+				} catch (error) {
+					console.warn(
+						"[PracticeIndex] Failed to clear queue before refresh:",
+						error,
+					);
+				}
+			}
+		}
+
 		setQueueDate(practiceDate);
 		setInitialPracticeDate(practiceDate);
 		localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
@@ -756,7 +788,7 @@ const PracticeIndex: Component = () => {
 		}
 
 		if (isQueueCompleted()) {
-			handlePracticeDateRefresh();
+			void handlePracticeDateRefresh();
 			return false;
 		}
 
