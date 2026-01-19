@@ -20,6 +20,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
+import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../../components/grids/types";
 import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
@@ -33,7 +34,9 @@ import {
 import { RepertoireEmptyState } from "../../components/repertoire";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { getUserPlaylists } from "../../lib/db/queries/playlists";
 import { dailyPracticeQueue } from "../../lib/db/schema";
+import type { PlaylistWithSummary } from "../../lib/db/types";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
 import {
@@ -73,10 +76,17 @@ const PracticeIndex: Component = () => {
 		remoteSyncDownCompletionVersion,
 		initialSyncComplete,
 		syncPracticeScope,
+		repertoireListChanged,
 		incrementRepertoireListChanged,
 	} = useAuth();
 	const { currentPlaylistId } = useCurrentPlaylist();
 	const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
+	const playlistsVersion = createMemo(
+		() => `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`,
+	);
+	const [playlistsLoadedVersion, setPlaylistsLoadedVersion] = createSignal<
+		string | null
+	>(null);
 
 	// Get current user's local database ID from user_profile
 	const [userId] = createResource(
@@ -108,6 +118,34 @@ const PracticeIndex: Component = () => {
 			return result[0]?.id ?? null;
 		},
 	);
+
+	const [playlists] = createResource(
+		() => {
+			const db = localDb();
+			const currentUser = user();
+			const internalUserId = userId();
+			const version = playlistsVersion();
+
+			return db && currentUser && internalUserId
+				? { db, userId: currentUser.id, version }
+				: null;
+		},
+		async (params) => {
+			if (!params) return [] as PlaylistWithSummary[];
+			return getUserPlaylists(params.db, params.userId);
+		},
+	);
+
+	createEffect(() => {
+		if (!initialSyncComplete() || !user() || !localDb() || !userId()) {
+			setPlaylistsLoadedVersion(null);
+			return;
+		}
+
+		if (!playlists.loading && playlists() !== undefined) {
+			setPlaylistsLoadedVersion(playlistsVersion());
+		}
+	});
 
 	// Helper to get current user ID (for non-reactive contexts)
 	const getUserId = async (): Promise<string | null> => {
@@ -866,7 +904,17 @@ const PracticeIndex: Component = () => {
 	};
 
 	const renderPracticeFallback = () => {
-		if (initialSyncComplete() && !currentPlaylistId()) {
+		const playlistsReady = playlistsLoadedVersion() === playlistsVersion();
+		const playlistsLoading =
+			!playlistsReady || playlists.loading || playlists() === undefined;
+		const playlistCount = playlists()?.length ?? 0;
+
+		if (
+			initialSyncComplete() &&
+			!currentPlaylistId() &&
+			!playlistsLoading &&
+			playlistCount === 0
+		) {
 			return (
 				<RepertoireEmptyState
 					title="No current repertoire"
@@ -885,11 +933,11 @@ const PracticeIndex: Component = () => {
 		}
 
 		return (
-			<div class="flex items-center justify-center h-full">
-				<p class="text-gray-500 dark:text-gray-400">
-					Loading practice queue...
-				</p>
-			</div>
+			<GridStatusMessage
+				variant="loading"
+				title="Loading practice queue..."
+				description="Syncing your scheduled tunes."
+			/>
 		);
 	};
 
