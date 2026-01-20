@@ -29,14 +29,14 @@
             "request": "launch",
             "name": "Chrome Debug TuneTrees PWA App",
             "url": "http://localhost:5173/", // Adjust if your Vite app runs on a different port
-            "webRoot": "/Users/sboag/gittt/tunetrees", // Adjust if your source code is in a different directory
+            "webRoot": "${workspaceFolder}", // Adjust if your source code is in a different directory
             "sourceMaps": true
         },
         {
             "type": "node",
             "request": "launch",
             "name": "Open Playwright Chromium - Practice",
-            "cwd": "/Users/sboag/gittt/tunetrees",
+            "cwd": "${workspaceFolder}",
             "runtimeExecutable": "npx",
             "runtimeArgs": [
                 "playwright",
@@ -57,7 +57,7 @@
             "type": "node",
             "request": "launch",
             "name": "Run npm dev",
-            "cwd": "/Users/sboag/gittt/tunetrees",
+            "cwd": "${workspaceFolder}",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run",
@@ -76,7 +76,7 @@
             "type": "node",
             "request": "launch",
             "name": "Debug Worker (Wrangler dev)",
-            "cwd": "/Users/sboag/gittt/tunetrees/worker",
+            "cwd": "${workspaceFolder}/worker",
             "runtimeExecutable": "npx",
             "runtimeArgs": [
                 "wrangler",
@@ -99,7 +99,7 @@
             "type": "node",
             "request": "launch",
             "name": "Run npm migrate:production",
-            "cwd": "/Users/sboag/gittt/tunetrees",
+            "cwd": "${workspaceFolder}",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run",

@@ -20,6 +20,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { TunesGridScheduled } from "../../components/grids";
+import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../../components/grids/types";
 import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
@@ -33,7 +34,9 @@ import {
 import { RepertoireEmptyState } from "../../components/repertoire";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { getUserPlaylists } from "../../lib/db/queries/playlists";
 import { dailyPracticeQueue } from "../../lib/db/schema";
+import type { PlaylistWithSummary } from "../../lib/db/types";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
 import {
@@ -73,10 +76,17 @@ const PracticeIndex: Component = () => {
 		remoteSyncDownCompletionVersion,
 		initialSyncComplete,
 		syncPracticeScope,
+		repertoireListChanged,
 		incrementRepertoireListChanged,
 	} = useAuth();
 	const { currentPlaylistId } = useCurrentPlaylist();
 	const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
+	const playlistsVersion = createMemo(
+		() => `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`,
+	);
+	const [playlistsLoadedVersion, setPlaylistsLoadedVersion] = createSignal<
+		string | null
+	>(null);
 
 	// Get current user's local database ID from user_profile
 	const [userId] = createResource(
@@ -108,6 +118,34 @@ const PracticeIndex: Component = () => {
 			return result[0]?.id ?? null;
 		},
 	);
+
+	const [playlists] = createResource(
+		() => {
+			const db = localDb();
+			const currentUser = user();
+			const internalUserId = userId();
+			const version = playlistsVersion();
+
+			return db && currentUser && internalUserId
+				? { db, userId: currentUser.id, version }
+				: null;
+		},
+		async (params) => {
+			if (!params) return [] as PlaylistWithSummary[];
+			return getUserPlaylists(params.db, params.userId);
+		},
+	);
+
+	createEffect(() => {
+		if (!initialSyncComplete() || !user() || !localDb() || !userId()) {
+			setPlaylistsLoadedVersion(null);
+			return;
+		}
+
+		if (!playlists.loading && playlists() !== undefined) {
+			setPlaylistsLoadedVersion(playlistsVersion());
+		}
+	});
 
 	// Helper to get current user ID (for non-reactive contexts)
 	const getUserId = async (): Promise<string | null> => {
@@ -483,6 +521,14 @@ const PracticeIndex: Component = () => {
 		return filtered;
 	});
 
+	const practiceListLoading = () =>
+		practiceListData.loading || queueInitialized.loading;
+	const practiceListError = () =>
+		practiceListData.error ||
+		(queueInitialized() === false
+			? "Practice queue failed to initialize."
+			: undefined);
+
 	// Grid no longer provides a clear-evaluations callback; parent clears evaluations directly
 
 	// Handle recall evaluation changes (single source of truth)
@@ -737,8 +783,40 @@ const PracticeIndex: Component = () => {
 		}
 	};
 
-	const handlePracticeDateRefresh = () => {
+	const handlePracticeDateRefresh = async () => {
 		const practiceDate = getPracticeDate();
+		const db = localDb();
+		const playlistId = currentPlaylistId();
+
+		if (db && playlistId) {
+			const userId = await getUserId();
+			if (userId) {
+				const dayStart = new Date(practiceDate);
+				dayStart.setHours(0, 0, 0, 0);
+				const nextDay = new Date(dayStart);
+				nextDay.setDate(nextDay.getDate() + 1);
+
+				try {
+					await db
+						.delete(dailyPracticeQueue)
+						.where(
+							and(
+								eq(dailyPracticeQueue.userRef, userId),
+								eq(dailyPracticeQueue.playlistRef, playlistId),
+								gte(dailyPracticeQueue.windowStartUtc, dayStart.toISOString()),
+								lt(dailyPracticeQueue.windowStartUtc, nextDay.toISOString()),
+							),
+						)
+						.run();
+				} catch (error) {
+					console.warn(
+						"[PracticeIndex] Failed to clear queue before refresh:",
+						error,
+					);
+				}
+			}
+		}
+
 		setQueueDate(practiceDate);
 		setInitialPracticeDate(practiceDate);
 		localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
@@ -756,7 +834,7 @@ const PracticeIndex: Component = () => {
 		}
 
 		if (isQueueCompleted()) {
-			handlePracticeDateRefresh();
+			void handlePracticeDateRefresh();
 			return false;
 		}
 
@@ -826,7 +904,17 @@ const PracticeIndex: Component = () => {
 	};
 
 	const renderPracticeFallback = () => {
-		if (initialSyncComplete() && !currentPlaylistId()) {
+		const playlistsReady = playlistsLoadedVersion() === playlistsVersion();
+		const playlistsLoading =
+			!playlistsReady || playlists.loading || playlists() === undefined;
+		const playlistCount = playlists()?.length ?? 0;
+
+		if (
+			initialSyncComplete() &&
+			!currentPlaylistId() &&
+			!playlistsLoading &&
+			playlistCount === 0
+		) {
 			return (
 				<RepertoireEmptyState
 					title="No current repertoire"
@@ -845,11 +933,11 @@ const PracticeIndex: Component = () => {
 		}
 
 		return (
-			<div class="flex items-center justify-center h-full">
-				<p class="text-gray-500 dark:text-gray-400">
-					Loading practice queue...
-				</p>
-			</div>
+			<GridStatusMessage
+				variant="loading"
+				title="Loading practice queue..."
+				description="Syncing your scheduled tunes."
+			/>
 		);
 	};
 
@@ -916,6 +1004,8 @@ const PracticeIndex: Component = () => {
 							evaluations={evaluations()}
 							onTableInstanceChange={setTableInstance}
 							practiceListData={filteredPracticeList()}
+							isLoading={practiceListLoading()}
+							loadError={practiceListError()}
 						/>
 					</Show>
 				</Show>
