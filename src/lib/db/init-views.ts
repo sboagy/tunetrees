@@ -186,7 +186,7 @@ SELECT
   td.purpose,
   td.note_private,
   td.note_public,
-  COALESCE(td.recall_eval, CASE WHEN pr.quality=1 THEN 'again' WHEN pr.quality=2 THEN 'hard' WHEN pr.quality=3 THEN 'good' WHEN pr.quality=4 THEN 'easy' END) AS recall_eval,
+  td.recall_eval,
   (
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note

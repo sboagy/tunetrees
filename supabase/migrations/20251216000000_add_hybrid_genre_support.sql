@@ -105,7 +105,7 @@ AS SELECT tune.id,
     td.purpose,
     td.note_private,
     td.note_public,
-    COALESCE(td.recall_eval, CASE WHEN pr.quality=1 THEN 'again' WHEN pr.quality=2 THEN 'hard' WHEN pr.quality=3 THEN 'good' WHEN pr.quality=4 THEN 'easy' END) AS recall_eval,
+    td.recall_eval,
     ( SELECT string_agg(note.note_text, ' '::text) AS string_agg
            FROM note
           WHERE note.tune_ref = tune.id AND note.user_ref = playlist.user_ref) AS notes,
