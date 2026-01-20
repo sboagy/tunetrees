@@ -1986,7 +1986,6 @@ async function main(): Promise<void> {
     foreignKeys,
     tableComments,
     columnComments,
-    viewColumnComments,
   } = await introspect({ databaseUrl: args.databaseUrl, schema: args.schema });
 
   const next = buildSchemaTs({
