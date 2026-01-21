@@ -24,6 +24,7 @@ export interface TableMeta {
   hasDeletedFlag: boolean;
   changeCategory: ChangeCategory;
   normalize?: (row: Record<string, unknown>) => Record<string, unknown>;
+  columnDescriptions?: Record<string, string>;
 }
 
 export const SYNCABLE_TABLES = SYNCABLE_TABLES_GENERATED;
@@ -47,65 +48,325 @@ function normalizeDatetimeFields(row: Record<string, unknown>, fields: string[])
   return normalized;
 }
 
-const TABLE_EXTRAS: Record<SyncableTableName, Pick<TableMeta, "changeCategory" | "normalize">> = {
+const TABLE_EXTRAS: Record<SyncableTableName, Pick<TableMeta, "changeCategory" | "normalize" | "columnDescriptions">> = {
   "daily_practice_queue": {
     changeCategory: "practice",
     normalize: (row) => normalizeDatetimeFields(row, ["window_start_utc", "window_end_utc", "generated_at", "completed_at", "snapshot_coalesced_ts"]),
+    columnDescriptions: {
+  "acceptable_delinquency_window_snapshot": "Snapshot of delinquency window.",
+  "active": "Whether this queue entry is still active.",
+  "bucket": "Priority bucket (lower = higher priority).",
+  "completed_at": "Timestamp when queue entry was completed.",
+  "device_id": "Device that last modified this record.",
+  "exposures_completed": "Number of exposures completed so far.",
+  "exposures_required": "Number of exposures required for this queue item.",
+  "generated_at": "Timestamp when queue entry was generated.",
+  "id": "Primary key for the queue entry.",
+  "last_modified_at": "Timestamp of last modification.",
+  "latest_due_snapshot": "Snapshot of latest due date.",
+  "mode": "Practice mode (e.g., flashcard, listening).",
+  "order_index": "Order within the bucket.",
+  "outcome": "Outcome of the queue entry (pass/fail/skip).",
+  "playlist_ref": "Reference to the playlist.",
+  "queue_date": "Date this queue was generated for.",
+  "scheduled_snapshot": "Snapshot of scheduled time.",
+  "snapshot_coalesced_ts": "Timestamp when queue was coalesced.",
+  "sync_version": "Sync version for conflict resolution.",
+  "tune_ref": "Reference to the tune in queue.",
+  "tz_offset_minutes_snapshot": "Snapshot of user timezone offset.",
+  "user_ref": "User ID who owns this queue entry.",
+  "window_end_utc": "End of practice window (UTC).",
+  "window_start_utc": "Start of practice window (UTC)."
+},
   },
   "genre": {
     changeCategory: "catalog",
+    columnDescriptions: {
+  "description": "Description of the genre.",
+  "id": "Primary key (genre identifier).",
+  "name": "Genre name.",
+  "region": "Geographic region associated with the genre."
+},
   },
   "genre_tune_type": {
     changeCategory: "catalog",
+    columnDescriptions: {
+  "genre_id": "Reference to the genre.",
+  "tune_type_id": "Reference to the tune type."
+},
   },
   "instrument": {
     changeCategory: "catalog",
+    columnDescriptions: {
+  "deleted": "Soft-delete flag for the instrument.",
+  "description": "Description of the instrument.",
+  "device_id": "Device that last modified this record.",
+  "genre_default": "Default genre associated with this instrument.",
+  "id": "Primary key for the instrument.",
+  "instrument": "Instrument name.",
+  "last_modified_at": "Timestamp of last modification.",
+  "private_to_user": "User ID if this is a private instrument (null = public).",
+  "sync_version": "Sync version for conflict resolution."
+},
   },
   "note": {
     changeCategory: "repertoire",
+    columnDescriptions: {
+  "created_date": "Timestamp when the note was created.",
+  "deleted": "Soft-delete flag for the note.",
+  "device_id": "Device that last modified this record.",
+  "display_order": "User-defined display order for drag-and-drop reordering in the UI",
+  "favorite": "Whether this is marked as a favorite note.",
+  "id": "Primary key for the note.",
+  "last_modified_at": "Timestamp of last modification.",
+  "note_text": "Text content of the note.",
+  "playlist_ref": "Reference to the playlist (optional).",
+  "public": "Whether the note is public (true) or private (false).",
+  "sync_version": "Sync version for conflict resolution.",
+  "tune_ref": "Reference to the tune.",
+  "user_ref": "User ID who created this note."
+},
   },
   "playlist": {
     changeCategory: "repertoire",
+    columnDescriptions: {
+  "deleted": "Soft-delete flag for the playlist.",
+  "device_id": "Device that last modified this record.",
+  "genre_default": "Default genre filter for this playlist.",
+  "instrument_ref": "Reference to the instrument for this playlist.",
+  "last_modified_at": "Timestamp of last modification.",
+  "name": "Name of the playlist (repertoire).",
+  "playlist_id": "Primary key for the playlist.",
+  "sr_alg_type": "Spaced repetition algorithm type (SM2/FSRS).",
+  "sync_version": "Sync version for conflict resolution.",
+  "user_ref": "User ID who owns this playlist."
+},
   },
   "playlist_tune": {
     changeCategory: "repertoire",
+    columnDescriptions: {
+  "current": "Timestamp when added to current learnings.",
+  "deleted": "Soft-delete flag for this playlist entry.",
+  "device_id": "Device that last modified this record.",
+  "goal": "Practice goal (recall/sight_read/technique).",
+  "last_modified_at": "Timestamp of last modification.",
+  "learned": "Timestamp when marked as fully learned.",
+  "playlist_ref": "Reference to the playlist.",
+  "scheduled": "Manual schedule override for next review.",
+  "sync_version": "Sync version for conflict resolution.",
+  "tune_ref": "Reference to the tune."
+},
   },
   "practice_record": {
     changeCategory: "practice",
     normalize: (row) => normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]),
+    columnDescriptions: {
+  "backup_practiced": "Backup timestamp (pre-update stored value).",
+  "device_id": "Device that last modified this record.",
+  "difficulty": "Difficulty rating for FSRS scheduling.",
+  "due": "Due date for next review.",
+  "easiness": "Easiness factor (SM2) or retention value (FSRS).",
+  "elapsed_days": "Days since previous review.",
+  "goal": "Practice goal for this record.",
+  "id": "Primary key for the practice record.",
+  "interval": "Days until next review (interval).",
+  "lapses": "Number of times forgotten (lapses).",
+  "last_modified_at": "Timestamp of last modification.",
+  "playlist_ref": "Reference to the playlist.",
+  "practiced": "Timestamp when the tune was practiced.",
+  "quality": "Quality rating (0-5) for this practice session.",
+  "repetitions": "Total number of repetitions completed.",
+  "stability": "Memory stability value from spaced repetition algorithm.",
+  "state": "Scheduler state (0=new, 1=learning, 2=review, 3=relearning).",
+  "step": "Current learning step.",
+  "sync_version": "Sync version for conflict resolution.",
+  "technique": "Technique note for this practice session.",
+  "tune_ref": "Reference to the tune practiced."
+},
   },
   "prefs_scheduling_options": {
     changeCategory: "user",
+    columnDescriptions: {
+  "acceptable_delinquency_window": "Days allowed before tune is considered delinquent.",
+  "auto_schedule_new": "Include never-practiced tunes in daily practice queue (Q3 bucket). Default: true",
+  "days_per_week": "Number of days per week to practice.",
+  "device_id": "Device that last modified this record.",
+  "exceptions": "Schedule exceptions/off-days (JSON format).",
+  "last_modified_at": "Timestamp of last modification.",
+  "max_reviews_per_day": "Maximum reviews per day cap.",
+  "min_reviews_per_day": "Minimum reviews per day target.",
+  "sync_version": "Sync version for conflict resolution.",
+  "user_id": "User ID who owns these preferences.",
+  "weekly_rules": "Weekly scheduling rules (JSON format)."
+},
   },
   "prefs_spaced_repetition": {
     changeCategory: "user",
+    columnDescriptions: {
+  "alg_type": "Algorithm type (SM2 or FSRS).",
+  "device_id": "Device that last modified this record.",
+  "enable_fuzzing": "Whether to enable interval fuzzing.",
+  "fsrs_weights": "FSRS algorithm weights (JSON format).",
+  "last_modified_at": "Timestamp of last modification.",
+  "learning_steps": "Learning steps configuration (JSON format).",
+  "maximum_interval": "Maximum interval in days.",
+  "relearning_steps": "Relearning steps configuration (JSON format).",
+  "request_retention": "Target retention rate (FSRS).",
+  "sync_version": "Sync version for conflict resolution.",
+  "user_id": "User ID who owns these preferences."
+},
   },
   "reference": {
     changeCategory: "repertoire",
+    columnDescriptions: {
+  "comment": "Optional comment about the reference.",
+  "deleted": "Soft-delete flag for the reference.",
+  "device_id": "Device that last modified this record.",
+  "display_order": "User-defined display order for drag-and-drop reordering in the UI",
+  "favorite": "Whether this is marked as a favorite reference.",
+  "id": "Primary key for the reference.",
+  "last_modified_at": "Timestamp of last modification.",
+  "public": "Whether the reference is public.",
+  "ref_type": "Type of reference (website/audio/video).",
+  "sync_version": "Sync version for conflict resolution.",
+  "title": "Title/label for the reference.",
+  "tune_ref": "Reference to the tune.",
+  "url": "URL of the reference.",
+  "user_ref": "User ID who created this reference."
+},
   },
   "tab_group_main_state": {
     changeCategory: null,
+    columnDescriptions: {
+  "device_id": "Device that last modified this record.",
+  "id": "Primary key for this state record.",
+  "last_modified_at": "Timestamp of last modification.",
+  "playlist_id": "Currently selected playlist.",
+  "practice_mode_flashcard": "Whether practice mode is flashcard (1) or list (0).",
+  "practice_show_submitted": "Whether to show submitted items in practice view.",
+  "sidebar_dock_position": "Sidebar position (left/right/hidden).",
+  "sync_version": "Sync version for conflict resolution.",
+  "tab_spec": "Additional tab specification.",
+  "user_id": "User ID who owns this state.",
+  "which_tab": "Currently selected main tab (practice/repertoire/catalog/analysis)."
+},
   },
   "table_state": {
     changeCategory: null,
+    columnDescriptions: {
+  "current_tune": "Currently selected tune ID.",
+  "device_id": "Device that last modified this record.",
+  "last_modified_at": "Timestamp of last modification.",
+  "playlist_id": "Reference to the playlist.",
+  "purpose": "Purpose/view this state applies to (practice/repertoire/catalog/analysis).",
+  "screen_size": "Screen size category (small/full).",
+  "settings": "Table settings (column order, sorting, filters) in JSON format.",
+  "sync_version": "Sync version for conflict resolution.",
+  "user_id": "User ID who owns this table state."
+},
   },
   "table_transient_data": {
     changeCategory: "practice",
+    columnDescriptions: {
+  "backup_practiced": "Backup practiced timestamp.",
+  "device_id": "Device that last modified this record.",
+  "difficulty": "Difficulty rating (staged).",
+  "due": "Next due date (staged).",
+  "easiness": "Easiness factor (staged).",
+  "goal": "Practice goal (staged).",
+  "interval": "Interval (staged).",
+  "last_modified_at": "Timestamp of last modification.",
+  "note_private": "Private practice note (not synced to others).",
+  "note_public": "Public practice note (shared).",
+  "playlist_id": "Reference to the playlist.",
+  "practiced": "Timestamp when practiced (staged).",
+  "purpose": "Purpose/context of this staged data.",
+  "quality": "Quality rating (staged).",
+  "recall_eval": "Recall evaluation selection.",
+  "repetitions": "Repetitions count (staged).",
+  "stability": "Memory stability (staged).",
+  "state": "Scheduler state (staged).",
+  "step": "Learning step (staged).",
+  "sync_version": "Sync version for conflict resolution.",
+  "technique": "Technique note (staged).",
+  "tune_id": "Reference to the tune.",
+  "user_id": "User ID who owns this transient data."
+},
   },
   "tag": {
     changeCategory: "repertoire",
+    columnDescriptions: {
+  "device_id": "Device that last modified this record.",
+  "last_modified_at": "Timestamp of last modification.",
+  "sync_version": "Sync version for conflict resolution.",
+  "tag_id": "Primary key for the tag.",
+  "tag_text": "Text content of the tag.",
+  "tune_ref": "Reference to the tune.",
+  "user_ref": "User ID who owns this tag."
+},
   },
   "tune": {
     changeCategory: "catalog",
+    columnDescriptions: {
+  "artist": "Artist name for pop/rock/jazz tunes.",
+  "composer": "Composer name for classical/choral tunes.",
+  "deleted": "Soft-delete flag for the tune.",
+  "genre": "Genre identifier assigned to the tune.",
+  "id": "Primary key for the tune.",
+  "id_foreign": "External tune identifier (e.g. irishtune.info, Spotify).",
+  "incipit": "Opening notes or incipit text.",
+  "mode": "Musical mode of the tune.",
+  "private_for": "User profile ID if the tune is private.",
+  "release_year": "Release year for the recording or tune.",
+  "structure": "Tune structure shorthand (e.g. AABB).",
+  "title": "Tune title as displayed in the UI.",
+  "type": "Tune type classification (reel, jig, etc.) used in filtering."
+},
   },
   "tune_override": {
     changeCategory: "repertoire",
+    columnDescriptions: {
+  "deleted": "Soft-delete flag for the override.",
+  "device_id": "Device that last modified this record.",
+  "genre": "User-specific genre override.",
+  "id": "Primary key for the override record.",
+  "incipit": "User-specific incipit override.",
+  "last_modified_at": "Timestamp of last modification.",
+  "mode": "User-specific mode override.",
+  "structure": "User-specific tune structure override.",
+  "sync_version": "Sync version for conflict resolution.",
+  "title": "User-specific tune title override.",
+  "tune_ref": "Reference to the tune being overridden.",
+  "type": "User-specific tune type override.",
+  "user_ref": "User ID who owns this override."
+},
   },
   "tune_type": {
     changeCategory: "catalog",
+    columnDescriptions: {
+  "description": "Description of the tune type.",
+  "id": "Primary key (tune type identifier).",
+  "name": "Tune type name (reel, jig, hornpipe, etc.).",
+  "rhythm": "Rhythmic pattern of the tune type."
+},
   },
   "user_profile": {
     changeCategory: "user",
+    columnDescriptions: {
+  "acceptable_delinquency_window": "User default delinquency window in days.",
+  "avatar_url": "URL to user avatar/profile picture.",
+  "deleted": "Soft-delete flag for the user profile.",
+  "device_id": "Device that last modified this record.",
+  "email": "User email address.",
+  "id": "Primary key for the user profile.",
+  "last_modified_at": "Timestamp of last modification.",
+  "name": "User display name.",
+  "phone": "User phone number.",
+  "phone_verified": "Timestamp when phone was verified.",
+  "sr_alg_type": "Preferred spaced repetition algorithm (SM2/FSRS).",
+  "supabase_user_id": "Reference to Supabase auth user ID.",
+  "sync_version": "Sync version for conflict resolution."
+},
   },
 };
 

@@ -137,12 +137,10 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
       );
     };
 
-    // Click on title column header to sort
-    const titleHeader = page.locator(
-      '[data-testid="tunes-grid-repertoire"] thead th:has-text("Title")'
-    );
+    // Click on title column sort control to sort
+    const titleSortButton = page.getByTestId("column-sort-title");
     const titlesBefore = await getTitles();
-    await titleHeader.locator("button").first().click();
+    await titleSortButton.click();
     await expect
       .poll(async () => getTitles(), {
         timeout: 10_000,
@@ -162,7 +160,7 @@ test.describe("OFFLINE-002: Repertoire Tab Offline CRUD", () => {
     await goOnline(page);
 
     // Verify sorting still works after going online (toggle to ascending)
-    await titleHeader.locator("button").first().click();
+    await titleSortButton.click();
     await expect
       .poll(async () => getTitles(), {
         timeout: 10_000,
