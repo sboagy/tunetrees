@@ -12,7 +12,7 @@ import {
   type VisibilityState,
 } from "@tanstack/solid-table";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { GripVertical } from "lucide-solid";
+import { GripVertical, Info } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -23,6 +23,8 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   CELL_CLASSES,
   CONTAINER_CLASSES,
@@ -64,11 +66,16 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   enableColumnReorder?: boolean;
   // Enable/disable row selection (default true)
   enableRowSelection?: boolean;
+  // Optional map of column descriptions to show in header popovers
+  columnDescriptions?: Partial<Record<string, string>>;
 }
 
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const [openPopover, setOpenPopover] = createSignal<string | null>(null);
+  let popoverRef: HTMLDivElement | undefined;
+  useClickOutside(() => popoverRef, () => setOpenPopover(null));
   const collectColumnIds = (
     cols: ColumnDef<T, unknown>[]
   ): ReadonlySet<string> => {
@@ -570,13 +577,58 @@ export const TunesGrid = (<T extends { id: string | number }>(
                           )
                         }
                       >
-                        <div class="flex items-center gap-0 justify-between">
+                        <div class="flex items-center gap-1 justify-between">
                           <span class="flex items-center gap-1 flex-1 min-w-0">
                             {flexRender(
                               header.column.columnDef.header,
                               header.getContext()
                             )}
                           </span>
+                          <Show
+                            when={
+                              !!props.columnDescriptions?.[header.column.id]
+                            }
+                          >
+                            <Popover
+                              open={openPopover() === header.column.id}
+                              onOpenChange={(isOpen) =>
+                                setOpenPopover(
+                                  isOpen ? header.column.id : null
+                                )
+                              }
+                            >
+                              <PopoverTrigger
+                                as="button"
+                                type="button"
+                                class="flex-shrink-0 inline-flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                                aria-label={`About ${header.column.columnDef.header as string}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setOpenPopover((current) =>
+                                    current === header.column.id
+                                      ? null
+                                      : header.column.id
+                                  );
+                                }}
+                              >
+                                <Info size={14} />
+                                <span class="sr-only">
+                                  {`About ${header.column.columnDef.header as string}`}
+                                </span>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                ref={(el: HTMLDivElement) => {
+                                  popoverRef = el;
+                                }}
+                                onClick={(event: MouseEvent) =>
+                                  event.stopPropagation()
+                                }
+                                data-testid={`column-info-${header.column.id}`}
+                              >
+                                {props.columnDescriptions?.[header.column.id]}
+                              </PopoverContent>
+                            </Popover>
+                          </Show>
                           <Show
                             when={
                               !!props.enableColumnReorder &&

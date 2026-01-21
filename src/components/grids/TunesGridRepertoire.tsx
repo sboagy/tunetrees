@@ -20,6 +20,7 @@ import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPlaylistTunesStaged } from "../../lib/db/queries/playlists";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
+import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
@@ -140,6 +141,17 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const loadError = createMemo(() => playlistTunesData.error);
   const hasTunes = createMemo(() => filteredTunes().length > 0);
 
+  const [columnDescriptions] = createResource(
+    () => {
+      const db = localDb();
+      return db ? { db } : null;
+    },
+    async (params) => {
+      if (!params) return {};
+      return await getViewColumnDescriptions(params.db, "practice_list_staged");
+    }
+  );
+
   return (
     <div class="h-full flex flex-col">
       {/* Error */}
@@ -170,6 +182,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             userId={props.userId}
             playlistId={currentPlaylistId() || undefined}
             data={filteredTunes()}
+            columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}
             enableColumnReorder={true}
             onRowClick={(row) => handleRowClick(row as Tune)}
