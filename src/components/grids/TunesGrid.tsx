@@ -675,6 +675,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
 																class="flex-shrink-0 inline-flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
 																aria-label={sortLabel()}
 																title={sortLabel()}
+																data-testid={`column-sort-${header.column.id}`}
 																onClick={(event) => {
 																	event.stopPropagation();
 																	header.column.toggleSorting();
