@@ -8,17 +8,6 @@
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sqliteSyncColumns } from "./sync-columns";
 
-export const viewColumnMeta = sqliteTable("view_column_meta", {
-  viewName: text("view_name").notNull(),
-  columnName: text("column_name").notNull(),
-  description: text("description").notNull(),
-}
-, (t) => [
-  primaryKey({ columns: [t.viewName, t.columnName] }),
-  index("idx_view_column_meta_view").on(t.viewName),
-]
-);
-
 export const dailyPracticeQueue = sqliteTable("daily_practice_queue", {
   id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref").notNull(),
@@ -129,6 +118,25 @@ export const playlistTune = sqliteTable("playlist_tune", {
 }
 , (t) => [
   primaryKey({ columns: [t.playlistRef, t.tuneRef] }),
+]
+);
+
+export const plugin = sqliteTable("plugin", {
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userRef: text("user_ref").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  script: text("script").notNull(),
+  capabilities: text("capabilities").notNull(),
+  isPublic: integer("is_public").notNull().default(0),
+  enabled: integer("enabled").notNull().default(1),
+  version: integer("version").notNull().default(1),
+  deleted: integer("deleted").notNull().default(0),
+  ...sqliteSyncColumns,
+}
+, (t) => [
+  index("idx_plugin_public").on(t.isPublic),
+  index("idx_plugin_user_ref").on(t.userRef),
 ]
 );
 

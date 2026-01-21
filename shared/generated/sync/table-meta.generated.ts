@@ -12,6 +12,7 @@ export interface TableMetaCore {
   booleanColumns: string[];
   supportsIncremental: boolean;
   hasDeletedFlag: boolean;
+  columnDescriptions?: Record<string, string>;
 }
 
 export const SYNCABLE_TABLES = [
@@ -22,6 +23,7 @@ export const SYNCABLE_TABLES = [
   "note",
   "playlist",
   "playlist_tune",
+  "plugin",
   "practice_record",
   "prefs_scheduling_options",
   "prefs_spaced_repetition",
@@ -78,6 +80,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     booleanColumns: ["public", "favorite", "deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    columnDescriptions: {
+  "display_order": "User-defined display order for drag-and-drop reordering in the UI"
+},
   },
   "playlist": {
     primaryKey: "playlist_id",
@@ -92,6 +97,14 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     uniqueKeys: ["playlist_ref", "tune_ref"],
     timestamps: ["current", "learned", "scheduled", "last_modified_at"],
     booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+  },
+  "plugin": {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["is_public", "enabled", "deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
   },
@@ -110,6 +123,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     booleanColumns: ["auto_schedule_new"],
     supportsIncremental: true,
     hasDeletedFlag: false,
+    columnDescriptions: {
+  "auto_schedule_new": "Include never-practiced tunes in daily practice queue (Q3 bucket). Default: true"
+},
   },
   "prefs_spaced_repetition": {
     primaryKey: ["user_id", "alg_type"],
@@ -126,6 +142,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     booleanColumns: ["public", "favorite", "deleted"],
     supportsIncremental: true,
     hasDeletedFlag: true,
+    columnDescriptions: {
+  "display_order": "User-defined display order for drag-and-drop reordering in the UI"
+},
   },
   "tab_group_main_state": {
     primaryKey: "id",
