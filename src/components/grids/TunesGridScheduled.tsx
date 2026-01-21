@@ -12,19 +12,21 @@ import {
   type Component,
   createEffect,
   createMemo,
+  createResource,
   createSignal,
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
+import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // No direct staging here; parent handles DB side-effects.
-  useAuth(); // keep hook call if auth context side-effects are desired; otherwise remove entirely.
+  const { localDb } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -116,6 +118,17 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const loadError = createMemo(() => props.loadError);
   const hasTunes = createMemo(() => tunes().length > 0);
 
+  const [columnDescriptions] = createResource(
+    () => {
+      const db = localDb();
+      return db ? { db } : null;
+    },
+    async (params) => {
+      if (!params) return {};
+      return await getViewColumnDescriptions(params.db, "practice_list_staged");
+    }
+  );
+
   return (
     <div class="h-full flex flex-col">
       {/* Show grid when data is available */}
@@ -154,6 +167,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           userId={props.userId}
           playlistId={currentPlaylistId() || undefined}
           data={tunes()}
+          columnDescriptions={columnDescriptions()}
           currentRowId={currentTuneId() || undefined}
           enableColumnReorder={true}
           enableRowSelection={false}

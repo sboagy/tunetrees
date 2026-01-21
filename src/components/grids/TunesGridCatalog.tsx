@@ -28,6 +28,7 @@ import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPlaylistTunes } from "../../lib/db/queries/playlists";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
+import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
 import { GridStatusMessage } from "./GridStatusMessage";
@@ -193,6 +194,17 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     });
   });
 
+  const [columnDescriptions] = createResource(
+    () => {
+      const db = localDb();
+      return db ? { db } : null;
+    },
+    async (params) => {
+      if (!params) return {};
+      return await getViewColumnDescriptions(params.db, "practice_list_staged");
+    }
+  );
+
   // Columns are derived inside TunesGrid via getColumns("catalog")
 
   // Table instance will be provided by TunesGrid via onTableReady
@@ -257,13 +269,14 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
         }
       >
         <div class="flex-1 overflow-hidden">
-          <TunesGrid
-            tablePurpose="catalog"
-            userId={props.userId}
-            playlistId={currentPlaylistId() || undefined}
-            data={filteredTunes()}
-            currentRowId={currentTuneId() || undefined}
-            enableColumnReorder={true}
+        <TunesGrid
+          tablePurpose="catalog"
+          userId={props.userId}
+          playlistId={currentPlaylistId() || undefined}
+          data={filteredTunes()}
+          columnDescriptions={columnDescriptions()}
+          currentRowId={currentTuneId() || undefined}
+          enableColumnReorder={true}
             onRowClick={(row) => handleRowClick(row as Tune)}
             onRowDoubleClick={(row) => handleRowDoubleClick(row as Tune)}
             columnVisibility={columnVisibility()}

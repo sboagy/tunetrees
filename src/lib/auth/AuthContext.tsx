@@ -108,7 +108,9 @@ interface AuthState {
   ) => Promise<{ error: AuthError | null }>;
 
   /** Sign in anonymously (local-only, no account) */
-  signInAnonymously: () => Promise<{ error: Error | null }>;
+  signInAnonymously: (
+    injectedUserId?: string
+  ) => Promise<{ error: Error | null }>;
 
   /** Convert anonymous user to registered account */
   convertAnonymousToRegistered: (
@@ -1330,7 +1332,17 @@ export const AuthProvider: ParentComponent = (props) => {
    * If user previously signed out as anonymous, restores their session
    * instead of creating a new anonymous user (preserves their data)
    */
-  const signInAnonymously = async () => {
+  const signInAnonymously = async (injectedUserId?: string) => {
+    if (injectedUserId) {
+      setLoading(true);
+      diagLog("🔐 Anonymous sign-in (injected user id)");
+      await initializeAnonymousDatabase(injectedUserId);
+      setIsAnonymous(true);
+      setUserIdInt(injectedUserId);
+      setLoading(false);
+      return { error: null };
+    }
+
     setLoading(true);
     diagLog("🔐 Anonymous sign-in attempt (Supabase native)");
 

@@ -9,6 +9,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import {
   clearDb,
   getDb,
+  getSqliteInstance,
   initializeDb,
   type SqliteDatabase,
 } from "@/lib/db/client-sqlite";
@@ -557,6 +558,72 @@ async function getTunesByTitles(titles: string[]) {
   `);
   return rows;
 }
+
+async function seedSampleCatalogRow() {
+  const now = new Date().toISOString();
+  const rawDb = await getSqliteInstance();
+  if (!rawDb) {
+    throw new Error("SQLite instance not available for seed");
+  }
+  // Ensure genre exists to satisfy FK.
+  rawDb.run(
+    "INSERT OR IGNORE INTO genre (id, name, region, description) VALUES (?, ?, ?, ?)",
+    ["itrad", "Irish Traditional", "Ireland", "Traditional Irish music genre"]
+  );
+  rawDb.run(
+    "INSERT OR IGNORE INTO user_profile (id, supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      "test-user-id",
+      "test-user-id",
+      "Test User",
+      null,
+      "fsrs",
+      0,
+      1,
+      now,
+      "local",
+    ]
+  );
+  rawDb.run(
+    `INSERT OR REPLACE INTO tune (
+      id,
+      title,
+      type,
+      structure,
+      mode,
+      incipit,
+      genre,
+      composer,
+      artist,
+      id_foreign,
+      release_year,
+      private_for,
+      primary_origin,
+      deleted,
+      sync_version,
+      last_modified_at,
+      device_id
+    ) VALUES (
+      '${generateId()}',
+      'Sample Reel',
+      'Reel',
+      'AABB',
+      'Dmix',
+      'd2 dA',
+      'itrad',
+      'Traditional',
+      'Session',
+      '12345',
+      2020,
+      NULL,
+      'irishtune.info',
+      0,
+      1,
+      '${now}',
+      'local'
+    )`
+  );
+}
 /**
  * Get count of pending sync outbox items
  * Used by offline tests to verify sync state
@@ -696,6 +763,7 @@ declare global {
         }>
       >;
       getQueueWindows: (playlistId: string) => Promise<string[]>;
+      seedSampleCatalogRow: () => Promise<void>;
       // New query functions for scheduling tests
       getPracticeRecords: (tuneIds: string[]) => Promise<
         Array<{
@@ -976,6 +1044,9 @@ if (typeof window !== "undefined") {
           ORDER BY window_start_utc DESC
         `);
         return rows.map((r) => r.window_start_utc);
+      },
+      seedSampleCatalogRow: async () => {
+        await seedSampleCatalogRow();
       },
       getSyncVersion: () => {
         // Access the sync version from AuthContext

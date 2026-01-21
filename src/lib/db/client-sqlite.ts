@@ -18,6 +18,7 @@ import initSqlJs from "sql.js";
 import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as schema from "../../../drizzle/schema-sqlite";
 import { initializeViews, recreateViews } from "./init-views";
+import { initializeViewColumnMeta } from "./init-view-column-meta";
 import {
   createSyncPushQueueTable,
   installSyncTriggers,
@@ -411,6 +412,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
           "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
           "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
+          "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
@@ -441,6 +443,7 @@ export async function initializeDb(
       }
 
       await initializeViews(drizzleDb);
+      await initializeViewColumnMeta(drizzleDb);
       ensureNotCleared();
       try {
         ensureColumnExists("user_profile", "avatar_url", "avatar_url text");
@@ -482,6 +485,17 @@ export async function initializeDb(
           "tune_override",
           "release_year",
           "release_year integer"
+        );
+        requireSqliteDb().run(`
+          CREATE TABLE IF NOT EXISTS view_column_meta (
+            view_name TEXT NOT NULL,
+            column_name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            PRIMARY KEY (view_name, column_name)
+          )
+        `);
+        requireSqliteDb().run(
+          "CREATE INDEX IF NOT EXISTS idx_view_column_meta_view ON view_column_meta(view_name)"
         );
       } catch (err) {
         console.warn("⚠️ Column ensure check failed:", err);
