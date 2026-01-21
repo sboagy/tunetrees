@@ -64,3 +64,7 @@ Then:
 - `src/components/grids/TunesGridScheduled.tsx`
 - `supabase/migrations/20260120000000_add_description_comments.sql`
 - `drizzle/migrations/sqlite/0009_add_view_column_meta.sql`
+
+## Status
+
+Done
