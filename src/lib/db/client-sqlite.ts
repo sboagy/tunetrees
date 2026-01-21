@@ -150,7 +150,7 @@ const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-const CURRENT_DB_VERSION = 7;
+const CURRENT_DB_VERSION = 8;
 
 // Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -411,6 +411,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
           "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
           "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
+          "/drizzle/migrations/sqlite/0009_add_plugins.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });

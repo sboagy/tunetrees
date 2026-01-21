@@ -40,6 +40,7 @@ docs/
 - [Setup Guide](development/setup.md) - Set up your development environment
 - [Architecture](development/architecture.md) - Understand the system design
 - [Database](development/database.md) - Database schema and sync architecture
+- [Extensibility Proposals](development/extensibility.md) - Import + scheduling extension options
 - [Testing](development/testing.md) - Run and write tests
 - [Deployment](development/deployment.md) - Deploy to production
 - [Sync Diagnostics](development/setup.md) - Enable `VITE_SYNC_DIAGNOSTICS` and optional worker `SYNC_DIAGNOSTICS`
@@ -53,4 +54,3 @@ docs/
 
 **Project:** [TuneTrees on GitHub](https://github.com/sboagy/tunetrees)  
 **Live App:** [tunetrees.com](https://tunetrees.com)
-
