@@ -107,6 +107,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
   function getConflictTarget(tableName: string): string[] {
     const meta = TABLE_REGISTRY[tableName];
     if (!meta) throw new Error(`Unknown table: ${tableName}`);
+    if (tableName === "user_profile") return ["supabase_user_id"];
     if (meta.uniqueKeys) return meta.uniqueKeys;
     return Array.isArray(meta.primaryKey) ? meta.primaryKey : [meta.primaryKey];
   }
@@ -146,6 +147,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     const collections = getWorkerConfig().collections ?? {};
     const result: Record<string, Set<string>> = {};
 
+    // Load user collections (playlists, etc.)
     for (const [name, cfg] of Object.entries(collections)) {
       const table = params.tables[cfg.table];
       if (!table) {
@@ -174,6 +176,29 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
       result[name] = new Set(rows.map((r: any) => String(r.id)));
     }
 
+    // Load user's selected genres for catalog filtering
+    const userGenreSelectionTable = params.tables.userGenreSelection;
+    if (userGenreSelectionTable) {
+      try {
+        const genreRows = await params.tx
+          .select({ genreId: userGenreSelectionTable.genreId })
+          .from(userGenreSelectionTable)
+          .where(eq(userGenreSelectionTable.userId, params.userId));
+
+        const selectedGenreIds = genreRows.map((r: any) => String(r.genreId));
+        result.selectedGenres = new Set(selectedGenreIds);
+
+        console.log(
+          `[SYNC] Loaded ${selectedGenreIds.length} selected genres for user ${params.userId}`
+        );
+      } catch (error) {
+        console.warn("[SYNC] Failed to load user genre selection:", error);
+        result.selectedGenres = new Set();
+      }
+    } else {
+      result.selectedGenres = new Set();
+    }
+
     return result;
   }
 
@@ -184,6 +209,50 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     collections: Record<string, Set<string>>;
   }): unknown[] | null {
     const conditions: unknown[] = [];
+
+    // Apply genre filtering for catalog tables
+    const selectedGenres = params.collections.selectedGenres;
+    const isCatalogTable = ["genre", "tune", "tune_type", "genre_tune_type"].includes(
+      params.tableName
+    );
+
+    if (isCatalogTable && selectedGenres && selectedGenres.size > 0) {
+      const genreIds = Array.from(selectedGenres);
+
+      if (params.tableName === "genre") {
+        // Filter genre table to only selected genres
+        if (params.table.id) {
+          conditions.push(inArray(params.table.id, genreIds));
+          return conditions;
+        }
+      } else if (params.tableName === "tune") {
+        // Filter tune table to only tunes with selected genres
+        if (params.table.genre) {
+          conditions.push(inArray(params.table.genre, genreIds));
+          // Also include user's private tunes regardless of genre
+          if (params.table.privateFor) {
+            return [
+              or(
+                inArray(params.table.genre, genreIds),
+                eq(params.table.privateFor, params.userId)
+              )
+            ];
+          }
+          return conditions;
+        }
+      } else if (params.tableName === "genre_tune_type") {
+        // Filter junction table to only selected genres
+        if (params.table.genreId) {
+          conditions.push(inArray(params.table.genreId, genreIds));
+          return conditions;
+        }
+      } else if (params.tableName === "tune_type") {
+        // For tune_type, we need to filter based on genre_tune_type junction
+        // This is more complex - for now, we'll allow all tune types
+        // Future: could query genre_tune_type and filter tune_type accordingly
+        return [];
+      }
+    }
 
     const rule = getPullRule(params.tableName);
     if (rule) {

@@ -17,8 +17,8 @@ import initSqlJs from "sql.js";
 // eslint-disable-next-line import/no-unresolved
 import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as schema from "../../../drizzle/schema-sqlite";
-import { initializeViews, recreateViews } from "./init-views";
 import { initializeViewColumnMeta } from "./init-view-column-meta";
+import { initializeViews, recreateViews } from "./init-views";
 import {
   createSyncPushQueueTable,
   installSyncTriggers,
@@ -496,6 +496,44 @@ export async function initializeDb(
         `);
         requireSqliteDb().run(
           "CREATE INDEX IF NOT EXISTS idx_view_column_meta_view ON view_column_meta(view_name)"
+        );
+
+        requireSqliteDb().run(`
+          CREATE TABLE IF NOT EXISTS user_genre_selection (
+            user_id TEXT NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
+            genre_id TEXT NOT NULL REFERENCES genre(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            sync_version INTEGER NOT NULL DEFAULT 1,
+            device_id TEXT,
+            PRIMARY KEY (user_id, genre_id)
+          )
+        `);
+        requireSqliteDb().run(
+          "CREATE INDEX IF NOT EXISTS idx_user_genre_selection_user_id ON user_genre_selection(user_id)"
+        );
+        requireSqliteDb().run(
+          "CREATE INDEX IF NOT EXISTS idx_user_genre_selection_genre_id ON user_genre_selection(genre_id)"
+        );
+        ensureColumnExists(
+          "user_genre_selection",
+          "created_at",
+          "created_at text not null default CURRENT_TIMESTAMP"
+        );
+        ensureColumnExists(
+          "user_genre_selection",
+          "last_modified_at",
+          "last_modified_at text not null default CURRENT_TIMESTAMP"
+        );
+        ensureColumnExists(
+          "user_genre_selection",
+          "sync_version",
+          "sync_version integer not null default 1"
+        );
+        ensureColumnExists(
+          "user_genre_selection",
+          "device_id",
+          "device_id text"
         );
       } catch (err) {
         console.warn("⚠️ Column ensure check failed:", err);

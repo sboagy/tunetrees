@@ -26,6 +26,10 @@ const sidebarNavItems: SidebarNavItem[] = [
     href: "/user-settings/appearance",
   },
   {
+    title: "Catalog & Sync",
+    href: "/user-settings/catalog-sync",
+  },
+  {
     title: "Scheduling Options",
     href: "/user-settings/scheduling-options",
   },

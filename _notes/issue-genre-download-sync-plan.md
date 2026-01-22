@@ -57,7 +57,7 @@ Create a reusable `GenreMultiSelect` component:
   - `upsertUserGenreSelection(db, userId, genreIds)`
   - `clearUserGenreSelection(db, userId)` (if empty selection should revert to all)
 - **Defaults**:
-  - If no selection exists, treat as “all genres” for backward compatibility.
+  - If no selection exists, treat as “all genres” for backward compatibility.  (Note this behavior is likely to be changed, once the lead dev has a better idea of the UI flow).
 
 ## Catalog & Search
 - Update `getTunesForUser` (or the catalog query layer) to accept a `genreIds` filter.
@@ -65,6 +65,7 @@ Create a reusable `GenreMultiSelect` component:
 - Ensure `CatalogToolbar` still shows full filter options *within* the selected genres.
 
 ## Sync / Download Changes
+- **Delay catalog sync/download**: When onboarding, the sync of the catalog shouldn't be done until the user creates a repertoir and chooses catalog sync options.
 - **Client sync request**: include selected genre IDs in sync request payload/config.
 - **Worker filtering**:
   - Filter catalog tables by genre selection:
@@ -72,7 +73,7 @@ Create a reusable `GenreMultiSelect` component:
     - `tune` rows: only those with `genre_ref` in selection (and any required joins).
     - `tune_type` and junction tables: only rows tied to selected genres.
   - Preserve user-owned data (playlists, notes, practice history) regardless of genre.
-- **Fallback**: If user has no selection stored, request full catalog (current behavior).
+- **Fallback**: If user has no selection stored, request full catalog (current behavior).  (Note this behavior is likely to be changed, once the lead dev has a better idea of the UI flow).
 
 ## Testing Strategy
 - **Unit tests**:

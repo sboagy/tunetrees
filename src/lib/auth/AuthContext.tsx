@@ -29,7 +29,10 @@ import {
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
-import { enableSyncTriggers, suppressSyncTriggers } from "../db/install-triggers";
+import {
+  enableSyncTriggers,
+  suppressSyncTriggers,
+} from "../db/install-triggers";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 import {
@@ -368,12 +371,54 @@ export const AuthProvider: ParentComponent = (props) => {
     // Track first completion per worker to ensure view signals fire at least once.
     let firstSyncCompletionHandled = false;
 
+    const requestOverridesProvider = isAnonymousUser
+      ? async () => {
+          try {
+            const { getUserGenreSelection } = await import(
+              "@/lib/db/queries/user-genre-selection"
+            );
+            const selected = await getUserGenreSelection(db, authUserId);
+            const basePullTables = [
+              "genre",
+              "tune_type",
+              "genre_tune_type",
+              "instrument",
+            ];
+            const pullTables =
+              selected.length > 0
+                ? [...basePullTables, "tune"]
+                : basePullTables;
+
+            return {
+              collectionsOverride: { selectedGenres: selected },
+              pullTables,
+            };
+          } catch (error) {
+            console.warn(
+              "[AuthContext] Failed to resolve genre selection overrides:",
+              error
+            );
+            return {
+              collectionsOverride: { selectedGenres: [] },
+              pullTables: [
+                "genre",
+                "tune_type",
+                "genre_tune_type",
+                "instrument",
+              ],
+            };
+          }
+        }
+      : undefined;
+
     const syncWorker = startSyncWorker(db, {
       supabase,
       userId: authUserId,
       realtimeEnabled:
         !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
       syncIntervalMs: isAnonymousUser ? 30000 : 5000, // Anonymous: less frequent sync
+      pullOnly: isAnonymousUser,
+      requestOverridesProvider,
       onSyncComplete: async (result) => {
         diagLog("[AuthContext] onSyncComplete called", result);
 
@@ -725,11 +770,9 @@ export const AuthProvider: ParentComponent = (props) => {
         `✅ [AuthContext] Anonymous local DB ready (offline-safe). userIdInt=${anonymousUserId}`
       );
 
-      // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
-      // The sync worker pulls system/shared reference rows (user_ref NULL) plus user-owned rows.
-      // This replaces the old direct Supabase queries for reference data.
+      // 2. Start sync worker to fetch reference data (pull-only for anonymous).
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
-        diagLog("📥 Starting sync worker for anonymous user...");
+        diagLog("📥 Starting sync worker for anonymous user (pull-only)...");
         const syncWorker = await startSyncWorkerForUser(
           db,
           anonymousUserId,
@@ -737,11 +780,11 @@ export const AuthProvider: ParentComponent = (props) => {
         );
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
-        log.info("Sync worker started for anonymous user");
+        log.info("Sync worker started for anonymous user (pull-only)");
         diagLog(
-          "⏳ [AuthContext] Anonymous sync worker started, waiting for initial sync..."
+          "⏳ [AuthContext] Anonymous sync worker started (pull-only), waiting for initial sync..."
         );
-        // Note: userIdInt will be set in onSyncComplete callback
+        // Note: userIdInt will be set in onSyncComplete callback if needed
       } else {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
         // When sync is disabled, set userIdInt immediately and mark sync as complete

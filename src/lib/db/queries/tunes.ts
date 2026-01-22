@@ -85,45 +85,48 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
 /**
  * Get all tunes for a user (includes public and user's private tunes)
  * Merges tune_override data when showPublic is false (default)
+ * Respects user's genre selection if available (defaults to all genres if no selection)
  *
  * @param db - SQLite database instance
- * @param userId - Supabase Auth user UUID
+ * @param userId - Supabase Auth user UUID (internal user_profile.id)
  * @param showPublic - If true, returns public tune data without overrides. If false (default), returns merged tune + override data
- * @returns Array of tunes with overrides applied (unless showPublic is true)
+ * @returns Array of tunes with overrides applied (unless showPublic is true), filtered by user's selected genres
  */
 export async function getTunesForUser(
   db: SqliteDatabase,
   userId: string,
   showPublic: boolean = false
 ): Promise<Tune[]> {
-  // Use raw SQL to COALESCE tune and tune_override fields
-  const query = showPublic
-    ? // When showPublic=true, return only tune table data (no overrides)
-      sql`
-      SELECT 
-        t.id,
-        t.id_foreign as idForeign,
-        t.primary_origin as primaryOrigin,
-        t.title,
-        t.type,
-        t.structure,
-        t.mode,
-        t.incipit,
-        t.genre,
-        t.composer,
-        t.artist,
-        t.release_year as releaseYear,
-        t.private_for as privateFor,
-        t.deleted,
-        t.sync_version as syncVersion,
-        t.last_modified_at as lastModifiedAt,
-        t.device_id as deviceId
-      FROM tune t
-      WHERE t.deleted = 0
-      ORDER BY t.title
-    `
-    : // When showPublic=false (default), merge tune + tune_override with COALESCE
-      sql`
+  // Load user's selected genres
+  const { getUserGenreSelection } = await import("./user-genre-selection");
+  const selectedGenreIds = await getUserGenreSelection(db, userId);
+
+  // Build the query with conditional genre filtering
+  if (showPublic) {
+    // When showPublic=true, return only tune table data (no overrides)
+    const query = db
+      .select()
+      .from(schema.tune)
+      .where(
+        and(
+          eq(schema.tune.deleted, 0),
+          selectedGenreIds.length > 0
+            ? inArray(schema.tune.genre, selectedGenreIds)
+            : undefined
+        )
+      )
+      .orderBy(asc(schema.tune.title));
+    return await query.all();
+  } else {
+    // When showPublic=false (default), merge tune + tune_override with COALESCE
+    // Note: Due to limitations with Drizzle + raw SQL needed for COALESCE,
+    // we use a raw SQL query
+    const genreFilterSql =
+      selectedGenreIds.length > 0
+        ? `AND COALESCE(o.genre, t.genre) IN (${selectedGenreIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")})`
+        : "";
+
+    const query = sql`
       SELECT 
         t.id,
         COALESCE(o.id_foreign, t.id_foreign) as idForeign,
@@ -148,10 +151,12 @@ export async function getTunesForUser(
         AND o.user_ref = ${userId}
         AND o.deleted = 0
       WHERE t.deleted = 0
+        ${sql.raw(genreFilterSql)}
       ORDER BY COALESCE(o.title, t.title)
     `;
 
-  return await db.all<Tune>(query);
+    return await db.all<Tune>(query);
+  }
 }
 
 /**
