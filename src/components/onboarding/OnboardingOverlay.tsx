@@ -36,7 +36,6 @@ export const OnboardingOverlay: Component = () => {
     forceSyncDown,
     remoteSyncDownCompletionVersion,
     user,
-    userIdInt,
   } = useAuth();
   const navigate = useNavigate();
   const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
@@ -69,7 +68,7 @@ export const OnboardingOverlay: Component = () => {
         const db = localDb();
         if (!db || isLoadingGenres()) return;
 
-        const resolvedUserId = userIdInt() ?? user()?.id;
+        const resolvedUserId = user()?.id;
         if (!resolvedUserId) return;
 
         setIsLoadingGenres(true);
@@ -124,7 +123,7 @@ export const OnboardingOverlay: Component = () => {
     if (selectedGenreIds().length === 0) return;
 
     const db = localDb();
-    const userId = userIdInt() ?? user()?.id;
+    const userId = user()?.id;
     if (!db || !userId) return;
 
     setIsSavingGenres(true);

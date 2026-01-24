@@ -34,6 +34,7 @@ export const SYNCABLE_TABLES = [
   "tune",
   "tune_override",
   "tune_type",
+  "user_genre_selection",
   "user_profile",
 ] as const;
 
@@ -428,6 +429,14 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
   "name": "Tune type name (reel, jig, hornpipe, etc.).",
   "rhythm": "Rhythmic pattern of the tune type."
 },
+  },
+  "user_genre_selection": {
+    primaryKey: ["user_id", "genre_id"],
+    uniqueKeys: ["user_id", "genre_id"],
+    timestamps: ["created_at", "last_modified_at"],
+    booleanColumns: [],
+    supportsIncremental: true,
+    hasDeletedFlag: false,
   },
   "user_profile": {
     primaryKey: "id",

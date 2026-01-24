@@ -1133,6 +1133,18 @@ export const TopNav: Component = () => {
                         class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                         onClick={() => {
                           setShowUserMenu(false);
+                          try {
+                            const returnTo =
+                              window.location.pathname +
+                              window.location.search +
+                              window.location.hash;
+                            window.sessionStorage.setItem(
+                              "tt-settings-return",
+                              returnTo
+                            );
+                          } catch {
+                            // ignore storage failures
+                          }
                           window.location.href =
                             "/user-settings/scheduling-options";
                         }}

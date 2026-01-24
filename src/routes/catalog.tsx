@@ -50,8 +50,8 @@ const CatalogPage: Component = () => {
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get current user ID (supabase UUID)
-  const userId = createMemo(() => user()?.id || null);
+  // Get current user ID
+  const userId = createMemo(() => user()?.id ?? null);
 
   // Helper to safely get string from searchParams
   const getParam = (value: string | string[] | undefined): string => {

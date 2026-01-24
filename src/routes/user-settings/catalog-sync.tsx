@@ -11,18 +11,30 @@ import { type Genre, GenreMultiSelect } from "@/components/genre-selection";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   getGenresWithSelection,
+  getRequiredGenreIdsForUser,
+  purgeLocalCatalogForGenres,
   upsertUserGenreSelection,
 } from "@/lib/db/queries/user-genre-selection";
 
+// Genre with selection status (returned by getGenresWithSelection)
+type GenreWithSelection = Genre & { selected: boolean };
+
 const CatalogSyncPage: Component = () => {
-  const { user, localDb } = useAuth();
+  const {
+    user,
+    localDb,
+    forceSyncDown,
+    forceSyncUp,
+    incrementCatalogListChanged,
+  } = useAuth();
 
   // State
-  const [genres, setGenres] = createSignal<Genre[]>([]);
+  const [genres, setGenres] = createSignal<GenreWithSelection[]>([]);
   const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
   const [originalSelectedIds, setOriginalSelectedIds] = createSignal<string[]>(
     []
   );
+  const [requiredGenreIds, setRequiredGenreIds] = createSignal<string[]>([]);
 
   // UI state
   const [isLoading, setIsLoading] = createSignal(true);
@@ -31,23 +43,41 @@ const CatalogSyncPage: Component = () => {
   const [successMessage, setSuccessMessage] = createSignal<string | null>(null);
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 
+  const normalizeIds = (ids: string[]) => [...ids].sort();
+  const idsEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const aSorted = normalizeIds(a);
+    const bSorted = normalizeIds(b);
+    return aSorted.every((id, index) => id === bSorted[index]);
+  };
+
   // Load genres and current selection
   createEffect(() => {
-    const currentUser = user();
+    const currentUserId = user()?.id;
     const db = localDb();
-    if (currentUser?.id && db) {
+    if (currentUserId && db) {
       setIsLoading(true);
-      getGenresWithSelection(db, currentUser.id)
-        .then((genreList) => {
+      Promise.all([
+        getGenresWithSelection(db, currentUserId),
+        getRequiredGenreIdsForUser(db, currentUserId),
+      ])
+        .then(([genreList, requiredIds]) => {
           // Sort by name
-          genreList.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+          genreList.sort((a: GenreWithSelection, b: GenreWithSelection) =>
+            (a.name ?? "").localeCompare(b.name ?? "")
+          );
           setGenres(genreList);
 
           const selectedIds = genreList
-            .filter((g) => g.selected)
-            .map((g) => g.id);
-          setSelectedGenreIds(selectedIds);
-          setOriginalSelectedIds(selectedIds);
+            .filter((g: GenreWithSelection) => g.selected)
+            .map((g: GenreWithSelection) => g.id);
+          const combined = Array.from(
+            new Set([...selectedIds, ...requiredIds])
+          );
+
+          setRequiredGenreIds(requiredIds);
+          setSelectedGenreIds(combined);
+          setOriginalSelectedIds([...combined]);
         })
         .catch((error) => {
           console.error("Failed to load genres:", error);
@@ -61,33 +91,62 @@ const CatalogSyncPage: Component = () => {
 
   // Track changes
   const handleSelectionChange = (newIds: string[]) => {
-    setSelectedGenreIds(newIds);
-    setIsDirty(
-      JSON.stringify(newIds.sort()) !==
-        JSON.stringify(originalSelectedIds().sort())
-    );
+    const locked = requiredGenreIds();
+    const combined = Array.from(new Set([...newIds, ...locked]));
+    setSelectedGenreIds(combined);
+    setIsDirty(!idsEqual(combined, originalSelectedIds()));
     setSuccessMessage(null);
     setErrorMessage(null);
   };
 
   // Save changes
   const handleSave = async () => {
-    if (selectedGenreIds().length === 0) {
-      setErrorMessage("Please select at least one genre");
-      return;
-    }
-
-    const currentUser = user();
+    const currentUserId = user()?.id;
     const db = localDb();
-    if (!currentUser?.id || !db) {
+    if (!currentUserId || !db) {
       setErrorMessage("User not authenticated");
       return;
     }
 
+    const locked = requiredGenreIds();
+    const nextSelected = Array.from(
+      new Set([...selectedGenreIds(), ...locked])
+    );
+    if (nextSelected.length === 0) {
+      setErrorMessage("Please select at least one genre");
+      return;
+    }
+
+    const removed = originalSelectedIds().filter(
+      (id) => !nextSelected.includes(id)
+    );
+    const added = nextSelected.filter(
+      (id) => !originalSelectedIds().includes(id)
+    );
+
     setIsSubmitting(true);
     try {
-      await upsertUserGenreSelection(db, currentUser.id, selectedGenreIds());
-      setOriginalSelectedIds([...selectedGenreIds()]);
+      await upsertUserGenreSelection(db, currentUserId, nextSelected);
+
+      if (removed.length > 0) {
+        const { tuneIds } = await purgeLocalCatalogForGenres(
+          db,
+          currentUserId,
+          removed
+        );
+        if (tuneIds.length > 0) {
+          incrementCatalogListChanged();
+        }
+      }
+
+      await forceSyncUp({ allowDeletes: true });
+
+      if (added.length > 0 || removed.length > 0) {
+        await forceSyncDown({ full: true });
+      }
+
+      setSelectedGenreIds([...nextSelected]);
+      setOriginalSelectedIds([...nextSelected]);
       setIsDirty(false);
       setSuccessMessage("Catalog selection saved successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -100,27 +159,31 @@ const CatalogSyncPage: Component = () => {
   };
 
   return (
-    <div class="max-w-2xl">
+    <div class="space-y-6">
       {/* Header */}
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+      <div>
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
           Catalog & Sync
-        </h1>
-        <p class="text-gray-600 dark:text-gray-400 mt-2">
-          Choose which genres are stored offline and synced.
+        </h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Choose which genres are stored offline and synced. Your selected
+          genres will be downloaded and synced when you connect to the internet.
+          Unselected genres will not be stored locally, reducing data usage.
         </p>
       </div>
 
       {/* Messages */}
       <Show when={successMessage()}>
-        <div class="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-800 dark:text-green-200">
-          ✓ {successMessage()}
+        <div class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+          <p class="text-sm text-green-800 dark:text-green-200">
+            {successMessage()}
+          </p>
         </div>
       </Show>
 
       <Show when={errorMessage()}>
-        <div class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
-          ✕ {errorMessage()}
+        <div class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+          <p class="text-sm text-red-800 dark:text-red-200">{errorMessage()}</p>
         </div>
       </Show>
 
@@ -134,41 +197,31 @@ const CatalogSyncPage: Component = () => {
         }
       >
         {/* Genre selection */}
-        <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
-          <GenreMultiSelect
-            genres={genres()}
-            selectedGenreIds={selectedGenreIds()}
-            onChange={handleSelectionChange}
-            searchable={true}
-            disabled={isSubmitting()}
-            testIdPrefix="settings-genre"
-          />
-        </div>
+        <GenreMultiSelect
+          genres={genres() as Genre[]}
+          selectedGenreIds={selectedGenreIds()}
+          onChange={handleSelectionChange}
+          searchable={true}
+          disabled={isSubmitting()}
+          testIdPrefix="settings-genre"
+          listContainerClass="h-40"
+          density="compact"
+          lockedGenreIds={requiredGenreIds()}
+          lockedLabel="In repertoire"
+        />
 
         {/* Save button */}
-        <div class="flex gap-3">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!isDirty() || isSubmitting()}
-            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="settings-genre-save"
-          >
-            {isSubmitting() ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!isDirty() || isSubmitting()}
+          class="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
+          data-testid="settings-genre-save"
+        >
+          {isSubmitting() ? "Saving..." : "Save Changes"}
+        </button>
 
         {/* Info box */}
-        <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-            💡 About genre selection
-          </h3>
-          <p class="text-sm text-blue-800 dark:text-blue-200">
-            Your selected genres will be downloaded and synced when you connect
-            to the internet. Unselected genres will not be stored locally,
-            reducing data usage.
-          </p>
-        </div>
       </Show>
     </div>
   );

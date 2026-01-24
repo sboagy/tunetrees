@@ -129,6 +129,10 @@ export const WORKER_SYNC_CONFIG =
         "kind": "eqUserId",
         "column": "user_ref"
       },
+      "user_genre_selection": {
+        "kind": "eqUserId",
+        "column": "user_id"
+      },
       "user_profile": {
         "kind": "eqUserId",
         "column": "supabase_user_id"
@@ -473,6 +477,17 @@ export const WORKER_SYNC_CONFIG =
       },
       "tune_type": {
         "denyDelete": true
+      },
+      "user_genre_selection": {
+        "denyDelete": true,
+        "sanitize": {
+          "coerceNumericProps": [
+            {
+              "prop": "syncVersion",
+              "kind": "int"
+            }
+          ]
+        }
       },
       "user_profile": {
         "sanitize": {

@@ -324,6 +324,19 @@ export const tuneType = sqliteTable("tune_type", {
 }
 );
 
+export const userGenreSelection = sqliteTable("user_genre_selection", {
+  userId: text("user_id").notNull().references(() => userProfile.id),
+  genreId: text("genre_id").notNull().references(() => genre.id),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  ...sqliteSyncColumns,
+}
+, (t) => [
+  primaryKey({ columns: [t.userId, t.genreId] }),
+  index("idx_user_genre_selection_genre_id").on(t.genreId),
+  index("idx_user_genre_selection_user_id").on(t.userId),
+]
+);
+
 export const userProfile = sqliteTable("user_profile", {
   id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   supabaseUserId: text("supabase_user_id").notNull(),
