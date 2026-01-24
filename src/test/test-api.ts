@@ -229,6 +229,121 @@ async function getTuneOverrideCountForCurrentUser() {
   return rows[0]?.count ?? 0;
 }
 
+async function getCatalogTuneCountsForUser() {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+
+  const totalRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM tune t
+    WHERE t.deleted = 0
+  `);
+
+  const { getTunesForUser } = await import("@/lib/db/queries/tunes");
+  const filtered = await getTunesForUser(db, userRef);
+
+  return {
+    total: Number(totalRows[0]?.count ?? 0),
+    filtered: filtered.length,
+  };
+}
+
+async function getCatalogSelectionDiagnostics() {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+
+  const userProfileRows = await db.all<{
+    id: string;
+    supabase_user_id: string | null;
+  }>(sql`
+    SELECT id, supabase_user_id
+    FROM user_profile
+    WHERE id = ${userRef} OR supabase_user_id = ${userRef}
+  `);
+
+  const userIds = new Set<string>([userRef]);
+  for (const row of userProfileRows) {
+    if (row.id) userIds.add(row.id);
+    if (row.supabase_user_id) userIds.add(row.supabase_user_id);
+  }
+
+  const userIdList = Array.from(userIds)
+    .map((id) => `'${id.replace(/'/g, "''")}'`)
+    .join(", ");
+
+  const selectionRows = await db.all<{ user_id: string; genre_id: string }>(
+    sql`
+      SELECT user_id, genre_id
+      FROM user_genre_selection
+      WHERE user_id IN (${sql.raw(userIdList)})
+    `
+  );
+
+  const playlistDefaultsRows = await db.all<{ genre: string | null }>(sql`
+    SELECT DISTINCT p.genre_default AS genre
+    FROM playlist p
+    WHERE p.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+      AND p.genre_default IS NOT NULL
+  `);
+
+  const repertoireGenreRows = await db.all<{ genre: string | null }>(sql`
+    SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
+    FROM playlist_tune pt
+    JOIN playlist p
+      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    JOIN tune t
+      ON t.id = pt.tune_ref AND t.deleted = 0
+    LEFT JOIN tune_override o
+      ON o.tune_ref = t.id
+      AND o.user_ref IN (${sql.raw(userIdList)})
+      AND o.deleted = 0
+    WHERE pt.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+  `);
+
+  const playlistCountRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM playlist p
+    WHERE p.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+  `);
+
+  const playlistTuneCountRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM playlist_tune pt
+    JOIN playlist p
+      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    WHERE pt.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+  `);
+
+  const catalogTuneCountRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM tune t
+    WHERE t.deleted = 0
+  `);
+
+  return {
+    userRef,
+    userIdVariants: Array.from(userIds),
+    userProfile: userProfileRows,
+    selectionRows,
+    selectedGenreIds: selectionRows.map((row) => row.genre_id),
+    playlistDefaults: playlistDefaultsRows
+      .map((row) => row.genre)
+      .filter((genreId): genreId is string => !!genreId),
+    repertoireGenres: repertoireGenreRows
+      .map((row) => row.genre)
+      .filter((genreId): genreId is string => !!genreId),
+    counts: {
+      playlistCount: Number(playlistCountRows[0]?.count ?? 0),
+      playlistTuneCount: Number(playlistTuneCountRows[0]?.count ?? 0),
+      tuneCount: Number(catalogTuneCountRows[0]?.count ?? 0),
+    },
+  };
+}
+
 /**
  * Get practice records for specific tunes
  */
@@ -719,6 +834,24 @@ declare global {
       getPracticeCount: (playlistId: string) => Promise<number>; // UUID
       getRepertoireCount: (playlistId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
+      getCatalogTuneCountsForUser: () => Promise<{
+        total: number;
+        filtered: number;
+      }>;
+      getCatalogSelectionDiagnostics: () => Promise<{
+        userRef: string;
+        userIdVariants: string[];
+        userProfile: Array<{ id: string; supabase_user_id: string | null }>;
+        selectionRows: Array<{ user_id: string; genre_id: string }>;
+        selectedGenreIds: string[];
+        playlistDefaults: string[];
+        repertoireGenres: string[];
+        counts: {
+          playlistCount: number;
+          playlistTuneCount: number;
+          tuneCount: number;
+        };
+      }>;
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
       dispose: () => Promise<void>;
@@ -901,6 +1034,8 @@ if (typeof window !== "undefined") {
       getPracticeCount,
       getRepertoireCount,
       getTuneOverrideCountForCurrentUser,
+      getCatalogTuneCountsForUser,
+      getCatalogSelectionDiagnostics,
       getPracticeRecords,
       getLatestPracticeRecord,
       getScheduledDates,

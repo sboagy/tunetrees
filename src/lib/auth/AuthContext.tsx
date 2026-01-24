@@ -29,7 +29,10 @@ import {
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
-import { enableSyncTriggers, suppressSyncTriggers } from "../db/install-triggers";
+import {
+  enableSyncTriggers,
+  suppressSyncTriggers,
+} from "../db/install-triggers";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 import {
@@ -236,6 +239,7 @@ export const AuthProvider: ParentComponent = (props) => {
   // Sync worker cleanup function and service instance
   let stopSyncWorker: (() => void) | null = null;
   let syncServiceInstance: SyncService | null = null;
+  let catalogSelectionReconciledKey: string | null = null;
   let autoPersistCleanup: (() => void) | null = null;
 
   // Track if database is being initialized to prevent double initialization
@@ -330,29 +334,176 @@ export const AuthProvider: ParentComponent = (props) => {
    * Used after initial sync to get the internal ID for FK relationships.
    */
   async function getUserInternalIdFromLocalDb(
-    _db: SqliteDatabase,
+    db: SqliteDatabase,
     authUserId: string
   ): Promise<string | null> {
-    return authUserId;
-    // try {
-    //   const { userProfile } = await import("@/lib/db/schema");
-    //   const { eq } = await import("drizzle-orm");
+    try {
+      const { userProfile } = await import("@/lib/db/schema");
+      const { eq } = await import("drizzle-orm");
 
-    //   const result = await db
-    //     .select({ id: userProfile.id })
-    //     .from(userProfile)
-    //     .where(eq(userProfile.supabaseUserId, authUserId))
-    //     .limit(1);
+      const result = await db
+        .select({ id: userProfile.id })
+        .from(userProfile)
+        .where(eq(userProfile.supabaseUserId, authUserId))
+        .limit(1);
 
-    //   if (result && result.length > 0) {
-    //     return result[0].id;
-    //   }
-    //   return null;
-    // } catch (error) {
-    //   log.error("Failed to get user internal ID from local DB:", error);
-    //   return null;
-    // }
+      if (result && result.length > 0) {
+        return result[0].id;
+      }
+      return null;
+    } catch (error) {
+      log.error("Failed to get user internal ID from local DB:", error);
+      return null;
+    }
   }
+
+  const arraysEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const aSorted = [...a].sort();
+    const bSorted = [...b].sort();
+    return aSorted.every((id, index) => id === bSorted[index]);
+  };
+
+  const reconcileCatalogSelection = async (params: {
+    db: SqliteDatabase;
+    userId: string;
+    isAnonymousUser: boolean;
+    /** If true, skip forceSyncUp/Down calls (used during initial sync to avoid recursion) */
+    skipSync?: boolean;
+  }) => {
+    try {
+      const [genreSelection, genreQueries] = await Promise.all([
+        import("@/lib/db/queries/user-genre-selection"),
+        import("@/lib/db/queries/genres"),
+      ]);
+
+      const selected = await genreSelection.getUserGenreSelection(
+        params.db,
+        params.userId
+      );
+      const required = await genreSelection.getRequiredGenreIdsForUser(
+        params.db,
+        params.userId
+      );
+      const { playlistCount, playlistTuneCount } =
+        await genreSelection.getUserRepertoireStats(params.db, params.userId);
+      const playlistDefaults =
+        await genreSelection.getPlaylistGenreDefaultsForUser(
+          params.db,
+          params.userId
+        );
+      const tuneGenres = await genreSelection.getRepertoireTuneGenreIdsForUser(
+        params.db,
+        params.userId
+      );
+
+      diagLog("🔎 [AuthContext] reconcileCatalogSelection snapshot", {
+        userId: params.userId,
+        selectedCount: selected.length,
+        requiredCount: required.length,
+        playlistDefaultsCount: playlistDefaults.length,
+        tuneGenresCount: tuneGenres.length,
+        playlistCount,
+        playlistTuneCount,
+        selected,
+        required,
+        playlistDefaults,
+      });
+
+      const selectedKey = [...selected].sort().join(",");
+      const requiredKey = [...required].sort().join(",");
+      const playlistDefaultsKey = [...playlistDefaults].sort().join(",");
+      const tuneGenresKey = [...tuneGenres].sort().join(",");
+      const reconcileKey = [
+        params.userId,
+        `selected:${selectedKey}`,
+        `required:${requiredKey}`,
+        `defaults:${playlistDefaultsKey}`,
+        `tunes:${tuneGenresKey}`,
+        `playlistCount:${playlistCount}`,
+        `playlistTuneCount:${playlistTuneCount}`,
+      ].join("|");
+
+      if (catalogSelectionReconciledKey === reconcileKey) return;
+      catalogSelectionReconciledKey = reconcileKey;
+
+      let effectiveSelected: string[] = [];
+
+      if (selected.length > 0) {
+        // Rule 1: honor selection, but ensure repertoire genres are included.
+        effectiveSelected = Array.from(new Set([...selected, ...required]));
+      } else if (playlistCount > 0) {
+        if (playlistTuneCount > 0) {
+          // Rule 2: use genres from repertoire tunes + playlist defaults.
+          effectiveSelected = Array.from(
+            new Set([...tuneGenres, ...playlistDefaults])
+          );
+        } else {
+          // Rule 3: no tunes yet, use playlist defaults.
+          effectiveSelected = Array.from(new Set([...playlistDefaults]));
+        }
+      } else {
+        // Rule 4: no playlists, empty selection is acceptable.
+        effectiveSelected = [];
+      }
+
+      if (effectiveSelected.length === 0) return;
+
+      const selectionChanged = !arraysEqual(selected, effectiveSelected);
+      diagLog("🔎 [AuthContext] reconcileCatalogSelection plan", {
+        userId: params.userId,
+        selectionChanged,
+        effectiveSelectedCount: effectiveSelected.length,
+      });
+      if (selectionChanged) {
+        await genreSelection.upsertUserGenreSelection(
+          params.db,
+          params.userId,
+          effectiveSelected
+        );
+      }
+
+      if (effectiveSelected.length > 0) {
+        const allGenres = await genreQueries.getAllGenres(params.db);
+        const unselected = allGenres
+          .map((g) => g.id)
+          .filter((id) => !effectiveSelected.includes(id));
+
+        const purgeResult = await genreSelection.purgeLocalCatalogForGenres(
+          params.db,
+          params.userId,
+          unselected
+        );
+        diagLog("🔎 [AuthContext] reconcileCatalogSelection purge", {
+          userId: params.userId,
+          unselectedCount: unselected.length,
+          purgedTuneCount: purgeResult.tuneIds.length,
+        });
+
+        // Skip sync calls during initial sync to avoid recursion - the sync just completed
+        if (!params.skipSync) {
+          if (selectionChanged && !params.isAnonymousUser) {
+            await forceSyncUp({ allowDeletes: true });
+          }
+
+          if (selectionChanged || purgeResult.tuneIds.length > 0) {
+            await forceSyncDown({ full: true });
+          }
+        }
+
+        // ALWAYS signal catalog list changed after reconciliation completes.
+        // This ensures the catalog grid refetches with the updated genre selection.
+        // Previously only incremented when tunes were purged, causing stale data
+        // when grid fetched before reconciliation completed.
+        incrementCatalogListChanged();
+      }
+    } catch (error) {
+      console.warn(
+        "[AuthContext] Failed to reconcile catalog genre selection:",
+        error
+      );
+    }
+  };
 
   /**
    * Start the sync worker with common configuration.
@@ -368,12 +519,54 @@ export const AuthProvider: ParentComponent = (props) => {
     // Track first completion per worker to ensure view signals fire at least once.
     let firstSyncCompletionHandled = false;
 
+    const requestOverridesProvider = async () => {
+      try {
+        const { getUserGenreSelection } = await import(
+          "@/lib/db/queries/user-genre-selection"
+        );
+        const selected = await getUserGenreSelection(db, authUserId);
+
+        if (!isAnonymousUser && selected.length === 0) {
+          return null;
+        }
+
+        const basePullTables = [
+          "genre",
+          "tune_type",
+          "genre_tune_type",
+          "instrument",
+        ];
+        const pullTables = isAnonymousUser
+          ? selected.length > 0
+            ? [...basePullTables, "tune"]
+            : basePullTables
+          : undefined;
+
+        return {
+          collectionsOverride: { selectedGenres: selected },
+          ...(pullTables ? { pullTables } : {}),
+        };
+      } catch (error) {
+        console.warn(
+          "[AuthContext] Failed to resolve genre selection overrides:",
+          error
+        );
+        if (!isAnonymousUser) return null;
+        return {
+          collectionsOverride: { selectedGenres: [] },
+          pullTables: ["genre", "tune_type", "genre_tune_type", "instrument"],
+        };
+      }
+    };
+
     const syncWorker = startSyncWorker(db, {
       supabase,
       userId: authUserId,
       realtimeEnabled:
         !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
       syncIntervalMs: isAnonymousUser ? 30000 : 5000, // Anonymous: less frequent sync
+      pullOnly: isAnonymousUser,
+      requestOverridesProvider,
       onSyncComplete: async (result) => {
         diagLog("[AuthContext] onSyncComplete called", result);
 
@@ -444,6 +637,16 @@ export const AuthProvider: ParentComponent = (props) => {
             );
           }
 
+          // CRITICAL: Reconcile genre selection BEFORE marking sync complete.
+          // This ensures the catalog grid sees the correct genre filters when it fetches.
+          // Previously, setTimeout deferred this causing a race where grid fetched with empty selection.
+          await reconcileCatalogSelection({
+            db,
+            userId: authUserId,
+            isAnonymousUser,
+            skipSync: true, // Sync just completed; avoid recursive sync calls
+          });
+
           setInitialSyncComplete(true);
           diagLog(
             "✅ [AuthContext] Initial sync complete, UI can now load data"
@@ -469,6 +672,16 @@ export const AuthProvider: ParentComponent = (props) => {
                 );
               });
           });
+        }
+
+        if (!isFirstSyncCompletion) {
+          setTimeout(() => {
+            void reconcileCatalogSelection({
+              db,
+              userId: authUserId,
+              isAnonymousUser,
+            });
+          }, 0);
         }
 
         // CRITICAL FIX: On the first sync completion for a worker, always trigger all view signals
@@ -725,11 +938,9 @@ export const AuthProvider: ParentComponent = (props) => {
         `✅ [AuthContext] Anonymous local DB ready (offline-safe). userIdInt=${anonymousUserId}`
       );
 
-      // 2. Start sync worker to fetch reference data (genres, tune_types, instruments, tunes)
-      // The sync worker pulls system/shared reference rows (user_ref NULL) plus user-owned rows.
-      // This replaces the old direct Supabase queries for reference data.
+      // 2. Start sync worker to fetch reference data (pull-only for anonymous).
       if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
-        diagLog("📥 Starting sync worker for anonymous user...");
+        diagLog("📥 Starting sync worker for anonymous user (pull-only)...");
         const syncWorker = await startSyncWorkerForUser(
           db,
           anonymousUserId,
@@ -737,11 +948,11 @@ export const AuthProvider: ParentComponent = (props) => {
         );
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
-        log.info("Sync worker started for anonymous user");
+        log.info("Sync worker started for anonymous user (pull-only)");
         diagLog(
-          "⏳ [AuthContext] Anonymous sync worker started, waiting for initial sync..."
+          "⏳ [AuthContext] Anonymous sync worker started (pull-only), waiting for initial sync..."
         );
-        // Note: userIdInt will be set in onSyncComplete callback
+        // Note: userIdInt will be set in onSyncComplete callback if needed
       } else {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
         // When sync is disabled, set userIdInt immediately and mark sync as complete
@@ -1578,6 +1789,7 @@ export const AuthProvider: ParentComponent = (props) => {
    */
   const signOut = async () => {
     setLoading(true);
+    catalogSelectionReconciledKey = null;
 
     // For anonymous users, DON'T call supabase.auth.signOut()
     // This preserves their session so they can return to the same account

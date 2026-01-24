@@ -9,7 +9,7 @@
  * @module lib/sync/engine
  */
 
-import type { SyncChange } from "@oosync/shared/protocol";
+import type { SyncChange, SyncRequestOverrides } from "@oosync/shared/protocol";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { and, eq } from "drizzle-orm";
 import { getAdapter, type SyncableTableName } from "./adapters";
@@ -22,8 +22,8 @@ import {
   markOutboxCompleted,
   type OutboxItem,
 } from "./outbox";
-import { WorkerClient } from "./worker-client";
 import { getSyncRuntime, type SqliteDatabase } from "./runtime-context";
+import { WorkerClient } from "./worker-client";
 
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
@@ -84,6 +84,10 @@ export interface SyncConfig {
   batchSize: number; // Max items per sync batch
   maxRetries: number; // Max retry attempts for failed items
   timeoutMs: number; // Network timeout in milliseconds
+  /** When true, never push local changes; pull-only sync. */
+  pullOnly?: boolean;
+  /** Optional per-sync overrides for pull behavior. */
+  requestOverridesProvider?: () => Promise<SyncRequestOverrides | null>;
 }
 
 const DEFAULT_CONFIG: SyncConfig = {
@@ -260,6 +264,8 @@ export class SyncEngine {
    */
   async syncWithWorker(options?: {
     allowDeletes?: boolean;
+    pullOnly?: boolean;
+    requestOverrides?: SyncRequestOverrides | null;
   }): Promise<SyncResult> {
     const startTime = new Date().toISOString();
     const errors: string[] = [];
@@ -297,6 +303,7 @@ export class SyncEngine {
       : null;
 
     const allowDeletes = options?.allowDeletes ?? true;
+    const pullOnly = options?.pullOnly ?? this.config.pullOnly ?? false;
 
     try {
       // 1. Get Auth Token
@@ -308,11 +315,16 @@ export class SyncEngine {
       }
       const workerClient = new WorkerClient(session.access_token);
 
+      const requestOverrides =
+        options?.requestOverrides ??
+        (this.config.requestOverridesProvider
+          ? await this.config.requestOverridesProvider()
+          : undefined);
+
       // 2. Gather Pending Changes (Push)
-      const pendingItems = await getPendingOutboxItems(
-        this.localDb,
-        this.config.batchSize
-      );
+      const pendingItems = pullOnly
+        ? []
+        : await getPendingOutboxItems(this.localDb, this.config.batchSize);
 
       // Sort by dependency to ensure correct order (though worker handles transaction)
       const sortedItems = sortOutboxItemsByDependency(pendingItems);
@@ -634,6 +646,7 @@ export class SyncEngine {
         this.lastSyncTimestamp || undefined,
         {
           pageSize: 200,
+          overrides: requestOverrides ?? undefined,
         }
       );
 
@@ -678,6 +691,7 @@ export class SyncEngine {
             pullCursor,
             syncStartedAt,
             pageSize: 200,
+            overrides: requestOverrides ?? undefined,
           });
 
           pullCursor = pageResponse.nextCursor;

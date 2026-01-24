@@ -16,6 +16,18 @@ export interface SyncChange<TTableName extends string = TableName> {
   lastModifiedAt: string; // ISO timestamp from client
 }
 
+export interface SyncCollectionsOverride {
+  /** Explicit selected genres (snake_case IDs). Empty array = explicit empty selection. */
+  selectedGenres?: string[];
+}
+
+export interface SyncRequestOverrides {
+  /** Optional per-request collections override (e.g., selected genres). */
+  collectionsOverride?: SyncCollectionsOverride;
+  /** Optional allowlist of tables to pull for this sync. */
+  pullTables?: string[];
+}
+
 export interface SyncRequest<TTableName extends string = TableName> {
   changes: Array<SyncChange<TTableName>>;
   lastSyncAt?: string; // ISO timestamp of last successful sync
@@ -38,6 +50,11 @@ export interface SyncRequest<TTableName extends string = TableName> {
    * The worker may clamp this to a safe maximum.
    */
   pageSize?: number;
+
+  /** Optional per-request overrides that affect pull behavior. */
+  collectionsOverride?: SyncCollectionsOverride;
+  /** Optional allowlist of tables to pull for this sync. */
+  pullTables?: string[];
 }
 
 export interface SyncResponse<TTableName extends string = TableName> {

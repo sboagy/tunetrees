@@ -278,6 +278,7 @@ interface SyncContext {
   /** Supabase auth uid (JWT sub). */
   authUserId: string;
   collections: Record<string, Set<string>>;
+  pullTables?: Set<string>;
   now: string;
   diagnosticsEnabled: boolean;
 }
@@ -472,6 +473,45 @@ function sqliteToPostgres(
   return result;
 }
 
+function remapUserRefsForPush(
+  data: Record<string, unknown>,
+  ctx: SyncContext
+): Record<string, unknown> {
+  const result = { ...data };
+  const replaceIfAuth = (prop: string) => {
+    if (!(prop in result)) return;
+    const value = result[prop];
+    if (value === null || typeof value === "undefined") return;
+    if (String(value) === ctx.authUserId) {
+      result[prop] = ctx.userId;
+    }
+  };
+
+  replaceIfAuth("userRef");
+  replaceIfAuth("userId");
+  replaceIfAuth("privateFor");
+  replaceIfAuth("privateToUser");
+
+  return result;
+}
+
+function remapUserProfileForPush(
+  tableName: string,
+  data: Record<string, unknown>,
+  ctx: SyncContext
+): Record<string, unknown> {
+  if (tableName !== "user_profile") return data;
+
+  const result = { ...data };
+  if (ctx.userId) {
+    result.id = ctx.userId;
+  }
+  if (ctx.authUserId) {
+    result.supabaseUserId = ctx.authUserId;
+  }
+  return result;
+}
+
 /**
  * Convert Postgres booleans to SQLite integers (0/1).
  */
@@ -529,7 +569,8 @@ async function verifyJwt(
  */
 async function applyChange(
   tx: Transaction,
-  change: IncomingSyncChange
+  change: IncomingSyncChange,
+  ctx: SyncContext
 ): Promise<void> {
   // Skip sync infrastructure tables
   if (!isClientSyncChange(change)) {
@@ -565,6 +606,8 @@ async function applyChange(
     change.table,
     change.data as Record<string, unknown>
   );
+  data = remapUserRefsForPush(data, ctx);
+  data = remapUserProfileForPush(change.table, data, ctx);
 
   const sanitized = sanitizeForPush({
     tableName: change.table,
@@ -594,7 +637,13 @@ async function applyChange(
   } else {
     const omitSetProps = pushRule?.upsert?.omitSetProps;
     const keepProps = pushRule?.upsert?.retryMinimalPayloadKeepProps;
-    const upsertOpts = omitSetProps ? ({ omitSetProps } as const) : undefined;
+    const resolvedOmitSetProps =
+      change.table === "user_profile"
+        ? Array.from(new Set([...(omitSetProps ?? []), "id"]))
+        : omitSetProps;
+    const upsertOpts = resolvedOmitSetProps
+      ? ({ omitSetProps: resolvedOmitSetProps } as const)
+      : undefined;
 
     try {
       // Use a savepoint so a failed statement doesn't abort the outer transaction.
@@ -709,12 +758,13 @@ async function applyUpsert(
  */
 async function processPushChanges(
   tx: Transaction,
+  ctx: SyncContext,
   changes: IncomingSyncChange[]
 ): Promise<void> {
   console.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
     try {
-      await applyChange(tx, change);
+      await applyChange(tx, change, ctx);
     } catch (e) {
       throw new Error(
         `[PUSH] Failed applying ${change.table} rowId=${change.rowId}: ${formatDbError(e)}`
@@ -852,6 +902,11 @@ async function processInitialSyncPaged(
   // Advance until we find a table with rows to return, or we finish.
   while (tableIndex < SYNCABLE_TABLES.length) {
     const tableName = SYNCABLE_TABLES[tableIndex] as SyncableTableName;
+    if (ctx.pullTables && !ctx.pullTables.has(tableName)) {
+      tableIndex += 1;
+      offset = 0;
+      continue;
+    }
     const changes = await fetchTableForInitialSyncPage(
       tx,
       tableName,
@@ -1012,6 +1067,9 @@ async function processIncrementalSync(
       console.log(`[PULL:INCR] Skipping unknown table: ${tableName}`);
       continue;
     }
+    if (ctx.pullTables && !ctx.pullTables.has(tableName)) {
+      continue;
+    }
     const tableChanges = await fetchChangedRowsFromTable(
       tx,
       tableName as SyncableTableName,
@@ -1074,11 +1132,28 @@ async function handleSync(
     try {
       const userProfile = getSchemaTables().user_profile as any;
       if (userProfile?.id && userProfile?.supabaseUserId) {
-        const rows = await tx
+        let rows = await tx
           .select({ id: userProfile.id })
           .from(userProfile)
           .where(eq(userProfile.supabaseUserId, authUserId))
           .limit(1);
+
+        if (rows.length === 0) {
+          try {
+            await tx.insert(userProfile).values({ supabaseUserId: authUserId });
+          } catch (insertError) {
+            console.warn(
+              `[SYNC] Failed to ensure user_profile row for auth uid ${authUserId}`,
+              insertError
+            );
+          }
+
+          rows = await tx
+            .select({ id: userProfile.id })
+            .from(userProfile)
+            .where(eq(userProfile.supabaseUserId, authUserId))
+            .limit(1);
+        }
 
         if (rows.length > 0 && rows[0]?.id) {
           internalUserId = String(rows[0].id);
@@ -1101,16 +1176,29 @@ async function handleSync(
       tables: getSchemaTables(),
     });
 
+    if (
+      payload.collectionsOverride &&
+      "selectedGenres" in payload.collectionsOverride
+    ) {
+      const selected = payload.collectionsOverride.selectedGenres ?? [];
+      collections.selectedGenres = new Set(selected.map((g) => String(g)));
+    }
+
+    const pullTables = payload.pullTables
+      ? new Set(payload.pullTables.map((t) => String(t)))
+      : undefined;
+
     const ctx: SyncContext = {
       userId: internalUserId,
       authUserId,
       collections,
+      pullTables,
       now,
       diagnosticsEnabled,
     };
 
     // PUSH: Apply client changes
-    await processPushChanges(tx, payload.changes as IncomingSyncChange[]);
+    await processPushChanges(tx, ctx, payload.changes as IncomingSyncChange[]);
 
     // PULL: Gather changes for client
     if (payload.lastSyncAt) {

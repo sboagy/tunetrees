@@ -493,6 +493,7 @@ export async function setupDeterministicTestParallel(
     await clearUserTable(user, "playlist_tune");
     whichTables = [...whichTables, "playlist_tune"];
   }
+  await clearUserTable(user, "user_genre_selection");
   if (opts.clearNotesAndReferences) {
     await clearUserTable(user, "note");
     await clearUserTable(user, "reference");
@@ -670,6 +671,9 @@ function applyTableQueryFilters(
     query = query.eq("user_id", user.userId);
   } else if (tableName === "prefs_scheduling_options") {
     // prefs_scheduling_options is keyed by user_id (not user_ref)
+    query = query.eq("user_id", user.userId);
+  } else if (tableName === "user_genre_selection") {
+    // user_genre_selection is keyed by user_id (not user_ref)
     query = query.eq("user_id", user.userId);
   } else if (tableName === "tune_override") {
     // tune_override.user_ref references internal user_profile.id, not supabase_user_id.
@@ -954,6 +958,7 @@ export async function setupForPracticeTestsParallel(
 
     // 2. Reset repertoire
     await clearUserTable(user, "playlist_tune");
+    await clearUserTable(user, "user_genre_selection");
 
     await verifyTablesEmpty(user, [
       "practice_record",
@@ -962,6 +967,7 @@ export async function setupForPracticeTestsParallel(
       "tune_override",
       "prefs_scheduling_options",
       "playlist_tune",
+      "user_genre_selection",
     ]);
 
     if (repertoireTunes.length > 0) {
@@ -1133,6 +1139,9 @@ export async function setupForRepertoireTestsParallel(
 
   log.debug(`🔧 [${user.name}] setupForRepertoireTests Starting...`);
 
+  // Ensure online state before setup (offline state is sticky across tests).
+  await page.context().setOffline(false);
+
   // 1. Clear practice state
   await clearUserTable(user, "practice_record");
   await clearUserTable(user, "daily_practice_queue");
@@ -1142,6 +1151,7 @@ export async function setupForRepertoireTestsParallel(
 
   // 2. Reset repertoire
   await clearUserTable(user, "playlist_tune");
+  await clearUserTable(user, "user_genre_selection");
 
   await verifyTablesEmpty(user, [
     "practice_record",
@@ -1150,6 +1160,7 @@ export async function setupForRepertoireTestsParallel(
     "tune_override",
     "prefs_scheduling_options",
     "playlist_tune",
+    "user_genre_selection",
   ]);
 
   await seedUserRepertoire(user, repertoireTunes);
@@ -1296,6 +1307,7 @@ export async function setupForCatalogTestsParallel(
     await clearUserTable(user, "playlist_tune");
     whichTables = [...whichTables, "playlist_tune"];
   }
+  await clearUserTable(user, "user_genre_selection");
 
   // 2. Clear practice state
   await clearUserTable(user, "practice_record");

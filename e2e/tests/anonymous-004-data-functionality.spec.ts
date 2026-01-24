@@ -26,11 +26,18 @@ const test = base.extend({
 test.describe("Anonymous User Data Functionality", () => {
   let ttPage: TuneTreesPage;
 
+  const ANON_REPERTOIRE_CONFIG = {
+    name: "Anon Repertoire",
+    default_genre: "ITRAD",
+    instrument: "Irish Flute",
+    genres_filter: ["ITRAD"],
+  };
+
   test("4.1 Anonymous user can view catalog tunes", async ({ page }) => {
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously (no playlist needed for catalog viewing)
     await ttPage.gotoLogin();
-    await ttPage.signInAnonymously();
+    await ttPage.signInAnonymously(ANON_REPERTOIRE_CONFIG);
 
     // Navigate to Catalog tab
     await ttPage.navigateToTab("catalog");
@@ -51,7 +58,10 @@ test.describe("Anonymous User Data Functionality", () => {
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously WITH a playlist (needed for repertoire functionality)
     await ttPage.gotoLogin();
-    await ttPage.signInAnonymouslyWithPlaylist("Anon Test Playlist");
+    await ttPage.signInAnonymously({
+      ...ANON_REPERTOIRE_CONFIG,
+      name: "Anon Test Playlist",
+    });
 
     // Navigate to Catalog tab
     await ttPage.navigateToTab("catalog");
@@ -107,7 +117,10 @@ test.describe("Anonymous User Data Functionality", () => {
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously WITH a playlist (needed for repertoire functionality)
     await ttPage.gotoLogin();
-    await ttPage.signInAnonymouslyWithPlaylist("Anon Persist Test");
+    await ttPage.signInAnonymously({
+      ...ANON_REPERTOIRE_CONFIG,
+      name: "Anon Persist Test",
+    });
 
     // Navigate to Catalog tab and add a tune
     await ttPage.navigateToTab("catalog");
@@ -138,11 +151,15 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.repertoireTab.click();
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
 
-    const repertoireRows = ttPage.repertoireGrid.locator("tbody tr[data-index]");
-    await expect.poll(async () => repertoireRows.count(), {
-      timeout: 15000,
-      intervals: [100, 200, 500, 1000],
-    }).toBeGreaterThan(0);
+    const repertoireRows = ttPage.repertoireGrid.locator(
+      "tbody tr[data-index]"
+    );
+    await expect
+      .poll(async () => repertoireRows.count(), {
+        timeout: 15000,
+        intervals: [100, 200, 500, 1000],
+      })
+      .toBeGreaterThan(0);
 
     const countBefore = await repertoireRows.count();
     expect(countBefore).toBeGreaterThan(0);
@@ -156,7 +173,9 @@ test.describe("Anonymous User Data Functionality", () => {
 
     // Navigate back to Repertoire
     await ttPage.navigateToTab("repertoire");
-    await expect(ttPage.repertoireColumnsButton).toBeVisible({ timeout: 20000 });
+    await expect(ttPage.repertoireColumnsButton).toBeVisible({
+      timeout: 20000,
+    });
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 20000 });
 
     // Wait for the grid to rehydrate from local DB
@@ -177,7 +196,7 @@ test.describe("Anonymous User Data Functionality", () => {
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously (no playlist needed for reference data viewing)
     await ttPage.gotoLogin();
-    await ttPage.signInAnonymously();
+    await ttPage.signInAnonymously(ANON_REPERTOIRE_CONFIG);
 
     // Navigate to Catalog tab
     await ttPage.navigateToTab("catalog");

@@ -350,6 +350,9 @@ const TABLE_EXTRAS: Record<SyncableTableName, Pick<TableMeta, "changeCategory" |
   "rhythm": "Rhythmic pattern of the tune type."
 },
   },
+  "user_genre_selection": {
+    changeCategory: "user",
+  },
   "user_profile": {
     changeCategory: "user",
     columnDescriptions: {
@@ -503,6 +506,7 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   "tune": 12,
   "tune_override": 19,
   "tune_type": 3,
+  "user_genre_selection": 20,
   "user_profile": 5,
 };
 
@@ -525,5 +529,6 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   "tune": "tune",
   "tune_override": "tuneOverride",
   "tune_type": "tuneType",
+  "user_genre_selection": "userGenreSelection",
   "user_profile": "userProfile",
 };
