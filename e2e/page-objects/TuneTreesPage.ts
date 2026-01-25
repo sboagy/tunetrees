@@ -1192,6 +1192,9 @@ export class TuneTreesPage {
 
     if (isToolbarSearchVisible) {
       // Desktop: use toolbar search box
+      await this.searchBox.scrollIntoViewIfNeeded().catch(() => undefined);
+      await this.searchBox.isEditable({ timeout: 5000 });
+      await this.page.waitForTimeout(100); // Trying to help flaky test
       await this.searchBox.fill(tuneTitle);
       await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
     } else {
