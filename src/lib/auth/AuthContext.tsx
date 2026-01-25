@@ -239,7 +239,6 @@ export const AuthProvider: ParentComponent = (props) => {
   // Sync worker cleanup function and service instance
   let stopSyncWorker: (() => void) | null = null;
   let syncServiceInstance: SyncService | null = null;
-  let catalogSelectionReconciledKey: string | null = null;
   let autoPersistCleanup: (() => void) | null = null;
 
   // Track if database is being initialized to prevent double initialization
@@ -409,23 +408,6 @@ export const AuthProvider: ParentComponent = (props) => {
         required,
         playlistDefaults,
       });
-
-      const selectedKey = [...selected].sort().join(",");
-      const requiredKey = [...required].sort().join(",");
-      const playlistDefaultsKey = [...playlistDefaults].sort().join(",");
-      const tuneGenresKey = [...tuneGenres].sort().join(",");
-      const reconcileKey = [
-        params.userId,
-        `selected:${selectedKey}`,
-        `required:${requiredKey}`,
-        `defaults:${playlistDefaultsKey}`,
-        `tunes:${tuneGenresKey}`,
-        `playlistCount:${playlistCount}`,
-        `playlistTuneCount:${playlistTuneCount}`,
-      ].join("|");
-
-      if (catalogSelectionReconciledKey === reconcileKey) return;
-      catalogSelectionReconciledKey = reconcileKey;
 
       let effectiveSelected: string[] = [];
 
@@ -1789,7 +1771,6 @@ export const AuthProvider: ParentComponent = (props) => {
    */
   const signOut = async () => {
     setLoading(true);
-    catalogSelectionReconciledKey = null;
 
     // For anonymous users, DON'T call supabase.auth.signOut()
     // This preserves their session so they can return to the same account
