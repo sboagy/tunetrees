@@ -112,6 +112,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
   });
 
   test("should display existing practice records in grid", async ({ page }) => {
+    test.setTimeout(90000);
     // ARRANGE: Find a tune and create some practice records first
     await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);

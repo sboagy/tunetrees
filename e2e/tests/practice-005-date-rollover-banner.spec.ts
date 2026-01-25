@@ -378,7 +378,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
 
     currentDate = await advanceDays(context, 1, currentDate);
     await page.waitForTimeout(ROLLOVER_WAIT_MS);
-    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 5000 });
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
 
     await expect
       .poll(

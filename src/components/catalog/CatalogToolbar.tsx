@@ -74,12 +74,22 @@ export interface CatalogToolbarProps {
   availableGenres: string[];
   /** Available playlists */
   availablePlaylists: PlaylistWithSummary[];
+  /** Loading states for async data */
+  loading?: {
+    genres?: boolean;
+    playlists?: boolean;
+  };
   /** Selected rows count for Delete button state */
   selectedRowsCount?: number;
   /** Table instance for column visibility control and row selection */
   table?: Table<ITuneOverview>;
   /** Playlist ID for adding tunes to repertoire */
   playlistId?: string;
+  /** Controlled state for filter panel expansion */
+  filterPanelExpanded?: boolean;
+  onFilterPanelExpandedChange?: (expanded: boolean) => void;
+  /** Hide playlist filter (for Repertoire tab where playlist is implied) */
+  hidePlaylistFilter?: boolean;
 }
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
@@ -241,6 +251,10 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             availablePlaylists={props.availablePlaylists}
             selectedPlaylistIds={props.selectedPlaylistIds}
             onPlaylistIdsChange={props.onPlaylistIdsChange}
+            loading={props.loading}
+            hidePlaylistFilter={props.hidePlaylistFilter}
+            isExpanded={props.filterPanelExpanded}
+            onExpandedChange={props.onFilterPanelExpandedChange}
           />
 
           {/* Add Tune button */}

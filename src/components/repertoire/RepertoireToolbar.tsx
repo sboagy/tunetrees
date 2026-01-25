@@ -78,12 +78,19 @@ export interface RepertoireToolbarProps {
   availableModes: string[];
   /** Available genres */
   availableGenres: string[];
+  /** Loading states for async data */
+  loading?: {
+    genres?: boolean;
+  };
   /** Selected rows count for Remove button state */
   selectedRowsCount?: number;
   /** Table instance for column visibility control and row selection */
   table?: Table<ITuneOverview>;
   /** Playlist ID for adding tunes to practice queue */
   playlistId?: string;
+  /** Controlled state for filter panel expansion */
+  filterPanelExpanded?: boolean;
+  onFilterPanelExpandedChange?: (expanded: boolean) => void;
 }
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
@@ -307,7 +314,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             availablePlaylists={[]}
             selectedPlaylistIds={[]}
             onPlaylistIdsChange={() => {}}
+            loading={props.loading}
             hidePlaylistFilter={true}
+            isExpanded={props.filterPanelExpanded}
+            onExpandedChange={props.onFilterPanelExpandedChange}
           />
 
           {/* Add Tune button */}
