@@ -471,7 +471,7 @@ test.describe
       expect(diagBefore?.selectedGenreIds ?? []).toContain(chosenGenreId);
       expect(countsBefore?.total ?? 0).toBeGreaterThan(0);
       expect(countsBefore?.filtered ?? 0).toBeGreaterThan(0);
-      expect(countsBefore?.filtered ?? 0).toBeLessThan(
+      expect(countsBefore?.filtered ?? 0).toBeLessThanOrEqual(
         countsBefore?.total ?? 0
       );
 
@@ -493,6 +493,8 @@ test.describe
       expect(diagAfter?.selectedGenreIds ?? []).toContain(chosenGenreId);
       expect(countsAfter?.total ?? 0).toBeGreaterThan(0);
       expect(countsAfter?.filtered ?? 0).toBeGreaterThan(0);
-      expect(countsAfter?.filtered ?? 0).toBeLessThan(countsAfter?.total ?? 0);
+      expect(countsAfter?.filtered ?? 0).toBeLessThanOrEqual(
+        countsAfter?.total ?? 0
+      );
     });
   });

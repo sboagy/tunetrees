@@ -89,6 +89,9 @@ const CatalogPage: Component = () => {
     null
   );
 
+  // Track filter panel expanded state
+  const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);
+
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
   // Runs whenever searchParams changes. This resolves the initial race condition
   // by ensuring signals are populated before the sync effect (Effect 2) runs.
@@ -330,9 +333,15 @@ const CatalogPage: Component = () => {
           availableModes={availableModes()}
           availableGenres={availableGenres()}
           availablePlaylists={userPlaylists() || []}
+          loading={{
+            genres: allGenres.loading,
+            playlists: userPlaylists.loading,
+          }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
           playlistId={currentPlaylistId() || undefined}
+          filterPanelExpanded={filterPanelExpanded()}
+          onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
       </Show>
 

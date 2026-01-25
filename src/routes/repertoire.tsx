@@ -311,6 +311,9 @@ const RepertoirePage: Component = () => {
     null
   );
 
+  // Track filter panel expanded state
+  const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);
+
   createEffect(() => {
     console.log("[RepertoirePage] tableInstance updated:", !!tableInstance());
   });
@@ -331,9 +334,12 @@ const RepertoirePage: Component = () => {
           availableTypes={availableTypes()}
           availableModes={availableModes()}
           availableGenres={availableGenres()}
+          loading={{ genres: allGenres.loading }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
           playlistId={currentPlaylistId() || undefined}
+          filterPanelExpanded={filterPanelExpanded()}
+          onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
       </Show>
 

@@ -261,7 +261,7 @@ export class TuneTreesPage {
     // Search & Filters
     this.searchBox = page.getByPlaceholder(/Search/i);
     this.searchBoxPanel = page.getByTestId("search-box-panel");
-    this.filtersButton = page.getByRole("button", { name: "Filter options" });
+    this.filtersButton = page.getByTestId("filters-button");
     this.typeFilter = page.getByRole("button", { name: "Filter by Type" });
     this.modeFilter = page.getByRole("button", { name: "Filter by Mode" });
     this.genreFilter = page.getByRole("button", { name: "Filter by Genre" });
@@ -1201,7 +1201,10 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!isPanelSearchVisible) {
-        await this.page.waitForTimeout(50); // Trying to help flaky test
+        await expect(this.filtersButton).toBeVisible();
+        await expect(this.filtersButton).toBeAttached();
+        await expect(this.filtersButton).toBeEnabled();
+        await this.page.waitForTimeout(250); // Trying to help flaky test
         await this.filtersButton.click();
         await expect(this.searchBoxPanel).toBeVisible();
         await expect(this.searchBoxPanel).toBeAttached();
@@ -1393,9 +1396,41 @@ export class TuneTreesPage {
   /**
    * Filter by type (Jig, Reel, etc.)
    */
-  async filterByGenre(genre: string) {
+  async filterByGenre(
+    genre: string,
+    gridId: string = "catalog",
+    nRowsTest = 10
+  ) {
+    const rowsLocator = this.getRows(gridId);
+
+    await expect
+      .poll(async () => await rowsLocator.count().catch(() => 0), {
+        timeout: 10_000,
+        intervals: [100, 250, 500, 1000],
+      })
+      .toBeGreaterThan(nRowsTest);
+
+    const rowsCount = await rowsLocator.count();
+    expect(rowsCount).toBeGreaterThan(nRowsTest);
+
+    // Ensure panel is closed before trying to open it
+    // (might still be closing from a previous filter operation)
+    await expect(this.searchBoxPanel)
+      .not.toBeVisible({ timeout: 2000 })
+      .catch(() => {});
+
+    // Wait for filters button to be enabled - it's disabled while genres/playlists load
+    await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
+    await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
+
     await this.filtersButton.click();
-    await this.page.waitForTimeout(500);
+
+    await this.page.waitForTimeout(250);
+
+    await expect(this.genreFilter).toBeVisible({ timeout: 5000 });
+    await expect(this.genreFilter).toBeEnabled({ timeout: 10000 });
+    await this.page.waitForTimeout(250);
+
     await this.genreFilter.click();
     await this.page.waitForTimeout(500);
 
@@ -1403,10 +1438,15 @@ export class TuneTreesPage {
       name: genre,
     });
 
-    await option.isVisible();
-    await option.setChecked(true);
-    await this.page.waitForTimeout(1000);
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(option).toBeEnabled({ timeout: 10000 });
+    await this.page.waitForTimeout(250);
+
+    await option.click();
+    await expect(option).toBeChecked({ timeout: 1000 });
+
     await this.filtersButton.click();
+    await expect(option).not.toBeVisible({ timeout: 5000 });
   }
 
   /**
