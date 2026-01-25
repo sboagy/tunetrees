@@ -241,6 +241,11 @@ export const AuthProvider: ParentComponent = (props) => {
   let syncServiceInstance: SyncService | null = null;
   let autoPersistCleanup: (() => void) | null = null;
 
+  // Catalog reconciliation tracking
+  let catalogSelectionReconciledKey: string | null = null;
+  let reconcileRunCount = 0;
+  const RECONCILE_CHECK_INTERVAL = 10; // Check for drift every 10 syncs (~50 seconds)
+
   // Track if database is being initialized to prevent double initialization
   let isInitializing = false;
 
@@ -408,6 +413,39 @@ export const AuthProvider: ParentComponent = (props) => {
         required,
         playlistDefaults,
       });
+
+      const selectedKey = [...selected].sort().join(",");
+      const requiredKey = [...required].sort().join(",");
+      const playlistDefaultsKey = [...playlistDefaults].sort().join(",");
+      const tuneGenresKey = [...tuneGenres].sort().join(",");
+      const reconcileKey = [
+        params.userId,
+        `selected:${selectedKey}`,
+        `required:${requiredKey}`,
+        `defaults:${playlistDefaultsKey}`,
+        `tunes:${tuneGenresKey}`,
+        `playlistCount:${playlistCount}`,
+        `playlistTuneCount:${playlistTuneCount}`,
+      ].join("|");
+
+      // Smart guard: Run reconciliation if:
+      // 1. First run (key is null), OR
+      // 2. Selection inputs changed (key mismatch), OR
+      // 3. Periodic check (every Nth sync for self-healing)
+      const shouldReconcile =
+        catalogSelectionReconciledKey !== reconcileKey ||
+        reconcileRunCount % RECONCILE_CHECK_INTERVAL === 0;
+
+      reconcileRunCount++;
+
+      if (!shouldReconcile) {
+        diagLog(
+          "🔎 [AuthContext] Skipping reconciliation (no changes, not periodic check)"
+        );
+        return;
+      }
+
+      catalogSelectionReconciledKey = reconcileKey;
 
       let effectiveSelected: string[] = [];
 
@@ -1771,6 +1809,8 @@ export const AuthProvider: ParentComponent = (props) => {
    */
   const signOut = async () => {
     setLoading(true);
+    catalogSelectionReconciledKey = null;
+    reconcileRunCount = 0;
 
     // For anonymous users, DON'T call supabase.auth.signOut()
     // This preserves their session so they can return to the same account
