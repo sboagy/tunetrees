@@ -21,4 +21,4 @@ SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # SYNC_DIAGNOSTICS_USER_ID = "<supabase-auth-uid>"
 
 [observability]
-enabled = false
+enabled = true
