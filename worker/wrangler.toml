@@ -8,6 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "541252cc94ca43cf83aa01ec4936726f"
+localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 [vars]
 SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
