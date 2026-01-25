@@ -708,7 +708,7 @@ RENAME TO `table_transient_data`;
 --> statement-breakpoint
 CREATE TABLE
 	`__new_tag` (
-		`id` text PRIMARY KEY NOT NULL,
+		`tag_id` text PRIMARY KEY NOT NULL,
 		`user_ref` text NOT NULL,
 		`tune_ref` text NOT NULL,
 		`tag_text` text NOT NULL,
@@ -722,7 +722,7 @@ CREATE TABLE
 --> statement-breakpoint
 INSERT INTO
 	`__new_tag` (
-		"id",
+		"tag_id",
 		"user_ref",
 		"tune_ref",
 		"tag_text",
@@ -731,7 +731,7 @@ INSERT INTO
 		"device_id"
 	)
 SELECT
-	"id",
+	"tag_id",
 	"user_ref",
 	"tune_ref",
 	"tag_text",
