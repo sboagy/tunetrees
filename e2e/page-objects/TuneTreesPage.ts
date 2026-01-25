@@ -1674,6 +1674,7 @@ export class TuneTreesPage {
 
       await this.flashcardRevealToggle.click();
       await this.page.waitForTimeout(200);
+
       await expect(this.flashcardRevealToggle).toHaveAttribute(
         "aria-label",
         desiredLabel,
