@@ -1655,6 +1655,8 @@ export class TuneTreesPage {
    */
   async ensureReveal(desiredBack: boolean) {
     await expect(this.flashcardRevealToggle).toBeVisible({ timeout: 10_000 });
+    await expect(this.flashcardRevealToggle).toBeEnabled({ timeout: 10_000 });
+    await this.page.waitForTimeout(100);
 
     const desiredLabel = desiredBack ? /Show front/i : /Show back/i;
     for (let i = 0; i < 2; i++) {
@@ -1671,6 +1673,8 @@ export class TuneTreesPage {
       }
 
       await this.flashcardRevealToggle.click();
+      await this.page.waitForTimeout(200);
+
       await expect(this.flashcardRevealToggle).toHaveAttribute(
         "aria-label",
         desiredLabel,
