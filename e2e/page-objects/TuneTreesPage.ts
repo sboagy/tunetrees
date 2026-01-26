@@ -1207,9 +1207,15 @@ export class TuneTreesPage {
         await expect(this.filtersButton).toBeVisible();
         await expect(this.filtersButton).toBeAttached();
         await expect(this.filtersButton).toBeEnabled();
-        await this.page.waitForTimeout(250); // Trying to help flaky test
+        
+        // Click and wait for panel to open by checking aria-expanded
         await this.filtersButton.click();
-        await expect(this.searchBoxPanel).toBeVisible();
+        
+        // Wait for aria-expanded="true" to confirm state update
+        await expect(this.filtersButton).toHaveAttribute('aria-expanded', 'true', { timeout: 3000 });
+        
+        // Then wait for the search panel to actually become visible
+        await expect(this.searchBoxPanel).toBeVisible({ timeout: 3000 });
         await expect(this.searchBoxPanel).toBeAttached();
         await expect(this.searchBoxPanel).toBeEnabled();
       }
