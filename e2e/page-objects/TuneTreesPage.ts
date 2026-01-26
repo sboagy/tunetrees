@@ -260,14 +260,14 @@ export class TuneTreesPage {
 
     // Search & Filters
     this.searchBox = page.getByPlaceholder(/Search/i);
-    this.searchBoxPanel = page.getByTestId("search-box-panel");
-    this.filtersButton = page.getByTestId("filters-button");
-    this.typeFilter = page.getByRole("button", { name: "Filter by Type" });
-    this.modeFilter = page.getByRole("button", { name: "Filter by Mode" });
-    this.genreFilter = page.getByRole("button", { name: "Filter by Genre" });
-    this.playlistFilter = page.getByRole("button", {
-      name: "Filter by Playlist",
+    this.searchBoxPanel = page.getByRole("textbox", {
+      name: "Search tunes...",
     });
+    this.filtersButton = page.getByTestId("filters-button");
+    this.typeFilter = page.getByTestId("filter-dropdown-type");
+    this.modeFilter = page.getByTestId("filter-dropdown-mode");
+    this.genreFilter = page.getByTestId("filter-dropdown-genre");
+    this.playlistFilter = page.getByTestId("filter-dropdown-playlist");
     this.clearFilters = page.getByRole("button", { name: /^Clear All/i });
 
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
@@ -1072,6 +1072,20 @@ export class TuneTreesPage {
     await this.page.waitForTimeout(2000); // Allow sync to start
   }
 
+  async getColumnIndexByHeaderTextViaLocator(
+    gridLocator: Locator,
+    columnHeaderText: string
+  ) {
+    const headers = gridLocator.locator("thead th");
+    const headerTexts = await headers.allTextContents();
+    const columnIndex = headerTexts.findIndex((text) =>
+      new RegExp(columnHeaderText, "i").test(text)
+    );
+
+    // Allow -1 as a return
+    return columnIndex;
+  }
+
   /**
    * Finds the index of a column in a grid by its header text.
    * @param gridTestId The data-testid of the grid container.
@@ -1186,9 +1200,38 @@ export class TuneTreesPage {
    */
   async searchForTune(tuneTitle: string, grid: Locator): Promise<void> {
     // Check if toolbar search box is visible (desktop view)
-    const isToolbarSearchVisible = await this.searchBox
-      .isVisible({ timeout: 1000 })
-      .catch(() => false);
+    const isToolbarSearchVisible = await (async () => {
+      const blockStartMs = Date.now();
+      try {
+        const timeoutMs = 5000;
+        const pollIntervalMs = 250;
+        const startMs = Date.now();
+
+        // Poll until toolbar search appears (desktop) or filter button appears (mobile).
+        // Early exit if filter button is visible, indicating mobile layout.
+        while (Date.now() - startMs < timeoutMs) {
+          const visible = await this.searchBox
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (visible) return true;
+          // If the filter button is visible already, we should be in mobile view,
+          // so go ahead and take this as a quick indication that we're in mobile view
+          // and exit the loop early.
+          const filtersVisible = await this.filtersButton
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (filtersVisible) return false;
+          await this.page.waitForTimeout(pollIntervalMs);
+        }
+
+        return false;
+      } finally {
+        const elapsedMs = Date.now() - blockStartMs;
+        console.log(
+          `[searchForTune] toolbar search visibility check took ${elapsedMs}ms`
+        );
+      }
+    })();
 
     if (isToolbarSearchVisible) {
       // Desktop: use toolbar search box
@@ -1200,28 +1243,63 @@ export class TuneTreesPage {
     } else {
       // Mobile: open filter panel if needed and use search box inside
       const isPanelSearchVisible = await this.searchBoxPanel
-        .isVisible({ timeout: 1000 })
+        .isVisible({ timeout: 2000 })
         .catch(() => false);
 
       if (!isPanelSearchVisible) {
         await expect(this.filtersButton).toBeVisible();
         await expect(this.filtersButton).toBeAttached();
         await expect(this.filtersButton).toBeEnabled();
-        
-        // Click and wait for panel to open by checking aria-expanded
-        await this.filtersButton.click();
-        
+
+        const isClickSuccessful = await (async () => {
+          const blockStartMs = Date.now();
+          try {
+            const timeoutMs = 8000;
+            const pollIntervalMs = 250;
+            const startMs = Date.now();
+
+            // Poll for successful panel opening after clicking filter button.
+            // Success is indicated by aria-expanded attribute being set.
+            while (Date.now() - startMs < timeoutMs) {
+              await this.filtersButton.click();
+              await this.page.waitForTimeout(100);
+              const ariaExpanded = await this.filtersButton
+                .getAttribute("aria-expanded")
+                .catch(() => null);
+
+              if (ariaExpanded) return true;
+              await this.page.waitForTimeout(pollIntervalMs);
+            }
+
+            return false;
+          } finally {
+            const elapsedMs = Date.now() - blockStartMs;
+            console.log(
+              `[searchForTune] toolbar search panel (mobile) visibility check took ${elapsedMs}ms`
+            );
+          }
+        })();
+
+        expect(isClickSuccessful).toBe(true);
+
         // Wait for aria-expanded="true" to confirm state update
-        await expect(this.filtersButton).toHaveAttribute('aria-expanded', 'true', { timeout: 3000 });
-        
-        // Then wait for the search panel to actually become visible
-        await expect(this.searchBoxPanel).toBeVisible({ timeout: 3000 });
-        await expect(this.searchBoxPanel).toBeAttached();
-        await expect(this.searchBoxPanel).toBeEnabled();
+        await expect(this.filtersButton).toHaveAttribute(
+          "aria-expanded",
+          "true",
+          { timeout: 3000 }
+        );
+
+        const genreButton = this.genreFilter;
+
+        await expect(genreButton).toBeVisible();
+        await expect(genreButton).toBeAttached();
+        await expect(genreButton).toBeEnabled();
       }
 
+      await expect(this.searchBoxPanel).toBeVisible();
+      await expect(this.searchBoxPanel).toBeAttached();
+      await expect(this.searchBoxPanel).toBeEditable();
       await this.searchBoxPanel.fill(tuneTitle);
-      await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
 
       // Ensure the filter panel is closed so the grid is interactable.
       // (The panel may already be open from earlier steps.)
@@ -1239,6 +1317,42 @@ export class TuneTreesPage {
           await this.page.keyboard.press("Escape").catch(() => {});
         }
         await this.page.waitForTimeout(300);
+      }
+      const noTunesFoundLocator = this.page.getByText("No tunes found");
+
+      const dataRows = grid.locator("tbody tr[data-index], tbody tr");
+      const firstRow = dataRows.nth(1);
+      const titleColumnIndex = await this.getColumnIndexByHeaderTextViaLocator(
+        grid,
+        "Title"
+      );
+
+      let firstRowTitle = "";
+      if (titleColumnIndex > -1) {
+        for (let attempt = 0; attempt < 6; attempt++) {
+          firstRowTitle = await firstRow
+            .locator(`td:nth-child(${titleColumnIndex + 1})`)
+            .innerText();
+
+          if (firstRowTitle === tuneTitle) break;
+
+          await this.page.waitForTimeout(200);
+
+          const noTunesWereFound = await noTunesFoundLocator
+            .isVisible({ timeout: 100 })
+            .catch(() => false);
+
+          if (noTunesWereFound) {
+            break;
+          }
+        }
+      }
+      const noTunesWereFound = await noTunesFoundLocator
+        .isVisible({ timeout: 100 })
+        .catch(() => false);
+
+      if (!noTunesWereFound) {
+        expect(firstRowTitle).toContain(tuneTitle);
       }
     }
 
