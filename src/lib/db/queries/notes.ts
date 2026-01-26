@@ -97,7 +97,7 @@ export async function createNote(
     .get();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -140,7 +140,7 @@ export async function updateNote(
     .get();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -172,7 +172,7 @@ export async function updateNoteOrder(
       })
       .where(eq(schema.note.id, noteIds[i]));
   }
-  
+
   // CRITICAL: Persist to IndexedDB immediately after batch updates
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -199,7 +199,7 @@ export async function deleteNote(
     .get();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();

@@ -252,11 +252,16 @@ export class SyncService {
       // SQLite + outbox. If user refreshes before auto-persist fires, it's lost.
       try {
         await getSyncRuntime().persistDb?.();
-        console.log("[SyncService] ✅ Persisted DB after sync failure to protect user data");
+        console.log(
+          "[SyncService] ✅ Persisted DB after sync failure to protect user data"
+        );
       } catch (persistError) {
-        console.warn("[SyncService] ⚠️ Failed to persist DB after sync error:", persistError);
+        console.warn(
+          "[SyncService] ⚠️ Failed to persist DB after sync error:",
+          persistError
+        );
       }
-      
+
       // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);

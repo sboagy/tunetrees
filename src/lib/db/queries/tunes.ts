@@ -263,7 +263,7 @@ export async function createTune(
     .returning();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -312,7 +312,7 @@ export async function updateTune(
     .returning();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -372,7 +372,7 @@ export async function deleteTune(
     .where(eq(schema.tune.id, tuneId));
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();

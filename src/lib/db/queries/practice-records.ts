@@ -80,7 +80,7 @@ export async function createPracticeRecord(
     lastModifiedAt: now,
     deviceId: "local",
   });
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -132,7 +132,7 @@ export async function updatePracticeRecord(
     .update(practiceRecord)
     .set(updateData)
     .where(eq(practiceRecord.id, recordId));
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
@@ -149,7 +149,7 @@ export async function deletePracticeRecord(
   recordId: string
 ): Promise<void> {
   await db.delete(practiceRecord).where(eq(practiceRecord.id, recordId));
-  
+
   // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
