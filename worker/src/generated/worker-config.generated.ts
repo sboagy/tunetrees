@@ -394,7 +394,7 @@ export const WORKER_SYNC_CONFIG =
         }
       },
       "table_transient_data": {
-        "denyDelete": true,
+        "denyDelete": false,
         "sanitize": {
           "coerceNumericProps": [
             {

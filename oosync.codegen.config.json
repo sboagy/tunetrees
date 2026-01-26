@@ -45,6 +45,9 @@
     "config": {
       "push": {
         "tableRules": {
+          "table_transient_data": {
+            "denyDelete": false
+          },
           "practice_record": {
             "denyDelete": true,
             "upsert": {
