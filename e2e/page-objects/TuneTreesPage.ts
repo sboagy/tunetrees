@@ -1554,12 +1554,20 @@ export class TuneTreesPage {
     await expect(this.genreFilter).toBeEnabled({ timeout: 10000 });
     await this.page.waitForTimeout(250);
 
-    await this.genreFilter.click();
-    await this.page.waitForTimeout(500);
-
     const option = this.page.getByRole("checkbox", {
       name: genre,
     });
+
+    for (let attempt = 0; attempt < 7; attempt++) {
+      await this.genreFilter.click();
+      await this.page.waitForTimeout(250);
+
+      const isVisible = await option
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (isVisible) break;
+      await this.page.waitForTimeout(250);
+    }
 
     await expect(option).toBeVisible({ timeout: 5000 });
     await expect(option).toBeEnabled({ timeout: 10000 });
