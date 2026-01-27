@@ -247,6 +247,21 @@ export class SyncService {
 
       return result;
     } catch (error) {
+      // CRITICAL: Persist DB on sync failure to prevent data loss on refresh
+      // When sync fails (e.g., constraint violation), the data is still in local
+      // SQLite + outbox. If user refreshes before auto-persist fires, it's lost.
+      try {
+        await getSyncRuntime().persistDb?.();
+        console.log(
+          "[SyncService] ✅ Persisted DB after sync failure to protect user data"
+        );
+      } catch (persistError) {
+        console.warn(
+          "[SyncService] ⚠️ Failed to persist DB after sync error:",
+          persistError
+        );
+      }
+
       // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);

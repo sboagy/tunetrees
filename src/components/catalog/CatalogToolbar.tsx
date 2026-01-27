@@ -232,6 +232,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               value={props.searchQuery}
               onInput={(e) => props.onSearchChange(e.currentTarget.value)}
               class={TOOLBAR_SEARCH_INPUT}
+              data-testid="search-box-panel"
             />
           </div>
 
