@@ -143,6 +143,7 @@ const FilterDropdown: Component<{
         aria-label={`Filter by ${props.title}`}
         aria-expanded={isOpen()}
         aria-haspopup="listbox"
+        data-testid={`filter-dropdown-${props.title.toLowerCase()}`}
       >
         <span>{props.title}</span>
         <Show when={props.loading}>
