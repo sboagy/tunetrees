@@ -47,6 +47,11 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
     await ttPage.onboardingGenreContinueButton.click();
 
     await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+    await page.getByRole("button", { name: "Got it!" }).click();
+
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+
     await page.waitForURL(/\?tab=catalog/, { timeout: 15000 });
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
     await expect(ttPage.onboardingGenreContinueButton).toBeHidden({
