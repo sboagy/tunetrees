@@ -58,9 +58,34 @@ CREATE INDEX IF NOT EXISTS idx_user_genre_selection_genre
 
 **Objective**: Add genre filtering to sync requests without hardcoding app logic into oosync
 
+---
+
+### ⚠️ CRITICAL: Pre-Sync Metadata Requirement ⚠️
+
+**Scope**: This pre-sync + genre filter sequence runs **only** when `requestOverridesProvider` is configured **and** the user is authenticated. If either is missing, run the normal sync with no genre filtering.
+
+**Before calculating the genre filter, we MUST pre-fetch small metadata tables:**
+- `user_profile` (for FK constraints)
+- `user_genre_selection` (explicit genre choices)
+- `playlist` (playlist metadata with genre_default)
+
+**Then calculate genre filter** (including Postgres query for initial sync to find existing playlist_tune genres)
+
+**Then run existing sync** with genre filter applied via `requestOverridesProvider`
+
+**The genre filter restricts WHICH rows get synced, not the sync table ordering** (existing sync engine already handles FK constraint ordering).
+
+See section 2.3 below for detailed implementation.
+
+---
+
 ### 2.1 Design: SyncRequestOverrides Extension
 
 **Strategy**: Use existing `requestOverridesProvider` callback pattern in oosync to inject genre filter at runtime.
+
+**CRITICAL**: Genre filter calculation requires **different queries** for initial vs incremental sync:
+- **Initial sync**: Must query POSTGRES via Supabase client (no local data exists)
+- **Incremental sync**: Can query LOCAL SQLite (local data already exists)
 
 ```typescript
 // App-side (src/lib/sync/genre-filter.ts)
@@ -70,35 +95,78 @@ interface GenreFilterOverrides {
 }
 
 async function buildGenreFilterOverrides(
-  db: SqliteDatabase, 
-  userId: string
+  db: SqliteDatabase,
+  supabase: SupabaseClient, // ← CRITICAL: Need Supabase client for Postgres queries
+  userId: string,
+  isInitialSync: boolean
 ): Promise<SyncRequestOverrides> {
-  // 1. Fetch user's selected genres from user_genre_selection
+  // PREREQUISITE: This function is called AFTER Phase 0 metadata pre-fetch
+  // So user_genre_selection and playlist tables already exist in LOCAL SQLite
+  
+  // 1. Fetch user's selected genres from user_genre_selection (LOCAL SQLite)
+  //    Available because Phase 0 synced this table
   const selectedGenres = await db
     .select({ genreId: userGenreSelection.genreId })
     .from(userGenreSelection)
     .where(eq(userGenreSelection.userId, userId));
   
-  // 2. Fetch genres from user's existing playlists (for incremental sync)
-  //    This solves chicken-egg: we only need to preserve genres already in local DB
-  const playlistGenres = await db.execute(sql`
-    SELECT DISTINCT t.genre 
-    FROM playlist_tune pt
-    INNER JOIN tune t ON pt.tune_ref = t.id
-    WHERE pt.playlist_ref IN (
-      SELECT playlist_id FROM playlist WHERE user_ref = ${userId}
-    )
-    AND t.genre IS NOT NULL
-  `);
+  // 2. Fetch genres from playlist.genre_default (LOCAL SQLite)
+  //    Available because Phase 0 synced this table
+  const playlistDefaultGenres = await db
+    .select({ genre: playlist.genreDefault })
+    .from(playlist)
+    .where(
+      and(
+        eq(playlist.userRef, userId),
+        isNotNull(playlist.genreDefault)
+      )
+    );
+  
+  // 3. Fetch genres from playlist_tune relationships
+  //    CRITICAL: Initial sync queries POSTGRES, incremental queries LOCAL SQLite
+  let playlistTuneGenres: string[] = [];
+  
+  if (isInitialSync) {
+    // INITIAL SYNC: Query POSTGRES (local playlist_tune doesn't exist yet!)
+    const { data } = await supabase
+      .from('playlist_tune')
+      .select('tune!inner(genre)')
+      .in('playlist_ref', 
+        await db.select({ id: playlist.playlistId }).from(playlist).where(eq(playlist.userRef, userId))
+      )
+      .not('tune.genre', 'is', null);
+    
+    playlistTuneGenres = [...new Set(data?.map(pt => pt.tune.genre) || [])];
+  } else {
+    // INCREMENTAL SYNC: Query LOCAL SQLite (playlist_tune + tune already synced)
+    const result = await db.execute(sql`
+      SELECT DISTINCT t.genre
+      FROM playlist_tune pt
+      INNER JOIN tune t ON pt.tune_ref = t.id
+      INNER JOIN playlist p ON pt.playlist_ref = p.playlist_id
+      WHERE p.user_ref = ${userId}
+      AND t.genre IS NOT NULL
+    `);
+    playlistTuneGenres = result.map(r => r.genre);
+  }
   
   return {
     genreFilter: {
-      selectedGenreIds: selectedGenres.map(g => g.genreId),
-      playlistGenreIds: playlistGenres.map(g => g.genre),
+      selectedGenreIds: [
+        ...selectedGenres.map(g => g.genreId),
+        ...playlistDefaultGenres.map(g => g.genre),
+        ...playlistTuneGenres
+      ],
+      playlistGenreIds: playlistTuneGenres, // For logging/debugging
     }
   };
 }
 ```
+
+**Key differences**:
+- ✅ Initial sync: `supabase.from('playlist_tune')` (Postgres query)
+- ✅ Incremental sync: `db.execute(sql...)` (SQLite query)
+- ✅ Both return the same genre list, just from different sources
 
 ### 2.2 Worker Implementation (Generic)
 
@@ -153,67 +221,294 @@ function applyGenreFilter(
 - ✅ Optional: Falls back to full pull if no overrides provided
 - ✅ App-controlled: Genre logic lives in app, oosync just applies filters
 
-### 2.3 Chicken-Egg Resolution Strategy
+### 2.3 Pre-Sync Metadata and Genre Filter Calculation
 
-**Problem**: To filter tunes by genre, we need to know genres. But genres come from:
+**Problem**: To filter tunes by genre, we need to know which genres to include. Genres come from:
 1. `user_genre_selection` (explicit selections)
-2. `playlist_tune` → `tune.genre` (implicit from existing playlists)
+2. `playlist.genre_default` (playlist-level genre)
+3. `playlist_tune` → `tune.genre` (implicit from existing playlists on Postgres)
 
-**Solution**: Two-phase filter
+**Solution**: Pre-fetch metadata, then calculate genre filter
 
-**Initial Sync (Cold Start)**:
-```
-1. Pull user_genre_selection first (small table, <10 rows)
-2. Pull tunes filtered by selected genres only
-3. Pull references filtered by selected genres only
-4. Pull playlist_tune (will only reference tunes we already have)
-```
+### Step 1: Pre-Sync Metadata Fetch
 
-**Incremental Sync (Warm)**:
-```
-1. Fetch genres from local playlist_tune JOIN tune (already in SQLite)
-2. Combine with user_genre_selection
-3. Pull only tunes/references matching combined filter
-4. Preserves existing playlist data while respecting new selections
-```
+**Before the main sync**, fetch small metadata tables needed to calculate the genre filter:
 
-**Code**:
 ```typescript
-async function getEffectiveGenreFilter(
-  db: SqliteDatabase,
-  userId: string,
-  isInitialSync: boolean
-): Promise<string[]> {
-  if (isInitialSync) {
-    // Cold start: only explicit selections
-    const selected = await db
-      .select({ genreId: userGenreSelection.genreId })
-      .from(userGenreSelection)
-      .where(eq(userGenreSelection.userId, userId));
-    return selected.map(g => g.genreId);
-  } else {
-    // Incremental: explicit + implicit from playlists
-    const explicit = await db
-      .select({ genreId: userGenreSelection.genreId })
-      .from(userGenreSelection)
-      .where(eq(userGenreSelection.userId, userId));
-    
-    const implicit = await db.execute(sql`
-      SELECT DISTINCT t.genre
-      FROM playlist_tune pt
-      INNER JOIN tune t ON pt.tune_ref = t.id
-      INNER JOIN playlist p ON pt.playlist_ref = p.playlist_id
-      WHERE p.user_ref = ${userId}
-      AND t.genre IS NOT NULL
-    `);
-    
-    return [...new Set([
-      ...explicit.map(g => g.genreId),
-      ...implicit.map(g => g.genre)
-    ])];
-  }
+async function preSyncMetadata(userId: string): Promise<void> {
+  // Pre-fetch user_profile FIRST (FK constraint: user_genre_selection + playlist reference it)
+  await syncTable('user_profile', { filter: { user_id: userId } });
+  
+  // Then fetch genre selection and playlists
+  await syncTable('user_genre_selection', { noFilter: true });
+  await syncTable('playlist', { noFilter: true });
 }
 ```
+
+**Why these tables**:
+- `user_profile` (~1 row) - FK parent for user_genre_selection and playlist
+- `user_genre_selection` (~10 rows) - explicit genre choices
+- `playlist` (~5 rows) - playlist metadata (including genre_default)
+
+**Performance**: Total ~20 rows, <50ms
+
+### Step 2: Calculate Effective Genre Filter
+
+**Initial Sync (Cold Start - NO local data)**:
+```typescript
+async function getEffectiveGenreFilter_InitialSync(
+  db: SqliteDatabase,
+  postgresClient: SupabaseClient,
+  userId: string
+): Promise<string[]> {
+  // Local SQLite has NO tune data yet, so can't query LOCAL playlist_tune
+  // But we MUST query POSTGRES playlist_tune to avoid orphans!
+  
+  // 1. Get explicit genre selections (from local, just synced)
+  const selected = await db
+    .select({ genreId: userGenreSelection.genreId })
+    .from(userGenreSelection)
+    .where(eq(userGenreSelection.userId, userId));
+  
+  // 2. Get implicit genres from playlist.genre_default (from local, just synced)
+  const playlistGenres = await db
+    .select({ genre: playlist.genreDefault })
+    .from(playlist)
+    .where(
+      and(
+        eq(playlist.userRef, userId),
+        isNotNull(playlist.genreDefault)
+      )
+    );
+  
+  // 3. Get genres from EXISTING playlist_tune relationships on POSTGRES
+  //    (Critical: user may have deselected genres but still has tunes in playlists)
+  const { data: playlistTuneGenres } = await postgresClient
+    .from('playlist_tune')
+    .select(`
+      tune!inner(genre)
+    `)
+    .eq('playlist.user_ref', userId)
+    .not('tune.genre', 'is', null);
+  
+  const playlistTuneGenreIds = [
+    ...new Set(playlistTuneGenres?.map(pt => pt.tune.genre) || [])
+  ];
+  
+  // 4. Combine all three sources
+  return [...new Set([
+    ...selected.map(g => g.genreId),
+    ...playlistGenres.map(g => g.genre),
+    ...playlistTuneGenreIds
+  ])];
+}
+```
+
+**Incremental Sync (Warm - has local data)**:
+```typescript
+async function getEffectiveGenreFilter_IncrementalSync(
+  db: SqliteDatabase,
+  userId: string
+): Promise<string[]> {
+  // 1. Get explicit selections (from just-synced metadata)
+  const explicit = await db
+    .select({ genreId: userGenreSelection.genreId })
+    .from(userGenreSelection)
+    .where(eq(userGenreSelection.userId, userId));
+  
+  // 2. Get implicit genres from LOCAL playlist_tune + tune data
+  //    (This queries LOCAL SQLite, not Postgres!)
+  const implicit = await db.execute(sql`
+    SELECT DISTINCT t.genre
+    FROM playlist_tune pt
+    INNER JOIN tune t ON pt.tune_ref = t.id
+    INNER JOIN playlist p ON pt.playlist_ref = p.playlist_id
+    WHERE p.user_ref = ${userId}
+    AND t.genre IS NOT NULL
+  `);
+  
+  // 3. Combine both sources (prevents orphaning existing playlist data)
+  return [...new Set([
+    ...explicit.map(g => g.genreId),
+    ...implicit.map(g => g.genre)
+  ])];
+}
+```
+
+---
+
+### Critical Scenario: Why Postgres Query is Required
+
+**Concrete Example**:
+
+1. **Day 1**: User selects [Irish, Scottish, Folk] in genre settings
+2. **Day 2**: User adds 50 Folk tunes to "My Folk Favorites" playlist
+3. **Day 3**: User changes genre selection to [Irish, Scottish] (removes Folk)
+4. **Day 4**: User does cold start sync (new device or cleared browser data)
+
+**What happens without the Postgres query**:
+```
+❌ Calculate genre filter
+   - user_genre_selection: [Irish, Scottish]
+   - playlist.genre_default: [Irish, Scottish]
+   - Effective filter: [Irish, Scottish]
+   
+❌ Main sync runs
+   - Fetches only Irish and Scottish tunes
+   - Folk tunes NOT synced
+   
+❌ When sync reaches playlist_tune
+   - Tries to sync "My Folk Favorites" playlist
+   - 50 playlist_tune rows reference Folk tunes
+   - Folk tunes don't exist locally
+   - ORPHANS! Playlist is broken
+```
+
+**What happens WITH the Postgres query**:
+```
+✅ Calculate genre filter
+   - user_genre_selection: [Irish, Scottish]
+   - playlist.genre_default: [Irish, Scottish]
+   - Postgres playlist_tune query: [Irish, Scottish, Folk] ← Finds deselected genre!
+   - Effective filter: [Irish, Scottish, Folk]
+   
+✅ Main sync runs
+   - Fetches Irish, Scottish, AND Folk tunes
+   - All 50 Folk tunes synced
+   
+✅ When sync reaches playlist_tune
+   - Syncs "My Folk Favorites" playlist
+   - All 50 playlist_tune rows find their tunes
+   - NO ORPHANS! Playlist works correctly
+```
+
+**Key insight**: User's `playlist_tune` data represents a **stronger commitment** than `user_genre_selection`. You can deselect a genre in settings, but if you have tunes from that genre in playlists, you still need them.
+
+---
+
+### Step 3: Orchestrate Pre-Sync in requestOverridesProvider
+
+**The `requestOverridesProvider` callback orchestrates the pre-fetch and filter calculation:**
+
+**Guard**: Only run this callback for authenticated users. If there is no active session or no provider configured, skip pre-sync and run the normal sync without a genre filter.
+
+```typescript
+// In AuthContext or sync initialization
+const syncEngine = new SyncEngine({
+  // ... existing config
+  requestOverridesProvider: async () => {
+    const isInitialSync = !syncEngine.lastSyncTimestamp;
+    
+    // 1. Pre-fetch metadata using direct worker calls
+    await preSyncMetadataViaWorker(workerClient, userId);
+    
+    // 2. Calculate genre filter from now-populated local state
+    const genreFilter = isInitialSync
+      ? await getEffectiveGenreFilter_InitialSync(db, supabase, userId)
+      : await getEffectiveGenreFilter_IncrementalSync(db, userId);
+    
+    // 3. Return filter for main sync
+    return {
+      genreFilter: {
+        selectedGenreIds: genreFilter,
+        playlistGenreIds: genreFilter,
+      }
+    };
+  }
+});
+```
+
+**Pre-Sync Helper (Calls Worker Directly)**:
+
+```typescript
+async function preSyncMetadataViaWorker(
+  workerClient: WorkerClient,
+  userId: string
+): Promise<void> {
+  // Pull only metadata tables using pullTables override
+  const response = await workerClient.sync([], undefined, {
+    overrides: {
+      pullTables: ['user_profile', 'user_genre_selection', 'playlist']
+    }
+  });
+  
+  // Apply changes to local DB (user_profile, user_genre_selection, playlist)
+  await applyChangesToLocalDB(response.changes);
+}
+```
+
+**Key Points**:
+- ✅ `requestOverridesProvider` orchestrates pre-fetch before returning filter
+- ✅ Uses direct worker call with `pullTables` override for metadata
+- ✅ Existing sync engine runs normally after provider returns
+- ✅ Genre filter restricts rows from `tune` and `reference` tables only
+- ✅ Table ordering and FK constraints handled by existing engine
+
+---
+
+### Summary: How Genre Filtering Works
+
+**The genre filter is just a filter, not a new sync sequence:**
+
+**When it applies**: Only when `requestOverridesProvider` is configured and the user is authenticated. Otherwise, sync runs normally with no filter.
+
+1. **Pre-sync step** (new): Fetch 3 small metadata tables (~20 rows, <50ms)
+2. **Calculate filter** (new): Combine user_genre_selection + playlist.genre_default + Postgres playlist_tune query
+3. **Run existing sync** (unchanged): Sync engine runs normally with genre filter applied via `requestOverridesProvider`
+
+**What changes**:
+- Worker applies genre filter to `tune` and `reference` queries: `.in('genre', allowedGenres)`
+- Result: 1,500 records synced instead of 6,925
+
+**What stays the same**:
+- Table sync order (existing FK constraint handling)
+- When `playlist_tune` syncs relative to `tune` (existing engine controls this)
+- Conflict resolution, outbox, error handling (all unchanged)
+
+**Key Invariants**:
+1. ✅ Metadata pre-fetch happens before main sync (20 rows, fast)
+2. ✅ Genre filter includes THREE sources: user_genre_selection + playlist.genre_default + Postgres playlist_tune genres
+3. ✅ Initial sync queries POSTGRES for playlist_tune genres (local SQLite is empty)
+4. ✅ Incremental sync queries LOCAL SQLite for playlist_tune genres (already synced)
+5. ✅ Existing sync engine handles all table ordering and FK constraints
+6. ✅ No orphans possible: filter always includes genres needed by existing playlist_tune rows
+  const isInitialSync = await isFirstSync(userId);
+  
+  // PHASE 0: Pre-fetch metadata (ALWAYS FIRST)
+  console.log('[Sync] Phase 0: Pre-fetching metadata...');
+  await preSyncMetadata(userId);
+  
+  // PHASE 1: Calculate genre filter
+  console.log('[Sync] Phase 1: Calculating genre filter...');
+  const genreFilter = isInitialSync
+    ? await getEffectiveGenreFilter_InitialSync(db, postgresClient, userId)
+    : await getEffectiveGenreFilter_IncrementalSync(db, userId);
+  
+  console.log(`[Sync] Genre filter: ${genreFilter.length} genres`);
+  console.log(`[Sync] Genres: ${genreFilter.join(', ')}`);
+  
+  // PHASE 2: Main sync with genre filter
+  console.log('[Sync] Phase 2: Syncing filtered data...');
+  await mainSync(userId, genreFilter);
+  
+  // PHASE 3: Post-sync relationships
+  console.log('[Sync] Phase 3: Syncing relationship tables...');
+  await postSyncRelationships(userId);
+  
+  console.log('[Sync] Complete!');
+}
+```
+
+**Critical detail**: Initial sync requires **one Postgres query** in Phase 1 to discover genres from existing `playlist_tune` relationships. This is a small, targeted query that prevents orphans.
+
+**Key Invariants**:
+1. ✅ Metadata tables (`user_genre_selection`, `playlist`) sync FIRST, before genre filter is calculated
+2. ✅ Genre filter queries LOCAL SQLite data for metadata, but POSTGRES for `playlist_tune` genres (on cold start)
+3. ✅ **Initial sync** includes genres from: `user_genre_selection` + `playlist.genre_default` + **Postgres `playlist_tune` → `tune.genre`**
+4. ✅ **Incremental sync** includes genres from: `user_genre_selection` + `playlist.genre_default` + **LOCAL `playlist_tune` → `tune.genre`**
+5. ✅ Main data tables (`tune`, `reference`) sync with genre filter applied
+6. ✅ Relationship tables (`playlist_tune`) sync LAST to avoid orphan references (all referenced tunes already exist)
+7. ✅ No orphans possible: genre filter always includes all genres needed by `playlist_tune`, even if user deselected them
 
 ---
 
@@ -375,11 +670,19 @@ if (SYNC_DIAGNOSTICS) {
 ### Sprint 2: Genre Filtering (3-5 days)
 **Goal**: Reduce data transfer by 75%
 
-- [ ] Implement `buildGenreFilterOverrides()` in app
+- [ ] Implement 3-phase sync sequencing:
+  - [ ] Phase 0: Pre-sync metadata fetch (`user_genre_selection`, `playlist`)
+  - [ ] Phase 1: Calculate effective genre filter from LOCAL SQLite
+  - [ ] Phase 2: Main sync with genre filter applied
+  - [ ] Phase 3: Post-sync relationship tables (`playlist_tune`)
+- [ ] Implement `preSyncMetadata()` in sync engine
+- [ ] Implement `getEffectiveGenreFilter_InitialSync()` for cold start
+- [ ] Implement `getEffectiveGenreFilter_IncrementalSync()` for warm sync
 - [ ] Wire up `requestOverridesProvider` in AuthContext
-- [ ] Add genre filter logic to worker (generic)
+- [ ] Add generic genre filter logic to worker (`oosync/worker/src/index.ts`)
 - [ ] Test with 2-genre vs 25-genre selections
-- [ ] Validate no data loss on genre changes
+- [ ] Validate no data loss on genre changes (orphan prevention)
+- [ ] Verify `playlist_tune` syncs AFTER `tune` to avoid orphan references
 
 **Expected Result**: 15s → 5-8s load time (1,500 records vs 6,925)
 
@@ -414,19 +717,16 @@ if (SYNC_DIAGNOSTICS) {
 - Initial sync: 5-8 seconds  
 - Records pulled: 1,500 (75% reduction)
 - Slow queries: 0
-- Network: 10-15 sequential requests
-
-**After Phase 3 (Parallel)**:
-- Initial sync: 2-3 seconds
-- Records pulled: 1,500
-- Slow queries: 0
-- Network: 3-4 parallel batches
-
----
-
-## Testing Strategy
-
-### Index Testing
+- [ ] Implement `preSyncMetadataViaWorker()` helper (direct worker call for user_profile, user_genre_selection, playlist)
+- [ ] Implement `applyChangesToLocalDB()` helper (apply metadata changes to SQLite)
+- [ ] Implement `getEffectiveGenreFilter_InitialSync()` (queries Postgres for playlist_tune genres)
+- [ ] Implement `getEffectiveGenreFilter_IncrementalSync()` (queries local SQLite for playlist_tune genres)
+- [ ] Wire up `requestOverridesProvider` in AuthContext to orchestrate pre-sync + filter calculation
+- [ ] Add `pullTables` support to worker if not already present
+- [ ] Add genre filter logic to worker (`oosync/worker/src/index.ts`)
+- [ ] Test with 2-genre vs 25-genre selections
+- [ ] Validate no data loss on genre changes (orphan prevention via Postgres query)
+- [ ] Verify existing sync engine handles table ordering correctly (no engine changes needed)
 ```sql
 -- Before index
 EXPLAIN ANALYZE 
