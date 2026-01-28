@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-supabase-sourcemaps.js",
     "dev": "vite",
     "dev:worker": "cd worker && npm run dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
