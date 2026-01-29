@@ -558,13 +558,25 @@ export const AuthProvider: ParentComponent = (props) => {
           const lastSyncAt =
             syncServiceInstance?.getLastSyncDownTimestamp?.() ?? null;
           if (!metadataPrefetchPromise) {
-            metadataPrefetchPromise = preSyncMetadataViaWorker({
+            // Get internal user ID for backfill
+            const internalId = await getUserInternalIdFromLocalDb(
               db,
-              supabase,
-              lastSyncAt,
-            }).finally(() => {
-              metadataPrefetchPromise = null;
-            });
+              authUserId
+            );
+            if (!internalId) {
+              console.warn(
+                "[AuthContext] No internal user ID for metadata pre-fetch, skipping"
+              );
+            } else {
+              metadataPrefetchPromise = preSyncMetadataViaWorker({
+                db,
+                supabase,
+                lastSyncAt,
+                userId: internalId,
+              }).finally(() => {
+                metadataPrefetchPromise = null;
+              });
+            }
           }
 
           await metadataPrefetchPromise;
@@ -651,6 +663,26 @@ export const AuthProvider: ParentComponent = (props) => {
         });
       } catch (error) {
         console.error("[AuthContext] Failed to build sync overrides:", error);
+        
+        // For anonymous users, return metadata-only fallback to preserve deferral strategy
+        // Returning null would cause a full catalog pull, defeating PR #405 goals
+        if (isAnonymousUser && catalogSyncPending()) {
+          console.warn(
+            "[AuthContext] Falling back to metadata-only sync for anonymous user"
+          );
+          return {
+            pullTables: [
+              "genre",
+              "genre_tune_type",
+              "tune_type",
+              "instrument",
+              "user_profile",
+              "user_genre_selection",
+              "playlist",
+            ],
+          };
+        }
+        
         return null;
       }
     };
