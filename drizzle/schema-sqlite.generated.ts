@@ -88,6 +88,7 @@ export const note = sqliteTable("note", {
   ...sqliteSyncColumns,
 }
 , (t) => [
+  index("idx_note_last_modified_at").on(t.lastModifiedAt),
   index("idx_note_tune_playlist").on(t.tuneRef, t.playlistRef),
   index("idx_note_tune_playlist_user_public").on(t.tuneRef, t.playlistRef, t.userRef, t.public),
   index("idx_note_tune_user").on(t.tuneRef, t.userRef),
@@ -295,6 +296,9 @@ export const tune = sqliteTable("tune", {
   releaseYear: integer("release_year"),
   ...sqliteSyncColumns,
 }
+, (t) => [
+  index("idx_tune_genre").on(t.genre),
+]
 );
 
 export const tuneOverride = sqliteTable("tune_override", {

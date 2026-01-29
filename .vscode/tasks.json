@@ -141,6 +141,15 @@
 				"kind": "build",
 				"isDefault": true
 			}
-		}
+		},
+		{
+            "label": "wipe-chrome-profile",
+            "type": "shell",
+            "command": "rm -rf ${workspaceFolder}/.vscode/chrome-session",
+            "presentation": {
+                "reveal": "silent", // Prevents the terminal from popping up unless there's an error
+                "close": true       // Automatically closes the terminal after the command finishes
+            },
+        }
 	]
 }
