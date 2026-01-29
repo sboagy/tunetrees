@@ -21,9 +21,18 @@ export interface SyncCollectionsOverride {
   selectedGenres?: string[];
 }
 
+export interface SyncGenreFilter {
+  /** Effective genre list used for filtering catalog pulls. */
+  selectedGenreIds: string[];
+  /** Genres inferred from existing playlist_tune relationships. */
+  playlistGenreIds: string[];
+}
+
 export interface SyncRequestOverrides {
   /** Optional per-request collections override (e.g., selected genres). */
   collectionsOverride?: SyncCollectionsOverride;
+  /** Optional genre filter for catalog pulls. */
+  genreFilter?: SyncGenreFilter;
   /** Optional allowlist of tables to pull for this sync. */
   pullTables?: string[];
 }
@@ -53,6 +62,8 @@ export interface SyncRequest<TTableName extends string = TableName> {
 
   /** Optional per-request overrides that affect pull behavior. */
   collectionsOverride?: SyncCollectionsOverride;
+  /** Optional genre filter for catalog pulls. */
+  genreFilter?: SyncGenreFilter;
   /** Optional allowlist of tables to pull for this sync. */
   pullTables?: string[];
 }

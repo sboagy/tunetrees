@@ -39,7 +39,9 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
       timeout: 15000,
     });
     await ttPage.onboardingGenreClearAllButton.click();
-    await ttPage.onboardingGenreCheckboxes.first().click();
+    await ttPage.page
+      .getByRole("checkbox", { name: "Blues - Blues", exact: true })
+      .click();
 
     await expect(ttPage.onboardingGenreContinueButton).toBeEnabled({
       timeout: 10000,

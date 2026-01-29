@@ -173,11 +173,11 @@ export async function getPlaylistGenreDefaultsForUser(
   userId: string
 ): Promise<string[]> {
   const rows = await db.all<{ genre: string | null }>(sql`
-    SELECT DISTINCT p.genre_default AS genre
-    FROM playlist p
-    WHERE p.deleted = 0
-      AND p.user_ref = ${userId}
-      AND p.genre_default IS NOT NULL
+    SELECT DISTINCT v.genre_default AS genre
+    FROM view_playlist_joined v
+    WHERE v.playlist_deleted = 0
+      AND v.user_ref = ${userId}
+      AND v.genre_default IS NOT NULL
   `);
 
   return rows

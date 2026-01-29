@@ -17,6 +17,7 @@ import type {
   SyncRequest,
   SyncResponse,
 } from "../../src/shared/protocol";
+import { debug, setDebugEnabled } from "./debug";
 import type { IPushTableRule, SyncSchemaDeps } from "./sync-schema";
 import { createSyncSchema } from "./sync-schema";
 
@@ -96,6 +97,7 @@ export function createWorker(artifacts: WorkerArtifacts) {
     syncableTables: artifacts.syncableTables,
     tableRegistryCore: artifacts.tableRegistryCore,
     workerSyncConfig: artifacts.workerSyncConfig,
+    schemaTables: artifacts.schemaTables,
   });
 
   SYNCABLE_TABLES = schema.SYNCABLE_TABLES;
@@ -265,6 +267,8 @@ export interface Env {
   DATABASE_URL?: string;
   SUPABASE_URL: string;
   SUPABASE_JWT_SECRET: string;
+  /** When "true", enables debug logging (console.log statements). */
+  WORKER_DEBUG?: string;
   /** When "true", emits extra sync diagnostics logs (initial sync only). */
   SYNC_DIAGNOSTICS?: string;
   /** Optional: only emit diagnostics when JWT sub matches this value. */
@@ -317,7 +321,7 @@ async function logPlaylistTuneInitialSyncDiagnostics(
     .from(playlistTune)
     .where(baseWhere);
 
-  console.log("[SYNC_DIAG] playlist_tune initial-sync snapshot", {
+  debug.log("[SYNC_DIAG] playlist_tune initial-sync snapshot", {
     userId: ctx.userId,
     userPlaylistCount: playlistIds.length,
     syncStartedAt,
@@ -542,7 +546,7 @@ async function verifyJwt(
 ): Promise<string | null> {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    console.log("[AUTH] No Bearer token in Authorization header");
+    debug.log("[AUTH] No Bearer token in Authorization header");
     return null;
   }
 
@@ -552,7 +556,7 @@ async function verifyJwt(
       token,
       new TextEncoder().encode(secret)
     );
-    console.log("[AUTH] JWT verified successfully, user:", payload.sub);
+    debug.log("[AUTH] JWT verified successfully, user:", payload.sub);
     return payload.sub ?? null;
   } catch (e) {
     console.error("[AUTH] JWT verification failed:", e);
@@ -574,7 +578,7 @@ async function applyChange(
 ): Promise<void> {
   // Skip sync infrastructure tables
   if (!isClientSyncChange(change)) {
-    console.log(`[PUSH] Skipping sync infrastructure table: ${change.table}`);
+    debug.log(`[PUSH] Skipping sync infrastructure table: ${change.table}`);
     return;
   }
 
@@ -588,13 +592,13 @@ async function applyChange(
 
   const table = getSchemaTables()[change.table];
   if (!table) {
-    console.log(`[PUSH] Unknown table: ${change.table}`);
+    debug.log(`[PUSH] Unknown table: ${change.table}`);
     return;
   }
 
   const t = table as DrizzleTable;
   if (!t.lastModifiedAt) {
-    console.log(
+    debug.log(
       `[PUSH] Table ${change.table} has no lastModifiedAt column, skipping`
     );
     return;
@@ -609,6 +613,9 @@ async function applyChange(
   data = remapUserRefsForPush(data, ctx);
   data = remapUserProfileForPush(change.table, data, ctx);
 
+  // Normalize timestamps for Postgres (add 'Z' suffix if missing, etc.)
+  data = normalizeRowForSync(change.table, data);
+
   const sanitized = sanitizeForPush({
     tableName: change.table,
     changeLastModifiedAt: change.lastModifiedAt,
@@ -621,7 +628,7 @@ async function applyChange(
     );
   }
 
-  console.log(
+  debug.log(
     `[PUSH] Applying ${change.deleted ? "DELETE" : "UPSERT"} to ${change.table}, rowId: ${change.rowId}`
   );
 
@@ -761,7 +768,7 @@ async function processPushChanges(
   ctx: SyncContext,
   changes: IncomingSyncChange[]
 ): Promise<void> {
-  console.log(`[PUSH] Processing ${changes.length} changes from client`);
+  debug.log(`[PUSH] Processing ${changes.length} changes from client`);
   for (const change of changes) {
     try {
       await applyChange(tx, change, ctx);
@@ -771,7 +778,7 @@ async function processPushChanges(
       );
     }
   }
-  console.log(`[PUSH] Completed processing ${changes.length} changes`);
+  debug.log(`[PUSH] Completed processing ${changes.length} changes`);
 }
 
 // ============================================================================
@@ -828,7 +835,7 @@ async function fetchTableForInitialSyncPage(
     collections: ctx.collections,
   });
   if (conditions === null) {
-    console.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
+    debug.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
     return [];
   }
 
@@ -852,7 +859,7 @@ async function fetchTableForInitialSyncPage(
 
   const rows = await query.limit(limit).offset(offset);
 
-  console.log(
+  debug.log(
     `[PULL:INITIAL] ${tableName}: fetched page rows=${rows.length} offset=${offset} limit=${limit}`
   );
 
@@ -980,7 +987,7 @@ async function getChangedTables(
     .where(gt(syncChangeLog.changedAt, lastSyncAt));
 
   const tables = entries.map((e) => e.tableName);
-  console.log(
+  debug.log(
     `[PULL:INCR] Tables changed since ${lastSyncAt}: [${tables.join(", ")}]`
   );
   return tables;
@@ -1001,7 +1008,7 @@ async function fetchChangedRowsFromTable(
 
   const t = table as DrizzleTable;
   if (!t.lastModifiedAt) {
-    console.log(`[PULL:INCR] ${tableName} has no lastModifiedAt, skipping`);
+    debug.log(`[PULL:INCR] ${tableName} has no lastModifiedAt, skipping`);
     return []; // Table doesn't support incremental sync
   }
 
@@ -1013,7 +1020,7 @@ async function fetchChangedRowsFromTable(
     collections: ctx.collections,
   });
   if (userConditions === null) {
-    console.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
+    debug.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
     return []; // Skip table (e.g., no playlists)
   }
 
@@ -1025,7 +1032,7 @@ async function fetchChangedRowsFromTable(
       : timeCondition;
 
   const rows = await tx.select().from(table).where(allConditions);
-  console.log(
+  debug.log(
     `[PULL:INCR] ${tableName}: fetched ${rows.length} changed rows since ${lastSyncAt}`
   );
 
@@ -1050,13 +1057,13 @@ async function processIncrementalSync(
   lastSyncAt: string,
   ctx: SyncContext
 ): Promise<SyncChange[]> {
-  console.log(
+  debug.log(
     `[PULL:INCR] Starting incremental sync for user ${ctx.userId} since ${lastSyncAt}`
   );
   const changedTables = await getChangedTables(tx, lastSyncAt);
 
   if (changedTables.length === 0) {
-    console.log(`[PULL:INCR] No tables changed since ${lastSyncAt}`);
+    debug.log(`[PULL:INCR] No tables changed since ${lastSyncAt}`);
     return [];
   }
 
@@ -1064,7 +1071,7 @@ async function processIncrementalSync(
   for (const tableName of changedTables) {
     // Only process tables we know about
     if (!SYNCABLE_TABLES.includes(tableName as SyncableTableName)) {
-      console.log(`[PULL:INCR] Skipping unknown table: ${tableName}`);
+      debug.log(`[PULL:INCR] Skipping unknown table: ${tableName}`);
       continue;
     }
     if (ctx.pullTables && !ctx.pullTables.has(tableName)) {
@@ -1079,7 +1086,7 @@ async function processIncrementalSync(
     allChanges.push(...tableChanges);
   }
 
-  console.log(
+  debug.log(
     `[PULL:INCR] Completed incremental sync: ${allChanges.length} total changes`
   );
   return allChanges;
@@ -1118,8 +1125,8 @@ async function handleSync(
     );
   }
 
-  console.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
-  console.log(
+  debug.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
+  debug.log(
     `[SYNC] Request: lastSyncAt=${payload.lastSyncAt ?? "null"}, changes=${payload.changes.length}`
   );
 
@@ -1184,9 +1191,24 @@ async function handleSync(
       collections.selectedGenres = new Set(selected.map((g) => String(g)));
     }
 
+    if (payload.genreFilter) {
+      const selected = payload.genreFilter.selectedGenreIds ?? [];
+      const playlist = payload.genreFilter.playlistGenreIds ?? [];
+      const effective = [...selected, ...playlist].map((g) => String(g));
+      collections.selectedGenres = new Set(effective);
+    }
+
     const pullTables = payload.pullTables
       ? new Set(payload.pullTables.map((t) => String(t)))
       : undefined;
+
+    if (pullTables) {
+      debug.log(
+        `[Worker] 🚨 pullTables override received: ${Array.from(pullTables).join(", ")}`
+      );
+    } else {
+      debug.log("[Worker] 🚨 No pullTables override - syncing all tables");
+    }
 
     const ctx: SyncContext = {
       userId: internalUserId,
@@ -1240,7 +1262,7 @@ async function handleSync(
     // sync_change_log now has at most ~20 rows (one per table)
   });
 
-  console.log(
+  debug.log(
     `[SYNC] === Completed ${syncType} sync: returning ${responseChanges.length} changes, syncedAt=${now} ===`
   );
 
@@ -1294,6 +1316,9 @@ function errorResponse(
 }
 
 async function fetch(request: Request, env: Env): Promise<Response> {
+  // Initialize debug logging based on environment variable
+  setDebugEnabled(env);
+
   // Get CORS headers for this request (needed for all responses)
   const corsHeaders = getCorsHeaders(request);
 
@@ -1315,7 +1340,7 @@ async function fetch(request: Request, env: Env): Promise<Response> {
 
     // Sync endpoint
     if (request.method === "POST" && url.pathname === "/api/sync") {
-      console.log(`[HTTP] POST /api/sync received`);
+      debug.log(`[HTTP] POST /api/sync received`);
 
       // Validate environment configuration
       if (!env.SUPABASE_JWT_SECRET) {
@@ -1326,7 +1351,7 @@ async function fetch(request: Request, env: Env): Promise<Response> {
       // Authenticate
       const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
       if (!userId) {
-        console.log(`[HTTP] Unauthorized - JWT verification failed`);
+        debug.log(`[HTTP] Unauthorized - JWT verification failed`);
         return errorResponse("Unauthorized", 401, corsHeaders);
       }
 
@@ -1341,14 +1366,14 @@ async function fetch(request: Request, env: Env): Promise<Response> {
         const payload = (await request.json()) as SyncRequest;
 
         try {
-          console.log(`[HTTP] Sync request parsed, calling handleSync`);
+          debug.log(`[HTTP] Sync request parsed, calling handleSync`);
           const response = await handleSync(
             db,
             payload,
             userId,
             diagnosticsEnabled
           );
-          console.log(`[HTTP] Sync completed successfully`);
+          debug.log(`[HTTP] Sync completed successfully`);
           return jsonResponse(response, 200, corsHeaders);
         } finally {
           await close();
