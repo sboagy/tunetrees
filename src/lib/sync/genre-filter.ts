@@ -1,9 +1,5 @@
 import type { SyncRequestOverrides } from "@oosync/shared/protocol";
-import {
-  applyRemoteChangesToLocalDb,
-  backfillOutboxSince,
-  WorkerClient,
-} from "@oosync/sync";
+import { applyRemoteChangesToLocalDb, WorkerClient } from "@oosync/sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import {
@@ -24,15 +20,8 @@ export async function preSyncMetadataViaWorker(params: {
   supabase: SupabaseClient;
   tables?: string[];
   lastSyncAt?: string | null;
-  userId: string;
 }): Promise<void> {
-  const {
-    db,
-    supabase,
-    tables = DEFAULT_METADATA_TABLES,
-    lastSyncAt,
-    userId,
-  } = params;
+  const { db, supabase, tables = DEFAULT_METADATA_TABLES, lastSyncAt } = params;
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -60,20 +49,6 @@ export async function preSyncMetadataViaWorker(params: {
       await applyRemoteChangesToLocalDb({
         localDb: db,
         changes: response.changes,
-        // Backfill any local writes that occurred during trigger suppression
-        onTriggersRestored: async (triggersSuppressedAt) => {
-          const backfilled = await backfillOutboxSince(
-            db,
-            triggersSuppressedAt,
-            tablesToPull, // Only backfill the tables we just synced
-            `preSyncMeta_${userId.substring(0, 8)}`
-          );
-          if (backfilled > 0) {
-            console.log(
-              `[GenreFilter] Backfilled ${backfilled} outbox entries during metadata pre-sync`
-            );
-          }
-        },
       });
 
       pullCursor = response.nextCursor;

@@ -227,19 +227,6 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     const tuneTable = (schemaTables as Record<string, any>).tune;
     if (!tuneTable) return null;
 
-    // Design intent: Filter ALL tables with tune_ref (notes, practice_record, references)
-    // by selected genres. This ensures:
-    // 1. Anonymous users only sync data for their selected genres (performance + storage)
-    // 2. Authenticated users see their full data but catalog is scoped to selected genres
-    // 
-    // Consequences:
-    // - If a user deselects a genre, they won't see notes/practice for those tunes
-    // - For authenticated users, the data still exists remotely (not deleted)
-    // - For anonymous users, this prevents unnecessary data download
-    // 
-    // Alternative considered: Only filter catalog tables (tune, reference)
-    // Rejected because: Notes/practice for deselected genres waste sync bandwidth
-
     const tuneConditions: SQLWrapper[] = [];
 
     if (tuneTable.genre) {

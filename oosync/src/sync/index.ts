@@ -10,7 +10,6 @@
 export { applyRemoteChangesToLocalDb } from "./apply-remote-changes";
 export { SyncEngine } from "./engine";
 export {
-  backfillOutboxSince,
   clearOldOutboxItems,
   clearSyncOutbox,
   getFailedOutboxItems,
