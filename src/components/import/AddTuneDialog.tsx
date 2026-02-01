@@ -86,8 +86,9 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   const [urlOrTitle, setUrlOrTitle] = createSignal<string>("");
   const [importSource, setImportSource] = createSignal<string>("the-session");
   const [importPlugins, setImportPlugins] = createSignal<Plugin[]>([]);
-  const [importPluginError, setImportPluginError] =
-    createSignal<string | null>(null);
+  const [importPluginError, setImportPluginError] = createSignal<string | null>(
+    null
+  );
 
   // Sub-dialog states
   const [showTuneSelectDialog, setShowTuneSelectDialog] = createSignal(false);
@@ -561,10 +562,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
           </Show>
 
           <Show when={importPluginError()}>
-            <p
-              class="text-xs text-red-600"
-              data-testid="import-plugin-error"
-            >
+            <p class="text-xs text-red-600" data-testid="import-plugin-error">
               {importPluginError()}
             </p>
           </Show>
@@ -637,7 +635,10 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
           <Show when={importPlugins().length > 0}>
             <div class="text-sm text-gray-700 dark:text-gray-300">
               <p class="mt-2">
-                Plugin importers available: {importPlugins().map((p) => p.name).join(", ")}
+                Plugin importers available:{" "}
+                {importPlugins()
+                  .map((p) => p.name)
+                  .join(", ")}
               </p>
             </div>
           </Show>

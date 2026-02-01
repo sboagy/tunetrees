@@ -151,11 +151,7 @@ const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-<<<<<<< HEAD
-const CURRENT_DB_VERSION = 8;
-=======
 const CURRENT_DB_VERSION = 9; // v9: Remove denyDelete rule for table_transient_data to allow hard deletes
->>>>>>> origin/main
 
 // Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";

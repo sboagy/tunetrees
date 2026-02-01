@@ -222,9 +222,7 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
 
     const fnHandle = track(qjs.getProp(qjs.global, message.functionName));
     if (qjs.typeof(fnHandle) !== "function") {
-      throw new Error(
-        `Plugin did not define ${message.functionName}()`
-      );
+      throw new Error(`Plugin did not define ${message.functionName}()`);
     }
 
     const payloadHandle = track(toHandle(message.payload));

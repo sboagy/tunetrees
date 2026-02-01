@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import type { IncomingMessage } from "node:http";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -64,7 +65,7 @@ export default defineConfig(() => {
         "/api/proxy": {
           target: "http://localhost",
           changeOrigin: true,
-          router: (req) => {
+          router: (req: IncomingMessage) => {
             try {
               const url = new URL(req.url ?? "", "http://localhost");
               const targetUrl = url.searchParams.get("url");
