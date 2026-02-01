@@ -172,6 +172,10 @@ export async function getPlaylistGenreDefaultsForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<string[]> {
+  console.log(
+    `[getPlaylistGenreDefaultsForUser] Querying for userId=${userId}`
+  );
+
   const rows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT v.genre_default AS genre
     FROM view_playlist_joined v
@@ -179,6 +183,11 @@ export async function getPlaylistGenreDefaultsForUser(
       AND v.user_ref = ${userId}
       AND v.genre_default IS NOT NULL
   `);
+
+  console.log(
+    `[getPlaylistGenreDefaultsForUser] Found ${rows.length} rows:`,
+    rows
+  );
 
   return rows
     .map((row) => row.genre)

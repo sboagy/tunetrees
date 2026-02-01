@@ -557,11 +557,19 @@ export const AuthProvider: ParentComponent = (props) => {
         if (!isAnonymousUser) {
           const lastSyncAt =
             syncServiceInstance?.getLastSyncDownTimestamp?.() ?? null;
+
+          // Get userId for debug logging (best effort)
+          const debugUserId = await getUserInternalIdFromLocalDb(
+            db,
+            authUserId
+          ).catch(() => null);
+
           if (!metadataPrefetchPromise) {
             metadataPrefetchPromise = preSyncMetadataViaWorker({
               db,
               supabase,
               lastSyncAt,
+              userId: debugUserId ?? undefined,
             }).finally(() => {
               metadataPrefetchPromise = null;
             });
