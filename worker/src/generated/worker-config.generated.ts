@@ -130,8 +130,29 @@ export const WORKER_SYNC_CONFIG =
         "column": "user_ref"
       },
       "tune": {
-        "kind": "orNullEqUserId",
-        "column": "private_for"
+        "kind": "compound",
+        "operator": "or",
+        "rules": [
+          {
+            "kind": "compound",
+            "operator": "and",
+            "rules": [
+              {
+                "kind": "inCollection",
+                "column": "genre",
+                "collection": "selectedGenres"
+              },
+              {
+                "kind": "publicOnly",
+                "column": "private_for"
+              }
+            ]
+          },
+          {
+            "kind": "eqUserId",
+            "column": "private_for"
+          }
+        ]
       },
       "tune_override": {
         "kind": "eqUserId",

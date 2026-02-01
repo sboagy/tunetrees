@@ -45,6 +45,31 @@
     "config": {
       "pull": {
         "tableRules": {
+          "tune": {
+            "kind": "compound",
+            "operator": "or",
+            "rules": [
+              {
+                "kind": "compound",
+                "operator": "and",
+                "rules": [
+                  {
+                    "kind": "inCollection",
+                    "column": "genre",
+                    "collection": "selectedGenres"
+                  },
+                  {
+                    "kind": "publicOnly",
+                    "column": "private_for"
+                  }
+                ]
+              },
+              {
+                "kind": "eqUserId",
+                "column": "private_for"
+              }
+            ]
+          },
           "note": {
             "kind": "rpc",
             "functionName": "sync_get_user_notes",

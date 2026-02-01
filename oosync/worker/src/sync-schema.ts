@@ -1,4 +1,4 @@
-import { eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { debug } from "./debug";
 
@@ -67,7 +67,9 @@ export type PullTableRule =
   | { kind: "eqUserId"; column: string }
   | { kind: "orNullEqUserId"; column: string }
   | { kind: "inCollection"; column: string; collection: string }
-  | { kind: "rpc"; functionName: string; params: string[] };
+  | { kind: "rpc"; functionName: string; params: string[] }
+  | { kind: "compound"; rules: PullTableRule[]; operator?: "and" | "or" }
+  | { kind: "publicOnly"; column: string };
 
 export interface IPullConfig {
   tableRules?: Record<string, PullTableRule>;
@@ -208,45 +210,84 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     return result;
   }
 
+  function applyPullRule(
+    rule: PullTableRule,
+    params: {
+      tableName: string;
+      table: any;
+      userId: string;
+      collections: Record<string, Set<string>>;
+    }
+  ): unknown[] | null {
+    // RPC rules handle all filtering server-side (no WHERE clause needed)
+    if (rule.kind === "rpc") {
+      return []; // Empty array = no additional filters (RPC handles everything)
+    }
+
+    // Compound rule: evaluate each nested rules and combine with OR or AND
+    if (rule.kind === "compound") {
+      const nestedConditions: any[] = [];
+
+      for (const nestedRule of rule.rules) {
+        const result = applyPullRule(nestedRule, params);
+        if (result !== null && result.length > 0) {
+          nestedConditions.push(...result);
+        } else if (rule.operator === "and") {
+          // For AND: if any nested rule returns null/empty, entire compound fails
+          return null;
+        }
+      }
+
+      if (nestedConditions.length === 0) return null;
+      if (nestedConditions.length === 1) return nestedConditions;
+
+      // Combine nested conditions with AND or OR (default: OR)
+      const operator = rule.operator || "or";
+      const combiner = operator === "and" ? and : or;
+      return [combiner(...nestedConditions) as any];
+    }
+
+    // Simple rules: resolve column and apply filter
+    const prop = snakeToCamel(rule.column);
+    const col = params.table[prop];
+    if (!col) return [];
+
+    if (rule.kind === "eqUserId") {
+      return [eq(col, params.userId)];
+    }
+
+    if (rule.kind === "orNullEqUserId") {
+      return [or(isNull(col), eq(col, params.userId))];
+    }
+
+    if (rule.kind === "inCollection") {
+      const ids = params.collections[rule.collection];
+      const arr = ids ? Array.from(ids) : [];
+      if (arr.length === 0) return null;
+      return [inArray(col, arr)];
+    }
+
+    if (rule.kind === "publicOnly") {
+      return [isNull(col)];
+    }
+
+    return [];
+  }
+
   function buildUserFilter(params: {
     tableName: string;
     table: any;
     userId: string;
     collections: Record<string, Set<string>>;
   }): unknown[] | null {
-    const conditions: unknown[] = [];
-
     const rule = getPullRule(params.tableName);
     if (rule) {
-      // RPC rules handle all filtering server-side (no WHERE clause needed)
-      if (rule.kind === "rpc") {
-        return []; // Empty array = no additional filters (RPC handles everything)
-      }
-
-      const prop = snakeToCamel(rule.column);
-      const col = params.table[prop];
-      if (!col) return [];
-
-      if (rule.kind === "eqUserId") {
-        conditions.push(eq(col, params.userId));
-        return conditions;
-      }
-
-      if (rule.kind === "orNullEqUserId") {
-        conditions.push(or(isNull(col), eq(col, params.userId)));
-        return conditions;
-      }
-
-      if (rule.kind === "inCollection") {
-        const ids = params.collections[rule.collection];
-        const arr = ids ? Array.from(ids) : [];
-        if (arr.length === 0) return null;
-        conditions.push(inArray(col, arr));
-        return conditions;
-      }
+      return applyPullRule(rule, params);
     }
 
     // Heuristic fallback (schema-agnostic conventions).
+    const conditions: unknown[] = [];
+
     if (params.table.userId) {
       conditions.push(eq(params.table.userId, params.userId));
     } else if (params.table.userRef) {
