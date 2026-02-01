@@ -2,6 +2,15 @@
 
 **Issue**: Initial sync takes 65+ seconds, downloading 6,925 records (3,006 catalog items) when user only needs ~500 records based on selected genres.
 
+**Status**: Phase 2 (Genre Filtering) ✅ **COMPLETED** - Phase 1 (Indexes) and Phase 3 (Parallel) remain.
+
+**Key Implementation Decisions**:
+1. ✅ **Server-side RPC filtering**: Used Postgres RPC functions (`sync_get_user_notes`, `sync_get_user_references`) instead of client-side filtering for better performance
+2. ✅ **Metadata pre-sync**: Added 5 tables including `genre` to prevent FK constraint failures
+3. ✅ **FK deferral/retry**: Handles dependency ordering during metadata sync
+4. ✅ **Orphan purge**: Added `purgeOrphanedAnnotations()` for cleanup after genre removal in settings
+5. ✅ **E2E test coverage**: Comprehensive test suite validates all scenarios
+
 **Root Causes**:
 1. Missing database indexes causing 20-30s queries
 2. Worker pulls ALL catalog data, client filters post-sync
@@ -57,6 +66,8 @@ CREATE INDEX IF NOT EXISTS idx_user_genre_selection_genre
 ## Phase 2: Sync Request Overrides (Medium-term)
 
 **Objective**: Add genre filtering to sync requests without hardcoding app logic into oosync
+
+**Implementation Decision**: ✅ Used **server-side RPC functions** instead of client-side filtering for `note` and `reference` tables. This provides better performance by leveraging Postgres indexes and reducing data transfer.
 
 ---
 
@@ -168,12 +179,14 @@ async function buildGenreFilterOverrides(
 - ✅ Incremental sync: `db.execute(sql...)` (SQLite query)
 - ✅ Both return the same genre list, just from different sources
 
-### 2.2 Worker Implementation (Generic)
+### 2.2 Worker Implementation (RPC-Based)
 
-**Location**: `oosync/worker/src/index.ts` (or new `oosync/worker/src/filters.ts`)
+**Location**: `oosync/worker/src/index.ts` + new RPC functions in Postgres
+
+**Actual Implementation**: Uses server-side RPC functions for `note` and `reference` tables instead of client-side filtering.
 
 ```typescript
-// Worker receives overrides in request body
+// Worker receives genre filter in request body
 interface SyncRequest {
   // ... existing fields
   overrides?: {
@@ -183,43 +196,66 @@ interface SyncRequest {
     };
   };
 }
-
-// Apply filter to pull queries (generic pattern)
-function applyGenreFilter(
-  query: PostgresQuery,
-  tableName: string,
-  genreFilter?: { selectedGenreIds: string[], playlistGenreIds: string[] }
-): PostgresQuery {
-  if (!genreFilter) return query;
-  
-  // Genre filtering logic based on table
-  if (tableName === 'tune') {
-    // Filter tunes by selected genres OR genres already in user's playlists
-    const allowedGenres = [
-      ...genreFilter.selectedGenreIds,
-      ...genreFilter.playlistGenreIds
-    ];
-    return query.in('genre', allowedGenres);
-  }
-  
-  if (tableName === 'reference') {
-    // Filter references by genre_id (if column exists)
-    const allowedGenres = [
-      ...genreFilter.selectedGenreIds,
-      ...genreFilter.playlistGenreIds
-    ];
-    return query.in('genre_id', allowedGenres);
-  }
-  
-  // Other tables: no filtering
-  return query;
-}
 ```
 
+**Key Changes**:
+1. **New table pull rule type**: `{ kind: "rpc", functionName: string, params: string[] }`
+2. **Worker config changes** (in `worker-config.generated.ts`):
+   - `note` table: Changed from `orNullEqUserId` to `rpc` with `sync_get_user_notes`
+   - `reference` table: Changed from `orNullEqUserId` to `rpc` with `sync_get_user_references`
+
+3. **RPC functions** (server-side in Postgres):
+   ```sql
+   -- sql_scripts/sync_get_user_notes.sql
+   CREATE OR REPLACE FUNCTION sync_get_user_notes(
+     p_user_id UUID,
+     p_genre_ids TEXT[],
+     p_after_timestamp TIMESTAMPTZ DEFAULT NULL,
+     p_limit INTEGER DEFAULT 1000,
+     p_offset INTEGER DEFAULT 0
+   ) RETURNS SETOF note AS $$
+     SELECT n.*
+     FROM note n
+     JOIN tune t ON n.tune_ref = t.id
+     WHERE (
+       (t.genre = ANY(p_genre_ids) AND t.private_for IS NULL)
+       OR t.private_for = p_user_id
+     )
+     AND (n.user_ref IS NULL OR n.user_ref = p_user_id)
+     AND (p_after_timestamp IS NULL OR n.last_modified_at > p_after_timestamp)
+     AND t.deleted = FALSE
+     ORDER BY n.last_modified_at ASC, n.id ASC
+     LIMIT p_limit OFFSET p_offset;
+   $$;
+   
+   -- sync_get_user_references.sql is similar
+   ```
+
+4. **Worker RPC handling** (in `oosync/worker/src/index.ts`):
+   ```typescript
+   if (rule?.kind === "rpc") {
+     const rpcParams = {
+       p_user_id: ctx.authUserId,
+       p_genre_ids: ctx.genreFilter?.selectedGenreIds ?? [],
+       p_after_timestamp: lastSyncAt,
+       p_limit: 1000,
+       p_offset: 0
+     };
+     const rows = await fetchViaRPC(tx, rule.functionName, rpcParams);
+   }
+   ```
+
+**Benefits of RPC approach**:
+- ✅ Server-side filtering reduces data transfer (Postgres does the JOIN + filtering)
+- ✅ Leverages Postgres indexes for optimal performance
+- ✅ Supports incremental sync via `p_after_timestamp` parameter
+- ✅ Generic worker implementation (table config specifies RPC function name)
+- ✅ Handles private tunes correctly (bypasses genre filter for user's own tunes)
+
 **Constraints**:
-- ✅ Generic: No hardcoded table/column names in oosync core
-- ✅ Optional: Falls back to full pull if no overrides provided
-- ✅ App-controlled: Genre logic lives in app, oosync just applies filters
+- ✅ Generic: Worker has no knowledge of "notes" or "references", just calls RPC by name
+- ✅ Optional: Falls back to collection-based filtering if no genreFilter provided
+- ✅ App-controlled: Genre logic lives in SQL functions, worker just passes parameters
 
 ### 2.3 Pre-Sync Metadata and Genre Filter Calculation
 
@@ -235,13 +271,26 @@ function applyGenreFilter(
 **Before the main sync**, fetch small metadata tables needed to calculate the genre filter:
 
 ```typescript
-async function preSyncMetadata(userId: string): Promise<void> {
-  // Pre-fetch user_profile FIRST (FK constraint: user_genre_selection + playlist reference it)
-  await syncTable('user_profile', { filter: { user_id: userId } });
+// Actual implementation in src/lib/sync/genre-filter.ts
+const DEFAULT_METADATA_TABLES = [
+  "user_profile",      // FK parent (must be first)
+  "user_genre_selection", // Explicit genre choices
+  "playlist",          // Playlist metadata (including genre_default)
+  "instrument",        // Referenced by playlist.instrument_ref
+  "genre",             // Required for playlist.genre_default FK constraint
+];
+
+async function preSyncMetadataViaWorker(params: {
+  db: SqliteDatabase;
+  supabase: SupabaseClient;
+  tables?: string[];
+  lastSyncAt?: string | null;
+}): Promise<void> {
+  // 1. Pre-fetch user_profile FIRST (FK constraint parent)
+  await pullTables(["user_profile"]);
   
-  // Then fetch genre selection and playlists
-  await syncTable('user_genre_selection', { noFilter: true });
-  await syncTable('playlist', { noFilter: true });
+  // 2. Then fetch remaining metadata tables
+  await pullTables(["user_genre_selection", "playlist", "instrument", "genre"]);
 }
 ```
 
@@ -249,8 +298,32 @@ async function preSyncMetadata(userId: string): Promise<void> {
 - `user_profile` (~1 row) - FK parent for user_genre_selection and playlist
 - `user_genre_selection` (~10 rows) - explicit genre choices
 - `playlist` (~5 rows) - playlist metadata (including genre_default)
+- `instrument` (~5 rows) - referenced by playlist.instrument_ref FK
+- **`genre` (~25 rows)** - ✅ **CRITICAL**: Required for playlist.genre_default FK constraint to succeed
 
-**Performance**: Total ~20 rows, <50ms
+**Performance**: Total ~50 rows, <100ms
+
+**Critical Fix**: Added "genre" to metadata tables to prevent FK constraint failures when syncing playlist table. Without this, playlist inserts fail because genre_default references genre.id which doesn't exist locally yet.
+
+**FK Deferral Logic**: The `preSyncMetadataViaWorker()` implementation includes FK deferral/retry logic to handle dependency ordering:
+```typescript
+// First pass: try to apply all changes
+const deferredChanges = [];
+await applyRemoteChangesToLocalDb({
+  localDb: db,
+  changes: response.changes,
+  deferForeignKeyFailuresTo: deferredChanges,
+});
+
+// Second pass: retry deferred changes (FK dependencies now resolved)
+if (deferredChanges.length > 0) {
+  await applyRemoteChangesToLocalDb({
+    localDb: db,
+    changes: deferredChanges,
+  });
+}
+```
+This ensures that if instrument or genre records arrive before playlist records in the same batch, they get deferred and retried after dependencies are satisfied.
 
 ### Step 2: Calculate Effective Genre Filter
 
@@ -667,24 +740,45 @@ if (SYNC_DIAGNOSTICS) {
 
 **Expected Result**: 65s → 15-20s load time
 
-### Sprint 2: Genre Filtering (3-5 days)
+### Sprint 2: Genre Filtering (3-5 days) — **COMPLETED**
 **Goal**: Reduce data transfer by 75%
 
-- [ ] Implement 3-phase sync sequencing:
-  - [ ] Phase 0: Pre-sync metadata fetch (`user_genre_selection`, `playlist`)
-  - [ ] Phase 1: Calculate effective genre filter from LOCAL SQLite
-  - [ ] Phase 2: Main sync with genre filter applied
-  - [ ] Phase 3: Post-sync relationship tables (`playlist_tune`)
-- [ ] Implement `preSyncMetadata()` in sync engine
-- [ ] Implement `getEffectiveGenreFilter_InitialSync()` for cold start
-- [ ] Implement `getEffectiveGenreFilter_IncrementalSync()` for warm sync
-- [ ] Wire up `requestOverridesProvider` in AuthContext
-- [ ] Add generic genre filter logic to worker (`oosync/worker/src/index.ts`)
-- [ ] Test with 2-genre vs 25-genre selections
-- [ ] Validate no data loss on genre changes (orphan prevention)
-- [ ] Verify `playlist_tune` syncs AFTER `tune` to avoid orphan references
+**Implementation Status**: ✅ **DONE**
 
-**Expected Result**: 15s → 5-8s load time (1,500 records vs 6,925)
+- [x] Implement metadata pre-sync sequence:
+  - [x] Phase 0: Pre-sync metadata fetch (`user_profile`, `user_genre_selection`, `playlist`, `instrument`, `genre`)
+  - [x] Phase 1: Calculate effective genre filter from LOCAL SQLite (uses Postgres RPC for initial sync playlist_tune genres)
+  - [x] Phase 2: Main sync with genre filter applied
+- [x] Implement `preSyncMetadataViaWorker()` with FK deferral/retry logic (`src/lib/sync/genre-filter.ts`)
+- [x] Implement `getEffectiveGenreFilterInitialSync()` for cold start (queries Postgres for playlist_tune genres)
+- [x] Implement `getEffectiveGenreFilterIncrementalSync()` for warm sync (queries local SQLite)
+- [x] Wire up `requestOverridesProvider` in AuthContext to orchestrate pre-sync + filter calculation
+- [x] **NEW: Create RPC functions for server-side filtering**:
+  - [x] `sync_get_user_notes(p_user_id, p_genre_ids, p_after_timestamp, p_limit, p_offset)`
+  - [x] `sync_get_user_references(p_user_id, p_genre_ids, p_after_timestamp, p_limit, p_offset)`
+  - [x] Migration: `supabase/migrations/20260130000000_add_sync_rpc_functions.sql`
+- [x] **NEW: Update worker config** (`worker/src/generated/worker-config.generated.ts`):
+  - [x] Changed `note` table from `orNullEqUserId` to `rpc` (uses `sync_get_user_notes`)
+  - [x] Changed `reference` table from `orNullEqUserId` to `rpc` (uses `sync_get_user_references`)
+- [x] Add RPC handling to worker (`oosync/worker/src/index.ts`)
+- [x] **NEW: Add orphan purge logic** (`src/lib/sync/genre-filter.ts`):
+  - [x] `purgeOrphanedAnnotations()` - removes notes/references for deselected genres
+  - [x] Called from Settings → Catalog & Sync after genre removal
+- [x] **NEW: Add E2E test coverage** (`e2e/tests/annotations-filter-001-rpc-genre-sync.spec.ts`):
+  - [x] Test A: Onboarding filters annotations server-side
+  - [x] Test B: Settings genre addition syncs new annotations
+  - [x] Test C: Settings genre removal purges orphaned annotations
+  - [x] Test D: Private tunes sync regardless of genre filter
+- [x] Test with 2-genre vs 25-genre selections
+- [x] Validate no data loss on genre changes (orphan prevention via Postgres query + purge)
+- [x] Verify existing sync engine handles table ordering correctly (no engine changes needed)
+
+**Actual Result**: 
+- Server-side filtering via RPC functions (more efficient than client-side)
+- Orphan prevention: Initial sync queries Postgres playlist_tune genres, incremental uses local
+- Orphan cleanup: purgeOrphanedAnnotations() runs after genre removal in settings
+- E2E tests validate all scenarios
+- Expected improvement: 1,500 records vs 6,925 (75% reduction when using selective genre filter)
 
 ### Sprint 3: Parallel Pagination (2-3 days)
 **Goal**: Reduce network latency by 5x
@@ -814,19 +908,40 @@ const effectiveGenres = [
 
 ## Files to Modify
 
-### Phase 1 (Indexes)
+### Phase 1 (Indexes) - NOT YET IMPLEMENTED
 - `supabase/migrations/YYYYMMDD_add_genre_filter_indexes.sql` (NEW)
 
-### Phase 2 (Genre Filter)
-- `src/lib/sync/genre-filter.ts` (NEW)
-- `src/contexts/AuthContext.tsx` (wire up requestOverridesProvider)
-- `oosync/worker/src/index.ts` (add generic filter logic)
-- `oosync/worker/src/types.ts` (add SyncRequestOverrides interface)
+### Phase 2 (Genre Filter) - ✅ **COMPLETED**
+**App-side**:
+- ✅ `src/lib/sync/genre-filter.ts` - Created with:
+  - `preSyncMetadataViaWorker()` - Pre-fetches metadata with FK deferral logic
+  - `getEffectiveGenreFilterInitialSync()` - Cold start filter (queries Postgres RPC)
+  - `getEffectiveGenreFilterIncrementalSync()` - Warm filter (queries local SQLite)
+  - `buildGenreFilterOverrides()` - Main entry point for genre filter calculation
+  - `purgeOrphanedAnnotations()` - Cleanup for removed genres
+- ✅ `src/lib/auth/AuthContext.tsx` - Wired up `requestOverridesProvider` callback
+- ✅ `src/lib/db/queries/user-genre-selection.ts` - Helper functions for genre queries
+- ✅ `src/routes/user-settings/catalog-sync.tsx` - Added purgeOrphanedAnnotations call after genre removal
 
-### Phase 3 (Parallel)
+**Worker-side**:
+- ✅ `oosync/worker/src/index.ts` - Added RPC handling for genre-filtered tables
+- ✅ `oosync/worker/src/sync-schema.ts` - Added `rpc` pull rule type
+- ✅ `worker/src/generated/worker-config.generated.ts` - Changed note/reference to use RPC
+
+**Database**:
+- ✅ `sql_scripts/sync_get_user_notes.sql` - RPC for genre-filtered note sync
+- ✅ `sql_scripts/sync_get_user_references.sql` - RPC for genre-filtered reference sync
+- ✅ `supabase/migrations/20260130000000_add_sync_rpc_functions.sql` - Migration for RPCs
+- ✅ `supabase/migrations/20260127000000_add_playlist_tune_genre_rpc.sql` - Fixed redundant auth check
+
+**Testing**:
+- ✅ `e2e/tests/annotations-filter-001-rpc-genre-sync.spec.ts` - Comprehensive E2E test suite
+- ✅ `src/test/test-api.ts` - Added test helpers for annotation testing
+
+### Phase 3 (Parallel) - NOT YET IMPLEMENTED
 - `oosync/worker-client.ts` (batched parallel fetching)
 - `oosync/src/sync/engine.ts` (integrate parallel client)
 
-### Phase 4 (Diagnostics)
+### Phase 4 (Diagnostics) - NOT YET IMPLEMENTED
 - `oosync/src/sync/engine.ts` (add logging)
 - `src/contexts/AuthContext.tsx` (expose sync metrics to UI)
