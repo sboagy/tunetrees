@@ -34,6 +34,7 @@ export class WorkerClient {
       syncStartedAt: options?.syncStartedAt,
       pageSize: options?.pageSize,
       collectionsOverride: overrides?.collectionsOverride,
+      genreFilter: overrides?.genreFilter,
       pullTables: overrides?.pullTables,
     };
 

@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2024-04-01"
 compatibility_flags = ["nodejs_compat"]
 
+[dev]
+port = 8787
+
 # Hyperdrive Binding (PostgreSQL Connection Pooling)
 # Manages connection pooling to prevent "too many connections" errors
 [[hyperdrive]]
@@ -13,6 +16,10 @@ localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres
 [vars]
 SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # SUPABASE_JWT_SECRET should be set via `wrangler secret put SUPABASE_JWT_SECRET`
+
+# Optional: Enable worker debug logging (console.log statements)
+# Set to "true" to enable verbose logging for development/debugging
+# WORKER_DEBUG = "true"
 
 # Optional: sync diagnostics (debug only)
 # When enabled, the worker includes a `debug[]` array in sync responses.

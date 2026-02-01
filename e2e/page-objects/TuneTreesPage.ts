@@ -1554,30 +1554,54 @@ export class TuneTreesPage {
     await expect(this.genreFilter).toBeEnabled({ timeout: 10000 });
     await this.page.waitForTimeout(250);
 
-    const option = this.page.getByRole("checkbox", {
+    const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-genre`);
+
+    const option = dropdownPanel.getByRole("checkbox", {
       name: genre,
     });
 
+    console.log(`Filtering by genre: "${genre}"`);
+
     for (let attempt = 0; attempt < 7; attempt++) {
-      await this.genreFilter.click();
-      await this.page.waitForTimeout(250);
+      await this.genreFilter
+        .click({ delay: 10, timeout: 2000 })
+        .catch(() => {});
 
       const isVisible = await option
         .isVisible({ timeout: 1000 })
         .catch(() => false);
-      if (isVisible) break;
+      const isEnabled = await option
+        .isEnabled({ timeout: 1000 })
+        .catch(() => false);
+      const panelIsOpen = await dropdownPanel
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      console.log(
+        `isVisible: ${isVisible}, isEnabled: ${isEnabled}, panelIsOpen: ${panelIsOpen}`
+      );
+      if (panelIsOpen && isEnabled && isVisible) {
+        break;
+      }
+
+      console.log(
+        `Genre option "${genre}" not visible/enabled yet, retrying...`
+      );
       await this.page.waitForTimeout(250);
     }
 
+    await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
     await expect(option).toBeVisible({ timeout: 5000 });
     await expect(option).toBeEnabled({ timeout: 10000 });
     await this.page.waitForTimeout(250);
 
-    await option.click();
-    await expect(option).toBeChecked({ timeout: 1000 });
+    await option.check();
+    await expect(option).toBeChecked();
 
-    await this.filtersButton.click();
-    await expect(option).not.toBeVisible({ timeout: 5000 });
+    const filterBoxIsOpen = await dropdownPanel.isVisible();
+    if (filterBoxIsOpen) {
+      await this.filtersButton.click();
+      await expect(option).not.toBeVisible({ timeout: 5000 });
+    }
   }
 
   /**
