@@ -82,8 +82,17 @@ const FilterDropdown: Component<{
   let buttonRef: HTMLButtonElement | undefined;
 
   // Handle click outside to close
+  // Only close if the click is within the app container (#root) to avoid
+  // interference from test automation or browser extensions
   const handleClickOutside = (event: MouseEvent) => {
     const target = event.target as Node;
+
+    // Only process clicks that occur within the app root
+    const appRoot = document.getElementById("root");
+    if (!appRoot?.contains(target)) {
+      return;
+    }
+
     if (
       dropdownRef &&
       !dropdownRef.contains(target) &&
@@ -143,6 +152,7 @@ const FilterDropdown: Component<{
         aria-label={`Filter by ${props.title}`}
         aria-expanded={isOpen()}
         aria-haspopup="listbox"
+        data-testid={`filter-dropdown-${props.title.toLowerCase()}`}
       >
         <span>{props.title}</span>
         <Show when={props.loading}>
@@ -171,7 +181,10 @@ const FilterDropdown: Component<{
 
       <Show when={isOpen()}>
         <div class="absolute left-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-          <div class="p-2">
+          <div
+            class="p-2"
+            data-testid={`filter-dropdown-menu-${props.title.toLowerCase()}`}
+          >
             <Show
               when={!props.loading && props.items.length > 0}
               fallback={
@@ -251,10 +264,12 @@ export interface FilterPanelProps {
   };
   /** Hide playlist filter (for Repertoire tab where playlist is implied) */
   hidePlaylistFilter?: boolean;
+  /** Controlled state for panel expansion */
+  isExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 export const FilterPanel: Component<FilterPanelProps> = (props) => {
-  const [isExpanded, setIsExpanded] = createSignal(false);
   const [panelStyle, setPanelStyle] = createSignal<{
     top: string;
     left?: string;
@@ -262,6 +277,11 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
   }>({ top: "0px" });
   let panelRef: HTMLDivElement | undefined;
   let buttonRef: HTMLButtonElement | undefined;
+
+  const isExpanded = () => props.isExpanded ?? false;
+  const setIsExpanded = (value: boolean) => {
+    props.onExpandedChange?.(value);
+  };
 
   // Calculate panel position based on trigger button
   const updatePosition = () => {
@@ -405,12 +425,16 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setIsExpanded(!isExpanded())}
+        onClick={() => {
+          setIsExpanded(!isExpanded());
+        }}
         title="Open filter options"
-        class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50"
+        disabled={props.loading?.genres || props.loading?.playlists}
+        class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Filter options"
         aria-expanded={isExpanded()}
         aria-haspopup="true"
+        data-testid="filters-button"
       >
         <svg
           class="w-3.5 h-3.5 flex-shrink-0"

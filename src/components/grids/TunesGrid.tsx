@@ -23,6 +23,8 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   CELL_CLASSES,
   CONTAINER_CLASSES,
@@ -64,11 +66,19 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   enableColumnReorder?: boolean;
   // Enable/disable row selection (default true)
   enableRowSelection?: boolean;
+  // Optional map of column descriptions to show in header popovers
+  columnDescriptions?: Partial<Record<string, string>>;
 }
 
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const [openPopover, setOpenPopover] = createSignal<string | null>(null);
+  let popoverRef: HTMLDivElement | undefined;
+  useClickOutside(
+    () => popoverRef,
+    () => setOpenPopover(null)
+  );
   const collectColumnIds = (
     cols: ColumnDef<T, unknown>[]
   ): ReadonlySet<string> => {
@@ -206,19 +216,27 @@ export const TunesGrid = (<T extends { id: string | number }>(
     initialState.columnVisibility || {}
   );
 
-  // Restore rowSelection when userId becomes available (after initial render)
+  const [lastSelectionKey, setLastSelectionKey] = createSignal<string | null>(
+    null
+  );
+
+  // Restore rowSelection when the storage key changes (user/playlist/tab changes)
   createEffect(() => {
     const key = stateKey();
+    const keySignature = `${key.userId}:${key.tablePurpose}:${key.playlistId}`;
+    if (keySignature === lastSelectionKey()) return;
+    setLastSelectionKey(keySignature);
+
     const loaded = loadTableState(key);
-    if (loaded?.rowSelection && Object.keys(loaded.rowSelection).length > 0) {
-      const current = rowSelection();
-      // Only restore if current state is empty (avoid overwriting user's new selections)
-      if (Object.keys(current).length === 0) {
+    if (loaded?.rowSelection) {
+      if (Object.keys(loaded.rowSelection).length > 0) {
         console.log(
           `[TunesGrid ${props.tablePurpose}] Restoring ${Object.keys(loaded.rowSelection).length} row selections from localStorage`
         );
-        setRowSelection(loaded.rowSelection);
       }
+      setRowSelection(loaded.rowSelection);
+    } else if (Object.keys(rowSelection()).length > 0) {
+      setRowSelection({});
     }
   });
 
@@ -472,7 +490,51 @@ export const TunesGrid = (<T extends { id: string | number }>(
     }
   });
 
+  // Reactive state for stabilization tracking
+  const [targetScroll, setTargetScroll] = createSignal(0);
+  const [isStabilizing, setIsStabilizing] = createSignal(false);
+  const [lastRowCount, setLastRowCount] = createSignal(0);
+  let stabilizeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Watch for row count changes at component level (proper reactive scope)
+  createEffect(() => {
+    const rowCount = table.getRowModel().rows.length;
+    const previous = lastRowCount();
+
+    if (rowCount !== previous && previous >= 0) {
+      console.log(
+        `[TunesGrid ${props.tablePurpose}] Row count changed: ${previous} → ${rowCount}`
+      );
+      setIsStabilizing(true);
+
+      // Re-apply target scroll if we're supposed to be scrolled
+      const target = targetScroll();
+      if (target > 0 && containerRef) {
+        containerRef.scrollTop = target;
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Re-applying target scroll: ${target}px`
+        );
+      }
+
+      // Clear any existing stabilization timeout
+      if (stabilizeTimeout) clearTimeout(stabilizeTimeout);
+
+      // Mark as stable after 300ms of no changes
+      stabilizeTimeout = setTimeout(() => {
+        setIsStabilizing(false);
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Data stabilized at ${rowCount} rows`
+        );
+      }, 300);
+    }
+
+    setLastRowCount(rowCount);
+  });
+
   onMount(() => {
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cleanupScrollListener: (() => void) | null = null;
+
     const waitForContainer = () => {
       if (!containerRef) {
         requestAnimationFrame(waitForContainer);
@@ -482,31 +544,73 @@ export const TunesGrid = (<T extends { id: string | number }>(
         requestAnimationFrame(waitForContainer);
         return;
       }
+
+      // Load target scroll from storage
       const key = scrollKey();
-      if (key) {
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          containerRef.scrollTop = Number.parseInt(stored, 10);
-        }
+      const storedScroll = key
+        ? Number.parseInt(localStorage.getItem(key) || "0", 10)
+        : 0;
+      setTargetScroll(storedScroll);
+      setLastRowCount(table.getRowModel().rows.length);
+
+      // Apply initial scroll - let row count effect handle stabilization
+      if (storedScroll > 0) {
+        setIsStabilizing(true); // Start in stabilizing mode
+        containerRef.scrollTop = storedScroll;
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Applied initial scroll: ${storedScroll}px, entering stabilization mode`
+        );
       }
-      let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
       const handleScroll = () => {
         if (scrollTimeout) clearTimeout(scrollTimeout);
+
+        // During stabilization, if scroll is wrong, re-apply target instead of saving
+        const target = targetScroll();
+        const stabilizing = isStabilizing();
+
+        if (stabilizing && containerRef && target > 0) {
+          const currentScroll = containerRef.scrollTop;
+          // If scroll is significantly below target (more than 10% off), re-apply
+          if (currentScroll < target * 0.9) {
+            console.log(
+              `[TunesGrid ${props.tablePurpose}] Scroll during stabilization: ${currentScroll}px, re-applying ${target}px`
+            );
+            containerRef.scrollTop = target;
+            return; // Don't save during stabilization
+          }
+        }
+
         scrollTimeout = setTimeout(() => {
           const key = scrollKey();
-          if (containerRef && key) {
-            localStorage.setItem(key, String(containerRef.scrollTop));
+          if (containerRef && key && !isStabilizing()) {
+            const scrollPos = containerRef.scrollTop;
+            console.log(
+              `[TunesGrid ${props.tablePurpose}] Saving scroll position: ${scrollPos}px`
+            );
+            localStorage.setItem(key, String(scrollPos));
+            setTargetScroll(scrollPos); // Update target to current position
           }
-          props.onSelectionChange?.(Object.keys(rowSelection()).length);
         }, 150);
       };
+
       containerRef.addEventListener("scroll", handleScroll, { passive: true });
-      onCleanup(() => {
-        if (containerRef)
+
+      // Store cleanup function to be called on component unmount
+      cleanupScrollListener = () => {
+        if (containerRef) {
           containerRef.removeEventListener("scroll", handleScroll);
-        if (scrollTimeout) clearTimeout(scrollTimeout);
-      });
+        }
+      };
     };
+
+    // Register cleanup at onMount level (synchronous, in reactive scope)
+    onCleanup(() => {
+      if (cleanupScrollListener) cleanupScrollListener();
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      if (stabilizeTimeout) clearTimeout(stabilizeTimeout);
+    });
+
     waitForContainer();
   });
 
@@ -543,88 +647,195 @@ export const TunesGrid = (<T extends { id: string | number }>(
               {(headerGroup) => (
                 <tr>
                   <For each={headerGroup.headers}>
-                    {(header) => (
-                      <th
-                        data-column-id={header.column.id}
-                        data-testid={`ch-${header.column.id}`}
-                        class={getHeaderCellClasses(
-                          `${draggedColumnId() === header.column.id ? "opacity-50" : ""} ${
-                            isDragging() &&
-                            hoverColumnId() === header.column.id &&
-                            draggedColumnId() !== header.column.id
-                              ? "bg-blue-50 dark:bg-blue-900/20"
-                              : ""
-                          }`
-                        )}
-                        style={{ width: `${header.getSize()}px` }}
-                        onDragOver={(e) =>
-                          handleDragOver(
-                            e as unknown as DragEvent,
-                            header.column.id
-                          )
-                        }
-                        onDrop={(e) =>
-                          handleDrop(
-                            e as unknown as DragEvent,
-                            header.column.id
-                          )
-                        }
-                      >
-                        <div class="flex items-center gap-0 justify-between">
-                          <span class="flex items-center gap-1 flex-1 min-w-0">
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                          </span>
-                          <Show
-                            when={
-                              !!props.enableColumnReorder &&
-                              header.column.id !== "select" &&
-                              header.column.id !== "actions"
-                            }
-                          >
-                            <button
-                              type="button"
-                              draggable={true}
-                              onDragStart={(e) =>
-                                handleDragStart(
-                                  e as unknown as DragEvent,
-                                  header.column.id
-                                )
+                    {(header) => {
+                      const headerLabelText =
+                        typeof header.column.columnDef.header === "string"
+                          ? header.column.columnDef.header
+                          : header.column.id;
+                      const columnMeta = header.column.columnDef.meta as
+                        | { description?: string }
+                        | undefined;
+                      const columnDescription =
+                        props.columnDescriptions?.[header.column.id] ??
+                        columnMeta?.description;
+                      const canSort = () => header.column.getCanSort();
+                      const sortState = () => header.column.getIsSorted();
+                      const sortLabel = () =>
+                        sortState() === "asc"
+                          ? "Sorted ascending - click to sort descending"
+                          : sortState() === "desc"
+                            ? "Sorted descending - click to clear sort"
+                            : "Not sorted - click to sort ascending";
+                      const headerContent = flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      );
+
+                      return (
+                        <th
+                          data-column-id={header.column.id}
+                          data-testid={`ch-${header.column.id}`}
+                          class={getHeaderCellClasses(
+                            `${draggedColumnId() === header.column.id ? "opacity-50" : ""} ${
+                              isDragging() &&
+                              hoverColumnId() === header.column.id &&
+                              draggedColumnId() !== header.column.id
+                                ? "bg-blue-50 dark:bg-blue-900/20"
+                                : ""
+                            }`
+                          )}
+                          style={{ width: `${header.getSize()}px` }}
+                          onDragOver={(e) =>
+                            handleDragOver(
+                              e as unknown as DragEvent,
+                              header.column.id
+                            )
+                          }
+                          onDrop={(e) =>
+                            handleDrop(
+                              e as unknown as DragEvent,
+                              header.column.id
+                            )
+                          }
+                        >
+                          <div class="flex items-center gap-1">
+                            <div class="flex items-center gap-1 min-w-0 flex-1">
+                              <Show
+                                when={!!columnDescription}
+                                fallback={
+                                  <Show
+                                    when={canSort()}
+                                    fallback={
+                                      <span class="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+                                        {headerContent}
+                                      </span>
+                                    }
+                                  >
+                                    <button
+                                      type="button"
+                                      class="flex items-center gap-1 min-w-0 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400"
+                                      aria-label={sortLabel()}
+                                      title={sortLabel()}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        header.column.toggleSorting();
+                                      }}
+                                    >
+                                      <span class="min-w-0 flex-1 overflow-hidden">
+                                        {headerContent}
+                                      </span>
+                                    </button>
+                                  </Show>
+                                }
+                              >
+                                <Popover
+                                  open={openPopover() === header.column.id}
+                                  onOpenChange={(isOpen) =>
+                                    setOpenPopover(
+                                      isOpen ? header.column.id : null
+                                    )
+                                  }
+                                >
+                                  <PopoverTrigger
+                                    as="button"
+                                    type="button"
+                                    class="flex items-center gap-1 min-w-0 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400"
+                                    aria-label={`About ${headerLabelText}`}
+                                  >
+                                    <span class="min-w-0 flex-1 overflow-hidden">
+                                      {headerContent}
+                                    </span>
+                                    <span class="sr-only">
+                                      {`About ${headerLabelText}`}
+                                    </span>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    ref={(el: HTMLDivElement) => {
+                                      popoverRef = el;
+                                    }}
+                                    onClick={(event: MouseEvent) =>
+                                      event.stopPropagation()
+                                    }
+                                    data-testid={`column-info-${header.column.id}`}
+                                  >
+                                    {columnDescription}
+                                  </PopoverContent>
+                                </Popover>
+                              </Show>
+                            </div>
+                            <Show when={canSort()}>
+                              <button
+                                type="button"
+                                class="flex-shrink-0 inline-flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
+                                aria-label={sortLabel()}
+                                title={sortLabel()}
+                                data-testid={`column-sort-${header.column.id}`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  header.column.toggleSorting();
+                                }}
+                              >
+                                <span aria-hidden="true">
+                                  {sortState() === "asc"
+                                    ? "↑"
+                                    : sortState() === "desc"
+                                      ? "↓"
+                                      : "↕"}
+                                </span>
+                                <span class="sr-only">{sortLabel()}</span>
+                              </button>
+                            </Show>
+                            <Show
+                              when={
+                                !!props.enableColumnReorder &&
+                                header.column.id !== "select" &&
+                                header.column.id !== "actions"
                               }
-                              onDragEnd={handleDragEnd}
-                              class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
-                              aria-label={`Drag to reorder ${header.column.columnDef.header as string} column`}
                             >
-                              <GripVertical
-                                size={14}
-                                class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                              />
-                            </button>
-                          </Show>
-                          <Show when={header.column.getCanResize()}>
-                            <button
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                setIsResizing(true);
-                                header.getResizeHandler()(e);
-                              }}
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                setIsResizing(true);
-                                header.getResizeHandler()(e);
-                              }}
-                              class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
-                              aria-label={`Resize ${header.id} column`}
-                            >
-                              <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
-                            </button>
-                          </Show>
-                        </div>
-                      </th>
-                    )}
+                              <button
+                                type="button"
+                                draggable={true}
+                                onDragStart={(e) =>
+                                  handleDragStart(
+                                    e as unknown as DragEvent,
+                                    header.column.id
+                                  )
+                                }
+                                onDragEnd={handleDragEnd}
+                                onClick={(event) => event.stopPropagation()}
+                                class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
+                                aria-label={`Drag to reorder ${headerLabelText} column`}
+                              >
+                                <GripVertical
+                                  size={14}
+                                  class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                />
+                              </button>
+                            </Show>
+                            <Show when={header.column.getCanResize()}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.stopPropagation();
+                                  setIsResizing(true);
+                                  header.getResizeHandler()(e);
+                                }}
+                                onTouchStart={(e) => {
+                                  e.stopPropagation();
+                                  setIsResizing(true);
+                                  header.getResizeHandler()(e);
+                                }}
+                                onClick={(event) => event.stopPropagation()}
+                                class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
+                                aria-label={`Resize ${header.id} column`}
+                              >
+                                <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
+                              </button>
+                            </Show>
+                          </div>
+                        </th>
+                      );
+                    }}
                   </For>
                 </tr>
               )}

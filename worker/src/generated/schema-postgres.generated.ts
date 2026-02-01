@@ -299,6 +299,15 @@ export const tuneType = pgTable("tune_type", {
   description: text("description"),
 });
 
+export const userGenreSelection = pgTable("user_genre_selection", {
+  userId: text("user_id").notNull(),
+  genreId: text("genre_id").notNull(),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  lastModifiedAt: text("last_modified_at").notNull().$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  deviceId: text("device_id"),
+});
+
 export const userProfile = pgTable("user_profile", {
   id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   supabaseUserId: text("supabase_user_id").notNull(),
@@ -336,5 +345,6 @@ export const tables = {
   "tune": tune,
   "tune_override": tuneOverride,
   "tune_type": tuneType,
+  "user_genre_selection": userGenreSelection,
   "user_profile": userProfile,
 } as const;

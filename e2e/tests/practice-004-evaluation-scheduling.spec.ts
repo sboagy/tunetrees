@@ -49,7 +49,9 @@ test.describe
       });
 
       // Wait for practice grid to load (can mount late under full-suite parallel load)
-      await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
+      await expect(ttPage.practiceColumnsButton).toBeVisible({
+        timeout: 20000,
+      });
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
@@ -236,6 +238,5 @@ test.describe
       await expect(ttPage.submitEvaluationsButton.locator("span")).toHaveCount(
         1
       );
-
     });
   });

@@ -81,8 +81,12 @@ export const WORKER_SYNC_CONFIG =
         "column": "private_to_user"
       },
       "note": {
-        "kind": "orNullEqUserId",
-        "column": "user_ref"
+        "kind": "rpc",
+        "functionName": "sync_get_user_notes",
+        "params": [
+          "userId",
+          "genreIds"
+        ]
       },
       "playlist": {
         "kind": "eqUserId",
@@ -112,8 +116,12 @@ export const WORKER_SYNC_CONFIG =
         "column": "user_id"
       },
       "reference": {
-        "kind": "orNullEqUserId",
-        "column": "user_ref"
+        "kind": "rpc",
+        "functionName": "sync_get_user_references",
+        "params": [
+          "userId",
+          "genreIds"
+        ]
       },
       "tab_group_main_state": {
         "kind": "eqUserId",
@@ -132,12 +140,37 @@ export const WORKER_SYNC_CONFIG =
         "column": "user_ref"
       },
       "tune": {
-        "kind": "orNullEqUserId",
-        "column": "private_for"
+        "kind": "compound",
+        "operator": "or",
+        "rules": [
+          {
+            "kind": "compound",
+            "operator": "and",
+            "rules": [
+              {
+                "kind": "inCollection",
+                "column": "genre",
+                "collection": "selectedGenres"
+              },
+              {
+                "kind": "publicOnly",
+                "column": "private_for"
+              }
+            ]
+          },
+          {
+            "kind": "eqUserId",
+            "column": "private_for"
+          }
+        ]
       },
       "tune_override": {
         "kind": "eqUserId",
         "column": "user_ref"
+      },
+      "user_genre_selection": {
+        "kind": "eqUserId",
+        "column": "user_id"
       },
       "user_profile": {
         "kind": "eqUserId",
@@ -414,7 +447,7 @@ export const WORKER_SYNC_CONFIG =
         }
       },
       "table_transient_data": {
-        "denyDelete": true,
+        "denyDelete": false,
         "sanitize": {
           "coerceNumericProps": [
             {
@@ -497,6 +530,17 @@ export const WORKER_SYNC_CONFIG =
       },
       "tune_type": {
         "denyDelete": true
+      },
+      "user_genre_selection": {
+        "denyDelete": false,
+        "sanitize": {
+          "coerceNumericProps": [
+            {
+              "prop": "syncVersion",
+              "kind": "int"
+            }
+          ]
+        }
       },
       "user_profile": {
         "sanitize": {

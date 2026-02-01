@@ -50,8 +50,8 @@ const CatalogPage: Component = () => {
   const { currentPlaylistId } = useCurrentPlaylist();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get current user ID (supabase UUID)
-  const userId = createMemo(() => user()?.id || null);
+  // Get current user ID
+  const userId = createMemo(() => user()?.id ?? null);
 
   // Helper to safely get string from searchParams
   const getParam = (value: string | string[] | undefined): string => {
@@ -88,6 +88,9 @@ const CatalogPage: Component = () => {
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
     null
   );
+
+  // Track filter panel expanded state
+  const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);
 
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
   // Runs whenever searchParams changes. This resolves the initial race condition
@@ -330,9 +333,15 @@ const CatalogPage: Component = () => {
           availableModes={availableModes()}
           availableGenres={availableGenres()}
           availablePlaylists={userPlaylists() || []}
+          loading={{
+            genres: allGenres.loading,
+            playlists: userPlaylists.loading,
+          }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
           playlistId={currentPlaylistId() || undefined}
+          filterPanelExpanded={filterPanelExpanded()}
+          onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
       </Show>
 

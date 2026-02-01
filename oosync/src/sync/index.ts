@@ -7,11 +7,13 @@
  * @module lib/sync
  */
 
+export { applyRemoteChangesToLocalDb } from "./apply-remote-changes";
+export { SyncEngine } from "./engine";
 export {
   clearOldOutboxItems,
   clearSyncOutbox,
-  getOutboxStats,
   getFailedOutboxItems,
+  getOutboxStats,
   retryOutboxItem,
 } from "./outbox";
 export type {
@@ -19,13 +21,11 @@ export type {
   SyncOperation,
   SyncStatus,
 } from "./queue";
-
+export { RealtimeManager } from "./realtime";
 export {
   SyncInProgressError,
   type SyncResult,
   SyncService,
   startSyncWorker,
 } from "./service";
-
-export { SyncEngine } from "./engine";
-export { RealtimeManager } from "./realtime";
+export { WorkerClient } from "./worker-client";

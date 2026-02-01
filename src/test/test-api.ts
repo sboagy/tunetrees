@@ -9,13 +9,16 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import {
   clearDb,
   getDb,
+  getSqliteInstance,
   initializeDb,
   type SqliteDatabase,
 } from "@/lib/db/client-sqlite";
 import {
   dailyPracticeQueue,
+  note,
   playlistTune,
   practiceRecord,
+  reference,
 } from "@/lib/db/schema";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
@@ -226,6 +229,121 @@ async function getTuneOverrideCountForCurrentUser() {
     WHERE tovr.user_ref = ${userRef}
   `);
   return rows[0]?.count ?? 0;
+}
+
+async function getCatalogTuneCountsForUser() {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+
+  const totalRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) as count
+    FROM tune t
+    WHERE t.deleted = 0
+  `);
+
+  const { getTunesForUser } = await import("@/lib/db/queries/tunes");
+  const filtered = await getTunesForUser(db, userRef);
+
+  return {
+    total: Number(totalRows[0]?.count ?? 0),
+    filtered: filtered.length,
+  };
+}
+
+async function getCatalogSelectionDiagnostics() {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+
+  const userProfileRows = await db.all<{
+    id: string;
+    supabase_user_id: string | null;
+  }>(sql`
+    SELECT id, supabase_user_id
+    FROM user_profile
+    WHERE id = ${userRef} OR supabase_user_id = ${userRef}
+  `);
+
+  const userIds = new Set<string>([userRef]);
+  for (const row of userProfileRows) {
+    if (row.id) userIds.add(row.id);
+    if (row.supabase_user_id) userIds.add(row.supabase_user_id);
+  }
+
+  const userIdList = Array.from(userIds)
+    .map((id) => `'${id.replace(/'/g, "''")}'`)
+    .join(", ");
+
+  const selectionRows = await db.all<{ user_id: string; genre_id: string }>(
+    sql`
+      SELECT user_id, genre_id
+      FROM user_genre_selection
+      WHERE user_id IN (${sql.raw(userIdList)})
+    `
+  );
+
+  const playlistDefaultsRows = await db.all<{ genre: string | null }>(sql`
+    SELECT DISTINCT p.genre_default AS genre
+    FROM playlist p
+    WHERE p.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+      AND p.genre_default IS NOT NULL
+  `);
+
+  const repertoireGenreRows = await db.all<{ genre: string | null }>(sql`
+    SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
+    FROM playlist_tune pt
+    JOIN playlist p
+      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    JOIN tune t
+      ON t.id = pt.tune_ref AND t.deleted = 0
+    LEFT JOIN tune_override o
+      ON o.tune_ref = t.id
+      AND o.user_ref IN (${sql.raw(userIdList)})
+      AND o.deleted = 0
+    WHERE pt.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+  `);
+
+  const playlistCountRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM playlist p
+    WHERE p.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+  `);
+
+  const playlistTuneCountRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM playlist_tune pt
+    JOIN playlist p
+      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    WHERE pt.deleted = 0
+      AND p.user_ref IN (${sql.raw(userIdList)})
+  `);
+
+  const catalogTuneCountRows = await db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM tune t
+    WHERE t.deleted = 0
+  `);
+
+  return {
+    userRef,
+    userIdVariants: Array.from(userIds),
+    userProfile: userProfileRows,
+    selectionRows,
+    selectedGenreIds: selectionRows.map((row) => row.genre_id),
+    playlistDefaults: playlistDefaultsRows
+      .map((row) => row.genre)
+      .filter((genreId): genreId is string => !!genreId),
+    repertoireGenres: repertoireGenreRows
+      .map((row) => row.genre)
+      .filter((genreId): genreId is string => !!genreId),
+    counts: {
+      playlistCount: Number(playlistCountRows[0]?.count ?? 0),
+      playlistTuneCount: Number(playlistTuneCountRows[0]?.count ?? 0),
+      tuneCount: Number(catalogTuneCountRows[0]?.count ?? 0),
+    },
+  };
 }
 
 /**
@@ -557,6 +675,72 @@ async function getTunesByTitles(titles: string[]) {
   `);
   return rows;
 }
+
+async function seedSampleCatalogRow() {
+  const now = new Date().toISOString();
+  const rawDb = await getSqliteInstance();
+  if (!rawDb) {
+    throw new Error("SQLite instance not available for seed");
+  }
+  // Ensure genre exists to satisfy FK.
+  rawDb.run(
+    "INSERT OR IGNORE INTO genre (id, name, region, description) VALUES (?, ?, ?, ?)",
+    ["itrad", "Irish Traditional", "Ireland", "Traditional Irish music genre"]
+  );
+  rawDb.run(
+    "INSERT OR IGNORE INTO user_profile (id, supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      "test-user-id",
+      "test-user-id",
+      "Test User",
+      null,
+      "fsrs",
+      0,
+      1,
+      now,
+      "local",
+    ]
+  );
+  rawDb.run(
+    `INSERT OR REPLACE INTO tune (
+      id,
+      title,
+      type,
+      structure,
+      mode,
+      incipit,
+      genre,
+      composer,
+      artist,
+      id_foreign,
+      release_year,
+      private_for,
+      primary_origin,
+      deleted,
+      sync_version,
+      last_modified_at,
+      device_id
+    ) VALUES (
+      '${generateId()}',
+      'Sample Reel',
+      'Reel',
+      'AABB',
+      'Dmix',
+      'd2 dA',
+      'itrad',
+      'Traditional',
+      'Session',
+      '12345',
+      2020,
+      NULL,
+      'irishtune.info',
+      0,
+      1,
+      '${now}',
+      'local'
+    )`
+  );
+}
 /**
  * Get count of pending sync outbox items
  * Used by offline tests to verify sync state
@@ -636,6 +820,28 @@ async function getLocalRecord(
   );
   return rows.length > 0 ? rows[0] : null;
 }
+
+/**
+ * Get currently selected genres for the user
+ */
+async function getSelectedGenres(): Promise<string[]> {
+  const db = await ensureDb();
+  const rows = db.all(sql`SELECT genre_id FROM user_genre_selection`);
+  return rows.map((row: any) => row.genre_id);
+}
+
+/**
+ * Get a tune ID by genre
+ * Returns the first tune found for the given genre
+ */
+async function getTuneIdByGenre(genre: string): Promise<string | null> {
+  const db = await ensureDb();
+  const rows = await db.all(
+    sql`SELECT id FROM tune WHERE genre = ${genre} AND deleted = 0 LIMIT 1`
+  );
+  return rows.length > 0 ? (rows[0] as { id: string }).id : null;
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -644,6 +850,11 @@ declare global {
       setTestUserId: (userId: string) => void;
       getTestUserId: () => string | undefined;
       clearTestUserId: () => void;
+      getCurrentUserId: () => Promise<string>;
+      findOrCreatePrivateTune: (
+        genre: string,
+        userId: string
+      ) => Promise<string>;
       seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
         updated: number;
         queueCount: number;
@@ -652,6 +863,24 @@ declare global {
       getPracticeCount: (playlistId: string) => Promise<number>; // UUID
       getRepertoireCount: (playlistId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
+      getCatalogTuneCountsForUser: () => Promise<{
+        total: number;
+        filtered: number;
+      }>;
+      getCatalogSelectionDiagnostics: () => Promise<{
+        userRef: string;
+        userIdVariants: string[];
+        userProfile: Array<{ id: string; supabase_user_id: string | null }>;
+        selectionRows: Array<{ user_id: string; genre_id: string }>;
+        selectedGenreIds: string[];
+        playlistDefaults: string[];
+        repertoireGenres: string[];
+        counts: {
+          playlistCount: number;
+          playlistTuneCount: number;
+          tuneCount: number;
+        };
+      }>;
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
       dispose: () => Promise<void>;
@@ -696,6 +925,7 @@ declare global {
         }>
       >;
       getQueueWindows: (playlistId: string) => Promise<string[]>;
+      seedSampleCatalogRow: () => Promise<void>;
       // New query functions for scheduling tests
       getPracticeRecords: (tuneIds: string[]) => Promise<
         Array<{
@@ -811,6 +1041,21 @@ declare global {
         table: string,
         recordId: string | number
       ) => Promise<any>;
+      getSelectedGenres: () => Promise<string[]>;
+      getTuneIdByGenre: (genre: string) => Promise<string | null>;
+      getAnnotationCounts: (options?: {
+        tuneId?: string;
+      }) => Promise<{ notes: number; references: number }>;
+      getOrphanedAnnotationCounts: () => Promise<{
+        orphanedNotes: number;
+        orphanedReferences: number;
+      }>;
+      seedAnnotations: (input: {
+        tuneId: string;
+        noteCount?: number;
+        referenceCount?: number;
+        userId?: string;
+      }) => Promise<{ notesCreated: number; referencesCreated: number }>;
     };
   }
 }
@@ -829,10 +1074,48 @@ if (typeof window !== "undefined") {
         delete window.__ttTestUserId;
         console.log("[TestApi] Test user ID cleared");
       },
+      getCurrentUserId: async () => {
+        const db = await ensureDb();
+        return await resolveUserId(db);
+      },
+      findOrCreatePrivateTune: async (genre: string, userId: string) => {
+        const db = await ensureDb();
+
+        // Try to find existing private tune
+        const existing = await db.all<{ id: string }>(
+          sql`SELECT id FROM tune WHERE genre = ${genre} AND private_for = ${userId} AND deleted = 0 LIMIT 1`
+        );
+
+        if (existing.length > 0 && existing[0]?.id) {
+          return existing[0].id;
+        }
+
+        // Create a private tune using raw SQL
+        const tuneId = generateId();
+        const now = new Date().toISOString();
+
+        await db.run(
+          sql.raw(`INSERT INTO tune (
+            id, title, genre, private_for, deleted, sync_version, last_modified_at
+          ) VALUES (
+            '${tuneId}', 
+            'E2E Private Tune ${genre}', 
+            '${genre}', 
+            '${userId}', 
+            0, 
+            1,
+            '${now}'
+          )`)
+        );
+
+        return tuneId;
+      },
       seedAddToReview,
       getPracticeCount,
       getRepertoireCount,
       getTuneOverrideCountForCurrentUser,
+      getCatalogTuneCountsForUser,
+      getCatalogSelectionDiagnostics,
       getPracticeRecords,
       getLatestPracticeRecord,
       getScheduledDates,
@@ -977,6 +1260,9 @@ if (typeof window !== "undefined") {
         `);
         return rows.map((r) => r.window_start_utc);
       },
+      seedSampleCatalogRow: async () => {
+        await seedSampleCatalogRow();
+      },
       getSyncVersion: () => {
         // Access the sync version from AuthContext
         // The version starts at 0 and increments to 1 after initial sync
@@ -1030,6 +1316,108 @@ if (typeof window !== "undefined") {
       },
       getLocalRecord: async (table: string, recordId: string | number) => {
         return await getLocalRecord(table, recordId);
+      },
+      getAnnotationCounts: async (options?: { tuneId?: string }) => {
+        const db = await ensureDb();
+        const userRef = await resolveUserId(db);
+
+        // Count notes (filtered by genre via tune JOIN)
+        const noteQuery = options?.tuneId
+          ? sql`SELECT COUNT(*) as count FROM note n WHERE n.tune_ref = ${options.tuneId}`
+          : sql`
+              SELECT COUNT(*) as count 
+              FROM note n
+              JOIN tune t ON n.tune_ref = t.id
+              WHERE (n.user_ref IS NULL OR n.user_ref = ${userRef})
+                AND t.deleted = 0
+            `;
+
+        const noteRows = await db.all<{ count: number }>(noteQuery);
+
+        // Count references (same pattern)
+        const refQuery = options?.tuneId
+          ? sql`SELECT COUNT(*) as count FROM reference r WHERE r.tune_ref = ${options.tuneId}`
+          : sql`
+              SELECT COUNT(*) as count 
+              FROM reference r
+              JOIN tune t ON r.tune_ref = t.id
+              WHERE (r.user_ref IS NULL OR r.user_ref = ${userRef})
+                AND t.deleted = 0
+            `;
+
+        const refRows = await db.all<{ count: number }>(refQuery);
+
+        return {
+          notes: Number(noteRows[0]?.count ?? 0),
+          references: Number(refRows[0]?.count ?? 0),
+        };
+      },
+      getSelectedGenres,
+      getTuneIdByGenre,
+      getOrphanedAnnotationCounts: async () => {
+        const db = await ensureDb();
+
+        // Count notes with tune_ref NOT in tune table
+        const orphanedNotes = await db.all<{ count: number }>(sql`
+          SELECT COUNT(*) as count
+          FROM note n
+          WHERE n.tune_ref NOT IN (SELECT id FROM tune WHERE deleted = 0)
+        `);
+
+        // Count references with tune_ref NOT in tune table
+        const orphanedRefs = await db.all<{ count: number }>(sql`
+          SELECT COUNT(*) as count
+          FROM reference r
+          WHERE r.tune_ref NOT IN (SELECT id FROM tune WHERE deleted = 0)
+        `);
+
+        return {
+          orphanedNotes: Number(orphanedNotes[0]?.count ?? 0),
+          orphanedReferences: Number(orphanedRefs[0]?.count ?? 0),
+        };
+      },
+      seedAnnotations: async (input: {
+        tuneId: string;
+        noteCount?: number;
+        referenceCount?: number;
+        userId?: string;
+      }) => {
+        const db = await ensureDb();
+        const userRef = input.userId ?? (await resolveUserId(db));
+        const now = new Date().toISOString();
+
+        // Seed notes
+        for (let i = 0; i < (input.noteCount ?? 0); i++) {
+          await db.insert(note).values({
+            tuneRef: input.tuneId,
+            userRef,
+            noteText: `Test note ${i + 1}`,
+            public: 0,
+            deleted: 0,
+            displayOrder: i + 1,
+            createdDate: now,
+            lastModifiedAt: now,
+            syncVersion: 1,
+          });
+        }
+
+        // Seed references
+        for (let i = 0; i < (input.referenceCount ?? 0); i++) {
+          await db.insert(reference).values({
+            tuneRef: input.tuneId,
+            userRef,
+            url: `https://example.com/ref${i + 1}`,
+            comment: `Test reference ${i + 1}`,
+            deleted: 0,
+            lastModifiedAt: now,
+            syncVersion: 1,
+          });
+        }
+
+        return {
+          notesCreated: input.noteCount ?? 0,
+          referencesCreated: input.referenceCount ?? 0,
+        };
       },
     };
     // eslint-disable-next-line no-console

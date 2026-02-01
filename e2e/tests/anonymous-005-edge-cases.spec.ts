@@ -26,6 +26,13 @@ const test = base.extend({
 test.describe("Anonymous User Edge Cases", () => {
   let ttPage: TuneTreesPage;
 
+  const ANON_REPERTOIRE_CONFIG = {
+    name: "Anon Repertoire",
+    default_genre: "ITRAD",
+    instrument: "Irish Flute",
+    genres_filter: ["ITRAD"],
+  };
+
   test.beforeEach(async ({ page }) => {
     ttPage = new TuneTreesPage(page);
   });
@@ -119,7 +126,10 @@ test.describe("Anonymous User Edge Cases", () => {
   test("5.4 Anonymous user sign-out clears local data", async ({ page }) => {
     // Sign in anonymously WITH a playlist (needed for repertoire functionality)
     await ttPage.gotoLogin();
-    await ttPage.signInAnonymouslyWithPlaylist("Sign Out Test Playlist");
+    await ttPage.signInAnonymously({
+      ...ANON_REPERTOIRE_CONFIG,
+      name: "Sign Out Test Playlist",
+    });
 
     // Add some data - navigate to catalog
     await ttPage.navigateToTab("catalog");
@@ -139,7 +149,9 @@ test.describe("Anonymous User Edge Cases", () => {
 
       // Verify in repertoire
       await ttPage.navigateToTab("repertoire");
-      await expect(ttPage.repertoireColumnsButton).toBeVisible({ timeout: 20000 });
+      await expect(ttPage.repertoireColumnsButton).toBeVisible({
+        timeout: 20000,
+      });
       await ttPage.expectGridHasContent(ttPage.repertoireGrid);
 
       const beforeCount = await ttPage.repertoireGrid

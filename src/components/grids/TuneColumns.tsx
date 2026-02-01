@@ -59,36 +59,19 @@ const formatJustDate = (dateStr: string): string => {
 
 /**
  * Sortable column header component
+ *
+ * Sorting controls are rendered in the grid header to keep title clicks
+ * available for info popovers.
  */
 const SortableHeader: Component<{ column: any; title: string }> = (props) => {
-  const sortState = () => props.column.getIsSorted();
-
-  return (
-    <button
-      type="button"
-      class="flex items-center gap-2 select-none hover:text-blue-600 dark:hover:text-blue-400"
-      onClick={() => props.column.toggleSorting()}
-      title={
-        sortState() === "asc"
-          ? "Sorted ascending - click to sort descending"
-          : sortState() === "desc"
-            ? "Sorted descending - click to clear sort"
-            : "Not sorted - click to sort ascending"
-      }
-    >
-      <span>{props.title}</span>
-      <span class="text-gray-400">
-        {sortState() === "asc" ? "↑" : sortState() === "desc" ? "↓" : "↕"}
-      </span>
-    </button>
-  );
+  return <span class="truncate normal-case">{props.title}</span>;
 };
 
 /**
  * Non-sortable column header component
  */
 const StaticHeader: Component<{ title: string }> = (props) => {
-  return <span class="normal-case">{props.title}</span>;
+  return <span class="normal-case truncate">{props.title}</span>;
 };
 
 /**
@@ -628,6 +611,10 @@ export function getRepertoireColumns(
       id: "scheduled_raw",
       // accessorKey: "scheduled",
       accessorFn: (row) => row.scheduled || "",
+      meta: {
+        description:
+          "Manual scheduling override for this tune (raw timestamp).",
+      },
       header: ({ column }) => (
         <SortableHeader column={column} title="Sched Override" />
       ),
@@ -979,6 +966,10 @@ export function getScheduledColumns(
     {
       id: "bucket",
       accessorFn: (row) => row.bucket || "Due Today",
+      meta: {
+        description:
+          "Practice queue bucket computed by the scheduler (Due Today, Lapsed, New, Old Lapsed).",
+      },
       header: ({ column }) => <SortableHeader column={column} title="Bucket" />,
       cell: (info) => {
         const value = (info.getValue() as string) || "Due Today";
@@ -1011,6 +1002,10 @@ export function getScheduledColumns(
     {
       id: "evaluation",
       accessorFn: (row) => row.recall_eval || "",
+      meta: {
+        description:
+          "Your recall rating for this practice (Again/Hard/Good/Easy).",
+      },
       header: () => <StaticHeader title="Evaluation" />,
       enableSorting: false,
       sortingFn: noSortingFn,

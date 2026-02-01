@@ -50,7 +50,11 @@ interface OnboardingState {
 /**
  * Onboarding steps
  */
-export type OnboardingStep = "create-playlist" | "view-catalog" | "complete";
+export type OnboardingStep =
+  | "create-playlist"
+  | "choose-genres"
+  | "view-catalog"
+  | "complete";
 
 /**
  * Onboarding context (undefined until provider is mounted)
@@ -119,6 +123,8 @@ export const OnboardingProvider: ParentComponent = (props) => {
     console.log("🎓 Onboarding next step from:", current);
 
     if (current === "create-playlist") {
+      setOnboardingStep("choose-genres");
+    } else if (current === "choose-genres") {
       setOnboardingStep("view-catalog");
     } else if (current === "view-catalog") {
       setOnboardingStep("complete");

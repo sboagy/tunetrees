@@ -88,6 +88,7 @@ export const note = sqliteTable("note", {
   ...sqliteSyncColumns,
 }
 , (t) => [
+  index("idx_note_last_modified_at").on(t.lastModifiedAt),
   index("idx_note_tune_playlist").on(t.tuneRef, t.playlistRef),
   index("idx_note_tune_playlist_user_public").on(t.tuneRef, t.playlistRef, t.userRef, t.public),
   index("idx_note_tune_user").on(t.tuneRef, t.userRef),
@@ -314,6 +315,9 @@ export const tune = sqliteTable("tune", {
   releaseYear: integer("release_year"),
   ...sqliteSyncColumns,
 }
+, (t) => [
+  index("idx_tune_genre").on(t.genre),
+]
 );
 
 export const tuneOverride = sqliteTable("tune_override", {
@@ -341,6 +345,19 @@ export const tuneType = sqliteTable("tune_type", {
   rhythm: text("rhythm"),
   description: text("description"),
 }
+);
+
+export const userGenreSelection = sqliteTable("user_genre_selection", {
+  userId: text("user_id").notNull().references(() => userProfile.id),
+  genreId: text("genre_id").notNull().references(() => genre.id),
+  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
+  ...sqliteSyncColumns,
+}
+, (t) => [
+  primaryKey({ columns: [t.userId, t.genreId] }),
+  index("idx_user_genre_selection_genre_id").on(t.genreId),
+  index("idx_user_genre_selection_user_id").on(t.userId),
+]
 );
 
 export const userProfile = sqliteTable("user_profile", {

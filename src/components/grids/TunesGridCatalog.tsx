@@ -28,6 +28,7 @@ import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getPlaylistTunes } from "../../lib/db/queries/playlists";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
+import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
 import { GridStatusMessage } from "./GridStatusMessage";
@@ -36,7 +37,7 @@ import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
-  const { localDb, catalogListChanged, initialSyncComplete } = useAuth();
+  const { localDb, catalogListChanged, initialSyncComplete, user } = useAuth();
   const { currentPlaylistId } = useCurrentPlaylist();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
@@ -55,17 +56,19 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   // (Drag state removed; reordering not handled at wrapper level)
 
   // Fetch tunes data
+  // CRITICAL: Must wait for initialSyncComplete before fetching tunes.
+  // user_genre_selection data is needed to filter genres, and it's only
+  // available after sync completes. Without this check, getTunesForUser
+  // returns ALL tunes (unfiltered) because selectedGenreIds is empty.
   const [tunes] = createResource(
     () => {
       const db = localDb();
-      const userId = useAuth().user()?.id;
+      const userId = user()?.id;
       const version = catalogListChanged(); // Refetch when catalog changes
-      const syncComplete = initialSyncComplete(); // Wait for initial sync
+      const syncComplete = initialSyncComplete();
 
+      // MUST wait for sync to complete so user_genre_selection is loaded
       if (!syncComplete) {
-        console.log(
-          "[TunesGridCatalog] Waiting for initial sync to complete..."
-        );
         return null;
       }
 
@@ -81,7 +84,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [playlistTunes] = createResource(
     () => {
       const db = localDb();
-      const userId = useAuth().user()?.id;
+      const userId = user()?.id;
       const playlistIds = props.selectedPlaylistIds || [];
       return db && userId && playlistIds.length > 0
         ? { db, userId, playlistIds }
@@ -193,6 +196,17 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     });
   });
 
+  const [columnDescriptions] = createResource(
+    () => {
+      const db = localDb();
+      return db ? { db } : null;
+    },
+    async (params) => {
+      if (!params) return {};
+      return await getViewColumnDescriptions(params.db, "practice_list_staged");
+    }
+  );
+
   // Columns are derived inside TunesGrid via getColumns("catalog")
 
   // Table instance will be provided by TunesGrid via onTableReady
@@ -241,7 +255,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           error={loadError()}
         />
       </Show>
-
       {/* Loading state */}
       <Show when={!loadError() && isLoading()}>
         <GridStatusMessage
@@ -251,17 +264,14 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
         />
       </Show>
       {/* Table container with virtualization */}
-      <Show
-        when={
-          !loadError() && !isLoading() && hasTunes()
-        }
-      >
+      <Show when={!loadError() && !isLoading() && hasTunes()}>
         <div class="flex-1 overflow-hidden">
           <TunesGrid
             tablePurpose="catalog"
             userId={props.userId}
             playlistId={currentPlaylistId() || undefined}
             data={filteredTunes()}
+            columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}
             enableColumnReorder={true}
             onRowClick={(row) => handleRowClick(row as Tune)}
@@ -287,11 +297,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
         </div>
       </Show>{" "}
       {/* Empty state */}
-      <Show
-        when={
-          !loadError() && !isLoading() && !hasTunes()
-        }
-      >
+      <Show when={!loadError() && !isLoading() && !hasTunes()}>
         <GridStatusMessage
           variant="empty"
           title="No tunes found"

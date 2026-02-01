@@ -85,6 +85,15 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     setIsSubmitting(true);
 
     try {
+      const injectedTestUserId =
+        typeof window !== "undefined"
+          ? (window as { __ttTestUserId?: string }).__ttTestUserId
+          : undefined;
+      if (injectedTestUserId) {
+        await signInAnonymously(injectedTestUserId);
+        props.onSuccess?.();
+        return;
+      }
       const { error: anonymousError } = await signInAnonymously();
       if (anonymousError) {
         setError(anonymousError.message);

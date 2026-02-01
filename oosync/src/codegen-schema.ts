@@ -163,6 +163,12 @@ interface IColumnCommentRow {
   comment: string | null;
 }
 
+interface IViewColumnCommentRow {
+  view_name: string;
+  column_name: string;
+  comment: string | null;
+}
+
 function parseArgs(argv: string[]): IArgs {
   const check = argv.includes("--check");
   const strict = !argv.includes("--lenient");
@@ -398,6 +404,7 @@ function buildTableMetaTs(params: {
   strict: boolean;
   syncableTables: string[];
   tableRegistryCore: Record<string, ITableMetaCore>;
+  columnDescriptionsByTable: Record<string, Record<string, string>>;
 }): string {
   const colsByTable = groupByKey(params.columns, (c) => c.table_name);
   const uniqueByTableConstraint = groupByKey(
@@ -425,6 +432,7 @@ function buildTableMetaTs(params: {
   lines.push("  booleanColumns: string[];");
   lines.push("  supportsIncremental: boolean;");
   lines.push("  hasDeletedFlag: boolean;");
+  lines.push("  columnDescriptions?: Record<string, string>;");
   lines.push("}");
   lines.push("");
 
@@ -542,6 +550,17 @@ function buildTableMetaTs(params: {
     lines.push(
       `    hasDeletedFlag: ${core.hasDeletedFlag ? "true" : "false"},`
     );
+    const columnDescriptions = params.columnDescriptionsByTable[tableName];
+    if (columnDescriptions && Object.keys(columnDescriptions).length > 0) {
+      const sortedDescriptions = Object.fromEntries(
+        Object.entries(columnDescriptions).sort((a, b) =>
+          a[0].localeCompare(b[0])
+        )
+      );
+      lines.push(
+        `    columnDescriptions: ${JSON.stringify(sortedDescriptions, null, 2)},`
+      );
+    }
     lines.push("  },");
   }
 
@@ -562,6 +581,7 @@ async function introspect(params: {
   foreignKeys: IForeignKeyRow[];
   tableComments: ITableCommentRow[];
   columnComments: IColumnCommentRow[];
+  viewColumnComments: IViewColumnCommentRow[];
 }> {
   const sql = postgres(params.databaseUrl, {
     prepare: false,
@@ -689,6 +709,24 @@ async function introspect(params: {
       order by cl.relname, a.attnum;
     `;
 
+    const viewColumnComments = await sql<IViewColumnCommentRow[]>`
+      select
+        cl.relname as view_name,
+        a.attname as column_name,
+        d.description as comment
+      from pg_attribute a
+      join pg_class cl on cl.oid = a.attrelid
+      join pg_namespace n on n.oid = cl.relnamespace
+      left join pg_description d
+        on d.objoid = a.attrelid
+        and d.objsubid = a.attnum
+      where n.nspname = ${params.schema}
+        and cl.relkind in ('v', 'm')
+        and a.attnum > 0
+        and not a.attisdropped
+      order by cl.relname, a.attnum;
+    `;
+
     return {
       columns,
       primaryKeys,
@@ -697,6 +735,7 @@ async function introspect(params: {
       foreignKeys,
       tableComments,
       columnComments,
+      viewColumnComments,
     };
   } finally {
     await sql.end({ timeout: 5 });
@@ -959,6 +998,7 @@ function buildAppTableMetaTs(params: {
   normalizeDatetimeByTable: Record<string, string[]>;
   tableSyncOrder: Record<string, number>;
   tableToSchemaKey: Record<string, string>;
+  columnDescriptionsByTable: Record<string, Record<string, string>>;
 }): string {
   const lines: string[] = [];
   lines.push(createHeader({ schema: params.schema }));
@@ -988,6 +1028,7 @@ function buildAppTableMetaTs(params: {
   lines.push(
     "  normalize?: (row: Record<string, unknown>) => Record<string, unknown>;"
   );
+  lines.push("  columnDescriptions?: Record<string, string>;");
   lines.push("}");
   lines.push("");
 
@@ -1023,12 +1064,13 @@ function buildAppTableMetaTs(params: {
   lines.push("");
 
   lines.push(
-    'const TABLE_EXTRAS: Record<SyncableTableName, Pick<TableMeta, "changeCategory" | "normalize">> = {'
+    'const TABLE_EXTRAS: Record<SyncableTableName, Pick<TableMeta, "changeCategory" | "normalize" | "columnDescriptions">> = {'
   );
 
   for (const t of params.syncableTables) {
     const category = params.changeCategoryByTable[t] ?? null;
     const datetimeFields = params.normalizeDatetimeByTable[t];
+    const columnDescriptions = params.columnDescriptionsByTable[t];
     lines.push(`  ${JSON.stringify(t)}: {`);
     lines.push(
       `    changeCategory: ${category === null ? "null" : JSON.stringify(category)},`
@@ -1037,6 +1079,16 @@ function buildAppTableMetaTs(params: {
       const arr = `[${datetimeFields.map((c) => JSON.stringify(c)).join(", ")}]`;
       lines.push(
         `    normalize: (row) => normalizeDatetimeFields(row, ${arr}),`
+      );
+    }
+    if (columnDescriptions && Object.keys(columnDescriptions).length > 0) {
+      const sortedDescriptions = Object.fromEntries(
+        Object.entries(columnDescriptions).sort((a, b) =>
+          a[0].localeCompare(b[0])
+        )
+      );
+      lines.push(
+        `    columnDescriptions: ${JSON.stringify(sortedDescriptions, null, 2)},`
       );
     }
     lines.push("  },");
@@ -1248,6 +1300,7 @@ function buildDefaultWorkerConfig(params: {
     | { kind: "eqUserId"; column: string }
     | { kind: "orNullEqUserId"; column: string }
     | { kind: "inCollection"; column: string; collection: string }
+    | { kind: "rpc"; functionName: string; params: string[] }
   > = {};
   const pushRules: Record<
     string,
@@ -1933,6 +1986,7 @@ async function main(): Promise<void> {
     indexes,
     foreignKeys,
     tableComments,
+    columnComments,
   } = await introspect({ databaseUrl: args.databaseUrl, schema: args.schema });
 
   const next = buildSchemaTs({
@@ -1983,6 +2037,15 @@ async function main(): Promise<void> {
     ...(config.tableMeta?.tableRegistryCore ?? {}),
   };
 
+  const columnDescriptionsByTable: Record<string, Record<string, string>> = {};
+  for (const row of columnComments) {
+    if (!row.comment) continue;
+    if (!columnDescriptionsByTable[row.table_name]) {
+      columnDescriptionsByTable[row.table_name] = {};
+    }
+    columnDescriptionsByTable[row.table_name][row.column_name] = row.comment;
+  }
+
   const nextTableMeta = buildTableMetaTs({
     schema: args.schema,
     columns,
@@ -1991,6 +2054,7 @@ async function main(): Promise<void> {
     strict: args.strict,
     syncableTables,
     tableRegistryCore,
+    columnDescriptionsByTable,
   });
 
   const changeCategoryByTable: Record<string, ChangeCategory> = {
@@ -2038,6 +2102,7 @@ async function main(): Promise<void> {
     normalizeDatetimeByTable,
     tableSyncOrder,
     tableToSchemaKey,
+    columnDescriptionsByTable,
   });
 
   const nextWorkerPgSchema = buildPgSchemaTs({

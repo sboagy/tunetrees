@@ -1,6 +1,7 @@
 import type {
   SyncChange,
   SyncRequest,
+  SyncRequestOverrides,
   SyncResponse,
 } from "@oosync/shared/protocol";
 
@@ -21,8 +22,10 @@ export class WorkerClient {
       pullCursor?: string;
       syncStartedAt?: string;
       pageSize?: number;
+      overrides?: SyncRequestOverrides | null;
     }
   ): Promise<SyncResponse> {
+    const overrides = options?.overrides ?? undefined;
     const payload: SyncRequest = {
       changes,
       lastSyncAt,
@@ -30,6 +33,9 @@ export class WorkerClient {
       pullCursor: options?.pullCursor,
       syncStartedAt: options?.syncStartedAt,
       pageSize: options?.pageSize,
+      collectionsOverride: overrides?.collectionsOverride,
+      genreFilter: overrides?.genreFilter,
+      pullTables: overrides?.pullTables,
     };
 
     const response = await fetch(`${WORKER_URL}/api/sync`, {

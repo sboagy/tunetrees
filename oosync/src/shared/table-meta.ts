@@ -34,6 +34,8 @@ export interface ITableMeta {
   normalize?: (
     row: Readonly<Record<string, unknown>>
   ) => Record<string, unknown>;
+  /** Optional user-facing descriptions keyed by column name */
+  columnDescriptions?: Readonly<Record<string, string>>;
 }
 
 export type TableRegistry = Readonly<Record<string, ITableMeta>>;
