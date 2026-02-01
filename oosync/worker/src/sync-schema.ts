@@ -61,7 +61,8 @@ export interface IWorkerCollectionConfig {
 export type PullTableRule =
   | { kind: "eqUserId"; column: string }
   | { kind: "orNullEqUserId"; column: string }
-  | { kind: "inCollection"; column: string; collection: string };
+  | { kind: "inCollection"; column: string; collection: string }
+  | { kind: "orEqUserIdOrTrue"; column: string; orColumn: string };
 
 export interface IPullConfig {
   tableRules?: Record<string, PullTableRule>;
@@ -198,6 +199,14 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
 
       if (rule.kind === "orNullEqUserId") {
         conditions.push(or(isNull(col), eq(col, params.userId)));
+        return conditions;
+      }
+
+      if (rule.kind === "orEqUserIdOrTrue") {
+        const orProp = snakeToCamel(rule.orColumn);
+        const orCol = params.table[orProp];
+        if (!orCol) return [];
+        conditions.push(or(eq(col, params.userId), eq(orCol, true)));
         return conditions;
       }
 

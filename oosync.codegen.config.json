@@ -27,7 +27,8 @@
       "note": "repertoire",
       "reference": "repertoire",
       "tag": "repertoire",
-      "tune_override": "repertoire"
+      "tune_override": "repertoire",
+      "plugin": "user"
     },
     "tableToSchemaKeyOverrides": {
       "plugin": "plugin"
@@ -45,6 +46,15 @@
   },
   "worker": {
     "config": {
+      "pull": {
+        "tableRules": {
+          "plugin": {
+            "kind": "orEqUserIdOrTrue",
+            "column": "user_ref",
+            "orColumn": "is_public"
+          }
+        }
+      },
       "push": {
         "tableRules": {
           "practice_record": {

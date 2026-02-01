@@ -29,6 +29,11 @@ export const WORKER_SYNC_CONFIG =
       "idColumn": "playlist_id",
       "ownerColumn": "user_ref"
     },
+    "pluginIds": {
+      "table": "plugin",
+      "idColumn": "id",
+      "ownerColumn": "user_ref"
+    },
     "prefsSchedulingOptionsIds": {
       "table": "prefs_scheduling_options",
       "idColumn": "user_id",
@@ -87,6 +92,11 @@ export const WORKER_SYNC_CONFIG =
         "kind": "inCollection",
         "column": "playlist_ref",
         "collection": "playlistIds"
+      },
+      "plugin": {
+        "kind": "orEqUserIdOrTrue",
+        "column": "user_ref",
+        "orColumn": "is_public"
       },
       "practice_record": {
         "kind": "inCollection",
@@ -217,6 +227,20 @@ export const WORKER_SYNC_CONFIG =
           "coerceNumericProps": [
             {
               "prop": "syncVersion",
+              "kind": "int"
+            }
+          ]
+        }
+      },
+      "plugin": {
+        "sanitize": {
+          "coerceNumericProps": [
+            {
+              "prop": "syncVersion",
+              "kind": "int"
+            },
+            {
+              "prop": "version",
               "kind": "int"
             }
           ]

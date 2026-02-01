@@ -121,6 +121,25 @@ export const playlistTune = sqliteTable("playlist_tune", {
 ]
 );
 
+export const plugin = sqliteTable("plugin", {
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userRef: text("user_ref").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  script: text("script").notNull(),
+  capabilities: text("capabilities").notNull(),
+  isPublic: integer("is_public").notNull().default(0),
+  enabled: integer("enabled").notNull().default(1),
+  version: integer("version").notNull().default(1),
+  deleted: integer("deleted").notNull().default(0),
+  ...sqliteSyncColumns,
+}
+, (t) => [
+  index("idx_plugin_public").on(t.isPublic),
+  index("idx_plugin_user_ref").on(t.userRef),
+]
+);
+
 export const practiceRecord = sqliteTable("practice_record", {
   id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   playlistRef: text("playlist_ref").notNull().references(() => playlist.playlistId),

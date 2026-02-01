@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS "public"."plugin" (
   "device_id" "text"
 );
 
+ALTER TABLE "public"."plugin"
+  ADD CONSTRAINT "plugin_pkey" PRIMARY KEY ("id");
+
 ALTER TABLE "public"."plugin" OWNER TO "postgres";
 
 ALTER TABLE "public"."plugin" ENABLE ROW LEVEL SECURITY;

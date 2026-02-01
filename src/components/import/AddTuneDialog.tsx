@@ -14,7 +14,11 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import abcjs from "abcjs";
 import { Import } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { getPluginsByCapability } from "@/lib/db/queries/plugins";
+import type { Plugin } from "@/lib/db/types";
+import { runPluginFunction } from "@/lib/plugins/runtime";
 import {
   extractIncipitFromTheSessionJson,
   fetchTheSessionURLsFromTitle,
@@ -65,8 +69,7 @@ export interface AddTuneDialogProps {
 export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
-  // NOTE: auth context not currently needed in this dialog (imports are local-only)
-  // const auth = useAuth();
+  const { user, localDb } = useAuth();
 
   // Main dialog state - use controlled state if provided, otherwise internal state
   const [internalDialogOpen, setInternalDialogOpen] = createSignal(false);
@@ -81,6 +84,10 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
   const [selectedGenre, setSelectedGenre] = createSignal<string>("ITRAD");
   const [urlOrTitle, setUrlOrTitle] = createSignal<string>("");
+  const [importSource, setImportSource] = createSignal<string>("the-session");
+  const [importPlugins, setImportPlugins] = createSignal<Plugin[]>([]);
+  const [importPluginError, setImportPluginError] =
+    createSignal<string | null>(null);
 
   // Sub-dialog states
   const [showTuneSelectDialog, setShowTuneSelectDialog] = createSignal(false);
@@ -109,6 +116,43 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
     OTIME: "Old Time",
     BLUES: "Blues",
   };
+
+  const getImportSourceLabel = (value: string) => {
+    if (value === "the-session") return "The Session (built-in)";
+    if (value.startsWith("plugin:")) {
+      const id = value.replace("plugin:", "");
+      const plugin = importPlugins().find((row) => row.id === id);
+      return plugin ? `${plugin.name} (plugin)` : "Plugin";
+    }
+    return value;
+  };
+
+  const selectedImportPlugin = () => {
+    const source = importSource();
+    if (!source.startsWith("plugin:")) return null;
+    const id = source.replace("plugin:", "");
+    return importPlugins().find((row) => row.id === id) ?? null;
+  };
+
+  createEffect(() => {
+    const currentUser = user();
+    const db = localDb();
+    if (!currentUser?.id || !db) return;
+    getPluginsByCapability(db, currentUser.id, "parseImport", {
+      includePublic: true,
+      includeDisabled: false,
+    })
+      .then((plugins) => {
+        setImportPlugins(plugins);
+        if (plugins.length === 0) {
+          setImportSource("the-session");
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load import plugins", error);
+        setImportPluginError("Failed to load import plugins");
+      });
+  });
 
   /**
    * Handle "New" button - navigate to tune editor with optional title
@@ -144,6 +188,12 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
     setImportError(null);
 
     try {
+      const plugin = selectedImportPlugin();
+      if (plugin) {
+        await importFromPlugin(plugin, input);
+        return;
+      }
+
       if (input.startsWith("https://thesession.org")) {
         // Direct URL import
         await importFromTheSessionURL(input);
@@ -160,6 +210,128 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
     } finally {
       setIsImporting(false);
     }
+  };
+
+  interface PluginImportData {
+    title: string;
+    type?: string;
+    mode?: string;
+    structure?: string;
+    incipit?: string;
+    genre?: string;
+    composer?: string;
+    artist?: string;
+    idForeign?: string;
+    releaseYear?: number;
+    sourceUrl?: string;
+  }
+
+  const normalizePluginImportData = (
+    value: unknown
+  ): PluginImportData | null => {
+    if (!value) return null;
+    if (Array.isArray(value)) {
+      return value.length > 0 ? normalizePluginImportData(value[0]) : null;
+    }
+    if (typeof value !== "object") return null;
+
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.tunes)) {
+      return record.tunes.length > 0
+        ? normalizePluginImportData(record.tunes[0])
+        : null;
+    }
+    if (record.tune && typeof record.tune === "object") {
+      return normalizePluginImportData(record.tune as Record<string, unknown>);
+    }
+
+    const title = typeof record.title === "string" ? record.title : "";
+    if (!title) return null;
+
+    const releaseYearRaw =
+      record.releaseYear ?? record.release_year ?? record.release_years;
+    const releaseYear =
+      typeof releaseYearRaw === "number"
+        ? releaseYearRaw
+        : typeof releaseYearRaw === "string" && releaseYearRaw.trim() !== ""
+          ? Number(releaseYearRaw)
+          : undefined;
+
+    return {
+      title,
+      type: typeof record.type === "string" ? record.type : undefined,
+      mode: typeof record.mode === "string" ? record.mode : undefined,
+      structure:
+        typeof record.structure === "string" ? record.structure : undefined,
+      incipit: typeof record.incipit === "string" ? record.incipit : undefined,
+      genre: typeof record.genre === "string" ? record.genre : undefined,
+      composer:
+        typeof record.composer === "string" ? record.composer : undefined,
+      artist: typeof record.artist === "string" ? record.artist : undefined,
+      idForeign:
+        typeof record.idForeign === "string"
+          ? record.idForeign
+          : typeof record.id_foreign === "string"
+            ? record.id_foreign
+            : undefined,
+      releaseYear:
+        releaseYear && Number.isFinite(releaseYear) ? releaseYear : undefined,
+      sourceUrl:
+        typeof record.sourceUrl === "string"
+          ? record.sourceUrl
+          : typeof record.source_url === "string"
+            ? record.source_url
+            : typeof record.url === "string"
+              ? record.url
+              : undefined,
+    };
+  };
+
+  const importFromPlugin = async (plugin: Plugin, input: string) => {
+    const fullPath = location.pathname + location.search;
+    const payload = {
+      input,
+      genre: selectedGenre(),
+      isUrl: input.startsWith("http://") || input.startsWith("https://"),
+    };
+
+    const result = await runPluginFunction({
+      script: plugin.script,
+      functionName: "parseImport",
+      payload,
+      meta: {
+        pluginId: plugin.id,
+        pluginName: plugin.name,
+      },
+      timeoutMs: 10000,
+    });
+
+    const normalized = normalizePluginImportData(result);
+    if (!normalized) {
+      throw new Error("Plugin did not return valid tune data");
+    }
+
+    const params = new URLSearchParams({
+      title: normalized.title,
+      type: normalized.type ?? "",
+      mode: normalized.mode ?? "",
+      structure: normalized.structure ?? "",
+      incipit: normalized.incipit ?? "",
+      genre: normalized.genre ?? selectedGenre(),
+      composer: normalized.composer ?? "",
+      artist: normalized.artist ?? "",
+      idForeign: normalized.idForeign ?? "",
+      releaseYear:
+        normalized.releaseYear !== undefined
+          ? String(normalized.releaseYear)
+          : "",
+      sourceUrl: normalized.sourceUrl ?? input,
+    });
+
+    navigate(`/tunes/new?${params.toString()}`, {
+      state: { from: fullPath },
+    });
+    setMainDialogOpen(false);
   };
 
   /**
@@ -352,6 +524,51 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
             </div>
           </div>
 
+          <Show when={importPlugins().length > 0}>
+            <div class="grid grid-cols-4 items-center gap-4">
+              <label
+                for="import-source"
+                class="text-right font-medium text-sm text-gray-900 dark:text-gray-100"
+              >
+                Import Source:
+              </label>
+              <div class="col-span-3">
+                <Select
+                  id="import-source"
+                  value={importSource()}
+                  onChange={setImportSource}
+                  options={[
+                    "the-session",
+                    ...importPlugins().map((plugin) => `plugin:${plugin.id}`),
+                  ]}
+                  itemComponent={(props) => (
+                    <SelectItem item={props.item}>
+                      {getImportSourceLabel(props.item.rawValue)}
+                    </SelectItem>
+                  )}
+                >
+                  <SelectTrigger>
+                    <SelectValue<string>>
+                      {(state) =>
+                        getImportSourceLabel(state.selectedOption() || "")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </div>
+            </div>
+          </Show>
+
+          <Show when={importPluginError()}>
+            <p
+              class="text-xs text-red-600"
+              data-testid="import-plugin-error"
+            >
+              {importPluginError()}
+            </p>
+          </Show>
+
           {/* Import Site Information (for ITRAD only) */}
           <Show when={selectedGenre() === "ITRAD"}>
             <div class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
@@ -415,6 +632,13 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </Show>
+          <Show when={importPlugins().length > 0}>
+            <div class="text-sm text-gray-700 dark:text-gray-300">
+              <p class="mt-2">
+                Plugin importers available: {importPlugins().map((p) => p.name).join(", ")}
+              </p>
             </div>
           </Show>
 

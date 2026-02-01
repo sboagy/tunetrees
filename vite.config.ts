@@ -61,6 +61,41 @@ export default defineConfig(() => {
             });
           },
         },
+        "/api/proxy": {
+          target: "http://localhost",
+          changeOrigin: true,
+          router: (req) => {
+            try {
+              const url = new URL(req.url ?? "", "http://localhost");
+              const targetUrl = url.searchParams.get("url");
+              if (targetUrl) {
+                return new URL(targetUrl).origin;
+              }
+            } catch (error) {
+              console.error("[Vite Proxy] Invalid proxy URL:", error);
+            }
+            return "http://localhost";
+          },
+          rewrite: (path: string) => {
+            try {
+              const url = new URL(path, "http://localhost");
+              const targetUrl = url.searchParams.get("url");
+              if (targetUrl) {
+                const targetUrlObj = new URL(targetUrl);
+                return targetUrlObj.pathname + targetUrlObj.search;
+              }
+            } catch (error) {
+              console.error("[Vite Proxy] Error parsing URL:", error);
+            }
+            return path;
+          },
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
+              console.log(`[Vite Proxy] Proxying: ${req.method} ${req.url}`);
+              proxyReq.setHeader("User-Agent", "TuneTrees-PWA-Dev/1.0");
+            });
+          },
+        },
       },
     },
     test: {

@@ -100,6 +100,22 @@ export const playlistTune = pgTable("playlist_tune", {
   deviceId: text("device_id"),
 });
 
+export const plugin = pgTable("plugin", {
+  id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userRef: text("user_ref").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  script: text("script").notNull(),
+  capabilities: text("capabilities").notNull(),
+  isPublic: boolean("is_public").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(1),
+  version: integer("version").notNull().default(1),
+  deleted: boolean("deleted").notNull().default(0),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at").notNull().$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const practiceRecord = pgTable("practice_record", {
   id: text("id").notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
   playlistRef: text("playlist_ref").notNull(),
@@ -307,6 +323,7 @@ export const tables = {
   "note": note,
   "playlist": playlist,
   "playlist_tune": playlistTune,
+  "plugin": plugin,
   "practice_record": practiceRecord,
   "prefs_scheduling_options": prefsSchedulingOptions,
   "prefs_spaced_repetition": prefsSpacedRepetition,

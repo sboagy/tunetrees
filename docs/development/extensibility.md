@@ -2,6 +2,113 @@
 
 This document outlines **three minimal, secure extension approaches** for TuneTrees that keep complexity low while enabling new import sources and goal-specific scheduling logic.
 
+## Current Implementation: Sandboxed JS Plugins (QuickJS)
+
+TuneTrees now ships a **sandboxed QuickJS plugin system** for imports and goal-based scheduling.
+
+### Where it lives
+
+- Database table: `plugin`
+- UI: **User Settings → Plugins**
+- Runtime: `src/lib/plugins/quickjs-worker.ts` (Web Worker sandbox)
+
+### Capabilities
+
+Plugins declare capabilities as JSON (`capabilities` column):
+
+```json
+{
+  "parseImport": true,
+  "scheduleGoal": false
+}
+```
+
+Supported capabilities:
+
+- `parseImport` — parse external inputs into TuneTrees tune fields
+- `scheduleGoal` — override FSRS scheduling for a goal
+
+### Host helpers
+
+The sandbox provides:
+
+- `fetchUrl(url, options)` — fetch via `/api/proxy` (CORS-safe)
+- `parseCsv(text)` — CSV → array of objects
+- `parseJson(text)` — JSON → object
+- `log(...args)` — logs to console
+
+### `parseImport(payload)`
+
+Input payload:
+
+```json
+{
+  "input": "https://example.com/tunes.csv",
+  "genre": "ITRAD",
+  "isUrl": true
+}
+```
+
+Return an object with tune fields:
+
+```json
+{
+  "title": "New Tune",
+  "type": "Reel",
+  "mode": "D Major",
+  "structure": "AABB",
+  "incipit": "|:ABcd:|",
+  "genre": "ITRAD",
+  "sourceUrl": "https://example.com/tunes.csv"
+}
+```
+
+### `scheduleGoal(payload)`
+
+Input payload includes a `fallback` schedule (FSRS result). Return a full or partial schedule; missing fields will be filled from the fallback.
+
+```json
+{
+  "input": {
+    "playlistRef": "...",
+    "tuneRef": "...",
+    "quality": 3,
+    "practiced": "2026-01-20T12:00:00.000Z",
+    "goal": "recall"
+  },
+  "prior": null,
+  "preferences": {},
+  "scheduling": {},
+  "fallback": {
+    "nextDue": "2026-01-27T12:00:00.000Z",
+    "lastReview": "2026-01-20T12:00:00.000Z",
+    "state": 2,
+    "stability": 5,
+    "difficulty": 3,
+    "elapsedDays": 0,
+    "scheduledDays": 7,
+    "reps": 1,
+    "lapses": 0,
+    "interval": 7
+  }
+}
+```
+
+### Migrations + codegen
+
+When adding/altering plugin schema:
+
+1. `supabase db reset` (or `npm run db:local:reset`)
+2. `npm run codegen:schema`
+
+### Proxy configuration
+
+The generic proxy lives at `/api/proxy` with the following env vars:
+
+- `PROXY_BLOCKLIST` — comma-separated hostnames to block
+- `PROXY_TIMEOUT_MS` — request timeout (default 10000)
+- `PROXY_MAX_BYTES` — response size limit (default 2000000)
+
 ## Constraints & Goals
 
 - **PWA + offline-first:** Avoid runtime downloads of arbitrary code.
