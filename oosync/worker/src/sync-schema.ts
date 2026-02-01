@@ -1,12 +1,4 @@
-import {
-  and,
-  eq,
-  inArray,
-  isNull,
-  or,
-  type SQLWrapper,
-  sql,
-} from "drizzle-orm";
+import { eq, inArray, isNull, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { debug } from "./debug";
 
@@ -74,7 +66,8 @@ export interface IWorkerCollectionConfig {
 export type PullTableRule =
   | { kind: "eqUserId"; column: string }
   | { kind: "orNullEqUserId"; column: string }
-  | { kind: "inCollection"; column: string; collection: string };
+  | { kind: "inCollection"; column: string; collection: string }
+  | { kind: "rpc"; functionName: string; params: string[] };
 
 export interface IPullConfig {
   tableRules?: Record<string, PullTableRule>;
@@ -110,7 +103,6 @@ export interface IWorkerSyncConfig {
 export function createSyncSchema(deps: SyncSchemaDeps) {
   const SYNCABLE_TABLES = deps.syncableTables;
   const TABLE_REGISTRY: Record<string, TableMeta> = deps.tableRegistryCore;
-  const schemaTables = deps.schemaTables ?? {};
 
   function getPrimaryKey(tableName: string): string | string[] {
     const meta = TABLE_REGISTRY[tableName];
@@ -216,41 +208,6 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     return result;
   }
 
-  const buildTuneRefFilterCondition = (params: {
-    table: any;
-    userId: string;
-    genreIds: string[];
-  }): unknown | null => {
-    const tuneRef = params.table?.tuneRef;
-    if (!tuneRef || params.genreIds.length === 0) return null;
-
-    const tuneTable = (schemaTables as Record<string, any>).tune;
-    if (!tuneTable) return null;
-
-    const tuneConditions: SQLWrapper[] = [];
-
-    if (tuneTable.genre) {
-      const genreFilter = inArray(tuneTable.genre, params.genreIds);
-      if (genreFilter) {
-        const genreCondition = tuneTable.privateFor
-          ? and(genreFilter, isNull(tuneTable.privateFor))
-          : genreFilter;
-        if (genreCondition) tuneConditions.push(genreCondition);
-      }
-    }
-
-    if (tuneTable.privateFor) {
-      tuneConditions.push(eq(tuneTable.privateFor, params.userId));
-    }
-
-    if (tuneConditions.length === 0) return null;
-
-    const tuneFilter =
-      tuneConditions.length === 1 ? tuneConditions[0] : or(...tuneConditions);
-    const subquery = sql`(select id from tune where ${tuneFilter})`;
-    return inArray(tuneRef, subquery);
-  };
-
   function buildUserFilter(params: {
     tableName: string;
     table: any;
@@ -259,90 +216,25 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
   }): unknown[] | null {
     const conditions: unknown[] = [];
 
-    // Apply genre filtering for catalog tables
-    const selectedGenres = params.collections.selectedGenres;
-    const hasGenreFilter = !!selectedGenres && selectedGenres.size > 0;
-    const genreIds = hasGenreFilter ? Array.from(selectedGenres) : [];
-
-    if (params.tableName === "tune" || params.tableName === "genre") {
-      debug.log(
-        `[Worker] buildUserFilter(${params.tableName}): hasGenreFilter=${hasGenreFilter}, genreIds=${genreIds.length} [${genreIds.join(", ")}]`
-      );
-    }
-    const tuneRefFilter = hasGenreFilter
-      ? buildTuneRefFilterCondition({
-          table: params.table,
-          userId: params.userId,
-          genreIds,
-        })
-      : null;
-    const applyTuneRefFilter = (conds: unknown[]): unknown[] => {
-      if (tuneRefFilter) conds.push(tuneRefFilter);
-      return conds;
-    };
-    const isCatalogTable = [
-      "genre",
-      "tune",
-      "tune_type",
-      "genre_tune_type",
-    ].includes(params.tableName);
-
-    if (isCatalogTable && hasGenreFilter) {
-      if (params.tableName === "genre") {
-        debug.log(
-          `[Worker] ✅ Returning full genre list (needed for settings UI)`
-        );
-        // Always return full genre list so settings can display all genres.
-        return [];
-      } else if (params.tableName === "tune") {
-        // Filter tune table to only tunes with selected genres
-        if (params.table.genre) {
-          conditions.push(inArray(params.table.genre, genreIds));
-          // Also include user's private tunes regardless of genre
-          if (params.table.privateFor) {
-            debug.log(
-              `[Worker] ✅ Filtering tune table: public tunes in [${genreIds.join(", ")}] OR user's private tunes`
-            );
-            return [
-              or(
-                and(
-                  inArray(params.table.genre, genreIds),
-                  isNull(params.table.privateFor)
-                ),
-                eq(params.table.privateFor, params.userId)
-              ),
-            ];
-          }
-          return conditions;
-        }
-      } else if (params.tableName === "genre_tune_type") {
-        // Filter junction table to only selected genres
-        if (params.table.genreId) {
-          conditions.push(inArray(params.table.genreId, genreIds));
-          return conditions;
-        }
-      } else if (params.tableName === "tune_type") {
-        // For tune_type, we need to filter based on genre_tune_type junction
-        // This is more complex - for now, we'll allow all tune types
-        // Future: could query genre_tune_type and filter tune_type accordingly
-        return [];
-      }
-    }
-
     const rule = getPullRule(params.tableName);
     if (rule) {
+      // RPC rules handle all filtering server-side (no WHERE clause needed)
+      if (rule.kind === "rpc") {
+        return []; // Empty array = no additional filters (RPC handles everything)
+      }
+
       const prop = snakeToCamel(rule.column);
       const col = params.table[prop];
       if (!col) return [];
 
       if (rule.kind === "eqUserId") {
         conditions.push(eq(col, params.userId));
-        return applyTuneRefFilter(conditions);
+        return conditions;
       }
 
       if (rule.kind === "orNullEqUserId") {
         conditions.push(or(isNull(col), eq(col, params.userId)));
-        return applyTuneRefFilter(conditions);
+        return conditions;
       }
 
       if (rule.kind === "inCollection") {
@@ -350,7 +242,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
         const arr = ids ? Array.from(ids) : [];
         if (arr.length === 0) return null;
         conditions.push(inArray(col, arr));
-        return applyTuneRefFilter(conditions);
+        return conditions;
       }
     }
 
@@ -375,17 +267,25 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
       );
     }
 
-    return applyTuneRefFilter(conditions);
+    return conditions;
   }
 
   function normalizeRowForSync(
     tableName: string,
     row: Record<string, unknown>
   ): Record<string, unknown> {
+    // Transform ALL column names from snake_case to camelCase (RPC returns Postgres snake_case)
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      const camelKey = snakeToCamel(key);
+      normalized[camelKey] = value;
+    }
+
+    // Then normalize timestamp fields
     const timestampsSnake = getTimestampColumns(tableName);
-    if (timestampsSnake.length === 0) return row;
+    if (timestampsSnake.length === 0) return normalized;
     const props = timestampsSnake.map(snakeToCamel);
-    return normalizeDatetimeFields(row, props);
+    return normalizeDatetimeFields(normalized, props);
   }
 
   function minimalPayload(

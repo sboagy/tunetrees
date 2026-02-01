@@ -7,7 +7,7 @@
  *
  * @module worker/index
  */
-import { and, count, eq, gt, inArray, lte, max, min } from "drizzle-orm";
+import { and, eq, gt, lte } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { jwtVerify } from "jose";
@@ -81,6 +81,10 @@ let sanitizeForPush: (params: {
   notInitialized("sanitizeForPush");
 let getPushRule: (tableName: string) => IPushTableRule | undefined = () =>
   notInitialized("getPushRule");
+let getPullRule: (
+  tableName: string
+) => import("./sync-schema").PullTableRule | undefined = () =>
+  notInitialized("getPullRule");
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getSchemaTables(): Record<string, any> {
@@ -113,6 +117,7 @@ export function createWorker(artifacts: WorkerArtifacts) {
   snakeToCamel = schema.snakeToCamel;
   sanitizeForPush = schema.sanitizeForPush;
   getPushRule = schema.getPushRule;
+  getPullRule = schema.getPullRule;
 
   return { fetch };
 }
@@ -283,57 +288,10 @@ interface SyncContext {
   authUserId: string;
   collections: Record<string, Set<string>>;
   pullTables?: Set<string>;
+  /** Genre filter from client (effective genre list). */
+  genreFilter?: { selectedGenreIds: string[]; playlistGenreIds: string[] };
   now: string;
   diagnosticsEnabled: boolean;
-}
-
-async function logPlaylistTuneInitialSyncDiagnostics(
-  tx: Transaction,
-  ctx: SyncContext,
-  syncStartedAt: string
-): Promise<void> {
-  const playlistIds = Array.from(ctx.collections.playlistIds ?? []);
-  if (playlistIds.length === 0) return;
-
-  const playlistTune = (getSchemaTables().playlist_tune as any) ?? null;
-  if (!playlistTune?.playlistRef || !playlistTune?.lastModifiedAt) return;
-
-  const baseWhere = inArray(playlistTune.playlistRef, playlistIds as any);
-  const snapshotWhere = and(
-    baseWhere,
-    lte(playlistTune.lastModifiedAt, syncStartedAt)
-  );
-
-  const [totalAll] = await tx
-    .select({ n: count() })
-    .from(playlistTune)
-    .where(baseWhere);
-  const [totalSnapshot] = await tx
-    .select({ n: count() })
-    .from(playlistTune)
-    .where(snapshotWhere);
-
-  const [minMax] = await tx
-    .select({
-      min: min(playlistTune.lastModifiedAt),
-      max: max(playlistTune.lastModifiedAt),
-    })
-    .from(playlistTune)
-    .where(baseWhere);
-
-  debug.log("[SYNC_DIAG] playlist_tune initial-sync snapshot", {
-    userId: ctx.userId,
-    userPlaylistCount: playlistIds.length,
-    syncStartedAt,
-    totals: {
-      all: Number(totalAll?.n ?? 0),
-      snapshot: Number(totalSnapshot?.n ?? 0),
-    },
-    lastModifiedAt: {
-      min: minMax?.min ?? null,
-      max: minMax?.max ?? null,
-    },
-  });
 }
 
 interface InitialSyncCursorV1 {
@@ -451,6 +409,70 @@ function extractRowId(
     pkValues[pk.prop] = row[pk.prop];
   }
   return JSON.stringify(pkValues);
+}
+
+// ============================================================================
+// UTILITY: RPC Fetch
+// ============================================================================
+
+/**
+ * Fetch table data via Postgres RPC function.
+ * Used for tables with complex filtering requirements (e.g., JOINs).
+ */
+async function fetchViaRPC(
+  tx: Transaction,
+  functionName: string,
+  params: Record<string, unknown>
+): Promise<Record<string, unknown>[]> {
+  try {
+    // Build: SELECT * FROM function_name($1::UUID, $2::TEXT[], ...)
+    const paramKeys = Object.keys(params);
+    const paramValues = Object.values(params).map((v) => {
+      // postgres-js unsafe() requires all params to be strings or Buffer/ArrayBuffer
+      if (typeof v === "number") return String(v);
+      return v;
+    });
+
+    // Build SQL query string with placeholders and type casts
+    // Determine types based on parameter names
+    const placeholders: string[] = [];
+    for (let i = 0; i < paramValues.length; i++) {
+      const paramNum = i + 1;
+      const paramName = paramKeys[i];
+
+      if (paramName === "p_user_id") {
+        placeholders.push(`$${paramNum}::UUID`);
+      } else if (paramName === "p_genre_ids") {
+        placeholders.push(`$${paramNum}::TEXT[]`);
+      } else if (paramName === "p_after_timestamp") {
+        placeholders.push(`$${paramNum}::TIMESTAMPTZ`);
+      } else if (paramName === "p_limit" || paramName === "p_offset") {
+        placeholders.push(`$${paramNum}::INTEGER`);
+      } else {
+        // Default: no cast
+        placeholders.push(`$${paramNum}`);
+      }
+    }
+
+    const queryString = `SELECT * FROM ${functionName}(${placeholders.join(", ")})`;
+
+    // Execute using the underlying session (bypassing Drizzle's sql template to avoid array wrapping)
+    // Access the postgres-js client through the transaction's internal session
+    const session = (tx as any).session;
+    if (!session?.client) {
+      throw new Error(
+        "Cannot access underlying postgres client from transaction"
+      );
+    }
+
+    // Execute raw query with parameter binding
+    const result = await session.client.unsafe(queryString, paramValues);
+
+    return result as Record<string, unknown>[];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`RPC ${functionName} failed: ${message}`);
+  }
 }
 
 // ============================================================================
@@ -828,6 +850,44 @@ async function fetchTableForInitialSyncPage(
   const meta = TABLE_REGISTRY[tableName];
   if (!meta) return [];
 
+  // Check if table uses RPC for filtering
+  const rule = getPullRule(tableName);
+  if (rule?.kind === "rpc") {
+    // Use RPC to fetch data (handles all filtering server-side)
+    const rpcParams: Record<string, unknown> = {
+      p_user_id: ctx.authUserId,
+    };
+
+    // Map params: "userId" already in p_user_id, add others as needed
+    if (rule.params.includes("genreIds")) {
+      const genreSet = ctx.collections.selectedGenres;
+      rpcParams.p_genre_ids = genreSet ? Array.from(genreSet) : [];
+    }
+
+    // For initial sync, timestamp is NULL (fetch all rows)
+    rpcParams.p_after_timestamp = null;
+
+    // Pass pagination params to RPC
+    rpcParams.p_limit = limit;
+    rpcParams.p_offset = offset;
+
+    const rows = await fetchViaRPC(tx, rule.functionName, rpcParams);
+
+    debug.log(
+      `[PULL:INITIAL] ${tableName} (RPC): fetched ${rows.length} rows via ${rule.functionName}`
+    );
+
+    const changes: SyncChange[] = [];
+    for (const row of rows) {
+      // Apply adapter transformation: Postgres (snake_case) -> Client (camelCase)
+      const transformed = normalizeRowForSync(tableName, row);
+      const rowId = extractRowId(tableName, transformed, t);
+      changes.push(rowToSyncChange(tableName, rowId, transformed));
+    }
+    return changes;
+  }
+
+  // Standard SQL-based fetch (non-RPC tables)
   const conditions = buildUserFilter({
     tableName,
     table: t,
@@ -845,10 +905,6 @@ async function fetchTableForInitialSyncPage(
   // If the table has lastModifiedAt, only include rows up to syncStartedAt.
   if (t.lastModifiedAt) {
     whereConditions.push(lte(t.lastModifiedAt, syncStartedAt));
-  }
-
-  if (ctx.diagnosticsEnabled && tableName === "playlist_tune" && offset === 0) {
-    await logPlaylistTuneInitialSyncDiagnostics(tx, ctx, syncStartedAt);
   }
 
   let query = tx.select().from(table);
@@ -1012,6 +1068,52 @@ async function fetchChangedRowsFromTable(
     return []; // Table doesn't support incremental sync
   }
 
+  // Check if table uses RPC for filtering
+  const rule = getPullRule(tableName);
+  if (rule?.kind === "rpc") {
+    // Use RPC to fetch changed rows (handles all filtering server-side)
+    const rpcParams: Record<string, unknown> = {
+      p_user_id: ctx.authUserId,
+    };
+
+    // Map params - IMPORTANT: maintain order matching function signature
+    if (rule.params.includes("genreIds")) {
+      // Use effective genre filter from payload if available, otherwise fall back to ctx.collections
+      const effectiveGenres =
+        ctx.genreFilter?.selectedGenreIds ??
+        (ctx.collections.selectedGenres
+          ? Array.from(ctx.collections.selectedGenres)
+          : []);
+      rpcParams.p_genre_ids = effectiveGenres;
+      debug.log(
+        `[RPC] ${rule.functionName}: ${effectiveGenres.length} genres from ${ctx.genreFilter ? "payload" : "collections"}`
+      );
+    }
+
+    // Add timestamp param AFTER genreIds to match function signature
+    rpcParams.p_after_timestamp = lastSyncAt; // RPC will filter by last_modified_at > lastSyncAt
+
+    // For incremental sync, use default limit (1000) - should be small
+    rpcParams.p_limit = 1000;
+    rpcParams.p_offset = 0;
+
+    const rows = await fetchViaRPC(tx, rule.functionName, rpcParams);
+
+    debug.log(
+      `[PULL:INCR] ${tableName} (RPC): fetched ${rows.length} changed rows via ${rule.functionName} since ${lastSyncAt}`
+    );
+
+    const changes: SyncChange[] = [];
+    for (const row of rows) {
+      // Apply adapter transformation: Postgres (snake_case) -> Client (camelCase)
+      const transformed = normalizeRowForSync(tableName, row);
+      const rowId = extractRowId(tableName, transformed, t);
+      changes.push(rowToSyncChange(tableName, rowId, transformed));
+    }
+    return changes;
+  }
+
+  // Standard SQL-based incremental sync (non-RPC tables)
   // Build conditions: last_modified_at > lastSyncAt AND user_filter
   const userConditions = buildUserFilter({
     tableName,
@@ -1215,9 +1317,12 @@ async function handleSync(
       authUserId,
       collections,
       pullTables,
+      genreFilter: payload.genreFilter,
       now,
       diagnosticsEnabled,
     };
+
+    // Genre filter is passed to RPC functions when filtering note/reference tables
 
     // PUSH: Apply client changes
     await processPushChanges(tx, ctx, payload.changes as IncomingSyncChange[]);
