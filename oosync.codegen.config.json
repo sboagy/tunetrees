@@ -43,8 +43,25 @@
   },
   "worker": {
     "config": {
+      "pull": {
+        "tableRules": {
+          "note": {
+            "kind": "rpc",
+            "functionName": "sync_get_user_notes",
+            "params": ["userId", "genreIds"]
+          },
+          "reference": {
+            "kind": "rpc",
+            "functionName": "sync_get_user_references",
+            "params": ["userId", "genreIds"]
+          }
+        }
+      },
       "push": {
         "tableRules": {
+          "user_genre_selection": {
+            "denyDelete": false
+          },
           "table_transient_data": {
             "denyDelete": false
           },

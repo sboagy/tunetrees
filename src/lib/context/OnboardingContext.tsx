@@ -50,7 +50,11 @@ interface OnboardingState {
 /**
  * Onboarding steps
  */
-export type OnboardingStep = "create-playlist" | "choose-genres" | "view-catalog" | "complete";
+export type OnboardingStep =
+  | "create-playlist"
+  | "choose-genres"
+  | "view-catalog"
+  | "complete";
 
 /**
  * Onboarding context (undefined until provider is mounted)

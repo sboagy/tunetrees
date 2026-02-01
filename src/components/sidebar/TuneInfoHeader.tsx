@@ -66,7 +66,9 @@ export const TuneInfoHeader: Component = () => {
         <div class="text-center py-4 text-gray-500 dark:text-gray-400">
           <Music class="w-6 h-6 mx-auto mb-2 opacity-40" />
           <p class={`${fontClasses().text} italic`}>No tune selected</p>
-          <p class={`${fontClasses().textSmall} mt-0.5`}>Click a tune to view details</p>
+          <p class={`${fontClasses().textSmall} mt-0.5`}>
+            Click a tune to view details
+          </p>
         </div>
       </Show>
 
@@ -74,7 +76,9 @@ export const TuneInfoHeader: Component = () => {
       <Show when={currentTuneId() && tune.loading}>
         <div class="text-center py-3">
           <div class="animate-spin h-5 w-5 mx-auto border-2 border-blue-600 border-t-transparent rounded-full" />
-          <p class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400 mt-1.5`}>
+          <p
+            class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400 mt-1.5`}
+          >
             Loading...
           </p>
         </div>
@@ -85,8 +89,12 @@ export const TuneInfoHeader: Component = () => {
         <div class="space-y-1.5">
           {/* Title with Edit Button */}
           <div class="flex items-start gap-1.5">
-            <Music class={`${fontClasses().icon} text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5`} />
-            <h3 class={`${fontClasses().text} font-semibold text-gray-900 dark:text-white leading-tight break-words flex-1`}>
+            <Music
+              class={`${fontClasses().icon} text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5`}
+            />
+            <h3
+              class={`${fontClasses().text} font-semibold text-gray-900 dark:text-white leading-tight break-words flex-1`}
+            >
               {tune()!.title}
             </h3>
             <button
@@ -127,14 +135,18 @@ export const TuneInfoHeader: Component = () => {
           {/* Type and Mode */}
           <div class="flex flex-wrap gap-1.5 pl-5">
             <Show when={tune()!.type}>
-              <span class={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${fontClasses().textSmall} font-medium bg-blue-100/60 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border border-blue-200/30 dark:border-blue-700/30`}>
+              <span
+                class={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${fontClasses().textSmall} font-medium bg-blue-100/60 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border border-blue-200/30 dark:border-blue-700/30`}
+              >
                 <Tag class={fontClasses().iconSmall} />
                 {tune()!.type}
               </span>
             </Show>
 
             <Show when={tune()!.mode}>
-              <span class={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${fontClasses().textSmall} font-medium bg-green-100/60 dark:bg-green-900/40 text-green-800 dark:text-green-200 border border-green-200/30 dark:border-green-700/30`}>
+              <span
+                class={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${fontClasses().textSmall} font-medium bg-green-100/60 dark:bg-green-900/40 text-green-800 dark:text-green-200 border border-green-200/30 dark:border-green-700/30`}
+              >
                 <Settings2 class={fontClasses().iconSmall} />
                 {tune()!.mode}
               </span>
@@ -144,7 +156,9 @@ export const TuneInfoHeader: Component = () => {
           {/* Structure */}
           <Show when={tune()!.structure}>
             <div class="pl-5">
-              <p class={`${fontClasses().textSmall} text-gray-600 dark:text-gray-400`}>
+              <p
+                class={`${fontClasses().textSmall} text-gray-600 dark:text-gray-400`}
+              >
                 <span class="font-medium">Structure:</span> {tune()!.structure}
               </p>
             </div>
@@ -153,7 +167,9 @@ export const TuneInfoHeader: Component = () => {
           {/* Genre */}
           <Show when={tune()!.genre}>
             <div class="pl-5">
-              <p class={`${fontClasses().textSmall} text-gray-600 dark:text-gray-400`}>
+              <p
+                class={`${fontClasses().textSmall} text-gray-600 dark:text-gray-400`}
+              >
                 <span class="font-medium">Genre:</span> {tune()!.genre}
               </p>
             </div>

@@ -143,6 +143,24 @@ const CatalogSyncPage: Component = () => {
 
       if (added.length > 0 || removed.length > 0) {
         await forceSyncDown({ full: true });
+
+        // Purge orphaned annotations AFTER sync completes (only when genres removed)
+        if (removed.length > 0) {
+          const { purgeOrphanedAnnotations } = await import(
+            "@/lib/sync/genre-filter"
+          );
+          const { deletedCounts } = await purgeOrphanedAnnotations(db);
+          const total = Object.values(deletedCounts).reduce(
+            (sum, count) => sum + count,
+            0
+          );
+          if (total > 0) {
+            console.log(
+              `[CatalogSync] Purged ${total} orphaned annotation records`,
+              deletedCounts
+            );
+          }
+        }
       }
 
       setSelectedGenreIds([...nextSelected]);

@@ -27,12 +27,57 @@ Inherits global execution guardrails from `.github/copilot-instructions.md` and 
 
 These exist to keep `oosync` future-standalone.
 
+### Import direction rules
+
 - `oosync/**` MUST NOT import from app `src/**`.
 - `oosync/src/**` MUST NOT import from `oosync/worker/**` (core/lib cannot depend on Worker runtime).
 - Worker implementation (`oosync/worker/**`) MUST NOT import from app `src/**`.
 - `shared/generated/**` is a **pure generated contract** (types/data/constants only; no app imports).
 
+### Generic implementation rules
+
+oosync must be purely generic. **No application-specific references** of any kind:
+
+- ❌ **Hardcoded table names**: `if (tableName === "tune")` or `"SELECT * FROM user_genre_selection"`
+- ❌ **Hardcoded column names**: `record.genre`, `tune.private_for` (unless from config/contract)
+- ❌ **Hardcoded collection names**: `ctx.collections.selectedGenres` (unless from config)
+- ❌ **App-specific concepts in strings**: `"genreFilter"`, `"catalogTable"`, `"practiceRecord"`
+- ❌ **Schema assumptions in logic**: Assuming FK relationships, JOIN patterns, or filtering rules
+
+- ✅ **Config-driven references**: Table/column names from `oosync.codegen.config.json` or generated contract
+- ✅ **Generic type variants**: `PullTableRule` with `kind: "rpc"` (doesn't specify which RPCs exist)
+- ✅ **Parameter mapping**: RPC `params: ["userId", "genreIds"]` where values come from generated config
+- ✅ **Collection registry**: `ctx.collections[collectionName]` where collection names from config
+
+**Schema assumptions must be via**:
+1. `oosync.codegen.config.json` (top-level config file)
+2. Generated artifacts in `shared/generated/**` or `worker/src/generated/**`
+3. Postgres table comments (`@oosync.*` tags)
+
+### Handling boundary violations
+
 If a change forces an import direction that violates the above, stop and redesign around a generated artifact or an interface.
+
+If an existing violation of this rule is found:
+- **If part of current task**: Fix it as part of the work (document in commit message)
+- **If not part of current task**: DO NOT change it directly, but DO report it in the task summary
+
+### Generated files are write-only (no manual edits)
+
+**CRITICAL**: Generated files (`worker/src/generated/*`, `shared/generated/*`) are **write-only outputs**. Manual edits are **silently wiped** on next `npm run codegen:schema` run.
+
+**If a feature requires changes to generated files**:
+
+1. **STOP and ask the human**: "This feature requires codegen changes to `<file>`. Should I:
+   - Implement codegen support first? (preferred)
+   - Add to `oosync.codegen.config.json` as a manual override?
+   - Defer this feature to a separate PR?"
+
+2. **Never manually edit generated files** - any such edit will be lost on next regeneration
+
+3. **If codegen must be updated**: Implement the codegen change, regenerate, verify outputs, then continue with feature implementation
+
+**Exception for config-driven overrides**: If the feature can be expressed via `oosync.codegen.config.json` (e.g., `tableRuleOverrides`), add the config entry instead of touching generated files. Config entries survive regeneration.
 
 ## Codegen is the source of truth
 

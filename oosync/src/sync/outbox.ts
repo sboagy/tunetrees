@@ -249,10 +249,7 @@ export async function markOutboxInProgress(
   id: string
 ): Promise<void> {
   const queue = getSyncPushQueueTable();
-  await db
-    .update(queue)
-    .set({ status: "in_progress" })
-    .where(eq(queue.id, id));
+  await db.update(queue).set({ status: "in_progress" }).where(eq(queue.id, id));
 }
 
 /**

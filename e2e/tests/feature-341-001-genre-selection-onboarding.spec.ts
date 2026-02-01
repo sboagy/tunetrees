@@ -39,7 +39,9 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
       timeout: 15000,
     });
     await ttPage.onboardingGenreClearAllButton.click();
-    await ttPage.onboardingGenreCheckboxes.first().click();
+    await ttPage.page
+      .getByRole("checkbox", { name: "Blues - Blues", exact: true })
+      .click();
 
     await expect(ttPage.onboardingGenreContinueButton).toBeEnabled({
       timeout: 10000,
@@ -47,6 +49,11 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
     await ttPage.onboardingGenreContinueButton.click();
 
     await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+    await page.getByRole("button", { name: "Got it!" }).click();
+
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+
     await page.waitForURL(/\?tab=catalog/, { timeout: 15000 });
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
     await expect(ttPage.onboardingGenreContinueButton).toBeHidden({

@@ -1,5 +1,6 @@
 import { eq, inArray, isNull, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
+import { debug } from "./debug";
 
 export function snakeToCamel(snake: string): string {
   return snake.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
@@ -14,7 +15,8 @@ export function normalizeDatetimeFields(
     const value = normalized[field];
     if (typeof value !== "string") continue;
     let result = value.includes(" ") ? value.replace(" ", "T") : value;
-    if (/Z$/i.test(result) || /[+-]\d{2}:?\d{2}$/.test(result)) {
+    // Check if already has timezone: Z or +/-HH:MM or +/-HHMM or +/-HH
+    if (/Z$/i.test(result) || /[+-]\d{2}(:?\d{2})?$/.test(result)) {
       normalized[field] = result;
       continue;
     }
@@ -42,6 +44,9 @@ export interface SyncSchemaDeps {
   tableRegistryCore: Record<string, TableMetaCore>;
   /** Worker-only, app-specific rules/config blob. */
   workerSyncConfig: unknown;
+  /** Drizzle schema tables (camelCase, worker runtime). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schemaTables?: Record<string, any>;
 }
 
 export type TableMeta = TableMetaCore;
@@ -61,7 +66,8 @@ export interface IWorkerCollectionConfig {
 export type PullTableRule =
   | { kind: "eqUserId"; column: string }
   | { kind: "orNullEqUserId"; column: string }
-  | { kind: "inCollection"; column: string; collection: string };
+  | { kind: "inCollection"; column: string; collection: string }
+  | { kind: "rpc"; functionName: string; params: string[] };
 
 export interface IPullConfig {
   tableRules?: Record<string, PullTableRule>;
@@ -188,7 +194,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
         const selectedGenreIds = genreRows.map((r: any) => String(r.genreId));
         result.selectedGenres = new Set(selectedGenreIds);
 
-        console.log(
+        debug.log(
           `[SYNC] Loaded ${selectedGenreIds.length} selected genres for user ${params.userId}`
         );
       } catch (error) {
@@ -210,52 +216,13 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
   }): unknown[] | null {
     const conditions: unknown[] = [];
 
-    // Apply genre filtering for catalog tables
-    const selectedGenres = params.collections.selectedGenres;
-    const isCatalogTable = ["genre", "tune", "tune_type", "genre_tune_type"].includes(
-      params.tableName
-    );
-
-    if (isCatalogTable && selectedGenres && selectedGenres.size > 0) {
-      const genreIds = Array.from(selectedGenres);
-
-      if (params.tableName === "genre") {
-        // Filter genre table to only selected genres
-        if (params.table.id) {
-          conditions.push(inArray(params.table.id, genreIds));
-          return conditions;
-        }
-      } else if (params.tableName === "tune") {
-        // Filter tune table to only tunes with selected genres
-        if (params.table.genre) {
-          conditions.push(inArray(params.table.genre, genreIds));
-          // Also include user's private tunes regardless of genre
-          if (params.table.privateFor) {
-            return [
-              or(
-                inArray(params.table.genre, genreIds),
-                eq(params.table.privateFor, params.userId)
-              )
-            ];
-          }
-          return conditions;
-        }
-      } else if (params.tableName === "genre_tune_type") {
-        // Filter junction table to only selected genres
-        if (params.table.genreId) {
-          conditions.push(inArray(params.table.genreId, genreIds));
-          return conditions;
-        }
-      } else if (params.tableName === "tune_type") {
-        // For tune_type, we need to filter based on genre_tune_type junction
-        // This is more complex - for now, we'll allow all tune types
-        // Future: could query genre_tune_type and filter tune_type accordingly
-        return [];
-      }
-    }
-
     const rule = getPullRule(params.tableName);
     if (rule) {
+      // RPC rules handle all filtering server-side (no WHERE clause needed)
+      if (rule.kind === "rpc") {
+        return []; // Empty array = no additional filters (RPC handles everything)
+      }
+
       const prop = snakeToCamel(rule.column);
       const col = params.table[prop];
       if (!col) return [];
@@ -307,10 +274,18 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     tableName: string,
     row: Record<string, unknown>
   ): Record<string, unknown> {
+    // Transform ALL column names from snake_case to camelCase (RPC returns Postgres snake_case)
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      const camelKey = snakeToCamel(key);
+      normalized[camelKey] = value;
+    }
+
+    // Then normalize timestamp fields
     const timestampsSnake = getTimestampColumns(tableName);
-    if (timestampsSnake.length === 0) return row;
+    if (timestampsSnake.length === 0) return normalized;
     const props = timestampsSnake.map(snakeToCamel);
-    return normalizeDatetimeFields(row, props);
+    return normalizeDatetimeFields(normalized, props);
   }
 
   function minimalPayload(

@@ -1300,6 +1300,7 @@ function buildDefaultWorkerConfig(params: {
     | { kind: "eqUserId"; column: string }
     | { kind: "orNullEqUserId"; column: string }
     | { kind: "inCollection"; column: string; collection: string }
+    | { kind: "rpc"; functionName: string; params: string[] }
   > = {};
   const pushRules: Record<
     string,

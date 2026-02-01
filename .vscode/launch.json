@@ -27,6 +27,22 @@
         {
             "type": "chrome",
             "request": "launch",
+            "name": "TuneTrees: Clean Chrome",
+            "url": "http://localhost:5173/?tab=practice",
+            "webRoot": "${workspaceFolder}/src",
+            "userDataDir": "${workspaceFolder}/.vscode/chrome-session",
+            "preLaunchTask": "wipe-chrome-profile",
+            "runtimeArgs": [
+                "--remote-debugging-port=9222",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-fre",
+                "--user-data-dir=${workspaceFolder}/.vscode/chrome-session"
+            ]
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
             "name": "Chrome Debug TuneTrees PWA App",
             "url": "http://localhost:5173/", // Adjust if your Vite app runs on a different port
             "webRoot": "${workspaceFolder}", // Adjust if your source code is in a different directory

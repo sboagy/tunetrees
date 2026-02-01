@@ -36,6 +36,8 @@ export const OnboardingOverlay: Component = () => {
     forceSyncDown,
     remoteSyncDownCompletionVersion,
     user,
+    catalogSyncPending,
+    triggerCatalogSync,
   } = useAuth();
   const navigate = useNavigate();
   const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
@@ -128,14 +130,44 @@ export const OnboardingOverlay: Component = () => {
 
     setIsSavingGenres(true);
     try {
-      const { upsertUserGenreSelection } = await import(
-        "@/lib/db/queries/user-genre-selection"
-      );
+      const { upsertUserGenreSelection, purgeLocalCatalogForGenres } =
+        await import("@/lib/db/queries/user-genre-selection");
+
+      // Save genre selection
       await upsertUserGenreSelection(db, userId, selectedGenreIds());
       console.log("✅ Genre selection saved");
-      void forceSyncDown({ full: true }).catch((error) => {
-        console.warn("Failed to refresh catalog after genre selection:", error);
-      });
+
+      // If catalog sync was deferred until onboarding, trigger it now with genre filter
+      if (catalogSyncPending()) {
+        console.log(
+          "🎵 Triggering catalog sync with selected genres:",
+          selectedGenreIds()
+        );
+        await triggerCatalogSync();
+      } else {
+        // Catalog was already synced (e.g., user changed genres after initial onboarding)
+        // Purge deselected genres and re-sync
+        console.log("🧹 Purging non-selected catalog tunes...");
+        const allGenres = genres().map((g) => g.id);
+        const deselectedGenres = allGenres.filter(
+          (id) => !selectedGenreIds().includes(id)
+        );
+        const purgeResult = await purgeLocalCatalogForGenres(
+          db,
+          userId,
+          deselectedGenres
+        );
+        console.log(
+          `✅ Purged ${purgeResult.tuneIds.length} tunes from deselected genres`
+        );
+
+        void forceSyncDown({ full: true }).catch((error) => {
+          console.warn(
+            "Failed to refresh catalog after genre selection:",
+            error
+          );
+        });
+      }
       nextStep();
       navigate("/?tab=catalog");
     } catch (error) {

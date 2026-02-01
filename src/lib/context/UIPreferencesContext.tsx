@@ -70,7 +70,9 @@ export const UIPreferencesProvider: ParentComponent = (props) => {
     // Save to localStorage
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      const prefs = stored ? (JSON.parse(stored) as UIPreferences) : { ...DEFAULT_PREFERENCES };
+      const prefs = stored
+        ? (JSON.parse(stored) as UIPreferences)
+        : { ...DEFAULT_PREFERENCES };
       prefs.sidebarFontSize = size;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
     } catch (error) {
@@ -96,7 +98,9 @@ export const UIPreferencesProvider: ParentComponent = (props) => {
 export function useUIPreferences(): UIPreferencesContextType {
   const context = useContext(UIPreferencesContext);
   if (!context) {
-    throw new Error("useUIPreferences must be used within UIPreferencesProvider");
+    throw new Error(
+      "useUIPreferences must be used within UIPreferencesProvider"
+    );
   }
   return context;
 }

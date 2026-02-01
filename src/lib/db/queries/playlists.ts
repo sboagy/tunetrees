@@ -22,81 +22,81 @@ import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
-	instrument,
-	playlist,
-	playlistTune,
-	tune,
-	userProfile,
+  instrument,
+  playlist,
+  playlistTune,
+  tune,
+  userProfile,
 } from "../schema";
 import type {
-	NewPlaylist,
-	NewPlaylistTune,
-	Playlist,
-	PlaylistTune,
-	PlaylistWithSummary,
+  NewPlaylist,
+  NewPlaylistTune,
+  Playlist,
+  PlaylistTune,
+  PlaylistWithSummary,
 } from "../types";
 
 const userRefCache = new Map<string, string>();
 const warnedUserIdMismatch = new Set<string>();
 
 async function resolveUserRef(
-	db: SqliteDatabase,
-	userId: string,
-	options?: { waitForMs?: number; pollEveryMs?: number },
+  db: SqliteDatabase,
+  userId: string,
+  options?: { waitForMs?: number; pollEveryMs?: number }
 ): Promise<string | null> {
-	const cached = userRefCache.get(userId);
-	if (cached) return cached;
+  const cached = userRefCache.get(userId);
+  if (cached) return cached;
 
-	const waitForMs = options?.waitForMs ?? 0;
-	const pollEveryMs = options?.pollEveryMs ?? 100;
-	const startedAt = Date.now();
+  const waitForMs = options?.waitForMs ?? 0;
+  const pollEveryMs = options?.pollEveryMs ?? 100;
+  const startedAt = Date.now();
 
-	// On first login, the UI can query before initial syncDown has applied user_profile.
-	// Poll briefly to avoid treating this transient state as “no playlists”.
-	//
-	// Note: In production we currently expect `user_profile.id` and
-	// `user_profile.supabase_user_id` to be equal. This function is therefore
-	// effectively a cached assertion + short poll for row existence.
-	while (true) {
-		const match = await db
-			.select({
-				id: userProfile.id,
-				supabaseUserId: userProfile.supabaseUserId,
-			})
-			.from(userProfile)
-			.where(
-				or(eq(userProfile.supabaseUserId, userId), eq(userProfile.id, userId)),
-			)
-			.limit(1);
+  // On first login, the UI can query before initial syncDown has applied user_profile.
+  // Poll briefly to avoid treating this transient state as “no playlists”.
+  //
+  // Note: In production we currently expect `user_profile.id` and
+  // `user_profile.supabase_user_id` to be equal. This function is therefore
+  // effectively a cached assertion + short poll for row existence.
+  while (true) {
+    const match = await db
+      .select({
+        id: userProfile.id,
+        supabaseUserId: userProfile.supabaseUserId,
+      })
+      .from(userProfile)
+      .where(
+        or(eq(userProfile.supabaseUserId, userId), eq(userProfile.id, userId))
+      )
+      .limit(1);
 
-		if (match.length > 0) {
-			const resolved = match[0];
-			if (
-				resolved.supabaseUserId &&
-				resolved.id &&
-				resolved.supabaseUserId !== resolved.id &&
-				!warnedUserIdMismatch.has(resolved.id)
-			) {
-				warnedUserIdMismatch.add(resolved.id);
-				console.warn(
-					`[resolveUserRef] Invariant violated: user_profile.id (${resolved.id}) != user_profile.supabase_user_id (${resolved.supabaseUserId})`,
-				);
-			}
+    if (match.length > 0) {
+      const resolved = match[0];
+      if (
+        resolved.supabaseUserId &&
+        resolved.id &&
+        resolved.supabaseUserId !== resolved.id &&
+        !warnedUserIdMismatch.has(resolved.id)
+      ) {
+        warnedUserIdMismatch.add(resolved.id);
+        console.warn(
+          `[resolveUserRef] Invariant violated: user_profile.id (${resolved.id}) != user_profile.supabase_user_id (${resolved.supabaseUserId})`
+        );
+      }
 
-			userRefCache.set(userId, resolved.id);
-			if (resolved.supabaseUserId)
-				userRefCache.set(resolved.supabaseUserId, resolved.id);
-			return resolved.id;
-		}
+      userRefCache.set(userId, resolved.id);
+      if (resolved.supabaseUserId)
+        userRefCache.set(resolved.supabaseUserId, resolved.id);
+      return resolved.id;
+    }
 
-		if (Date.now() - startedAt >= waitForMs) {
-			return null;
-		}
+    if (Date.now() - startedAt >= waitForMs) {
+      return null;
+    }
 
-		await new Promise<void>((resolve) => {
-			setTimeout(() => resolve(), pollEveryMs);
-		});
-	}
+    await new Promise<void>((resolve) => {
+      setTimeout(() => resolve(), pollEveryMs);
+    });
+  }
 }
 
 /**
@@ -117,69 +117,69 @@ async function resolveUserRef(
  * ```
  */
 export async function getUserPlaylists(
-	db: SqliteDatabase,
-	userId: string,
-	includeDeleted = false,
+  db: SqliteDatabase,
+  userId: string,
+  includeDeleted = false
 ): Promise<PlaylistWithSummary[]> {
-	const userRef = await resolveUserRef(db, userId, {
-		waitForMs: 2_000,
-		pollEveryMs: 100,
-	});
+  const userRef = await resolveUserRef(db, userId, {
+    waitForMs: 2_000,
+    pollEveryMs: 100,
+  });
 
-	if (!userRef) {
-		console.log(
-			`⚠️ User profile not found yet for ${userId}, returning empty playlists`,
-		);
-		return [];
-	}
+  if (!userRef) {
+    console.log(
+      `⚠️ User profile not found yet for ${userId}, returning empty playlists`
+    );
+    return [];
+  }
 
-	// Build query conditions
-	const conditions = [eq(playlist.userRef, userRef)];
-	if (!includeDeleted) {
-		conditions.push(eq(playlist.deleted, 0));
-	}
+  // Build query conditions
+  const conditions = [eq(playlist.userRef, userRef)];
+  if (!includeDeleted) {
+    conditions.push(eq(playlist.deleted, 0));
+  }
 
-	// Get playlists with tune count and instrument names
-	// Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
-	const playlists = await db
-		.select({
-			playlistId: playlist.playlistId,
-			userRef: playlist.userRef,
-			name: playlist.name,
-			instrumentRef: playlist.instrumentRef,
-			instrumentName: instrument.instrument,
-			// Select both genre columns for post-query resolution
-			playlistGenre: playlist.genreDefault,
-			instrumentGenre: instrument.genreDefault,
-			srAlgType: playlist.srAlgType,
-			deleted: playlist.deleted,
-			syncVersion: playlist.syncVersion,
-			lastModifiedAt: playlist.lastModifiedAt,
-			deviceId: playlist.deviceId,
-			tuneCount: sql<number>`(
+  // Get playlists with tune count and instrument names
+  // Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
+  const playlists = await db
+    .select({
+      playlistId: playlist.playlistId,
+      userRef: playlist.userRef,
+      name: playlist.name,
+      instrumentRef: playlist.instrumentRef,
+      instrumentName: instrument.instrument,
+      // Select both genre columns for post-query resolution
+      playlistGenre: playlist.genreDefault,
+      instrumentGenre: instrument.genreDefault,
+      srAlgType: playlist.srAlgType,
+      deleted: playlist.deleted,
+      syncVersion: playlist.syncVersion,
+      lastModifiedAt: playlist.lastModifiedAt,
+      deviceId: playlist.deviceId,
+      tuneCount: sql<number>`(
         SELECT COUNT(*)
         FROM playlist_tune
         WHERE playlist_ref = ${playlist.playlistId}
           AND deleted = 0
       )`,
-		})
-		.from(playlist)
-		.leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
-		.where(and(...conditions))
-		.orderBy(playlist.lastModifiedAt);
+    })
+    .from(playlist)
+    .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
+    .where(and(...conditions))
+    .orderBy(playlist.lastModifiedAt);
 
-	// Debug logs removed for cleanliness
+  // Debug logs removed for cleanliness
 
-	return playlists.map((p) => ({
-		...p,
-		// Resolve genre: use playlist's genreDefault if set, otherwise use instrument's genreDefault
-		genreDefault: p.playlistGenre ?? p.instrumentGenre,
-		tuneCount: Number(p.tuneCount) || 0,
-		instrumentName: p.instrumentName || undefined, // Convert null to undefined
-		// Remove the temporary fields from the result
-		playlistGenre: undefined,
-		instrumentGenre: undefined,
-	}));
+  return playlists.map((p) => ({
+    ...p,
+    // Resolve genre: use playlist's genreDefault if set, otherwise use instrument's genreDefault
+    genreDefault: p.playlistGenre ?? p.instrumentGenre,
+    tuneCount: Number(p.tuneCount) || 0,
+    instrumentName: p.instrumentName || undefined, // Convert null to undefined
+    // Remove the temporary fields from the result
+    playlistGenre: undefined,
+    instrumentGenre: undefined,
+  }));
 }
 
 /**
@@ -201,36 +201,36 @@ export async function getUserPlaylists(
  * ```
  */
 export async function getPlaylistById(
-	db: SqliteDatabase,
-	playlistId: string,
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  userId: string
 ): Promise<Playlist | null> {
-	// Get user_ref from supabase_user_id
-	const userRecord = await db
-		.select({ id: userProfile.id })
-		.from(userProfile)
-		.where(eq(userProfile.supabaseUserId, userId))
-		.limit(1);
+  // Get user_ref from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
 
-	if (!userRecord || userRecord.length === 0) {
-		return null;
-	}
+  if (!userRecord || userRecord.length === 0) {
+    return null;
+  }
 
-	const userRef = userRecord[0].id;
+  const userRef = userRecord[0].id;
 
-	const result = await db
-		.select()
-		.from(playlist)
-		.where(
-			and(eq(playlist.playlistId, playlistId), eq(playlist.userRef, userRef)),
-		)
-		.limit(1);
+  const result = await db
+    .select()
+    .from(playlist)
+    .where(
+      and(eq(playlist.playlistId, playlistId), eq(playlist.userRef, userRef))
+    )
+    .limit(1);
 
-	if (!result || result.length === 0) {
-		return null;
-	}
+  if (!result || result.length === 0) {
+    return null;
+  }
 
-	return result[0];
+  return result[0];
 }
 
 /**
@@ -254,54 +254,54 @@ export async function getPlaylistById(
  * ```
  */
 export async function createPlaylist(
-	db: SqliteDatabase,
-	userId: string,
-	data: Omit<
-		NewPlaylist,
-		"playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
-	>,
+  db: SqliteDatabase,
+  userId: string,
+  data: Omit<
+    NewPlaylist,
+    "playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
+  >
 ): Promise<Playlist> {
-	// Get user_ref from supabase_user_id
-	const userRecord = await db
-		.select({ id: userProfile.id })
-		.from(userProfile)
-		.where(eq(userProfile.supabaseUserId, userId))
-		.limit(1);
+  // Get user_ref from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
 
-	if (!userRecord || userRecord.length === 0) {
-		throw new Error(`User not found: ${userId}`);
-	}
+  if (!userRecord || userRecord.length === 0) {
+    throw new Error(`User not found: ${userId}`);
+  }
 
-	const userRef = userRecord[0].id;
-	const now = new Date().toISOString();
+  const userRef = userRecord[0].id;
+  const now = new Date().toISOString();
 
-	const newPlaylist: NewPlaylist = {
-		playlistId: generateId(),
-		userRef,
-		name: data.name ?? null,
-		genreDefault: data.genreDefault ?? null,
-		instrumentRef: data.instrumentRef ?? null,
-		srAlgType: data.srAlgType ?? null,
-		deleted: 0,
-		syncVersion: 1,
-		lastModifiedAt: now,
-		deviceId: "local", // TODO: Get actual device ID
-	};
+  const newPlaylist: NewPlaylist = {
+    playlistId: generateId(),
+    userRef,
+    name: data.name ?? null,
+    genreDefault: data.genreDefault ?? null,
+    instrumentRef: data.instrumentRef ?? null,
+    srAlgType: data.srAlgType ?? null,
+    deleted: 0,
+    syncVersion: 1,
+    lastModifiedAt: now,
+    deviceId: "local", // TODO: Get actual device ID
+  };
 
-	const result = await db.insert(playlist).values(newPlaylist).returning();
+  const result = await db.insert(playlist).values(newPlaylist).returning();
 
-	if (!result || result.length === 0) {
-		throw new Error("Failed to create playlist");
-	}
+  if (!result || result.length === 0) {
+    throw new Error("Failed to create playlist");
+  }
 
-	const created = result[0];
+  const created = result[0];
 
-	// Sync is handled automatically by SQL triggers populating sync_outbox
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
-	// Persist to IndexedDB
-	await persistDb();
+  // Persist to IndexedDB
+  await persistDb();
 
-	return created;
+  return created;
 }
 
 /**
@@ -324,43 +324,43 @@ export async function createPlaylist(
  * ```
  */
 export async function updatePlaylist(
-	db: SqliteDatabase,
-	playlistId: string,
-	userId: string,
-	data: Partial<Omit<NewPlaylist, "userRef" | "id">>,
+  db: SqliteDatabase,
+  playlistId: string,
+  userId: string,
+  data: Partial<Omit<NewPlaylist, "userRef" | "id">>
 ): Promise<Playlist | null> {
-	// Verify ownership
-	const existing = await getPlaylistById(db, playlistId, userId);
-	if (!existing) {
-		return null;
-	}
+  // Verify ownership
+  const existing = await getPlaylistById(db, playlistId, userId);
+  if (!existing) {
+    return null;
+  }
 
-	const now = new Date().toISOString();
+  const now = new Date().toISOString();
 
-	const updateData = {
-		...data,
-		syncVersion: (existing.syncVersion || 0) + 1,
-		lastModifiedAt: now,
-	};
+  const updateData = {
+    ...data,
+    syncVersion: (existing.syncVersion || 0) + 1,
+    lastModifiedAt: now,
+  };
 
-	const result = await db
-		.update(playlist)
-		.set(updateData)
-		.where(eq(playlist.playlistId, playlistId))
-		.returning();
+  const result = await db
+    .update(playlist)
+    .set(updateData)
+    .where(eq(playlist.playlistId, playlistId))
+    .returning();
 
-	if (!result || result.length === 0) {
-		return null;
-	}
+  if (!result || result.length === 0) {
+    return null;
+  }
 
-	const updated = result[0];
+  const updated = result[0];
 
-	// Sync is handled automatically by SQL triggers populating sync_outbox
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
-	// Persist to IndexedDB
-	await persistDb();
+  // Persist to IndexedDB
+  await persistDb();
 
-	return updated;
+  return updated;
 }
 
 /**
@@ -382,44 +382,44 @@ export async function updatePlaylist(
  * ```
  */
 export async function deletePlaylist(
-	db: SqliteDatabase,
-	playlistId: string,
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  userId: string
 ): Promise<boolean> {
-	// Verify ownership
-	const existing = await getPlaylistById(db, playlistId, userId);
-	if (!existing) {
-		return false;
-	}
+  // Verify ownership
+  const existing = await getPlaylistById(db, playlistId, userId);
+  if (!existing) {
+    return false;
+  }
 
-	const now = new Date().toISOString();
+  const now = new Date().toISOString();
 
-	// Soft delete the playlist
-	await db
-		.update(playlist)
-		.set({
-			deleted: 1,
-			syncVersion: (existing.syncVersion || 0) + 1,
-			lastModifiedAt: now,
-		})
-		.where(eq(playlist.playlistId, playlistId));
+  // Soft delete the playlist
+  await db
+    .update(playlist)
+    .set({
+      deleted: 1,
+      syncVersion: (existing.syncVersion || 0) + 1,
+      lastModifiedAt: now,
+    })
+    .where(eq(playlist.playlistId, playlistId));
 
-	// Soft delete all playlist-tune associations
-	await db
-		.update(playlistTune)
-		.set({
-			deleted: 1,
-			syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
-			lastModifiedAt: now,
-		})
-		.where(eq(playlistTune.playlistRef, playlistId));
+  // Soft delete all playlist-tune associations
+  await db
+    .update(playlistTune)
+    .set({
+      deleted: 1,
+      syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+      lastModifiedAt: now,
+    })
+    .where(eq(playlistTune.playlistRef, playlistId));
 
-	// Sync is handled automatically by SQL triggers populating sync_outbox
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
-	// Persist to IndexedDB
-	await persistDb();
+  // Persist to IndexedDB
+  await persistDb();
 
-	return true;
+  return true;
 }
 
 /**
@@ -441,82 +441,82 @@ export async function deletePlaylist(
  * ```
  */
 export async function addTuneToPlaylist(
-	db: SqliteDatabase,
-	playlistId: string,
-	tuneId: string,
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  tuneId: string,
+  userId: string
 ): Promise<PlaylistTune> {
-	// Verify playlist ownership
-	const playlistRecord = await getPlaylistById(db, playlistId, userId);
-	if (!playlistRecord) {
-		throw new Error("Playlist not found or access denied");
-	}
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
 
-	// Check if association already exists
-	const existing = await db
-		.select()
-		.from(playlistTune)
-		.where(
-			and(
-				eq(playlistTune.playlistRef, playlistId),
-				eq(playlistTune.tuneRef, tuneId),
-			),
-		)
-		.limit(1);
+  // Check if association already exists
+  const existing = await db
+    .select()
+    .from(playlistTune)
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.tuneRef, tuneId)
+      )
+    )
+    .limit(1);
 
-	if (existing && existing.length > 0) {
-		// If it was soft-deleted, undelete it
-		if (existing[0].deleted === 1) {
-			const now = new Date().toISOString();
-			const result = await db
-				.update(playlistTune)
-				.set({
-					deleted: 0,
-					syncVersion: (existing[0].syncVersion || 0) + 1,
-					lastModifiedAt: now,
-				})
-				.where(
-					and(
-						eq(playlistTune.playlistRef, playlistId),
-						eq(playlistTune.tuneRef, tuneId),
-					),
-				)
-				.returning();
+  if (existing && existing.length > 0) {
+    // If it was soft-deleted, undelete it
+    if (existing[0].deleted === 1) {
+      const now = new Date().toISOString();
+      const result = await db
+        .update(playlistTune)
+        .set({
+          deleted: 0,
+          syncVersion: (existing[0].syncVersion || 0) + 1,
+          lastModifiedAt: now,
+        })
+        .where(
+          and(
+            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.tuneRef, tuneId)
+          )
+        )
+        .returning();
 
-			return result[0];
-		}
+      return result[0];
+    }
 
-		// Already exists and not deleted
-		return existing[0];
-	}
+    // Already exists and not deleted
+    return existing[0];
+  }
 
-	// Create new association
-	const now = new Date().toISOString();
-	const newAssociation: NewPlaylistTune = {
-		playlistRef: playlistId,
-		tuneRef: tuneId,
-		current: null,
-		learned: null,
-		scheduled: now, // Schedule for immediate practice
-		goal: "recall",
-		deleted: 0,
-		syncVersion: 1,
-		lastModifiedAt: now,
-		deviceId: "local",
-	};
+  // Create new association
+  const now = new Date().toISOString();
+  const newAssociation: NewPlaylistTune = {
+    playlistRef: playlistId,
+    tuneRef: tuneId,
+    current: null,
+    learned: null,
+    scheduled: now, // Schedule for immediate practice
+    goal: "recall",
+    deleted: 0,
+    syncVersion: 1,
+    lastModifiedAt: now,
+    deviceId: "local",
+  };
 
-	const result = await db
-		.insert(playlistTune)
-		.values(newAssociation)
-		.returning();
+  const result = await db
+    .insert(playlistTune)
+    .values(newAssociation)
+    .returning();
 
-	if (!result || result.length === 0) {
-		throw new Error("Failed to add tune to playlist");
-	}
+  if (!result || result.length === 0) {
+    throw new Error("Failed to add tune to playlist");
+  }
 
-	// Sync is handled automatically by SQL triggers populating sync_outbox
+  // Sync is handled automatically by SQL triggers populating sync_outbox
 
-	return result[0];
+  return result[0];
 }
 
 /**
@@ -539,42 +539,42 @@ export async function addTuneToPlaylist(
  * ```
  */
 export async function removeTuneFromPlaylist(
-	db: SqliteDatabase,
-	playlistId: string,
-	tuneId: string,
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  tuneId: string,
+  userId: string
 ): Promise<boolean> {
-	// Verify playlist ownership
-	const playlistRecord = await getPlaylistById(db, playlistId, userId);
-	if (!playlistRecord) {
-		return false;
-	}
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    return false;
+  }
 
-	const now = new Date().toISOString();
+  const now = new Date().toISOString();
 
-	const result = await db
-		.update(playlistTune)
-		.set({
-			deleted: 1,
-			syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
-			lastModifiedAt: now,
-		})
-		.where(
-			and(
-				eq(playlistTune.playlistRef, playlistId),
-				eq(playlistTune.tuneRef, tuneId),
-			),
-		)
-		.returning();
+  const result = await db
+    .update(playlistTune)
+    .set({
+      deleted: 1,
+      syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+      lastModifiedAt: now,
+    })
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.tuneRef, tuneId)
+      )
+    )
+    .returning();
 
-	if (!result || result.length === 0) {
-		return false;
-	}
+  if (!result || result.length === 0) {
+    return false;
+  }
 
-	// Queue for sync
-	// await queueSync(db, 'playlist_tune', `${playlistId}-${tuneId}`, 'update');
+  // Queue for sync
+  // await queueSync(db, 'playlist_tune', `${playlistId}-${tuneId}`, 'update');
 
-	return true;
+  return true;
 }
 
 /**
@@ -594,71 +594,71 @@ export async function removeTuneFromPlaylist(
  * ```
  */
 export async function getPlaylistTunes(
-	db: SqliteDatabase,
-	playlistId: string,
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  userId: string
 ) {
-	// Verify playlist ownership
-	const playlistRecord = await getPlaylistById(db, playlistId, userId);
-	if (!playlistRecord) {
-		throw new Error("Playlist not found or access denied");
-	}
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
 
-	const result = await db
-		.select({
-			// PlaylistTune fields
-			playlistRef: playlistTune.playlistRef,
-			tuneRef: playlistTune.tuneRef,
-			current: playlistTune.current,
-			learned: playlistTune.learned,
-			scheduled: playlistTune.scheduled,
-			goal: playlistTune.goal,
+  const result = await db
+    .select({
+      // PlaylistTune fields
+      playlistRef: playlistTune.playlistRef,
+      tuneRef: playlistTune.tuneRef,
+      current: playlistTune.current,
+      learned: playlistTune.learned,
+      scheduled: playlistTune.scheduled,
+      goal: playlistTune.goal,
 
-			// Tune fields
-			tuneId: tune.id,
-			title: tune.title,
-			composer: tune.composer,
-			artist: tune.artist,
-			idForeign: tune.idForeign,
-			releaseYear: tune.releaseYear,
-			type: tune.type,
-			mode: tune.mode,
-			structure: tune.structure,
-			incipit: tune.incipit,
-			genre: tune.genre,
-		})
-		.from(playlistTune)
-		.innerJoin(tune, eq(playlistTune.tuneRef, tune.id))
-		.where(
-			and(
-				eq(playlistTune.playlistRef, playlistId),
-				eq(playlistTune.deleted, 0),
-				eq(tune.deleted, 0),
-			),
-		)
-		.orderBy(tune.title);
+      // Tune fields
+      tuneId: tune.id,
+      title: tune.title,
+      composer: tune.composer,
+      artist: tune.artist,
+      idForeign: tune.idForeign,
+      releaseYear: tune.releaseYear,
+      type: tune.type,
+      mode: tune.mode,
+      structure: tune.structure,
+      incipit: tune.incipit,
+      genre: tune.genre,
+    })
+    .from(playlistTune)
+    .innerJoin(tune, eq(playlistTune.tuneRef, tune.id))
+    .where(
+      and(
+        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.deleted, 0),
+        eq(tune.deleted, 0)
+      )
+    )
+    .orderBy(tune.title);
 
-	return result.map((row) => ({
-		playlistRef: row.playlistRef,
-		tuneRef: row.tuneRef,
-		current: row.current,
-		learned: row.learned,
-		scheduled: row.scheduled,
-		goal: row.goal,
-		tune: {
-			id: row.tuneId,
-			title: row.title,
-			composer: row.composer,
-			artist: row.artist,
-			idForeign: row.idForeign,
-			releaseYear: row.releaseYear,
-			type: row.type,
-			mode: row.mode,
-			structure: row.structure,
-			incipit: row.incipit,
-			genre: row.genre,
-		},
-	}));
+  return result.map((row) => ({
+    playlistRef: row.playlistRef,
+    tuneRef: row.tuneRef,
+    current: row.current,
+    learned: row.learned,
+    scheduled: row.scheduled,
+    goal: row.goal,
+    tune: {
+      id: row.tuneId,
+      title: row.title,
+      composer: row.composer,
+      artist: row.artist,
+      idForeign: row.idForeign,
+      releaseYear: row.releaseYear,
+      type: row.type,
+      mode: row.mode,
+      structure: row.structure,
+      incipit: row.incipit,
+      genre: row.genre,
+    },
+  }));
 }
 
 /**
@@ -679,34 +679,34 @@ export async function getPlaylistTunes(
  * ```
  */
 export async function getPlaylistTunesStaged(
-	db: SqliteDatabase,
-	playlistId: string,
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  userId: string
 ) {
-	// Verify playlist ownership
-	const playlistRecord = await getPlaylistById(db, playlistId, userId);
-	if (!playlistRecord) {
-		throw new Error("Playlist not found or access denied");
-	}
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
 
-	// Get user_ref from supabase_user_id
-	const userRecord = await db
-		.select({ id: userProfile.id })
-		.from(userProfile)
-		.where(eq(userProfile.supabaseUserId, userId))
-		.limit(1);
+  // Get user_ref from supabase_user_id
+  const userRecord = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.supabaseUserId, userId))
+    .limit(1);
 
-	if (!userRecord || userRecord.length === 0) {
-		throw new Error(`User not found: ${userId}`);
-	}
+  if (!userRecord || userRecord.length === 0) {
+    throw new Error(`User not found: ${userId}`);
+  }
 
-	const userRef = userRecord[0].id;
-	console.log(
-		`[getPlaylistTunesStaged] Resolved userRef: ${userRef} for userId: ${userId}`,
-	);
+  const userRef = userRecord[0].id;
+  console.log(
+    `[getPlaylistTunesStaged] Resolved userRef: ${userRef} for userId: ${userId}`
+  );
 
-	// Query the practice_list_staged view directly
-	const result = await db.all<any>(sql`
+  // Query the practice_list_staged view directly
+  const result = await db.all<any>(sql`
     SELECT * FROM practice_list_staged
     WHERE playlist_id = ${playlistId}
       AND user_ref = ${userRef}
@@ -714,11 +714,11 @@ export async function getPlaylistTunesStaged(
       AND playlist_deleted = 0
     ORDER BY title
   `);
-	console.log(
-		`[getPlaylistTunesStaged] Found ${result.length} tunes for playlist ${playlistId}`,
-	);
+  console.log(
+    `[getPlaylistTunesStaged] Found ${result.length} tunes for playlist ${playlistId}`
+  );
 
-	return result;
+  return result;
 }
 
 /**
@@ -740,50 +740,50 @@ export async function getPlaylistTunesStaged(
  * ```
  */
 export async function addTunesToPlaylist(
-	db: SqliteDatabase,
-	playlistId: string,
-	tuneIds: string[],
-	userId: string,
+  db: SqliteDatabase,
+  playlistId: string,
+  tuneIds: string[],
+  userId: string
 ): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
-	// Verify playlist ownership
-	const playlistRecord = await getPlaylistById(db, playlistId, userId);
-	if (!playlistRecord) {
-		throw new Error("Playlist not found or access denied");
-	}
+  // Verify playlist ownership
+  const playlistRecord = await getPlaylistById(db, playlistId, userId);
+  if (!playlistRecord) {
+    throw new Error("Playlist not found or access denied");
+  }
 
-	let added = 0;
-	let skipped = 0;
-	const addedTuneIds: string[] = [];
+  let added = 0;
+  let skipped = 0;
+  const addedTuneIds: string[] = [];
 
-	for (const tuneId of tuneIds) {
-		try {
-			// Check if already exists
-			const existing = await db
-				.select()
-				.from(playlistTune)
-				.where(
-					and(
-						eq(playlistTune.playlistRef, playlistId),
-						eq(playlistTune.tuneRef, tuneId),
-					),
-				)
-				.limit(1);
+  for (const tuneId of tuneIds) {
+    try {
+      // Check if already exists
+      const existing = await db
+        .select()
+        .from(playlistTune)
+        .where(
+          and(
+            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.tuneRef, tuneId)
+          )
+        )
+        .limit(1);
 
-			if (existing && existing.length > 0 && existing[0].deleted === 0) {
-				// Already in playlist and not deleted
-				skipped++;
-				continue;
-			}
+      if (existing && existing.length > 0 && existing[0].deleted === 0) {
+        // Already in playlist and not deleted
+        skipped++;
+        continue;
+      }
 
-			// Add the tune (or undelete if it was deleted)
-			await addTuneToPlaylist(db, playlistId, tuneId, userId);
-			added++;
-			addedTuneIds.push(tuneId);
-		} catch (error) {
-			console.error(`Error adding tune ${tuneId} to playlist:`, error);
-			skipped++;
-		}
-	}
+      // Add the tune (or undelete if it was deleted)
+      await addTuneToPlaylist(db, playlistId, tuneId, userId);
+      added++;
+      addedTuneIds.push(tuneId);
+    } catch (error) {
+      console.error(`Error adding tune ${tuneId} to playlist:`, error);
+      skipped++;
+    }
+  }
 
-	return { added, skipped, tuneIds: addedTuneIds };
+  return { added, skipped, tuneIds: addedTuneIds };
 }

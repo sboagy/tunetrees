@@ -82,8 +82,17 @@ const FilterDropdown: Component<{
   let buttonRef: HTMLButtonElement | undefined;
 
   // Handle click outside to close
+  // Only close if the click is within the app container (#root) to avoid
+  // interference from test automation or browser extensions
   const handleClickOutside = (event: MouseEvent) => {
     const target = event.target as Node;
+
+    // Only process clicks that occur within the app root
+    const appRoot = document.getElementById("root");
+    if (!appRoot?.contains(target)) {
+      return;
+    }
+
     if (
       dropdownRef &&
       !dropdownRef.contains(target) &&
@@ -172,7 +181,10 @@ const FilterDropdown: Component<{
 
       <Show when={isOpen()}>
         <div class="absolute left-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-          <div class="p-2">
+          <div
+            class="p-2"
+            data-testid={`filter-dropdown-menu-${props.title.toLowerCase()}`}
+          >
             <Show
               when={!props.loading && props.items.length > 0}
               fallback={

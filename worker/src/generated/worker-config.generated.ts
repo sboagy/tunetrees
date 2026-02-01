@@ -76,8 +76,12 @@ export const WORKER_SYNC_CONFIG =
         "column": "private_to_user"
       },
       "note": {
-        "kind": "orNullEqUserId",
-        "column": "user_ref"
+        "kind": "rpc",
+        "functionName": "sync_get_user_notes",
+        "params": [
+          "userId",
+          "genreIds"
+        ]
       },
       "playlist": {
         "kind": "eqUserId",
@@ -102,8 +106,12 @@ export const WORKER_SYNC_CONFIG =
         "column": "user_id"
       },
       "reference": {
-        "kind": "orNullEqUserId",
-        "column": "user_ref"
+        "kind": "rpc",
+        "functionName": "sync_get_user_references",
+        "params": [
+          "userId",
+          "genreIds"
+        ]
       },
       "tab_group_main_state": {
         "kind": "eqUserId",
@@ -479,7 +487,7 @@ export const WORKER_SYNC_CONFIG =
         "denyDelete": true
       },
       "user_genre_selection": {
-        "denyDelete": true,
+        "denyDelete": false,
         "sanitize": {
           "coerceNumericProps": [
             {
