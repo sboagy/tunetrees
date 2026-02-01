@@ -99,6 +99,9 @@ export default defineConfig(() => {
         },
       },
     },
+    worker: {
+      format: "es",
+    },
     test: {
       exclude: [
         "**/node_modules/**",
@@ -149,6 +152,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
           // Cache all static assets INCLUDING WASM and SQL files for offline
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,wasm,sql}"],
           // Runtime caching strategies
