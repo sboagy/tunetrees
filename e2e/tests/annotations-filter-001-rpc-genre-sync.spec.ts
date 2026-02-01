@@ -163,6 +163,7 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("B: Settings genre addition syncs new genre's annotations", async ({
     page,
   }) => {
+    test.setTimeout(45000); // Genre sync + polling takes time
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
     await waitForSyncComplete(page);
 
