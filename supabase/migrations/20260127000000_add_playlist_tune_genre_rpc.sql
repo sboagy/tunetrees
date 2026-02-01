@@ -18,8 +18,7 @@ AS $$
     AND t.deleted = false
   WHERE pt.deleted = false
     AND t.genre IS NOT NULL
-    AND p.user_ref::text = p_user_id
-    AND p_user_id = public.auth_internal_user_id()::text;
+    AND p.user_ref::text = p_user_id;
 $$;
 
 REVOKE ALL ON FUNCTION public.get_playlist_tune_genres_for_user(text) FROM anon, authenticated;
