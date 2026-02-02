@@ -56,9 +56,7 @@ function formatWithBiome(targetPath: string, content: string): string {
       `Biome format failed for ${targetPath}: ${stderr || "unknown error"}`
     );
   }
-  return typeof result.stdout === "string"
-    ? result.stdout
-    : result.stdout.toString("utf8");
+  return result.stdout;
 }
 
 function isLocalSupabaseDatabaseUrl(databaseUrl: string): boolean {
