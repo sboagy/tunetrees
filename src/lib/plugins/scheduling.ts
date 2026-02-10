@@ -2,6 +2,7 @@
  * Scheduling plugin helpers
  */
 
+import { sql } from "drizzle-orm";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import { getPluginsByCapability } from "@/lib/db/queries/plugins";
 import type {
@@ -13,14 +14,19 @@ import type {
   RecordPracticeInput,
 } from "@/lib/db/types";
 import { runPluginFunction } from "@/lib/plugins/runtime";
+import { FSRSService } from "@/lib/scheduling/fsrs-service";
+import type { SchedulingService } from "@/lib/scheduling/scheduler-interface";
+import { toast } from "solid-sonner";
 
 export async function getSchedulingPlugin(
   db: SqliteDatabase,
-  userId: string
+  userId: string,
+  goal?: string
 ): Promise<Plugin | null> {
   const plugins = await getPluginsByCapability(db, userId, "scheduleGoal", {
     includePublic: true,
     includeDisabled: false,
+    goal,
   });
   return plugins[0] ?? null;
 }
@@ -61,6 +67,187 @@ export function serializeSchedule(
     lapses: schedule.lapses,
     interval: schedule.interval,
   };
+}
+
+const QUERY_LIMIT = 500;
+const ALLOWED_TABLES = new Set([
+  "practice_record",
+  "playlist_tune",
+  "daily_practice_queue",
+  "user_profile",
+  "prefs_scheduling_options",
+  "prefs_spaced_repetition",
+]);
+const DISALLOWED_COLUMNS: string[] = []; // TODO: add column disallow-list as needed.
+
+function extractTableNames(query: string): string[] {
+  const names: string[] = [];
+  const regex = /\b(from|join)\s+([a-zA-Z0-9_\."]+)/gi;
+  let match = regex.exec(query);
+  while (match) {
+    const raw = match[2] ?? "";
+    const cleaned = raw.replace(/^["']|["']$/g, "").split(".").pop();
+    if (cleaned) names.push(cleaned);
+    match = regex.exec(query);
+  }
+  return names;
+}
+
+function ensureQueryAllowed(rawQuery: string): string {
+  const query = rawQuery.trim();
+  if (!/^select\s/i.test(query)) {
+    throw new Error("Only SELECT queries are allowed");
+  }
+  if (/[;]|--|\/\*/.test(query)) {
+    throw new Error("Query contains unsupported tokens");
+  }
+
+  const tableNames = extractTableNames(query);
+  if (tableNames.length === 0) {
+    throw new Error("Query must reference an allowed table");
+  }
+  for (const table of tableNames) {
+    if (!ALLOWED_TABLES.has(table)) {
+      throw new Error(`Query references disallowed table: ${table}`);
+    }
+  }
+
+  if (DISALLOWED_COLUMNS.length > 0) {
+    const pattern = new RegExp(`\\b(${DISALLOWED_COLUMNS.join("|")})\\b`, "i");
+    if (pattern.test(query)) {
+      throw new Error("Query references disallowed column");
+    }
+  }
+
+  const limitMatch = query.match(/\blimit\s+(\d+)/i);
+  if (limitMatch) {
+    const limitValue = Number(limitMatch[1]);
+    if (Number.isFinite(limitValue) && limitValue > QUERY_LIMIT) {
+      throw new Error(`Query limit exceeds ${QUERY_LIMIT}`);
+    }
+    return query;
+  }
+
+  return `${query} LIMIT ${QUERY_LIMIT}`;
+}
+
+async function queryDbGatekeeper(
+  db: SqliteDatabase,
+  rawQuery: string
+): Promise<unknown> {
+  const query = ensureQueryAllowed(rawQuery);
+  return db.all(sql.raw(query));
+}
+
+function parsePracticeInput(raw: Record<string, unknown>): RecordPracticeInput {
+  const practicedRaw = raw.practiced;
+  const practiced = toDate(practicedRaw, new Date());
+  if (Number.isNaN(practiced.getTime())) {
+    throw new Error("Invalid practiced date");
+  }
+
+  const playlistRef = String(raw.playlistRef ?? "");
+  const tuneRef = String(raw.tuneRef ?? "");
+  const quality = Number(raw.quality ?? 0);
+  if (!playlistRef || !tuneRef || !Number.isFinite(quality)) {
+    throw new Error("Missing required practice input fields");
+  }
+
+  return {
+    playlistRef,
+    tuneRef,
+    quality,
+    practiced,
+    goal: typeof raw.goal === "string" ? raw.goal : undefined,
+    technique: typeof raw.technique === "string" ? raw.technique : undefined,
+  };
+}
+
+function normalizeFsrsPayload(payload: unknown): {
+  input: RecordPracticeInput;
+  prior: PracticeRecord | null;
+} {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("fsrsScheduler expects a payload object");
+  }
+  const data = payload as Record<string, unknown>;
+  const inputRaw =
+    data.input && typeof data.input === "object"
+      ? (data.input as Record<string, unknown>)
+      : data;
+  const prior =
+    data.prior && typeof data.prior === "object"
+      ? (data.prior as PracticeRecord)
+      : null;
+
+  return {
+    input: parsePracticeInput(inputRaw),
+    prior,
+  };
+}
+
+export class PluginSchedulingService implements SchedulingService {
+  private readonly fallbackScheduler: FSRSService;
+  private readonly params: {
+    plugin: Plugin;
+    db: SqliteDatabase;
+    preferences: PrefsSpacedRepetition;
+    scheduling: IUserSchedulingOptions;
+    playlistTuneCount?: number | null;
+  };
+
+  constructor(params: {
+    plugin: Plugin;
+    db: SqliteDatabase;
+    preferences: PrefsSpacedRepetition;
+    scheduling: IUserSchedulingOptions;
+    playlistTuneCount?: number | null;
+  }) {
+    this.params = params;
+    this.fallbackScheduler = new FSRSService(
+      params.preferences,
+      params.scheduling,
+      { playlistTuneCount: params.playlistTuneCount ?? null }
+    );
+  }
+
+  async processFirstReview(
+    input: RecordPracticeInput
+  ): Promise<NextReviewSchedule> {
+    const fallback = await this.fallbackScheduler.processFirstReview(input);
+    const override = await applySchedulingPlugin({
+      plugin: this.params.plugin,
+      input,
+      prior: null,
+      preferences: this.params.preferences,
+      scheduling: this.params.scheduling,
+      fallback,
+      db: this.params.db,
+      playlistTuneCount: this.params.playlistTuneCount,
+    });
+    return override ?? fallback;
+  }
+
+  async processReview(
+    input: RecordPracticeInput,
+    latestRecord: PracticeRecord
+  ): Promise<NextReviewSchedule> {
+    const fallback = await this.fallbackScheduler.processReview(
+      input,
+      latestRecord
+    );
+    const override = await applySchedulingPlugin({
+      plugin: this.params.plugin,
+      input,
+      prior: latestRecord,
+      preferences: this.params.preferences,
+      scheduling: this.params.scheduling,
+      fallback,
+      db: this.params.db,
+      playlistTuneCount: this.params.playlistTuneCount,
+    });
+    return override ?? fallback;
+  }
 }
 
 function toDate(value: unknown, fallback: Date): Date {
@@ -120,7 +307,32 @@ export async function applySchedulingPlugin(params: {
   preferences: PrefsSpacedRepetition | null;
   scheduling: IUserSchedulingOptions | null;
   fallback: NextReviewSchedule;
+  db: SqliteDatabase;
+  playlistTuneCount?: number | null;
 }): Promise<NextReviewSchedule | null> {
+  if (!params.preferences || !params.scheduling) {
+    return null;
+  }
+
+  const fsrsService = new FSRSService(params.preferences, params.scheduling, {
+    playlistTuneCount: params.playlistTuneCount ?? null,
+  });
+  const fsrsSchedulerBridge = {
+    processFirstReview: async (payload: unknown) => {
+      const { input } = normalizeFsrsPayload(payload);
+      const schedule = await fsrsService.processFirstReview(input);
+      return serializeSchedule(schedule);
+    },
+    processReview: async (payload: unknown) => {
+      const { input, prior } = normalizeFsrsPayload(payload);
+      if (!prior) {
+        throw new Error("fsrsScheduler.processReview requires prior record");
+      }
+      const schedule = await fsrsService.processReview(input, prior);
+      return serializeSchedule(schedule);
+    },
+  };
+
   const payload: SchedulingPluginPayload = {
     input: {
       playlistRef: params.input.playlistRef,
@@ -136,21 +348,36 @@ export async function applySchedulingPlugin(params: {
     fallback: serializeSchedule(params.fallback),
   };
 
+  const methodName = params.prior ? "processReview" : "processFirstReview";
+
   try {
     const result = await runPluginFunction({
       script: params.plugin.script,
-      functionName: "scheduleGoal",
+      functionName: "createScheduler",
+      methodName,
       payload,
       meta: {
         pluginId: params.plugin.id,
         pluginName: params.plugin.name,
       },
-      timeoutMs: 8000,
+      timeoutMs: 15000,
+      bridge: {
+        queryDb: (sqlText) => queryDbGatekeeper(params.db, sqlText),
+        fsrsScheduler: fsrsSchedulerBridge,
+      },
     });
 
     return normalizeScheduleOutput(result, params.fallback);
   } catch (error) {
     console.warn("Scheduling plugin failed, falling back to FSRS", error);
+    const message =
+      error instanceof Error ? error.message : "Plugin execution failed";
+    const pluginLabel = params.plugin.name || "Unknown plugin";
+    const pluginId = params.plugin.id ? ` (${params.plugin.id})` : "";
+    toast.error("Scheduling plugin failed", {
+      description: `Plugin: ${pluginLabel}${pluginId}. Method: ${methodName}. ${message}`,
+      duration: Infinity,
+    });
     return null;
   }
 }

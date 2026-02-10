@@ -8,12 +8,13 @@ import type {
 } from "quickjs-emscripten";
 import { newAsyncRuntime } from "quickjs-emscripten";
 
-export type PluginFunctionName = "parseImport" | "scheduleGoal";
+export type PluginFunctionName = "parseImport" | "createScheduler";
 
 interface InvokeMessage {
   type: "invoke";
   id: number;
   functionName: PluginFunctionName;
+  methodName?: "processFirstReview" | "processReview";
   script: string;
   payload: unknown;
   meta?: unknown;
@@ -37,11 +38,54 @@ interface WorkerResponseError {
 
 type WorkerResponse = WorkerResponseOk | WorkerResponseError;
 
-type AnyMessage = InvokeMessage;
+interface QueryRequest {
+  type: "query";
+  id: number;
+  invokeId: number;
+  sql: string;
+}
+
+interface QueryResponse {
+  type: "queryResult";
+  id: number;
+  ok: boolean;
+  result?: unknown;
+  error?: { message: string };
+}
+
+interface FsrsRequest {
+  type: "fsrs";
+  id: number;
+  invokeId: number;
+  method: "processFirstReview" | "processReview";
+  payload: unknown;
+}
+
+interface FsrsResponse {
+  type: "fsrsResult";
+  id: number;
+  ok: boolean;
+  result?: unknown;
+  error?: { message: string };
+}
+
+type AnyMessage = InvokeMessage | QueryResponse | FsrsResponse;
 
 const ctx = self as DedicatedWorkerGlobalScope;
 
+type CallResult = ReturnType<QuickJSAsyncContext["callFunction"]>;
+
 let runtimePromise: Promise<QuickJSAsyncRuntime> | null = null;
+let queryRequestId = 0;
+let fsrsRequestId = 0;
+const pendingQueries = new Map<
+  number,
+  { resolve: (value: unknown) => void; reject: (error: Error) => void }
+>();
+const pendingFsrs = new Map<
+  number,
+  { resolve: (value: unknown) => void; reject: (error: Error) => void }
+>();
 
 function getRuntime(): Promise<QuickJSAsyncRuntime> {
   if (!runtimePromise) {
@@ -106,6 +150,34 @@ function createHandleMapper(params: {
   };
 
   return { toHandle, shouldDispose };
+}
+
+function requestQuery(invokeId: number, sql: string): Promise<unknown> {
+  queryRequestId += 1;
+  const id = queryRequestId;
+  ctx.postMessage({ type: "query", id, invokeId, sql } as QueryRequest);
+  return new Promise((resolve, reject) => {
+    pendingQueries.set(id, { resolve, reject });
+  });
+}
+
+function requestFsrs(params: {
+  invokeId: number;
+  method: "processFirstReview" | "processReview";
+  payload: unknown;
+}): Promise<unknown> {
+  fsrsRequestId += 1;
+  const id = fsrsRequestId;
+  ctx.postMessage({
+    type: "fsrs",
+    id,
+    invokeId: params.invokeId,
+    method: params.method,
+    payload: params.payload,
+  } as FsrsRequest);
+  return new Promise((resolve, reject) => {
+    pendingFsrs.set(id, { resolve, reject });
+  });
 }
 
 async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
@@ -216,23 +288,114 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
     qjs.setProp(qjs.global, "fetchUrl", fetchUrlHandle);
     if (shouldDispose(fetchUrlHandle)) fetchUrlHandle.dispose();
 
+    const queryDbHandle = qjs.newAsyncifiedFunction(
+      "queryDb",
+      async (sqlHandle) => {
+        const raw = qjs.dump(sqlHandle);
+        if (typeof raw !== "string") {
+          throw new Error("queryDb expects a SQL string");
+        }
+        const result = await requestQuery(message.id, raw);
+        return toHandle(result);
+      }
+    );
+    qjs.setProp(qjs.global, "queryDb", queryDbHandle);
+    if (shouldDispose(queryDbHandle)) queryDbHandle.dispose();
+
+    const fsrsSchedulerHandle = qjs.newObject();
+    const processFirstHandle = qjs.newAsyncifiedFunction(
+      "processFirstReview",
+      async (payloadHandle) => {
+        const payload = qjs.dump(payloadHandle);
+        const result = await requestFsrs({
+          invokeId: message.id,
+          method: "processFirstReview",
+          payload,
+        });
+        return toHandle(result);
+      }
+    );
+    qjs.setProp(fsrsSchedulerHandle, "processFirstReview", processFirstHandle);
+    if (shouldDispose(processFirstHandle)) processFirstHandle.dispose();
+
+    const processReviewHandle = qjs.newAsyncifiedFunction(
+      "processReview",
+      async (payloadHandle) => {
+        const payload = qjs.dump(payloadHandle);
+        const result = await requestFsrs({
+          invokeId: message.id,
+          method: "processReview",
+          payload,
+        });
+        return toHandle(result);
+      }
+    );
+    qjs.setProp(fsrsSchedulerHandle, "processReview", processReviewHandle);
+    if (shouldDispose(processReviewHandle)) processReviewHandle.dispose();
+    qjs.setProp(qjs.global, "fsrsScheduler", fsrsSchedulerHandle);
+    if (shouldDispose(fsrsSchedulerHandle)) fsrsSchedulerHandle.dispose();
+
     const evalResult = await qjs.evalCodeAsync(message.script);
     const evalHandle = qjs.unwrapResult(evalResult);
     if (shouldDispose(evalHandle)) evalHandle.dispose();
 
-    const fnHandle = track(qjs.getProp(qjs.global, message.functionName));
-    if (qjs.typeof(fnHandle) !== "function") {
-      throw new Error(`Plugin did not define ${message.functionName}()`);
-    }
+    let callResult: CallResult;
 
-    const payloadHandle = track(toHandle(message.payload));
-    const metaHandle = track(toHandle(message.meta ?? null));
-    const callResult = qjs.callFunction(
-      fnHandle,
-      qjs.global,
-      payloadHandle,
-      metaHandle
-    );
+    if (message.functionName === "createScheduler") {
+      const factoryHandle = track(qjs.getProp(qjs.global, "createScheduler"));
+      if (qjs.typeof(factoryHandle) !== "function") {
+        throw new Error("Plugin did not define createScheduler()");
+      }
+
+      const contextHandle = track(qjs.newObject());
+      const fsrsHandle = track(qjs.getProp(qjs.global, "fsrsScheduler"));
+      const queryHandle = track(qjs.getProp(qjs.global, "queryDb"));
+      qjs.setProp(contextHandle, "fsrsScheduler", fsrsHandle);
+      qjs.setProp(contextHandle, "queryDb", queryHandle);
+
+      const schedulerResult = qjs.callFunction(
+        factoryHandle,
+        qjs.global,
+        contextHandle
+      );
+      const schedulerHandle = track(qjs.unwrapResult(schedulerResult));
+
+      if (!message.methodName) {
+        throw new Error("Missing scheduler method name");
+      }
+
+      const methodHandle = track(
+        qjs.getProp(schedulerHandle, message.methodName)
+      );
+      if (qjs.typeof(methodHandle) !== "function") {
+        throw new Error(
+          `Scheduler missing ${message.methodName}() implementation`
+        );
+      }
+
+      const payloadHandle = track(toHandle(message.payload));
+      const metaHandle = track(toHandle(message.meta ?? null));
+      callResult = qjs.callFunction(
+        methodHandle,
+        schedulerHandle,
+        payloadHandle,
+        metaHandle
+      );
+    } else {
+      const fnHandle = track(qjs.getProp(qjs.global, message.functionName));
+      if (qjs.typeof(fnHandle) !== "function") {
+        throw new Error(`Plugin did not define ${message.functionName}()`);
+      }
+
+      const payloadHandle = track(toHandle(message.payload));
+      const metaHandle = track(toHandle(message.meta ?? null));
+      callResult = qjs.callFunction(
+        fnHandle,
+        qjs.global,
+        payloadHandle,
+        metaHandle
+      );
+    }
     const valueHandle = track(qjs.unwrapResult(callResult));
     const resolvedResult = await qjs.resolvePromise(valueHandle);
     const resolvedHandle = track(qjs.unwrapResult(resolvedResult));
@@ -273,5 +436,33 @@ ctx.addEventListener("message", (event: MessageEvent<AnyMessage>) => {
     executeInvoke(message).then((response) => {
       ctx.postMessage(response);
     });
+    return;
+  }
+
+  if (message.type === "queryResult") {
+    const pendingQuery = pendingQueries.get(message.id);
+    if (!pendingQuery) return;
+    pendingQueries.delete(message.id);
+    if (message.ok) {
+      pendingQuery.resolve(message.result);
+    } else {
+      pendingQuery.reject(
+        new Error(message.error?.message ?? "queryDb failed")
+      );
+    }
+    return;
+  }
+
+  if (message.type === "fsrsResult") {
+    const pendingRequest = pendingFsrs.get(message.id);
+    if (!pendingRequest) return;
+    pendingFsrs.delete(message.id);
+    if (message.ok) {
+      pendingRequest.resolve(message.result);
+    } else {
+      pendingRequest.reject(
+        new Error(message.error?.message ?? "fsrsScheduler failed")
+      );
+    }
   }
 });
