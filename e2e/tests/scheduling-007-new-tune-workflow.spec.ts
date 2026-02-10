@@ -280,7 +280,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       await page.waitForTimeout(700);
 
       // Submit
-      await ttPage.submitEvaluationsButton.click();
+      await ttPage.submitEvaluations();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(2000);
 
@@ -411,7 +411,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await ttPage.selectFlashcardEvaluation("easy");
     await page.waitForTimeout(500);
 
-    await ttPage.submitEvaluationsButton.click();
+    await ttPage.submitEvaluations();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
 
@@ -527,7 +527,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await ttPage.selectFlashcardEvaluation("again");
     await page.waitForTimeout(500);
 
-    await ttPage.submitEvaluationsButton.click();
+    await ttPage.submitEvaluations();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
 

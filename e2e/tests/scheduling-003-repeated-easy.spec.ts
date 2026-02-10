@@ -146,7 +146,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       await page.waitForTimeout(500); // Allow staging to process
 
       // Submit evaluation
-      await ttPage.submitEvaluationsButton.click({ timeout: 900_000 });
+      await ttPage.submitEvaluations({ timeoutMs: 900_000 });
       await page.waitForTimeout(500); // Allow sync to complete
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(2000); // Allow sync to complete
@@ -405,7 +405,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     // First evaluation: "Easy"
     await ttPage.selectFlashcardEvaluation("easy");
     await page.waitForTimeout(500);
-    await ttPage.submitEvaluationsButton.click();
+    await ttPage.submitEvaluations();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
 

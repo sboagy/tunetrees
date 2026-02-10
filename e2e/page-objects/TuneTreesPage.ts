@@ -1973,6 +1973,42 @@ export class TuneTreesPage {
     );
   }
 
+  async waitForSubmitReady(
+    opts: { minCount?: number; timeoutMs?: number } = {}
+  ) {
+    const minCount = opts.minCount ?? 1;
+    const timeoutMs = opts.timeoutMs ?? 30000;
+
+    await expect(this.submitEvaluationsButton).toBeVisible({
+      timeout: timeoutMs,
+    });
+
+    await expect
+      .poll(
+        async () => {
+          const [title, enabled] = await Promise.all([
+            this.submitEvaluationsButton
+              .getAttribute("title")
+              .catch(() => null),
+            this.submitEvaluationsButton.isEnabled().catch(() => false),
+          ]);
+          const match = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
+          const count = match ? Number(match[1]) : 0;
+          return enabled && count >= minCount;
+        },
+        { timeout: timeoutMs, intervals: [100, 250, 500, 1000] }
+      )
+      .toBe(true);
+  }
+
+  async submitEvaluations(
+    opts: { minCount?: number; timeoutMs?: number } = {}
+  ) {
+    const timeoutMs = opts.timeoutMs ?? 30000;
+    await this.waitForSubmitReady(opts);
+    await this.submitEvaluationsButton.click({ timeout: timeoutMs });
+  }
+
   /**
    * Selects a spaced-repetition evaluation value for the currently displayed flashcard.
    *

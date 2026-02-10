@@ -45,6 +45,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
 
     await seedSchedulingPluginLocally(page, {
       goals: ["recall"],
+      userId: testUser.userId,
     });
 
     await verifyClockFrozen(
@@ -66,7 +67,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     ).toBeVisible({ timeout: 10000 });
 
     await ttPage.setRowEvaluation(row, "good");
-    await ttPage.submitEvaluationsButton.click();
+    await ttPage.submitEvaluations();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(1200);
 
