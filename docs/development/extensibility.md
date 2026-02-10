@@ -26,7 +26,7 @@ Plugins declare capabilities as JSON (`capabilities` column):
 Supported capabilities:
 
 - `parseImport` — parse external inputs into TuneTrees tune fields
-- `scheduleGoal` — override FSRS scheduling for a goal
+- `scheduleGoal` — override scheduling for a goal (via `createScheduler`)
 
 ### Host helpers
 
@@ -63,9 +63,31 @@ Return an object with tune fields:
 }
 ```
 
-### `scheduleGoal(payload)`
+### `createScheduler({ fsrsScheduler, queryDb })`
 
-Input payload includes a `fallback` schedule (FSRS result). Return a full or partial schedule; missing fields will be filled from the fallback.
+The factory returns an object with `processFirstReview` and `processReview`.
+Input payload includes a `fallback` schedule (FSRS result). Return a full or
+partial schedule; missing fields will be filled from the fallback.
+
+Helpers available:
+
+- `fsrsScheduler`: full FSRS scheduler interface for fallback results.
+- `queryDb(sql)`: read-only SQL with a 500-row limit and table allowlist.
+
+```typescript
+function createScheduler({ fsrsScheduler, queryDb }) {
+  return {
+    async processFirstReview(payload) {
+      return payload.fallback;
+    },
+    async processReview(payload) {
+      return payload.fallback;
+    },
+  };
+}
+```
+
+Payload example:
 
 ```json
 {
