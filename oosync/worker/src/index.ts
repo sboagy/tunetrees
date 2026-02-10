@@ -10,7 +10,7 @@
 import { and, eq, gt, lte } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { jwtVerify } from "jose";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 import postgres from "postgres";
 import type {
   SyncChange,
@@ -562,9 +562,23 @@ function postgresToSqlite(
 // UTILITY: Authentication
 // ============================================================================
 
+// Cached JWKS key set — lazily initialized per Supabase URL
+let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+let cachedJwksUrl: string | null = null;
+
+function getJwks(supabaseUrl: string): ReturnType<typeof createRemoteJWKSet> {
+  const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+  if (!cachedJwks || cachedJwksUrl !== jwksUrl) {
+    cachedJwks = createRemoteJWKSet(new URL(jwksUrl));
+    cachedJwksUrl = jwksUrl;
+  }
+  return cachedJwks;
+}
+
 async function verifyJwt(
   request: Request,
-  secret: string
+  secret: string,
+  supabaseUrl: string
 ): Promise<string | null> {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -574,10 +588,28 @@ async function verifyJwt(
 
   const token = authHeader.split(" ")[1];
   try {
-    const { payload } = await jwtVerify(
-      token,
-      new TextEncoder().encode(secret)
-    );
+    // Peek at the JWT header to choose verification strategy
+    const [headerB64] = token.split(".");
+    const headerJson = JSON.parse(atob(headerB64.replace(/-/g, "+").replace(/_/g, "/")));
+    const algorithm = headerJson.alg;
+
+    let payload: { sub?: string };
+
+    if (algorithm === "ES256") {
+      // ES256 (Supabase CLI >= 2.75): fetch public key from JWKS endpoint
+      debug.log("[AUTH] Using ES256 verification via JWKS");
+      const result = await jwtVerify(token, getJwks(supabaseUrl));
+      payload = result.payload;
+    } else {
+      // HS256 (Supabase CLI < 2.75): symmetric secret
+      debug.log("[AUTH] Using HS256 verification");
+      const result = await jwtVerify(
+        token,
+        new TextEncoder().encode(secret)
+      );
+      payload = result.payload;
+    }
+
     debug.log("[AUTH] JWT verified successfully, user:", payload.sub);
     return payload.sub ?? null;
   } catch (e) {
@@ -1454,7 +1486,7 @@ async function fetch(request: Request, env: Env): Promise<Response> {
       }
 
       // Authenticate
-      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET);
+      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET, env.SUPABASE_URL);
       if (!userId) {
         debug.log(`[HTTP] Unauthorized - JWT verification failed`);
         return errorResponse("Unauthorized", 401, corsHeaders);
