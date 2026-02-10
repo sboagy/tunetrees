@@ -198,6 +198,7 @@ export const plugin = sqliteTable(
     enabled: integer("enabled").notNull().default(1),
     version: integer("version").notNull().default(1),
     deleted: integer("deleted").notNull().default(0),
+    goals: text("goals").notNull().default("[]"),
     ...sqliteSyncColumns,
   },
   (t) => [

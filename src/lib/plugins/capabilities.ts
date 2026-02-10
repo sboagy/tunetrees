@@ -10,6 +10,7 @@ export type PluginCapability = "parseImport" | "scheduleGoal";
 export interface ParsedCapabilities {
   parseImport?: boolean;
   scheduleGoal?: boolean;
+  goals?: string[];
 }
 
 const CAPABILITY_KEYS: PluginCapability[] = ["parseImport", "scheduleGoal"];
@@ -35,6 +36,9 @@ export function parseCapabilities(raw: string | null): ParsedCapabilities {
       return {
         parseImport: Boolean(obj.parseImport ?? obj.parse_import),
         scheduleGoal: Boolean(obj.scheduleGoal ?? obj.schedule_goal),
+        goals: Array.isArray(obj.goals)
+          ? obj.goals.filter((goal) => typeof goal === "string")
+          : undefined,
       };
     }
   } catch {
@@ -55,5 +59,6 @@ export function serializeCapabilities(input: ParsedCapabilities): string {
   return JSON.stringify({
     parseImport: Boolean(input.parseImport),
     scheduleGoal: Boolean(input.scheduleGoal),
+    goals: Array.isArray(input.goals) ? input.goals : undefined,
   });
 }

@@ -150,6 +150,7 @@ export const plugin = pgTable("plugin", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  goals: text("goals").notNull().default("[]"),
 });
 
 export const practiceRecord = pgTable("practice_record", {
