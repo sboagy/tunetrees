@@ -36,7 +36,11 @@ import {
   applySchedulingPlugin,
   getSchedulingPlugin,
 } from "../plugins/scheduling";
-import { FSRS_QUALITY_MAP, FSRSService } from "../scheduling/fsrs-service";
+import {
+  FSRS_QUALITY_MAP,
+  FSRSService,
+  getPlaylistTuneCount,
+} from "../scheduling/fsrs-service";
 import { getPracticeDate } from "../utils/practice-date";
 import { generateId } from "../utils/uuid";
 
@@ -110,22 +114,27 @@ export async function evaluatePractice(
     throw new Error("User FSRS preferences not found");
   }
   const scheduling = await getUserSchedulingOptions(db, userId);
-  const fsrsService = new FSRSService(
-    prefs,
-    scheduling,
+  const playlistTuneCount = await getPlaylistTuneCount(
     db,
     normalizedInput.playlistRef
   );
+  const fsrsService = new FSRSService(prefs, scheduling, {
+    playlistTuneCount,
+  });
   const latestRecord = await getLatestPracticeRecord(
     db,
     normalizedInput.tuneRef,
     normalizedInput.playlistRef
   );
   const schedule = latestRecord
-    ? fsrsService.processReview(normalizedInput, latestRecord)
-    : fsrsService.processFirstReview(normalizedInput);
+    ? await fsrsService.processReview(normalizedInput, latestRecord)
+    : await fsrsService.processFirstReview(normalizedInput);
 
-  const schedulingPlugin = await getSchedulingPlugin(db, userId);
+  const schedulingPlugin = await getSchedulingPlugin(
+    db,
+    userId,
+    normalizedInput.goal ?? "recall"
+  );
   const pluginSchedule = schedulingPlugin
     ? await applySchedulingPlugin({
         plugin: schedulingPlugin,
@@ -134,6 +143,8 @@ export async function evaluatePractice(
         preferences: prefs,
         scheduling,
         fallback: schedule,
+        db,
+        playlistTuneCount,
       })
     : null;
 
