@@ -69,7 +69,8 @@ export type PullTableRule =
   | { kind: "inCollection"; column: string; collection: string }
   | { kind: "rpc"; functionName: string; params: string[] }
   | { kind: "compound"; rules: PullTableRule[]; operator?: "and" | "or" }
-  | { kind: "publicOnly"; column: string };
+  | { kind: "publicOnly"; column: string }
+  | { kind: "orEqUserIdOrTrue"; column: string; orColumn: string };
 
 export interface IPullConfig {
   tableRules?: Record<string, PullTableRule>;
@@ -265,6 +266,13 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
       const arr = ids ? Array.from(ids) : [];
       if (arr.length === 0) return null;
       return [inArray(col, arr)];
+    }
+
+    if (rule.kind === "orEqUserIdOrTrue") {
+      const orProp = snakeToCamel(rule.orColumn);
+      const orCol = params.table[orProp];
+      if (!orCol) return [];
+      return [or(eq(col, params.userId), eq(orCol, true))];
     }
 
     if (rule.kind === "publicOnly") {

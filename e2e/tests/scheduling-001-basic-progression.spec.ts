@@ -102,7 +102,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
 
       // Use the page-object helper to avoid menu detachment races during rerenders.
       await ttPage.setRowEvaluation(row, rating);
-      await ttPage.submitEvaluationsButton.click();
+      await ttPage.submitEvaluations();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(1200); // allow sync & view update
     }

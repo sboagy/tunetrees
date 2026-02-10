@@ -16,6 +16,7 @@ import {
 import {
   dailyPracticeQueue,
   note,
+  plugin,
   playlistTune,
   practiceRecord,
   reference,
@@ -23,6 +24,7 @@ import {
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
+import { serializeCapabilities } from "@/lib/plugins/capabilities";
 
 type SeedAddToReviewInput = {
   playlistId: string; // UUID
@@ -31,6 +33,41 @@ type SeedAddToReviewInput = {
   // resolve from current Supabase session via user_profile lookup.
   userId?: string;
 };
+
+type SeedSchedulingPluginInput = {
+  script?: string;
+  goals?: string[];
+  userId?: string;
+  name?: string;
+  description?: string | null;
+  enabled?: boolean;
+  isPublic?: boolean;
+};
+
+const DEFAULT_SCHEDULING_PLUGIN_SCRIPT = `function createScheduler() {
+  function apply(payload) {
+    const practiced = new Date(payload.input.practiced);
+    const nextDue = new Date(practiced);
+    nextDue.setDate(nextDue.getDate() + 1);
+
+    return {
+      ...payload.fallback,
+      lastReview: payload.input.practiced,
+      nextDue: nextDue.toISOString(),
+      interval: 1,
+      scheduledDays: 1,
+    };
+  }
+
+  return {
+    async processFirstReview(payload) {
+      return apply(payload);
+    },
+    async processReview(payload) {
+      return apply(payload);
+    },
+  };
+}`;
 
 /**
  * Injected test user ID - set via window.__ttTestUserId to bypass Supabase auth lookup.
@@ -187,6 +224,40 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
     queueCount: regenerated.length,
     userRef,
   };
+}
+
+async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
+  const db = await ensureDb();
+  const userRef = input.userId ?? (await resolveUserId(db));
+  const now = new Date().toISOString();
+  const goals = Array.isArray(input.goals) ? input.goals : ["recall"];
+  const script = input.script ?? DEFAULT_SCHEDULING_PLUGIN_SCRIPT;
+
+  const [created] = await db
+    .insert(plugin)
+    .values({
+      id: generateId(),
+      userRef,
+      name: input.name ?? "E2E Scheduling Plugin",
+      description: input.description ?? "Seeded by test API",
+      script,
+      capabilities: serializeCapabilities({
+        scheduleGoal: true,
+        goals,
+      }),
+      goals: JSON.stringify(goals),
+      isPublic: input.isPublic ? 1 : 0,
+      enabled: input.enabled === false ? 0 : 1,
+      version: 1,
+      deleted: 0,
+      syncVersion: 1,
+      lastModifiedAt: now,
+      deviceId: "local",
+    })
+    .returning();
+
+  if (!created) throw new Error("Failed to seed scheduling plugin");
+  return created;
 }
 
 async function getPracticeCount(playlistId: string) {
@@ -860,6 +931,9 @@ declare global {
         queueCount: number;
         userRef: string; // UUID
       }>;
+      seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
+        id: string;
+      }>;
       getPracticeCount: (playlistId: string) => Promise<number>; // UUID
       getRepertoireCount: (playlistId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
@@ -1111,6 +1185,7 @@ if (typeof window !== "undefined") {
         return tuneId;
       },
       seedAddToReview,
+      seedSchedulingPlugin,
       getPracticeCount,
       getRepertoireCount,
       getTuneOverrideCountForCurrentUser,

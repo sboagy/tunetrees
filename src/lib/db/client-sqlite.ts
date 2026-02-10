@@ -151,7 +151,7 @@ const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-const CURRENT_DB_VERSION = 9; // v9: Remove denyDelete rule for table_transient_data to allow hard deletes
+const CURRENT_DB_VERSION = 10; // v10: add plugin goals column
 
 // Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -413,6 +413,8 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
           "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
           "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
+          "/drizzle/migrations/sqlite/0009_add_plugins.sql",
+          "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });

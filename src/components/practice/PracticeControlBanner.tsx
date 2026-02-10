@@ -42,6 +42,8 @@ import { QueueDateSelector } from "./QueueDateSelector";
 export interface PracticeControlBannerProps {
   /** Number of evaluations staged for submit */
   evaluationsCount?: number;
+  /** True when evaluations are still staging */
+  isStaging?: boolean;
   /** Handler for submit evaluations */
   onSubmitEvaluations?: () => void;
   /** Show submitted records flag */
@@ -83,7 +85,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 
   const handleSubmit = async () => {
     // Protect against rapid clicks by disabling immediately
-    if (isSubmitting()) return;
+    if (isSubmitting() || props.isStaging) return;
     setIsSubmitting(true);
 
     try {
@@ -187,19 +189,26 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             disabled={
               !props.evaluationsCount ||
               props.evaluationsCount === 0 ||
-              isSubmitting()
+              isSubmitting() ||
+              props.isStaging
             }
-            title={`Submit ${props.evaluationsCount || 0} practice evaluations`}
+            title={
+              props.isStaging
+                ? "Staging evaluations..."
+                : `Submit ${props.evaluationsCount || 0} practice evaluations`
+            }
             class={`${TOOLBAR_BUTTON_BASE}`}
             classList={{
               [`${TOOLBAR_BUTTON_PRIMARY}`]:
                 !!props.evaluationsCount &&
                 props.evaluationsCount > 0 &&
-                !isSubmitting(),
+                !isSubmitting() &&
+                !props.isStaging,
               "text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/70 border-gray-300/50 dark:border-gray-600/50 opacity-60 cursor-not-allowed":
                 !props.evaluationsCount ||
                 props.evaluationsCount === 0 ||
-                isSubmitting(),
+                isSubmitting() ||
+                props.isStaging,
             }}
           >
             <Send size={14} />

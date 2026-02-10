@@ -28,7 +28,11 @@
       "note": "repertoire",
       "reference": "repertoire",
       "tag": "repertoire",
-      "tune_override": "repertoire"
+      "tune_override": "repertoire",
+      "plugin": "user"
+    },
+    "tableToSchemaKeyOverrides": {
+      "plugin": "plugin"
     },
     "normalizeDatetimeByTable": {
       "practice_record": ["practiced", "backup_practiced", "due"],
@@ -45,6 +49,11 @@
     "config": {
       "pull": {
         "tableRules": {
+          "plugin": {
+            "kind": "orEqUserIdOrTrue",
+            "column": "user_ref",
+            "orColumn": "is_public"
+          },
           "tune": {
             "kind": "compound",
             "operator": "or",

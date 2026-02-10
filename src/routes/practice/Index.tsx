@@ -163,8 +163,9 @@ const PracticeIndex: Component = () => {
     return result[0]?.id ?? null;
   };
 
-  // Track evaluations count and table instance for toolbar
-  const [evaluationsCount, setEvaluationsCount] = createSignal(0);
+  // Track in-flight staging to prevent submit before previews are persisted.
+  const [stagingTuneIds, setStagingTuneIds] = createSignal<string[]>([]);
+  const isStaging = () => stagingTuneIds().length > 0;
 
   // Shared evaluation state between grid and flashcard views.
   // Keys are tune IDs (UUID strings).
@@ -203,12 +204,6 @@ const PracticeIndex: Component = () => {
     setDidHydrateEvaluations(true);
   });
 
-  // Update count when evaluations change
-  createEffect(() => {
-    // Count only non-empty evaluations; empty string represents "(Not Set)"
-    const count = Object.values(evaluations()).filter((v) => v !== "").length;
-    setEvaluationsCount(count);
-  });
 
   // Display Submitted state - persisted to localStorage
   const STORAGE_KEY = "TT_PRACTICE_SHOW_SUBMITTED";
@@ -501,6 +496,14 @@ const PracticeIndex: Component = () => {
     setIsQueueCompleted(allCompleted);
   });
 
+  // Count staged evaluations from the practice list view (authoritative source).
+  const evaluationsCount = createMemo(() => {
+    const data = practiceListData() || [];
+    return data.reduce((count, tune) => {
+      return count + (Number(tune.has_staged) === 1 ? 1 : 0);
+    }, 0);
+  });
+
   // Filtered practice list - applies showSubmitted filter
   // This is the single source of truth for both grid and flashcard views
   const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
@@ -539,6 +542,7 @@ const PracticeIndex: Component = () => {
     console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
 
     // 1) Optimistic shared-state update (drives both grid and flashcard)
+    const previousEvaluation = evaluations()[tuneId];
     const nextEvaluations = { ...evaluations(), [tuneId]: evaluation };
     setEvaluations(nextEvaluations);
 
@@ -558,6 +562,10 @@ const PracticeIndex: Component = () => {
       );
       return; // Still keep optimistic state
     }
+
+    setStagingTuneIds((prev) =>
+      prev.includes(tuneId) ? prev : [...prev, tuneId]
+    );
 
     try {
       if (evaluation === "") {
@@ -589,6 +597,18 @@ const PracticeIndex: Component = () => {
         `❌ [PracticeIndex] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for ${tuneId}:`,
         error
       );
+      setEvaluations((prev) => {
+        const restored = { ...prev };
+        if (previousEvaluation === undefined) {
+          delete restored[tuneId];
+        } else {
+          restored[tuneId] = previousEvaluation;
+        }
+        return restored;
+      });
+      toast.error("Failed to stage evaluation. Please try again.");
+    } finally {
+      setStagingTuneIds((prev) => prev.filter((id) => id !== tuneId));
     }
   };
 
@@ -614,6 +634,11 @@ const PracticeIndex: Component = () => {
     if (!userId) {
       console.error("Could not determine user ID");
       toast.error("Cannot submit: User not found");
+      return;
+    }
+
+    if (isStaging()) {
+      toast.warning("Please wait for evaluations to finish staging.");
       return;
     }
 
@@ -953,6 +978,7 @@ const PracticeIndex: Component = () => {
       {/* Sticky Control Banner */}
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}
+        isStaging={isStaging()}
         onSubmitEvaluations={handleSubmitEvaluations}
         onAddTunes={handleAddTunes}
         queueDate={queueDate()}

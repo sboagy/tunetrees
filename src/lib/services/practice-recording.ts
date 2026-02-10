@@ -32,7 +32,15 @@ import type {
   PracticeRecord,
   RecordPracticeInput,
 } from "../db/types";
-import { FSRS_QUALITY_MAP, FSRSService } from "../scheduling/fsrs-service";
+import {
+  applySchedulingPlugin,
+  getSchedulingPlugin,
+} from "../plugins/scheduling";
+import {
+  FSRS_QUALITY_MAP,
+  FSRSService,
+  getPlaylistTuneCount,
+} from "../scheduling/fsrs-service";
 import { getPracticeDate } from "../utils/practice-date";
 import { generateId } from "../utils/uuid";
 
@@ -106,20 +114,41 @@ export async function evaluatePractice(
     throw new Error("User FSRS preferences not found");
   }
   const scheduling = await getUserSchedulingOptions(db, userId);
-  const fsrsService = new FSRSService(
-    prefs,
-    scheduling,
+  const playlistTuneCount = await getPlaylistTuneCount(
     db,
     normalizedInput.playlistRef
   );
+  const fsrsService = new FSRSService(prefs, scheduling, {
+    playlistTuneCount,
+  });
   const latestRecord = await getLatestPracticeRecord(
     db,
     normalizedInput.tuneRef,
     normalizedInput.playlistRef
   );
   const schedule = latestRecord
-    ? fsrsService.processReview(normalizedInput, latestRecord)
-    : fsrsService.processFirstReview(normalizedInput);
+    ? await fsrsService.processReview(normalizedInput, latestRecord)
+    : await fsrsService.processFirstReview(normalizedInput);
+
+  const schedulingPlugin = await getSchedulingPlugin(
+    db,
+    userId,
+    normalizedInput.goal ?? "recall"
+  );
+  const pluginSchedule = schedulingPlugin
+    ? await applySchedulingPlugin({
+        plugin: schedulingPlugin,
+        input: normalizedInput,
+        prior: latestRecord ?? null,
+        preferences: prefs,
+        scheduling,
+        fallback: schedule,
+        db,
+        playlistTuneCount,
+      })
+    : null;
+
+  const resolvedSchedule = pluginSchedule ?? schedule;
 
   // Lapses business rule override (Again only increments when prior state was Review=2)
   const priorState = latestRecord?.state ?? 0;
@@ -136,21 +165,21 @@ export async function evaluatePractice(
     practiced: normalizedInput.practiced.toISOString(),
     quality: normalizedInput.quality,
     easiness: null,
-    interval: schedule.interval,
-    repetitions: schedule.reps,
-    due: schedule.nextDue.toISOString(),
+    interval: resolvedSchedule.interval,
+    repetitions: resolvedSchedule.reps,
+    due: resolvedSchedule.nextDue.toISOString(),
     backupPracticed: null,
-    stability: schedule.stability,
-    elapsedDays: schedule.elapsed_days,
+    stability: resolvedSchedule.stability,
+    elapsedDays: resolvedSchedule.elapsed_days,
     lapses: lapsesValue,
-    state: schedule.state,
-    difficulty: schedule.difficulty,
+    state: resolvedSchedule.state,
+    difficulty: resolvedSchedule.difficulty,
     step: null,
     goal: normalizedInput.goal || "recall",
     technique: normalizedInput.technique || null,
   };
 
-  return { schedule, record, prior: latestRecord ?? null };
+  return { schedule: resolvedSchedule, record, prior: latestRecord ?? null };
 }
 
 /**

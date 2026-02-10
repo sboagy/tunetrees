@@ -36,6 +36,7 @@ export type TuneOverride = InferSelectModel<typeof schema.tuneOverride>;
 export type Genre = InferSelectModel<typeof schema.genre>;
 export type Instrument = InferSelectModel<typeof schema.instrument>;
 export type TuneType = InferSelectModel<typeof schema.tuneType>;
+export type Plugin = InferSelectModel<typeof schema.plugin>;
 // export type UserAnnotationSet = InferSelectModel<
 //   typeof schema.userAnnotationSet
 // >;
@@ -62,6 +63,7 @@ export type NewTuneOverride = InferInsertModel<typeof schema.tuneOverride>;
 export type NewGenre = InferInsertModel<typeof schema.genre>;
 export type NewInstrument = InferInsertModel<typeof schema.instrument>;
 export type NewTuneType = InferInsertModel<typeof schema.tuneType>;
+export type NewPlugin = InferInsertModel<typeof schema.plugin>;
 // export type NewUserAnnotationSet = InferInsertModel<
 //   typeof schema.userAnnotationSet
 // >;

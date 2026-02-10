@@ -226,7 +226,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         await ttPage.enableFlashcardMode();
         await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
         await ttPage.selectFlashcardEvaluation(meta.rating);
-        await ttPage.submitEvaluationsButton.click();
+        await ttPage.submitEvaluations();
         await page.waitForLoadState("networkidle", { timeout: 15000 });
         await page.waitForTimeout(1500);
         ttPage.flashcardModeSwitch.isVisible({ timeout: 15000 });

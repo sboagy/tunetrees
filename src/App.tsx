@@ -43,6 +43,7 @@ const SchedulingOptionsPage = lazy(
 const SpacedRepetitionPage = lazy(
   () => import("./routes/user-settings/spaced-repetition")
 );
+const PluginsPage = lazy(() => import("./routes/user-settings/plugins"));
 
 // Lazy load auth callback pages
 const AuthCallback = lazy(() => import("./routes/auth/callback"));
@@ -109,6 +110,7 @@ function App() {
                       path="/spaced-repetition"
                       component={SpacedRepetitionPage}
                     />
+                    <Route path="/plugins" component={PluginsPage} />
                     <Route path="/account" component={AccountPage} />
                   </Route>
 

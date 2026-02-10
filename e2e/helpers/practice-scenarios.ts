@@ -33,6 +33,26 @@ export async function seedAddToReviewLocally(
   }, opts);
 }
 
+export async function seedSchedulingPluginLocally(
+  page: Page,
+  opts?: {
+    script?: string;
+    goals?: string[];
+    userId?: string;
+    name?: string;
+    description?: string | null;
+    enabled?: boolean;
+    isPublic?: boolean;
+  }
+) {
+  return await page.evaluate(async (input) => {
+    if (!(window as any).__ttTestApi) {
+      throw new Error("__ttTestApi not attached on window");
+    }
+    return await (window as any).__ttTestApi.seedSchedulingPlugin(input);
+  }, opts);
+}
+
 /**
  * Read the current practice queue size (latest snapshot) from inside the app.
  */
@@ -481,6 +501,7 @@ export async function setupDeterministicTestParallel(
     "practice_record",
     "tune_override",
     "prefs_scheduling_options",
+    "plugin",
   ];
 
   if (opts.clearNotesAndReferences) {
@@ -503,6 +524,7 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
   await clearUserTable(user, "table_transient_data");
+  await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);
 
@@ -955,6 +977,7 @@ export async function setupForPracticeTestsParallel(
     await clearUserTable(user, "table_transient_data");
     await clearUserTable(user, "tune_override");
     await clearUserTable(user, "prefs_scheduling_options");
+    await clearUserTable(user, "plugin");
 
     // 2. Reset repertoire
     await clearUserTable(user, "playlist_tune");
@@ -966,6 +989,7 @@ export async function setupForPracticeTestsParallel(
       "table_transient_data",
       "tune_override",
       "prefs_scheduling_options",
+      "plugin",
       "playlist_tune",
       "user_genre_selection",
     ]);
@@ -1148,6 +1172,7 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "plugin");
 
   // 2. Reset repertoire
   await clearUserTable(user, "playlist_tune");
@@ -1159,6 +1184,7 @@ export async function setupForRepertoireTestsParallel(
     "table_transient_data",
     "tune_override",
     "prefs_scheduling_options",
+    "plugin",
     "playlist_tune",
     "user_genre_selection",
   ]);
@@ -1300,6 +1326,7 @@ export async function setupForCatalogTestsParallel(
     "tune_override",
     "prefs_scheduling_options",
     "playlist_tune",
+    "plugin",
   ];
 
   // 1. Clear only user's repertoire (keep catalog!)
@@ -1315,6 +1342,7 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);
 

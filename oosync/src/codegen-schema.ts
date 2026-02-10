@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import process from "node:process";
@@ -29,6 +30,34 @@ const DEFAULT_OUTPUT_WORKER_CONFIG_FILE = path.join(
 
 const LOCAL_SUPABASE_DATABASE_URL =
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+
+function resolveBiomeBin(): string {
+  const binDir = path.join(__dirname, "../../node_modules/.bin");
+  const binName = process.platform === "win32" ? "biome.cmd" : "biome";
+  const localBin = path.join(binDir, binName);
+  return fs.existsSync(localBin) ? localBin : binName;
+}
+
+function formatWithBiome(targetPath: string, content: string): string {
+  const biomeBin = resolveBiomeBin();
+  const result = spawnSync(
+    biomeBin,
+    ["format", "--stdin-file-path", targetPath],
+    {
+      input: content,
+      encoding: "utf8",
+      stdio: "pipe",
+    }
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    const stderr = result.stderr ? String(result.stderr) : "";
+    throw new Error(
+      `Biome format failed for ${targetPath}: ${stderr || "unknown error"}`
+    );
+  }
+  return result.stdout;
+}
 
 function isLocalSupabaseDatabaseUrl(databaseUrl: string): boolean {
   try {
@@ -2128,11 +2157,29 @@ async function main(): Promise<void> {
     config: mergedWorkerConfig,
   });
 
+  const formattedSchema = formatWithBiome(outputSchemaFile, next);
+  const formattedTableMeta = formatWithBiome(
+    outputTableMetaFile,
+    nextTableMeta
+  );
+  const formattedAppTableMeta = formatWithBiome(
+    outputAppTableMetaFile,
+    nextAppTableMeta
+  );
+  const formattedWorkerPgSchema = formatWithBiome(
+    outputWorkerPgSchemaFile,
+    nextWorkerPgSchema
+  );
+  const formattedWorkerConfig = formatWithBiome(
+    outputWorkerConfigFile,
+    nextWorkerConfig
+  );
+
   if (args.check) {
     const current = fs.existsSync(outputSchemaFile)
       ? fs.readFileSync(outputSchemaFile, "utf8")
       : "";
-    if (current !== next) {
+    if (current !== formattedSchema) {
       throw new Error(
         `SQLite schema is out of date. Run: npm run codegen:schema (output: ${outputSchemaFile})`
       );
@@ -2142,7 +2189,7 @@ async function main(): Promise<void> {
       const currentMeta = fs.existsSync(outputTableMetaFile)
         ? fs.readFileSync(outputTableMetaFile, "utf8")
         : "";
-      if (currentMeta !== nextTableMeta) {
+      if (currentMeta !== formattedTableMeta) {
         throw new Error(
           `Shared table metadata is out of date. Run: npm run codegen:schema (output: ${outputTableMetaFile})`
         );
@@ -2153,7 +2200,7 @@ async function main(): Promise<void> {
       const currentAppMeta = fs.existsSync(outputAppTableMetaFile)
         ? fs.readFileSync(outputAppTableMetaFile, "utf8")
         : "";
-      if (currentAppMeta !== nextAppTableMeta) {
+      if (currentAppMeta !== formattedAppTableMeta) {
         throw new Error(
           `App table metadata is out of date. Run: npm run codegen:schema (output: ${outputAppTableMetaFile})`
         );
@@ -2163,7 +2210,7 @@ async function main(): Promise<void> {
     const currentWorkerSchema = fs.existsSync(outputWorkerPgSchemaFile)
       ? fs.readFileSync(outputWorkerPgSchemaFile, "utf8")
       : "";
-    if (currentWorkerSchema !== nextWorkerPgSchema) {
+    if (currentWorkerSchema !== formattedWorkerPgSchema) {
       throw new Error(
         `Worker Postgres schema is out of date. Run: npm run codegen:schema (output: ${outputWorkerPgSchemaFile})`
       );
@@ -2172,7 +2219,7 @@ async function main(): Promise<void> {
     const currentWorkerConfig = fs.existsSync(outputWorkerConfigFile)
       ? fs.readFileSync(outputWorkerConfigFile, "utf8")
       : "";
-    if (currentWorkerConfig !== nextWorkerConfig) {
+    if (currentWorkerConfig !== formattedWorkerConfig) {
       throw new Error(
         `Worker config is out of date. Run: npm run codegen:schema (output: ${outputWorkerConfigFile})`
       );
@@ -2184,18 +2231,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  fs.writeFileSync(outputSchemaFile, next, "utf8");
+  fs.writeFileSync(outputSchemaFile, formattedSchema, "utf8");
   fs.mkdirSync(path.dirname(outputTableMetaFile), { recursive: true });
-  fs.writeFileSync(outputTableMetaFile, nextTableMeta, "utf8");
+  fs.writeFileSync(outputTableMetaFile, formattedTableMeta, "utf8");
 
   fs.mkdirSync(path.dirname(outputAppTableMetaFile), { recursive: true });
-  fs.writeFileSync(outputAppTableMetaFile, nextAppTableMeta, "utf8");
+  fs.writeFileSync(outputAppTableMetaFile, formattedAppTableMeta, "utf8");
 
   fs.mkdirSync(path.dirname(outputWorkerPgSchemaFile), { recursive: true });
-  fs.writeFileSync(outputWorkerPgSchemaFile, nextWorkerPgSchema, "utf8");
+  fs.writeFileSync(outputWorkerPgSchemaFile, formattedWorkerPgSchema, "utf8");
 
   fs.mkdirSync(path.dirname(outputWorkerConfigFile), { recursive: true });
-  fs.writeFileSync(outputWorkerConfigFile, nextWorkerConfig, "utf8");
+  fs.writeFileSync(outputWorkerConfigFile, formattedWorkerConfig, "utf8");
   // eslint-disable-next-line no-console
   console.log(
     `✅ Wrote ${path.relative(process.cwd(), outputSchemaFile)}, ${path.relative(

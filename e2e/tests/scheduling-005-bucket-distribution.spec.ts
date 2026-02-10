@@ -351,7 +351,7 @@ test.describe
       await page.getByTestId("recall-eval-option-good").click();
       await page.waitForTimeout(300);
 
-      await ttPage.submitEvaluationsButton.click();
+      await ttPage.submitEvaluations();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(2000);
 
