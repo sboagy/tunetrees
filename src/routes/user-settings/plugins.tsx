@@ -36,36 +36,124 @@ interface PluginDraft {
   description: string;
   script: string;
   capabilities: ParsedCapabilities;
+  goals: string[];
   isPublic: boolean;
   enabled: boolean;
   version: number;
 }
 
-const DEFAULT_PLUGIN_SCRIPT = `// TuneTrees Plugin Template
-// Define parseImport and/or scheduleGoal.
+const DEFAULT_PLUGIN_SCRIPT = `// TuneTrees Scheduling Plugin Template
+// Define createScheduler() to return processFirstReview/processReview.
 
-function parseImport(payload, meta) {
-  // payload = { input, genre, isUrl }
-  // return { title, type, mode, structure, incipit, genre, sourceUrl }
-  log("parseImport", payload, meta);
+function addDays(isoDate, days) {
+  const base = new Date(isoDate);
+  if (Number.isNaN(base.getTime())) return isoDate;
+  base.setDate(base.getDate() + days);
+  return base.toISOString();
+}
+
+async function getRecentQualities(queryDb, input) {
+  const rows = await queryDb(
+    "SELECT quality FROM practice_record " +
+      "WHERE playlist_ref = '" +
+      input.playlistRef +
+      "' AND tune_ref = '" +
+      input.tuneRef +
+      "' ORDER BY practiced DESC LIMIT 6"
+  );
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => Number(r.quality)).filter((q) => Number.isFinite(q));
+}
+
+function pickIntervalDays(qualities) {
+  let goodStreak = 0;
+  let easyStreak = 0;
+  for (const q of qualities) {
+    if (q >= 4) {
+      easyStreak += 1;
+      goodStreak += 1;
+    } else if (q >= 3) {
+      goodStreak += 1;
+      easyStreak = 0;
+    } else {
+      break;
+    }
+  }
+
+  if (easyStreak >= 3) return 7; // weekly
+  if (goodStreak >= 3) return 4; // every four days
+  if (goodStreak >= 1) return 2; // every other day
+  return 1; // daily
+}
+
+function buildSchedule(fallback, practicedIso, intervalDays) {
   return {
-    title: "New Tune",
-    genre: payload.genre,
-    sourceUrl: payload.input,
+    ...fallback,
+    nextDue: addDays(practicedIso, intervalDays),
+    interval: intervalDays,
+    scheduledDays: intervalDays,
+    lastReview: practicedIso,
   };
 }
 
-function scheduleGoal(payload, meta) {
-  // payload = { input, prior, preferences, scheduling, fallback }
-  // return a schedule shape (see fallback for example)
-  log("scheduleGoal", payload, meta);
-  return payload.fallback;
+function createScheduler({ fsrsScheduler, queryDb }) {
+  async function schedule(payload) {
+    const { input, fallback } = payload;
+    const qualities = await getRecentQualities(queryDb, input);
+    const intervalDays = pickIntervalDays([input.quality, ...qualities]);
+    return buildSchedule(fallback, input.practiced, intervalDays);
+  }
+
+  return {
+    async processFirstReview(payload) {
+      return schedule(payload);
+    },
+    async processReview(payload) {
+      return schedule(payload);
+    },
+  };
 }
 `;
 
 const DEFAULT_CAPABILITIES: ParsedCapabilities = {
-  parseImport: true,
-  scheduleGoal: false,
+  parseImport: false,
+  scheduleGoal: true,
+};
+
+const DEFAULT_GOALS = ["fluency"];
+const GOAL_OPTIONS = [
+  { value: "recall", label: "Recall" },
+  { value: "initial_learn", label: "Initial Learn" },
+  { value: "fluency", label: "Fluency" },
+  { value: "session_ready", label: "Session Ready" },
+  { value: "performance_polish", label: "Performance Polish" },
+];
+
+const parseGoals = (raw?: string | null): string[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.filter((goal) => typeof goal === "string");
+    }
+  } catch {
+    return [];
+  }
+  return [];
+};
+
+const formatCapabilities = (row: Plugin): string => {
+  const parsed = parseCapabilities(row.capabilities);
+  const labels: string[] = [];
+  if (parsed.parseImport) labels.push("parseImport");
+  if (parsed.scheduleGoal) {
+    const parsedGoals = parseGoals(row.goals);
+    const goals = parsedGoals.length > 0 ? parsedGoals : parsed.goals ?? [];
+    labels.push(
+      goals.length > 0 ? `scheduleGoal(${goals.join(", ")})` : "scheduleGoal"
+    );
+  }
+  return labels.length > 0 ? labels.join(", ") : "None";
 };
 
 const CodeMirrorEditor: Component<{
@@ -164,10 +252,10 @@ const PluginsPage: Component = () => {
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 
   const [testFunction, setTestFunction] = createSignal<
-    "parseImport" | "scheduleGoal"
+    "parseImport" | "processFirstReview" | "processReview"
   >("parseImport");
-  const [testPayload, setTestPayload] = createSignal<string>(
-    JSON.stringify(
+  const DEFAULT_TEST_PAYLOADS = {
+    parseImport: JSON.stringify(
       {
         input: "https://example.com/tunes.csv",
         genre: "ITRAD",
@@ -175,7 +263,83 @@ const PluginsPage: Component = () => {
       },
       null,
       2
-    )
+    ),
+    processFirstReview: JSON.stringify(
+      {
+        input: {
+          playlistRef: "playlist-id",
+          tuneRef: "tune-id",
+          quality: 3,
+          practiced: new Date().toISOString(),
+          goal: "fluency",
+          technique: "daily_practice",
+        },
+        prior: null,
+        preferences: null,
+        scheduling: null,
+        fallback: {
+          nextDue: new Date().toISOString(),
+          lastReview: new Date().toISOString(),
+          state: 0,
+          stability: 1,
+          difficulty: 1,
+          elapsedDays: 0,
+          scheduledDays: 1,
+          reps: 0,
+          lapses: 0,
+          interval: 1,
+        },
+      },
+      null,
+      2
+    ),
+    processReview: JSON.stringify(
+      {
+        input: {
+          playlistRef: "playlist-id",
+          tuneRef: "tune-id",
+          quality: 3,
+          practiced: new Date().toISOString(),
+          goal: "fluency",
+          technique: "daily_practice",
+        },
+        prior: {
+          id: "record-id",
+          playlistRef: "playlist-id",
+          tuneRef: "tune-id",
+          practiced: new Date().toISOString(),
+          quality: 3,
+          due: new Date().toISOString(),
+          stability: 1,
+          difficulty: 1,
+          interval: 1,
+          repetitions: 1,
+          lapses: 0,
+          state: 1,
+          elapsedDays: 0,
+          lastModifiedAt: new Date().toISOString(),
+        },
+        preferences: null,
+        scheduling: null,
+        fallback: {
+          nextDue: new Date().toISOString(),
+          lastReview: new Date().toISOString(),
+          state: 1,
+          stability: 1,
+          difficulty: 1,
+          elapsedDays: 0,
+          scheduledDays: 1,
+          reps: 1,
+          lapses: 0,
+          interval: 1,
+        },
+      },
+      null,
+      2
+    ),
+  };
+  const [testPayload, setTestPayload] = createSignal<string>(
+    DEFAULT_TEST_PAYLOADS.parseImport
   );
   const [testMeta, setTestMeta] = createSignal<string>(
     JSON.stringify({ source: "plugin-test" }, null, 2)
@@ -212,13 +376,20 @@ const PluginsPage: Component = () => {
       if (selectedId()) {
         const updated = rows.find((row) => row.id === selectedId());
         if (updated) {
+          const parsedCapabilities = parseCapabilities(updated.capabilities);
+          const parsedGoals = parseGoals(updated.goals);
+          const goals =
+            parsedGoals.length > 0
+              ? parsedGoals
+              : parsedCapabilities.goals ?? [];
           setDraft({
             id: updated.id,
             userRef: updated.userRef,
             name: updated.name,
             description: updated.description ?? "",
             script: updated.script,
-            capabilities: parseCapabilities(updated.capabilities),
+            capabilities: parsedCapabilities,
+            goals,
             isPublic: updated.isPublic === 1,
             enabled: updated.enabled === 1,
             version: updated.version ?? 1,
@@ -235,6 +406,11 @@ const PluginsPage: Component = () => {
   };
 
   createEffect(() => {
+    const fn = testFunction();
+    setTestPayload(DEFAULT_TEST_PAYLOADS[fn]);
+  });
+
+  createEffect(() => {
     const currentUser = user();
     const db = localDb();
     if (!currentUser?.id || !db) return;
@@ -244,13 +420,18 @@ const PluginsPage: Component = () => {
   createEffect(() => {
     const plugin = selectedPlugin();
     if (!plugin) return;
+    const parsedCapabilities = parseCapabilities(plugin.capabilities);
+    const parsedGoals = parseGoals(plugin.goals);
+    const goals =
+      parsedGoals.length > 0 ? parsedGoals : parsedCapabilities.goals ?? [];
     setDraft({
       id: plugin.id,
       userRef: plugin.userRef,
       name: plugin.name,
       description: plugin.description ?? "",
       script: plugin.script,
-      capabilities: parseCapabilities(plugin.capabilities),
+      capabilities: parsedCapabilities,
+      goals,
       isPublic: plugin.isPublic === 1,
       enabled: plugin.enabled === 1,
       version: plugin.version ?? 1,
@@ -267,6 +448,15 @@ const PluginsPage: Component = () => {
     setErrorMessage(null);
   };
 
+  const updateGoals = (goal: string, enabled: boolean) => {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const nextGoals = enabled
+      ? Array.from(new Set([...currentDraft.goals, goal]))
+      : currentDraft.goals.filter((item) => item !== goal);
+    updateDraft({ goals: nextGoals });
+  };
+
   const handleCreate = async () => {
     const currentUser = user();
     const db = localDb();
@@ -279,7 +469,11 @@ const PluginsPage: Component = () => {
         name: "New Plugin",
         description: "",
         script: DEFAULT_PLUGIN_SCRIPT,
-        capabilities: serializeCapabilities(DEFAULT_CAPABILITIES),
+        capabilities: serializeCapabilities({
+          ...DEFAULT_CAPABILITIES,
+          goals: DEFAULT_GOALS,
+        }),
+        goals: DEFAULT_GOALS,
         enabled: true,
         isPublic: false,
         version: 1,
@@ -308,7 +502,11 @@ const PluginsPage: Component = () => {
         name: currentDraft.name,
         description: currentDraft.description,
         script: currentDraft.script,
-        capabilities: serializeCapabilities(currentDraft.capabilities),
+        capabilities: serializeCapabilities({
+          ...currentDraft.capabilities,
+          goals: currentDraft.goals,
+        }),
+        goals: currentDraft.goals,
         isPublic: currentDraft.isPublic,
         enabled: currentDraft.enabled,
         version: currentDraft.version,
@@ -363,9 +561,13 @@ const PluginsPage: Component = () => {
     try {
       const payload = JSON.parse(testPayload());
       const meta = JSON.parse(testMeta());
+      const selectedFunction = testFunction();
       const result = await runPluginFunction({
         script: currentDraft.script,
-        functionName: testFunction(),
+        functionName:
+          selectedFunction === "parseImport" ? "parseImport" : "createScheduler",
+        methodName:
+          selectedFunction === "parseImport" ? undefined : selectedFunction,
         payload,
         meta,
         timeoutMs: 10000,
@@ -433,10 +635,7 @@ const PluginsPage: Component = () => {
                       {row.name}
                     </td>
                     <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
-                      {Object.entries(parseCapabilities(row.capabilities))
-                        .filter(([, enabled]) => enabled)
-                        .map(([key]) => key)
-                        .join(", ") || "None"}
+                      {formatCapabilities(row)}
                     </td>
                     <td class="px-4 py-2">
                       {row.isPublic === 1 ? "Yes" : "No"}
@@ -617,6 +816,29 @@ const PluginsPage: Component = () => {
                 </label>
               </div>
 
+              <Show when={current().capabilities.scheduleGoal}>
+                <div class="space-y-2">
+                  <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Goals
+                  </div>
+                  <div class="flex flex-wrap gap-3">
+                    {GOAL_OPTIONS.map((option) => (
+                      <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={current().goals.includes(option.value)}
+                          disabled={!isOwner()}
+                          onChange={(e) =>
+                            updateGoals(option.value, e.currentTarget.checked)
+                          }
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </Show>
+
               <div class="space-y-2">
                 <div
                   class="text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -667,14 +889,18 @@ const PluginsPage: Component = () => {
                         setTestFunction(
                           e.currentTarget.value as
                             | "parseImport"
-                            | "scheduleGoal"
+                            | "processFirstReview"
+                            | "processReview"
                         )
                       }
                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                       data-testid="plugin-test-function"
                     >
                       <option value="parseImport">parseImport</option>
-                      <option value="scheduleGoal">scheduleGoal</option>
+                      <option value="processFirstReview">
+                        processFirstReview
+                      </option>
+                      <option value="processReview">processReview</option>
                     </select>
                   </div>
                   <div class="space-y-2">
