@@ -331,6 +331,19 @@ export function detectReferenceType(url: string): string {
     return "sheet-music";
   }
 
+  // Audio platforms
+  if (
+    urlLower.includes("soundcloud.com") ||
+    urlLower.includes("spotify.com") ||
+    urlLower.includes("bandcamp.com") ||
+    urlLower.includes(".mp3") ||
+    urlLower.includes(".wav") ||
+    urlLower.includes(".ogg") ||
+    urlLower.includes(".m4a")
+  ) {
+    return "audio";
+  }
+
   // Social media
   if (
     urlLower.includes("facebook.com") ||
@@ -341,7 +354,8 @@ export function detectReferenceType(url: string): string {
     return "social";
   }
 
-  return "other";
+  // Default to 'website' for better UX than 'other'
+  return "website";
 }
 
 /**
