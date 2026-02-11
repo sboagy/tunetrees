@@ -32,8 +32,7 @@ CREATE TABLE
 -- User Profile
 CREATE TABLE
     IF NOT EXISTS user_profile (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        supabase_user_id uuid NOT NULL UNIQUE,
+        supabase_user_id uuid PRIMARY KEY,
         name text,
         email text,
         sr_alg_type text,
@@ -59,7 +58,7 @@ CREATE TABLE
         mode text,
         incipit text,
         genre text REFERENCES genre (id),
-        private_for uuid REFERENCES user_profile (id),
+        private_for uuid REFERENCES user_profile (supabase_user_id),
         deleted boolean NOT NULL DEFAULT false,
         sync_version integer NOT NULL DEFAULT 1,
         last_modified_at timestamp NOT NULL DEFAULT now (),
@@ -71,7 +70,7 @@ CREATE TABLE
     IF NOT EXISTS tune_override (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
         tune_ref uuid NOT NULL REFERENCES tune (id),
-        user_ref uuid NOT NULL REFERENCES user_profile (id),
+        user_ref uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         title text,
         type text,
         structure text,
@@ -88,7 +87,7 @@ CREATE TABLE
 CREATE TABLE
     IF NOT EXISTS instrument (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        private_to_user uuid REFERENCES user_profile (id),
+        private_to_user uuid REFERENCES user_profile (supabase_user_id),
         instrument text,
         description text,
         genre_default text,
@@ -107,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_instrument_private_to_user ON instrument (private
 CREATE TABLE
     IF NOT EXISTS playlist (
         playlist_id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        user_ref uuid NOT NULL REFERENCES user_profile (id),
+        user_ref uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         name text,
         instrument_ref uuid,
         genre_default text REFERENCES genre (id),
@@ -215,7 +214,7 @@ CREATE INDEX IF NOT EXISTS idx_queue_generated_at ON daily_practice_queue (gener
 CREATE TABLE
     IF NOT EXISTS note (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        user_ref uuid REFERENCES user_profile (id),
+        user_ref uuid REFERENCES user_profile (supabase_user_id),
         tune_ref uuid NOT NULL REFERENCES tune (id),
         playlist_ref uuid REFERENCES playlist (playlist_id),
         created_date timestamp,
@@ -246,7 +245,7 @@ CREATE TABLE
         url text NOT NULL,
         ref_type text,
         tune_ref uuid NOT NULL REFERENCES tune (id),
-        user_ref uuid REFERENCES user_profile (id),
+        user_ref uuid REFERENCES user_profile (supabase_user_id),
         comment text,
         title text,
         public boolean,
@@ -279,7 +278,7 @@ CREATE INDEX IF NOT EXISTS idx_reference_user_tune_public ON reference (user_ref
 CREATE TABLE
     IF NOT EXISTS tag (
         tag_id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        user_ref uuid NOT NULL REFERENCES user_profile (id),
+        user_ref uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         tune_ref uuid NOT NULL REFERENCES tune (id),
         tag_text text NOT NULL,
         sync_version integer NOT NULL DEFAULT 1,
@@ -295,7 +294,7 @@ CREATE INDEX IF NOT EXISTS idx_tag_user_ref_tune_ref ON tag (user_ref, tune_ref)
 -- Prefs Spaced Repetition
 CREATE TABLE
     IF NOT EXISTS prefs_spaced_repetition (
-        user_id uuid NOT NULL REFERENCES user_profile (id),
+        user_id uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         alg_type text NOT NULL,
         fsrs_weights text,
         request_retention real,
@@ -313,7 +312,7 @@ CREATE TABLE
 -- Prefs Scheduling Options
 CREATE TABLE
     IF NOT EXISTS prefs_scheduling_options (
-        user_id uuid PRIMARY KEY REFERENCES user_profile (id),
+        user_id uuid PRIMARY KEY REFERENCES user_profile (supabase_user_id),
         acceptable_delinquency_window integer NOT NULL DEFAULT 21,
         min_reviews_per_day integer,
         max_reviews_per_day integer,
@@ -330,7 +329,7 @@ CREATE TABLE
 CREATE TABLE
     IF NOT EXISTS tab_group_main_state (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        user_id uuid NOT NULL REFERENCES user_profile (id),
+        user_id uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         which_tab text DEFAULT 'practice',
         playlist_id uuid,
         tab_spec text,
@@ -349,7 +348,7 @@ CREATE TABLE
 -- Table State
 CREATE TABLE
     IF NOT EXISTS table_state (
-        user_id uuid NOT NULL REFERENCES user_profile (id),
+        user_id uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         screen_size text NOT NULL,
         purpose text NOT NULL,
         playlist_id uuid NOT NULL REFERENCES playlist (playlist_id),
@@ -368,7 +367,7 @@ CREATE TABLE
 -- Table Transient Data
 CREATE TABLE
     IF NOT EXISTS table_transient_data (
-        user_id uuid NOT NULL REFERENCES user_profile (id),
+        user_id uuid NOT NULL REFERENCES user_profile (supabase_user_id),
         tune_id uuid NOT NULL REFERENCES tune (id),
         playlist_id uuid NOT NULL REFERENCES playlist (playlist_id),
         purpose text,

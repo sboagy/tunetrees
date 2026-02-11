@@ -63,8 +63,7 @@ async function createSchema() {
       
       -- User Profile
       CREATE TABLE IF NOT EXISTS user_profile (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        supabase_user_id uuid NOT NULL UNIQUE,
+        supabase_user_id uuid PRIMARY KEY,
         name text,
         email text,
         sr_alg_type text,
@@ -88,7 +87,7 @@ async function createSchema() {
         mode text,
         incipit text,
         genre text REFERENCES genre(id),
-        private_for uuid REFERENCES user_profile(id),
+        private_for uuid REFERENCES user_profile(supabase_user_id),
         deleted boolean NOT NULL DEFAULT false,
         sync_version integer NOT NULL DEFAULT 1,
         last_modified_at timestamp NOT NULL DEFAULT now(),
@@ -99,7 +98,7 @@ async function createSchema() {
       CREATE TABLE IF NOT EXISTS tune_override (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         tune_ref uuid NOT NULL REFERENCES tune(id),
-        user_ref uuid NOT NULL REFERENCES user_profile(id),
+        user_ref uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         title text,
         type text,
         structure text,
@@ -115,7 +114,7 @@ async function createSchema() {
       -- Instrument
       CREATE TABLE IF NOT EXISTS instrument (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        private_to_user uuid REFERENCES user_profile(id),
+        private_to_user uuid REFERENCES user_profile(supabase_user_id),
         instrument text,
         description text,
         genre_default text,
@@ -132,7 +131,7 @@ async function createSchema() {
       -- Playlist
       CREATE TABLE IF NOT EXISTS playlist (
         playlist_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_ref uuid NOT NULL REFERENCES user_profile(id),
+        user_ref uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         name text,
         instrument_ref uuid,
         genre_default text REFERENCES genre(id),
@@ -230,7 +229,7 @@ async function createSchema() {
       -- Note
       CREATE TABLE IF NOT EXISTS note (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_ref uuid REFERENCES user_profile(id),
+        user_ref uuid REFERENCES user_profile(supabase_user_id),
         tune_ref uuid NOT NULL REFERENCES tune(id),
         playlist_ref uuid REFERENCES playlist(playlist_id),
         created_date timestamp,
@@ -256,7 +255,7 @@ async function createSchema() {
         url text NOT NULL,
         ref_type text,
         tune_ref uuid NOT NULL REFERENCES tune(id),
-        user_ref uuid REFERENCES user_profile(id),
+        user_ref uuid REFERENCES user_profile(supabase_user_id),
         comment text,
         title text,
         public boolean,
@@ -277,7 +276,7 @@ async function createSchema() {
       -- Tag
       CREATE TABLE IF NOT EXISTS tag (
         tag_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_ref uuid NOT NULL REFERENCES user_profile(id),
+        user_ref uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         tune_ref uuid NOT NULL REFERENCES tune(id),
         tag_text text NOT NULL,
         sync_version integer NOT NULL DEFAULT 1,
@@ -291,7 +290,7 @@ async function createSchema() {
       
       -- Prefs Spaced Repetition
       CREATE TABLE IF NOT EXISTS prefs_spaced_repetition (
-        user_id uuid NOT NULL REFERENCES user_profile(id),
+        user_id uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         alg_type text NOT NULL,
         fsrs_weights text,
         request_retention real,
@@ -308,7 +307,7 @@ async function createSchema() {
       
       -- Prefs Scheduling Options
       CREATE TABLE IF NOT EXISTS prefs_scheduling_options (
-        user_id uuid PRIMARY KEY REFERENCES user_profile(id),
+        user_id uuid PRIMARY KEY REFERENCES user_profile(supabase_user_id),
         acceptable_delinquency_window integer NOT NULL DEFAULT 21,
         min_reviews_per_day integer,
         max_reviews_per_day integer,
@@ -323,7 +322,7 @@ async function createSchema() {
       -- Tab Group Main State
       CREATE TABLE IF NOT EXISTS tab_group_main_state (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id uuid NOT NULL REFERENCES user_profile(id),
+        user_id uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         which_tab text DEFAULT 'practice',
         playlist_id uuid,
         tab_spec text,
@@ -338,7 +337,7 @@ async function createSchema() {
       
       -- Table State
       CREATE TABLE IF NOT EXISTS table_state (
-        user_id uuid NOT NULL REFERENCES user_profile(id),
+        user_id uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         screen_size text NOT NULL,
         purpose text NOT NULL,
         playlist_id uuid NOT NULL REFERENCES playlist(playlist_id),
@@ -354,7 +353,7 @@ async function createSchema() {
       
       -- Table Transient Data
       CREATE TABLE IF NOT EXISTS table_transient_data (
-        user_id uuid NOT NULL REFERENCES user_profile(id),
+        user_id uuid NOT NULL REFERENCES user_profile(supabase_user_id),
         tune_id uuid NOT NULL REFERENCES tune(id),
         playlist_id uuid NOT NULL REFERENCES playlist(playlist_id),
         purpose text,

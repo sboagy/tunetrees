@@ -466,7 +466,7 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     hasDeletedFlag: false,
   },
   user_profile: {
-    primaryKey: "id",
+    primaryKey: "supabase_user_id",
     uniqueKeys: null,
     timestamps: ["phone_verified", "last_modified_at"],
     booleanColumns: ["deleted"],
@@ -478,7 +478,6 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       deleted: "Soft-delete flag for the user profile.",
       device_id: "Device that last modified this record.",
       email: "User email address.",
-      id: "Primary key for the user profile.",
       last_modified_at: "Timestamp of last modification.",
       name: "User display name.",
       phone: "User phone number.",

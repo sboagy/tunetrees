@@ -64,7 +64,7 @@ export const WORKER_SYNC_CONFIG = {
     },
     userProfileIds: {
       table: "user_profile",
-      idColumn: "id",
+      idColumn: "supabase_user_id",
       ownerColumn: "supabase_user_id",
     },
   },

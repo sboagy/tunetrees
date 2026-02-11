@@ -21,7 +21,7 @@ export const tabGroupMainState = pgTable(
   "tab_group_main_state",
   {
     id: serial().primaryKey().notNull(),
-    userId: integer("user_id").notNull(),
+    userId: uuid("user_id").notNull(),
     whichTab: text("which_tab").default("practice"),
     playlistId: integer("playlist_id"),
     tabSpec: text("tab_spec"),
@@ -41,16 +41,14 @@ export const tabGroupMainState = pgTable(
     }),
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.id],
-      name: "tab_group_main_state_user_id_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "tab_group_main_state_user_id_user_profile_fkey",
     }),
     pgPolicy("Users can view own tab group state", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_id IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_id = auth.uid())`,
     }),
     pgPolicy("Users can insert own tab group state", {
       as: "permissive",
@@ -96,7 +94,7 @@ export const tag = pgTable(
   "tag",
   {
     tagId: serial("tag_id").primaryKey().notNull(),
-    userRef: integer("user_ref").notNull(),
+    userRef: uuid("user_ref").notNull(),
     tuneRef: integer("tune_ref").notNull(),
     tagText: text("tag_text").notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
@@ -108,12 +106,12 @@ export const tag = pgTable(
   (table) => [
     index("idx_tag_user_ref_tag_text").using(
       "btree",
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.tagText.asc().nullsLast().op("text_ops")
     ),
     index("idx_tag_user_ref_tune_ref").using(
       "btree",
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.tuneRef.asc().nullsLast().op("int4_ops")
     ),
     foreignKey({
@@ -123,8 +121,8 @@ export const tag = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.id],
-      name: "tag_user_ref_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "tag_user_ref_user_profile_fkey",
     }),
     unique("tag_user_ref_tune_ref_tag_text_unique").on(
       table.userRef,
@@ -135,9 +133,7 @@ export const tag = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_ref IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_ref = auth.uid())`,
     }),
     pgPolicy("Users can insert own tags", {
       as: "permissive",
@@ -160,8 +156,7 @@ export const tag = pgTable(
 export const userProfile = pgTable(
   "user_profile",
   {
-    id: serial().primaryKey().notNull(),
-    supabaseUserId: uuid("supabase_user_id").notNull(),
+    supabaseUserId: uuid("supabase_user_id").primaryKey().notNull(),
     name: text(),
     email: text(),
     srAlgType: text("sr_alg_type"),
@@ -177,8 +172,7 @@ export const userProfile = pgTable(
       .notNull(),
     deviceId: text("device_id"),
   },
-  (table) => [
-    unique("user_profile_supabase_user_id_unique").on(table.supabaseUserId),
+  () => [
     pgPolicy("Users can view own profile", {
       as: "permissive",
       for: "select",
@@ -288,7 +282,7 @@ export const tune = pgTable(
     mode: text(),
     incipit: text(),
     genre: text(),
-    privateFor: integer("private_for"),
+    privateFor: uuid("private_for"),
     deleted: boolean().default(false).notNull(),
     syncVersion: integer("sync_version").default(1).notNull(),
     lastModifiedAt: timestamp("last_modified_at", { mode: "string" })
@@ -304,16 +298,14 @@ export const tune = pgTable(
     }),
     foreignKey({
       columns: [table.privateFor],
-      foreignColumns: [userProfile.id],
-      name: "tune_private_for_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "tune_private_for_user_profile_fkey",
     }),
     pgPolicy("Users can view public or own private tunes", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`((private_for IS NULL) OR (private_for IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid()))))`,
+      using: sql`((private_for IS NULL) OR (private_for = auth.uid()))`,
     }),
     pgPolicy("Users can insert own private tunes", {
       as: "permissive",
@@ -338,7 +330,7 @@ export const tuneOverride = pgTable(
   {
     id: serial().primaryKey().notNull(),
     tuneRef: integer("tune_ref").notNull(),
-    userRef: integer("user_ref").notNull(),
+    userRef: uuid("user_ref").notNull(),
     title: text(),
     type: text(),
     structure: text(),
@@ -365,16 +357,14 @@ export const tuneOverride = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.id],
-      name: "tune_override_user_ref_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "tune_override_user_ref_user_profile_fkey",
     }),
     pgPolicy("Users can view own tune overrides", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_ref IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_ref = auth.uid())`,
     }),
     pgPolicy("Users can insert own tune overrides", {
       as: "permissive",
@@ -398,7 +388,7 @@ export const instrument = pgTable(
   "instrument",
   {
     id: serial().primaryKey().notNull(),
-    privateToUser: integer("private_to_user"),
+    privateToUser: uuid("private_to_user"),
     instrument: text(),
     description: text(),
     genreDefault: text("genre_default"),
@@ -416,7 +406,7 @@ export const instrument = pgTable(
     ),
     index("idx_instrument_private_to_user").using(
       "btree",
-      table.privateToUser.asc().nullsLast().op("int4_ops")
+      table.privateToUser.asc().nullsLast().op("uuid_ops")
     ),
     foreignKey({
       columns: [table.genreDefault],
@@ -425,8 +415,8 @@ export const instrument = pgTable(
     }),
     foreignKey({
       columns: [table.privateToUser],
-      foreignColumns: [userProfile.id],
-      name: "instrument_private_to_user_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "instrument_private_to_user_user_profile_fkey",
     }),
     unique("instrument_private_to_user_instrument_unique").on(
       table.privateToUser,
@@ -436,9 +426,7 @@ export const instrument = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`((private_to_user IS NULL) OR (private_to_user IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid()))))`,
+      using: sql`((private_to_user IS NULL) OR (private_to_user = auth.uid()))`,
     }),
     pgPolicy("Users can insert own private instruments", {
       as: "permissive",
@@ -462,7 +450,7 @@ export const dailyPracticeQueue = pgTable(
   "daily_practice_queue",
   {
     id: serial().primaryKey().notNull(),
-    userRef: integer("user_ref").notNull(),
+    userRef: uuid("user_ref").notNull(),
     playlistRef: integer("playlist_ref").notNull(),
     mode: text(),
     queueDate: timestamp("queue_date", { mode: "string" }),
@@ -499,19 +487,19 @@ export const dailyPracticeQueue = pgTable(
     ),
     index("idx_queue_user_playlist_active").using(
       "btree",
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.playlistRef.asc().nullsLast().op("bool_ops"),
       table.active.asc().nullsLast().op("bool_ops")
     ),
     index("idx_queue_user_playlist_bucket").using(
       "btree",
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.playlistRef.asc().nullsLast().op("int4_ops"),
       table.bucket.asc().nullsLast().op("int4_ops")
     ),
     index("idx_queue_user_playlist_window").using(
       "btree",
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.playlistRef.asc().nullsLast().op("timestamp_ops"),
       table.windowStartUtc.asc().nullsLast().op("int4_ops")
     ),
@@ -527,8 +515,8 @@ export const dailyPracticeQueue = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.id],
-      name: "daily_practice_queue_user_profile_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "daily_practice_queue_user_profile_fkey",
     }),
     unique(
       "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tun"
@@ -537,9 +525,7 @@ export const dailyPracticeQueue = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_ref IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_ref = auth.uid())`,
     }),
     pgPolicy("Users can insert own practice queue items", {
       as: "permissive",
@@ -581,7 +567,7 @@ export const note = pgTable(
   "note",
   {
     id: serial().primaryKey().notNull(),
-    userRef: integer("user_ref"),
+    userRef: uuid("user_ref"),
     tuneRef: integer("tune_ref").notNull(),
     playlistRef: integer("playlist_ref"),
     createdDate: timestamp("created_date", { mode: "string" }),
@@ -605,13 +591,13 @@ export const note = pgTable(
       "btree",
       table.tuneRef.asc().nullsLast().op("int4_ops"),
       table.playlistRef.asc().nullsLast().op("bool_ops"),
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.public.asc().nullsLast().op("bool_ops")
     ),
     index("idx_note_tune_user").using(
       "btree",
       table.tuneRef.asc().nullsLast().op("int4_ops"),
-      table.userRef.asc().nullsLast().op("int4_ops")
+      table.userRef.asc().nullsLast().op("uuid_ops")
     ),
     foreignKey({
       columns: [table.playlistRef],
@@ -625,16 +611,14 @@ export const note = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.id],
-      name: "note_user_ref_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "note_user_ref_user_profile_fkey",
     }),
     pgPolicy("Users can view own or public notes", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`((user_ref IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid()))) OR (public = true))`,
+      using: sql`((user_ref = auth.uid()) OR (public = true))`,
     }),
     pgPolicy("Users can insert own notes", {
       as: "permissive",
@@ -660,7 +644,7 @@ export const playlist = pgTable(
   "playlist",
   {
     playlistId: serial("playlist_id").primaryKey().notNull(),
-    userRef: integer("user_ref").notNull(),
+    userRef: uuid("user_ref").notNull(),
     instrumentRef: integer("instrument_ref"),
     srAlgType: text("sr_alg_type"),
     deleted: boolean().default(false).notNull(),
@@ -680,8 +664,8 @@ export const playlist = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.id],
-      name: "playlist_user_ref_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "playlist_user_ref_user_profile_fkey",
     }),
     unique("playlist_user_ref_instrument_ref_unique").on(
       table.userRef,
@@ -691,9 +675,7 @@ export const playlist = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_ref IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_ref = auth.uid())`,
     }),
     pgPolicy("Users can insert own playlists", {
       as: "permissive",
@@ -716,7 +698,7 @@ export const playlist = pgTable(
 export const prefsSchedulingOptions = pgTable(
   "prefs_scheduling_options",
   {
-    userId: integer("user_id").primaryKey().notNull(),
+    userId: uuid("user_id").primaryKey().notNull(),
     acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
       .default(21)
       .notNull(),
@@ -734,16 +716,14 @@ export const prefsSchedulingOptions = pgTable(
   (table) => [
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.id],
-      name: "prefs_scheduling_options_user_id_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "prefs_scheduling_options_user_id_user_profile_fkey",
     }),
     pgPolicy("Users can view own scheduling preferences", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_id IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_id = auth.uid())`,
     }),
     pgPolicy("Users can insert own scheduling preferences", {
       as: "permissive",
@@ -770,7 +750,7 @@ export const reference = pgTable(
     url: text().notNull(),
     refType: text("ref_type"),
     tuneRef: integer("tune_ref").notNull(),
-    userRef: integer("user_ref"),
+    userRef: uuid("user_ref"),
     comment: text(),
     title: text(),
     public: boolean(),
@@ -791,11 +771,11 @@ export const reference = pgTable(
     index("idx_reference_tune_user_ref").using(
       "btree",
       table.tuneRef.asc().nullsLast().op("int4_ops"),
-      table.userRef.asc().nullsLast().op("int4_ops")
+      table.userRef.asc().nullsLast().op("uuid_ops")
     ),
     index("idx_reference_user_tune_public").using(
       "btree",
-      table.userRef.asc().nullsLast().op("int4_ops"),
+      table.userRef.asc().nullsLast().op("uuid_ops"),
       table.tuneRef.asc().nullsLast().op("int4_ops"),
       table.public.asc().nullsLast().op("bool_ops")
     ),
@@ -806,16 +786,14 @@ export const reference = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.id],
-      name: "reference_user_ref_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "reference_user_ref_user_profile_fkey",
     }),
     pgPolicy("Users can view own or system references", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`((user_ref IS NULL) OR (user_ref IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid()))))`,
+      using: sql`((user_ref IS NULL) OR (user_ref = auth.uid()))`,
     }),
     pgPolicy("Users can insert own references", {
       as: "permissive",
@@ -874,7 +852,7 @@ export const genreTuneType = pgTable(
 export const tableState = pgTable(
   "table_state",
   {
-    userId: integer("user_id").notNull(),
+    userId: uuid("user_id").notNull(),
     screenSize: text("screen_size").notNull(),
     purpose: text().notNull(),
     playlistId: integer("playlist_id").notNull(),
@@ -894,8 +872,8 @@ export const tableState = pgTable(
     }),
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.id],
-      name: "table_state_user_id_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "table_state_user_id_user_profile_fkey",
     }),
     primaryKey({
       columns: [
@@ -910,9 +888,7 @@ export const tableState = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_id IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_id = auth.uid())`,
     }),
     pgPolicy("Users can insert own table state", {
       as: "permissive",
@@ -1002,7 +978,7 @@ export const playlistTune = pgTable(
 export const prefsSpacedRepetition = pgTable(
   "prefs_spaced_repetition",
   {
-    userId: integer("user_id").notNull(),
+    userId: uuid("user_id").notNull(),
     algType: text("alg_type").notNull(),
     fsrsWeights: text("fsrs_weights"),
     requestRetention: real("request_retention"),
@@ -1019,8 +995,8 @@ export const prefsSpacedRepetition = pgTable(
   (table) => [
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.id],
-      name: "prefs_spaced_repetition_user_id_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "prefs_spaced_repetition_user_id_user_profile_fkey",
     }),
     primaryKey({
       columns: [table.userId, table.algType],
@@ -1030,9 +1006,7 @@ export const prefsSpacedRepetition = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_id IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_id = auth.uid())`,
     }),
     pgPolicy("Users can insert own SR preferences", {
       as: "permissive",
@@ -1056,7 +1030,7 @@ export const prefsSpacedRepetition = pgTable(
 export const tableTransientData = pgTable(
   "table_transient_data",
   {
-    userId: integer("user_id").notNull(),
+    userId: uuid("user_id").notNull(),
     tuneId: integer("tune_id").notNull(),
     playlistId: integer("playlist_id").notNull(),
     purpose: text(),
@@ -1095,8 +1069,8 @@ export const tableTransientData = pgTable(
     }),
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.id],
-      name: "table_transient_data_user_id_user_profile_id_fk",
+      foreignColumns: [userProfile.supabaseUserId],
+      name: "table_transient_data_user_id_user_profile_fkey",
     }),
     primaryKey({
       columns: [table.userId, table.tuneId, table.playlistId],
@@ -1106,9 +1080,7 @@ export const tableTransientData = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(user_id IN ( SELECT user_profile.id
-   FROM user_profile
-  WHERE (user_profile.supabase_user_id = auth.uid())))`,
+      using: sql`(user_id = auth.uid())`,
     }),
     pgPolicy("Users can insert own transient data", {
       as: "permissive",
