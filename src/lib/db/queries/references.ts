@@ -137,6 +137,11 @@ export async function createReference(
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  // Auto-persist runs every 30s, but user might refresh before that fires
+  const { persistDb } = await import("../client-sqlite");
+  await persistDb();
+
   return result as Reference;
 }
 
@@ -198,6 +203,10 @@ export async function updateReference(
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  const { persistDb } = await import("../client-sqlite");
+  await persistDb();
+
   return result as Reference | undefined;
 }
 
@@ -225,6 +234,10 @@ export async function updateReferenceOrder(
       })
       .where(eq(schema.reference.id, referenceIds[i]));
   }
+
+  // CRITICAL: Persist to IndexedDB immediately after batch updates
+  const { persistDb } = await import("../client-sqlite");
+  await persistDb();
 }
 
 /**
@@ -252,6 +265,10 @@ export async function deleteReference(
     .get();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
+
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  const { persistDb } = await import("../client-sqlite");
+  await persistDb();
 
   return result !== undefined;
 }
@@ -314,6 +331,19 @@ export function detectReferenceType(url: string): string {
     return "sheet-music";
   }
 
+  // Audio platforms
+  if (
+    urlLower.includes("soundcloud.com") ||
+    urlLower.includes("spotify.com") ||
+    urlLower.includes("bandcamp.com") ||
+    urlLower.includes(".mp3") ||
+    urlLower.includes(".wav") ||
+    urlLower.includes(".ogg") ||
+    urlLower.includes(".m4a")
+  ) {
+    return "audio";
+  }
+
   // Social media
   if (
     urlLower.includes("facebook.com") ||
@@ -324,7 +354,8 @@ export function detectReferenceType(url: string): string {
     return "social";
   }
 
-  return "other";
+  // Default to 'website' for better UX than 'other'
+  return "website";
 }
 
 /**

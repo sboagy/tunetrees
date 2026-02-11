@@ -27,6 +27,13 @@ const test = base.extend({
 test.describe("Anonymous User Sign-In Flow", () => {
   let ttPage: TuneTreesPage;
 
+  const ANON_REPERTOIRE_CONFIG = {
+    name: "Anon Repertoire",
+    default_genre: "ITRAD",
+    instrument: "Irish Flute",
+    genres_filter: ["ITRAD"],
+  };
+
   test.beforeEach(async ({ page }) => {
     ttPage = new TuneTreesPage(page);
   });
@@ -113,32 +120,17 @@ test.describe("Anonymous User Sign-In Flow", () => {
   test("1.4 Anonymous user can access all main tabs", async () => {
     // Navigate and sign in anonymously
     await ttPage.gotoLogin();
-    await ttPage.signInAnonymously();
+    await ttPage.signInAnonymously(ANON_REPERTOIRE_CONFIG);
 
-    // Verify Practice tab accessible
-    // New anonymous users have no playlist, so they see loading/no content state
-    await expect(ttPage.practiceTab).toBeVisible({ timeout: 10000 });
-    await ttPage.practiceTab.click();
-    // Check that the practice tab content area exists (may show loading or empty state)
-    const practiceContent = ttPage.page.getByRole("heading", {
-      name: "No current repertoire",
+    await ttPage.navigateToTab("practice");
+    await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
+
+    await ttPage.navigateToTab("repertoire");
+    await expect(ttPage.repertoireColumnsButton).toBeVisible({
+      timeout: 20000,
     });
-    await expect(practiceContent).toBeVisible({ timeout: 10000 });
-    const createRepertoireButton = ttPage.page.getByTestId("tab-repertoire");
-    await expect(createRepertoireButton).toBeVisible();
 
-    // Verify Repertoire tab accessible (new users see "No playlist selected")
-    await ttPage.repertoireTab.click();
-    const repertoireContent = ttPage.page.getByRole("heading", {
-      name: "No current repertoire",
-    });
-    await expect(repertoireContent).toBeVisible({ timeout: 10000 });
-
-    // Verify Catalog tab accessible (always has public tunes, but needs loading time)
-    await ttPage.catalogTab.click();
-    const catalogContent = ttPage.catalogGrid.or(
-      ttPage.page.getByText("Loading")
-    );
-    await expect(catalogContent).toBeVisible({ timeout: 15000 });
+    await ttPage.navigateToTab("catalog");
+    await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
   });
 });

@@ -32,6 +32,9 @@ import NewTunePage from "./routes/tunes/new";
 // Lazy load settings pages
 const UserSettingsLayout = lazy(() => import("./routes/user-settings"));
 const AppearancePage = lazy(() => import("./routes/user-settings/appearance"));
+const CatalogSyncPage = lazy(
+  () => import("./routes/user-settings/catalog-sync")
+);
 const AvatarPage = lazy(() => import("./routes/user-settings/avatar"));
 const AccountPage = lazy(() => import("./routes/user-settings/account"));
 const SchedulingOptionsPage = lazy(
@@ -40,6 +43,7 @@ const SchedulingOptionsPage = lazy(
 const SpacedRepetitionPage = lazy(
   () => import("./routes/user-settings/spaced-repetition")
 );
+const PluginsPage = lazy(() => import("./routes/user-settings/plugins"));
 
 // Lazy load auth callback pages
 const AuthCallback = lazy(() => import("./routes/auth/callback"));
@@ -96,6 +100,7 @@ function App() {
                   {/* User Settings Routes (Modal) */}
                   <Route path="/user-settings" component={UserSettingsLayout}>
                     <Route path="/appearance" component={AppearancePage} />
+                    <Route path="/catalog-sync" component={CatalogSyncPage} />
                     <Route path="/avatar" component={AvatarPage} />
                     <Route
                       path="/scheduling-options"
@@ -105,6 +110,7 @@ function App() {
                       path="/spaced-repetition"
                       component={SpacedRepetitionPage}
                     />
+                    <Route path="/plugins" component={PluginsPage} />
                     <Route path="/account" component={AccountPage} />
                   </Route>
 

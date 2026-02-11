@@ -255,6 +255,67 @@ SM2 algorithm available as alternative:
 
 Uses classic SuperMemo 2 algorithm with EF (easiness factor).
 
+## Scheduling Plugins (Goal-Based Extensions)
+
+TuneTrees supports goal-based scheduling via plugins. Scheduling plugins are
+executed in a QuickJS sandbox and can override the full schedule output.
+
+Plugins can be scoped to goals using the `plugin.goals` JSON array. If the list
+is empty, the plugin is treated as a match for any goal.
+
+### Plugin Contract
+
+Plugins must export a factory function:
+
+```typescript
+function createScheduler({ fsrsScheduler, queryDb }) {
+       return {
+              async processFirstReview(payload) {
+                     // payload = { input, prior, preferences, scheduling, fallback }
+                     return payload.fallback;
+              },
+              async processReview(payload) {
+                     return payload.fallback;
+              },
+       };
+}
+```
+
+**Payload:**
+- `input`: `{ playlistRef, tuneRef, quality, practiced, goal, technique }`
+- `prior`: latest `practice_record` row or `null`
+- `preferences`: user FSRS preferences
+- `scheduling`: user scheduling options
+- `fallback`: serialized FSRS schedule (see below)
+
+**Return value:** an object shaped like `NextReviewSchedule` (strings are OK; the
+host normalizes). Use `payload.fallback` as a template.
+
+### Helpers
+
+- `fsrsScheduler`: full FSRS scheduler interface, callable from plugins for
+       fallback results.
+- `queryDb(sql)`: read-only SQL access with a 500-row limit and table allowlist.
+       Allowed tables: `practice_record`, `playlist_tune`, `daily_practice_queue`,
+       `user_profile`, `prefs_scheduling_options`, `prefs_spaced_repetition`.
+
+### Serialized Schedule Shape
+
+```typescript
+{
+       nextDue: string;
+       lastReview: string;
+       state: number;
+       stability: number;
+       difficulty: number;
+       elapsedDays: number;
+       scheduledDays: number;
+       reps: number;
+       lapses: number;
+       interval: number;
+}
+```
+
 ---
 
 For practice flow details, see [practice_flow.md](../practice_flow.md).

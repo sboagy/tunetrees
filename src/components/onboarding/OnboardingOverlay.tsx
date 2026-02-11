@@ -9,9 +9,17 @@
 
 import { useNavigate } from "@solidjs/router";
 import { Info, X } from "lucide-solid";
-import { type Component, createSignal, Match, Show, Switch } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  createSignal,
+  Match,
+  Show,
+  Switch,
+} from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
+import { type Genre, GenreMultiSelect } from "../genre-selection";
 import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
 
 /**
@@ -22,21 +30,151 @@ import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
 export const OnboardingOverlay: Component = () => {
   const { needsOnboarding, onboardingStep, nextStep, skipOnboarding } =
     useOnboarding();
-  const { incrementRepertoireListChanged } = useAuth();
+  const {
+    incrementRepertoireListChanged,
+    localDb,
+    forceSyncDown,
+    remoteSyncDownCompletionVersion,
+    user,
+    catalogSyncPending,
+    triggerCatalogSync,
+  } = useAuth();
   const navigate = useNavigate();
   const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
+  const [playlistCreated, setPlaylistCreated] = createSignal(false);
+  const [genres, setGenres] = createSignal<Genre[]>([]);
+  const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
+  const [isLoadingGenres, setIsLoadingGenres] = createSignal(false);
+  const [isSavingGenres, setIsSavingGenres] = createSignal(false);
 
   const handlePlaylistCreated = () => {
+    setPlaylistCreated(true);
     setShowPlaylistDialog(false);
     // Trigger global playlist list refresh so TopNav dropdown updates
     incrementRepertoireListChanged();
-    // Move to next step: view catalog
+    // Move to next step: choose genres (don't navigate yet)
     nextStep();
-    navigate("/?tab=catalog");
   };
 
   const handleSkip = () => {
     skipOnboarding();
+  };
+
+  // Load genres when component mounts or step changes to choose-genres
+  createEffect(() => {
+    const syncVersion = remoteSyncDownCompletionVersion();
+    void syncVersion;
+
+    if (onboardingStep() === "choose-genres" && genres().length === 0) {
+      const loadGenres = async () => {
+        const db = localDb();
+        if (!db || isLoadingGenres()) return;
+
+        const resolvedUserId = user()?.id;
+        if (!resolvedUserId) return;
+
+        setIsLoadingGenres(true);
+        try {
+          const { getGenresWithSelection } = await import(
+            "@/lib/db/queries/user-genre-selection"
+          );
+          const { getUserPlaylists } = await import(
+            "@/lib/db/queries/playlists"
+          );
+
+          const genreList = await getGenresWithSelection(db, resolvedUserId);
+          // Sort by name
+          genreList.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+          setGenres(genreList);
+
+          // If user already made a selection, preserve it; otherwise default to existing selection or all
+          if (selectedGenreIds().length === 0) {
+            const preselected = genreList
+              .filter((g) => g.selected)
+              .map((g) => g.id);
+
+            if (preselected.length > 0) {
+              setSelectedGenreIds(preselected);
+            } else if (genreList.length > 0) {
+              const playlists = await getUserPlaylists(db, resolvedUserId);
+              const latest = playlists[playlists.length - 1];
+              const defaultGenreId = latest?.genreDefault ?? null;
+
+              if (
+                defaultGenreId &&
+                genreList.some((g) => g.id === defaultGenreId)
+              ) {
+                setSelectedGenreIds([defaultGenreId]);
+              } else {
+                setSelectedGenreIds(genreList.map((g) => g.id));
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load genres:", error);
+        } finally {
+          setIsLoadingGenres(false);
+        }
+      };
+
+      loadGenres();
+    }
+  });
+
+  const handleSaveGenres = async () => {
+    if (selectedGenreIds().length === 0) return;
+
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) return;
+
+    setIsSavingGenres(true);
+    try {
+      const { upsertUserGenreSelection, purgeLocalCatalogForGenres } =
+        await import("@/lib/db/queries/user-genre-selection");
+
+      // Save genre selection
+      await upsertUserGenreSelection(db, userId, selectedGenreIds());
+      console.log("✅ Genre selection saved");
+
+      // If catalog sync was deferred until onboarding, trigger it now with genre filter
+      if (catalogSyncPending()) {
+        console.log(
+          "🎵 Triggering catalog sync with selected genres:",
+          selectedGenreIds()
+        );
+        await triggerCatalogSync();
+      } else {
+        // Catalog was already synced (e.g., user changed genres after initial onboarding)
+        // Purge deselected genres and re-sync
+        console.log("🧹 Purging non-selected catalog tunes...");
+        const allGenres = genres().map((g) => g.id);
+        const deselectedGenres = allGenres.filter(
+          (id) => !selectedGenreIds().includes(id)
+        );
+        const purgeResult = await purgeLocalCatalogForGenres(
+          db,
+          userId,
+          deselectedGenres
+        );
+        console.log(
+          `✅ Purged ${purgeResult.tuneIds.length} tunes from deselected genres`
+        );
+
+        void forceSyncDown({ full: true }).catch((error) => {
+          console.warn(
+            "Failed to refresh catalog after genre selection:",
+            error
+          );
+        });
+      }
+      nextStep();
+      navigate("/?tab=catalog");
+    } catch (error) {
+      console.error("Failed to save genre selection:", error);
+    } finally {
+      setIsSavingGenres(false);
+    }
   };
 
   return (
@@ -47,7 +185,9 @@ export const OnboardingOverlay: Component = () => {
           isOpen={showPlaylistDialog()}
           onClose={() => {
             setShowPlaylistDialog(false);
-            skipOnboarding(); // If they close without creating, skip onboarding
+            if (!playlistCreated()) {
+              skipOnboarding(); // If they close without creating, skip onboarding
+            }
           }}
           onSaved={handlePlaylistCreated}
         />
@@ -105,7 +245,10 @@ export const OnboardingOverlay: Component = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowPlaylistDialog(true)}
+                      onClick={() => {
+                        setPlaylistCreated(false);
+                        setShowPlaylistDialog(true);
+                      }}
                       class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
                       data-testid="onboarding-create-repertoire"
                     >
@@ -117,7 +260,66 @@ export const OnboardingOverlay: Component = () => {
             </div>
           </Match>
 
-          {/* Step 2: View Catalog */}
+          {/* Step 2: Choose Genres */}
+          <Match when={onboardingStep() === "choose-genres"}>
+            <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                      <Info class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+                      Choose additional genres to download 🎵
+                    </h2>
+                  </div>
+                </div>
+
+                <div class="space-y-4">
+                  <p class="text-gray-600 dark:text-gray-300 text-sm">
+                    Select the genres you want available offline. You can change
+                    this later in Settings.
+                  </p>
+
+                  {/* Genre multi-select component */}
+                  <Show
+                    when={!isLoadingGenres()}
+                    fallback={
+                      <div class="flex items-center justify-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      </div>
+                    }
+                  >
+                    <GenreMultiSelect
+                      genres={genres()}
+                      selectedGenreIds={selectedGenreIds()}
+                      onChange={setSelectedGenreIds}
+                      searchable={true}
+                      disabled={isSavingGenres()}
+                      autoScrollToSelected={true}
+                      testIdPrefix="onboarding-genre"
+                    />
+                  </Show>
+
+                  <div class="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSaveGenres}
+                      disabled={
+                        isSavingGenres() || selectedGenreIds().length === 0
+                      }
+                      class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="onboarding-genre-continue"
+                    >
+                      {isSavingGenres() ? "Saving..." : "Continue"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Match>
+
+          {/* Step 3: View Catalog */}
           <Match when={onboardingStep() === "view-catalog"}>
             <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">

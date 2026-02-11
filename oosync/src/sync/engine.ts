@@ -9,11 +9,10 @@
  * @module lib/sync/engine
  */
 
-import type { SyncChange } from "@oosync/shared/protocol";
+import type { SyncChange, SyncRequestOverrides } from "@oosync/shared/protocol";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { and, eq } from "drizzle-orm";
 import { getAdapter, type SyncableTableName } from "./adapters";
-import { toCamelCase } from "./casing";
+import { applyRemoteChangesToLocalDb } from "./apply-remote-changes";
 import {
   backfillOutboxSince,
   fetchLocalRowByPrimaryKey,
@@ -22,8 +21,8 @@ import {
   markOutboxCompleted,
   type OutboxItem,
 } from "./outbox";
-import { WorkerClient } from "./worker-client";
 import { getSyncRuntime, type SqliteDatabase } from "./runtime-context";
+import { WorkerClient } from "./worker-client";
 
 // Debug flag for sync logging (set VITE_SYNC_DEBUG=true in .env to enable)
 const SYNC_DEBUG = import.meta.env.VITE_SYNC_DEBUG === "true";
@@ -84,6 +83,10 @@ export interface SyncConfig {
   batchSize: number; // Max items per sync batch
   maxRetries: number; // Max retry attempts for failed items
   timeoutMs: number; // Network timeout in milliseconds
+  /** When true, never push local changes; pull-only sync. */
+  pullOnly?: boolean;
+  /** Optional per-sync overrides for pull behavior. */
+  requestOverridesProvider?: () => Promise<SyncRequestOverrides | null>;
 }
 
 const DEFAULT_CONFIG: SyncConfig = {
@@ -161,17 +164,6 @@ function sortOutboxItemsByDependency(items: OutboxItem[]): OutboxItem[] {
 
     return orderA - orderB;
   });
-}
-
-function sanitizeData(data: any) {
-  const sanitized = { ...data };
-  // Convert boolean to integer for SQLite
-  for (const key in sanitized) {
-    if (typeof sanitized[key] === "boolean") {
-      sanitized[key] = sanitized[key] ? 1 : 0;
-    }
-  }
-  return sanitized;
 }
 
 /**
@@ -260,6 +252,8 @@ export class SyncEngine {
    */
   async syncWithWorker(options?: {
     allowDeletes?: boolean;
+    pullOnly?: boolean;
+    requestOverrides?: SyncRequestOverrides | null;
   }): Promise<SyncResult> {
     const startTime = new Date().toISOString();
     const errors: string[] = [];
@@ -268,12 +262,7 @@ export class SyncEngine {
     const affectedTablesSet = new Set<string>();
 
     const {
-      tableSyncOrder,
-      tableToSchemaKey,
-      localSchema,
       getSqliteInstance,
-      suppressSyncTriggers,
-      enableSyncTriggers,
       loadOutboxBackupForUser,
       clearOutboxBackupForUser,
       replayOutboxBackup,
@@ -297,6 +286,7 @@ export class SyncEngine {
       : null;
 
     const allowDeletes = options?.allowDeletes ?? true;
+    const pullOnly = options?.pullOnly ?? this.config.pullOnly ?? false;
 
     try {
       // 1. Get Auth Token
@@ -308,11 +298,16 @@ export class SyncEngine {
       }
       const workerClient = new WorkerClient(session.access_token);
 
+      const requestOverrides =
+        options?.requestOverrides ??
+        (this.config.requestOverridesProvider
+          ? await this.config.requestOverridesProvider()
+          : undefined);
+
       // 2. Gather Pending Changes (Push)
-      const pendingItems = await getPendingOutboxItems(
-        this.localDb,
-        this.config.batchSize
-      );
+      const pendingItems = pullOnly
+        ? []
+        : await getPendingOutboxItems(this.localDb, this.config.batchSize);
 
       // Sort by dependency to ensure correct order (though worker handles transaction)
       const sortedItems = sortOutboxItemsByDependency(pendingItems);
@@ -380,11 +375,6 @@ export class SyncEngine {
         }
       }
 
-      const isForeignKeyConstraintFailure = (e: unknown): boolean => {
-        const msg = e instanceof Error ? e.message : String(e);
-        return /FOREIGN KEY constraint failed/i.test(msg);
-      };
-
       // Remote changes that failed FK constraints on first pass. This can happen
       // when the worker paginates by time and a child row arrives in an earlier page
       // than its parent row. We'll retry after all pages are applied.
@@ -396,202 +386,12 @@ export class SyncEngine {
           deferForeignKeyFailuresTo?: SyncChange[];
         }
       ) => {
-        if (remoteChanges.length === 0) return;
-
-        const sqliteInstance = await getSqliteInstance();
-        if (!sqliteInstance) return;
-
-        // While applying remote changes, suppress triggers so remote writes don't
-        // re-enter the outbox. If the user writes locally during this window, those
-        // changes may be missed; we backfill after re-enabling triggers.
-        const triggersSuppressedAt = new Date().toISOString();
-        suppressSyncTriggers(sqliteInstance);
-        try {
-          // Sort changes by dependency to avoid FK violations.
-          // Inserts/updates: parent tables first. Deletes: child tables first.
-          const sortedChanges = [...remoteChanges].sort((a, b) => {
-            const orderA = tableSyncOrder[a.table] ?? 100;
-            const orderB = tableSyncOrder[b.table] ?? 100;
-
-            if (a.deleted && b.deleted) return orderB - orderA;
-            if (!a.deleted && !b.deleted) return orderA - orderB;
-            if (a.deleted) return 1;
-            if (b.deleted) return -1;
-            return orderA - orderB;
-          });
-
-          for (const change of sortedChanges) {
-            affectedTablesSet.add(change.table);
-            const adapter = getAdapter(change.table as SyncableTableName);
-
-            const schemaKey = tableToSchemaKey[change.table] || change.table;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const table = (localSchema as any)[schemaKey];
-
-            if (!table) {
-              getLogger().warn(
-                `[SyncEngine] Table not found in local schema: ${change.table} (key: ${schemaKey})`
-              );
-              continue;
-            }
-
-            try {
-              if (change.deleted) {
-                // Delete local
-                const pk = adapter.primaryKey;
-                const localKeyData = adapter.toLocal(change.data);
-
-                if (Array.isArray(pk)) {
-                  const conditions = pk
-                    .map((k) => {
-                      const columnKey = toCamelCase(k);
-                      const value = localKeyData[columnKey];
-                      if (typeof value === "undefined") {
-                        getLogger().warn(
-                          `[SyncEngine] Missing PK value for ${change.table}.${k} during delete`,
-                          { rowId: change.rowId }
-                        );
-                        return null;
-                      }
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      return eq((table as any)[columnKey], value);
-                    })
-                    .filter((c): c is ReturnType<typeof eq> => c !== null);
-
-                  if (conditions.length !== pk.length) {
-                    continue;
-                  }
-                  await this.localDb
-                    .delete(table)
-                    .where(and(...conditions))
-                    .run();
-                } else if (typeof pk === "string") {
-                  const columnKey = toCamelCase(pk);
-                  const value = localKeyData[columnKey];
-                  if (typeof value === "undefined") {
-                    getLogger().warn(
-                      `[SyncEngine] Missing PK value for ${change.table}.${pk} during delete`,
-                      { rowId: change.rowId }
-                    );
-                    continue;
-                  }
-                  await this.localDb
-                    .delete(table)
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    .where(eq((table as any)[columnKey], value))
-                    .run();
-                }
-              } else {
-                // Upsert local
-                const sanitizedData = sanitizeData(change.data);
-
-                const adapterPk = adapter.primaryKey;
-                const conflictTarget = Array.isArray(adapterPk)
-                  ? adapterPk.map((k) => (table as any)[toCamelCase(k)])
-                  : (table as any)[toCamelCase(adapterPk as string)];
-
-                // Some tables have a natural composite unique key (adapter.conflictKeys)
-                // in addition to a synthetic PK (id). If we only upsert by id, an insert
-                // can fail on the composite unique constraint when the same logical row
-                // exists locally with a different id (e.g. retained IndexedDB + initial sync).
-                // Strategy:
-                // 1) Upsert by primary key (current behavior)
-                // 2) If that fails due to the composite unique constraint, upsert by the
-                //    composite key without ever updating `id`.
-                const compositeKeys = adapter.conflictKeys;
-                const isSingleIdPk =
-                  !Array.isArray(adapter.primaryKey) &&
-                  adapter.primaryKey === "id";
-
-                if (isSingleIdPk && compositeKeys) {
-                  try {
-                    await this.localDb
-                      .insert(table)
-                      .values(sanitizedData)
-                      .onConflictDoUpdate({
-                        target: conflictTarget,
-                        set: sanitizedData,
-                      })
-                      .run();
-                  } catch (e) {
-                    const errorMsg = e instanceof Error ? e.message : String(e);
-                    const isCompositeUniqueViolation =
-                      errorMsg.includes("UNIQUE constraint failed:") &&
-                      compositeKeys.every(
-                        (k) =>
-                          errorMsg.includes(`${change.table}.${k}`) ||
-                          errorMsg.includes(k)
-                      );
-
-                    if (!isCompositeUniqueViolation) {
-                      throw e;
-                    }
-
-                    await this.localDb
-                      .insert(table)
-                      .values(sanitizedData)
-                      .onConflictDoUpdate({
-                        target: compositeKeys.map(
-                          (k) => (table as any)[toCamelCase(k)]
-                        ),
-                        // Default behavior: do not update synthetic PK `id` when resolving
-                        // a natural unique-key conflict (prevents rewiring local foreign keys).
-                        // Exception: user_profile.id is the canonical identity referenced by
-                        // many tables (e.g. playlist.user_ref). If a local user_profile row was
-                        // created pre-sync (same supabase_user_id, different id), we must adopt
-                        // the server-provided `id` so downstream rows match and FK inserts succeed.
-                        set:
-                          change.table === "user_profile" &&
-                          compositeKeys.length === 1 &&
-                          compositeKeys[0] === "supabase_user_id"
-                            ? sanitizedData
-                            : ((): Record<string, unknown> => {
-                                const { id: _ignoredId, ...rest } =
-                                  sanitizedData as Record<string, unknown>;
-                                return rest;
-                              })(),
-                      })
-                      .run();
-                  }
-                } else {
-                  await this.localDb
-                    .insert(table)
-                    .values(sanitizedData)
-                    .onConflictDoUpdate({
-                      target: conflictTarget,
-                      set: sanitizedData,
-                    })
-                    .run();
-                }
-              }
-              synced++;
-            } catch (e) {
-              if (isForeignKeyConstraintFailure(e)) {
-                const target = opts?.deferForeignKeyFailuresTo;
-                if (target) {
-                  target.push(change);
-                } else {
-                  deferredForeignKeyChanges.push(change);
-                }
-                continue;
-              }
-
-              failed++;
-              const errorMsg = e instanceof Error ? e.message : "Unknown error";
-              errors.push(`${change.table}:${change.rowId}: ${errorMsg}`);
-              getLogger().error(
-                `[SyncEngine] Failed to apply change to ${change.table} rowId=${change.rowId}:`,
-                e
-              );
-              // Continue applying other tables so core UI data isn't blocked
-            }
-          }
-        } finally {
-          enableSyncTriggers(sqliteInstance);
-
-          // Best-effort backfill: if a user wrote while triggers were suppressed,
-          // ensure those changes make it into the outbox.
-          try {
+        const applied = await applyRemoteChangesToLocalDb({
+          localDb: this.localDb,
+          changes: remoteChanges,
+          deferForeignKeyFailuresTo:
+            opts?.deferForeignKeyFailuresTo ?? deferredForeignKeyChanges,
+          onTriggersRestored: async (triggersSuppressedAt) => {
             const backfilled = await backfillOutboxSince(
               this.localDb,
               triggersSuppressedAt,
@@ -603,13 +403,14 @@ export class SyncEngine {
                 `[SyncEngine] Backfilled ${backfilled} outbox entries written during trigger suppression`
               );
             }
-          } catch (e) {
-            // Never fail sync because of best-effort backfill.
-            getLogger().warn(
-              "[SyncEngine] Outbox backfill after trigger suppression failed",
-              e
-            );
-          }
+          },
+        });
+
+        synced += applied.synced;
+        failed += applied.failed;
+        errors.push(...applied.errors);
+        for (const table of applied.affectedTables) {
+          affectedTablesSet.add(table);
         }
       };
       let pullCursor: string | undefined;
@@ -634,6 +435,7 @@ export class SyncEngine {
         this.lastSyncTimestamp || undefined,
         {
           pageSize: 200,
+          overrides: requestOverrides ?? undefined,
         }
       );
 
@@ -678,6 +480,7 @@ export class SyncEngine {
             pullCursor,
             syncStartedAt,
             pageSize: 200,
+            overrides: requestOverrides ?? undefined,
           });
 
           pullCursor = pageResponse.nextCursor;

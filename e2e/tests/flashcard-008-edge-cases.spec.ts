@@ -408,7 +408,11 @@ test.describe
         .first();
       await expect(gridEvalTrigger).toBeVisible({ timeout: 10000 });
       await gridEvalTrigger.click();
-      await page.getByTestId("recall-eval-option-good").click();
+
+      // Wait for the evaluation options dropdown to appear before clicking
+      const goodOption = page.getByTestId("recall-eval-option-good");
+      await expect(goodOption).toBeVisible({ timeout: 10000 });
+      await goodOption.click();
       await page.waitForTimeout(300);
       await app.submitEvaluationsButton.click();
       await page.waitForTimeout(1500);

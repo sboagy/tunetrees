@@ -26,12 +26,20 @@ const sidebarNavItems: SidebarNavItem[] = [
     href: "/user-settings/appearance",
   },
   {
+    title: "Catalog & Sync",
+    href: "/user-settings/catalog-sync",
+  },
+  {
     title: "Scheduling Options",
     href: "/user-settings/scheduling-options",
   },
   {
     title: "Spaced Repetition",
     href: "/user-settings/spaced-repetition",
+  },
+  {
+    title: "Plugins",
+    href: "/user-settings/plugins",
   },
   {
     title: "Account",
@@ -86,7 +94,18 @@ const UserSettingsLayout: ParentComponent = (props) => {
   const handleClose = () => {
     setIsOpen(false);
     // Navigate back to preserve tab/playlist context
-    navigate(-1);
+    if (typeof window !== "undefined") {
+      const returnTo = window.sessionStorage.getItem("tt-settings-return");
+      if (returnTo) {
+        window.sessionStorage.removeItem("tt-settings-return");
+        if (!returnTo.startsWith("/user-settings")) {
+          navigate(returnTo, { replace: true });
+          return;
+        }
+      }
+    }
+
+    navigate("/", { replace: true });
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {

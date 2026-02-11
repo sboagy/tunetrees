@@ -535,6 +535,14 @@ const handleSubmitEvaluations = async () => {
 
 **Note:** No longer calls `forceSyncUp()` after submit - background sync handles upload automatically. View-specific signal (`incrementPracticeListStagedChanged`) triggers grid refresh immediately.
 
+### Scheduling Plugin Override (Immediate Commit Path)
+
+When `recordPracticeRating` uses `evaluatePractice()`, the host computes the
+FSRS schedule first and then invokes the scheduling plugin (if configured for
+the current goal). The plugin may return a full schedule override or call
+`fsrsScheduler` for baseline results. Plugin failures surface a toast and
+fall back to FSRS without breaking the practice flow.
+
 ### Commit Service
 ### Commit Service
 

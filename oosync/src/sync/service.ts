@@ -11,6 +11,7 @@
  * @module lib/sync/service
  */
 
+import type { SyncRequestOverrides } from "@oosync/shared/protocol";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "solid-sonner";
 import { SyncEngine } from "./engine";
@@ -51,6 +52,10 @@ export interface SyncServiceConfig {
   userId: string | null;
   realtimeEnabled?: boolean;
   syncIntervalMs?: number;
+  /** When true, never push local changes; pull-only sync. */
+  pullOnly?: boolean;
+  /** Optional per-sync overrides for pull behavior. */
+  requestOverridesProvider?: () => Promise<SyncRequestOverrides | null>;
   onSyncComplete?: (result: SyncResult) => void;
   onRealtimeConnected?: () => void;
   onRealtimeDisconnected?: () => void;
@@ -86,6 +91,8 @@ export class SyncService {
         batchSize: 100,
         maxRetries: 3,
         timeoutMs: 30000,
+        pullOnly: config.pullOnly,
+        requestOverridesProvider: config.requestOverridesProvider,
       }
     );
 
@@ -187,6 +194,10 @@ export class SyncService {
       throw new SyncInProgressError();
     }
 
+    if (this.config.pullOnly) {
+      return await this.syncDown();
+    }
+
     this.isSyncing = true;
 
     try {
@@ -218,6 +229,14 @@ export class SyncService {
       throw new SyncInProgressError();
     }
 
+    if (this.config.pullOnly) {
+      const errorResult = this.createErrorResult(
+        new Error("Sync uploads are disabled in pull-only mode")
+      );
+      this.config.onSyncComplete?.(errorResult);
+      return errorResult;
+    }
+
     this.isSyncing = true;
 
     try {
@@ -228,6 +247,21 @@ export class SyncService {
 
       return result;
     } catch (error) {
+      // CRITICAL: Persist DB on sync failure to prevent data loss on refresh
+      // When sync fails (e.g., constraint violation), the data is still in local
+      // SQLite + outbox. If user refreshes before auto-persist fires, it's lost.
+      try {
+        await getSyncRuntime().persistDb?.();
+        console.log(
+          "[SyncService] ✅ Persisted DB after sync failure to protect user data"
+        );
+      } catch (persistError) {
+        console.warn(
+          "[SyncService] ⚠️ Failed to persist DB after sync error:",
+          persistError
+        );
+      }
+
       // Call onSyncComplete even on errors so UI can react
       const errorResult = this.createErrorResult(error);
       this.config.onSyncComplete?.(errorResult);
@@ -252,32 +286,35 @@ export class SyncService {
     this.isSyncing = true;
 
     try {
+      const pullOnly = this.config.pullOnly === true;
       // CRITICAL: Upload pending changes BEFORE downloading remote changes
       // This prevents race conditions where:
       // 1. User deletes a row locally
       // 2. DELETE is queued but not yet sent to Supabase
       // 3. syncDown runs and re-downloads the "deleted" row from Supabase
       // 4. Row reappears in local DB (zombie record)
-      const stats = await this.syncEngine.getOutboxStats();
-      if (stats.pending > 0 || stats.inProgress > 0) {
-        console.log(
-          `[SyncService] ⚠️  BLOCKING syncDown: ${stats.pending} pending changes must upload first`
-        );
-        try {
-          await this.syncEngine.syncUpFromOutbox();
+      if (!pullOnly) {
+        const stats = await this.syncEngine.getOutboxStats();
+        if (stats.pending > 0 || stats.inProgress > 0) {
           console.log(
-            "[SyncService] ✅ Pending changes uploaded - safe to syncDown"
+            `[SyncService] ⚠️  BLOCKING syncDown: ${stats.pending} pending changes must upload first`
           );
-        } catch (error) {
-          console.error(
-            "[SyncService] ❌ Failed to upload pending changes:",
-            error
-          );
-          // CRITICAL: DO NOT proceed with syncDown if upload failed
-          // This would cause zombie records (deleted items reappearing)
-          throw new Error(
-            "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
-          );
+          try {
+            await this.syncEngine.syncUpFromOutbox();
+            console.log(
+              "[SyncService] ✅ Pending changes uploaded - safe to syncDown"
+            );
+          } catch (error) {
+            console.error(
+              "[SyncService] ❌ Failed to upload pending changes:",
+              error
+            );
+            // CRITICAL: DO NOT proceed with syncDown if upload failed
+            // This would cause zombie records (deleted items reappearing)
+            throw new Error(
+              "Cannot syncDown while pending changes exist - upload failed. Local data preserved."
+            );
+          }
         }
       }
 
@@ -320,24 +357,26 @@ export class SyncService {
 
     this.isSyncing = true;
     try {
-      const stats = await this.syncEngine.getOutboxStats();
-      if (stats.pending > 0 || stats.inProgress > 0) {
-        console.log(
-          `[SyncService] ⚠️  BLOCKING scoped syncDown: ${stats.pending} pending changes must upload first`
-        );
-        try {
-          await this.syncEngine.syncUpFromOutbox();
+      if (!this.config.pullOnly) {
+        const stats = await this.syncEngine.getOutboxStats();
+        if (stats.pending > 0 || stats.inProgress > 0) {
           console.log(
-            "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
+            `[SyncService] ⚠️  BLOCKING scoped syncDown: ${stats.pending} pending changes must upload first`
           );
-        } catch (error) {
-          console.error(
-            "[SyncService] ❌ Failed to upload pending changes before scoped syncDown:",
-            error
-          );
-          throw new Error(
-            "Cannot run scoped syncDown while pending changes exist - upload failed."
-          );
+          try {
+            await this.syncEngine.syncUpFromOutbox();
+            console.log(
+              "[SyncService] ✅ Pending changes uploaded - scoped syncDown safe"
+            );
+          } catch (error) {
+            console.error(
+              "[SyncService] ❌ Failed to upload pending changes before scoped syncDown:",
+              error
+            );
+            throw new Error(
+              "Cannot run scoped syncDown while pending changes exist - upload failed."
+            );
+          }
         }
       }
 
@@ -408,7 +447,9 @@ export class SyncService {
             console.log(
               "[SyncService] Went offline during initial syncDown; deferring until online"
             );
-            window.addEventListener("online", runInitialSyncDown, { once: true });
+            window.addEventListener("online", runInitialSyncDown, {
+              once: true,
+            });
             return;
           }
 
@@ -464,84 +505,86 @@ export class SyncService {
 
     // Periodic syncUp (frequent - push local changes to server)
     // Only runs if there are pending changes to avoid unnecessary network calls
-    this.syncIntervalId = window.setInterval(async () => {
-      try {
-        // Safety check: ensure database is initialized
-        if (!this.db) {
-          console.warn(
-            "[SyncService] Database not initialized yet, skipping syncUp check"
-          );
-          return;
-        }
-
-        // Check if there are pending changes before syncing (using outbox)
-        const stats = await this.syncEngine.getOutboxStats();
-        const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
-
-        if (hasPendingChanges) {
-          // Skip sync if offline (browser reports no connectivity)
-          if (!navigator.onLine) {
-            // Silently skip - this is expected behavior when offline
+    if (!this.config.pullOnly) {
+      this.syncIntervalId = window.setInterval(async () => {
+        try {
+          // Safety check: ensure database is initialized
+          if (!this.db) {
+            console.warn(
+              "[SyncService] Database not initialized yet, skipping syncUp check"
+            );
             return;
           }
 
-          console.log(
-            `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
-          );
-          const result = await this.syncUp();
-          // Only show error toast for non-network failures
-          const hasNetworkError = result.errors.some(
-            (e) =>
-              e.includes("Failed to fetch") ||
-              e.includes("ERR_INTERNET_DISCONNECTED") ||
-              e.includes("NetworkError")
-          );
+          // Check if there are pending changes before syncing (using outbox)
+          const stats = await this.syncEngine.getOutboxStats();
+          const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
 
-          if (result.success) {
-            this.consecutiveSyncUpFailures = 0;
-          } else {
-            this.consecutiveSyncUpFailures += 1;
-          }
-
-          // `itemsFailed` reflects local apply failures for pulled changes.
-          // Push failures often surface only in `errors`, so toast on those too.
-          if (!result.success && !hasNetworkError) {
-            const shouldToast =
-              this.consecutiveSyncUpFailures === 1 ||
-              this.consecutiveSyncUpFailures === 5 ||
-              this.consecutiveSyncUpFailures === 10;
-
-            if (shouldToast) {
-              const summary = result.errors[0] ?? "Unknown server error";
-              toast.error(
-                `Sync upload failed (attempt ${this.consecutiveSyncUpFailures}). Your data is still saved locally. ${summary}`,
-                {
-                  duration: 7000,
-                }
-              );
+          if (hasPendingChanges) {
+            // Skip sync if offline (browser reports no connectivity)
+            if (!navigator.onLine) {
+              // Silently skip - this is expected behavior when offline
+              return;
             }
-          }
-        } else {
-          // Silent - no need to log when there's nothing to sync
-        }
-      } catch (error) {
-        // Silently skip if sync is already in progress (expected on slow connections)
-        if (error instanceof SyncInProgressError) {
-          console.debug(
-            "[SyncService] Skipping periodic syncUp - sync already in progress"
-          );
-          return;
-        }
 
-        console.error("[SyncService] Error in periodic syncUp:", error);
-        toast.error(
-          "Background sync error. Your changes may not be uploaded.",
-          {
-            duration: 5000,
+            console.log(
+              `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
+            );
+            const result = await this.syncUp();
+            // Only show error toast for non-network failures
+            const hasNetworkError = result.errors.some(
+              (e) =>
+                e.includes("Failed to fetch") ||
+                e.includes("ERR_INTERNET_DISCONNECTED") ||
+                e.includes("NetworkError")
+            );
+
+            if (result.success) {
+              this.consecutiveSyncUpFailures = 0;
+            } else {
+              this.consecutiveSyncUpFailures += 1;
+            }
+
+            // `itemsFailed` reflects local apply failures for pulled changes.
+            // Push failures often surface only in `errors`, so toast on those too.
+            if (!result.success && !hasNetworkError) {
+              const shouldToast =
+                this.consecutiveSyncUpFailures === 1 ||
+                this.consecutiveSyncUpFailures === 5 ||
+                this.consecutiveSyncUpFailures === 10;
+
+              if (shouldToast) {
+                const summary = result.errors[0] ?? "Unknown server error";
+                toast.error(
+                  `Sync upload failed (attempt ${this.consecutiveSyncUpFailures}). Your data is still saved locally. ${summary}`,
+                  {
+                    duration: 7000,
+                  }
+                );
+              }
+            }
+          } else {
+            // Silent - no need to log when there's nothing to sync
           }
-        );
-      }
-    }, syncUpIntervalMs);
+        } catch (error) {
+          // Silently skip if sync is already in progress (expected on slow connections)
+          if (error instanceof SyncInProgressError) {
+            console.debug(
+              "[SyncService] Skipping periodic syncUp - sync already in progress"
+            );
+            return;
+          }
+
+          console.error("[SyncService] Error in periodic syncUp:", error);
+          toast.error(
+            "Background sync error. Your changes may not be uploaded.",
+            {
+              duration: 5000,
+            }
+          );
+        }
+      }, syncUpIntervalMs);
+    }
 
     // Periodic syncDown (infrequent - pull remote changes from server)
     this.syncDownIntervalId = window.setInterval(() => {
@@ -573,11 +616,18 @@ export class SyncService {
       });
     }, syncDownIntervalMs);
 
-    console.log(
-      `[SyncService] Auto sync started:`,
-      `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
-      `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
-    );
+    if (this.config.pullOnly) {
+      console.log(
+        `[SyncService] Auto sync started (pull-only):`,
+        `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
+      );
+    } else {
+      console.log(
+        `[SyncService] Auto sync started:`,
+        `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
+        `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
+      );
+    }
   }
 
   /**

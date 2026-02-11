@@ -34,6 +34,7 @@ import type {
   RecordPracticeInput,
 } from "../db/types";
 import { generateId } from "../utils/uuid";
+import type { SchedulingService } from "./scheduler-interface";
 
 /**
  * FSRS quality ratings mapped to ts-fsrs Grade enum
@@ -75,7 +76,7 @@ const TECHNIQUE_MODIFIERS = {
  * Provides a clean API for scheduling operations that integrates
  * with Solid signals and stores.
  */
-export class FSRSService {
+export class FSRSService implements SchedulingService {
   private scheduler: ReturnType<typeof fsrs>;
   private playlistTuneCount: number | null = null; // populated asynchronously
   /** Accessor for tune count (may be null if not yet loaded) */
@@ -86,8 +87,7 @@ export class FSRSService {
   constructor(
     prefs: PrefsSpacedRepetition,
     scheduling: IUserSchedulingOptions,
-    db: SqliteDatabase,
-    playlistRef: string
+    options?: { playlistTuneCount?: number | null }
   ) {
     // Parse FSRS weights from JSON string (stored in database)
     const weights = prefs.fsrsWeights
@@ -102,20 +102,7 @@ export class FSRSService {
       ? (JSON.parse(prefs.relearningSteps) as number[]).map((m) => `${m}m`)
       : ["10m"];
 
-    // Determine playlist size (async). Constructor cannot be async, so populate later.
-    void getPlaylistTuneCount(db, playlistRef)
-      .then((cnt) => {
-        this.playlistTuneCount = cnt;
-        console.log(
-          `[FSRSService] Playlist ${playlistRef} tune count loaded: ${cnt}`
-        );
-      })
-      .catch((e) => {
-        console.warn(
-          `[FSRSService] Failed to load playlist tune count for ${playlistRef}:`,
-          e
-        );
-      });
+    this.playlistTuneCount = options?.playlistTuneCount ?? null;
 
     const maxReviewsPerDay =
       scheduling.maxReviewsPerDay && scheduling.maxReviewsPerDay > 0
@@ -127,8 +114,37 @@ export class FSRSService {
       typeof window !== "undefined"
         ? (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__
         : undefined;
-    const effectivePlaylistTuneCount: number =
-      tuneCountOverride ?? this.playlistTuneCount ?? 400;
+
+    /**
+     * Calculate effective playlist size with bounds for maximum interval calculation.
+     *
+     * RATIONALE:
+     * The maximum interval is calculated to ensure ongoing rotation of the user's
+     * repertoire based on how many tunes they can practice per day. This prevents
+     * intervals from growing so large that tunes fall out of regular rotation.
+     *
+     * UPPER BOUND (400 tunes):
+     * Even if the user's repertoire exceeds 400 tunes, we cap the effective size
+     * to prevent intervals from becoming excessively long. This acknowledges that
+     * maintaining perfect spaced repetition for very large repertoires may not be
+     * realistic, and users benefit from shorter intervals to keep tunes in rotation.
+     *
+     * LOWER BOUND (50 tunes):
+     * For small repertoires, we set a minimum of 50 tunes to ensure the FSRS
+     * algorithm has sufficient headroom to differentiate between rating qualities
+     * (Easy vs Good vs Hard). Without this floor, tiny repertoires would result in
+     * maximum intervals of only 1-2 days, eliminating the value of spaced repetition
+     * and preventing interval growth for "Easy" ratings. Below ~50 tunes, rotation-
+     * based capping isn't necessary since the user can practice all tunes frequently.
+     *
+     * FORMULA: max_interval = 3 * (effective_tunes / reviews_per_day)
+     * This gives roughly 3 full rotations of the repertoire before hitting the cap.
+     */
+    const rawPlaylistTuneCount = tuneCountOverride ?? this.playlistTuneCount ?? 400;
+    const effectivePlaylistTuneCount: number = Math.min(
+      Math.max(rawPlaylistTuneCount, 50),
+      400
+    );
 
     const testMaxReviewsOverride =
       typeof window !== "undefined"
@@ -166,7 +182,7 @@ export class FSRSService {
       // High retention (95%) as default because 'Performance' requires higher recall than 'Facts'
       request_retention:
         testRequestRetentionOverride ?? prefs.requestRetention ?? 0.95,
-      maximum_interval: calculatedMaxInterval, // prefs.maximumInterval ?? calculatedMaxInterval,
+      maximum_interval: calculatedMaxInterval,
       enable_fuzz:
         testEnableFuzzOverride ??
         (prefs.enableFuzzing ? Boolean(prefs.enableFuzzing) : true),
@@ -182,7 +198,9 @@ export class FSRSService {
    * @param input - Practice session input
    * @returns Next review schedule and updated card state
    */
-  processFirstReview(input: RecordPracticeInput): NextReviewSchedule {
+  async processFirstReview(
+    input: RecordPracticeInput
+  ): Promise<NextReviewSchedule> {
     const card = createEmptyCard(input.practiced);
     const rating = this.qualityToRating(input.quality);
 
@@ -216,10 +234,10 @@ export class FSRSService {
    * @param latestRecord - Latest practice record for this tune
    * @returns Next review schedule and updated card state
    */
-  processReview(
+  async processReview(
     input: RecordPracticeInput,
     latestRecord: PracticeRecord
-  ): NextReviewSchedule {
+  ): Promise<NextReviewSchedule> {
     // Reconstruct FSRS card from latest practice record
     const card: Card = {
       due: new Date(latestRecord.due ?? new Date()),
@@ -409,10 +427,9 @@ export class FSRSService {
 export function createFSRSService(
   prefs: PrefsSpacedRepetition,
   scheduling: IUserSchedulingOptions,
-  db: SqliteDatabase,
-  playlistRef: string
+  options?: { playlistTuneCount?: number | null }
 ): FSRSService {
-  return new FSRSService(prefs, scheduling, db, playlistRef);
+  return new FSRSService(prefs, scheduling, options);
 }
 
 /**

@@ -16,6 +16,7 @@
       "instrument": "catalog",
       "prefs_scheduling_options": "user",
       "prefs_spaced_repetition": "user",
+      "user_genre_selection": "user",
       "playlist": "repertoire",
       "table_state": null,
       "tab_group_main_state": null,
@@ -27,7 +28,11 @@
       "note": "repertoire",
       "reference": "repertoire",
       "tag": "repertoire",
-      "tune_override": "repertoire"
+      "tune_override": "repertoire",
+      "plugin": "user"
+    },
+    "tableToSchemaKeyOverrides": {
+      "plugin": "plugin"
     },
     "normalizeDatetimeByTable": {
       "practice_record": ["practiced", "backup_practiced", "due"],
@@ -42,8 +47,58 @@
   },
   "worker": {
     "config": {
+      "pull": {
+        "tableRules": {
+          "plugin": {
+            "kind": "orEqUserIdOrTrue",
+            "column": "user_ref",
+            "orColumn": "is_public"
+          },
+          "tune": {
+            "kind": "compound",
+            "operator": "or",
+            "rules": [
+              {
+                "kind": "compound",
+                "operator": "and",
+                "rules": [
+                  {
+                    "kind": "inCollection",
+                    "column": "genre",
+                    "collection": "selectedGenres"
+                  },
+                  {
+                    "kind": "publicOnly",
+                    "column": "private_for"
+                  }
+                ]
+              },
+              {
+                "kind": "eqUserId",
+                "column": "private_for"
+              }
+            ]
+          },
+          "note": {
+            "kind": "rpc",
+            "functionName": "sync_get_user_notes",
+            "params": ["userId", "genreIds"]
+          },
+          "reference": {
+            "kind": "rpc",
+            "functionName": "sync_get_user_references",
+            "params": ["userId", "genreIds"]
+          }
+        }
+      },
       "push": {
         "tableRules": {
+          "user_genre_selection": {
+            "denyDelete": false
+          },
+          "table_transient_data": {
+            "denyDelete": false
+          },
           "practice_record": {
             "denyDelete": true,
             "upsert": {
