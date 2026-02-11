@@ -31,7 +31,9 @@ export interface ReferenceFormData {
 
 const REFERENCE_TYPES = [
   { value: "video", label: "🎥 Video" },
+  { value: "audio", label: "🎵 Audio" },
   { value: "sheet-music", label: "🎼 Sheet Music" },
+  { value: "website", label: "🌐 Website" },
   { value: "article", label: "📄 Article" },
   { value: "social", label: "👥 Social Media" },
   { value: "other", label: "🔗 Other" },

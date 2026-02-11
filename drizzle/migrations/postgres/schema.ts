@@ -836,7 +836,7 @@ export const reference = pgTable(
     check("check_public", sql`public = ANY (ARRAY[true, false])`),
     check(
       "check_ref_type",
-      sql`ref_type = ANY (ARRAY['website'::text, 'audio'::text, 'video'::text])`
+      sql`ref_type = ANY (ARRAY['website'::text, 'audio'::text, 'video'::text, 'sheet-music'::text, 'article'::text, 'social'::text, 'other'::text]) OR ref_type IS NULL`
     ),
   ]
 );
