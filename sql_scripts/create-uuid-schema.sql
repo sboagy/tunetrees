@@ -256,7 +256,7 @@ CREATE TABLE
         last_modified_at timestamp NOT NULL DEFAULT now (),
         device_id text,
         CONSTRAINT check_ref_type CHECK (
-            ref_type IN ('website', 'audio', 'video', 'sheet-music', 'article', 'social', 'other')
+            ref_type IN ('website', 'audio', 'video', 'sheet-music', 'article', 'social', 'lesson', 'other')
             OR ref_type IS NULL
         ),
         CONSTRAINT check_public CHECK (

@@ -265,7 +265,7 @@ async function createSchema() {
         sync_version integer NOT NULL DEFAULT 1,
         last_modified_at timestamp NOT NULL DEFAULT now(),
         device_id text,
-        CONSTRAINT check_ref_type CHECK (ref_type IN ('website', 'audio', 'video', 'sheet-music', 'article', 'social', 'other') OR ref_type IS NULL),
+        CONSTRAINT check_ref_type CHECK (ref_type IN ('website', 'audio', 'video', 'sheet-music', 'article', 'social', 'lesson', 'other') OR ref_type IS NULL),
         CONSTRAINT check_public CHECK (public IN (true, false) OR public IS NULL),
         CONSTRAINT check_favorite CHECK (favorite IN (true, false) OR favorite IS NULL)
       );

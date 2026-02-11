@@ -36,6 +36,7 @@ const REFERENCE_TYPES = [
   { value: "website", label: "🌐 Website" },
   { value: "article", label: "📄 Article" },
   { value: "social", label: "👥 Social Media" },
+  { value: "lesson", label: "🎓 Lesson" },
   { value: "other", label: "🔗 Other" },
 ];
 

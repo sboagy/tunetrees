@@ -82,6 +82,7 @@ describe("detectReferenceType", () => {
       "sheet-music",
       "article",
       "social",
+      "lesson",
       "other",
     ];
 
