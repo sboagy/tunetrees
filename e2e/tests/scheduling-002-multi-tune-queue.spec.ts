@@ -110,7 +110,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
     await page.waitForTimeout(500);
 
     // Submit all staged evaluations
-    await ttPage.submitEvaluationsButton.click();
+    await ttPage.submitEvaluations();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
 
@@ -162,7 +162,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
     }
 
     await page.waitForTimeout(500);
-    await ttPage.submitEvaluationsButton.click();
+    await ttPage.submitEvaluations();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
 

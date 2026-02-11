@@ -490,7 +490,51 @@ export const TunesGrid = (<T extends { id: string | number }>(
     }
   });
 
+  // Reactive state for stabilization tracking
+  const [targetScroll, setTargetScroll] = createSignal(0);
+  const [isStabilizing, setIsStabilizing] = createSignal(false);
+  const [lastRowCount, setLastRowCount] = createSignal(0);
+  let stabilizeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Watch for row count changes at component level (proper reactive scope)
+  createEffect(() => {
+    const rowCount = table.getRowModel().rows.length;
+    const previous = lastRowCount();
+
+    if (rowCount !== previous && previous >= 0) {
+      console.log(
+        `[TunesGrid ${props.tablePurpose}] Row count changed: ${previous} → ${rowCount}`
+      );
+      setIsStabilizing(true);
+
+      // Re-apply target scroll if we're supposed to be scrolled
+      const target = targetScroll();
+      if (target > 0 && containerRef) {
+        containerRef.scrollTop = target;
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Re-applying target scroll: ${target}px`
+        );
+      }
+
+      // Clear any existing stabilization timeout
+      if (stabilizeTimeout) clearTimeout(stabilizeTimeout);
+
+      // Mark as stable after 300ms of no changes
+      stabilizeTimeout = setTimeout(() => {
+        setIsStabilizing(false);
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Data stabilized at ${rowCount} rows`
+        );
+      }, 300);
+    }
+
+    setLastRowCount(rowCount);
+  });
+
   onMount(() => {
+    let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cleanupScrollListener: (() => void) | null = null;
+
     const waitForContainer = () => {
       if (!containerRef) {
         requestAnimationFrame(waitForContainer);
@@ -500,31 +544,73 @@ export const TunesGrid = (<T extends { id: string | number }>(
         requestAnimationFrame(waitForContainer);
         return;
       }
+
+      // Load target scroll from storage
       const key = scrollKey();
-      if (key) {
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          containerRef.scrollTop = Number.parseInt(stored, 10);
-        }
+      const storedScroll = key
+        ? Number.parseInt(localStorage.getItem(key) || "0", 10)
+        : 0;
+      setTargetScroll(storedScroll);
+      setLastRowCount(table.getRowModel().rows.length);
+
+      // Apply initial scroll - let row count effect handle stabilization
+      if (storedScroll > 0) {
+        setIsStabilizing(true); // Start in stabilizing mode
+        containerRef.scrollTop = storedScroll;
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Applied initial scroll: ${storedScroll}px, entering stabilization mode`
+        );
       }
-      let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
       const handleScroll = () => {
         if (scrollTimeout) clearTimeout(scrollTimeout);
+
+        // During stabilization, if scroll is wrong, re-apply target instead of saving
+        const target = targetScroll();
+        const stabilizing = isStabilizing();
+
+        if (stabilizing && containerRef && target > 0) {
+          const currentScroll = containerRef.scrollTop;
+          // If scroll is significantly below target (more than 10% off), re-apply
+          if (currentScroll < target * 0.9) {
+            console.log(
+              `[TunesGrid ${props.tablePurpose}] Scroll during stabilization: ${currentScroll}px, re-applying ${target}px`
+            );
+            containerRef.scrollTop = target;
+            return; // Don't save during stabilization
+          }
+        }
+
         scrollTimeout = setTimeout(() => {
           const key = scrollKey();
-          if (containerRef && key) {
-            localStorage.setItem(key, String(containerRef.scrollTop));
+          if (containerRef && key && !isStabilizing()) {
+            const scrollPos = containerRef.scrollTop;
+            console.log(
+              `[TunesGrid ${props.tablePurpose}] Saving scroll position: ${scrollPos}px`
+            );
+            localStorage.setItem(key, String(scrollPos));
+            setTargetScroll(scrollPos); // Update target to current position
           }
-          props.onSelectionChange?.(Object.keys(rowSelection()).length);
         }, 150);
       };
+
       containerRef.addEventListener("scroll", handleScroll, { passive: true });
-      onCleanup(() => {
-        if (containerRef)
+
+      // Store cleanup function to be called on component unmount
+      cleanupScrollListener = () => {
+        if (containerRef) {
           containerRef.removeEventListener("scroll", handleScroll);
-        if (scrollTimeout) clearTimeout(scrollTimeout);
-      });
+        }
+      };
     };
+
+    // Register cleanup at onMount level (synchronous, in reactive scope)
+    onCleanup(() => {
+      if (cleanupScrollListener) cleanupScrollListener();
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      if (stabilizeTimeout) clearTimeout(stabilizeTimeout);
+    });
+
     waitForContainer();
   });
 

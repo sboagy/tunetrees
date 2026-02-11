@@ -15,7 +15,9 @@ describe("GridStatusMessage", () => {
     ));
 
     expect(screen.getByText("Unable to load")).toBeDefined();
-    expect(screen.getByText("There was a problem loading tunes.")).toBeDefined();
+    expect(
+      screen.getByText("There was a problem loading tunes.")
+    ).toBeDefined();
     expect(screen.getByText("Refresh the page to try again.")).toBeDefined();
     expect(screen.getByText("Error details: Network timeout")).toBeDefined();
   });

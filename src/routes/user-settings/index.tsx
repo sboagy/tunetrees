@@ -38,6 +38,10 @@ const sidebarNavItems: SidebarNavItem[] = [
     href: "/user-settings/spaced-repetition",
   },
   {
+    title: "Plugins",
+    href: "/user-settings/plugins",
+  },
+  {
     title: "Account",
     href: "/user-settings/account",
   },

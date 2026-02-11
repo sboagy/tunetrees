@@ -15,12 +15,16 @@ import {
 } from "@/lib/db/client-sqlite";
 import {
   dailyPracticeQueue,
+  note,
+  plugin,
   playlistTune,
   practiceRecord,
+  reference,
 } from "@/lib/db/schema";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
+import { serializeCapabilities } from "@/lib/plugins/capabilities";
 
 type SeedAddToReviewInput = {
   playlistId: string; // UUID
@@ -29,6 +33,41 @@ type SeedAddToReviewInput = {
   // resolve from current Supabase session via user_profile lookup.
   userId?: string;
 };
+
+type SeedSchedulingPluginInput = {
+  script?: string;
+  goals?: string[];
+  userId?: string;
+  name?: string;
+  description?: string | null;
+  enabled?: boolean;
+  isPublic?: boolean;
+};
+
+const DEFAULT_SCHEDULING_PLUGIN_SCRIPT = `function createScheduler() {
+  function apply(payload) {
+    const practiced = new Date(payload.input.practiced);
+    const nextDue = new Date(practiced);
+    nextDue.setDate(nextDue.getDate() + 1);
+
+    return {
+      ...payload.fallback,
+      lastReview: payload.input.practiced,
+      nextDue: nextDue.toISOString(),
+      interval: 1,
+      scheduledDays: 1,
+    };
+  }
+
+  return {
+    async processFirstReview(payload) {
+      return apply(payload);
+    },
+    async processReview(payload) {
+      return apply(payload);
+    },
+  };
+}`;
 
 /**
  * Injected test user ID - set via window.__ttTestUserId to bypass Supabase auth lookup.
@@ -185,6 +224,40 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
     queueCount: regenerated.length,
     userRef,
   };
+}
+
+async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
+  const db = await ensureDb();
+  const userRef = input.userId ?? (await resolveUserId(db));
+  const now = new Date().toISOString();
+  const goals = Array.isArray(input.goals) ? input.goals : ["recall"];
+  const script = input.script ?? DEFAULT_SCHEDULING_PLUGIN_SCRIPT;
+
+  const [created] = await db
+    .insert(plugin)
+    .values({
+      id: generateId(),
+      userRef,
+      name: input.name ?? "E2E Scheduling Plugin",
+      description: input.description ?? "Seeded by test API",
+      script,
+      capabilities: serializeCapabilities({
+        scheduleGoal: true,
+        goals,
+      }),
+      goals: JSON.stringify(goals),
+      isPublic: input.isPublic ? 1 : 0,
+      enabled: input.enabled === false ? 0 : 1,
+      version: 1,
+      deleted: 0,
+      syncVersion: 1,
+      lastModifiedAt: now,
+      deviceId: "local",
+    })
+    .returning();
+
+  if (!created) throw new Error("Failed to seed scheduling plugin");
+  return created;
 }
 
 async function getPracticeCount(playlistId: string) {
@@ -818,6 +891,28 @@ async function getLocalRecord(
   );
   return rows.length > 0 ? rows[0] : null;
 }
+
+/**
+ * Get currently selected genres for the user
+ */
+async function getSelectedGenres(): Promise<string[]> {
+  const db = await ensureDb();
+  const rows = db.all(sql`SELECT genre_id FROM user_genre_selection`);
+  return rows.map((row: any) => row.genre_id);
+}
+
+/**
+ * Get a tune ID by genre
+ * Returns the first tune found for the given genre
+ */
+async function getTuneIdByGenre(genre: string): Promise<string | null> {
+  const db = await ensureDb();
+  const rows = await db.all(
+    sql`SELECT id FROM tune WHERE genre = ${genre} AND deleted = 0 LIMIT 1`
+  );
+  return rows.length > 0 ? (rows[0] as { id: string }).id : null;
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -826,10 +921,18 @@ declare global {
       setTestUserId: (userId: string) => void;
       getTestUserId: () => string | undefined;
       clearTestUserId: () => void;
+      getCurrentUserId: () => Promise<string>;
+      findOrCreatePrivateTune: (
+        genre: string,
+        userId: string
+      ) => Promise<string>;
       seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
         updated: number;
         queueCount: number;
         userRef: string; // UUID
+      }>;
+      seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
+        id: string;
       }>;
       getPracticeCount: (playlistId: string) => Promise<number>; // UUID
       getRepertoireCount: (playlistId: string) => Promise<number>; // UUID
@@ -1012,6 +1115,21 @@ declare global {
         table: string,
         recordId: string | number
       ) => Promise<any>;
+      getSelectedGenres: () => Promise<string[]>;
+      getTuneIdByGenre: (genre: string) => Promise<string | null>;
+      getAnnotationCounts: (options?: {
+        tuneId?: string;
+      }) => Promise<{ notes: number; references: number }>;
+      getOrphanedAnnotationCounts: () => Promise<{
+        orphanedNotes: number;
+        orphanedReferences: number;
+      }>;
+      seedAnnotations: (input: {
+        tuneId: string;
+        noteCount?: number;
+        referenceCount?: number;
+        userId?: string;
+      }) => Promise<{ notesCreated: number; referencesCreated: number }>;
     };
   }
 }
@@ -1030,7 +1148,44 @@ if (typeof window !== "undefined") {
         delete window.__ttTestUserId;
         console.log("[TestApi] Test user ID cleared");
       },
+      getCurrentUserId: async () => {
+        const db = await ensureDb();
+        return await resolveUserId(db);
+      },
+      findOrCreatePrivateTune: async (genre: string, userId: string) => {
+        const db = await ensureDb();
+
+        // Try to find existing private tune
+        const existing = await db.all<{ id: string }>(
+          sql`SELECT id FROM tune WHERE genre = ${genre} AND private_for = ${userId} AND deleted = 0 LIMIT 1`
+        );
+
+        if (existing.length > 0 && existing[0]?.id) {
+          return existing[0].id;
+        }
+
+        // Create a private tune using raw SQL
+        const tuneId = generateId();
+        const now = new Date().toISOString();
+
+        await db.run(
+          sql.raw(`INSERT INTO tune (
+            id, title, genre, private_for, deleted, sync_version, last_modified_at
+          ) VALUES (
+            '${tuneId}', 
+            'E2E Private Tune ${genre}', 
+            '${genre}', 
+            '${userId}', 
+            0, 
+            1,
+            '${now}'
+          )`)
+        );
+
+        return tuneId;
+      },
       seedAddToReview,
+      seedSchedulingPlugin,
       getPracticeCount,
       getRepertoireCount,
       getTuneOverrideCountForCurrentUser,
@@ -1236,6 +1391,108 @@ if (typeof window !== "undefined") {
       },
       getLocalRecord: async (table: string, recordId: string | number) => {
         return await getLocalRecord(table, recordId);
+      },
+      getAnnotationCounts: async (options?: { tuneId?: string }) => {
+        const db = await ensureDb();
+        const userRef = await resolveUserId(db);
+
+        // Count notes (filtered by genre via tune JOIN)
+        const noteQuery = options?.tuneId
+          ? sql`SELECT COUNT(*) as count FROM note n WHERE n.tune_ref = ${options.tuneId}`
+          : sql`
+              SELECT COUNT(*) as count 
+              FROM note n
+              JOIN tune t ON n.tune_ref = t.id
+              WHERE (n.user_ref IS NULL OR n.user_ref = ${userRef})
+                AND t.deleted = 0
+            `;
+
+        const noteRows = await db.all<{ count: number }>(noteQuery);
+
+        // Count references (same pattern)
+        const refQuery = options?.tuneId
+          ? sql`SELECT COUNT(*) as count FROM reference r WHERE r.tune_ref = ${options.tuneId}`
+          : sql`
+              SELECT COUNT(*) as count 
+              FROM reference r
+              JOIN tune t ON r.tune_ref = t.id
+              WHERE (r.user_ref IS NULL OR r.user_ref = ${userRef})
+                AND t.deleted = 0
+            `;
+
+        const refRows = await db.all<{ count: number }>(refQuery);
+
+        return {
+          notes: Number(noteRows[0]?.count ?? 0),
+          references: Number(refRows[0]?.count ?? 0),
+        };
+      },
+      getSelectedGenres,
+      getTuneIdByGenre,
+      getOrphanedAnnotationCounts: async () => {
+        const db = await ensureDb();
+
+        // Count notes with tune_ref NOT in tune table
+        const orphanedNotes = await db.all<{ count: number }>(sql`
+          SELECT COUNT(*) as count
+          FROM note n
+          WHERE n.tune_ref NOT IN (SELECT id FROM tune WHERE deleted = 0)
+        `);
+
+        // Count references with tune_ref NOT in tune table
+        const orphanedRefs = await db.all<{ count: number }>(sql`
+          SELECT COUNT(*) as count
+          FROM reference r
+          WHERE r.tune_ref NOT IN (SELECT id FROM tune WHERE deleted = 0)
+        `);
+
+        return {
+          orphanedNotes: Number(orphanedNotes[0]?.count ?? 0),
+          orphanedReferences: Number(orphanedRefs[0]?.count ?? 0),
+        };
+      },
+      seedAnnotations: async (input: {
+        tuneId: string;
+        noteCount?: number;
+        referenceCount?: number;
+        userId?: string;
+      }) => {
+        const db = await ensureDb();
+        const userRef = input.userId ?? (await resolveUserId(db));
+        const now = new Date().toISOString();
+
+        // Seed notes
+        for (let i = 0; i < (input.noteCount ?? 0); i++) {
+          await db.insert(note).values({
+            tuneRef: input.tuneId,
+            userRef,
+            noteText: `Test note ${i + 1}`,
+            public: 0,
+            deleted: 0,
+            displayOrder: i + 1,
+            createdDate: now,
+            lastModifiedAt: now,
+            syncVersion: 1,
+          });
+        }
+
+        // Seed references
+        for (let i = 0; i < (input.referenceCount ?? 0); i++) {
+          await db.insert(reference).values({
+            tuneRef: input.tuneId,
+            userRef,
+            url: `https://example.com/ref${i + 1}`,
+            comment: `Test reference ${i + 1}`,
+            deleted: 0,
+            lastModifiedAt: now,
+            syncVersion: 1,
+          });
+        }
+
+        return {
+          notesCreated: input.noteCount ?? 0,
+          referencesCreated: input.referenceCount ?? 0,
+        };
       },
     };
     // eslint-disable-next-line no-console

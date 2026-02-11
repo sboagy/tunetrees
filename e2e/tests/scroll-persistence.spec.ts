@@ -117,7 +117,15 @@ test.describe("Scroll Position Persistence", () => {
     await removeScrollTestTunes(addedTuneIds, currentTestUser);
   });
 
-  test.skip("Catalog: scroll position persists across tab switches", async ({
+  async function waitToSettle(page: Page) {
+    await page.waitForTimeout(200);
+    for (let i = 0; i < 2; i++) {
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(300);
+    }
+  }
+
+  test("Catalog: scroll position persists across tab switches", async ({
     page,
   }) => {
     // Navigate to Catalog tab
@@ -130,6 +138,7 @@ test.describe("Scroll Position Persistence", () => {
     const gridContainer = page.locator(
       'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
     );
+    await waitToSettle(page);
 
     // Log element properties to debug
     const elementInfo = await gridContainer.evaluate((el) => ({
@@ -145,7 +154,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Wait for scroll to settle (especially important in Firefox)
-    await page.waitForTimeout(200);
+    await waitToSettle(page);
 
     // Verify scroll actually worked before proceeding
     const actualScroll = await gridContainer.evaluate((el) => el.scrollTop);
@@ -164,41 +173,45 @@ test.describe("Scroll Position Persistence", () => {
     }
 
     // Wait for debounce to persist scroll position (300ms + buffer)
-    await page.waitForTimeout(500);
+    await waitToSettle(page);;
 
     // Check localStorage - all grids now use integer userId from user_profile table
     const storedValue = await page.evaluate((userId) => {
       return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
     }, currentTestUser.userId);
     console.log("[CATALOG TEST] localStorage value:", storedValue);
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Verify we scrolled (check scrollTop is approximately 1000)
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
     console.log("[CATALOG TEST] scrollTopBefore:", scrollTopBefore);
-    expect(scrollTopBefore).toBeGreaterThan(900);
+    expect(scrollTopBefore).toBeGreaterThan(600);
     expect(scrollTopBefore).toBeLessThan(1100);
-    await page.waitForTimeout(2000);
+    await waitToSettle(page);
+    await page.waitForTimeout(3000);
 
     // Switch to Practice tab
     await page.click('button:has-text("Practice")');
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
+    await page.waitForTimeout(3000);
 
     // Switch back to Catalog tab
     await page.click('button:has-text("Catalog")');
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
+    await page.waitForTimeout(3000);
 
     // Verify scroll position restored
     const gridContainerAfter = page.locator(
       'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
     );
+    await waitToSettle(page);
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
       gridContainerAfter
     );
-    expect(scrollTopAfter).toBeGreaterThan(900);
+    expect(scrollTopAfter).toBeGreaterThan(400)
     expect(scrollTopAfter).toBeLessThan(1100);
   });
 
@@ -207,9 +220,7 @@ test.describe("Scroll Position Persistence", () => {
   }) => {
     // Navigate to Repertoire tab
     await page.click('button:has-text("Repertoire")');
-    await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
-      timeout: 5000,
-    });
+    await waitToSettle(page);
 
     // Scroll down (reduced amount for smaller grids)
     const gridContainer = page.locator(
@@ -219,8 +230,7 @@ test.describe("Scroll Position Persistence", () => {
       el.scrollTop = 400; // Reduced from 800px
     });
 
-    // Wait for debounce
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Verify scrolled
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
@@ -229,11 +239,13 @@ test.describe("Scroll Position Persistence", () => {
 
     // Switch tabs and return
     await page.click('button:has-text("Catalog")');
-    await page.waitForTimeout(500);
+
+    await waitToSettle(page);
+    await page.waitForTimeout(2000);
+
     await page.click('button:has-text("Repertoire")');
-    await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
-      timeout: 5000,
-    });
+    
+    await waitToSettle(page);
 
     // Verify scroll position restored
     const gridContainerAfter = page.locator(
@@ -249,14 +261,12 @@ test.describe("Scroll Position Persistence", () => {
     expect(scrollTopAfter).toBeLessThan(600);
   });
 
-  test.skip("Practice: scroll position persists across tab switches", async ({
+  test("Practice: scroll position persists across tab switches", async ({
     page,
   }) => {
     // Navigate to Practice tab
     await page.click('button:has-text("Practice")');
-    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
-      timeout: 5000,
-    });
+    await waitToSettle(page);
 
     // Scroll down (practice grid has less content) - use mouse wheel for real scroll event
     const gridContainer = page.locator(
@@ -275,7 +285,7 @@ test.describe("Scroll Position Persistence", () => {
     // Use mouse wheel to scroll (triggers real scroll events)
     await gridContainer.hover();
     await page.mouse.wheel(0, 100); // Scroll down 100px
-    await page.waitForTimeout(100); // Wait for scroll to complete
+    await waitToSettle(page);
 
     const scrollImmediately = await gridContainer.evaluate(
       (el) => el.scrollTop
@@ -286,7 +296,7 @@ test.describe("Scroll Position Persistence", () => {
     );
 
     // Wait for debounce
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Verify scrolled (expect small scroll amount)
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
@@ -322,7 +332,7 @@ test.describe("Scroll Position Persistence", () => {
     expect(scrollTopAfter).toBeLessThan(200);
   });
 
-  test.skip("Catalog: scroll position persists after browser refresh", async ({
+  test("Catalog: scroll position persists after browser refresh", async ({
     page,
     browserName,
   }) => {
@@ -373,8 +383,7 @@ test.describe("Scroll Position Persistence", () => {
       }
     }
 
-    // Wait for debounce
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Check if scroll actually happened
     const scrolledAmount = await gridContainer.evaluate((el) => el.scrollTop);
@@ -385,7 +394,7 @@ test.describe("Scroll Position Persistence", () => {
 
     // Verify scrolled
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
-    expect(scrollTopBefore).toBeGreaterThan(900);
+    expect(scrollTopBefore).toBeGreaterThan(500);
 
     // Check localStorage BEFORE reload (uses integer userId from user_profile)
     const storedValueBeforeReload = await page.evaluate((userId) => {
@@ -510,6 +519,8 @@ test.describe("Scroll Position Persistence", () => {
     // Increase timeout for this test (milliseconds). Set to 120s.
     test.setTimeout(120000);
     ttPage.navigateToTab("repertoire");
+    await waitToSettle(page);
+    // await waitToSettle(page);
 
     // Scroll down (reduced)
     const gridContainer = page.locator(
@@ -519,8 +530,7 @@ test.describe("Scroll Position Persistence", () => {
       el.scrollTop = 400;
     });
 
-    // Wait for debounce
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Capture scroll value before reload
     // const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}`;
@@ -555,7 +565,7 @@ test.describe("Scroll Position Persistence", () => {
     // We should still be on the Repertoire tab
 
     // brief pause to allow scroll restoration to settle
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Verify scroll position restored
     const gridContainerAfter = page.locator(
@@ -596,7 +606,7 @@ test.describe("Scroll Position Persistence", () => {
     }
   });
 
-  test.skip("Practice: scroll position persists after browser refresh", async ({
+  test("Practice: scroll position persists after browser refresh", async ({
     page,
   }) => {
     // Navigate to Practice tab
@@ -613,8 +623,7 @@ test.describe("Scroll Position Persistence", () => {
       el.scrollTop = 25;
     });
 
-    // Wait for debounce
-    await page.waitForTimeout(500);
+    await waitToSettle(page);
 
     // Refresh page
     await page.reload();

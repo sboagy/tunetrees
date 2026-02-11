@@ -130,6 +130,13 @@ interface AuthState {
 
   /** Force sync up to Supabase (push local changes immediately) */
   forceSyncUp: (opts?: { allowDeletes?: boolean }) => Promise<void>;
+
+  /** Catalog sync pending (true if initial sync excluded catalog tables until after onboarding) */
+  catalogSyncPending: Accessor<boolean>;
+
+  /** Trigger catalog sync after onboarding completion (pulls catalog tables with genre filter) */
+  triggerCatalogSync: () => Promise<void>;
+
   /** Last successful syncDown ISO timestamp (null if none yet) */
   lastSyncTimestamp: Accessor<string | null>;
   /** Mode of last syncDown ('full' | 'incremental' | null if none yet) */
@@ -212,6 +219,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [remoteSyncDownCompletionVersion, setRemoteSyncDownCompletionVersion] =
     createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
+  const [catalogSyncPending, setCatalogSyncPending] = createSignal(false);
   const [isAnonymous, setIsAnonymous] = createSignal(false);
   // Track last successful syncDown timestamp (used for displaying sync recency)
   const [lastSyncTimestamp, setLastSyncTimestamp] = createSignal<string | null>(
@@ -538,44 +546,120 @@ export const AuthProvider: ParentComponent = (props) => {
     // so we can't rely on it to infer whether this is the first sync completion.
     // Track first completion per worker to ensure view signals fire at least once.
     let firstSyncCompletionHandled = false;
+    let metadataPrefetchPromise: Promise<void> | null = null;
 
     const requestOverridesProvider = async () => {
       try {
-        const { getUserGenreSelection } = await import(
-          "@/lib/db/queries/user-genre-selection"
-        );
-        const selected = await getUserGenreSelection(db, authUserId);
+        const { buildGenreFilterOverrides, preSyncMetadataViaWorker } =
+          await import("@/lib/sync/genre-filter");
 
-        if (!isAnonymousUser && selected.length === 0) {
+        // Only pre-fetch metadata for authenticated users (anonymous users work from local DB only)
+        if (!isAnonymousUser) {
+          const lastSyncAt =
+            syncServiceInstance?.getLastSyncDownTimestamp?.() ?? null;
+
+          // Get userId for debug logging (best effort)
+          const debugUserId = await getUserInternalIdFromLocalDb(
+            db,
+            authUserId
+          ).catch(() => null);
+
+          if (!metadataPrefetchPromise) {
+            metadataPrefetchPromise = preSyncMetadataViaWorker({
+              db,
+              supabase,
+              lastSyncAt,
+              userId: debugUserId ?? undefined,
+            }).finally(() => {
+              metadataPrefetchPromise = null;
+            });
+          }
+
+          await metadataPrefetchPromise;
+        }
+
+        const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
+        if (!internalId) {
+          console.warn(
+            "[AuthContext] Failed to resolve internal user id for genre filtering"
+          );
           return null;
         }
 
-        const basePullTables = [
-          "genre",
-          "tune_type",
-          "genre_tune_type",
-          "instrument",
-        ];
-        const pullTables = isAnonymousUser
-          ? selected.length > 0
-            ? [...basePullTables, "tune"]
-            : basePullTables
-          : undefined;
+        const isInitialSync =
+          !syncServiceInstance?.getLastSyncDownTimestamp?.();
 
-        return {
-          collectionsOverride: { selectedGenres: selected },
-          ...(pullTables ? { pullTables } : {}),
-        };
+        // For anonymous users on initial sync when catalog sync hasn't been done yet:
+        // Only pull metadata tables (genre, instrument) to populate onboarding dialogs.
+        // Catalog tables (tune, reference, etc.) will be pulled after genre selection.
+        // We check catalogSyncPending (not initialSyncComplete) because initialSyncComplete
+        // is set to true early to let the offline-first UI load, but catalog sync is still pending.
+        if (isAnonymousUser && isInitialSync && catalogSyncPending()) {
+          const pullTablesOverride = {
+            pullTables: [
+              "genre",
+              "genre_tune_type",
+              "tune_type",
+              "instrument",
+              "user_profile",
+              "user_genre_selection",
+              "playlist",
+            ],
+          };
+          console.log(
+            "[AuthContext] 🎯 Anonymous initial sync: Deferring catalog sync until after genre selection. pullTables=",
+            pullTablesOverride.pullTables
+          );
+          return pullTablesOverride;
+        }
+
+        // For anonymous users doing catalog sync after genre selection:
+        // Pull only the catalog tables that were excluded from initial sync.
+        // This is a "partial initial sync" for catalog tables with genre filter applied.
+        if (isAnonymousUser && isInitialSync && !catalogSyncPending()) {
+          const catalogTablesOverride = {
+            pullTables: [
+              "tune",
+              "reference",
+              "note",
+              "playlist_tune",
+              "practice_record",
+              "tune_override",
+              "daily_practice_queue",
+              "tab_group_main_state",
+              "table_state",
+              "table_transient_data",
+              "tag",
+              "prefs_scheduling_options",
+              "prefs_spaced_repetition",
+            ],
+          };
+          console.log(
+            "[AuthContext] 🎯 Anonymous catalog sync: Pulling catalog tables with genre filter. pullTables=",
+            catalogTablesOverride.pullTables
+          );
+          // Let genre filter be applied to these tables
+          const genreOverrides = await buildGenreFilterOverrides({
+            db,
+            supabase,
+            userId: internalId,
+            isInitialSync,
+          });
+          return {
+            ...catalogTablesOverride,
+            ...genreOverrides,
+          };
+        }
+
+        return await buildGenreFilterOverrides({
+          db,
+          supabase,
+          userId: internalId,
+          isInitialSync,
+        });
       } catch (error) {
-        console.warn(
-          "[AuthContext] Failed to resolve genre selection overrides:",
-          error
-        );
-        if (!isAnonymousUser) return null;
-        return {
-          collectionsOverride: { selectedGenres: [] },
-          pullTables: ["genre", "tune_type", "genre_tune_type", "instrument"],
-        };
+        console.error("[AuthContext] Failed to build sync overrides:", error);
+        return null;
       }
     };
 
@@ -835,6 +919,7 @@ export const AuthProvider: ParentComponent = (props) => {
     if (currentUserId && currentUserId !== anonymousUserId) {
       diagLog("🔄 Switching anonymous users - resetting sync state");
       setInitialSyncComplete(false);
+      setCatalogSyncPending(true); // New anonymous user needs to go through onboarding
       setUserIdInt(null);
     }
 
@@ -948,6 +1033,9 @@ export const AuthProvider: ParentComponent = (props) => {
 
       // Set anonymous flag early (before sync)
       setIsAnonymous(true);
+
+      // For anonymous users, catalog sync is deferred until after genre selection during onboarding
+      setCatalogSyncPending(true);
 
       // Offline-first: local SQLite is already usable at this point (we just ensured
       // user_profile exists). Allow UI to load immediately, even if initial syncDown
@@ -2172,6 +2260,21 @@ export const AuthProvider: ParentComponent = (props) => {
     signOut,
     forceSyncDown,
     forceSyncUp,
+    catalogSyncPending,
+    triggerCatalogSync: async () => {
+      if (catalogSyncPending()) {
+        console.log(
+          "[AuthContext] Triggering catalog sync after genre selection"
+        );
+        setCatalogSyncPending(false);
+
+        // Use full:true to make this an "initial sync" so requestOverridesProvider
+        // can apply the catalog-only pullTables override (condition #2).
+        // Without full:true, this would be an incremental sync and the pullTables condition
+        // wouldn't match (because isInitialSync would be false).
+        await forceSyncDown({ full: true });
+      }
+    },
     lastSyncTimestamp,
     lastSyncMode,
     syncPracticeScope,

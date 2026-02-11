@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import type { IncomingMessage } from "node:http";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -61,7 +62,45 @@ export default defineConfig(() => {
             });
           },
         },
+        "/api/proxy": {
+          target: "http://localhost",
+          changeOrigin: true,
+          router: (req: IncomingMessage) => {
+            try {
+              const url = new URL(req.url ?? "", "http://localhost");
+              const targetUrl = url.searchParams.get("url");
+              if (targetUrl) {
+                return new URL(targetUrl).origin;
+              }
+            } catch (error) {
+              console.error("[Vite Proxy] Invalid proxy URL:", error);
+            }
+            return "http://localhost";
+          },
+          rewrite: (path: string) => {
+            try {
+              const url = new URL(path, "http://localhost");
+              const targetUrl = url.searchParams.get("url");
+              if (targetUrl) {
+                const targetUrlObj = new URL(targetUrl);
+                return targetUrlObj.pathname + targetUrlObj.search;
+              }
+            } catch (error) {
+              console.error("[Vite Proxy] Error parsing URL:", error);
+            }
+            return path;
+          },
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
+              console.log(`[Vite Proxy] Proxying: ${req.method} ${req.url}`);
+              proxyReq.setHeader("User-Agent", "TuneTrees-PWA-Dev/1.0");
+            });
+          },
+        },
       },
+    },
+    worker: {
+      format: "es",
     },
     test: {
       exclude: [
@@ -113,6 +152,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
           // Cache all static assets INCLUDING WASM and SQL files for offline
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,wasm,sql}"],
           // Runtime caching strategies
