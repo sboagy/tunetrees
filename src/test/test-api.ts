@@ -323,9 +323,9 @@ async function getCatalogSelectionDiagnostics() {
     id: string;
     supabase_user_id: string | null;
   }>(sql`
-    SELECT id, supabase_user_id
+    SELECT supabase_user_id AS id, supabase_user_id
     FROM user_profile
-    WHERE id = ${userRef} OR supabase_user_id = ${userRef}
+    WHERE supabase_user_id = ${userRef}
   `);
 
   const userIds = new Set<string>([userRef]);
@@ -753,18 +753,8 @@ async function seedSampleCatalogRow() {
     ["itrad", "Irish Traditional", "Ireland", "Traditional Irish music genre"]
   );
   rawDb.run(
-    "INSERT OR IGNORE INTO user_profile (id, supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      "test-user-id",
-      "test-user-id",
-      "Test User",
-      null,
-      "fsrs",
-      0,
-      1,
-      now,
-      "local",
-    ]
+    "INSERT OR IGNORE INTO user_profile (supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ["test-user-id", "Test User", null, "fsrs", 0, 1, now, "local"]
   );
   rawDb.run(
     `INSERT OR REPLACE INTO tune (

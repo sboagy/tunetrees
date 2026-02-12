@@ -66,10 +66,14 @@ import {
  * ```
  */
 const PracticeIndex: Component = () => {
+  const PRACTICE_GATE_DIAGNOSTICS =
+    import.meta.env.VITE_PRACTICE_GATE_DIAGNOSTICS === "true";
+
   const navigate = useNavigate();
   const location = useLocation();
   const {
     user,
+    userIdInt,
     localDb,
     incrementPracticeListStagedChanged,
     practiceListStagedChanged,
@@ -88,26 +92,9 @@ const PracticeIndex: Component = () => {
     string | null
   >(null);
 
-  // Get current user's Supabase Auth UUID
-  const [userId] = createResource(() => {
-    const currentUser = user();
-    const syncReady = initialSyncComplete();
-    const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
-    const remoteSyncReady =
-      remoteSyncDownCompletionVersion() > 0 ||
-      !isOnline ||
-      import.meta.env.VITE_DISABLE_SYNC === "true";
-
-    if (!syncReady || !remoteSyncReady) {
-      console.log(
-        "[PracticeIndex] Waiting for initial sync/syncDown before resolving userId..."
-      );
-      return null;
-    }
-
-    // After eliminating user_profile.id, userProfileId is just the Supabase Auth UUID
-    return currentUser?.id ?? null;
-  });
+  // Canonical user identifier after eliminating user_profile.id.
+  // Prefer AuthContext's resolved ID; fall back to Supabase auth user id.
+  const userId = createMemo(() => userIdInt() ?? user()?.id ?? null);
 
   const [playlists] = createResource(
     () => {
@@ -125,6 +112,71 @@ const PracticeIndex: Component = () => {
       return getUserPlaylists(params.db, params.userId);
     }
   );
+
+  const practiceGateState = createMemo(() => {
+    const currentUser = user();
+    const db = localDb();
+    const playlistId = currentPlaylistId();
+    const syncComplete = initialSyncComplete();
+    const userIdValue = userId();
+    const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+    const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
+    const remoteSyncVersion = remoteSyncDownCompletionVersion();
+    const remoteSyncReady = remoteSyncVersion > 0 || !isOnline || syncDisabled;
+
+    return {
+      hasUser: !!currentUser,
+      hasLocalDb: !!db,
+      hasPlaylist: !!playlistId,
+      syncComplete,
+      hasUserId: !!userIdValue,
+      remoteSyncVersion,
+      remoteSyncReady,
+      isOnline,
+      syncDisabled,
+    };
+  });
+
+  const isPracticeGateOpen = createMemo(() => {
+    const state = practiceGateState();
+    return (
+      state.hasUser &&
+      state.hasLocalDb &&
+      state.hasPlaylist &&
+      state.syncComplete &&
+      state.hasUserId
+    );
+  });
+
+  const practiceGateBlockingReasons = createMemo(() => {
+    const state = practiceGateState();
+    const reasons: string[] = [];
+
+    if (!state.hasUser) reasons.push("auth user");
+    if (!state.hasLocalDb) reasons.push("localDb");
+    if (!state.hasPlaylist) reasons.push("currentPlaylistId");
+    if (!state.syncComplete) reasons.push("initialSyncComplete");
+    if (!state.hasUserId) reasons.push("userId()");
+
+    return reasons;
+  });
+
+  let lastPracticeGateSignature: string | null = null;
+  createEffect(() => {
+    if (!PRACTICE_GATE_DIAGNOSTICS) return;
+
+    const state = practiceGateState();
+    const signature = JSON.stringify(state);
+
+    if (signature === lastPracticeGateSignature) return;
+    lastPracticeGateSignature = signature;
+
+    if (!isPracticeGateOpen()) {
+      console.log(
+        `[PracticeIndexGate] blocked=${practiceGateBlockingReasons().join(",") || "none"} state=${signature}`
+      );
+    }
+  });
 
   createEffect(() => {
     if (!initialSyncComplete() || !user() || !localDb() || !userId()) {
@@ -912,6 +964,8 @@ const PracticeIndex: Component = () => {
   };
 
   const renderPracticeFallback = () => {
+    const gateBlocked = !isPracticeGateOpen();
+    const blockingReasons = practiceGateBlockingReasons();
     const playlistsReady = playlistsLoadedVersion() === playlistsVersion();
     const playlistsLoading =
       !playlistsReady || playlists.loading || playlists() === undefined;
@@ -944,7 +998,11 @@ const PracticeIndex: Component = () => {
       <GridStatusMessage
         variant="loading"
         title="Loading practice queue..."
-        description="Syncing your scheduled tunes."
+        description={
+          PRACTICE_GATE_DIAGNOSTICS && gateBlocked && blockingReasons.length > 0
+            ? `Waiting for: ${blockingReasons.join(", ")}`
+            : "Syncing your scheduled tunes."
+        }
       />
     );
   };
@@ -978,17 +1036,7 @@ const PracticeIndex: Component = () => {
 
       {/* Main Content Area - Grid or Flashcard fills remaining space */}
       <div class={GRID_CONTENT_CONTAINER}>
-        <Show
-          when={
-            user() &&
-            localDb() &&
-            currentPlaylistId() &&
-            initialSyncComplete() &&
-            !userId.loading &&
-            userId()
-          }
-          fallback={renderPracticeFallback()}
-        >
+        <Show when={isPracticeGateOpen()} fallback={renderPracticeFallback()}>
           <Show
             when={!flashcardMode()}
             fallback={

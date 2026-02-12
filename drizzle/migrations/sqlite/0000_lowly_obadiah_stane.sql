@@ -78,6 +78,7 @@ CREATE TABLE
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
 	FOREIGN KEY (`private_to_user`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
+	);
 --> statement-breakpoint
 CREATE INDEX `idx_instrument_instrument` ON `instrument` (`instrument`);
 
@@ -357,7 +358,8 @@ CREATE TABLE
 		FOREIGN KEY (`genre`) REFERENCES `genre` (`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`private_for`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action);
 
---> statement-breakpointCREATE TABLE
+--> statement-breakpoint
+CREATE TABLE
 	`tune_override` (
 		`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 		`tune_ref` integer NOT NULL,
