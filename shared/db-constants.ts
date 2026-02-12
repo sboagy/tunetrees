@@ -11,8 +11,8 @@ export const TBL = {
   GENRE_TUNE_TYPE: "genre_tune_type",
   INSTRUMENT: "instrument",
   NOTE: "note",
-  PLAYLIST: "playlist",
-  PLAYLIST_TUNE: "playlist_tune",
+  REPERTOIRE: "repertoire",
+  REPERTOIRE_TUNE: "repertoire_tune",
   PRACTICE_RECORD: "practice_record",
   PREFS_SCHEDULING_OPTIONS: "prefs_scheduling_options",
   PREFS_SPACED_REPETITION: "prefs_spaced_repetition",
@@ -40,7 +40,7 @@ export const COL = {
   DELETED: "deleted",
   USER_REF: "user_ref",
   TUNE_REF: "tune_ref",
-  PLAYLIST_REF: "playlist_ref",
+  REPERTOIRE_REF: "repertoire_ref",
   GENRE_ID: "genre_id",
   TUNE_TYPE_ID: "tune_type_id",
   NAME: "name",
@@ -81,12 +81,12 @@ export const COL = {
   FAVORITE: "favorite",
   DISPLAY_ORDER: "display_order",
 
-  // playlist
-  PLAYLIST_ID: "playlist_id",
+  // repertoire
+  REPERTOIRE_ID: "repertoire_id",
   INSTRUMENT_REF: "instrument_ref",
   SR_ALG_TYPE: "sr_alg_type",
 
-  // playlist_tune
+  // repertoire_tune
   CURRENT: "current",
   LEARNED: "learned",
   SCHEDULED: "scheduled",
@@ -148,7 +148,7 @@ export const COL = {
 
   // tab_group_main_state
   WHICH_TAB: "which_tab",
-  PLAYLIST_ID_FK: "playlist_id", // Note: playlist_id is used as PK in playlist table, but as FK here
+  REPERTOIRE_ID_FK: "repertoire_id", // Note: repertoire_id is used as PK in repertoire table, but as FK here
   TAB_SPEC: "tab_spec",
   PRACTICE_SHOW_SUBMITTED: "practice_show_submitted",
   PRACTICE_MODE_FLASHCARD: "practice_mode_flashcard",
