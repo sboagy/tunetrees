@@ -48,7 +48,22 @@ ALTER TABLE user_genre_selection DROP CONSTRAINT IF EXISTS user_genre_selection_
 ALTER TABLE plugin DROP CONSTRAINT IF EXISTS plugin_user_ref_fkey;
 
 -- ============================================================================
--- STEP 2: Add new foreign key constraints to user_profile.supabase_user_id
+-- STEP 2: Shift PRIMARY KEY from id to supabase_user_id
+-- ============================================================================
+-- CRITICAL: Must do this BEFORE creating new FK constraints
+-- FK constraints require target column to be PRIMARY KEY or UNIQUE
+
+-- Drop the old primary key constraint
+ALTER TABLE user_profile DROP CONSTRAINT user_profile_pkey;
+
+-- Make supabase_user_id the new primary key
+ALTER TABLE user_profile ADD PRIMARY KEY (supabase_user_id);
+
+-- Drop the id column (no longer needed)
+ALTER TABLE user_profile DROP COLUMN id;
+
+-- ============================================================================
+-- STEP 3: Add new foreign key constraints to user_profile.supabase_user_id
 -- ============================================================================
 
 ALTER TABLE tab_group_main_state
@@ -112,11 +127,11 @@ ALTER TABLE plugin
   FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
 
 -- ============================================================================
--- STEP 3: Update RLS policies to use auth.uid() directly
+-- STEP 4: Update RLS policies to use auth.uid() directly
 -- ============================================================================
--- NOTE: Must update policies BEFORE dropping user_profile.id column
--- Many policies use subqueries like: SELECT id FROM user_profile WHERE supabase_user_id = auth.uid()
--- These simplify to direct comparisons after FK rewiring
+-- NOTE: Policies updated after FK rewiring is complete
+-- Many old policies used subqueries like: SELECT id FROM user_profile WHERE supabase_user_id = auth.uid()
+-- These simplify to direct auth.uid() comparisons after FK rewiring
 
 -- Playlist policies
 DROP POLICY IF EXISTS "Users can view own playlists" ON playlist;
@@ -773,19 +788,6 @@ ORDER BY
 
 ALTER VIEW "public"."view_practice_record_readable" OWNER TO "postgres";
 COMMENT ON VIEW "public"."view_practice_record_readable" IS 'Human-readable view of practice records with resolved user names, instrument names, tune titles, and decoded quality/state labels. Uses security_invoker to respect RLS.';
-
--- ============================================================================
--- STEP 7: Update user_profile table (drop id column, make supabase_user_id PK)
--- ============================================================================
-
--- Drop the old primary key constraint
-ALTER TABLE user_profile DROP CONSTRAINT user_profile_pkey;
-
--- Drop the id column
-ALTER TABLE user_profile DROP COLUMN id;
-
--- Make supabase_user_id the new primary key
-ALTER TABLE user_profile ADD PRIMARY KEY (supabase_user_id);
 
 
 COMMIT;
