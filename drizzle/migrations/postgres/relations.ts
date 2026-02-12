@@ -1,10 +1,10 @@
 import { relations } from "drizzle-orm/relations";
-import { playlist, tabGroupMainState, userProfile, tune, tag, practiceRecord, genre, tuneOverride, instrument, dailyPracticeQueue, note, prefsSchedulingOptions, reference, genreTuneType, tuneType, tableState, playlistTune, prefsSpacedRepetition, tableTransientData } from "./schema";
+import { repertoire, tabGroupMainState, userProfile, tune, tag, practiceRecord, genre, tuneOverride, instrument, dailyPracticeQueue, note, prefsSchedulingOptions, reference, genreTuneType, tuneType, tableState, repertoireTune, prefsSpacedRepetition, tableTransientData } from "./schema";
 
 export const tabGroupMainStateRelations = relations(tabGroupMainState, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [tabGroupMainState.playlistId],
-		references: [playlist.playlistId]
+	repertoire: one(repertoire, {
+		fields: [tabGroupMainState.repertoireId],
+		references: [repertoire.repertoireId]
 	}),
 	userProfile: one(userProfile, {
 		fields: [tabGroupMainState.userId],
@@ -12,21 +12,21 @@ export const tabGroupMainStateRelations = relations(tabGroupMainState, ({one}) =
 	}),
 }));
 
-export const playlistRelations = relations(playlist, ({one, many}) => ({
+export const repertoireRelations = relations(repertoire, ({one, many}) => ({
 	tabGroupMainStates: many(tabGroupMainState),
 	practiceRecords: many(practiceRecord),
 	dailyPracticeQueues: many(dailyPracticeQueue),
 	notes: many(note),
 	instrument: one(instrument, {
-		fields: [playlist.instrumentRef],
+		fields: [repertoire.instrumentRef],
 		references: [instrument.id]
 	}),
 	userProfile: one(userProfile, {
-		fields: [playlist.userRef],
+		fields: [repertoire.userRef],
 		references: [userProfile.id]
 	}),
 	tableStates: many(tableState),
-	playlistTunes: many(playlistTune),
+	repertoireTunes: many(repertoireTune),
 	tableTransientData: many(tableTransientData),
 }));
 
@@ -38,7 +38,7 @@ export const userProfileRelations = relations(userProfile, ({many}) => ({
 	instruments: many(instrument),
 	dailyPracticeQueues: many(dailyPracticeQueue),
 	notes: many(note),
-	playlists: many(playlist),
+	repertoires: many(repertoire),
 	prefsSchedulingOptions: many(prefsSchedulingOptions),
 	references: many(reference),
 	tableStates: many(tableState),
@@ -72,14 +72,14 @@ export const tuneRelations = relations(tune, ({one, many}) => ({
 	dailyPracticeQueues: many(dailyPracticeQueue),
 	notes: many(note),
 	references: many(reference),
-	playlistTunes: many(playlistTune),
+	repertoireTunes: many(repertoireTune),
 	tableTransientData: many(tableTransientData),
 }));
 
 export const practiceRecordRelations = relations(practiceRecord, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [practiceRecord.playlistRef],
-		references: [playlist.playlistId]
+	repertoire: one(repertoire, {
+		fields: [practiceRecord.repertoireRef],
+		references: [repertoire.repertoireId]
 	}),
 	tune: one(tune, {
 		fields: [practiceRecord.tuneRef],
@@ -118,13 +118,13 @@ export const instrumentRelations = relations(instrument, ({one, many}) => ({
 		fields: [instrument.privateToUser],
 		references: [userProfile.id]
 	}),
-	playlists: many(playlist),
+	repertoires: many(repertoire),
 }));
 
 export const dailyPracticeQueueRelations = relations(dailyPracticeQueue, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [dailyPracticeQueue.playlistRef],
-		references: [playlist.playlistId]
+	repertoire: one(repertoire, {
+		fields: [dailyPracticeQueue.repertoireRef],
+		references: [repertoire.repertoireId]
 	}),
 	tune: one(tune, {
 		fields: [dailyPracticeQueue.tuneRef],
@@ -137,9 +137,9 @@ export const dailyPracticeQueueRelations = relations(dailyPracticeQueue, ({one})
 }));
 
 export const noteRelations = relations(note, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [note.playlistRef],
-		references: [playlist.playlistId]
+	repertoire: one(repertoire, {
+		fields: [note.repertoireRef],
+		references: [repertoire.repertoireId]
 	}),
 	tune: one(tune, {
 		fields: [note.tuneRef],
@@ -185,9 +185,9 @@ export const tuneTypeRelations = relations(tuneType, ({many}) => ({
 }));
 
 export const tableStateRelations = relations(tableState, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [tableState.playlistId],
-		references: [playlist.playlistId]
+	repertoire: one(repertoire, {
+		fields: [tableState.repertoireId],
+		references: [repertoire.repertoireId]
 	}),
 	userProfile: one(userProfile, {
 		fields: [tableState.userId],
@@ -195,13 +195,13 @@ export const tableStateRelations = relations(tableState, ({one}) => ({
 	}),
 }));
 
-export const playlistTuneRelations = relations(playlistTune, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [playlistTune.playlistRef],
-		references: [playlist.playlistId]
+export const repertoireTuneRelations = relations(repertoireTune, ({one}) => ({
+	repertoire: one(repertoire, {
+		fields: [repertoireTune.repertoireRef],
+		references: [repertoire.repertoireId]
 	}),
 	tune: one(tune, {
-		fields: [playlistTune.tuneRef],
+		fields: [repertoireTune.tuneRef],
 		references: [tune.id]
 	}),
 }));
@@ -214,9 +214,9 @@ export const prefsSpacedRepetitionRelations = relations(prefsSpacedRepetition, (
 }));
 
 export const tableTransientDataRelations = relations(tableTransientData, ({one}) => ({
-	playlist: one(playlist, {
-		fields: [tableTransientData.playlistId],
-		references: [playlist.playlistId]
+	repertoire: one(repertoire, {
+		fields: [tableTransientData.repertoireId],
+		references: [repertoire.repertoireId]
 	}),
 	tune: one(tune, {
 		fields: [tableTransientData.tuneId],

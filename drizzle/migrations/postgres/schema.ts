@@ -23,7 +23,7 @@ export const tabGroupMainState = pgTable(
     id: serial().primaryKey().notNull(),
     userId: integer("user_id").notNull(),
     whichTab: text("which_tab").default("practice"),
-    playlistId: integer("playlist_id"),
+    repertoireId: integer("repertoire_id"),
     tabSpec: text("tab_spec"),
     practiceShowSubmitted: integer("practice_show_submitted").default(0),
     practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
@@ -35,9 +35,9 @@ export const tabGroupMainState = pgTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.playlistId],
-      foreignColumns: [playlist.playlistId],
-      name: "tab_group_main_state_playlist_fk",
+      columns: [table.repertoireId],
+      foreignColumns: [repertoire.repertoireId],
+      name: "tab_group_main_state_repertoire_fk",
     }),
     foreignKey({
       columns: [table.userId],
@@ -202,7 +202,7 @@ export const practiceRecord = pgTable(
   "practice_record",
   {
     id: serial().primaryKey().notNull(),
-    playlistRef: integer("playlist_ref").notNull(),
+    repertoireRef: integer("repertoire_ref").notNull(),
     tuneRef: integer("tune_ref").notNull(),
     practiced: timestamp({ mode: "string" }),
     quality: integer(),
@@ -234,24 +234,24 @@ export const practiceRecord = pgTable(
       "btree",
       table.practiced.desc().nullsLast().op("timestamp_ops")
     ),
-    index("idx_practice_record_tune_playlist_practiced").using(
+    index("idx_practice_record_tune_repertoire_practiced").using(
       "btree",
       table.tuneRef.asc().nullsLast().op("int4_ops"),
-      table.playlistRef.asc().nullsLast().op("timestamp_ops"),
+      table.repertoireRef.asc().nullsLast().op("timestamp_ops"),
       table.practiced.desc().nullsLast().op("timestamp_ops")
     ),
     foreignKey({
-      columns: [table.playlistRef],
-      foreignColumns: [playlist.playlistId],
-      name: "practice_record_playlist_ref_playlist_playlist_id_fk",
+      columns: [table.repertoireRef],
+      foreignColumns: [repertoire.repertoireId],
+      name: "practice_record_repertoire_ref_repertoire_repertoire_id_fk",
     }),
     foreignKey({
       columns: [table.tuneRef],
       foreignColumns: [tune.id],
       name: "practice_record_tune_ref_tune_id_fk",
     }),
-    unique("practice_record_tune_ref_playlist_ref_practiced_unique").on(
-      table.playlistRef,
+    unique("practice_record_tune_ref_repertoire_ref_practiced_unique").on(
+      table.repertoireRef,
       table.tuneRef,
       table.practiced
     ),
@@ -259,9 +259,9 @@ export const practiceRecord = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(playlist_ref IN ( SELECT playlist.playlist_id
-   FROM playlist
-  WHERE (playlist.user_ref IN ( SELECT user_profile.id
+      using: sql`(repertoire_ref IN ( SELECT repertoire.repertoire_id
+   FROM repertoire
+  WHERE (repertoire.user_ref IN ( SELECT user_profile.id
            FROM user_profile
           WHERE (user_profile.supabase_user_id = auth.uid())))))`,
     }),
@@ -463,7 +463,7 @@ export const dailyPracticeQueue = pgTable(
   {
     id: serial().primaryKey().notNull(),
     userRef: integer("user_ref").notNull(),
-    playlistRef: integer("playlist_ref").notNull(),
+    repertoireRef: integer("repertoire_ref").notNull(),
     mode: text(),
     queueDate: timestamp("queue_date", { mode: "string" }),
     windowStartUtc: timestamp("window_start_utc", { mode: "string" }).notNull(),
@@ -497,28 +497,28 @@ export const dailyPracticeQueue = pgTable(
       "btree",
       table.generatedAt.asc().nullsLast().op("timestamp_ops")
     ),
-    index("idx_queue_user_playlist_active").using(
+    index("idx_queue_user_repertoire_active").using(
       "btree",
       table.userRef.asc().nullsLast().op("int4_ops"),
-      table.playlistRef.asc().nullsLast().op("bool_ops"),
+      table.repertoireRef.asc().nullsLast().op("bool_ops"),
       table.active.asc().nullsLast().op("bool_ops")
     ),
-    index("idx_queue_user_playlist_bucket").using(
+    index("idx_queue_user_repertoire_bucket").using(
       "btree",
       table.userRef.asc().nullsLast().op("int4_ops"),
-      table.playlistRef.asc().nullsLast().op("int4_ops"),
+      table.repertoireRef.asc().nullsLast().op("int4_ops"),
       table.bucket.asc().nullsLast().op("int4_ops")
     ),
-    index("idx_queue_user_playlist_window").using(
+    index("idx_queue_user_repertoire_window").using(
       "btree",
       table.userRef.asc().nullsLast().op("int4_ops"),
-      table.playlistRef.asc().nullsLast().op("timestamp_ops"),
+      table.repertoireRef.asc().nullsLast().op("timestamp_ops"),
       table.windowStartUtc.asc().nullsLast().op("int4_ops")
     ),
     foreignKey({
-      columns: [table.playlistRef],
-      foreignColumns: [playlist.playlistId],
-      name: "daily_practice_queue_playlist_fk",
+      columns: [table.repertoireRef],
+      foreignColumns: [repertoire.repertoireId],
+      name: "daily_practice_queue_repertoire_fk",
     }),
     foreignKey({
       columns: [table.tuneRef],
@@ -531,8 +531,8 @@ export const dailyPracticeQueue = pgTable(
       name: "daily_practice_queue_user_profile_fk",
     }),
     unique(
-      "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tun"
-    ).on(table.userRef, table.playlistRef, table.windowStartUtc, table.tuneRef),
+      "daily_practice_queue_user_ref_repertoire_ref_window_start_utc_tun"
+    ).on(table.userRef, table.repertoireRef, table.windowStartUtc, table.tuneRef),
     pgPolicy("Users can view own practice queue", {
       as: "permissive",
       for: "select",
@@ -583,7 +583,7 @@ export const note = pgTable(
     id: serial().primaryKey().notNull(),
     userRef: integer("user_ref"),
     tuneRef: integer("tune_ref").notNull(),
-    playlistRef: integer("playlist_ref"),
+    repertoireRef: integer("repertoire_ref"),
     createdDate: timestamp("created_date", { mode: "string" }),
     noteText: text("note_text"),
     public: boolean().default(false).notNull(),
@@ -596,15 +596,15 @@ export const note = pgTable(
     deviceId: text("device_id"),
   },
   (table) => [
-    index("idx_note_tune_playlist").using(
+    index("idx_note_tune_repertoire").using(
       "btree",
       table.tuneRef.asc().nullsLast().op("int4_ops"),
-      table.playlistRef.asc().nullsLast().op("int4_ops")
+      table.repertoireRef.asc().nullsLast().op("int4_ops")
     ),
-    index("idx_note_tune_playlist_user_public").using(
+    index("idx_note_tune_repertoire_user_public").using(
       "btree",
       table.tuneRef.asc().nullsLast().op("int4_ops"),
-      table.playlistRef.asc().nullsLast().op("bool_ops"),
+      table.repertoireRef.asc().nullsLast().op("bool_ops"),
       table.userRef.asc().nullsLast().op("int4_ops"),
       table.public.asc().nullsLast().op("bool_ops")
     ),
@@ -614,9 +614,9 @@ export const note = pgTable(
       table.userRef.asc().nullsLast().op("int4_ops")
     ),
     foreignKey({
-      columns: [table.playlistRef],
-      foreignColumns: [playlist.playlistId],
-      name: "note_playlist_ref_playlist_playlist_id_fk",
+      columns: [table.repertoireRef],
+      foreignColumns: [repertoire.repertoireId],
+      name: "note_repertoire_ref_repertoire_repertoire_id_fk",
     }),
     foreignKey({
       columns: [table.tuneRef],
@@ -656,10 +656,10 @@ export const note = pgTable(
   ]
 );
 
-export const playlist = pgTable(
-  "playlist",
+export const repertoire = pgTable(
+  "repertoire",
   {
-    playlistId: serial("playlist_id").primaryKey().notNull(),
+    repertoireId: serial("repertoire_id").primaryKey().notNull(),
     userRef: integer("user_ref").notNull(),
     instrumentRef: integer("instrument_ref"),
     srAlgType: text("sr_alg_type"),
@@ -676,18 +676,18 @@ export const playlist = pgTable(
     foreignKey({
       columns: [table.instrumentRef],
       foreignColumns: [instrument.id],
-      name: "playlist_instrument_fk",
+      name: "repertoire_instrument_fk",
     }),
     foreignKey({
       columns: [table.userRef],
       foreignColumns: [userProfile.id],
-      name: "playlist_user_ref_user_profile_id_fk",
+      name: "repertoire_user_ref_user_profile_id_fk",
     }),
-    unique("playlist_user_ref_instrument_ref_unique").on(
+    unique("repertoire_user_ref_instrument_ref_unique").on(
       table.userRef,
       table.instrumentRef
     ),
-    pgPolicy("Users can view own playlists", {
+    pgPolicy("Users can view own repertoires", {
       as: "permissive",
       for: "select",
       to: ["public"],
@@ -695,17 +695,17 @@ export const playlist = pgTable(
    FROM user_profile
   WHERE (user_profile.supabase_user_id = auth.uid())))`,
     }),
-    pgPolicy("Users can insert own playlists", {
+    pgPolicy("Users can insert own repertoires", {
       as: "permissive",
       for: "insert",
       to: ["public"],
     }),
-    pgPolicy("Users can update own playlists", {
+    pgPolicy("Users can update own repertoires", {
       as: "permissive",
       for: "update",
       to: ["public"],
     }),
-    pgPolicy("Users can delete own playlists", {
+    pgPolicy("Users can delete own repertoires", {
       as: "permissive",
       for: "delete",
       to: ["public"],
@@ -877,7 +877,7 @@ export const tableState = pgTable(
     userId: integer("user_id").notNull(),
     screenSize: text("screen_size").notNull(),
     purpose: text().notNull(),
-    playlistId: integer("playlist_id").notNull(),
+    repertoireId: integer("repertoire_id").notNull(),
     settings: text(),
     currentTune: integer("current_tune"),
     syncVersion: integer("sync_version").default(1).notNull(),
@@ -888,9 +888,9 @@ export const tableState = pgTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.playlistId],
-      foreignColumns: [playlist.playlistId],
-      name: "table_state_playlist_id_playlist_playlist_id_fk",
+      columns: [table.repertoireId],
+      foreignColumns: [repertoire.repertoireId],
+      name: "table_state_repertoire_id_repertoire_repertoire_id_fk",
     }),
     foreignKey({
       columns: [table.userId],
@@ -902,9 +902,9 @@ export const tableState = pgTable(
         table.userId,
         table.screenSize,
         table.purpose,
-        table.playlistId,
+        table.repertoireId,
       ],
-      name: "table_state_user_id_screen_size_purpose_playlist_id_pk",
+      name: "table_state_user_id_screen_size_purpose_repertoire_id_pk",
     }),
     pgPolicy("Users can view own table state", {
       as: "permissive",
@@ -940,10 +940,10 @@ export const tableState = pgTable(
   ]
 );
 
-export const playlistTune = pgTable(
-  "playlist_tune",
+export const repertoireTune = pgTable(
+  "repertoire_tune",
   {
-    playlistRef: integer("playlist_ref").notNull(),
+    repertoireRef: integer("repertoire_ref").notNull(),
     tuneRef: integer("tune_ref").notNull(),
     current: timestamp({ mode: "string" }),
     learned: timestamp({ mode: "string" }),
@@ -958,40 +958,40 @@ export const playlistTune = pgTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.playlistRef],
-      foreignColumns: [playlist.playlistId],
-      name: "playlist_tune_playlist_ref_playlist_playlist_id_fk",
+      columns: [table.repertoireRef],
+      foreignColumns: [repertoire.repertoireId],
+      name: "repertoire_tune_repertoire_ref_repertoire_repertoire_id_fk",
     }),
     foreignKey({
       columns: [table.tuneRef],
       foreignColumns: [tune.id],
-      name: "playlist_tune_tune_ref_tune_id_fk",
+      name: "repertoire_tune_tune_ref_tune_id_fk",
     }),
     primaryKey({
-      columns: [table.playlistRef, table.tuneRef],
-      name: "playlist_tune_playlist_ref_tune_ref_pk",
+      columns: [table.repertoireRef, table.tuneRef],
+      name: "repertoire_tune_repertoire_ref_tune_ref_pk",
     }),
-    pgPolicy("Users can view own playlist tunes", {
+    pgPolicy("Users can view own repertoire tunes", {
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql`(playlist_ref IN ( SELECT playlist.playlist_id
-   FROM playlist
-  WHERE (playlist.user_ref IN ( SELECT user_profile.id
+      using: sql`(repertoire_ref IN ( SELECT repertoire.repertoire_id
+   FROM repertoire
+  WHERE (repertoire.user_ref IN ( SELECT user_profile.id
            FROM user_profile
           WHERE (user_profile.supabase_user_id = auth.uid())))))`,
     }),
-    pgPolicy("Users can insert own playlist tunes", {
+    pgPolicy("Users can insert own repertoire tunes", {
       as: "permissive",
       for: "insert",
       to: ["public"],
     }),
-    pgPolicy("Users can update own playlist tunes", {
+    pgPolicy("Users can update own repertoire tunes", {
       as: "permissive",
       for: "update",
       to: ["public"],
     }),
-    pgPolicy("Users can delete own playlist tunes", {
+    pgPolicy("Users can delete own repertoire tunes", {
       as: "permissive",
       for: "delete",
       to: ["public"],
@@ -1058,7 +1058,7 @@ export const tableTransientData = pgTable(
   {
     userId: integer("user_id").notNull(),
     tuneId: integer("tune_id").notNull(),
-    playlistId: integer("playlist_id").notNull(),
+    repertoireId: integer("repertoire_id").notNull(),
     purpose: text(),
     notePrivate: text("note_private"),
     notePublic: text("note_public"),
@@ -1084,9 +1084,9 @@ export const tableTransientData = pgTable(
   },
   (table) => [
     foreignKey({
-      columns: [table.playlistId],
-      foreignColumns: [playlist.playlistId],
-      name: "table_transient_data_playlist_id_playlist_playlist_id_fk",
+      columns: [table.repertoireId],
+      foreignColumns: [repertoire.repertoireId],
+      name: "table_transient_data_repertoire_id_repertoire_repertoire_id_fk",
     }),
     foreignKey({
       columns: [table.tuneId],
@@ -1099,8 +1099,8 @@ export const tableTransientData = pgTable(
       name: "table_transient_data_user_id_user_profile_id_fk",
     }),
     primaryKey({
-      columns: [table.userId, table.tuneId, table.playlistId],
-      name: "table_transient_data_tune_id_user_id_playlist_id_pk",
+      columns: [table.userId, table.tuneId, table.repertoireId],
+      name: "table_transient_data_tune_id_user_id_repertoire_id_pk",
     }),
     pgPolicy("Users can view own transient data", {
       as: "permissive",
@@ -1127,10 +1127,10 @@ export const tableTransientData = pgTable(
     }),
   ]
 );
-export const viewPlaylistJoined = pgView("view_playlist_joined", {
-  playlistId: integer("playlist_id"),
+export const viewRepertoireJoined = pgView("view_repertoire_joined", {
+  repertoireId: integer("repertoire_id"),
   userRef: integer("user_ref"),
-  playlistDeleted: boolean("playlist_deleted"),
+  repertoireDeleted: boolean("repertoire_deleted"),
   instrumentRef: integer("instrument_ref"),
   privateToUser: integer("private_to_user"),
   instrument: text(),
@@ -1138,7 +1138,7 @@ export const viewPlaylistJoined = pgView("view_playlist_joined", {
   genreDefault: text("genre_default"),
   instrumentDeleted: boolean("instrument_deleted"),
 }).as(
-  sql`SELECT p.playlist_id, p.user_ref, p.deleted AS playlist_deleted, p.instrument_ref, i.private_to_user, i.instrument, i.description, i.genre_default, i.deleted AS instrument_deleted FROM playlist p JOIN instrument i ON p.instrument_ref = i.id`
+  sql`SELECT p.repertoire_id, p.user_ref, p.deleted AS repertoire_deleted, p.instrument_ref, i.private_to_user, i.instrument, i.description, i.genre_default, i.deleted AS instrument_deleted FROM repertoire p JOIN instrument i ON p.instrument_ref = i.id`
 );
 
 export const practiceListJoined = pgView("practice_list_joined", {
@@ -1167,14 +1167,14 @@ export const practiceListJoined = pgView("practice_list_joined", {
   latestGoal: text("latest_goal"),
   latestTechnique: text("latest_technique"),
   tags: text(),
-  playlistRef: integer("playlist_ref"),
+  repertoireRef: integer("repertoire_ref"),
   userRef: integer("user_ref"),
-  playlistDeleted: boolean("playlist_deleted"),
+  repertoireDeleted: boolean("repertoire_deleted"),
   notes: text(),
   favoriteUrl: text("favorite_url"),
   hasOverride: integer("has_override"),
 }).as(
-  sql`SELECT tune.id, COALESCE(tune_override.title, tune.title) AS title, COALESCE(tune_override.type, tune.type) AS type, COALESCE(tune_override.structure, tune.structure) AS structure, COALESCE(tune_override.mode, tune.mode) AS mode, COALESCE(tune_override.incipit, tune.incipit) AS incipit, COALESCE(tune_override.genre, tune.genre) AS genre, tune.deleted, tune.private_for, playlist_tune.learned, playlist_tune.goal, playlist_tune.scheduled, practice_record.state AS latest_state, practice_record.practiced AS latest_practiced, practice_record.quality AS latest_quality, practice_record.easiness AS latest_easiness, practice_record.difficulty AS latest_difficulty, practice_record."interval" AS latest_interval, practice_record.stability AS latest_stability, practice_record.step AS latest_step, practice_record.repetitions AS latest_repetitions, practice_record.due AS latest_due, practice_record.goal AS latest_goal, practice_record.technique AS latest_technique, ( SELECT string_agg(tag_1.tag_text, ' '::text) AS string_agg FROM tag tag_1 WHERE tag_1.tune_ref = tune.id AND tag_1.user_ref = playlist.user_ref) AS tags, playlist_tune.playlist_ref, playlist.user_ref, playlist_tune.deleted AS playlist_deleted, ( SELECT string_agg(note.note_text, ' '::text) AS string_agg FROM note WHERE note.tune_ref = tune.id AND note.user_ref = playlist.user_ref) AS notes, ( SELECT ref.url FROM reference ref WHERE ref.tune_ref = tune.id AND ref.user_ref = playlist.user_ref AND ref.favorite = true LIMIT 1) AS favorite_url, CASE WHEN tune_override.user_ref = playlist.user_ref THEN 1 ELSE 0 END AS has_override FROM tune LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref LEFT JOIN tune_override ON tune_override.tune_ref = tune.id LEFT JOIN ( SELECT DISTINCT ON (pr.tune_ref, pr.playlist_ref) pr.id, pr.playlist_ref, pr.tune_ref, pr.practiced, pr.quality, pr.easiness, pr.difficulty, pr.stability, pr."interval", pr.step, pr.repetitions, pr.lapses, pr.elapsed_days, pr.state, pr.due, pr.backup_practiced, pr.goal, pr.technique, pr.sync_version, pr.last_modified_at, pr.device_id FROM practice_record pr ORDER BY pr.tune_ref, pr.playlist_ref, pr.id DESC) practice_record ON practice_record.tune_ref = tune.id AND practice_record.playlist_ref = playlist_tune.playlist_ref LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id) WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref`
+  sql`SELECT tune.id, COALESCE(tune_override.title, tune.title) AS title, COALESCE(tune_override.type, tune.type) AS type, COALESCE(tune_override.structure, tune.structure) AS structure, COALESCE(tune_override.mode, tune.mode) AS mode, COALESCE(tune_override.incipit, tune.incipit) AS incipit, COALESCE(tune_override.genre, tune.genre) AS genre, tune.deleted, tune.private_for, repertoire_tune.learned, repertoire_tune.goal, repertoire_tune.scheduled, practice_record.state AS latest_state, practice_record.practiced AS latest_practiced, practice_record.quality AS latest_quality, practice_record.easiness AS latest_easiness, practice_record.difficulty AS latest_difficulty, practice_record."interval" AS latest_interval, practice_record.stability AS latest_stability, practice_record.step AS latest_step, practice_record.repetitions AS latest_repetitions, practice_record.due AS latest_due, practice_record.goal AS latest_goal, practice_record.technique AS latest_technique, ( SELECT string_agg(tag_1.tag_text, ' '::text) AS string_agg FROM tag tag_1 WHERE tag_1.tune_ref = tune.id AND tag_1.user_ref = repertoire.user_ref) AS tags, repertoire_tune.repertoire_ref, repertoire.user_ref, repertoire_tune.deleted AS repertoire_deleted, ( SELECT string_agg(note.note_text, ' '::text) AS string_agg FROM note WHERE note.tune_ref = tune.id AND note.user_ref = repertoire.user_ref) AS notes, ( SELECT ref.url FROM reference ref WHERE ref.tune_ref = tune.id AND ref.user_ref = repertoire.user_ref AND ref.favorite = true LIMIT 1) AS favorite_url, CASE WHEN tune_override.user_ref = repertoire.user_ref THEN 1 ELSE 0 END AS has_override FROM tune LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref LEFT JOIN tune_override ON tune_override.tune_ref = tune.id LEFT JOIN ( SELECT DISTINCT ON (pr.tune_ref, pr.repertoire_ref) pr.id, pr.repertoire_ref, pr.tune_ref, pr.practiced, pr.quality, pr.easiness, pr.difficulty, pr.stability, pr."interval", pr.step, pr.repetitions, pr.lapses, pr.elapsed_days, pr.state, pr.due, pr.backup_practiced, pr.goal, pr.technique, pr.sync_version, pr.last_modified_at, pr.device_id FROM practice_record pr ORDER BY pr.tune_ref, pr.repertoire_ref, pr.id DESC) practice_record ON practice_record.tune_ref = tune.id AND practice_record.repertoire_ref = repertoire_tune.repertoire_ref LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id) WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref`
 );
 
 export const practiceListStaged = pgView("practice_list_staged", {
@@ -1191,9 +1191,9 @@ export const practiceListStaged = pgView("practice_list_staged", {
   goal: text(),
   scheduled: timestamp({ mode: "string" }),
   userRef: integer("user_ref"),
-  playlistId: integer("playlist_id"),
+  repertoireId: integer("repertoire_id"),
   instrument: text(),
-  playlistDeleted: boolean("playlist_deleted"),
+  repertoireDeleted: boolean("repertoire_deleted"),
   latestState: integer("latest_state"),
   latestPracticed: timestamp("latest_practiced", { mode: "string" }),
   latestQuality: integer("latest_quality"),
@@ -1219,5 +1219,5 @@ export const practiceListStaged = pgView("practice_list_staged", {
   hasOverride: integer("has_override"),
   hasStaged: integer("has_staged"),
 }).as(
-  sql`SELECT tune.id, COALESCE(tune_override.title, tune.title) AS title, COALESCE(tune_override.type, tune.type) AS type, COALESCE(tune_override.structure, tune.structure) AS structure, COALESCE(tune_override.mode, tune.mode) AS mode, COALESCE(tune_override.incipit, tune.incipit) AS incipit, COALESCE(tune_override.genre, tune.genre) AS genre, tune.private_for, tune.deleted, playlist_tune.learned, COALESCE(td.goal, COALESCE(pr.goal, 'recall'::text)) AS goal, playlist_tune.scheduled, playlist.user_ref, playlist.playlist_id, instrument.instrument, playlist_tune.deleted AS playlist_deleted, COALESCE(td.state, pr.state) AS latest_state, COALESCE(td.practiced, pr.practiced) AS latest_practiced, COALESCE(td.quality, pr.quality) AS latest_quality, COALESCE(td.easiness, pr.easiness) AS latest_easiness, COALESCE(td.difficulty, pr.difficulty) AS latest_difficulty, COALESCE(td.stability, pr.stability) AS latest_stability, COALESCE(td."interval", pr."interval") AS latest_interval, COALESCE(td.step, pr.step) AS latest_step, COALESCE(td.repetitions, pr.repetitions) AS latest_repetitions, COALESCE(td.due, pr.due) AS latest_due, COALESCE(td.backup_practiced, pr.backup_practiced) AS latest_backup_practiced, COALESCE(td.goal, pr.goal) AS latest_goal, COALESCE(td.technique, pr.technique) AS latest_technique, ( SELECT string_agg(tag_1.tag_text, ' '::text) AS string_agg FROM tag tag_1 WHERE tag_1.tune_ref = tune.id AND tag_1.user_ref = playlist.user_ref) AS tags, td.purpose, td.note_private, td.note_public, td.recall_eval, ( SELECT string_agg(note.note_text, ' '::text) AS string_agg FROM note WHERE note.tune_ref = tune.id AND note.user_ref = playlist.user_ref) AS notes, ( SELECT ref.url FROM reference ref WHERE ref.tune_ref = tune.id AND ref.user_ref = playlist.user_ref AND ref.favorite = true LIMIT 1) AS favorite_url, CASE WHEN tune_override.user_ref = playlist.user_ref THEN 1 ELSE 0 END AS has_override, CASE WHEN td.practiced IS NOT NULL OR td.quality IS NOT NULL OR td.easiness IS NOT NULL OR td.difficulty IS NOT NULL OR td."interval" IS NOT NULL OR td.step IS NOT NULL OR td.repetitions IS NOT NULL OR td.due IS NOT NULL OR td.backup_practiced IS NOT NULL OR td.goal IS NOT NULL OR td.technique IS NOT NULL OR td.stability IS NOT NULL THEN 1 ELSE 0 END AS has_staged FROM tune LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref LEFT JOIN tune_override ON tune_override.tune_ref = tune.id LEFT JOIN instrument ON instrument.id = playlist.instrument_ref LEFT JOIN ( SELECT DISTINCT ON (pr_1.tune_ref, pr_1.playlist_ref) pr_1.id, pr_1.playlist_ref, pr_1.tune_ref, pr_1.practiced, pr_1.quality, pr_1.easiness, pr_1.difficulty, pr_1.stability, pr_1."interval", pr_1.step, pr_1.repetitions, pr_1.lapses, pr_1.elapsed_days, pr_1.state, pr_1.due, pr_1.backup_practiced, pr_1.goal, pr_1.technique, pr_1.sync_version, pr_1.last_modified_at, pr_1.device_id FROM practice_record pr_1 ORDER BY pr_1.tune_ref, pr_1.playlist_ref, pr_1.id DESC) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref LEFT JOIN tag ON tag.tune_ref = tune.id LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref`
+  sql`SELECT tune.id, COALESCE(tune_override.title, tune.title) AS title, COALESCE(tune_override.type, tune.type) AS type, COALESCE(tune_override.structure, tune.structure) AS structure, COALESCE(tune_override.mode, tune.mode) AS mode, COALESCE(tune_override.incipit, tune.incipit) AS incipit, COALESCE(tune_override.genre, tune.genre) AS genre, tune.private_for, tune.deleted, repertoire_tune.learned, COALESCE(td.goal, COALESCE(pr.goal, 'recall'::text)) AS goal, repertoire_tune.scheduled, repertoire.user_ref, repertoire.repertoire_id, instrument.instrument, repertoire_tune.deleted AS repertoire_deleted, COALESCE(td.state, pr.state) AS latest_state, COALESCE(td.practiced, pr.practiced) AS latest_practiced, COALESCE(td.quality, pr.quality) AS latest_quality, COALESCE(td.easiness, pr.easiness) AS latest_easiness, COALESCE(td.difficulty, pr.difficulty) AS latest_difficulty, COALESCE(td.stability, pr.stability) AS latest_stability, COALESCE(td."interval", pr."interval") AS latest_interval, COALESCE(td.step, pr.step) AS latest_step, COALESCE(td.repetitions, pr.repetitions) AS latest_repetitions, COALESCE(td.due, pr.due) AS latest_due, COALESCE(td.backup_practiced, pr.backup_practiced) AS latest_backup_practiced, COALESCE(td.goal, pr.goal) AS latest_goal, COALESCE(td.technique, pr.technique) AS latest_technique, ( SELECT string_agg(tag_1.tag_text, ' '::text) AS string_agg FROM tag tag_1 WHERE tag_1.tune_ref = tune.id AND tag_1.user_ref = repertoire.user_ref) AS tags, td.purpose, td.note_private, td.note_public, td.recall_eval, ( SELECT string_agg(note.note_text, ' '::text) AS string_agg FROM note WHERE note.tune_ref = tune.id AND note.user_ref = repertoire.user_ref) AS notes, ( SELECT ref.url FROM reference ref WHERE ref.tune_ref = tune.id AND ref.user_ref = repertoire.user_ref AND ref.favorite = true LIMIT 1) AS favorite_url, CASE WHEN tune_override.user_ref = repertoire.user_ref THEN 1 ELSE 0 END AS has_override, CASE WHEN td.practiced IS NOT NULL OR td.quality IS NOT NULL OR td.easiness IS NOT NULL OR td.difficulty IS NOT NULL OR td."interval" IS NOT NULL OR td.step IS NOT NULL OR td.repetitions IS NOT NULL OR td.due IS NOT NULL OR td.backup_practiced IS NOT NULL OR td.goal IS NOT NULL OR td.technique IS NOT NULL OR td.stability IS NOT NULL THEN 1 ELSE 0 END AS has_staged FROM tune LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref LEFT JOIN tune_override ON tune_override.tune_ref = tune.id LEFT JOIN instrument ON instrument.id = repertoire.instrument_ref LEFT JOIN ( SELECT DISTINCT ON (pr_1.tune_ref, pr_1.repertoire_ref) pr_1.id, pr_1.repertoire_ref, pr_1.tune_ref, pr_1.practiced, pr_1.quality, pr_1.easiness, pr_1.difficulty, pr_1.stability, pr_1."interval", pr_1.step, pr_1.repetitions, pr_1.lapses, pr_1.elapsed_days, pr_1.state, pr_1.due, pr_1.backup_practiced, pr_1.goal, pr_1.technique, pr_1.sync_version, pr_1.last_modified_at, pr_1.device_id FROM practice_record pr_1 ORDER BY pr_1.tune_ref, pr_1.repertoire_ref, pr_1.id DESC) pr ON pr.tune_ref = tune.id AND pr.repertoire_ref = repertoire_tune.repertoire_ref LEFT JOIN tag ON tag.tune_ref = tune.id LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.repertoire_id = repertoire_tune.repertoire_ref WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref`
 );
