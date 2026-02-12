@@ -10,8 +10,8 @@
 -- Fields included (used by practice-queue.ts):
 --   - id, title (tune identification)
 --   - scheduled, latest_due (scheduling timestamps)
---   - deleted, playlist_deleted (soft delete flags)
---   - user_ref, playlist_id (ownership)
+--   - deleted, repertoire_deleted (soft delete flags)
+--   - user_ref, repertoire_id (ownership)
 --
 -- Fields omitted (not used by practice queue algorithm):
 --   - type, mode, structure, incipit, genre (tune metadata)
@@ -27,9 +27,9 @@ CREATE VIEW
 SELECT
     t.id,
     t.title,
-    pt.playlist_ref AS playlist_id,
-    p.user_ref AS user_ref,
-    pt.current AS scheduled,
+    rt.repertoire_ref AS repertoire_id,
+    r.user_ref AS user_ref,
+    rt.current AS scheduled,
     (
         SELECT
             MAX(practiced)
@@ -37,15 +37,15 @@ SELECT
             practice_record pr
         WHERE
             pr.tune_ref = t.id
-            AND pr.playlist_ref = pt.playlist_ref
+            AND pr.repertoire_ref = rt.repertoire_ref
     ) AS latest_due,
     t.deleted,
-    p.deleted AS playlist_deleted
+    r.deleted AS repertoire_deleted
 FROM
     tune t
-    INNER JOIN playlist_tune pt ON pt.tune_ref = t.id
-    INNER JOIN playlist p ON p.playlist_id = pt.playlist_ref
+    INNER JOIN repertoire_tune rt ON rt.tune_ref = t.id
+    INNER JOIN repertoire r ON r.repertoire_id = rt.repertoire_ref
 WHERE
     t.deleted = 0
-    AND p.deleted = 0
-    AND pt.deleted = 0;
+    AND r.deleted = 0
+    AND rt.deleted = 0;
