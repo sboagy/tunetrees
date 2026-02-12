@@ -1906,8 +1906,7 @@ function buildPgSchemaTs(params: {
   }
 
   // Generate import statement with only used types (sorted alphabetically)
-  const sortedBuilders = Array.from(usedBuilders).sort();
-  const importTypes = [...sortedBuilders, "pgTable"];
+  const importTypes = [...Array.from(usedBuilders), "pgTable"].sort();
   lines.push(
     `import { ${importTypes.join(", ")} } from "drizzle-orm/pg-core";`
   );
