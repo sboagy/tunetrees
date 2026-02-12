@@ -999,7 +999,6 @@ export const AuthProvider: ParentComponent = (props) => {
 
           try {
             await db.insert(userProfile).values({
-              id: anonymousUserId, // Use Supabase UUID as internal ID
               supabaseUserId: anonymousUserId,
               name: "Anonymous User",
               email: null,

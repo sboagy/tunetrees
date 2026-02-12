@@ -1737,7 +1737,12 @@ function buildSchemaTs(params: {
       });
       if (parsedDefault) {
         if (parsedDefault.kind === "default") {
-          pieces.push(`default(${parsedDefault.value})`);
+          let defaultValue = parsedDefault.value;
+          // SQLite integer columns need numeric defaults, not boolean literals
+          if (builder === "integer" && pgType === "boolean") {
+            defaultValue = parsedDefault.value === "true" ? "1" : "0";
+          }
+          pieces.push(`default(${defaultValue})`);
         } else {
           pieces.push(`$defaultFn(${parsedDefault.value})`);
         }

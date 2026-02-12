@@ -370,7 +370,6 @@ export async function updateUserProfile(
   } else {
     // Insert new record (should rarely happen with proper auth flow)
     await db.insert(userProfile).values({
-      id: crypto.randomUUID(),
       supabaseUserId: data.supabaseUserId,
       name: data.name === null ? undefined : data.name,
       email: data.email === null ? undefined : data.email,
