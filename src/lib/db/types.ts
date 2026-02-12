@@ -18,7 +18,9 @@ import type * as schema from "./schema";
 export type User = InferSelectModel<typeof schema.userProfile>;
 export type Tune = InferSelectModel<typeof schema.tune>;
 export type Playlist = InferSelectModel<typeof schema.playlist>;
+export type Repertoire = InferSelectModel<typeof schema.playlist>;
 export type PlaylistTune = InferSelectModel<typeof schema.playlistTune>;
+export type RepertoireTune = InferSelectModel<typeof schema.playlistTune>;
 export type Note = InferSelectModel<typeof schema.note>;
 export type Reference = InferSelectModel<typeof schema.reference>;
 export type Tag = InferSelectModel<typeof schema.tag>;
@@ -45,7 +47,9 @@ export type Plugin = InferSelectModel<typeof schema.plugin>;
 export type NewUser = InferInsertModel<typeof schema.userProfile>;
 export type NewTune = InferInsertModel<typeof schema.tune>;
 export type NewPlaylist = InferInsertModel<typeof schema.playlist>;
+export type NewRepertoire = InferInsertModel<typeof schema.playlist>;
 export type NewPlaylistTune = InferInsertModel<typeof schema.playlistTune>;
+export type NewRepertoireTune = InferInsertModel<typeof schema.playlistTune>;
 export type NewNote = InferInsertModel<typeof schema.note>;
 export type NewReference = InferInsertModel<typeof schema.reference>;
 export type NewTag = InferInsertModel<typeof schema.tag>;
@@ -91,7 +95,7 @@ export interface TuneWithDetails extends Tune {
   noteCount?: number;
   referenceCount?: number;
   tagCount?: number;
-  playlistCount?: number;
+  repertoireCount?: number;
 
   // Latest practice info
   lastPracticed?: string;
@@ -103,7 +107,17 @@ export interface TuneWithDetails extends Tune {
 }
 
 /**
- * Playlist with tune count and other summary data
+ * Repertoire with tune count and other summary data
+ */
+export interface RepertoireWithSummary extends Repertoire {
+  tuneCount: number;
+  lastModified?: string;
+  instrumentName?: string;
+  genreName?: string;
+}
+
+/**
+ * Playlist with tune count and other summary data (deprecated alias)
  */
 export interface PlaylistWithSummary extends Playlist {
   tuneCount: number;
@@ -113,7 +127,32 @@ export interface PlaylistWithSummary extends Playlist {
 }
 
 /**
- * Tune in a playlist context (for practice queue)
+ * Tune in a repertoire context (for practice queue)
+ */
+export interface RepertoireTuneWithDetails {
+  // RepertoireTune fields
+  repertoire_ref: string; // UUID
+  tune_ref: string; // UUID
+  deleted: boolean | null;
+  current: string | null;
+
+  // Tune fields
+  tune: Tune;
+
+  // Practice scheduling data
+  nextReview?: string;
+  dueIn?: number; // days until due
+  state?: number; // FSRS state
+  difficulty?: number;
+  stability?: number;
+
+  // User notes and tags
+  notes?: Note[];
+  tags?: Tag[];
+}
+
+/**
+ * Tune in a playlist context (for practice queue) (deprecated alias)
  */
 export interface PlaylistTuneWithDetails {
   // PlaylistTune fields
@@ -142,7 +181,7 @@ export interface PlaylistTuneWithDetails {
  */
 export interface PracticeRecordWithTune extends PracticeRecord {
   tune: Tune;
-  playlistName?: string;
+  repertoireName?: string;
 }
 
 // ============================================================================
