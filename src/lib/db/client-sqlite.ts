@@ -496,7 +496,7 @@ export async function initializeDb(
 
         requireSqliteDb().run(`
           CREATE TABLE IF NOT EXISTS user_genre_selection (
-            user_id TEXT NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL REFERENCES user_profile(supabase_user_id) ON DELETE CASCADE,
             genre_id TEXT NOT NULL REFERENCES genre(id) ON DELETE CASCADE,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
