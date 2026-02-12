@@ -16,20 +16,20 @@ import {
 import {
   dailyPracticeQueue,
   note,
-  plugin,
   playlistTune,
+  plugin,
   practiceRecord,
   reference,
 } from "@/lib/db/schema";
+import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
-import { serializeCapabilities } from "@/lib/plugins/capabilities";
 
 type SeedAddToReviewInput = {
   playlistId: string; // UUID
   tuneIds: string[]; // UUIDs
-  // Optional explicit user id (user_profile.id UUID). If omitted, we will
+  // Optional explicit user id (Supabase Auth UUID). If omitted, we will
   // resolve from current Supabase session via user_profile lookup.
   userId?: string;
 };
@@ -88,7 +88,7 @@ async function ensureDb(): Promise<SqliteDatabase> {
   }
 }
 
-async function resolveUserId(db: SqliteDatabase): Promise<string> {
+async function resolveUserId(_db: SqliteDatabase): Promise<string> {
   // First check for injected test user ID (bypasses Supabase entirely)
   if (typeof window !== "undefined" && window.__ttTestUserId) {
     console.log(
@@ -97,17 +97,11 @@ async function resolveUserId(db: SqliteDatabase): Promise<string> {
     return window.__ttTestUserId;
   }
 
-  // Fall back to Supabase auth lookup
+  // After eliminating user_profile.id, just return the Supabase Auth UUID
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (!userId) throw new Error("No authenticated user in test session");
-
-  const result = await db.all<{ id: string }>(
-    sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`
-  );
-  const id = result[0]?.id;
-  if (!id) throw new Error("user_profile row not found for current user");
-  return id;
+  return userId;
 }
 
 async function seedAddToReview(input: SeedAddToReviewInput) {

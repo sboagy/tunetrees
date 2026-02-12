@@ -501,7 +501,6 @@ function sqliteToPostgres(
 
 function remapUserRefsForPush(
   data: Record<string, unknown>,
-  // biome-ignore lint/correctness/noUnusedVariables: Context preserved for signature compatibility
   _ctx: SyncContext
 ): Record<string, unknown> {
   // After eliminating user_profile.id, userId === authUserId (both are Supabase auth UUID).

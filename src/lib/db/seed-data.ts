@@ -46,9 +46,10 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
       [userId, now]
     );
 
-    // Get the user_profile ID
+    // After eliminating user_profile.id, userId IS the user identifier (supabase_user_id PK)
+    // Verify user_profile exists
     const userProfileResult = db.exec(
-      `SELECT id FROM user_profile WHERE supabase_user_id = ?`,
+      `SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ?`,
       [userId]
     );
 

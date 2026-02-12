@@ -17,7 +17,7 @@
  * @module lib/db/queries/playlists
  */
 
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
@@ -37,7 +37,6 @@ import type {
 } from "../types";
 
 const userRefCache = new Map<string, string>();
-const warnedUserIdMismatch = new Set<string>();
 
 async function resolveUserRef(
   db: SqliteDatabase,
@@ -53,40 +52,20 @@ async function resolveUserRef(
 
   // On first login, the UI can query before initial syncDown has applied user_profile.
   // Poll briefly to avoid treating this transient state as “no playlists”.
-  //
-  // Note: In production we currently expect `user_profile.id` and
-  // `user_profile.supabase_user_id` to be equal. This function is therefore
-  // effectively a cached assertion + short poll for row existence.
+  // After eliminating user_profile.id, we just verify the row exists and return userId.
   while (true) {
     const match = await db
       .select({
-        id: userProfile.id,
         supabaseUserId: userProfile.supabaseUserId,
       })
       .from(userProfile)
-      .where(
-        or(eq(userProfile.supabaseUserId, userId), eq(userProfile.id, userId))
-      )
+      .where(eq(userProfile.supabaseUserId, userId))
       .limit(1);
 
     if (match.length > 0) {
-      const resolved = match[0];
-      if (
-        resolved.supabaseUserId &&
-        resolved.id &&
-        resolved.supabaseUserId !== resolved.id &&
-        !warnedUserIdMismatch.has(resolved.id)
-      ) {
-        warnedUserIdMismatch.add(resolved.id);
-        console.warn(
-          `[resolveUserRef] Invariant violated: user_profile.id (${resolved.id}) != user_profile.supabase_user_id (${resolved.supabaseUserId})`
-        );
-      }
-
-      userRefCache.set(userId, resolved.id);
-      if (resolved.supabaseUserId)
-        userRefCache.set(resolved.supabaseUserId, resolved.id);
-      return resolved.id;
+      // userId IS the user_profile.supabase_user_id (PK)
+      userRefCache.set(userId, userId);
+      return userId;
     }
 
     if (Date.now() - startedAt >= waitForMs) {
@@ -205,18 +184,8 @@ export async function getPlaylistById(
   playlistId: string,
   userId: string
 ): Promise<Playlist | null> {
-  // Get user_ref from supabase_user_id
-  const userRecord = await db
-    .select({ id: userProfile.id })
-    .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, userId))
-    .limit(1);
-
-  if (!userRecord || userRecord.length === 0) {
-    return null;
-  }
-
-  const userRef = userRecord[0].id;
+  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  const userRef = userId;
 
   const result = await db
     .select()
@@ -261,18 +230,8 @@ export async function createPlaylist(
     "playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
   >
 ): Promise<Playlist> {
-  // Get user_ref from supabase_user_id
-  const userRecord = await db
-    .select({ id: userProfile.id })
-    .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, userId))
-    .limit(1);
-
-  if (!userRecord || userRecord.length === 0) {
-    throw new Error(`User not found: ${userId}`);
-  }
-
-  const userRef = userRecord[0].id;
+  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  const userRef = userId;
   const now = new Date().toISOString();
 
   const newPlaylist: NewPlaylist = {
@@ -689,21 +648,8 @@ export async function getPlaylistTunesStaged(
     throw new Error("Playlist not found or access denied");
   }
 
-  // Get user_ref from supabase_user_id
-  const userRecord = await db
-    .select({ id: userProfile.id })
-    .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, userId))
-    .limit(1);
-
-  if (!userRecord || userRecord.length === 0) {
-    throw new Error(`User not found: ${userId}`);
-  }
-
-  const userRef = userRecord[0].id;
-  console.log(
-    `[getPlaylistTunesStaged] Resolved userRef: ${userRef} for userId: ${userId}`
-  );
+  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  const userRef = userId;
 
   // Query the practice_list_staged view directly
   const result = await db.all<any>(sql`

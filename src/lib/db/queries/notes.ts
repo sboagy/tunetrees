@@ -7,7 +7,7 @@ import type { Note } from "../types";
 export interface CreateNoteData {
   tuneRef: string; // UUID
   noteText: string;
-  userRef: string; // UUID (user_profile.id)
+  userRef: string; // UUID (Supabase Auth ID, same as supabase_user_id)
   playlistRef?: string; // UUID
   favorite?: boolean;
 }

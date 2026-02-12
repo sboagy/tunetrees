@@ -24,7 +24,7 @@ export interface DateRolloverBannerProps {
   /** Callback when user clicks refresh button */
   onRefresh?: () => void | Promise<void>;
   /** Optional hook to decide whether to show the banner when a change is detected */
-  onDateChange?: (newDate: Date) => boolean | void;
+  onDateChange?: (newDate: Date) => boolean | undefined;
 }
 
 /**

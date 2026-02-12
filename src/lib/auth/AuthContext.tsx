@@ -349,12 +349,14 @@ export const AuthProvider: ParentComponent = (props) => {
     db: SqliteDatabase,
     authUserId: string
   ): Promise<string | null> {
+    // After eliminating user_profile.id, authUserId IS the user identifier (supabase_user_id PK).
+    // No lookup needed - just verify the user exists.
     try {
       const { userProfile } = await import("@/lib/db/schema");
       const { eq } = await import("drizzle-orm");
 
       const result = await db
-        .select({ id: userProfile.id })
+        .select({ id: userProfile.supabaseUserId })
         .from(userProfile)
         .where(eq(userProfile.supabaseUserId, authUserId))
         .limit(1);

@@ -8,7 +8,6 @@
 import {
   boolean,
   integer,
-  jsonb,
   pgTable,
   real,
   text,

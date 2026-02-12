@@ -8,7 +8,7 @@
  */
 
 import { useLocation, useNavigate } from "@solidjs/router";
-import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -88,10 +88,9 @@ const PracticeIndex: Component = () => {
     string | null
   >(null);
 
-  // Get current user's local database ID from user_profile
+  // Get current user's Supabase Auth UUID
   const [userId] = createResource(
     () => {
-      const db = localDb();
       const currentUser = user();
       const syncReady = initialSyncComplete();
       const isOnline =
@@ -108,14 +107,8 @@ const PracticeIndex: Component = () => {
         return null;
       }
 
-      return db && currentUser ? { db, userId: currentUser.id } : null;
-    },
-    async (params) => {
-      if (!params) return null;
-      const result = await params.db.all<{ id: string }>(
-        sql`SELECT id FROM user_profile WHERE supabase_user_id = ${params.userId} LIMIT 1`
-      );
-      return result[0]?.id ?? null;
+      // After eliminating user_profile.id, userProfileId is just the Supabase Auth UUID
+      return currentUser?.id ?? null;
     }
   );
 
@@ -153,14 +146,8 @@ const PracticeIndex: Component = () => {
     const id = userId();
     if (id) return id;
 
-    // Otherwise, fetch directly
-    const db = localDb();
-    if (!db || !user()) return null;
-
-    const result = await db.all<{ id: string }>(
-      sql`SELECT id FROM user_profile WHERE supabase_user_id = ${user()!.id} LIMIT 1`
-    );
-    return result[0]?.id ?? null;
+    // After eliminating user_profile.id, just return the Supabase Auth UUID
+    return user()?.id ?? null;
   };
 
   // Track in-flight staging to prevent submit before previews are persisted.

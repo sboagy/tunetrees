@@ -26,31 +26,9 @@
 import { and, eq, lt } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { getDueTunesLegacy } from "../db/queries/practice";
-import { dailyPracticeQueue, playlistTune, userProfile } from "../db/schema";
+import { dailyPracticeQueue, playlistTune } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { generateId } from "../utils/uuid";
-
-/**
- * Get user_profile.id from supabase_user_id (UUID)
- * Returns null if user not found
- */
-async function getUserProfileId(
-  db: SqliteDatabase,
-  supabaseUserId: string
-): Promise<string | null> {
-  // Returns UUID string
-  const result = await db
-    .select({ id: userProfile.id })
-    .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, supabaseUserId))
-    .limit(1);
-
-  if (!result || result.length === 0) {
-    return null;
-  }
-
-  return result[0].id; // UUID string
-}
 
 /**
  * Scheduling windows for bucket classification
@@ -232,11 +210,8 @@ export async function generateDailyPracticeQueue(
     tzOffsetMinutes = 0,
   } = options;
 
-  // Map UUID to integer user_profile.id
-  const userRef = await getUserProfileId(db, userId);
-  if (!userRef) {
-    throw new Error(`User not found: ${userId}`);
-  }
+  // userId is already the Supabase Auth UUID (same as supabase_user_id PK)
+  const userRef = userId;
 
   // Compute scheduling windows
   const windows = computeSchedulingWindows(
@@ -380,11 +355,8 @@ export async function refillPracticeQueue(
   count = 5,
   sitdownDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
-  // Map user UUID to integer ID
-  const userRef = await getUserProfileId(db, userId);
-  if (!userRef) {
-    throw new Error(`User profile not found for user: ${userId}`);
-  }
+  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  const userRef = userId;
 
   if (count <= 0) {
     return [];
@@ -495,11 +467,8 @@ export async function getQueueBucketCounts(
   playlistId: string, // UUID
   windowStartUtc: string
 ): Promise<Record<number, number>> {
-  // Map user UUID to integer ID
-  const userRef = await getUserProfileId(db, userId);
-  if (!userRef) {
-    throw new Error(`User profile not found for user: ${userId}`);
-  }
+  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  const userRef = userId;
 
   const queue = await db
     .select({ bucket: dailyPracticeQueue.bucket })

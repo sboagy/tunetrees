@@ -463,14 +463,8 @@ export async function initializeDb(
           "CREATE INDEX IF NOT EXISTS idx_sync_change_log_changed_at ON sync_change_log(changed_at)"
         );
 
-        // Some historical SQLite schemas used supabase_user_id as PK and did not include an `id` column.
-        // Ensure `id` exists so synced rows (which reference user_profile.id) can be inserted.
-        // Do NOT backfill id = supabase_user_id: server user_profile.id is not the auth UID.
-        ensureColumnExists("user_profile", "id", "id text");
-        // Keep a best-effort uniqueness index; multiple NULLs are allowed in SQLite.
-        requireSqliteDb().run(
-          "CREATE UNIQUE INDEX IF NOT EXISTS user_profile_id_unique ON user_profile(id)"
-        );
+        // Note: user_profile.id column eliminated - supabase_user_id is now the PK.
+        // No migration needed: generated schema uses supabaseUserId as PK.
 
         // Backward-compatible adds for hybrid tune fields.
         // Some existing IndexedDB DBs were created before these columns existed,
