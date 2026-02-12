@@ -15,7 +15,7 @@ CREATE TABLE "plugin" (
   "sync_version" integer DEFAULT 1 NOT NULL,
   "last_modified_at" text NOT NULL,
   "device_id" text,
-  FOREIGN KEY ("user_ref") REFERENCES "user_profile" ("id") ON UPDATE no action ON DELETE no action
+  FOREIGN KEY ("user_ref") REFERENCES "user_profile" ("supabase_user_id") ON UPDATE no action ON DELETE no action
 );
 
 --> statement-breakpoint

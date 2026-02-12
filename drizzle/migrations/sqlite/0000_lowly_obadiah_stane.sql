@@ -77,9 +77,7 @@ CREATE TABLE
 		`sync_version` integer DEFAULT 1 NOT NULL,
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
-		FOREIGN KEY (`private_to_user`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
-	);
-
+	FOREIGN KEY (`private_to_user`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 --> statement-breakpoint
 CREATE INDEX `idx_instrument_instrument` ON `instrument` (`instrument`);
 
@@ -104,7 +102,7 @@ CREATE TABLE
 		`sync_version` integer DEFAULT 1 NOT NULL,
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
-		FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action,
 		FOREIGN KEY (`tune_ref`) REFERENCES `tune` (`id`) ON UPDATE no action ON DELETE no action,
 		FOREIGN KEY (`playlist_ref`) REFERENCES `playlist` (`playlist_id`) ON UPDATE no action ON DELETE no action
 	);
@@ -129,7 +127,7 @@ CREATE TABLE
 		`sync_version` integer DEFAULT 1 NOT NULL,
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
-		FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
+		FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 	);
 
 --> statement-breakpoint
@@ -203,7 +201,7 @@ CREATE TABLE
 		`sync_version` integer DEFAULT 1 NOT NULL,
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
-		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
+		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 	);
 
 --> statement-breakpoint
@@ -221,9 +219,7 @@ CREATE TABLE
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
 		PRIMARY KEY (`user_id`, `alg_type`),
-		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
-	);
-
+	FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 --> statement-breakpoint
 CREATE TABLE
 	`reference` (
@@ -241,10 +237,7 @@ CREATE TABLE
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
 		FOREIGN KEY (`tune_ref`) REFERENCES `tune` (`id`) ON UPDATE no action ON DELETE no action,
-		FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
-	);
-
---> statement-breakpoint
+	FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 CREATE INDEX `idx_reference_tune_public` ON `reference` (`tune_ref`, `public`);
 
 --> statement-breakpoint
@@ -266,7 +259,7 @@ CREATE TABLE
 		`sync_version` integer DEFAULT 1 NOT NULL,
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
-		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
+		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 	);
 
 --> statement-breakpoint
@@ -287,7 +280,7 @@ CREATE TABLE
 			`purpose`,
 			`playlist_id`
 		),
-		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action,
+		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action,
 		FOREIGN KEY (`playlist_id`) REFERENCES `playlist` (`playlist_id`) ON UPDATE no action ON DELETE no action
 	);
 
@@ -318,7 +311,7 @@ CREATE TABLE
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
 		PRIMARY KEY (`tune_id`, `user_id`, `playlist_id`),
-		FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`user_id`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action,
 		FOREIGN KEY (`tune_id`) REFERENCES `tune` (`id`) ON UPDATE no action ON DELETE no action,
 		FOREIGN KEY (`playlist_id`) REFERENCES `playlist` (`playlist_id`) ON UPDATE no action ON DELETE no action
 	);
@@ -333,9 +326,7 @@ CREATE TABLE
 		`sync_version` integer DEFAULT 1 NOT NULL,
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
-		FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action,
-		FOREIGN KEY (`tune_ref`) REFERENCES `tune` (`id`) ON UPDATE no action ON DELETE no action
-	);
+	FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action,
 
 --> statement-breakpoint
 CREATE INDEX `idx_tag_user_ref_tag_text` ON `tag` (`user_ref`, `tag_text`);
@@ -362,10 +353,7 @@ CREATE TABLE
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
 		FOREIGN KEY (`genre`) REFERENCES `genre` (`id`) ON UPDATE no action ON DELETE no action,
-		FOREIGN KEY (`private_for`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action
-	);
-
---> statement-breakpoint
+	FOREIGN KEY (`private_for`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action
 CREATE TABLE
 	`tune_override` (
 		`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -382,10 +370,7 @@ CREATE TABLE
 		`last_modified_at` text NOT NULL,
 		`device_id` text,
 		FOREIGN KEY (`tune_ref`) REFERENCES `tune` (`id`) ON UPDATE no action ON DELETE no action,
-		FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`id`) ON UPDATE no action ON DELETE no action,
-		FOREIGN KEY (`genre`) REFERENCES `genre` (`id`) ON UPDATE no action ON DELETE no action
-	);
-
+	FOREIGN KEY (`user_ref`) REFERENCES `user_profile` (`supabase_user_id`) ON UPDATE no action ON DELETE no action,
 --> statement-breakpoint
 CREATE TABLE
 	`tune_type` (
