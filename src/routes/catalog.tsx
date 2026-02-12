@@ -28,6 +28,8 @@ import { CatalogToolbar } from "../components/catalog";
 import { TunesGridCatalog } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
+import { ChatFAB } from "../components/ai/ChatFAB";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
 import { getUserPlaylists } from "../lib/db/queries/playlists";
@@ -91,6 +93,9 @@ const CatalogPage: Component = () => {
 
   // Track filter panel expanded state
   const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);
+
+  // Track AI chat drawer state
+  const [isChatOpen, setIsChatOpen] = createSignal(false);
 
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
   // Runs whenever searchParams changes. This resolves the initial race condition
@@ -364,6 +369,19 @@ const CatalogPage: Component = () => {
           />
         </Show>
       </div>
+
+      {/* AI Chat FAB */}
+      <ChatFAB onClick={() => setIsChatOpen(true)} />
+
+      {/* AI Chat Drawer */}
+      <AIChatDrawer
+        isOpen={isChatOpen()}
+        onClose={() => setIsChatOpen(false)}
+        setSelectedTypes={setSelectedTypes}
+        setSelectedModes={setSelectedModes}
+        setSelectedGenres={setSelectedGenres}
+        currentPlaylistId={currentPlaylistId() || undefined}
+      />
     </div>
   );
 };

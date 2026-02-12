@@ -35,6 +35,8 @@ import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
 import { getPlaylistTunes } from "../lib/db/queries/playlists";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
+import { ChatFAB } from "../components/ai/ChatFAB";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 
 const arraysEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
@@ -93,6 +95,9 @@ const RepertoirePage: Component = () => {
   const [isInitialized, setIsInitialized] = createSignal(false);
 
   const [selectedRowsCount, setSelectedRowsCount] = createSignal(0);
+
+  // Track AI chat drawer state
+  const [isChatOpen, setIsChatOpen] = createSignal(false);
 
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
   // Runs whenever searchParams changes. This resolves the initial race condition
@@ -410,6 +415,19 @@ const RepertoirePage: Component = () => {
           }}
         />
       </Show>
+
+      {/* AI Chat FAB */}
+      <ChatFAB onClick={() => setIsChatOpen(true)} />
+
+      {/* AI Chat Drawer */}
+      <AIChatDrawer
+        isOpen={isChatOpen()}
+        onClose={() => setIsChatOpen(false)}
+        setSelectedTypes={setSelectedTypes}
+        setSelectedModes={setSelectedModes}
+        setSelectedGenres={setSelectedGenres}
+        currentPlaylistId={currentPlaylistId() || undefined}
+      />
     </div>
   );
 };
