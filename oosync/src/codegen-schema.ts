@@ -358,13 +358,13 @@ function parsePgDefault(params: {
   // boolean constants (often: false / 'false'::boolean)
   if (params.pgType === "boolean") {
     if (/^false(\b|::)/i.test(trimmed) || /^'false'::/i.test(trimmed)) {
-      return { kind: "default", value: "0" };
+      return { kind: "default", value: "false" };
     }
     if (/^true(\b|::)/i.test(trimmed) || /^'true'::/i.test(trimmed)) {
-      return { kind: "default", value: "1" };
+      return { kind: "default", value: "true" };
     }
-    if (/^'f'::/i.test(trimmed)) return { kind: "default", value: "0" };
-    if (/^'t'::/i.test(trimmed)) return { kind: "default", value: "1" };
+    if (/^'f'::/i.test(trimmed)) return { kind: "default", value: "false" };
+    if (/^'t'::/i.test(trimmed)) return { kind: "default", value: "true" };
   }
 
   // numeric constants with optional casts
@@ -1888,9 +1888,27 @@ function buildPgSchemaTs(params: {
 
   const lines: string[] = [];
   lines.push(createHeader({ schema: params.schema }));
-  lines.push(
-    'import { boolean, integer, jsonb, pgTable, real, text } from "drizzle-orm/pg-core";'
-  );
+
+  // Collect actually-used type builders to generate minimal imports
+  const usedBuilders = new Set<string>();
+
+  // First pass: collect all used type builders
+  for (const tableName of tables) {
+    const tableColumns = (colsByTable.get(tableName) ?? []).slice();
+    for (const col of tableColumns) {
+      const pgType = normalizeType({
+        dataType: col.data_type,
+        udtName: col.udt_name,
+      });
+      const builder = pgBuilderForPgType(pgType);
+      usedBuilders.add(builder);
+    }
+  }
+
+  // Generate import statement with only used types (sorted alphabetically)
+  const sortedBuilders = Array.from(usedBuilders).sort();
+  const importTypes = [...sortedBuilders, "pgTable"];
+  lines.push(`import { ${importTypes.join(", ")} } from "drizzle-orm/pg-core";`);
   lines.push("");
 
   for (const tableName of tables) {
