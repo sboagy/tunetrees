@@ -59,8 +59,8 @@ ALTER TABLE user_profile DROP CONSTRAINT user_profile_pkey;
 -- Make supabase_user_id the new primary key
 ALTER TABLE user_profile ADD PRIMARY KEY (supabase_user_id);
 
--- Drop the id column (no longer needed)
-ALTER TABLE user_profile DROP COLUMN id;
+-- Drop the id column (no longer needed) - CASCADE drops dependent policies/views
+ALTER TABLE user_profile DROP COLUMN id CASCADE;
 
 -- ============================================================================
 -- STEP 3: Add new foreign key constraints to user_profile.supabase_user_id
