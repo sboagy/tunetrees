@@ -304,14 +304,14 @@ import {
 } from "./local-db-lifecycle";
 import { getTestUserClient, type TestUser } from "./test-users";
 
-// Cache mapping from Supabase user UUID -> internal user_profile.id (user_ref)
+// Cache mapping from Supabase Auth UUID -> user_ref (same value after user_profile.id elimination)
 const internalUserRefCache: Map<string, string> = new Map();
 
 async function getInternalUserRef(
   _supabase: any,
   user: TestUser
 ): Promise<string | null> {
-  // In E2E fixtures, TestUser.userId is the internal app user id (user_profile.id).
+  // In E2E fixtures, TestUser.userId is the Supabase Auth UUID (user_profile.supabase_user_id PK).
   // (Supabase auth uid is available via getTestUserClient, but isn't needed here.)
   if (!internalUserRefCache.has(user.userId)) {
     internalUserRefCache.set(user.userId, user.userId);
@@ -698,12 +698,12 @@ function applyTableQueryFilters(
     // user_genre_selection is keyed by user_id (not user_ref)
     query = query.eq("user_id", user.userId);
   } else if (tableName === "tune_override") {
-    // tune_override.user_ref references internal user_profile.id, not supabase_user_id.
+    // tune_override.user_ref references user_profile.supabase_user_id (Supabase Auth UUID)
     const cached = internalUserRefCache.get(user.userId);
     if (cached) {
       query = query.eq("user_ref", cached);
     } else {
-      // Fallback: use supabase_user_id (will match zero rows); deletion will be retried in clearUserTable with explicit internal id.
+      // Fallback: use userId directly (which IS the Supabase Auth UUID)
       query = query.eq("user_ref", user.userId);
     }
   } else {

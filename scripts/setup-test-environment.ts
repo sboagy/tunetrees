@@ -135,8 +135,7 @@ async function setup() {
   console.log("\n2️⃣  Creating user profiles...");
 
   const userProfiles = TEST_USERS.map((user) => ({
-    id: user.id, // user_profile.id (auto-gen UUID, but we set it explicitly to match auth.users.id)
-    supabase_user_id: user.id, // References auth.users.id
+    supabase_user_id: user.id, // Primary key - References auth.users.id (Supabase Auth UUID)
     email: user.email,
     name: user.name,
     avatar_url: null, // Explicitly set nullable avatar field to avoid undefined
