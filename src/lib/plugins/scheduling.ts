@@ -86,7 +86,10 @@ function extractTableNames(query: string): string[] {
   let match = regex.exec(query);
   while (match) {
     const raw = match[2] ?? "";
-    const cleaned = raw.replace(/^["']|["']$/g, "").split(".").pop();
+    const cleaned = raw
+      .replace(/^["']|["']$/g, "")
+      .split(".")
+      .pop();
     if (cleaned) names.push(cleaned);
     match = regex.exec(query);
   }
