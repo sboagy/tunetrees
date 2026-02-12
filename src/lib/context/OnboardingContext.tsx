@@ -44,14 +44,14 @@ interface OnboardingState {
   skipOnboarding: () => void;
 
   /** Check if user should see onboarding (no repertoires) */
-  shouldShowOnboarding: (hasPlaylists: boolean) => boolean;
+  shouldShowOnboarding: (hasRepertoires: boolean) => boolean;
 }
 
 /**
  * Onboarding steps
  */
 export type OnboardingStep =
-  | "create-playlist"
+  | "create-repertoire"
   | "choose-genres"
   | "view-catalog"
   | "complete";
@@ -96,8 +96,8 @@ export const OnboardingProvider: ParentComponent = (props) => {
   /**
    * Check if user should see onboarding based on whether they have repertoires
    */
-  const shouldShowOnboarding = (hasPlaylists: boolean): boolean => {
-    return !hasPlaylists;
+  const shouldShowOnboarding = (hasRepertoires: boolean): boolean => {
+    return !hasRepertoires;
   };
 
   /**
@@ -112,7 +112,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     }
     console.log("🎓 Starting onboarding flow");
     setNeedsOnboarding(true);
-    setOnboardingStep("create-playlist");
+    setOnboardingStep("create-repertoire");
   };
 
   /**
@@ -122,7 +122,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     const current = onboardingStep();
     console.log("🎓 Onboarding next step from:", current);
 
-    if (current === "create-playlist") {
+    if (current === "create-repertoire") {
       setOnboardingStep("choose-genres");
     } else if (current === "choose-genres") {
       setOnboardingStep("view-catalog");

@@ -250,7 +250,7 @@ WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user
 /**
  * View 4: Daily Practice Queue with Human-Readable Names
  *
- * Joins daily_practice_queue with user, playlist, and tune information
+ * Joins daily_practice_queue with user, repertoire, and tune information
  * to show readable names instead of UUIDs. Useful for debugging in SQLite browser.
  *
  * Columns:
@@ -345,7 +345,7 @@ ORDER BY
  * View: view_practice_record_readable
  *
  * Human-readable practice records with resolved foreign keys.
- * Shows user names, tune titles, and playlist instruments instead of UUIDs.
+ * Shows user names, tune titles, and repertoire instruments instead of UUIDs.
  * Useful for debugging and data inspection in SQLite WASM Browser.
  */
 const VIEW_PRACTICE_RECORD_READABLE = /* sql */ `

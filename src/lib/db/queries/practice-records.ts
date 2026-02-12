@@ -12,7 +12,7 @@ import type { SqliteDatabase } from "../client-sqlite";
 import { practiceRecord } from "../schema";
 
 /**
- * Get all practice records for a tune in a playlist
+ * Get all practice records for a tune in a repertoire
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID

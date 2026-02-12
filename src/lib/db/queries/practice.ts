@@ -23,7 +23,7 @@ import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
   dailyPracticeQueue,
-  playlist,
+  repertoire,
   playlistTune,
   practiceRecord,
   prefsSchedulingOptions,
@@ -65,7 +65,7 @@ export type PracticeListStagedWithQueue = PracticeListStagedRow & {
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 /**
- * Clear stale staged evaluations for a playlist within the active queue window.
+ * Clear stale staged evaluations for a repertoire within the active queue window.
  *
  * This is a defensive cleanup pass that removes rows in `table_transient_data`
  * that no longer belong to the active queue window or predate the window
@@ -345,7 +345,7 @@ export async function getDueTunesLegacy(
   windowEnd.setMinutes(windowEnd.getMinutes() + 1);
 
   // Query practice_list_joined view or build joined query
-  // This gets all tunes in the playlist with their latest practice info
+  // This gets all tunes in the repertoire with their latest practice info
   const results = await db
     .select({
       // Tune info
@@ -778,11 +778,11 @@ export async function getPracticeHistory(
       },
 
       // Playlist name
-      playlistName: playlist.instrumentRef,
+      repertoireName: repertoire.instrumentRef,
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.playlistRef))
+    .innerJoin(repertoire, eq(repertoire.repertoireId, practiceRecord.playlistRef))
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
@@ -797,12 +797,12 @@ export async function getPracticeHistory(
 
   const results = await query;
 
-  // Convert null to undefined for playlistName to match interface
+  // Convert null to undefined for repertoireName to match interface
   return results.map((r) => ({
     ...r,
     elapsedDays: r.elapsed_days,
     backupPracticed: r.backup_practiced,
-    playlistName: r.playlistName ? String(r.playlistName) : undefined,
+    repertoireName: r.playlistName ? String(r.playlistName) : undefined,
   }));
 }
 
@@ -918,9 +918,9 @@ export async function addTunesToPracticeQueue(
     try {
       // Get userRef from playlist
       const playlistData = await db
-        .select({ userRef: playlist.userRef })
-        .from(playlist)
-        .where(eq(playlist.repertoireId, repertoireId))
+        .select({ userRef: repertoire.userRef })
+        .from(repertoire)
+        .where(eq(repertoire.repertoireId, repertoireId))
         .limit(1);
 
       if (playlistData && playlistData.length > 0) {
@@ -953,9 +953,9 @@ export async function addTunesToPracticeQueue(
 }
 
 /**
- * Get all practice records for a playlist
+ * Get all practice records for a repertoire
  *
- * Retrieves practice history for all tunes in a playlist.
+ * Retrieves practice history for all tunes in a repertoire.
  * Useful for analytics and progress tracking.
  *
  * @param db - SQLite database instance
@@ -966,7 +966,7 @@ export async function addTunesToPracticeQueue(
  * @example
  * ```typescript
  * const recent = await getPracticeRecords(db, 1, 100);
- * // Returns last 100 practice sessions for playlist
+ * // Returns last 100 practice sessions for repertoire
  * ```
  */
 export async function getPracticeRecords(
@@ -1021,20 +1021,20 @@ export async function getPracticeRecords(
       },
 
       // Playlist name
-      playlistName: playlist.instrumentRef,
+      repertoireName: repertoire.instrumentRef,
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.playlistRef))
+    .innerJoin(repertoire, eq(repertoire.repertoireId, practiceRecord.playlistRef))
     .where(eq(practiceRecord.playlistRef, repertoireId))
     .orderBy(desc(practiceRecord.practiced))
     .limit(limit);
 
-  // Convert null to undefined for playlistName to match interface
+  // Convert null to undefined for repertoireName to match interface
   return results.map((r) => ({
     ...r,
     elapsedDays: r.elapsed_days,
     backupPracticed: r.backup_practiced,
-    playlistName: r.playlistName ? String(r.playlistName) : undefined,
+    repertoireName: r.playlistName ? String(r.playlistName) : undefined,
   }));
 }

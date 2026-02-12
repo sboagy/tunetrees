@@ -39,7 +39,7 @@ import {
 import {
   FSRS_QUALITY_MAP,
   FSRSService,
-  getPlaylistTuneCount,
+  getRepertoireTuneCount,
 } from "../scheduling/fsrs-service";
 import { getPracticeDate } from "../utils/practice-date";
 import { generateId } from "../utils/uuid";
@@ -114,17 +114,17 @@ export async function evaluatePractice(
     throw new Error("User FSRS preferences not found");
   }
   const scheduling = await getUserSchedulingOptions(db, userId);
-  const playlistTuneCount = await getPlaylistTuneCount(
+  const repertoireTuneCount = await getRepertoireTuneCount(
     db,
-    normalizedInput.playlistRef
+    normalizedInput.repertoireRef
   );
   const fsrsService = new FSRSService(prefs, scheduling, {
-    playlistTuneCount,
+    repertoireTuneCount,
   });
   const latestRecord = await getLatestPracticeRecord(
     db,
     normalizedInput.tuneRef,
-    normalizedInput.playlistRef
+    normalizedInput.repertoireRef
   );
   const schedule = latestRecord
     ? await fsrsService.processReview(normalizedInput, latestRecord)
@@ -144,7 +144,7 @@ export async function evaluatePractice(
         scheduling,
         fallback: schedule,
         db,
-        playlistTuneCount,
+        repertoireTuneCount,
       })
     : null;
 
@@ -160,7 +160,7 @@ export async function evaluatePractice(
   const record: NewPracticeRecord = {
     id: generateId(),
     lastModifiedAt: getPracticeDate().toISOString(),
-    playlistRef: normalizedInput.playlistRef,
+    repertoireRef: normalizedInput.repertoireRef,
     tuneRef: normalizedInput.tuneRef,
     practiced: normalizedInput.practiced.toISOString(),
     quality: normalizedInput.quality,
@@ -203,7 +203,7 @@ async function persistPracticeRecord(
     })
     .where(
       and(
-        eq(repertoireTune.playlistRef, record.playlistRef),
+        eq(repertoireTune.repertoireRef, record.repertoireRef),
         eq(repertoireTune.tuneRef, record.tuneRef)
       )
     );
@@ -273,7 +273,7 @@ export async function getPracticeStatistics(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, repertoireId)
+        eq(practiceRecord.repertoireRef, repertoireId)
       )
     )
     .orderBy(practiceRecord.practiced);
@@ -327,7 +327,7 @@ export async function getPracticeStatistics(
  * the current practice queue into permanent practice_record entries.
  *
  * Workflow:
- * 1. Fetch all staged evaluations from table_transient_data for current playlist
+ * 1. Fetch all staged evaluations from table_transient_data for current repertoire
  * 2. Filter to only include tunes in daily_practice_queue (current session)
  * 3. For each staged evaluation:
  *    - Create practice_record with unique practiced timestamp
@@ -367,7 +367,7 @@ export async function commitStagedEvaluations(
       repertoireId,
       windowStartUtc,
       userIdType: typeof userId,
-      playlistIdType: typeof repertoireId,
+      repertoireIdType: typeof repertoireId,
     });
 
     const { sql } = await import("drizzle-orm");
@@ -380,7 +380,7 @@ export async function commitStagedEvaluations(
       activeWindowStart = windowStartUtc;
       console.log(`Using provided queue window: ${activeWindowStart}`);
     } else {
-      // Find the most recent queue window for this playlist
+      // Find the most recent queue window for this repertoire
       const latestWindow = await db.get<{ window_start_utc: string }>(sql`
         SELECT window_start_utc
         FROM daily_practice_queue
@@ -423,7 +423,7 @@ export async function commitStagedEvaluations(
     `);
     console.log("DEBUG query result (should match main query):", debugQuery);
 
-    // 1. Fetch all staged evaluations from table_transient_data for this playlist
+    // 1. Fetch all staged evaluations from table_transient_data for this repertoire
     console.log("Querying table_transient_data...");
     const stagedEvaluations = await db.all<{
       tune_id: string;
@@ -551,7 +551,7 @@ export async function commitStagedEvaluations(
 
       // Insert practice_record
       const recordId = generateId();
-      // Determine prior state & lapses (latest committed record for tune/playlist)
+      // Determine prior state & lapses (latest committed record for tune/repertoire)
       const prior = await db.get<{
         lapses: number | null;
         state: number | null;
@@ -704,7 +704,7 @@ export async function commitStagedEvaluations(
     await persistDb();
 
     console.log(
-      `✅ Committed ${committedTuneIds.length} staged evaluations for playlist ${repertoireId}`
+      `✅ Committed ${committedTuneIds.length} staged evaluations for repertoire ${repertoireId}`
     );
     console.log("=== commitStagedEvaluations END ===");
 
@@ -762,7 +762,7 @@ export async function undoLastPracticeRating(
       .where(
         and(
           eq(practiceRecord.tuneRef, tuneId),
-          eq(practiceRecord.playlistRef, repertoireId)
+          eq(practiceRecord.repertoireRef, repertoireId)
         )
       )
       .orderBy(practiceRecord.practiced)
@@ -791,7 +791,7 @@ export async function undoLastPracticeRating(
       })
       .where(
         and(
-          eq(repertoireTune.playlistRef, repertoireId),
+          eq(repertoireTune.repertoireRef, repertoireId),
           eq(repertoireTune.tuneRef, tuneId)
         )
       );

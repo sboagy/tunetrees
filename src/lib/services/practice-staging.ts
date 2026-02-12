@@ -96,7 +96,7 @@ export async function stagePracticeEvaluation(
   // Build RecordPracticeInput for evaluatePractice
   const input: RecordPracticeInput = {
     tuneRef: tuneId,
-    playlistRef: repertoireId,
+    repertoireRef: repertoireId,
     practiced: now,
     // Use FSRS Rating values (Again=1, Hard=2, Good=3, Easy=4) – Manual (0) not used here
     quality: mapEvaluationToRating(evaluation),
@@ -231,14 +231,14 @@ export async function clearStagedEvaluation(
 }
 
 /**
- * Clear all staged evaluations for a playlist
+ * Clear all staged evaluations for a repertoire
  *
  * Called after submitting evaluations to clean up transient data.
  *
  * @param db - SQLite database instance
  * @param repertoireId - Repertoire ID
  */
-export async function clearAllStagedForPlaylist(
+export async function clearAllStagedForRepertoire(
   db: SqliteDatabase,
   repertoireId: string
 ): Promise<void> {
@@ -247,5 +247,5 @@ export async function clearAllStagedForPlaylist(
     WHERE repertoire_id = ${repertoireId}
   `);
 
-  console.log(`🗑️  Cleared all staged evaluations for playlist ${repertoireId}`);
+  console.log(`🗑️  Cleared all staged evaluations for repertoire ${repertoireId}`);
 }

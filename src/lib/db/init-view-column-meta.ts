@@ -60,7 +60,7 @@ const VIEW_COLUMN_DESCRIPTIONS: ViewColumnDescription[] = [
   {
     viewName: "practice_list_staged",
     columnName: "goal",
-    description: "Practice goal for this tune in the playlist.",
+    description: "Practice goal for this tune in the repertoire.",
   },
   {
     viewName: "practice_list_staged",
@@ -70,7 +70,7 @@ const VIEW_COLUMN_DESCRIPTIONS: ViewColumnDescription[] = [
   {
     viewName: "practice_list_staged",
     columnName: "user_ref",
-    description: "User profile ID that owns the playlist.",
+    description: "User profile ID that owns the repertoire.",
   },
   {
     viewName: "practice_list_staged",
@@ -80,12 +80,12 @@ const VIEW_COLUMN_DESCRIPTIONS: ViewColumnDescription[] = [
   {
     viewName: "practice_list_staged",
     columnName: "instrument",
-    description: "Instrument name for the playlist.",
+    description: "Instrument name for the repertoire.",
   },
   {
     viewName: "practice_list_staged",
     columnName: "playlist_deleted",
-    description: "Whether the playlist entry has been soft-deleted.",
+    description: "Whether the repertoire entry has been soft-deleted.",
   },
   {
     viewName: "practice_list_staged",

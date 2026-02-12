@@ -435,7 +435,7 @@ export function createFSRSService(
 /**
  * Get the total number of tunes in all of a user's playlists (repertoire size).
  * Counts distinct repertoire_tune rows for playlists owned by the user.
- * Excludes deleted playlist or repertoire_tune rows.
+ * Excludes deleted repertoire or repertoire_tune rows.
  *
  * @param db Local SQLite database instance
  * @param userInternalId Internal user_profile.id (NOT supabase_user_id)

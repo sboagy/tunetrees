@@ -67,7 +67,7 @@ beforeEach(() => {
         VALUES (${TEST_USER_UUID}, ${TEST_USER_UUID}, 'test@example.com', 'Test User', datetime('now'))`
   );
   db.run(
-    sql`INSERT INTO playlist (repertoire_id, user_ref, last_modified_at) 
+    sql`INSERT INTO repertoire (repertoire_id, user_ref, last_modified_at) 
         VALUES (${TEST_PLAYLIST_UUID}, ${TEST_USER_UUID}, datetime('now'))`
   );
 });

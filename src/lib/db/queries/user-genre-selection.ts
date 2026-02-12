@@ -18,7 +18,7 @@ import {
   dailyPracticeQueue,
   genre,
   note,
-  playlistTune,
+  repertoireTune,
   practiceRecord,
   reference,
   tableTransientData,
@@ -157,35 +157,35 @@ export async function getRequiredGenreIdsForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<string[]> {
-  const [playlistDefaults, tuneGenres] = await Promise.all([
-    getPlaylistGenreDefaultsForUser(db, userId),
+  const [repertoireDefaults, tuneGenres] = await Promise.all([
+    getRepertoireGenreDefaultsForUser(db, userId),
     getRepertoireTuneGenreIdsForUser(db, userId),
   ]);
 
-  return Array.from(new Set([...playlistDefaults, ...tuneGenres]));
+  return Array.from(new Set([...repertoireDefaults, ...tuneGenres]));
 }
 
 /**
- * Get genre_default values from user playlists (repertoires).
+ * Get genre_default values from user repertoires (repertoires).
  */
-export async function getPlaylistGenreDefaultsForUser(
+export async function getRepertoireGenreDefaultsForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<string[]> {
   console.log(
-    `[getPlaylistGenreDefaultsForUser] Querying for userId=${userId}`
+    `[getRepertoireGenreDefaultsForUser] Querying for userId=${userId}`
   );
 
   const rows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT v.genre_default AS genre
-    FROM view_playlist_joined v
+    FROM view_repertoire_joined v
     WHERE v.playlist_deleted = 0
       AND v.user_ref = ${userId}
       AND v.genre_default IS NOT NULL
   `);
 
   console.log(
-    `[getPlaylistGenreDefaultsForUser] Found ${rows.length} rows:`,
+    `[getRepertoireGenreDefaultsForUser] Found ${rows.length} rows:`,
     rows
   );
 
@@ -222,19 +222,19 @@ export async function getRepertoireTuneGenreIdsForUser(
 }
 
 /**
- * Get counts for user playlists and playlist_tune rows.
+ * Get counts for user repertoires and playlist_tune rows.
  */
 export async function getUserRepertoireStats(
   db: SqliteDatabase,
   userId: string
-): Promise<{ playlistCount: number; playlistTuneCount: number }> {
-  const playlistRows = await db.all<{ count: number }>(sql`
+): Promise<{ repertoireCount: number; repertoireTuneCount: number }> {
+  const repertoireRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
     FROM repertoire p
     WHERE p.deleted = 0
       AND p.user_ref = ${userId}
   `);
-  const playlistCount = Number(playlistRows?.[0]?.count ?? 0);
+  const repertoireCount = Number(repertoireRows?.[0]?.count ?? 0);
 
   const tuneRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
@@ -244,9 +244,9 @@ export async function getUserRepertoireStats(
     WHERE pt.deleted = 0
       AND p.user_ref = ${userId}
   `);
-  const playlistTuneCount = Number(tuneRows?.[0]?.count ?? 0);
+  const repertoireTuneCount = Number(tuneRows?.[0]?.count ?? 0);
 
-  return { playlistCount, playlistTuneCount };
+  return { repertoireCount, repertoireTuneCount };
 }
 
 /**
@@ -303,7 +303,7 @@ export async function purgeLocalCatalogForGenres(
     await db
       .delete(tableTransientData)
       .where(inArray(tableTransientData.tuneId, tuneIds));
-    await db.delete(playlistTune).where(inArray(playlistTune.tuneRef, tuneIds));
+    await db.delete(repertoireTune).where(inArray(repertoireTune.tuneRef, tuneIds));
     await db.delete(tuneOverride).where(inArray(tuneOverride.tuneRef, tuneIds));
     await db.delete(tune).where(inArray(tune.id, tuneIds));
   } finally {

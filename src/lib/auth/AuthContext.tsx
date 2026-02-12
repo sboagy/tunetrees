@@ -279,7 +279,7 @@ export const AuthProvider: ParentComponent = (props) => {
         UNION ALL SELECT 'daily_practice_queue', COUNT(*) FROM daily_practice_queue
       `);
 
-      const playlistSummary = await db.all<{
+      const repertoireSummary = await db.all<{
         repertoire_id: string;
         name: string | null;
         user_ref: string;
@@ -309,7 +309,7 @@ export const AuthProvider: ParentComponent = (props) => {
             SELECT COUNT(*)
             FROM practice_list_staged pls
             WHERE pls.repertoire_id = p.repertoire_id
-              AND pls.playlist_deleted = 0
+              AND pls.repertoire_deleted = 0
               AND pls.deleted = 0
           ) AS staged_rows
         FROM repertoire p
@@ -323,7 +323,7 @@ export const AuthProvider: ParentComponent = (props) => {
       }>(sql`
         SELECT repertoire_id, COUNT(*) AS count
         FROM practice_list_staged
-        WHERE playlist_deleted = 0
+        WHERE repertoire_deleted = 0
           AND deleted = 0
         GROUP BY repertoire_id
         ORDER BY count DESC
@@ -333,7 +333,7 @@ export const AuthProvider: ParentComponent = (props) => {
       console.warn("🔎 [SYNC_DIAG] Snapshot", {
         at: now,
         totals,
-        topPlaylists: playlistSummary,
+        topRepertoires: repertoireSummary,
         stagedTop,
       });
     } catch (e) {
@@ -399,8 +399,8 @@ export const AuthProvider: ParentComponent = (props) => {
       );
       const { repertoireCount, repertoireTuneCount } =
         await genreSelection.getUserRepertoireStats(params.db, params.userId);
-      const playlistDefaults =
-        await genreSelection.getPlaylistGenreDefaultsForUser(
+      const repertoireDefaults =
+        await genreSelection.getRepertoireGenreDefaultsForUser(
           params.db,
           params.userId
         );
@@ -413,24 +413,24 @@ export const AuthProvider: ParentComponent = (props) => {
         userId: params.userId,
         selectedCount: selected.length,
         requiredCount: required.length,
-        playlistDefaultsCount: playlistDefaults.length,
+        repertoireDefaultsCount: repertoireDefaults.length,
         tuneGenresCount: tuneGenres.length,
         repertoireCount,
         repertoireTuneCount,
         selected,
         required,
-        playlistDefaults,
+        repertoireDefaults,
       });
 
       const selectedKey = [...selected].sort().join(",");
       const requiredKey = [...required].sort().join(",");
-      const playlistDefaultsKey = [...playlistDefaults].sort().join(",");
+      const repertoireDefaultsKey = [...repertoireDefaults].sort().join(",");
       const tuneGenresKey = [...tuneGenres].sort().join(",");
       const reconcileKey = [
         params.userId,
         `selected:${selectedKey}`,
         `required:${requiredKey}`,
-        `defaults:${playlistDefaultsKey}`,
+        `defaults:${repertoireDefaultsKey}`,
         `tunes:${tuneGenresKey}`,
         `repertoireCount:${repertoireCount}`,
         `repertoireTuneCount:${repertoireTuneCount}`,
@@ -464,11 +464,11 @@ export const AuthProvider: ParentComponent = (props) => {
         if (repertoireTuneCount > 0) {
           // Rule 2: use genres from repertoire tunes + repertoire defaults.
           effectiveSelected = Array.from(
-            new Set([...tuneGenres, ...playlistDefaults])
+            new Set([...tuneGenres, ...repertoireDefaults])
           );
         } else {
           // Rule 3: no tunes yet, use repertoire defaults.
-          effectiveSelected = Array.from(new Set([...playlistDefaults]));
+          effectiveSelected = Array.from(new Set([...repertoireDefaults]));
         }
       } else {
         // Rule 4: no repertoires, empty selection is acceptable.
