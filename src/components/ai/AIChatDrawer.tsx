@@ -111,7 +111,6 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
       <div
         class="fixed inset-0 bg-black/30 z-40"
         onClick={props.onClose}
-        onKeyDown={(e) => e.key === "Escape" && props.onClose()}
       />
 
       {/* Drawer */}

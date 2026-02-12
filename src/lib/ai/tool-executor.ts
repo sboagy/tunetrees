@@ -147,11 +147,16 @@ async function logPractice(
     };
   }
 
-  // Use current playlist or a default
-  const playlistId = currentPlaylistId || crypto.randomUUID();
+  // Use current playlist or return error if none available
+  if (!currentPlaylistId) {
+    return {
+      success: false,
+      message: "No active playlist. Please select a repertoire first.",
+    };
+  }
 
   // Create practice record
-  const recordId = await createPracticeRecord(localDb, playlistId, tune.id, {
+  const recordId = await createPracticeRecord(localDb, currentPlaylistId, tune.id, {
     practiced: new Date().toISOString(),
     quality: args.quality ?? 3,
   });
