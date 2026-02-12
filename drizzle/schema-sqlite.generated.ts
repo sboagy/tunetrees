@@ -46,7 +46,7 @@ export const dailyPracticeQueue = sqliteTable(
     exposuresRequired: integer("exposures_required"),
     exposuresCompleted: integer("exposures_completed").default(0),
     outcome: text("outcome"),
-    active: integer("active").notNull().default(1),
+    active: integer("active").notNull().default(true),
     ...sqliteSyncColumns,
   },
   (t) => [
@@ -105,7 +105,7 @@ export const instrument = sqliteTable(
     instrument: text("instrument"),
     description: text("description"),
     genreDefault: text("genre_default"),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     ...sqliteSyncColumns,
   },
   (t) => [
@@ -132,9 +132,9 @@ export const note = sqliteTable(
     playlistRef: text("playlist_ref").references(() => playlist.playlistId),
     createdDate: text("created_date"),
     noteText: text("note_text"),
-    public: integer("public").notNull().default(0),
+    public: integer("public").notNull().default(false),
     favorite: integer("favorite"),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     displayOrder: integer("display_order").notNull().default(0),
     ...sqliteSyncColumns,
   },
@@ -163,7 +163,7 @@ export const playlist = sqliteTable("playlist", {
   instrumentRef: text("instrument_ref"),
   genreDefault: text("genre_default").references(() => genre.id),
   srAlgType: text("sr_alg_type"),
-  deleted: integer("deleted").notNull().default(0),
+  deleted: integer("deleted").notNull().default(false),
   ...sqliteSyncColumns,
 });
 
@@ -180,7 +180,7 @@ export const playlistTune = sqliteTable(
     learned: text("learned"),
     scheduled: text("scheduled"),
     goal: text("goal").default("recall"),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     ...sqliteSyncColumns,
   },
   (t) => [primaryKey({ columns: [t.playlistRef, t.tuneRef] })]
@@ -200,10 +200,10 @@ export const plugin = sqliteTable(
     description: text("description"),
     script: text("script").notNull(),
     capabilities: text("capabilities").notNull(),
-    isPublic: integer("is_public").notNull().default(0),
-    enabled: integer("enabled").notNull().default(1),
+    isPublic: integer("is_public").notNull().default(false),
+    enabled: integer("enabled").notNull().default(true),
     version: integer("version").notNull().default(1),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     goals: text("goals").notNull().default("[]"),
     ...sqliteSyncColumns,
   },
@@ -272,7 +272,7 @@ export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
   daysPerWeek: integer("days_per_week"),
   weeklyRules: text("weekly_rules"),
   exceptions: text("exceptions"),
-  autoScheduleNew: integer("auto_schedule_new").notNull().default(1),
+  autoScheduleNew: integer("auto_schedule_new").notNull().default(true),
   ...sqliteSyncColumns,
 });
 
@@ -311,7 +311,7 @@ export const reference = sqliteTable(
     title: text("title"),
     public: integer("public"),
     favorite: integer("favorite"),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     displayOrder: integer("display_order").notNull().default(0),
     ...sqliteSyncColumns,
   },
@@ -447,7 +447,7 @@ export const tune = sqliteTable(
     privateFor: text("private_for").references(
       () => userProfile.supabaseUserId
     ),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     composer: text("composer"),
     artist: text("artist"),
     releaseYear: integer("release_year"),
@@ -473,7 +473,7 @@ export const tuneOverride = sqliteTable("tune_override", {
   genre: text("genre").references(() => genre.id),
   mode: text("mode"),
   incipit: text("incipit"),
-  deleted: integer("deleted").notNull().default(0),
+  deleted: integer("deleted").notNull().default(false),
   composer: text("composer"),
   artist: text("artist"),
   releaseYear: integer("release_year"),
@@ -522,7 +522,7 @@ export const userProfile = sqliteTable(
       "acceptable_delinquency_window"
     ).default(21),
     avatarUrl: text("avatar_url"),
-    deleted: integer("deleted").notNull().default(0),
+    deleted: integer("deleted").notNull().default(false),
     ...sqliteSyncColumns,
   },
   (t) => [uniqueIndex("user_profile_supabase_user_id_key").on(t.supabaseUserId)]
