@@ -89,28 +89,25 @@ const PracticeIndex: Component = () => {
   >(null);
 
   // Get current user's Supabase Auth UUID
-  const [userId] = createResource(
-    () => {
-      const currentUser = user();
-      const syncReady = initialSyncComplete();
-      const isOnline =
-        typeof navigator !== "undefined" ? navigator.onLine : true;
-      const remoteSyncReady =
-        remoteSyncDownCompletionVersion() > 0 ||
-        !isOnline ||
-        import.meta.env.VITE_DISABLE_SYNC === "true";
+  const [userId] = createResource(() => {
+    const currentUser = user();
+    const syncReady = initialSyncComplete();
+    const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+    const remoteSyncReady =
+      remoteSyncDownCompletionVersion() > 0 ||
+      !isOnline ||
+      import.meta.env.VITE_DISABLE_SYNC === "true";
 
-      if (!syncReady || !remoteSyncReady) {
-        console.log(
-          "[PracticeIndex] Waiting for initial sync/syncDown before resolving userId..."
-        );
-        return null;
-      }
-
-      // After eliminating user_profile.id, userProfileId is just the Supabase Auth UUID
-      return currentUser?.id ?? null;
+    if (!syncReady || !remoteSyncReady) {
+      console.log(
+        "[PracticeIndex] Waiting for initial sync/syncDown before resolving userId..."
+      );
+      return null;
     }
-  );
+
+    // After eliminating user_profile.id, userProfileId is just the Supabase Auth UUID
+    return currentUser?.id ?? null;
+  });
 
   const [playlists] = createResource(
     () => {
@@ -190,7 +187,6 @@ const PracticeIndex: Component = () => {
     }
     setDidHydrateEvaluations(true);
   });
-
 
   // Display Submitted state - persisted to localStorage
   const STORAGE_KEY = "TT_PRACTICE_SHOW_SUBMITTED";

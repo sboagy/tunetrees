@@ -48,7 +48,7 @@ export const tabGroupMainState = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_id = auth.uid())'),
+      using: sql.raw("(user_id = auth.uid())"),
     }),
     pgPolicy("Users can insert own tab group state", {
       as: "permissive",
@@ -67,7 +67,9 @@ export const tabGroupMainState = pgTable(
     }),
     check(
       "check_name",
-      sql.raw("which_tab = ANY (ARRAY['scheduled'::text, 'repertoire'::text, 'catalog'::text, 'analysis'::text])")
+      sql.raw(
+        "which_tab = ANY (ARRAY['scheduled'::text, 'repertoire'::text, 'catalog'::text, 'analysis'::text])"
+      )
     ),
   ]
 );
@@ -85,7 +87,7 @@ export const tuneType = pgTable(
       as: "permissive",
       for: "select",
       to: ["authenticated"],
-      using: sql.raw('true'),
+      using: sql.raw("true"),
     }),
   ]
 );
@@ -133,7 +135,7 @@ export const tag = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_ref = auth.uid())'),
+      using: sql.raw("(user_ref = auth.uid())"),
     }),
     pgPolicy("Users can insert own tags", {
       as: "permissive",
@@ -177,7 +179,7 @@ export const userProfile = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(auth.uid() = supabase_user_id)'),
+      using: sql.raw("(auth.uid() = supabase_user_id)"),
     }),
     pgPolicy("Users can update own profile", {
       as: "permissive",
@@ -253,7 +255,9 @@ export const practiceRecord = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(playlist_ref IN (SELECT playlist.playlist_id FROM playlist WHERE playlist.user_ref = auth.uid()))'),
+      using: sql.raw(
+        "(playlist_ref IN (SELECT playlist.playlist_id FROM playlist WHERE playlist.user_ref = auth.uid()))"
+      ),
     }),
     pgPolicy("Users can insert own practice records", {
       as: "permissive",
@@ -301,7 +305,7 @@ export const tune = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('((private_for IS NULL) OR (private_for = auth.uid()))'),
+      using: sql.raw("((private_for IS NULL) OR (private_for = auth.uid()))"),
     }),
     pgPolicy("Users can insert own private tunes", {
       as: "permissive",
@@ -360,7 +364,7 @@ export const tuneOverride = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_ref = auth.uid())'),
+      using: sql.raw("(user_ref = auth.uid())"),
     }),
     pgPolicy("Users can insert own tune overrides", {
       as: "permissive",
@@ -422,7 +426,9 @@ export const instrument = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('((private_to_user IS NULL) OR (private_to_user = auth.uid()))'),
+      using: sql.raw(
+        "((private_to_user IS NULL) OR (private_to_user = auth.uid()))"
+      ),
     }),
     pgPolicy("Users can insert own private instruments", {
       as: "permissive",
@@ -521,7 +527,7 @@ export const dailyPracticeQueue = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_ref = auth.uid())'),
+      using: sql.raw("(user_ref = auth.uid())"),
     }),
     pgPolicy("Users can insert own practice queue items", {
       as: "permissive",
@@ -554,7 +560,7 @@ export const genre = pgTable(
       as: "permissive",
       for: "select",
       to: ["authenticated"],
-      using: sql.raw('true'),
+      using: sql.raw("true"),
     }),
   ]
 );
@@ -614,7 +620,7 @@ export const note = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('((user_ref = auth.uid()) OR (public = true))'),
+      using: sql.raw("((user_ref = auth.uid()) OR (public = true))"),
     }),
     pgPolicy("Users can insert own notes", {
       as: "permissive",
@@ -631,8 +637,8 @@ export const note = pgTable(
       for: "delete",
       to: ["public"],
     }),
-    check("chk_favorite_bool", sql.raw('favorite = ANY (ARRAY[true, false])')),
-    check("chk_public_bool", sql.raw('public = ANY (ARRAY[true, false])')),
+    check("chk_favorite_bool", sql.raw("favorite = ANY (ARRAY[true, false])")),
+    check("chk_public_bool", sql.raw("public = ANY (ARRAY[true, false])")),
   ]
 );
 
@@ -671,7 +677,7 @@ export const playlist = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_ref = auth.uid())'),
+      using: sql.raw("(user_ref = auth.uid())"),
     }),
     pgPolicy("Users can insert own playlists", {
       as: "permissive",
@@ -719,7 +725,7 @@ export const prefsSchedulingOptions = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_id = auth.uid())'),
+      using: sql.raw("(user_id = auth.uid())"),
     }),
     pgPolicy("Users can insert own scheduling preferences", {
       as: "permissive",
@@ -789,7 +795,7 @@ export const reference = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('((user_ref IS NULL) OR (user_ref = auth.uid()))'),
+      using: sql.raw("((user_ref IS NULL) OR (user_ref = auth.uid()))"),
     }),
     pgPolicy("Users can insert own references", {
       as: "permissive",
@@ -806,11 +812,13 @@ export const reference = pgTable(
       for: "delete",
       to: ["public"],
     }),
-    check("check_favorite", sql.raw('favorite = ANY (ARRAY[true, false])')),
-    check("check_public", sql.raw('public = ANY (ARRAY[true, false])')),
+    check("check_favorite", sql.raw("favorite = ANY (ARRAY[true, false])")),
+    check("check_public", sql.raw("public = ANY (ARRAY[true, false])")),
     check(
       "check_ref_type",
-      sql.raw("ref_type = ANY (ARRAY['website'::text, 'audio'::text, 'video'::text, 'sheet-music'::text, 'article'::text, 'social'::text, 'lesson'::text, 'other'::text]) OR ref_type IS NULL")
+      sql.raw(
+        "ref_type = ANY (ARRAY['website'::text, 'audio'::text, 'video'::text, 'sheet-music'::text, 'article'::text, 'social'::text, 'lesson'::text, 'other'::text]) OR ref_type IS NULL"
+      )
     ),
   ]
 );
@@ -840,7 +848,7 @@ export const genreTuneType = pgTable(
       as: "permissive",
       for: "select",
       to: ["authenticated"],
-      using: sql.raw('true'),
+      using: sql.raw("true"),
     }),
   ]
 );
@@ -884,7 +892,7 @@ export const tableState = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_id = auth.uid())'),
+      using: sql.raw("(user_id = auth.uid())"),
     }),
     pgPolicy("Users can insert own table state", {
       as: "permissive",
@@ -903,7 +911,9 @@ export const tableState = pgTable(
     }),
     check(
       "purpose_check",
-      sql.raw("purpose = ANY (ARRAY['practice'::text, 'repertoire'::text, 'catalog'::text, 'analysis'::text])")
+      sql.raw(
+        "purpose = ANY (ARRAY['practice'::text, 'repertoire'::text, 'catalog'::text, 'analysis'::text])"
+      )
     ),
     check(
       "screen_size_check",
@@ -947,7 +957,9 @@ export const playlistTune = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(playlist_ref IN (SELECT playlist.playlist_id FROM playlist WHERE playlist.user_ref = auth.uid()))'),
+      using: sql.raw(
+        "(playlist_ref IN (SELECT playlist.playlist_id FROM playlist WHERE playlist.user_ref = auth.uid()))"
+      ),
     }),
     pgPolicy("Users can insert own playlist tunes", {
       as: "permissive",
@@ -998,7 +1010,7 @@ export const prefsSpacedRepetition = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_id = auth.uid())'),
+      using: sql.raw("(user_id = auth.uid())"),
     }),
     pgPolicy("Users can insert own SR preferences", {
       as: "permissive",
@@ -1015,7 +1027,10 @@ export const prefsSpacedRepetition = pgTable(
       for: "delete",
       to: ["public"],
     }),
-    check("check_name", sql.raw("alg_type = ANY (ARRAY['SM2'::text, 'FSRS'::text])")),
+    check(
+      "check_name",
+      sql.raw("alg_type = ANY (ARRAY['SM2'::text, 'FSRS'::text])")
+    ),
   ]
 );
 
@@ -1072,7 +1087,7 @@ export const tableTransientData = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw('(user_id = auth.uid())'),
+      using: sql.raw("(user_id = auth.uid())"),
     }),
     pgPolicy("Users can insert own transient data", {
       as: "permissive",

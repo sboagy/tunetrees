@@ -140,7 +140,8 @@ export class FSRSService implements SchedulingService {
      * FORMULA: max_interval = 3 * (effective_tunes / reviews_per_day)
      * This gives roughly 3 full rotations of the repertoire before hitting the cap.
      */
-    const rawPlaylistTuneCount = tuneCountOverride ?? this.playlistTuneCount ?? 400;
+    const rawPlaylistTuneCount =
+      tuneCountOverride ?? this.playlistTuneCount ?? 400;
     const effectivePlaylistTuneCount: number = Math.min(
       Math.max(rawPlaylistTuneCount, 50),
       400
