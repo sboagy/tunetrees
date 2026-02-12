@@ -13,7 +13,7 @@ export const dailyPracticeQueue = sqliteTable(
   {
     id: integer().primaryKey({ autoIncrement: true }).notNull(),
     userRef: integer("user_ref").notNull(),
-    playlistRef: integer("playlist_ref").notNull(),
+    repertoireRef: integer("repertoire_ref").notNull(),
     mode: text(),
     queueDate: text("queue_date"),
     windowStartUtc: text("window_start_utc").notNull(),
@@ -40,22 +40,22 @@ export const dailyPracticeQueue = sqliteTable(
   },
   (table) => [
     uniqueIndex(
-      "daily_practice_queue_user_ref_playlist_ref_window_start_utc_tune_ref_unique"
-    ).on(table.userRef, table.playlistRef, table.windowStartUtc, table.tuneRef),
+      "daily_practice_queue_user_ref_repertoire_ref_window_start_utc_tune_ref_unique"
+    ).on(table.userRef, table.repertoireRef, table.windowStartUtc, table.tuneRef),
     index("idx_queue_generated_at").on(table.generatedAt),
-    index("idx_queue_user_playlist_bucket").on(
+    index("idx_queue_user_repertoire_bucket").on(
       table.userRef,
-      table.playlistRef,
+      table.repertoireRef,
       table.bucket
     ),
-    index("idx_queue_user_playlist_active").on(
+    index("idx_queue_user_repertoire_active").on(
       table.userRef,
-      table.playlistRef,
+      table.repertoireRef,
       table.active
     ),
-    index("idx_queue_user_playlist_window").on(
+    index("idx_queue_user_repertoire_window").on(
       table.userRef,
-      table.playlistRef,
+      table.repertoireRef,
       table.windowStartUtc
     ),
   ]
@@ -117,7 +117,7 @@ export const note = sqliteTable(
     tuneRef: integer("tune_ref")
       .notNull()
       .references(() => tune.id),
-    playlistRef: integer("playlist_ref").references(() => playlist.playlistId),
+    repertoireRef: integer("repertoire_ref").references(() => repertoire.repertoireId),
     createdDate: text("created_date"),
     noteText: text("note_text"),
     public: integer().default(0).notNull(),
@@ -129,20 +129,20 @@ export const note = sqliteTable(
   },
   (table) => [
     index("idx_note_tune_user").on(table.tuneRef, table.userRef),
-    index("idx_note_tune_playlist_user_public").on(
+    index("idx_note_tune_repertoire_user_public").on(
       table.tuneRef,
-      table.playlistRef,
+      table.repertoireRef,
       table.userRef,
       table.public
     ),
-    index("idx_note_tune_playlist").on(table.tuneRef, table.playlistRef),
+    index("idx_note_tune_repertoire").on(table.tuneRef, table.repertoireRef),
   ]
 );
 
-export const playlist = sqliteTable(
-  "playlist",
+export const repertoire = sqliteTable(
+  "repertoire",
   {
-    playlistId: integer("playlist_id")
+    repertoireId: integer("repertoire_id")
       .primaryKey({ autoIncrement: true })
       .notNull(),
     userRef: integer("user_ref")
@@ -158,19 +158,19 @@ export const playlist = sqliteTable(
     deviceId: text("device_id"),
   },
   (table) => [
-    uniqueIndex("playlist_user_ref_instrument_ref_unique").on(
+    uniqueIndex("repertoire_user_ref_instrument_ref_unique").on(
       table.userRef,
       table.instrumentRef
     ),
   ]
 );
 
-export const playlistTune = sqliteTable(
-  "playlist_tune",
+export const repertoireTune = sqliteTable(
+  "repertoire_tune",
   {
-    playlistRef: integer("playlist_ref")
+    repertoireRef: integer("repertoire_ref")
       .notNull()
-      .references(() => playlist.playlistId),
+      .references(() => repertoire.repertoireId),
     tuneRef: integer("tune_ref")
       .notNull()
       .references(() => tune.id),
@@ -185,8 +185,8 @@ export const playlistTune = sqliteTable(
   },
   (table) => [
     primaryKey({
-      columns: [table.playlistRef, table.tuneRef],
-      name: "playlist_tune_playlist_ref_tune_ref_pk",
+      columns: [table.repertoireRef, table.tuneRef],
+      name: "repertoire_tune_repertoire_ref_tune_ref_pk",
     }),
   ]
 );
@@ -195,9 +195,9 @@ export const practiceRecord = sqliteTable(
   "practice_record",
   {
     id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    playlistRef: integer("playlist_ref")
+    repertoireRef: integer("repertoire_ref")
       .notNull()
-      .references(() => playlist.playlistId),
+      .references(() => repertoire.repertoireId),
     tuneRef: integer("tune_ref")
       .notNull()
       .references(() => tune.id),
@@ -221,15 +221,15 @@ export const practiceRecord = sqliteTable(
     deviceId: text("device_id"),
   },
   (table) => [
-    uniqueIndex("practice_record_tune_ref_playlist_ref_practiced_unique").on(
+    uniqueIndex("practice_record_tune_ref_repertoire_ref_practiced_unique").on(
       table.tuneRef,
-      table.playlistRef,
+      table.repertoireRef,
       table.practiced
     ),
     index("idx_practice_record_practiced").on(table.practiced),
-    index("idx_practice_record_tune_playlist_practiced").on(
+    index("idx_practice_record_tune_repertoire_practiced").on(
       table.tuneRef,
-      table.playlistRef,
+      table.repertoireRef,
       table.practiced
     ),
     index("idx_practice_record_id").on(table.id),
@@ -328,7 +328,7 @@ export const tabGroupMainState = sqliteTable("tab_group_main_state", {
     .notNull()
     .references(() => userProfile.id),
   whichTab: text("which_tab").default("practice"),
-  playlistId: integer("playlist_id"),
+  repertoireId: integer("repertoire_id"),
   tabSpec: text("tab_spec"),
   practiceShowSubmitted: integer("practice_show_submitted").default(0),
   practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
@@ -345,9 +345,9 @@ export const tableState = sqliteTable(
       .references(() => userProfile.id),
     screenSize: text("screen_size").notNull(),
     purpose: text().notNull(),
-    playlistId: integer("playlist_id")
+    repertoireId: integer("repertoire_id")
       .notNull()
-      .references(() => playlist.playlistId),
+      .references(() => repertoire.repertoireId),
     settings: text(),
     currentTune: integer("current_tune"),
     syncVersion: integer("sync_version").default(1).notNull(),
@@ -360,9 +360,9 @@ export const tableState = sqliteTable(
         table.userId,
         table.screenSize,
         table.purpose,
-        table.playlistId,
+        table.repertoireId,
       ],
-      name: "table_state_user_id_screen_size_purpose_playlist_id_pk",
+      name: "table_state_user_id_screen_size_purpose_repertoire_id_pk",
     }),
   ]
 );
@@ -376,9 +376,9 @@ export const tableTransientData = sqliteTable(
     tuneId: integer("tune_id")
       .notNull()
       .references(() => tune.id),
-    playlistId: integer("playlist_id")
+    repertoireId: integer("repertoire_id")
       .notNull()
-      .references(() => playlist.playlistId),
+      .references(() => repertoire.repertoireId),
     purpose: text(),
     notePrivate: text("note_private"),
     notePublic: text("note_public"),
@@ -402,8 +402,8 @@ export const tableTransientData = sqliteTable(
   },
   (table) => [
     primaryKey({
-      columns: [table.userId, table.tuneId, table.playlistId],
-      name: "table_transient_data_user_id_tune_id_playlist_id_pk",
+      columns: [table.userId, table.tuneId, table.repertoireId],
+      name: "table_transient_data_user_id_tune_id_repertoire_id_pk",
     }),
   ]
 );
