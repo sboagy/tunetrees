@@ -67,7 +67,7 @@ beforeEach(() => {
         VALUES (${TEST_USER_UUID}, ${TEST_USER_UUID}, 'test@example.com', 'Test User', datetime('now'))`
   );
   db.run(
-    sql`INSERT INTO playlist (playlist_id, user_ref, last_modified_at) 
+    sql`INSERT INTO playlist (repertoire_id, user_ref, last_modified_at) 
         VALUES (${TEST_PLAYLIST_UUID}, ${TEST_USER_UUID}, datetime('now'))`
   );
 });
@@ -85,9 +85,9 @@ function insertTune(
     VALUES (${id}, ${title}, datetime('now'), 1, 0)
   `);
 
-  // Insert into playlist_tune (uses composite primary key: playlist_ref + tune_ref)
+  // Insert into repertoire_tune (uses composite primary key: repertoire_ref + tune_ref)
   db.run(sql`
-    INSERT INTO playlist_tune (playlist_ref, tune_ref, current, last_modified_at, sync_version, deleted) 
+    INSERT INTO repertoire_tune (repertoire_ref, tune_ref, current, last_modified_at, sync_version, deleted) 
     VALUES (${TEST_PLAYLIST_UUID}, ${id}, ${scheduled}, datetime('now'), 1, 0)
   `);
 
@@ -96,7 +96,7 @@ function insertTune(
     // Generate a UUID for the practice record
     const practiceRecordId = `pr-${id}`;
     db.run(sql`
-      INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, last_modified_at, sync_version)
+      INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, last_modified_at, sync_version)
       VALUES (${practiceRecordId}, ${TEST_PLAYLIST_UUID}, ${id}, ${latestDue}, datetime('now'), 1)
     `);
   }

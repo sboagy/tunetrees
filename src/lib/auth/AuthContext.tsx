@@ -142,7 +142,7 @@ interface AuthState {
   /** Mode of last syncDown ('full' | 'incremental' | null if none yet) */
   lastSyncMode: Accessor<"full" | "incremental" | null>;
 
-  /** Scoped practice sync (playlist_tune, practice_record, daily_practice_queue, table_transient_data) */
+  /** Scoped practice sync (repertoire_tune, practice_record, daily_practice_queue, table_transient_data) */
   syncPracticeScope: () => Promise<void>;
 }
 
@@ -272,15 +272,15 @@ export const AuthProvider: ParentComponent = (props) => {
 
       const totals = await db.all<{ table: string; count: number }>(sql`
         SELECT 'user_profile' AS table, COUNT(*) AS count FROM user_profile
-        UNION ALL SELECT 'playlist', COUNT(*) FROM playlist
-        UNION ALL SELECT 'playlist_tune', COUNT(*) FROM playlist_tune
+        UNION ALL SELECT 'repertoire', COUNT(*) FROM repertoire
+        UNION ALL SELECT 'repertoire_tune', COUNT(*) FROM repertoire_tune
         UNION ALL SELECT 'tune', COUNT(*) FROM tune
         UNION ALL SELECT 'practice_record', COUNT(*) FROM practice_record
         UNION ALL SELECT 'daily_practice_queue', COUNT(*) FROM daily_practice_queue
       `);
 
       const playlistSummary = await db.all<{
-        playlist_id: string;
+        repertoire_id: string;
         name: string | null;
         user_ref: string;
         deleted: number;
@@ -289,43 +289,43 @@ export const AuthProvider: ParentComponent = (props) => {
         staged_rows: number;
       }>(sql`
         SELECT
-          p.playlist_id,
+          p.repertoire_id,
           p.name,
           p.user_ref,
           p.deleted,
           (
             SELECT COUNT(*)
-            FROM playlist_tune pt
-            WHERE pt.playlist_ref = p.playlist_id
+            FROM repertoire_tune pt
+            WHERE pt.repertoire_ref = p.repertoire_id
               AND pt.deleted = 0
           ) AS tune_count,
           (
             SELECT COUNT(*)
             FROM daily_practice_queue dpq
-            WHERE dpq.playlist_ref = p.playlist_id
+            WHERE dpq.repertoire_ref = p.repertoire_id
               AND dpq.active = 1
           ) AS active_queue,
           (
             SELECT COUNT(*)
             FROM practice_list_staged pls
-            WHERE pls.playlist_id = p.playlist_id
+            WHERE pls.repertoire_id = p.repertoire_id
               AND pls.playlist_deleted = 0
               AND pls.deleted = 0
           ) AS staged_rows
-        FROM playlist p
+        FROM repertoire p
         ORDER BY tune_count DESC
         LIMIT 10
       `);
 
       const stagedTop = await db.all<{
-        playlist_id: string;
+        repertoire_id: string;
         count: number;
       }>(sql`
-        SELECT playlist_id, COUNT(*) AS count
+        SELECT repertoire_id, COUNT(*) AS count
         FROM practice_list_staged
         WHERE playlist_deleted = 0
           AND deleted = 0
-        GROUP BY playlist_id
+        GROUP BY repertoire_id
         ORDER BY count DESC
         LIMIT 10
       `);
@@ -397,7 +397,7 @@ export const AuthProvider: ParentComponent = (props) => {
         params.db,
         params.userId
       );
-      const { playlistCount, playlistTuneCount } =
+      const { repertoireCount, repertoireTuneCount } =
         await genreSelection.getUserRepertoireStats(params.db, params.userId);
       const playlistDefaults =
         await genreSelection.getPlaylistGenreDefaultsForUser(
@@ -415,8 +415,8 @@ export const AuthProvider: ParentComponent = (props) => {
         requiredCount: required.length,
         playlistDefaultsCount: playlistDefaults.length,
         tuneGenresCount: tuneGenres.length,
-        playlistCount,
-        playlistTuneCount,
+        repertoireCount,
+        repertoireTuneCount,
         selected,
         required,
         playlistDefaults,
@@ -432,8 +432,8 @@ export const AuthProvider: ParentComponent = (props) => {
         `required:${requiredKey}`,
         `defaults:${playlistDefaultsKey}`,
         `tunes:${tuneGenresKey}`,
-        `playlistCount:${playlistCount}`,
-        `playlistTuneCount:${playlistTuneCount}`,
+        `repertoireCount:${repertoireCount}`,
+        `repertoireTuneCount:${repertoireTuneCount}`,
       ].join("|");
 
       // Smart guard: Run reconciliation if:
@@ -460,18 +460,18 @@ export const AuthProvider: ParentComponent = (props) => {
       if (selected.length > 0) {
         // Rule 1: honor selection, but ensure repertoire genres are included.
         effectiveSelected = Array.from(new Set([...selected, ...required]));
-      } else if (playlistCount > 0) {
-        if (playlistTuneCount > 0) {
-          // Rule 2: use genres from repertoire tunes + playlist defaults.
+      } else if (repertoireCount > 0) {
+        if (repertoireTuneCount > 0) {
+          // Rule 2: use genres from repertoire tunes + repertoire defaults.
           effectiveSelected = Array.from(
             new Set([...tuneGenres, ...playlistDefaults])
           );
         } else {
-          // Rule 3: no tunes yet, use playlist defaults.
+          // Rule 3: no tunes yet, use repertoire defaults.
           effectiveSelected = Array.from(new Set([...playlistDefaults]));
         }
       } else {
-        // Rule 4: no playlists, empty selection is acceptable.
+        // Rule 4: no repertoires, empty selection is acceptable.
         effectiveSelected = [];
       }
 
@@ -603,7 +603,7 @@ export const AuthProvider: ParentComponent = (props) => {
               "instrument",
               "user_profile",
               "user_genre_selection",
-              "playlist",
+              "repertoire",
             ],
           };
           console.log(
@@ -622,7 +622,7 @@ export const AuthProvider: ParentComponent = (props) => {
               "tune",
               "reference",
               "note",
-              "playlist_tune",
+              "repertoire_tune",
               "practice_record",
               "tune_override",
               "daily_practice_queue",
@@ -2111,7 +2111,7 @@ export const AuthProvider: ParentComponent = (props) => {
   /**
    * Increment repertoire list changed counter
    * Call after writes affecting repertoire VIEWs
-   * (repertoire metadata changes, playlist additions/deletions)
+   * (repertoire metadata changes, repertoire additions/deletions)
    */
   const incrementRepertoireListChanged = () => {
     setRepertoireListChanged((prev) => {
@@ -2214,7 +2214,7 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       diagLog("🔄 [syncPracticeScope] Starting scoped practice syncDown...");
       const tables = [
-        "playlist_tune",
+        "repertoire_tune",
         "practice_record",
         "daily_practice_queue",
         "table_transient_data",

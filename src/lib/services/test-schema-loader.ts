@@ -101,7 +101,7 @@ export function applyMigrations(db: BetterSQLite3Database): void {
  *
  * Loads a simplified version of the production view from a test SQL file.
  * The test view includes only the fields used by the practice queue algorithm
- * (id, title, scheduled, latest_due, deleted, playlist_deleted, user_ref, playlist_id).
+ * (id, title, scheduled, latest_due, deleted, repertoire_deleted, user_ref, repertoire_id).
  *
  * Production view has 40+ fields with tune_override joins, transient data, tags, notes, etc.
  * See: scripts/create-views-direct.ts for full production implementation.

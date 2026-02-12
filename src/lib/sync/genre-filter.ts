@@ -105,7 +105,7 @@ async function getEffectiveGenreFilterInitialSync(params: {
 }): Promise<{ effective: string[]; playlistGenres: string[] }> {
   const { db, supabase, userId } = params;
 
-  // Query LOCAL db for user genre selection and playlist defaults
+  // Query LOCAL db for user genre selection and repertoire defaults
   // Note: preSyncMetadataViaWorker already synced user_genre_selection, playlist, and instrument
   const [selectedGenres, playlistDefaultGenres] = await Promise.all([
     getUserGenreSelection(db, userId),

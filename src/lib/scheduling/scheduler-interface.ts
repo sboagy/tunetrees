@@ -19,7 +19,7 @@ export interface SchedulingService {
 }
 
 export interface SchedulingServiceOptions {
-  playlistTuneCount?: number | null;
+  repertoireTuneCount?: number | null;
 }
 
 export interface SchedulingServiceConstructor {

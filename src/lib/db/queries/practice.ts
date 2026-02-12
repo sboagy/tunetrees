@@ -75,28 +75,28 @@ type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
  *
  * @param db - SQLite database instance (sql.js in app or better-sqlite3 in tests)
  * @param userId - User ID (from user_profile.id)
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param windowStartIso19 - Window start timestamp normalized to ISO (YYYY-MM-DDTHH:MM:SS)
  * @returns Count of stale rows removed
  */
 export async function clearStaleStagedEvaluations(
   db: AnyDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   windowStartIso19: string
 ): Promise<number> {
   const result = await db.get<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM table_transient_data
     WHERE table_transient_data.user_id = ${userId}
-      AND table_transient_data.playlist_id = ${playlistId}
+      AND table_transient_data.repertoire_id = ${repertoireId}
 			AND (
 				NOT EXISTS (
 					SELECT 1
 					FROM daily_practice_queue dpq
 					WHERE dpq.tune_ref = table_transient_data.tune_id
 						AND dpq.user_ref = ${userId}
-						AND dpq.playlist_ref = ${playlistId}
+						AND dpq.repertoire_ref = ${repertoireId}
 						AND dpq.active = 1
 						AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
 				)
@@ -115,14 +115,14 @@ export async function clearStaleStagedEvaluations(
   await db.run(sql`
     DELETE FROM table_transient_data
     WHERE table_transient_data.user_id = ${userId}
-      AND table_transient_data.playlist_id = ${playlistId}
+      AND table_transient_data.repertoire_id = ${repertoireId}
 			AND (
 				NOT EXISTS (
 					SELECT 1
 					FROM daily_practice_queue dpq
 					WHERE dpq.tune_ref = table_transient_data.tune_id
 						AND dpq.user_ref = ${userId}
-						AND dpq.playlist_ref = ${playlistId}
+						AND dpq.repertoire_ref = ${repertoireId}
 						AND dpq.active = 1
 						AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
 				)
@@ -135,7 +135,7 @@ export async function clearStaleStagedEvaluations(
   }
 
   console.log(
-    `[clearStaleStagedEvaluations] Removed ${count} stale staged row(s) for user=${userId}, playlist=${playlistId}, window=${windowStartIso19}`
+    `[clearStaleStagedEvaluations] Removed ${count} stale staged row(s) for user=${userId}, playlist=${repertoireId}, window=${windowStartIso19}`
   );
 
   return count;
@@ -170,7 +170,7 @@ export interface DueTuneEntry {
  *
  * @param db - SQLite database instance
  * @param userId - User ID (from user_profile.id)
- * @param playlistId - Playlist to query
+ * @param repertoireId - Playlist to query
  * @param _delinquencyWindowDays - Unused (kept for API compatibility)
  * @returns Array of practice list rows with queue info (bucket, order_index, completed_at)
  *
@@ -184,7 +184,7 @@ export interface DueTuneEntry {
 export async function getPracticeList(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   _delinquencyWindowDays: number = 7, // Kept for API compatibility
   windowStartUtc?: string
 ): Promise<PracticeListStagedWithQueue[]> {
@@ -196,12 +196,12 @@ export async function getPracticeList(
     SELECT COUNT(*) as count
     FROM daily_practice_queue dpq
     WHERE dpq.user_ref = ${userId}
-      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.repertoire_ref = ${repertoireId}
       AND dpq.active = 1
   `);
   console.log("[DB identity]", db);
   console.log(
-    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${playlistId}`
+    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${repertoireId}`
   );
 
   // Debug: Check view rows
@@ -209,10 +209,10 @@ export async function getPracticeList(
     SELECT COUNT(*) as count
     FROM practice_list_staged pls
     WHERE pls.user_ref = ${userId}
-      AND pls.playlist_id = ${playlistId}
+      AND pls.repertoire_id = ${repertoireId}
   `);
   console.log(
-    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, playlist=${playlistId}`
+    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, playlist=${repertoireId}`
   );
 
   // DEBUG: Check what windows exist and which one we're selecting
@@ -223,7 +223,7 @@ export async function getPracticeList(
     SELECT window_start_utc, COUNT(*) as count
     FROM daily_practice_queue
     WHERE user_ref = ${userId}
-      AND playlist_ref = ${playlistId}
+      AND playlist_ref = ${repertoireId}
       AND active = 1
     GROUP BY window_start_utc
     ORDER BY window_start_utc DESC
@@ -252,7 +252,7 @@ export async function getPracticeList(
       SELECT MAX(window_start_utc) as max_window
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
-        AND playlist_ref = ${playlistId}
+        AND playlist_ref = ${repertoireId}
         AND active = 1
     `);
     console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
@@ -275,7 +275,7 @@ export async function getPracticeList(
   const windowStartIso19 = isoFormat.replace(" ", "T").substring(0, 19);
   // Defensive cleanup: remove stale staged rows that no longer match this
   // active queue window or that predate the window.
-  await clearStaleStagedEvaluations(db, userId, playlistId, windowStartIso19);
+  await clearStaleStagedEvaluations(db, userId, repertoireId, windowStartIso19);
 
   // Select from the MOST RECENT active queue snapshot
   // Match BOTH '2025-11-08T00:00:00' AND '2025-11-08 00:00:00' formats
@@ -292,9 +292,9 @@ export async function getPracticeList(
     INNER JOIN daily_practice_queue dpq 
       ON dpq.tune_ref = pls.id
       AND dpq.user_ref = pls.user_ref
-      AND dpq.playlist_ref = pls.playlist_id
+      AND dpq.repertoire_ref = pls.repertoire_id
     WHERE dpq.user_ref = ${userId}
-      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.repertoire_ref = ${repertoireId}
       AND dpq.active = 1
       AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
     GROUP BY pls.id
@@ -320,10 +320,10 @@ export async function getPracticeList(
 export async function getDueTunes(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   delinquencyWindowDays: number = 7
 ): Promise<PracticeListStagedWithQueue[]> {
-  return getPracticeList(db, userId, playlistId, delinquencyWindowDays);
+  return getPracticeList(db, userId, repertoireId, delinquencyWindowDays);
 }
 
 /**
@@ -333,7 +333,7 @@ export async function getDueTunes(
  */
 export async function getDueTunesLegacy(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   sitdownDate: Date,
   delinquencyWindowDays = 7
 ): Promise<DueTuneEntry[]> {
@@ -375,7 +375,7 @@ export async function getDueTunesLegacy(
         SELECT practiced 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND playlist_ref = ${repertoireId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -383,7 +383,7 @@ export async function getDueTunesLegacy(
         SELECT due 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND playlist_ref = ${repertoireId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -391,7 +391,7 @@ export async function getDueTunesLegacy(
         SELECT stability 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND playlist_ref = ${repertoireId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -399,7 +399,7 @@ export async function getDueTunesLegacy(
         SELECT difficulty 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND playlist_ref = ${repertoireId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -407,7 +407,7 @@ export async function getDueTunesLegacy(
         SELECT state 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND playlist_ref = ${repertoireId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -416,7 +416,7 @@ export async function getDueTunesLegacy(
     .innerJoin(playlistTune, eq(playlistTune.tuneRef, tune.id))
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.playlistRef, repertoireId),
         eq(playlistTune.deleted, 0),
         eq(tune.deleted, 0)
       )
@@ -542,7 +542,7 @@ export async function getDueTunesLegacy(
  *
  * @param db - SQLite database instance
  * @param userId - User UUID (Supabase)
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param queueDate - Date for the queue (defaults to today)
  * @returns Array of daily practice queue entries
  */
@@ -570,7 +570,7 @@ export async function getDailyPracticeQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userId),
-        eq(dailyPracticeQueue.playlistRef, playlistId),
+        eq(dailyPracticeQueue.playlistRef, repertoireId),
         eq(dailyPracticeQueue.active, 1),
         gte(dailyPracticeQueue.windowStartUtc, windowStart.toISOString()),
         lte(dailyPracticeQueue.windowEndUtc, windowEnd.toISOString())
@@ -590,7 +590,7 @@ export async function getDailyPracticeQueue(
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @returns Latest practice record or null if never practiced
  *
  * @example
@@ -605,7 +605,7 @@ export async function getDailyPracticeQueue(
 export async function getLatestPracticeRecord(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<PracticeRecord | null> {
   const results = await db
     .select()
@@ -613,7 +613,7 @@ export async function getLatestPracticeRecord(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.playlistRef, repertoireId)
       )
     )
     .orderBy(desc(practiceRecord.practiced))
@@ -715,7 +715,7 @@ export async function getUserSchedulingOptions(
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param limit - Maximum number of records to return (default: all)
  * @returns Array of practice records with tune information
  *
@@ -728,7 +728,7 @@ export async function getUserSchedulingOptions(
 export async function getPracticeHistory(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string,
+  repertoireId: string,
   limit?: number
 ): Promise<PracticeRecordWithTune[]> {
   let query = db
@@ -782,11 +782,11 @@ export async function getPracticeHistory(
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.playlistId, practiceRecord.playlistRef))
+    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.playlistRef))
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.playlistRef, repertoireId)
       )
     )
     .orderBy(desc(practiceRecord.practiced));
@@ -817,7 +817,7 @@ export async function getPracticeHistory(
  * `add_tunes_to_practice_queue` in tunetrees/app/queries.py
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param tuneIds - Array of tune IDs to add to practice queue
  * @returns Object with counts of added and skipped tunes
  *
@@ -829,7 +829,7 @@ export async function getPracticeHistory(
  */
 export async function addTunesToPracticeQueue(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   tuneIds: string[]
 ): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
   const now = new Date().toISOString();
@@ -849,7 +849,7 @@ export async function addTunesToPracticeQueue(
         })
         .where(
           and(
-            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.playlistRef, repertoireId),
             eq(playlistTune.tuneRef, tuneId),
             eq(playlistTune.deleted, 0)
           )
@@ -868,7 +868,7 @@ export async function addTunesToPracticeQueue(
           .from(practiceRecord)
           .where(
             and(
-              eq(practiceRecord.playlistRef, playlistId),
+              eq(practiceRecord.playlistRef, repertoireId),
               eq(practiceRecord.tuneRef, tuneId)
             )
           )
@@ -878,7 +878,7 @@ export async function addTunesToPracticeQueue(
         if (!existing || existing.length === 0) {
           await db.insert(practiceRecord).values({
             id: generateId(),
-            playlistRef: playlistId,
+            playlistRef: repertoireId,
             tuneRef: tuneId,
             practiced: null,
             quality: null,
@@ -920,7 +920,7 @@ export async function addTunesToPracticeQueue(
       const playlistData = await db
         .select({ userRef: playlist.userRef })
         .from(playlist)
-        .where(eq(playlist.playlistId, playlistId))
+        .where(eq(playlist.repertoireId, repertoireId))
         .limit(1);
 
       if (playlistData && playlistData.length > 0) {
@@ -934,7 +934,7 @@ export async function addTunesToPracticeQueue(
           .where(
             and(
               eq(dailyPracticeQueue.userRef, userRef),
-              eq(dailyPracticeQueue.playlistRef, playlistId),
+              eq(dailyPracticeQueue.playlistRef, repertoireId),
               eq(dailyPracticeQueue.queueDate, queueDate)
             )
           );
@@ -959,7 +959,7 @@ export async function addTunesToPracticeQueue(
  * Useful for analytics and progress tracking.
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param limit - Maximum number of records to return
  * @returns Array of practice records with tune information
  *
@@ -971,7 +971,7 @@ export async function addTunesToPracticeQueue(
  */
 export async function getPracticeRecords(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   limit = 100
 ): Promise<PracticeRecordWithTune[]> {
   const results = await db
@@ -1025,8 +1025,8 @@ export async function getPracticeRecords(
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.playlistId, practiceRecord.playlistRef))
-    .where(eq(practiceRecord.playlistRef, playlistId))
+    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.playlistRef))
+    .where(eq(practiceRecord.playlistRef, repertoireId))
     .orderBy(desc(practiceRecord.practiced))
     .limit(limit);
 

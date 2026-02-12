@@ -66,7 +66,7 @@ function mapEvaluationToRating(evaluation: string): Rating {
  *
  * @param db - SQLite database instance
  * @param userId - User ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param tuneId - Tune ID
  * @param evaluation - Recall evaluation ("again", "hard", "good", "easy")
  * @param goal - Practice goal (default: "recall")
@@ -82,7 +82,7 @@ function mapEvaluationToRating(evaluation: string): Rating {
 export async function stagePracticeEvaluation(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   evaluation: string,
   goal: string = "recall",
@@ -96,7 +96,7 @@ export async function stagePracticeEvaluation(
   // Build RecordPracticeInput for evaluatePractice
   const input: RecordPracticeInput = {
     tuneRef: tuneId,
-    playlistRef: playlistId,
+    playlistRef: repertoireId,
     practiced: now,
     // Use FSRS Rating values (Again=1, Hard=2, Good=3, Easy=4) – Manual (0) not used here
     quality: mapEvaluationToRating(evaluation),
@@ -133,7 +133,7 @@ export async function stagePracticeEvaluation(
     INSERT INTO table_transient_data (
       user_id,
       tune_id,
-      playlist_id,
+      repertoire_id,
       quality,
       difficulty,
       stability,
@@ -151,7 +151,7 @@ export async function stagePracticeEvaluation(
     ) VALUES (
       ${userId},
       ${tuneId},
-      ${playlistId},
+      ${repertoireId},
       ${preview.quality},
       ${preview.difficulty},
       ${preview.stability},
@@ -167,7 +167,7 @@ export async function stagePracticeEvaluation(
       1,
       ${lastModifiedAt}
     )
-    ON CONFLICT(user_id, tune_id, playlist_id) DO UPDATE SET
+    ON CONFLICT(user_id, tune_id, repertoire_id) DO UPDATE SET
       quality = excluded.quality,
       difficulty = excluded.difficulty,
       stability = excluded.stability,
@@ -207,19 +207,19 @@ export async function stagePracticeEvaluation(
  * @param db - SQLite database instance
  * @param userId - User ID
  * @param tuneId - Tune ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  */
 export async function clearStagedEvaluation(
   db: SqliteDatabase,
   userId: string,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
     WHERE user_id = ${userId}
       AND tune_id = ${tuneId}
-      AND playlist_id = ${playlistId}
+      AND repertoire_id = ${repertoireId}
   `);
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
@@ -236,16 +236,16 @@ export async function clearStagedEvaluation(
  * Called after submitting evaluations to clean up transient data.
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  */
 export async function clearAllStagedForPlaylist(
   db: SqliteDatabase,
-  playlistId: string
+  repertoireId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
-    WHERE playlist_id = ${playlistId}
+    WHERE repertoire_id = ${repertoireId}
   `);
 
-  console.log(`🗑️  Cleared all staged evaluations for playlist ${playlistId}`);
+  console.log(`🗑️  Cleared all staged evaluations for playlist ${repertoireId}`);
 }

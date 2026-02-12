@@ -78,16 +78,16 @@ const TECHNIQUE_MODIFIERS = {
  */
 export class FSRSService implements SchedulingService {
   private scheduler: ReturnType<typeof fsrs>;
-  private playlistTuneCount: number | null = null; // populated asynchronously
+  private repertoireTuneCount: number | null = null; // populated asynchronously
   /** Accessor for tune count (may be null if not yet loaded) */
   getPlaylistTuneCountCached(): number | null {
-    return this.playlistTuneCount;
+    return this.repertoireTuneCount;
   }
 
   constructor(
     prefs: PrefsSpacedRepetition,
     scheduling: IUserSchedulingOptions,
-    options?: { playlistTuneCount?: number | null }
+    options?: { repertoireTuneCount?: number | null }
   ) {
     // Parse FSRS weights from JSON string (stored in database)
     const weights = prefs.fsrsWeights
@@ -102,7 +102,7 @@ export class FSRSService implements SchedulingService {
       ? (JSON.parse(prefs.relearningSteps) as number[]).map((m) => `${m}m`)
       : ["10m"];
 
-    this.playlistTuneCount = options?.playlistTuneCount ?? null;
+    this.repertoireTuneCount = options?.repertoireTuneCount ?? null;
 
     const maxReviewsPerDay =
       scheduling.maxReviewsPerDay && scheduling.maxReviewsPerDay > 0
@@ -116,7 +116,7 @@ export class FSRSService implements SchedulingService {
         : undefined;
 
     /**
-     * Calculate effective playlist size with bounds for maximum interval calculation.
+     * Calculate effective repertoire size with bounds for maximum interval calculation.
      *
      * RATIONALE:
      * The maximum interval is calculated to ensure ongoing rotation of the user's
@@ -140,7 +140,7 @@ export class FSRSService implements SchedulingService {
      * FORMULA: max_interval = 3 * (effective_tunes / reviews_per_day)
      * This gives roughly 3 full rotations of the repertoire before hitting the cap.
      */
-    const rawPlaylistTuneCount = tuneCountOverride ?? this.playlistTuneCount ?? 400;
+    const rawPlaylistTuneCount = tuneCountOverride ?? this.repertoireTuneCount ?? 400;
     const effectivePlaylistTuneCount: number = Math.min(
       Math.max(rawPlaylistTuneCount, 50),
       400
@@ -427,32 +427,32 @@ export class FSRSService implements SchedulingService {
 export function createFSRSService(
   prefs: PrefsSpacedRepetition,
   scheduling: IUserSchedulingOptions,
-  options?: { playlistTuneCount?: number | null }
+  options?: { repertoireTuneCount?: number | null }
 ): FSRSService {
   return new FSRSService(prefs, scheduling, options);
 }
 
 /**
  * Get the total number of tunes in all of a user's playlists (repertoire size).
- * Counts distinct playlist_tune rows for playlists owned by the user.
- * Excludes deleted playlist or playlist_tune rows.
+ * Counts distinct repertoire_tune rows for playlists owned by the user.
+ * Excludes deleted playlist or repertoire_tune rows.
  *
  * @param db Local SQLite database instance
  * @param userInternalId Internal user_profile.id (NOT supabase_user_id)
  * @returns Number of tunes in the user's repertoire
  */
-export async function getPlaylistTuneCount(
+export async function getRepertoireTuneCount(
   db: SqliteDatabase,
   playlistRef: string
 ): Promise<number> {
   const rows = await db.all<{ cnt: number }>(sql`
     SELECT COUNT(*) AS cnt
-    FROM playlist_tune pt
-    WHERE pt.playlist_ref = ${playlistRef}
+    FROM repertoire_tune pt
+    WHERE pt.repertoire_ref = ${playlistRef}
       AND (pt.deleted IS NULL OR pt.deleted = 0)
   `);
   return rows[0]?.cnt ?? 0;
 }
 
 // Example usage:
-// const tuneCount = await getPlaylistTuneCount(localDb(), currentPlaylistId()!);
+// const tuneCount = await getRepertoireTuneCount(localDb(), currentPlaylistId()!);

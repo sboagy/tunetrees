@@ -2,7 +2,7 @@
  * Onboarding Context for TuneTrees
  *
  * Manages the new user onboarding flow for both anonymous and registered users.
- * Shows onboarding when no playlists exist (instead of using localStorage).
+ * Shows onboarding when no repertoires exist (instead of using localStorage).
  *
  * @module lib/context/OnboardingContext
  */
@@ -43,7 +43,7 @@ interface OnboardingState {
   /** Skip onboarding */
   skipOnboarding: () => void;
 
-  /** Check if user should see onboarding (no playlists) */
+  /** Check if user should see onboarding (no repertoires) */
   shouldShowOnboarding: (hasPlaylists: boolean) => boolean;
 }
 
@@ -94,7 +94,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
   );
 
   /**
-   * Check if user should see onboarding based on whether they have playlists
+   * Check if user should see onboarding based on whether they have repertoires
    */
   const shouldShowOnboarding = (hasPlaylists: boolean): boolean => {
     return !hasPlaylists;
@@ -154,7 +154,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
   };
 
   /**
-   * Reset onboarding state (useful for testing or after user creates a playlist)
+   * Reset onboarding state (useful for testing or after user creates a repertoire)
    */
 
   // const resetOnboarding = () => {

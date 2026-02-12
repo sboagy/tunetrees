@@ -113,7 +113,7 @@ export async function clearLocalDatabaseForMigration(
     const {
       dailyPracticeQueue,
       practiceRecord,
-      playlistTune,
+      repertoireTune,
       note,
       reference,
       tag,
@@ -128,7 +128,7 @@ export async function clearLocalDatabaseForMigration(
     const tablesToClear = [
       dailyPracticeQueue,
       practiceRecord,
-      playlistTune,
+      repertoireTune,
       note,
       reference,
       tag,

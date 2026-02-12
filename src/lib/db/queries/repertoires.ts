@@ -23,8 +23,8 @@ import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
   instrument,
-  playlist,
-  playlistTune,
+  repertoire,
+  repertoireTune,
   tune,
   userProfile,
 } from "../schema";
@@ -134,39 +134,39 @@ export async function getUserRepertoires(
   }
 
   // Build query conditions
-  const conditions = [eq(playlist.userRef, userRef)];
+  const conditions = [eq(repertoire.userRef, userRef)];
   if (!includeDeleted) {
-    conditions.push(eq(playlist.deleted, 0));
+    conditions.push(eq(repertoire.deleted, 0));
   }
 
   // Get repertoires with tune count and instrument names
   // Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
   const repertoires = await db
     .select({
-      repertoireId: playlist.playlistId,
-      userRef: playlist.userRef,
-      name: playlist.name,
-      instrumentRef: playlist.instrumentRef,
+      repertoireId: repertoire.repertoireId,
+      userRef: repertoire.userRef,
+      name: repertoire.name,
+      instrumentRef: repertoire.instrumentRef,
       instrumentName: instrument.instrument,
       // Select both genre columns for post-query resolution
-      repertoireGenre: playlist.genreDefault,
+      repertoireGenre: repertoire.genreDefault,
       instrumentGenre: instrument.genreDefault,
-      srAlgType: playlist.srAlgType,
-      deleted: playlist.deleted,
-      syncVersion: playlist.syncVersion,
-      lastModifiedAt: playlist.lastModifiedAt,
-      deviceId: playlist.deviceId,
+      srAlgType: repertoire.srAlgType,
+      deleted: repertoire.deleted,
+      syncVersion: repertoire.syncVersion,
+      lastModifiedAt: repertoire.lastModifiedAt,
+      deviceId: repertoire.deviceId,
       tuneCount: sql<number>`(
         SELECT COUNT(*)
-        FROM playlist_tune
-        WHERE playlist_ref = ${playlist.playlistId}
+        FROM repertoire_tune
+        WHERE repertoire_ref = ${repertoire.repertoireId}
           AND deleted = 0
       )`,
     })
-    .from(playlist)
-    .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
+    .from(repertoire)
+    .leftJoin(instrument, eq(repertoire.instrumentRef, instrument.id))
     .where(and(...conditions))
-    .orderBy(playlist.lastModifiedAt);
+    .orderBy(repertoire.lastModifiedAt);
 
   // Debug logs removed for cleanliness
 
@@ -220,9 +220,9 @@ export async function getRepertoireById(
 
   const result = await db
     .select()
-    .from(playlist)
+    .from(repertoire)
     .where(
-      and(eq(playlist.playlistId, repertoireId), eq(playlist.userRef, userRef))
+      and(eq(repertoire.repertoireId, repertoireId), eq(repertoire.userRef, userRef))
     )
     .limit(1);
 
@@ -288,7 +288,7 @@ export async function createRepertoire(
     deviceId: "local", // TODO: Get actual device ID
   };
 
-  const result = await db.insert(playlist).values(newRepertoire).returning();
+  const result = await db.insert(repertoire).values(newRepertoire).returning();
 
   if (!result || result.length === 0) {
     throw new Error("Failed to create repertoire");
@@ -344,9 +344,9 @@ export async function updateRepertoire(
   };
 
   const result = await db
-    .update(playlist)
+    .update(repertoire)
     .set(updateData)
-    .where(eq(playlist.playlistId, repertoireId))
+    .where(eq(repertoire.repertoireId, repertoireId))
     .returning();
 
   if (!result || result.length === 0) {
@@ -396,23 +396,23 @@ export async function deleteRepertoire(
 
   // Soft delete the repertoire
   await db
-    .update(playlist)
+    .update(repertoire)
     .set({
       deleted: 1,
       syncVersion: (existing.syncVersion || 0) + 1,
       lastModifiedAt: now,
     })
-    .where(eq(playlist.playlistId, repertoireId));
+    .where(eq(repertoire.repertoireId, repertoireId));
 
   // Soft delete all repertoire-tune associations
   await db
-    .update(playlistTune)
+    .update(repertoireTune)
     .set({
       deleted: 1,
-      syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+      syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
       lastModifiedAt: now,
     })
-    .where(eq(playlistTune.playlistRef, repertoireId));
+    .where(eq(repertoireTune.repertoireRef, repertoireId));
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 
@@ -455,11 +455,11 @@ export async function addTuneToRepertoire(
   // Check if association already exists
   const existing = await db
     .select()
-    .from(playlistTune)
+    .from(repertoireTune)
     .where(
       and(
-        eq(playlistTune.playlistRef, repertoireId),
-        eq(playlistTune.tuneRef, tuneId)
+        eq(repertoireTune.repertoireRef, repertoireId),
+        eq(repertoireTune.tuneRef, tuneId)
       )
     )
     .limit(1);
@@ -469,7 +469,7 @@ export async function addTuneToRepertoire(
     if (existing[0].deleted === 1) {
       const now = new Date().toISOString();
       const result = await db
-        .update(playlistTune)
+        .update(repertoireTune)
         .set({
           deleted: 0,
           syncVersion: (existing[0].syncVersion || 0) + 1,
@@ -477,8 +477,8 @@ export async function addTuneToRepertoire(
         })
         .where(
           and(
-            eq(playlistTune.playlistRef, repertoireId),
-            eq(playlistTune.tuneRef, tuneId)
+            eq(repertoireTune.repertoireRef, repertoireId),
+            eq(repertoireTune.tuneRef, tuneId)
           )
         )
         .returning();
@@ -506,7 +506,7 @@ export async function addTuneToRepertoire(
   };
 
   const result = await db
-    .insert(playlistTune)
+    .insert(repertoireTune)
     .values(newAssociation)
     .returning();
 
@@ -553,16 +553,16 @@ export async function removeTuneFromRepertoire(
   const now = new Date().toISOString();
 
   const result = await db
-    .update(playlistTune)
+    .update(repertoireTune)
     .set({
       deleted: 1,
-      syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+      syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
       lastModifiedAt: now,
     })
     .where(
       and(
-        eq(playlistTune.playlistRef, repertoireId),
-        eq(playlistTune.tuneRef, tuneId)
+        eq(repertoireTune.repertoireRef, repertoireId),
+        eq(repertoireTune.tuneRef, tuneId)
       )
     )
     .returning();
@@ -607,12 +607,12 @@ export async function getRepertoireTunes(
   const result = await db
     .select({
       // RepertoireTune fields
-      repertoireRef: playlistTune.playlistRef,
-      tuneRef: playlistTune.tuneRef,
-      current: playlistTune.current,
-      learned: playlistTune.learned,
-      scheduled: playlistTune.scheduled,
-      goal: playlistTune.goal,
+      repertoireRef: repertoireTune.repertoireRef,
+      tuneRef: repertoireTune.tuneRef,
+      current: repertoireTune.current,
+      learned: repertoireTune.learned,
+      scheduled: repertoireTune.scheduled,
+      goal: repertoireTune.goal,
 
       // Tune fields
       tuneId: tune.id,
@@ -627,12 +627,12 @@ export async function getRepertoireTunes(
       incipit: tune.incipit,
       genre: tune.genre,
     })
-    .from(playlistTune)
-    .innerJoin(tune, eq(playlistTune.tuneRef, tune.id))
+    .from(repertoireTune)
+    .innerJoin(tune, eq(repertoireTune.tuneRef, tune.id))
     .where(
       and(
-        eq(playlistTune.playlistRef, repertoireId),
-        eq(playlistTune.deleted, 0),
+        eq(repertoireTune.repertoireRef, repertoireId),
+        eq(repertoireTune.deleted, 0),
         eq(tune.deleted, 0)
       )
     )
@@ -708,10 +708,10 @@ export async function getRepertoireTunesStaged(
   // Query the practice_list_staged view directly
   const result = await db.all<any>(sql`
     SELECT * FROM practice_list_staged
-    WHERE playlist_id = ${repertoireId}
+    WHERE repertoire_id = ${repertoireId}
       AND user_ref = ${userRef}
       AND deleted = 0
-      AND playlist_deleted = 0
+      AND repertoire_deleted = 0
     ORDER BY title
   `);
   console.log(
@@ -760,11 +760,11 @@ export async function addTunesToRepertoire(
       // Check if already exists
       const existing = await db
         .select()
-        .from(playlistTune)
+        .from(repertoireTune)
         .where(
           and(
-            eq(playlistTune.playlistRef, repertoireId),
-            eq(playlistTune.tuneRef, tuneId)
+            eq(repertoireTune.repertoireRef, repertoireId),
+            eq(repertoireTune.tuneRef, tuneId)
           )
         )
         .limit(1);

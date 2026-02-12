@@ -17,10 +17,10 @@ import type * as schema from "./schema";
 // Select types (reading from database)
 export type User = InferSelectModel<typeof schema.userProfile>;
 export type Tune = InferSelectModel<typeof schema.tune>;
-export type Playlist = InferSelectModel<typeof schema.playlist>;
-export type Repertoire = InferSelectModel<typeof schema.playlist>;
-export type PlaylistTune = InferSelectModel<typeof schema.playlistTune>;
-export type RepertoireTune = InferSelectModel<typeof schema.playlistTune>;
+export type Playlist = InferSelectModel<typeof schema.repertoire>;
+export type Repertoire = InferSelectModel<typeof schema.repertoire>;
+export type PlaylistTune = InferSelectModel<typeof schema.repertoireTune>;
+export type RepertoireTune = InferSelectModel<typeof schema.repertoireTune>;
 export type Note = InferSelectModel<typeof schema.note>;
 export type Reference = InferSelectModel<typeof schema.reference>;
 export type Tag = InferSelectModel<typeof schema.tag>;
@@ -46,10 +46,10 @@ export type Plugin = InferSelectModel<typeof schema.plugin>;
 // Insert types (creating new records)
 export type NewUser = InferInsertModel<typeof schema.userProfile>;
 export type NewTune = InferInsertModel<typeof schema.tune>;
-export type NewPlaylist = InferInsertModel<typeof schema.playlist>;
-export type NewRepertoire = InferInsertModel<typeof schema.playlist>;
-export type NewPlaylistTune = InferInsertModel<typeof schema.playlistTune>;
-export type NewRepertoireTune = InferInsertModel<typeof schema.playlistTune>;
+export type NewPlaylist = InferInsertModel<typeof schema.repertoire>;
+export type NewRepertoire = InferInsertModel<typeof schema.repertoire>;
+export type NewPlaylistTune = InferInsertModel<typeof schema.repertoireTune>;
+export type NewRepertoireTune = InferInsertModel<typeof schema.repertoireTune>;
 export type NewNote = InferInsertModel<typeof schema.note>;
 export type NewReference = InferInsertModel<typeof schema.reference>;
 export type NewTag = InferInsertModel<typeof schema.tag>;
@@ -213,9 +213,9 @@ export interface UpdateTuneInput extends Partial<CreateTuneInput> {
 }
 
 /**
- * Input for creating a new playlist
+ * Input for creating a new repertoire
  */
-export interface CreatePlaylistInput {
+export interface CreateRepertoireInput {
   user_ref: string; // User UUID
   instrument?: string; // UUID
   genre?: string; // UUID
@@ -223,14 +223,22 @@ export interface CreatePlaylistInput {
 }
 
 /**
- * Input for updating a playlist
+ * Input for updating a repertoire
  */
-export interface UpdatePlaylistInput extends Partial<CreatePlaylistInput> {
-  id: string; // UUID (renamed from playlist_id)
+export interface UpdateRepertoireInput extends Partial<CreateRepertoireInput> {
+  id: string; // UUID (renamed from repertoire_id)
 }
 
 /**
- * Input for adding a tune to a playlist
+ * Input for adding a tune to a repertoire
+ */
+export interface AddTuneToRepertoireInput {
+  repertoire_ref: string; // UUID (was integer)
+  tune_ref: string; // UUID (was integer)
+}
+
+/**
+ * Input for adding a tune to a repertoire (deprecated alias)
  */
 export interface AddTuneToPlaylistInput {
   playlist_ref: string; // UUID (was integer)
@@ -346,14 +354,14 @@ export { Rating as FSRSRating, State as FSRSState } from "ts-fsrs";
  */
 export interface PracticeRecordWithTune extends PracticeRecord {
   tune: Tune;
-  playlistName?: string;
+  repertoireName?: string;
 }
 
 /**
  * Input for recording a practice session
  */
 export interface RecordPracticeInput {
-  playlistRef: string; // UUID (was integer)
+  repertoireRef: string; // UUID (was integer)
   tuneRef: string; // UUID (was integer)
   quality: number; // Rating quality (1-4 for FSRS: Again, Hard, Good, Easy)
   practiced: Date; // Practice session date/time

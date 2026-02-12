@@ -362,7 +362,7 @@ export interface DailyPracticeQueueRow {
  *
  * @param db - SQLite database instance
  * @param userRef - User ID (from user_profile.id)
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param windowStartKey - Window start timestamp (YYYY-MM-DD HH:MM:SS)
  * @returns Array of existing active queue rows
  */
@@ -402,7 +402,7 @@ async function fetchExistingActiveQueue(
  * @param windows - Scheduling windows
  * @param prefs - Scheduling preferences
  * @param userRef - User ID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param mode - Queue mode ("per_day" or "rolling")
  * @param localTzOffsetMinutes - Timezone offset
  * @param forceBucket - Force all rows to specific bucket (optional, for Q3 override)
@@ -483,7 +483,7 @@ function buildQueueRows(
  * @param db - SQLite database instance
  * @param rows - Queue rows to insert
  * @param userRef - User ID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param windows - Scheduling windows
  * @returns Persisted queue rows (may be existing rows if conflict)
  */
@@ -535,7 +535,7 @@ async function persistQueueRows(
  *
  * @param db - SQLite database instance
  * @param userRef - User ID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param practiceDate - The practice date (from getPracticeDate())
  * @param localTzOffsetMinutes - Client timezone offset (optional)
  * @returns True if queue was created, false if already existed
@@ -545,7 +545,7 @@ async function persistQueueRows(
  * import { getPracticeDate } from '../utils/practice-date';
  *
  * const practiceDate = getPracticeDate();
- * const created = await ensureDailyQueue(db, userId, playlistId, practiceDate);
+ * const created = await ensureDailyQueue(db, userId, repertoireId, practiceDate);
  * if (created) {
  *   console.log('Created new daily queue');
  * }
@@ -573,7 +573,7 @@ export async function ensureDailyQueue(
     SELECT 1 as one
     FROM daily_practice_queue
     WHERE user_ref = ${userRef}
-      AND playlist_ref = ${playlistRef}
+      AND repertoire_ref = ${playlistRef}
       AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartUtcIso19}
     LIMIT 1
   `);
@@ -619,7 +619,7 @@ export async function ensureDailyQueue(
  *
  * @param db - SQLite database instance
  * @param userRef - User ID (from user_profile.id)
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
  * @param localTzOffsetMinutes - Client timezone offset (optional)
  * @param mode - Queue mode ("per_day" or "rolling")
@@ -631,7 +631,7 @@ export async function ensureDailyQueue(
  * const queue = await generateOrGetPracticeQueue(
  *   db,
  *   1,  // userId
- *   5,  // playlistId
+ *   5,  // repertoireId
  *   new Date(),
  *   -240,  // EDT timezone
  *   "per_day",
@@ -670,7 +670,7 @@ export async function generateOrGetPracticeQueue(
   const stagedExists = await db.all<{ one: number }>(sql`
     SELECT 1 as one
     FROM practice_list_staged
-    WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}
+    WHERE user_ref = ${userRef} AND repertoire_id = ${playlistRef}
     LIMIT 1
   `);
   const hasData = stagedExists.length > 0;
@@ -729,7 +729,7 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND (
@@ -744,7 +744,7 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND (
@@ -774,7 +774,7 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND (
@@ -809,7 +809,7 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
-          AND playlist_id = ${playlistRef}
+          AND repertoire_id = ${playlistRef}
           AND deleted = 0
           AND playlist_deleted = 0
           AND scheduled IS NULL
@@ -822,7 +822,7 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
-          AND playlist_id = ${playlistRef}
+          AND repertoire_id = ${playlistRef}
           AND deleted = 0
           AND playlist_deleted = 0
           AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
@@ -853,7 +853,7 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND scheduled IS NOT NULL
@@ -957,7 +957,7 @@ export async function generateOrGetPracticeQueue(
  *
  * @param db - SQLite database instance
  * @param userRef - User ID (from user_profile.id)
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param count - Number of tunes to add (must be >= 1)
  * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
  * @param localTzOffsetMinutes - Client timezone offset (optional)
@@ -1025,7 +1025,7 @@ export async function addTunesToQueue(
     SELECT id, scheduled, latest_due
     FROM practice_list_staged
     WHERE user_ref = ${userRef}
-      AND playlist_id = ${playlistRef}
+      AND repertoire_id = ${playlistRef}
       AND deleted = 0
       AND playlist_deleted = 0
       AND (
