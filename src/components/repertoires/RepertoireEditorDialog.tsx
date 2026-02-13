@@ -25,10 +25,10 @@ import {
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import {
-  createPlaylist,
-  getPlaylistById,
-  updatePlaylist,
-} from "../../lib/db/queries/playlists";
+  createRepertoire,
+  getRepertoireById,
+  updateRepertoire,
+} from "../../lib/db/queries/repertoires";
 import type { Playlist } from "../../lib/db/types";
 import { RepertoireEditor } from "./RepertoireEditor";
 
@@ -74,7 +74,7 @@ export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
     },
     async (params) => {
       if (!params) return null;
-      const result = await getPlaylistById(
+      const result = await getRepertoireById(
         params.db,
         params.playlistId,
         params.userId
@@ -123,10 +123,10 @@ export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
     try {
       if (props.repertoireId) {
         // Update existing repertoire
-        await updatePlaylist(db, props.repertoireId, userId, repertoireData);
+        await updateRepertoire(db, props.repertoireId, userId, repertoireData);
       } else {
         // Create new repertoire
-        await createPlaylist(db, userId, {
+        await createRepertoire(db, userId, {
           name: repertoireData.name ?? "Untitled Repertoire",
           genreDefault: repertoireData.genreDefault ?? null,
           instrumentRef: repertoireData.instrumentRef ?? null,

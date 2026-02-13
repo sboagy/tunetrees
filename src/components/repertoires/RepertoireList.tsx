@@ -31,9 +31,9 @@ import {
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import {
-  deletePlaylist,
-  getUserPlaylists,
-} from "../../lib/db/queries/playlists";
+  deleteRepertoire,
+  getUserRepertoires,
+} from "../../lib/db/queries/repertoires";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 
 interface RepertoireListProps {
@@ -50,7 +50,7 @@ interface RepertoireListProps {
  *
  * @example
  * ```tsx
- * <RepertoireList onRepertoireSelect={(repertoire) => navigate(`/repertoires/${repertoire.playlistId}`)} />
+ * <RepertoireList onRepertoireSelect={(repertoire) => navigate(`/repertoires/${repertoire.repertoireId}`)} />
  * ```
  */
 export const RepertoireList: Component<RepertoireListProps> = (props) => {
@@ -71,7 +71,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
     },
     async (params) => {
       if (!params) return [];
-      return await getUserPlaylists(
+      return await getUserRepertoires(
         params.db,
         params.userId,
         props.includeDeleted ?? false
@@ -90,7 +90,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
 
     return allRepertoires.filter((repertoire: PlaylistWithSummary) => {
       // Search by repertoire ID
-      const matchesId = repertoire.playlistId.toString().includes(query);
+      const matchesId = repertoire.repertoireId.toString().includes(query);
       // Search by instrument
       const matchesInstrument = repertoire.instrumentRef
         ? repertoire.instrumentRef.toString().includes(query)
@@ -117,7 +117,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
 
     try {
       setDeletingId(repertoireId);
-      await deletePlaylist(db, repertoireId, userId);
+      await deleteRepertoire(db, repertoireId, userId);
 
       // Notify parent
       props.onRepertoireDeleted?.(repertoireId);
@@ -234,7 +234,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
       size: 100,
       cell: (info) => {
         const repertoire = info.row.original;
-        const isDeleting = deletingId() === repertoire.playlistId;
+        const isDeleting = deletingId() === repertoire.repertoireId;
 
         return (
           <div class="flex gap-2 items-center">
@@ -255,7 +255,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete(repertoire.playlistId);
+                handleDelete(repertoire.repertoireId);
               }}
               class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
               disabled={isDeleting}

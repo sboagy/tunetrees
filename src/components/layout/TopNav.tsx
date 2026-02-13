@@ -62,15 +62,15 @@ function formatRelativeTime(isoTs: string): string {
   return `${year}y`;
 }
 
-// Helper function to get display name for a playlist
-const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
+// Helper function to get display name for a repertoire
+const getRepertoireDisplayName = (repertoire: PlaylistWithSummary): string => {
   // If name exists and is not empty, use it
-  if (playlist.name?.trim()) {
-    return playlist.name.trim();
+  if (repertoire.name?.trim()) {
+    return repertoire.name.trim();
   }
 
   // Otherwise just use instrument name
-  const instrument = playlist.instrumentName || "Unknown Instrument";
+  const instrument = repertoire.instrumentName || "Unknown Instrument";
   return instrument;
 };
 
@@ -572,11 +572,11 @@ const PlaylistDropdown: Component<{
     }
   );
 
-  // Additional debug effect to track playlists changes
+  // Additional debug effect to track repertoires changes
   createEffect(() => {
-    const playlistsList = playlists();
+    const repertoiresList = playlists();
     const loading = playlists.loading;
-    log.debug("TOPNAV playlists changed:", {
+    log.debug("TOPNAV repertoires changed:", {
       loading,
       count: repertoiresList?.length || 0,
       repertoires:
@@ -639,12 +639,12 @@ const PlaylistDropdown: Component<{
       >
         <span class="hidden md:inline font-medium">
           {selectedPlaylist()
-            ? getPlaylistDisplayName(selectedPlaylist()!)
+            ? getRepertoireDisplayName(selectedPlaylist()!)
             : "No Repertoire"}
         </span>
         <span class="md:hidden inline-block max-w-[8ch] min-w-0 truncate font-medium">
           {selectedPlaylist()
-            ? getPlaylistDisplayName(selectedPlaylist()!)
+            ? getRepertoireDisplayName(selectedPlaylist()!)
             : "No Repertoire"}
         </span>
         <svg
@@ -678,27 +678,27 @@ const PlaylistDropdown: Component<{
               }
             >
               <For each={playlists()}>
-                {(playlist) => (
+                {(repertoire) => (
                   <button
                     type="button"
                     class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
                     classList={{
                       "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":
-                        currentRepertoireId() === playlist.playlistId,
+                        currentRepertoireId() === repertoire.repertoireId,
                     }}
-                    onClick={() => handlePlaylistSelect(playlist.playlistId)}
+                    onClick={() => handleRepertoireSelect(repertoire.repertoireId)}
                   >
                     <div class="flex-1">
                       <div class="font-medium">
-                        {getPlaylistDisplayName(playlist)}
+                        {getRepertoireDisplayName(repertoire)}
                       </div>
                       <div class="text-xs text-gray-500 dark:text-gray-400">
-                        {playlist.tuneCount} tune
-                        {playlist.tuneCount !== 1 ? "s" : ""}
-                        {playlist.genreDefault && ` • ${playlist.genreDefault}`}
+                        {repertoire.tuneCount} tune
+                        {repertoire.tuneCount !== 1 ? "s" : ""}
+                        {repertoire.genreDefault && ` • ${repertoire.genreDefault}`}
                       </div>
                     </div>
-                    <Show when={currentRepertoireId() === playlist.playlistId}>
+                    <Show when={currentRepertoireId() === repertoire.repertoireId}>
                       <svg
                         class="w-4 h-4 text-blue-600 dark:text-blue-400"
                         fill="currentColor"
@@ -724,7 +724,7 @@ const PlaylistDropdown: Component<{
             <button
               type="button"
               class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-              onClick={handleManagePlaylists}
+              onClick={handleManageRepertoires}
               data-testid="manage-repertoires-button"
             >
               <svg
