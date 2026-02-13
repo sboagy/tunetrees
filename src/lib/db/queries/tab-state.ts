@@ -27,7 +27,7 @@ export async function getTabState(
   const result = await db
     .select({
       whichTab: tabGroupMainState.whichTab,
-      playlistId: tabGroupMainState.playlistId,
+      repertoireId: tabGroupMainState.playlistId,
       sidebarDockPosition: tabGroupMainState.sidebarDockPosition,
     })
     .from(tabGroupMainState)
@@ -45,7 +45,7 @@ export async function getTabState(
 
   return {
     whichTab: (result[0].whichTab as TabId) || "practice",
-    playlistId: result[0].playlistId || undefined,
+    repertoireId: result[0].playlistId || undefined,
     sidebarCollapsed: false,
     sidebarDockPosition:
       (result[0].sidebarDockPosition as DockPosition) || "left",

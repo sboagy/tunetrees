@@ -156,7 +156,7 @@ export interface RepertoireTuneWithDetails {
  */
 export interface PlaylistTuneWithDetails {
   // PlaylistTune fields
-  playlist_ref: string; // UUID
+  repertoire_ref: string; // UUID
   tune_ref: string; // UUID
   deleted: boolean | null;
   current: string | null;
@@ -241,7 +241,7 @@ export interface AddTuneToRepertoireInput {
  * Input for adding a tune to a repertoire (deprecated alias)
  */
 export interface AddTuneToPlaylistInput {
-  playlist_ref: string; // UUID (was integer)
+  repertoire_ref: string; // UUID (was integer)
   tune_ref: string; // UUID (was integer)
 }
 

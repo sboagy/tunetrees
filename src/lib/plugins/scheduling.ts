@@ -146,15 +146,15 @@ function parsePracticeInput(raw: Record<string, unknown>): RecordPracticeInput {
     throw new Error("Invalid practiced date");
   }
 
-  const playlistRef = String(raw.playlistRef ?? "");
+  const repertoireRef = String(raw.repertoireRef ?? "");
   const tuneRef = String(raw.tuneRef ?? "");
   const quality = Number(raw.quality ?? 0);
-  if (!playlistRef || !tuneRef || !Number.isFinite(quality)) {
+  if (!repertoireRef || !tuneRef || !Number.isFinite(quality)) {
     throw new Error("Missing required practice input fields");
   }
 
   return {
-    playlistRef,
+    repertoireRef,
     tuneRef,
     quality,
     practiced,
@@ -335,7 +335,7 @@ export async function applySchedulingPlugin(params: {
 
   const payload: SchedulingPluginPayload = {
     input: {
-      playlistRef: params.input.playlistRef,
+      repertoireRef: params.input.repertoireRef,
       tuneRef: params.input.tuneRef,
       quality: params.input.quality,
       practiced: params.input.practiced.toISOString(),

@@ -84,7 +84,7 @@ const VIEW_COLUMN_DESCRIPTIONS: ViewColumnDescription[] = [
   },
   {
     viewName: "practice_list_staged",
-    columnName: "playlist_deleted",
+    columnName: "repertoire_deleted",
     description: "Whether the repertoire entry has been soft-deleted.",
   },
   {

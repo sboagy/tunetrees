@@ -120,9 +120,9 @@ FROM
     SELECT pr.*
     FROM practice_record pr
     INNER JOIN (
-      SELECT tune_ref, playlist_ref, MAX(id) as max_id
+      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
       FROM practice_record
-      GROUP BY tune_ref, playlist_ref
+      GROUP BY tune_ref, repertoire_ref
     ) latest ON pr.tune_ref = latest.tune_ref
       AND pr.repertoire_ref = latest.repertoire_ref
       AND pr.id = latest.max_id
@@ -233,9 +233,9 @@ FROM
     SELECT pr.*
     FROM practice_record pr
     INNER JOIN (
-      SELECT tune_ref, playlist_ref, MAX(id) as max_id
+      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
       FROM practice_record
-      GROUP BY tune_ref, playlist_ref
+      GROUP BY tune_ref, repertoire_ref
     ) latest ON pr.tune_ref = latest.tune_ref
       AND pr.repertoire_ref = latest.repertoire_ref
       AND pr.id = latest.max_id
@@ -256,7 +256,7 @@ WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user
  * Columns:
  * - queue_id: Queue row UUID
  * - user_name: User email/name
- * - playlist_instrument: Instrument name
+ * - repertoire_instrument: Instrument name
  * - tune_title: Tune title
  * - queue_date: Practice date (YYYY-MM-DD)
  * - window_start_utc: Queue window start timestamp
@@ -270,7 +270,7 @@ CREATE VIEW IF NOT EXISTS view_daily_practice_queue_readable AS
 SELECT
   dpq.id AS queue_id,
   COALESCE(up.name, up.email) AS user_name,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   dpq.queue_date,
   dpq.window_start_utc,
@@ -307,7 +307,7 @@ SELECT
   ttd.user_id,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   ttd.tune_id,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   ttd.repertoire_id,
   ttd.purpose,
   ttd.note_private,
@@ -354,7 +354,7 @@ SELECT
   COALESCE(up.name, up.email) AS user_name,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   pr.tune_ref,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   pr.repertoire_ref,
   pr.practiced,
   pr.quality,
