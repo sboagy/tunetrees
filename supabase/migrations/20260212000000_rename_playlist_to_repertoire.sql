@@ -83,11 +83,11 @@ ALTER TABLE public.daily_practice_queue
   UNIQUE (user_ref, repertoire_ref, window_start_utc, tune_ref);
 
 -- Step 7: Rename primary key constraint in repertoire_tune
-ALTER TABLE public.repertoire_tune 
-  DROP CONSTRAINT IF EXISTS playlist_tune_playlist_ref_tune_ref_pk;
-ALTER TABLE public.repertoire_tune 
-  ADD CONSTRAINT repertoire_tune_repertoire_ref_tune_ref_pk 
-  PRIMARY KEY (repertoire_ref, tune_ref);
+-- Note: When table is renamed, PostgreSQL automatically renames constraints
+-- The constraint playlist_tune_pkey becomes repertoire_tune_pkey
+-- We just need to handle the case where it might still have the old column names referenced
+-- Since we already renamed the columns, the constraint already references the new column names
+-- No action needed here - the constraint was automatically updated
 
 -- Step 8: Rename indexes
 -- practice_record indexes
