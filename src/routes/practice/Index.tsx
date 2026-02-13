@@ -862,7 +862,7 @@ const PracticeIndex: Component = () => {
             .where(
               and(
                 eq(dailyPracticeQueue.userRef, userId),
-                eq(dailyPracticeQueue.playlistRef, playlistId),
+                eq(dailyPracticeQueue.repertoireRef, playlistId),
                 gte(dailyPracticeQueue.windowStartUtc, dayStart.toISOString()),
                 lt(dailyPracticeQueue.windowStartUtc, nextDay.toISOString())
               )
@@ -934,7 +934,7 @@ const PracticeIndex: Component = () => {
         .where(
           and(
             eq(dailyPracticeQueue.userRef, userId),
-            eq(dailyPracticeQueue.playlistRef, playlistId),
+            eq(dailyPracticeQueue.repertoireRef, playlistId),
             gte(dailyPracticeQueue.windowStartUtc, today.toISOString()),
             lt(dailyPracticeQueue.windowStartUtc, tomorrow.toISOString())
           )

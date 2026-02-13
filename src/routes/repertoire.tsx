@@ -167,6 +167,7 @@ const RepertoirePage: Component = () => {
       c_types: undefined,
       c_modes: undefined,
       c_genres: undefined,
+      c_repertoires: undefined,
       c_playlists: undefined,
       // Clear any legacy/un-namespaced param that may linger from older builds
       playlists: undefined,
@@ -196,40 +197,40 @@ const RepertoirePage: Component = () => {
   // });
 
   // Fetch tunes in current playlist for filter options
-  const [playlistTunes] = createResource(
+  const [repertoireTunes] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const playlistId = currentPlaylistId();
+      const repertoireId = currentPlaylistId();
       const version = repertoireListChanged(); // Refetch when repertoire changes
-      log.debug("REPERTOIRE playlistTunes dependency:", {
+      log.debug("REPERTOIRE repertoireTunes dependency:", {
         hasDb: !!db,
         userId,
-        playlistId,
+        repertoireId,
         repertoireListChanged: version,
       });
-      return db && userId && playlistId
-        ? { db, userId, playlistId, version }
+      return db && userId && repertoireId
+        ? { db, userId, repertoireId, version }
         : null;
     },
     async (params) => {
-      log.debug("REPERTOIRE playlistTunes fetcher:", {
+      log.debug("REPERTOIRE repertoireTunes fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
       const result = await getPlaylistTunes(
         params.db,
-        params.playlistId,
+        params.repertoireId,
         params.userId
       );
-      log.debug("REPERTOIRE playlistTunes result:", result.length, "tunes");
+      log.debug("REPERTOIRE repertoireTunes result:", result.length, "tunes");
       return result;
     }
   );
 
   const repertoireIsEmpty = createMemo(
-    () => !playlistTunes.loading && (playlistTunes()?.length ?? 0) === 0
+    () => !repertoireTunes.loading && (repertoireTunes()?.length ?? 0) === 0
   );
 
   // Fetch all genres for proper genre names
@@ -257,7 +258,7 @@ const RepertoirePage: Component = () => {
 
   // Get unique types, modes, genres for filter dropdowns
   const availableTypes = createMemo(() => {
-    const tunes = playlistTunes() || [];
+    const tunes = repertoireTunes() || [];
     const types = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.type) types.add(tune.tune.type);
@@ -266,7 +267,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableModes = createMemo(() => {
-    const tunes = playlistTunes() || [];
+    const tunes = repertoireTunes() || [];
     const modes = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.mode) modes.add(tune.tune.mode);
@@ -275,7 +276,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableGenres = createMemo(() => {
-    const tunes = playlistTunes() || [];
+    const tunes = repertoireTunes() || [];
     const genres = allGenres() || [];
 
     log.debug("REPERTOIRE availableGenres:", {
@@ -321,7 +322,7 @@ const RepertoirePage: Component = () => {
   return (
     <div class="h-full flex flex-col">
       {/* Toolbar with Search and Filters */}
-      <Show when={!playlistTunes.loading && currentPlaylistId()}>
+      <Show when={!repertoireTunes.loading && currentPlaylistId()}>
         <RepertoireToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
@@ -347,7 +348,7 @@ const RepertoirePage: Component = () => {
       <div class={GRID_CONTENT_CONTAINER}>
         <Show when={userId() && currentPlaylistId()}>
           <Switch>
-            <Match when={playlistTunes.loading}>
+            <Match when={repertoireTunes.loading}>
               <div class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
                 Loading repertoire...
               </div>

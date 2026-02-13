@@ -74,9 +74,9 @@ const CatalogPage: Component = () => {
   const [selectedTypes, setSelectedTypes] = createSignal<string[]>([]);
   const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
-  const [selectedPlaylistIds, setSelectedPlaylistIds] = createSignal<string[]>(
-    []
-  );
+  const [selectedRepertoireIds, setSelectedRepertoireIds] = createSignal<
+    string[]
+  >([]);
 
   // --- Synchronization State Flag ---
   const [isInitialized, setIsInitialized] = createSignal(false);
@@ -103,6 +103,7 @@ const CatalogPage: Component = () => {
         searchParams.c_types,
         searchParams.c_modes,
         searchParams.c_genres,
+        searchParams.c_repertoires,
         searchParams.c_playlists,
         searchParams.tab, // Crucial for re-hydration when switching tabs
       ],
@@ -112,15 +113,17 @@ const CatalogPage: Component = () => {
         const types = getParamArray(searchParams.c_types);
         const modes = getParamArray(searchParams.c_modes);
         const genres = getParamArray(searchParams.c_genres);
-        const playlists = getParamArray(searchParams.c_playlists);
+        const repertoires = getParamArray(
+          searchParams.c_repertoires ?? searchParams.c_playlists
+        );
 
         // 2. Write to signals only if different (essential to prevent infinite loops)
         if (q !== searchQuery()) setSearchQuery(q);
         if (!arraysEqual(types, selectedTypes())) setSelectedTypes(types);
         if (!arraysEqual(modes, selectedModes())) setSelectedModes(modes);
         if (!arraysEqual(genres, selectedGenres())) setSelectedGenres(genres);
-        if (!arraysEqual(playlists, selectedPlaylistIds()))
-          setSelectedPlaylistIds(playlists);
+        if (!arraysEqual(repertoires, selectedRepertoireIds()))
+          setSelectedRepertoireIds(repertoires);
 
         // 3. Set initialization flag *after* the initial hydration is complete
         if (!isInitialized()) {
@@ -141,7 +144,9 @@ const CatalogPage: Component = () => {
       types: getParamArray(searchParams.c_types),
       modes: getParamArray(searchParams.c_modes),
       genres: getParamArray(searchParams.c_genres),
-      playlists: getParamArray(searchParams.c_playlists),
+      repertoires: getParamArray(
+        searchParams.c_repertoires ?? searchParams.c_playlists
+      ),
     };
 
     const desired = {
@@ -149,7 +154,7 @@ const CatalogPage: Component = () => {
       types: selectedTypes(),
       modes: selectedModes(),
       genres: selectedGenres(),
-      playlists: selectedPlaylistIds(),
+      repertoires: selectedRepertoireIds(),
     };
 
     const needsUpdate =
@@ -157,7 +162,7 @@ const CatalogPage: Component = () => {
       !arraysEqual(desired.types, current.types) ||
       !arraysEqual(desired.modes, current.modes) ||
       !arraysEqual(desired.genres, current.genres) ||
-      !arraysEqual(desired.playlists, current.playlists);
+      !arraysEqual(desired.repertoires, current.repertoires);
 
     if (!needsUpdate) return;
 
@@ -168,8 +173,11 @@ const CatalogPage: Component = () => {
       c_modes: desired.modes.length > 0 ? desired.modes.join(",") : undefined,
       c_genres:
         desired.genres.length > 0 ? desired.genres.join(",") : undefined,
-      c_playlists:
-        desired.playlists.length > 0 ? desired.playlists.join(",") : undefined,
+      c_repertoires:
+        desired.repertoires.length > 0
+          ? desired.repertoires.join(",")
+          : undefined,
+      c_playlists: undefined,
       // Proactively clear other tab's filter keys (Repertoire)
       r_q: undefined,
       r_types: undefined,
@@ -327,8 +335,8 @@ const CatalogPage: Component = () => {
           onModesChange={setSelectedModes}
           selectedGenres={selectedGenres()}
           onGenresChange={setSelectedGenres}
-          selectedPlaylistIds={selectedPlaylistIds()}
-          onPlaylistIdsChange={setSelectedPlaylistIds}
+          selectedPlaylistIds={selectedRepertoireIds()}
+          onPlaylistIdsChange={setSelectedRepertoireIds}
           availableTypes={availableTypes()}
           availableModes={availableModes()}
           availableGenres={availableGenres()}
@@ -357,7 +365,7 @@ const CatalogPage: Component = () => {
             selectedModes={selectedModes()}
             selectedGenreNames={selectedGenres()}
             allGenres={allGenres() || []}
-            selectedPlaylistIds={selectedPlaylistIds()}
+            selectedPlaylistIds={selectedRepertoireIds()}
             onTuneSelect={handleTuneSelect}
             onSelectionChange={setSelectedRowsCount}
             onTableReady={setTableInstance}
