@@ -23,7 +23,7 @@ import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
-import { removeTuneFromPlaylist } from "../../lib/db/queries/playlists";
+import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
@@ -213,7 +213,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       // Soft-delete playlist_tune rows so they disappear from repertoire immediately
       await Promise.all(
         tuneIds.map((tuneId) =>
-          removeTuneFromPlaylist(db, props.playlistId!, tuneId, currentUserId)
+          removeTuneFromRepertoire(db, props.playlistId!, tuneId, currentUserId)
         )
       );
 
@@ -312,11 +312,11 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             availableGenres={props.availableGenres}
             selectedGenres={props.selectedGenres}
             onGenresChange={props.onGenresChange}
-            availablePlaylists={[]}
-            selectedPlaylistIds={[]}
-            onPlaylistIdsChange={() => {}}
+            availableRepertoires={[]}
+            selectedRepertoireIds={[]}
+            onRepertoireIdsChange={() => {}}
             loading={props.loading}
-            hidePlaylistFilter={true}
+            hideRepertoireFilter={true}
             isExpanded={props.filterPanelExpanded}
             onExpandedChange={props.onFilterPanelExpandedChange}
           />

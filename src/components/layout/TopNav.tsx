@@ -22,14 +22,14 @@ import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { getSqliteInstance } from "../../lib/db/client-sqlite";
-import { getUserPlaylists } from "../../lib/db/queries/playlists";
+import { getUserRepertoires } from "../../lib/db/queries/repertoires";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 import { useClickOutside } from "../../lib/hooks/useClickOutside";
 import { log } from "../../lib/logger";
 import {
-  getSelectedPlaylistId,
-  setSelectedPlaylistId,
-} from "../../lib/services/playlist-service";
+  getSelectedRepertoireId,
+  setSelectedRepertoireId,
+} from "../../lib/services/repertoire-service";
 import { RepertoireManagerDialog } from "../repertoires/RepertoireManagerDialog";
 import {
   AlertDialog,
@@ -545,11 +545,11 @@ const PlaylistDropdown: Component<{
 
         if (shouldTopNavDiag) {
           console.log(
-            "🔄 [TopNav] Calling getUserPlaylists with userId:",
+            "🔄 [TopNav] Calling getUserRepertoires with userId:",
             params.userId
           );
         }
-        const result = await getUserPlaylists(params.db, params.userId);
+        const result = await getUserRepertoires(params.db, params.userId);
 
         if (shouldTopNavDiag) {
           console.log("✅ [TopNav] Got playlists:", result.length, result);
@@ -578,49 +578,49 @@ const PlaylistDropdown: Component<{
     const loading = playlists.loading;
     log.debug("TOPNAV playlists changed:", {
       loading,
-      count: playlistsList?.length || 0,
-      playlists:
-        playlistsList?.map((p) => ({ id: p.playlistId, name: p.name })) || [],
+      count: repertoiresList?.length || 0,
+      repertoires:
+        repertoiresList?.map((p: any) => ({ id: p.repertoireId, name: p.name })) || [],
     });
   });
 
-  // Load selected playlist from localStorage on mount
+  // Load selected repertoire from localStorage on mount
   createEffect(() => {
     const userId = user()?.id;
-    const playlistsList = playlists();
-    if (!userId || !playlistsList) return;
+    const repertoiresList = playlists();
+    if (!userId || !repertoiresList) return;
 
-    const storedId = getSelectedPlaylistId(userId);
+    const storedId = getSelectedRepertoireId(userId);
 
     if (storedId) {
       setCurrentRepertoireId(storedId);
-    } else if (playlistsList.length > 0) {
+    } else if (repertoiresList.length > 0) {
       // Default to first repertoire
-      const firstId = playlistsList[0].playlistId;
+      const firstId = repertoiresList[0].repertoireId;
       setCurrentRepertoireId(firstId);
-      setSelectedPlaylistId(userId, firstId);
+      setSelectedRepertoireId(userId, firstId);
     }
   });
 
-  const handlePlaylistSelect = (playlistId: string) => {
+  const handleRepertoireSelect = (repertoireId: string) => {
     const userId = user()?.id;
     if (!userId) return;
 
-    setCurrentRepertoireId(playlistId);
-    setSelectedPlaylistId(userId, playlistId);
+    setCurrentRepertoireId(repertoireId);
+    setSelectedRepertoireId(userId, repertoireId);
     setShowDropdown(false);
   };
 
-  const handleManagePlaylists = () => {
+  const handleManageRepertoires = () => {
     setShowDropdown(false);
     props.onOpenPlaylistManager();
   };
 
   const selectedPlaylist = createMemo(() => {
     const id = currentRepertoireId();
-    const playlistsList = playlists();
-    if (!id || !playlistsList) return null;
-    return playlistsList.find((p) => p.playlistId === id);
+    const repertoiresList = playlists();
+    if (!id || !repertoiresList) return null;
+    return repertoiresList.find((p: any) => p.repertoireId === id);
   });
 
   return (

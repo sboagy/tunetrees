@@ -182,7 +182,7 @@ export const RepertoireEditor: Component<RepertoireEditorProps> = (props) => {
           <Show when={props.repertoire}>
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
               <p class="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Repertoire ID:</strong> {props.repertoire?.playlistId}
+                <strong>Repertoire ID:</strong> {props.repertoire?.repertoireId}
               </p>
               <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
                 <strong>User Ref:</strong> {props.repertoire?.userRef}

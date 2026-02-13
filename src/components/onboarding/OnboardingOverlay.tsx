@@ -78,8 +78,8 @@ export const OnboardingOverlay: Component = () => {
           const { getGenresWithSelection } = await import(
             "@/lib/db/queries/user-genre-selection"
           );
-          const { getUserPlaylists } = await import(
-            "@/lib/db/queries/playlists"
+          const { getUserRepertoires } = await import(
+            "@/lib/db/queries/repertoires"
           );
 
           const genreList = await getGenresWithSelection(db, resolvedUserId);
@@ -96,8 +96,8 @@ export const OnboardingOverlay: Component = () => {
             if (preselected.length > 0) {
               setSelectedGenreIds(preselected);
             } else if (genreList.length > 0) {
-              const playlists = await getUserPlaylists(db, resolvedUserId);
-              const latest = playlists[playlists.length - 1];
+              const repertoires = await getUserRepertoires(db, resolvedUserId);
+              const latest = repertoires[repertoires.length - 1];
               const defaultGenreId = latest?.genreDefault ?? null;
 
               if (
@@ -197,7 +197,7 @@ export const OnboardingOverlay: Component = () => {
       <Show when={needsOnboarding()}>
         <Switch>
           {/* Step 1: Create Playlist */}
-          <Match when={onboardingStep() === "create-playlist"}>
+          <Match when={onboardingStep() === "create-repertoire"}>
             <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
                 <div class="flex items-start justify-between mb-4">
