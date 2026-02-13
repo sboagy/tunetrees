@@ -3,6 +3,7 @@
  */
 
 import { sql } from "drizzle-orm";
+import { toast } from "solid-sonner";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import { getPluginsByCapability } from "@/lib/db/queries/plugins";
 import type {
@@ -16,7 +17,6 @@ import type {
 import { runPluginFunction } from "@/lib/plugins/runtime";
 import { FSRSService } from "@/lib/scheduling/fsrs-service";
 import type { SchedulingService } from "@/lib/scheduling/scheduler-interface";
-import { toast } from "solid-sonner";
 
 export async function getSchedulingPlugin(
   db: SqliteDatabase,
@@ -363,7 +363,7 @@ export async function applySchedulingPlugin(params: {
         pluginId: params.plugin.id,
         pluginName: params.plugin.name,
       },
-      timeoutMs: 15000,
+      timeoutMs: 45000,
       bridge: {
         queryDb: (sqlText) => queryDbGatekeeper(params.db, sqlText),
         fsrsScheduler: fsrsSchedulerBridge,
