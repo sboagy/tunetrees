@@ -363,7 +363,7 @@ export async function applySchedulingPlugin(params: {
         pluginId: params.plugin.id,
         pluginName: params.plugin.name,
       },
-      timeoutMs: 90000, // 90 seconds, really long for CI, may want to reduce later
+      timeoutMs: 30000, // 30 seconds, really long for CI, may want to reduce later
       bridge: {
         queryDb: (sqlText) => queryDbGatekeeper(params.db, sqlText),
         fsrsScheduler: fsrsSchedulerBridge,
