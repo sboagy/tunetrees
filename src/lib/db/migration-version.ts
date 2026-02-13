@@ -118,7 +118,7 @@ export async function clearLocalDatabaseForMigration(
       reference,
       tag,
       tuneOverride,
-      playlist,
+      repertoire,
       tune,
       tableTransientData,
       tabGroupMainState,
@@ -133,7 +133,7 @@ export async function clearLocalDatabaseForMigration(
       reference,
       tag,
       tuneOverride,
-      playlist,
+      repertoire,
       tune, // Clear private tunes, will re-sync public catalog
       tableTransientData,
       tabGroupMainState,

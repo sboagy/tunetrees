@@ -6,7 +6,7 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { getUserPlaylists } from "@/lib/db/queries/playlists";
+import { getUserRepertoires } from "@/lib/db/queries/repertoires";
 import type { PlaylistWithSummary } from "@/lib/db/types";
 
 /**
@@ -57,7 +57,7 @@ export const RepertoireSelectorModal: Component<RepertoireSelectorModalProps> = 
       return [];
     }
 
-    return await getUserPlaylists(db, userId);
+    return await getUserRepertoires(db, userId);
   });
 
   const handleSelect = () => {
@@ -135,12 +135,12 @@ export const RepertoireSelectorModal: Component<RepertoireSelectorModalProps> = 
                   <button
                     type="button"
                     class={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
-                      selectedRepertoireId() === repertoireItem.playlistId
+                      selectedRepertoireId() === repertoireItem.repertoireId
                         ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
                         : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
                     }`}
                     onClick={() =>
-                      setSelectedRepertoireId(repertoireItem.playlistId)
+                      setSelectedRepertoireId(repertoireItem.repertoireId)
                     }
                   >
                     <div class="flex items-center justify-between">
@@ -154,7 +154,7 @@ export const RepertoireSelectorModal: Component<RepertoireSelectorModalProps> = 
                         </div>
                       </div>
                       <Show
-                        when={selectedRepertoireId() === repertoireItem.playlistId}
+                        when={selectedRepertoireId() === repertoireItem.repertoireId}
                       >
                         <svg
                           class="h-5 w-5 text-blue-500 dark:text-blue-400"

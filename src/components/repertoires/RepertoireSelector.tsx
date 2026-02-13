@@ -22,12 +22,12 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { getUserPlaylists } from "../../lib/db/queries/playlists";
+import { getUserRepertoires } from "../../lib/db/queries/repertoires";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 import {
-  getSelectedPlaylistId,
-  setSelectedPlaylistId,
-} from "../../lib/services/playlist-service";
+  getSelectedRepertoireId,
+  setSelectedRepertoireId,
+} from "../../lib/services/repertoire-service";
 
 interface RepertoireSelectorProps {
   /**
@@ -114,7 +114,7 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) =>
     if (!currentUser) return;
 
     setSelectedRepertoireIdSignal(repertoireId);
-    setSelectedPlaylistId(currentUser.id, repertoireId);
+    setSelectedRepertoireId(currentUser.id, repertoireId);
     setIsOpen(false);
 
     // Notify parent
@@ -126,7 +126,7 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) =>
   const selectedRepertoire = () => {
     const id = selectedRepertoireId();
     if (!id) return null;
-    return repertoires().find((p) => p.playlistId === id);
+    return repertoires().find((p) => p.repertoireId === id);
   };
 
   return (
@@ -188,9 +188,9 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) =>
             {(repertoire) => (
               <button
                 type="button"
-                onClick={() => handleRepertoireSelect(repertoire.playlistId)}
+                onClick={() => handleRepertoireSelect(repertoire.repertoireId)}
                 class={`w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                  repertoire.playlistId === selectedRepertoireId()
+                  repertoire.repertoireId === selectedRepertoireId()
                     ? "bg-blue-50 dark:bg-blue-900/20"
                     : ""
                 }`}
@@ -213,7 +213,7 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) =>
                   </div>
 
                   {/* Selected Checkmark */}
-                  <Show when={repertoire.playlistId === selectedRepertoireId()}>
+                  <Show when={repertoire.repertoireId === selectedRepertoireId()}>
                     <svg
                       class="w-5 h-5 text-blue-600 dark:text-blue-400"
                       fill="currentColor"

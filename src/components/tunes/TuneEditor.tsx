@@ -258,10 +258,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     async (params) => {
       if (!params) return null;
       const db = getDb();
-      const { getPlaylistById } = await import(
-        "../../lib/db/queries/playlists"
+      const { getRepertoireById } = await import(
+        "../../lib/db/queries/repertoires"
       );
-      const pl = await getPlaylistById(db, params.playlistId, params.userId);
+      const pl = await getRepertoireById(db, params.playlistId, params.userId);
       if (!pl) return null;
       // If repertoire.genreDefault null, attempt instrument fallback
       if (!pl.genreDefault && pl.instrumentRef) {

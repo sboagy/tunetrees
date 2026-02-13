@@ -64,7 +64,7 @@ export const RepertoireManagerDialog: Component<RepertoireManagerDialogProps> = 
 
   const handleRepertoireSelect = (repertoire: PlaylistWithSummary) => {
     // Open editor dialog instead of navigating
-    setEditingRepertoireId(repertoire.playlistId);
+    setEditingRepertoireId(repertoire.repertoireId);
     setShowEditorDialog(true);
   };
 
