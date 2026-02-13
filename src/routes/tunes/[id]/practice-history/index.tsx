@@ -18,7 +18,7 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useCurrentPlaylist } from "@/lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "@/lib/context/CurrentRepertoireContext";
 import {
   createPracticeRecord,
   deletePracticeRecord,
@@ -38,7 +38,7 @@ const PracticeHistoryPage: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { localDb, userIdInt } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
 
   // Track edits
   const [editedRecords, setEditedRecords] = createSignal<
@@ -72,8 +72,8 @@ const PracticeHistoryPage: Component = () => {
     () => {
       const db = localDb();
       const tuneId = params.id;
-      const playlistId = currentPlaylistId();
-      return db && tuneId && playlistId ? { db, tuneId, playlistId } : null;
+      const repertoireId = currentRepertoireId();
+      return db && tuneId && repertoireId ? { db, tuneId, playlistId: repertoireId } : null;
     },
     async (params) => {
       if (!params) return [];
@@ -137,8 +137,8 @@ const PracticeHistoryPage: Component = () => {
   // Save all changes
   const handleSave = async () => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
-    if (!db || !playlistId) return;
+    const repertoireId = currentRepertoireId();
+    if (!db || !repertoireId) return;
 
     setIsSaving(true);
     try {
@@ -174,12 +174,12 @@ const PracticeHistoryPage: Component = () => {
   // Add new practice record
   const handleAddRecord = async () => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
     const tuneId = params.id;
-    if (!db || !playlistId || !tuneId) return;
+    if (!db || !repertoireId || !tuneId) return;
 
     try {
-      await createPracticeRecord(db, playlistId, tuneId, {
+      await createPracticeRecord(db, repertoireId, tuneId, {
         practiced: new Date().toISOString(),
         quality: 3,
       });
@@ -191,9 +191,9 @@ const PracticeHistoryPage: Component = () => {
 
   const canAddRecord = () => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
     const tuneId = params.id;
-    return !!db && !!playlistId && !!tuneId && !practiceRecords.loading;
+    return !!db && !!repertoireId && !!tuneId && !practiceRecords.loading;
   };
 
   // Navigate back

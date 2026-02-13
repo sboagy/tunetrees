@@ -54,18 +54,18 @@ const PracticeHistory: Component = () => {
   ]);
   const [filterQuality, setFilterQuality] = createSignal<string>("");
   const [filterGoal, setFilterGoal] = createSignal<string>("");
-  const [selectedPlaylistId] = createSignal("1"); // TODO: Add playlist selector
+  const [selectedRepertoireId] = createSignal("1"); // TODO: Add repertoire selector
   const [pageSize, setPageSize] = createSignal(25);
 
   // Fetch practice records from local database
   const [records] = createResource(
     () => {
       const db = localDb();
-      return db ? { db, playlistId: selectedPlaylistId() } : null;
+      return db ? { db, repertoireId: selectedRepertoireId() } : null;
     },
     async (params) => {
       if (!params) return [];
-      return await getPracticeRecords(params.db, params.playlistId, 500); // Get more for filtering
+      return await getPracticeRecords(params.db, params.repertoireId, 500); // Get more for filtering
     }
   );
 

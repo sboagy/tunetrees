@@ -15,7 +15,7 @@ import type {
  * Generate localStorage key for table state
  */
 function getStorageKey(key: ITableStateKey): string {
-  return `table-state:${key.userId}:${key.tablePurpose}:${key.playlistId}`;
+  return `table-state:${key.userId}:${key.tablePurpose}:${key.repertoireId}`;
 }
 
 /**
