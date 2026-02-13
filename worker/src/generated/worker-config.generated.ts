@@ -65,7 +65,7 @@ export const WORKER_SYNC_CONFIG = {
     userProfileIds: {
       table: "user_profile",
       idColumn: "id",
-      ownerColumn: "supabase_user_id",
+      ownerColumn: "id",
     },
   },
   pull: {
@@ -166,7 +166,7 @@ export const WORKER_SYNC_CONFIG = {
       },
       user_profile: {
         kind: "eqUserId",
-        column: "supabase_user_id",
+        column: "id",
       },
     },
   },

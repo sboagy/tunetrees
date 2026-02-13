@@ -123,7 +123,7 @@ const AccountPage: Component = () => {
     try {
       // Update local profile
       await updateUserProfile(db, {
-        supabaseUserId: currentUser.id,
+        id: currentUser.id,
         name: name().trim() || null,
         email: email().trim() || null,
         phone: phone().trim() || null,

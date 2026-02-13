@@ -23,7 +23,9 @@ export const dailyPracticeQueue = sqliteTable(
       .notNull()
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    userRef: text("user_ref").notNull(),
+    userRef: text("user_ref")
+      .notNull()
+      .references(() => userProfile.id),
     playlistRef: text("playlist_ref").notNull(),
     mode: text("mode"),
     queueDate: text("queue_date"),
@@ -189,7 +191,9 @@ export const plugin = sqliteTable(
       .notNull()
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    userRef: text("user_ref").notNull(),
+    userRef: text("user_ref")
+      .notNull()
+      .references(() => userProfile.id),
     name: text("name").notNull(),
     description: text("description"),
     script: text("script").notNull(),
@@ -501,25 +505,20 @@ export const userGenreSelection = sqliteTable(
   ]
 );
 
-export const userProfile = sqliteTable(
-  "user_profile",
-  {
-    id: text("id")
-      .notNull()
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    supabaseUserId: text("supabase_user_id").notNull(),
-    name: text("name"),
-    email: text("email"),
-    srAlgType: text("sr_alg_type"),
-    phone: text("phone"),
-    phoneVerified: text("phone_verified"),
-    acceptableDelinquencyWindow: integer(
-      "acceptable_delinquency_window"
-    ).default(21),
-    avatarUrl: text("avatar_url"),
-    deleted: integer("deleted").notNull().default(0),
-    ...sqliteSyncColumns,
-  },
-  (t) => [uniqueIndex("user_profile_supabase_user_id_key").on(t.supabaseUserId)]
-);
+export const userProfile = sqliteTable("user_profile", {
+  id: text("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email"),
+  srAlgType: text("sr_alg_type"),
+  phone: text("phone"),
+  phoneVerified: text("phone_verified"),
+  acceptableDelinquencyWindow: integer("acceptable_delinquency_window").default(
+    21
+  ),
+  avatarUrl: text("avatar_url"),
+  deleted: integer("deleted").notNull().default(0),
+  ...sqliteSyncColumns,
+});

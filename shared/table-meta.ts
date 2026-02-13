@@ -394,7 +394,6 @@ const TABLE_EXTRAS: Record<
       phone: "User phone number.",
       phone_verified: "Timestamp when phone was verified.",
       sr_alg_type: "Preferred spaced repetition algorithm (SM2/FSRS).",
-      supabase_user_id: "Reference to Supabase auth user ID.",
       sync_version: "Sync version for conflict resolution.",
     },
   },
@@ -524,14 +523,14 @@ export function parseOutboxRowId(
 }
 
 export const TABLE_SYNC_ORDER: Record<string, number> = {
-  daily_practice_queue: 1,
-  genre: 2,
-  genre_tune_type: 5,
-  instrument: 7,
+  daily_practice_queue: 5,
+  genre: 1,
+  genre_tune_type: 3,
+  instrument: 6,
   note: 14,
-  playlist: 8,
+  playlist: 7,
   playlist_tune: 15,
-  plugin: 3,
+  plugin: 8,
   practice_record: 16,
   prefs_scheduling_options: 9,
   prefs_spaced_repetition: 10,
@@ -542,9 +541,9 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   tag: 19,
   tune: 13,
   tune_override: 20,
-  tune_type: 4,
+  tune_type: 2,
   user_genre_selection: 21,
-  user_profile: 6,
+  user_profile: 4,
 };
 
 export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {

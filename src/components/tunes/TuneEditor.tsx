@@ -442,17 +442,17 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
         const currentUser = user();
         if (currentUser?.id) {
           const db = getDb();
-          const supabaseUserId = currentUser.id; // This is a UUID string
+          const userId = currentUser.id;
 
           // Get current tags from database
-          const existingTags = await getTuneTags(db, tuneId, supabaseUserId);
+          const existingTags = await getTuneTags(db, tuneId, userId);
           const existingTagTexts = new Set(existingTags.map((t) => t.tagText));
           const newTagTexts = new Set(selectedTags());
 
           // Add new tags
           for (const tagText of newTagTexts) {
             if (!existingTagTexts.has(tagText)) {
-              await addTagToTune(db, tuneId, supabaseUserId, tagText);
+              await addTagToTune(db, tuneId, userId, tagText);
             }
           }
 
@@ -463,7 +463,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                 await removeTagFromTune(
                   db,
                   tuneId,
-                  supabaseUserId,
+                  userId,
                   tag.tagText
                 );
               }

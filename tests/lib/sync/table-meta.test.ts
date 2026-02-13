@@ -39,8 +39,8 @@ describe("TABLE_REGISTRY completeness", () => {
 
   it("has the expected number of tables", () => {
     // Update this if adding/removing tables
-    expect(SYNCABLE_TABLES.length).toBe(19);
-    expect(Object.keys(TABLE_REGISTRY).length).toBe(19);
+    expect(SYNCABLE_TABLES.length).toBe(21);
+    expect(Object.keys(TABLE_REGISTRY).length).toBe(21);
   });
 });
 
@@ -58,10 +58,11 @@ describe("COMPOSITE_PK_TABLES", () => {
     expect(COMPOSITE_PK_TABLES).toContain("table_state");
     expect(COMPOSITE_PK_TABLES).toContain("playlist_tune");
     expect(COMPOSITE_PK_TABLES).toContain("table_transient_data");
+    expect(COMPOSITE_PK_TABLES).toContain("user_genre_selection");
   });
 
-  it("has 5 composite key tables", () => {
-    expect(COMPOSITE_PK_TABLES.length).toBe(5);
+  it("has 6 composite key tables", () => {
+    expect(COMPOSITE_PK_TABLES.length).toBe(6);
   });
 });
 
@@ -364,7 +365,7 @@ describe("specific table metadata correctness", () => {
     expect(meta.uniqueKeys).toEqual(["playlist_ref", "tune_ref"]);
   });
 
-  it("user_profile uses supabase_user_id as PK", () => {
+  it("user_profile uses id as PK", () => {
     const meta = TABLE_REGISTRY.user_profile;
     expect(meta.primaryKey).toBe("id");
   });

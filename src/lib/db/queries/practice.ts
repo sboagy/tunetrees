@@ -74,7 +74,7 @@ type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
  * load; a no-op when no stale rows exist.
  *
  * @param db - SQLite database instance (sql.js in app or better-sqlite3 in tests)
- * @param userId - User ID (from user_profile.id)
+ * @param userId - Supabase Auth UUID
  * @param playlistId - Playlist ID
  * @param windowStartIso19 - Window start timestamp normalized to ISO (YYYY-MM-DDTHH:MM:SS)
  * @returns Count of stale rows removed
@@ -169,7 +169,7 @@ export interface DueTuneEntry {
  * Returns tunes in queue order (bucket, order_index) with completed_at tracking.
  *
  * @param db - SQLite database instance
- * @param userId - User ID (from user_profile.id)
+ * @param userId - Supabase Auth UUID
  * @param playlistId - Playlist to query
  * @param _delinquencyWindowDays - Unused (kept for API compatibility)
  * @returns Array of practice list rows with queue info (bucket, order_index, completed_at)
@@ -537,11 +537,8 @@ export async function getDueTunesLegacy(
  * This is the pre-generated, stable queue that doesn't change
  * as the user practices during the day.
  *
- * **Note:** Currently not functional - userId param expects user_profile.id (INTEGER)
- * but receives Supabase UUID (TEXT). Need to add user_profile lookup first.
- *
  * @param db - SQLite database instance
- * @param userId - User UUID (Supabase)
+ * @param userId - Supabase Auth UUID
  * @param playlistId - Playlist ID
  * @param queueDate - Date for the queue (defaults to today)
  * @returns Array of daily practice queue entries
@@ -552,34 +549,9 @@ export async function getDailyPracticeQueue(
   _playlistId: string,
   _queueDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
-  // TODO: Get user_profile.id from Supabase UUID
-  // For now, return empty array
-  console.warn("getDailyPracticeQueue: User ID lookup not implemented");
+  // TODO: Implement this function (currently unused)
+  console.warn("getDailyPracticeQueue: Not implemented");
   return [];
-
-  /* Original implementation - requires user_profile.id lookup
-  const windowStart = new Date(queueDate);
-  windowStart.setHours(0, 0, 0, 0);
-
-  const windowEnd = new Date(queueDate);
-  windowEnd.setHours(23, 59, 59, 999);
-
-  const results = await db
-    .select()
-    .from(dailyPracticeQueue)
-    .where(
-      and(
-        eq(dailyPracticeQueue.userRef, userId),
-        eq(dailyPracticeQueue.playlistRef, playlistId),
-        eq(dailyPracticeQueue.active, 1),
-        gte(dailyPracticeQueue.windowStartUtc, windowStart.toISOString()),
-        lte(dailyPracticeQueue.windowEndUtc, windowEnd.toISOString())
-      )
-    )
-    .orderBy(dailyPracticeQueue.bucket, dailyPracticeQueue.orderIndex);
-
-  return results;
-  */
 }
 
 /**
@@ -627,11 +599,8 @@ export async function getLatestPracticeRecord(
  *
  * Retrieves spaced repetition settings for FSRS algorithm initialization.
  *
- * **Note:** Currently not functional - userId param expects user_profile.id (INTEGER)
- * but receives Supabase UUID (TEXT). Returns default preferences for now.
- *
  * @param db - SQLite database instance
- * @param userId - User UUID (Supabase)
+ * @param userId - Supabase Auth UUID
  * @returns User preferences or null if not set
  */
 export async function getUserPreferences(

@@ -32,11 +32,11 @@ export interface TuneTag {
 /**
  * Get all unique tags for a user with usage counts
  * @param db - SQLite database instance
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  */
 export async function getUserTags(
   db: SqliteDatabase,
-  supabaseUserId: string
+  userId: string
 ): Promise<TagWithUsageCount[]> {
   const results = await db
     .select({
@@ -44,7 +44,7 @@ export async function getUserTags(
       usageCount: count(schema.tag.tuneRef),
     })
     .from(schema.tag)
-    .where(eq(schema.tag.userRef, supabaseUserId))
+    .where(eq(schema.tag.userRef, userId))
     .groupBy(schema.tag.tagText)
     .orderBy(schema.tag.tagText)
     .all();
@@ -56,12 +56,12 @@ export async function getUserTags(
  * Get all tags for a specific tune
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  */
 export async function getTuneTags(
   db: SqliteDatabase,
   tuneId: string,
-  supabaseUserId: string
+  userId: string
 ): Promise<TuneTag[]> {
   const results = await db
     .select({
@@ -72,7 +72,7 @@ export async function getTuneTags(
     .where(
       and(
         eq(schema.tag.tuneRef, tuneId),
-        eq(schema.tag.userRef, supabaseUserId)
+        eq(schema.tag.userRef, userId)
       )
     )
     .orderBy(schema.tag.tagText)
@@ -86,14 +86,14 @@ export async function getTuneTags(
  * If the tag already exists, does nothing (unique constraint)
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  * @param tagText - Tag text (will be normalized)
  * @param deviceId - Optional device ID for sync
  */
 export async function addTagToTune(
   db: SqliteDatabase,
   tuneId: string,
-  supabaseUserId: string,
+  userId: string,
   tagText: string,
   deviceId?: string
 ): Promise<Tag | null> {
@@ -105,7 +105,7 @@ export async function addTagToTune(
       .values({
         tagId: generateId(),
         tuneRef: tuneId,
-        userRef: supabaseUserId,
+        userRef: userId,
         tagText: tagText.trim().toLowerCase(), // Normalize tag text
         syncVersion: 1,
         lastModifiedAt: now,
@@ -132,13 +132,13 @@ export async function addTagToTune(
  * Remove a tag from a tune
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  * @param tagText - Tag text
  */
 export async function removeTagFromTune(
   db: SqliteDatabase,
   tuneId: string,
-  supabaseUserId: string,
+  userId: string,
   tagText: string
 ): Promise<boolean> {
   const result = await db
@@ -146,7 +146,7 @@ export async function removeTagFromTune(
     .where(
       and(
         eq(schema.tag.tuneRef, tuneId),
-        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.userRef, userId),
         eq(schema.tag.tagText, tagText.trim().toLowerCase())
       )
     )
@@ -175,12 +175,12 @@ export async function removeTagById(
 /**
  * Get usage count for a specific tag
  * @param db - SQLite database instance
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  * @param tagText - Tag text
  */
 export async function getTagUsageCount(
   db: SqliteDatabase,
-  supabaseUserId: string,
+  userId: string,
   tagText: string
 ): Promise<number> {
   const result = await db
@@ -190,7 +190,7 @@ export async function getTagUsageCount(
     .from(schema.tag)
     .where(
       and(
-        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.userRef, userId),
         eq(schema.tag.tagText, tagText)
       )
     )
@@ -203,19 +203,19 @@ export async function getTagUsageCount(
  * Delete all instances of a tag for a user
  * (removes tag from all tunes)
  * @param db - SQLite database instance
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  * @param tagText - Tag text
  */
 export async function deleteTagForUser(
   db: SqliteDatabase,
-  supabaseUserId: string,
+  userId: string,
   tagText: string
 ): Promise<number> {
   const result = await db
     .delete(schema.tag)
     .where(
       and(
-        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.userRef, userId),
         eq(schema.tag.tagText, tagText)
       )
     )
@@ -229,14 +229,14 @@ export async function deleteTagForUser(
  * Rename a tag for a user
  * (updates all instances of the old tag to the new tag text)
  * @param db - SQLite database instance
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  * @param oldTagText - Old tag text
  * @param newTagText - New tag text
  * @param deviceId - Optional device ID for sync
  */
 export async function renameTagForUser(
   db: SqliteDatabase,
-  supabaseUserId: string,
+  userId: string,
   oldTagText: string,
   newTagText: string,
   deviceId?: string
@@ -253,7 +253,7 @@ export async function renameTagForUser(
     })
     .where(
       and(
-        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.userRef, userId),
         eq(schema.tag.tagText, oldTagText)
       )
     )
@@ -266,12 +266,12 @@ export async function renameTagForUser(
 /**
  * Get all tunes that have ANY of the specified tags
  * @param db - SQLite database instance
- * @param supabaseUserId - Supabase Auth UUID
+ * @param userId - Supabase Auth UUID
  * @param tagTexts - Array of tag texts
  */
 export async function getTuneIdsByTags(
   db: SqliteDatabase,
-  supabaseUserId: string,
+  userId: string,
   tagTexts: string[]
 ): Promise<string[]> {
   if (tagTexts.length === 0) {
@@ -287,7 +287,7 @@ export async function getTuneIdsByTags(
     .from(schema.tag)
     .where(
       and(
-        eq(schema.tag.userRef, supabaseUserId),
+        eq(schema.tag.userRef, userId),
         inArray(schema.tag.tagText, normalizedTags)
       )
     )

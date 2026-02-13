@@ -66,16 +66,15 @@ export const GridStatusMessage: Component<GridStatusMessageProps> = (props) => {
           </p>
         </Show>
         <Show when={props.variant === "loading"}>
-          <div
+          <output
             class="mt-4 flex items-center justify-center"
-            role="status"
             aria-live="polite"
           >
             <div class="relative h-1 w-40 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
               <div class="absolute inset-y-0 left-0 w-1/2 rounded-full bg-blue-600/80 animate-pulse" />
             </div>
             <span class="sr-only">Loading in progress</span>
-          </div>
+          </output>
         </Show>
         <Show when={props.hint}>
           <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">

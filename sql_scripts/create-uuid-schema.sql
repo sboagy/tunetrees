@@ -32,8 +32,7 @@ CREATE TABLE
 -- User Profile
 CREATE TABLE
     IF NOT EXISTS user_profile (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-        supabase_user_id uuid NOT NULL UNIQUE,
+        id uuid PRIMARY KEY,
         name text,
         email text,
         sr_alg_type text,
@@ -441,16 +440,16 @@ ALTER TABLE genre_tune_type ENABLE ROW LEVEL SECURITY;
 -- ============================================================================
 CREATE POLICY "Users can view own profile" ON user_profile FOR
 SELECT
-    USING (supabase_user_id = auth.uid ());
+    USING (id = auth.uid ());
 
 CREATE POLICY "Users can insert own profile" ON user_profile FOR INSERT
 WITH
-    CHECK (supabase_user_id = auth.uid ());
+    CHECK (id = auth.uid ());
 
 CREATE POLICY "Users can update own profile" ON user_profile FOR
-UPDATE USING (supabase_user_id = auth.uid ());
+UPDATE USING (id = auth.uid ());
 
-CREATE POLICY "Users can delete own profile" ON user_profile FOR DELETE USING (supabase_user_id = auth.uid ());
+CREATE POLICY "Users can delete own profile" ON user_profile FOR DELETE USING (id = auth.uid ());
 
 -- ============================================================================
 -- Tune Policies (catalog + private)
@@ -465,7 +464,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -478,7 +477,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -490,7 +489,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -501,7 +500,7 @@ CREATE POLICY "Users can delete own private tunes" ON tune FOR DELETE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -517,7 +516,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -530,7 +529,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -542,7 +541,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -553,7 +552,7 @@ CREATE POLICY "Users can delete own tune overrides" ON tune_override FOR DELETE 
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -570,7 +569,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -583,7 +582,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -595,7 +594,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -606,7 +605,7 @@ CREATE POLICY "Users can delete own private instruments" ON instrument FOR DELET
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -622,7 +621,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -635,7 +634,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -647,7 +646,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -658,7 +657,7 @@ CREATE POLICY "Users can delete own playlists" ON playlist FOR DELETE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -680,7 +679,7 @@ SELECT
                     FROM
                         user_profile
                     WHERE
-                        supabase_user_id = auth.uid ()
+                        id = auth.uid ()
                 )
         )
     );
@@ -700,7 +699,7 @@ WITH
                     FROM
                         user_profile
                     WHERE
-                        supabase_user_id = auth.uid ()
+                        id = auth.uid ()
                 )
         )
     );
@@ -719,7 +718,7 @@ UPDATE USING (
                 FROM
                     user_profile
                 WHERE
-                    supabase_user_id = auth.uid ()
+                    id = auth.uid ()
             )
     )
 );
@@ -737,7 +736,7 @@ CREATE POLICY "Users can delete own playlist tunes" ON playlist_tune FOR DELETE 
                 FROM
                     user_profile
                 WHERE
-                    supabase_user_id = auth.uid ()
+                    id = auth.uid ()
             )
     )
 );
@@ -760,7 +759,7 @@ SELECT
                     FROM
                         user_profile
                     WHERE
-                        supabase_user_id = auth.uid ()
+                        id = auth.uid ()
                 )
         )
     );
@@ -780,7 +779,7 @@ WITH
                     FROM
                         user_profile
                     WHERE
-                        supabase_user_id = auth.uid ()
+                        id = auth.uid ()
                 )
         )
     );
@@ -799,7 +798,7 @@ UPDATE USING (
                 FROM
                     user_profile
                 WHERE
-                    supabase_user_id = auth.uid ()
+                    id = auth.uid ()
             )
     )
 );
@@ -817,7 +816,7 @@ CREATE POLICY "Users can delete own practice records" ON practice_record FOR DEL
                 FROM
                     user_profile
                 WHERE
-                    supabase_user_id = auth.uid ()
+                    id = auth.uid ()
             )
     )
 );
@@ -834,7 +833,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -847,7 +846,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -859,7 +858,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -870,7 +869,7 @@ CREATE POLICY "Users can delete own practice queue" ON daily_practice_queue FOR 
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -886,7 +885,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
         OR public = true
     );
@@ -900,7 +899,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -912,7 +911,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -923,7 +922,7 @@ CREATE POLICY "Users can delete own notes" ON note FOR DELETE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -939,7 +938,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
         OR public = true
     );
@@ -953,7 +952,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -965,7 +964,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -976,7 +975,7 @@ CREATE POLICY "Users can delete own references" ON reference FOR DELETE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -992,7 +991,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1005,7 +1004,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1017,7 +1016,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1028,7 +1027,7 @@ CREATE POLICY "Users can delete own tags" ON tag FOR DELETE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1044,7 +1043,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1057,7 +1056,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1069,7 +1068,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1080,7 +1079,7 @@ CREATE POLICY "Users can delete own spaced repetition prefs" ON prefs_spaced_rep
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1093,7 +1092,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1106,7 +1105,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1118,7 +1117,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1129,7 +1128,7 @@ CREATE POLICY "Users can delete own scheduling prefs" ON prefs_scheduling_option
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1145,7 +1144,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1158,7 +1157,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1170,7 +1169,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1181,7 +1180,7 @@ CREATE POLICY "Users can delete own tab group state" ON tab_group_main_state FOR
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1194,7 +1193,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1207,7 +1206,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1219,7 +1218,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1230,7 +1229,7 @@ CREATE POLICY "Users can delete own table state" ON table_state FOR DELETE USING
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1243,7 +1242,7 @@ SELECT
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1256,7 +1255,7 @@ WITH
             FROM
                 user_profile
             WHERE
-                supabase_user_id = auth.uid ()
+                id = auth.uid ()
         )
     );
 
@@ -1268,7 +1267,7 @@ UPDATE USING (
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 
@@ -1279,7 +1278,7 @@ CREATE POLICY "Users can delete own table transient data" ON table_transient_dat
         FROM
             user_profile
         WHERE
-            supabase_user_id = auth.uid ()
+            id = auth.uid ()
     )
 );
 

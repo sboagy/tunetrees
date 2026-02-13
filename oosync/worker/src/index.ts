@@ -10,7 +10,7 @@
 import { and, eq, gt, lte } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { jwtVerify, createRemoteJWKSet } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import postgres from "postgres";
 import type {
   SyncChange,
@@ -282,9 +282,9 @@ export interface Env {
 
 /** Context passed through sync operations */
 interface SyncContext {
-  /** Internal TuneTrees user id (user_profile.id). */
+  /** Supabase auth uid (user_profile.id, the PK). */
   userId: string;
-  /** Supabase auth uid (JWT sub). */
+  /** Supabase auth uid (JWT sub); same as userId after eliminating user_profile.id. */
   authUserId: string;
   collections: Record<string, Set<string>>;
   pullTables?: Set<string>;
@@ -501,24 +501,11 @@ function sqliteToPostgres(
 
 function remapUserRefsForPush(
   data: Record<string, unknown>,
-  ctx: SyncContext
+  _ctx: SyncContext
 ): Record<string, unknown> {
-  const result = { ...data };
-  const replaceIfAuth = (prop: string) => {
-    if (!(prop in result)) return;
-    const value = result[prop];
-    if (value === null || typeof value === "undefined") return;
-    if (String(value) === ctx.authUserId) {
-      result[prop] = ctx.userId;
-    }
-  };
-
-  replaceIfAuth("userRef");
-  replaceIfAuth("userId");
-  replaceIfAuth("privateFor");
-  replaceIfAuth("privateToUser");
-
-  return result;
+  // userId === authUserId (both are Supabase auth UUID).
+  // No remapping needed - user FKs reference user_profile.id directly.
+  return data;
 }
 
 function remapUserProfileForPush(
@@ -529,11 +516,9 @@ function remapUserProfileForPush(
   if (tableName !== "user_profile") return data;
 
   const result = { ...data };
-  if (ctx.userId) {
-    result.id = ctx.userId;
-  }
+  // user_profile.id is the canonical PK and should match authenticated user id.
   if (ctx.authUserId) {
-    result.supabaseUserId = ctx.authUserId;
+    result.id = ctx.authUserId;
   }
   return result;
 }
@@ -590,7 +575,9 @@ async function verifyJwt(
   try {
     // Peek at the JWT header to choose verification strategy
     const [headerB64] = token.split(".");
-    const headerJson = JSON.parse(atob(headerB64.replace(/-/g, "+").replace(/_/g, "/")));
+    const headerJson = JSON.parse(
+      atob(headerB64.replace(/-/g, "+").replace(/_/g, "/"))
+    );
     const algorithm = headerJson.alg;
 
     let payload: { sub?: string };
@@ -603,10 +590,7 @@ async function verifyJwt(
     } else {
       // HS256 (Supabase CLI < 2.75): symmetric secret
       debug.log("[AUTH] Using HS256 verification");
-      const result = await jwtVerify(
-        token,
-        new TextEncoder().encode(secret)
-      );
+      const result = await jwtVerify(token, new TextEncoder().encode(secret));
       payload = result.payload;
     }
 
@@ -923,7 +907,7 @@ async function fetchTableForInitialSyncPage(
   const conditions = buildUserFilter({
     tableName,
     table: t,
-    userId: tableName === "user_profile" ? ctx.authUserId : ctx.userId,
+    userId: ctx.userId, // userId === authUserId after eliminating user_profile.id
     collections: ctx.collections,
   });
   if (conditions === null) {
@@ -1150,7 +1134,7 @@ async function fetchChangedRowsFromTable(
   const userConditions = buildUserFilter({
     tableName,
     table: t,
-    userId: tableName === "user_profile" ? ctx.authUserId : ctx.userId,
+    userId: ctx.userId, // userId === authUserId after eliminating user_profile.id
     collections: ctx.collections,
   });
   if (userConditions === null) {
@@ -1265,55 +1249,13 @@ async function handleSync(
   );
 
   await db.transaction(async (tx) => {
+    // After eliminating user_profile.id, authUserId IS the user identifier.
+    // No resolution needed - user_profile.id is the PK.
     const authUserId = userId;
-
-    // Map Supabase auth uid -> internal user_profile.id.
-    // Most user-owned tables reference user_profile.id (e.g. user_ref/user_id), not auth uid.
-    let internalUserId = authUserId;
-    try {
-      const userProfile = getSchemaTables().user_profile as any;
-      if (userProfile?.id && userProfile?.supabaseUserId) {
-        let rows = await tx
-          .select({ id: userProfile.id })
-          .from(userProfile)
-          .where(eq(userProfile.supabaseUserId, authUserId))
-          .limit(1);
-
-        if (rows.length === 0) {
-          try {
-            await tx.insert(userProfile).values({ supabaseUserId: authUserId });
-          } catch (insertError) {
-            console.warn(
-              `[SYNC] Failed to ensure user_profile row for auth uid ${authUserId}`,
-              insertError
-            );
-          }
-
-          rows = await tx
-            .select({ id: userProfile.id })
-            .from(userProfile)
-            .where(eq(userProfile.supabaseUserId, authUserId))
-            .limit(1);
-        }
-
-        if (rows.length > 0 && rows[0]?.id) {
-          internalUserId = String(rows[0].id);
-        } else {
-          console.warn(
-            `[SYNC] No user_profile row found for auth uid ${authUserId}; using auth uid for scoping (may yield empty user-owned pulls).`
-          );
-        }
-      }
-    } catch (err) {
-      console.warn(
-        `[SYNC] Failed to resolve internal user id for auth uid ${authUserId}; using auth uid for scoping`,
-        err
-      );
-    }
 
     const collections = await loadUserCollections({
       tx,
-      userId: internalUserId,
+      userId: authUserId,
       tables: getSchemaTables(),
     });
 
@@ -1345,7 +1287,7 @@ async function handleSync(
     }
 
     const ctx: SyncContext = {
-      userId: internalUserId,
+      userId: authUserId,
       authUserId,
       collections,
       pullTables,
@@ -1486,7 +1428,11 @@ async function fetch(request: Request, env: Env): Promise<Response> {
       }
 
       // Authenticate
-      const userId = await verifyJwt(request, env.SUPABASE_JWT_SECRET, env.SUPABASE_URL);
+      const userId = await verifyJwt(
+        request,
+        env.SUPABASE_JWT_SECRET,
+        env.SUPABASE_URL
+      );
       if (!userId) {
         debug.log(`[HTTP] Unauthorized - JWT verification failed`);
         return errorResponse("Unauthorized", 401, corsHeaders);

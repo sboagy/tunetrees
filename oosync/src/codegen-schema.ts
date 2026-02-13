@@ -358,13 +358,13 @@ function parsePgDefault(params: {
   // boolean constants (often: false / 'false'::boolean)
   if (params.pgType === "boolean") {
     if (/^false(\b|::)/i.test(trimmed) || /^'false'::/i.test(trimmed)) {
-      return { kind: "default", value: "0" };
+      return { kind: "default", value: "false" };
     }
     if (/^true(\b|::)/i.test(trimmed) || /^'true'::/i.test(trimmed)) {
-      return { kind: "default", value: "1" };
+      return { kind: "default", value: "true" };
     }
-    if (/^'f'::/i.test(trimmed)) return { kind: "default", value: "0" };
-    if (/^'t'::/i.test(trimmed)) return { kind: "default", value: "1" };
+    if (/^'f'::/i.test(trimmed)) return { kind: "default", value: "false" };
+    if (/^'t'::/i.test(trimmed)) return { kind: "default", value: "true" };
   }
 
   // numeric constants with optional casts
@@ -1342,7 +1342,6 @@ function buildDefaultWorkerConfig(params: {
   > = {};
 
   const ownerCandidates = [
-    "supabase_user_id",
     "user_ref",
     "user_id",
     "private_to_user",
@@ -1386,6 +1385,16 @@ function buildDefaultWorkerConfig(params: {
         tableOwnerColumn.set(tableName, {
           column: overrideOwnerColumn,
           kind,
+        });
+      }
+    }
+
+    if (!tableOwnerColumn.has(tableName) && tableName === "user_profile") {
+      const idCol = colByName.get("id");
+      if (idCol) {
+        tableOwnerColumn.set(tableName, {
+          column: "id",
+          kind: "eqUserId",
         });
       }
     }
@@ -1737,7 +1746,12 @@ function buildSchemaTs(params: {
       });
       if (parsedDefault) {
         if (parsedDefault.kind === "default") {
-          pieces.push(`default(${parsedDefault.value})`);
+          let defaultValue = parsedDefault.value;
+          // SQLite integer columns need numeric defaults, not boolean literals
+          if (builder === "integer" && pgType === "boolean") {
+            defaultValue = parsedDefault.value === "true" ? "1" : "0";
+          }
+          pieces.push(`default(${defaultValue})`);
         } else {
           pieces.push(`$defaultFn(${parsedDefault.value})`);
         }
@@ -1888,8 +1902,27 @@ function buildPgSchemaTs(params: {
 
   const lines: string[] = [];
   lines.push(createHeader({ schema: params.schema }));
+
+  // Collect actually-used type builders to generate minimal imports
+  const usedBuilders = new Set<string>();
+
+  // First pass: collect all used type builders
+  for (const tableName of tables) {
+    const tableColumns = (colsByTable.get(tableName) ?? []).slice();
+    for (const col of tableColumns) {
+      const pgType = normalizeType({
+        dataType: col.data_type,
+        udtName: col.udt_name,
+      });
+      const builder = pgBuilderForPgType(pgType);
+      usedBuilders.add(builder);
+    }
+  }
+
+  // Generate import statement with only used types (sorted alphabetically)
+  const importTypes = [...Array.from(usedBuilders), "pgTable"].sort();
   lines.push(
-    'import { boolean, integer, jsonb, pgTable, real, text } from "drizzle-orm/pg-core";'
+    `import { ${importTypes.join(", ")} } from "drizzle-orm/pg-core";`
   );
   lines.push("");
 

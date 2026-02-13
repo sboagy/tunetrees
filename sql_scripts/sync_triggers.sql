@@ -1127,7 +1127,7 @@ VALUES
 END;
 
 -- ============================================================================
--- TRIGGERS: user_profile (single PK: supabase_user_id)
+-- TRIGGERS: user_profile (single PK: id)
 -- ============================================================================
 CREATE TRIGGER trg_user_profile_insert AFTER INSERT ON user_profile BEGIN
 INSERT INTO
@@ -1136,7 +1136,7 @@ VALUES
     (
         lower(hex (randomblob (16))),
         'user_profile',
-        NEW.supabase_user_id,
+        NEW.id,
         'INSERT',
         strftime ('%Y-%m-%dT%H:%M:%fZ', 'now')
     );
@@ -1151,7 +1151,7 @@ VALUES
     (
         lower(hex (randomblob (16))),
         'user_profile',
-        NEW.supabase_user_id,
+        NEW.id,
         'UPDATE',
         strftime ('%Y-%m-%dT%H:%M:%fZ', 'now')
     );
@@ -1165,7 +1165,7 @@ VALUES
     (
         lower(hex (randomblob (16))),
         'user_profile',
-        OLD.supabase_user_id,
+        OLD.id,
         'DELETE',
         strftime ('%Y-%m-%dT%H:%M:%fZ', 'now')
     );

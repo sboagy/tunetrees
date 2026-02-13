@@ -185,7 +185,6 @@ export const COL = {
   RHYTHM: "rhythm",
 
   // user_profile
-  SUPABASE_USER_ID: "supabase_user_id",
   EMAIL: "email",
   AVATAR_URL: "avatar_url",
   PHONE: "phone",

@@ -161,7 +161,6 @@ export const COMMON_KEYS_SNAKE_TO_CAMEL: Record<string, string> = {
   // display_order already covered
 
   // user_profile table
-  supabase_user_id: "supabaseUserId",
   email: "email",
   avatar_url: "avatarUrl",
   acceptable_delinquency_window: "acceptableDelinquencyWindow",

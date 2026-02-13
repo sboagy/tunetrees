@@ -98,8 +98,8 @@ const NewTunePage: Component = () => {
       const sourceUrl = initialData().sourceUrl;
       if (sourceUrl && newTune.id) {
         const userId = userIdInt();
-        const supabaseUserId = user()?.id;
-        if (userId && supabaseUserId) {
+        const authUserId = user()?.id;
+        if (userId && authUserId) {
           try {
             const foreignId = sourceUrl.split("/").filter(Boolean).pop();
             const title = sourceUrl.includes("://www.irishtune.info")
@@ -119,7 +119,7 @@ const NewTunePage: Component = () => {
                 public: true,
                 comment: undefined,
               },
-              supabaseUserId
+              authUserId
             );
           } catch (refError) {
             console.error("Error creating reference:", refError);

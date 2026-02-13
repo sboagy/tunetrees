@@ -128,4 +128,3 @@ CREATE TABLE `__new_table_transient_data` (
 INSERT INTO `__new_table_transient_data`("user_id", "tune_id", "playlist_id", "purpose", "note_private", "note_public", "recall_eval", "practiced", "quality", "easiness", "difficulty", "interval", "step", "repetitions", "due", "backup_practiced", "goal", "technique", "stability", "state", "sync_version", "last_modified_at", "device_id") SELECT "user_id", "tune_id", "playlist_id", "purpose", "note_private", "note_public", "recall_eval", "practiced", "quality", "easiness", "difficulty", "interval", "step", "repetitions", "due", "backup_practiced", "goal", "technique", "stability", "state", "sync_version", "last_modified_at", "device_id" FROM `table_transient_data`;--> statement-breakpoint
 DROP TABLE `table_transient_data`;--> statement-breakpoint
 ALTER TABLE `__new_table_transient_data` RENAME TO `table_transient_data`;--> statement-breakpoint
-ALTER TABLE `user_profile` ADD `id` text NOT NULL;

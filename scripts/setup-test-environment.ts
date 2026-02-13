@@ -135,8 +135,7 @@ async function setup() {
   console.log("\n2️⃣  Creating user profiles...");
 
   const userProfiles = TEST_USERS.map((user) => ({
-    id: user.id, // user_profile.id (auto-gen UUID, but we set it explicitly to match auth.users.id)
-    supabase_user_id: user.id, // References auth.users.id
+    id: user.id, // Primary key - References auth.users.id (Supabase Auth UUID)
     email: user.email,
     name: user.name,
     avatar_url: null, // Explicitly set nullable avatar field to avoid undefined
@@ -165,7 +164,7 @@ async function setup() {
 
   const playlists = TEST_USERS.map((user) => ({
     playlist_id: user.playlistId, // UUID schema uses playlist_id, not id
-    user_ref: user.id, // References user_profile.supabase_user_id
+    user_ref: user.id, // References user_profile.id
     name: null,
     instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID, // Can be set per-user if needed
     genre_default: "ITRAD", // Genre code, not full name

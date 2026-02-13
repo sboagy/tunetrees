@@ -113,8 +113,7 @@ beforeEach(async () => {
 
   db.run(`
     CREATE TABLE user_profile (
-      supabase_user_id TEXT PRIMARY KEY NOT NULL,
-      id TEXT,
+      id TEXT PRIMARY KEY NOT NULL,
       name TEXT
     )
   `);
@@ -164,6 +163,13 @@ beforeEach(async () => {
   `);
 
   db.run(`
+    CREATE TABLE plugin (
+      id TEXT PRIMARY KEY NOT NULL,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
     CREATE TABLE instrument (
       id TEXT PRIMARY KEY NOT NULL,
       instrument TEXT
@@ -192,6 +198,15 @@ beforeEach(async () => {
       user_id TEXT,
       tune_id TEXT,
       settings TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE user_genre_selection (
+      user_id TEXT NOT NULL,
+      genre_id TEXT NOT NULL,
+      last_modified_at TEXT,
+      PRIMARY KEY (user_id, genre_id)
     )
   `);
 });
@@ -403,9 +418,7 @@ describe("trigger functionality", () => {
   });
 
   it("uses composite key JSON for table_state (4-column PK)", () => {
-    db.run(
-      "INSERT INTO user_profile (supabase_user_id, id) VALUES ('sup-1', 'user-1')"
-    );
+    db.run("INSERT INTO user_profile (id) VALUES ('user-1')");
     db.run("INSERT INTO playlist (playlist_id, name) VALUES ('pl-1', 'Test')");
     db.run("DELETE FROM sync_push_queue");
 

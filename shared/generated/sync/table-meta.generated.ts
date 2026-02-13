@@ -484,7 +484,6 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       phone: "User phone number.",
       phone_verified: "Timestamp when phone was verified.",
       sr_alg_type: "Preferred spaced repetition algorithm (SM2/FSRS).",
-      supabase_user_id: "Reference to Supabase auth user ID.",
       sync_version: "Sync version for conflict resolution.",
     },
   },

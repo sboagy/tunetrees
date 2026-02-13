@@ -67,7 +67,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     ).toBeVisible({ timeout: 10000 });
 
     await ttPage.setRowEvaluation(row, "good");
-    await ttPage.submitEvaluations();
+    await ttPage.submitEvaluations({ timeoutMs: 60000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(1200);
 

@@ -825,7 +825,7 @@ export const TopNav: Component = () => {
         const result = await db
           .select({ avatarUrl: userProfile.avatarUrl })
           .from(userProfile)
-          .where(eq(userProfile.supabaseUserId, userId))
+          .where(eq(userProfile.id, userId))
           .limit(1);
 
         return result[0]?.avatarUrl || null;

@@ -97,15 +97,17 @@ export async function getPluginsByCapability(
 
   const goal = options?.goal;
 
-  return plugins.filter((row) => {
-    if (!includeDisabled && row.enabled !== 1) return false;
-    return hasCapability(row.capabilities, capability);
-  }).filter((row) => {
-    if (!goal) return true;
-    const goals = parseGoals(row.goals ?? null);
-    if (goals.length === 0) return true;
-    return goals.includes(goal);
-  });
+  return plugins
+    .filter((row) => {
+      if (!includeDisabled && row.enabled !== 1) return false;
+      return hasCapability(row.capabilities, capability);
+    })
+    .filter((row) => {
+      if (!goal) return true;
+      const goals = parseGoals(row.goals ?? null);
+      if (goals.length === 0) return true;
+      return goals.includes(goal);
+    });
 }
 
 export async function createPlugin(

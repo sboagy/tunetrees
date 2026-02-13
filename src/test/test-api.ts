@@ -16,20 +16,20 @@ import {
 import {
   dailyPracticeQueue,
   note,
-  plugin,
   playlistTune,
+  plugin,
   practiceRecord,
   reference,
 } from "@/lib/db/schema";
+import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
-import { serializeCapabilities } from "@/lib/plugins/capabilities";
 
 type SeedAddToReviewInput = {
   playlistId: string; // UUID
   tuneIds: string[]; // UUIDs
-  // Optional explicit user id (user_profile.id UUID). If omitted, we will
+  // Optional explicit user id (Supabase Auth UUID). If omitted, we will
   // resolve from current Supabase session via user_profile lookup.
   userId?: string;
 };
@@ -88,7 +88,7 @@ async function ensureDb(): Promise<SqliteDatabase> {
   }
 }
 
-async function resolveUserId(db: SqliteDatabase): Promise<string> {
+async function resolveUserId(_db: SqliteDatabase): Promise<string> {
   // First check for injected test user ID (bypasses Supabase entirely)
   if (typeof window !== "undefined" && window.__ttTestUserId) {
     console.log(
@@ -97,17 +97,11 @@ async function resolveUserId(db: SqliteDatabase): Promise<string> {
     return window.__ttTestUserId;
   }
 
-  // Fall back to Supabase auth lookup
+  // After eliminating user_profile.id, just return the Supabase Auth UUID
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (!userId) throw new Error("No authenticated user in test session");
-
-  const result = await db.all<{ id: string }>(
-    sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`
-  );
-  const id = result[0]?.id;
-  if (!id) throw new Error("user_profile row not found for current user");
-  return id;
+  return userId;
 }
 
 async function seedAddToReview(input: SeedAddToReviewInput) {
@@ -327,17 +321,15 @@ async function getCatalogSelectionDiagnostics() {
 
   const userProfileRows = await db.all<{
     id: string;
-    supabase_user_id: string | null;
   }>(sql`
-    SELECT id, supabase_user_id
+    SELECT id
     FROM user_profile
-    WHERE id = ${userRef} OR supabase_user_id = ${userRef}
+    WHERE id = ${userRef}
   `);
 
   const userIds = new Set<string>([userRef]);
   for (const row of userProfileRows) {
     if (row.id) userIds.add(row.id);
-    if (row.supabase_user_id) userIds.add(row.supabase_user_id);
   }
 
   const userIdList = Array.from(userIds)
@@ -759,18 +751,8 @@ async function seedSampleCatalogRow() {
     ["itrad", "Irish Traditional", "Ireland", "Traditional Irish music genre"]
   );
   rawDb.run(
-    "INSERT OR IGNORE INTO user_profile (id, supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      "test-user-id",
-      "test-user-id",
-      "Test User",
-      null,
-      "fsrs",
-      0,
-      1,
-      now,
-      "local",
-    ]
+    "INSERT OR IGNORE INTO user_profile (id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ["test-user-id", "Test User", null, "fsrs", 0, 1, now, "local"]
   );
   rawDb.run(
     `INSERT OR REPLACE INTO tune (
@@ -944,7 +926,7 @@ declare global {
       getCatalogSelectionDiagnostics: () => Promise<{
         userRef: string;
         userIdVariants: string[];
-        userProfile: Array<{ id: string; supabase_user_id: string | null }>;
+        userProfile: Array<{ id: string }>;
         selectionRows: Array<{ user_id: string; genre_id: string }>;
         selectedGenreIds: string[];
         playlistDefaults: string[];

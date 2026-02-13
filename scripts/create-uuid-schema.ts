@@ -63,8 +63,7 @@ async function createSchema() {
       
       -- User Profile
       CREATE TABLE IF NOT EXISTS user_profile (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        supabase_user_id uuid NOT NULL UNIQUE,
+        id uuid PRIMARY KEY,
         name text,
         email text,
         sr_alg_type text,

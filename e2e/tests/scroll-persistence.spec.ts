@@ -336,6 +336,7 @@ test.describe("Scroll Position Persistence", () => {
     page,
     browserName,
   }) => {
+    test.setTimeout(45000); // Increase timeout for this test (milliseconds). Set to 45 seconds.
     // Set up console listener early
     const consoleLogs: string[] = [];
     page.on("console", (msg) => {

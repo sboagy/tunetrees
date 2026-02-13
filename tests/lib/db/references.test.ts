@@ -32,26 +32,20 @@ describe("detectReferenceType", () => {
       "audio"
     );
     expect(detectReferenceType("https://spotify.com/track/123")).toBe("audio");
-    expect(detectReferenceType("https://bandcamp.com/album/xyz")).toBe(
-      "audio"
-    );
+    expect(detectReferenceType("https://bandcamp.com/album/xyz")).toBe("audio");
     expect(detectReferenceType("https://example.com/song.mp3")).toBe("audio");
     expect(detectReferenceType("https://example.com/song.wav")).toBe("audio");
   });
 
   it("should detect social media platforms", () => {
-    expect(detectReferenceType("https://facebook.com/page/123")).toBe(
-      "social"
-    );
+    expect(detectReferenceType("https://facebook.com/page/123")).toBe("social");
     expect(detectReferenceType("https://instagram.com/user/post/123")).toBe(
       "social"
     );
     expect(detectReferenceType("https://twitter.com/user/status/123")).toBe(
       "social"
     );
-    expect(detectReferenceType("https://x.com/user/status/123")).toBe(
-      "social"
-    );
+    expect(detectReferenceType("https://x.com/user/status/123")).toBe("social");
   });
 
   it("should default to website for unknown URLs", () => {

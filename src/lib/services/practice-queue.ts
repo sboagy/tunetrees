@@ -361,7 +361,7 @@ export interface DailyPracticeQueueRow {
  * Ported from legacy _fetch_existing_active_queue() (lines 674-693).
  *
  * @param db - SQLite database instance
- * @param userRef - User ID (from user_profile.id)
+ * @param userRef - Supabase Auth UUID
  * @param playlistRef - Playlist ID
  * @param windowStartKey - Window start timestamp (YYYY-MM-DD HH:MM:SS)
  * @returns Array of existing active queue rows
@@ -401,7 +401,7 @@ async function fetchExistingActiveQueue(
  * @param rows - Tunes from practice_list_staged VIEW
  * @param windows - Scheduling windows
  * @param prefs - Scheduling preferences
- * @param userRef - User ID
+ * @param userRef - Supabase Auth UUID
  * @param playlistRef - Playlist ID
  * @param mode - Queue mode ("per_day" or "rolling")
  * @param localTzOffsetMinutes - Timezone offset
@@ -482,7 +482,7 @@ function buildQueueRows(
  *
  * @param db - SQLite database instance
  * @param rows - Queue rows to insert
- * @param userRef - User ID
+ * @param userRef - Supabase Auth UUID
  * @param playlistRef - Playlist ID
  * @param windows - Scheduling windows
  * @returns Persisted queue rows (may be existing rows if conflict)
@@ -534,7 +534,7 @@ async function persistQueueRows(
  * This should be called on every page load to implement "create new queue every day" logic.
  *
  * @param db - SQLite database instance
- * @param userRef - User ID
+ * @param userRef - Supabase Auth UUID
  * @param playlistRef - Playlist ID
  * @param practiceDate - The practice date (from getPracticeDate())
  * @param localTzOffsetMinutes - Client timezone offset (optional)
@@ -618,7 +618,7 @@ export async function ensureDailyQueue(
  * Ported from legacy generate_or_get_practice_queue() (lines 911-975).
  *
  * @param db - SQLite database instance
- * @param userRef - User ID (from user_profile.id)
+ * @param userRef - Supabase Auth UUID
  * @param playlistRef - Playlist ID
  * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
  * @param localTzOffsetMinutes - Client timezone offset (optional)
@@ -956,7 +956,7 @@ export async function generateOrGetPracticeQueue(
  * Ported from legacy refill_practice_queue() (lines 1007-1112).
  *
  * @param db - SQLite database instance
- * @param userRef - User ID (from user_profile.id)
+ * @param userRef - Supabase Auth UUID
  * @param playlistRef - Playlist ID
  * @param count - Number of tunes to add (must be >= 1)
  * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)

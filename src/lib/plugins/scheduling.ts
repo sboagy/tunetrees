@@ -82,11 +82,14 @@ const DISALLOWED_COLUMNS: string[] = []; // TODO: add column disallow-list as ne
 
 function extractTableNames(query: string): string[] {
   const names: string[] = [];
-  const regex = /\b(from|join)\s+([a-zA-Z0-9_\."]+)/gi;
+  const regex = /\b(from|join)\s+([a-zA-Z0-9_."]+)/gi;
   let match = regex.exec(query);
   while (match) {
     const raw = match[2] ?? "";
-    const cleaned = raw.replace(/^["']|["']$/g, "").split(".").pop();
+    const cleaned = raw
+      .replace(/^["']|["']$/g, "")
+      .split(".")
+      .pop();
     if (cleaned) names.push(cleaned);
     match = regex.exec(query);
   }

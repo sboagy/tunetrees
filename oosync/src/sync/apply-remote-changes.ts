@@ -184,7 +184,7 @@ export async function applyRemoteChangesToLocalDb(params: {
                   set:
                     change.table === "user_profile" &&
                     compositeKeys.length === 1 &&
-                    compositeKeys[0] === "supabase_user_id"
+                    compositeKeys[0] === "id"
                       ? sanitizedData
                       : ((): Record<string, unknown> => {
                           const { id: _ignoredId, ...rest } =

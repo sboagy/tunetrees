@@ -223,8 +223,8 @@ export async function runQuickJsPlugin(params: {
   return await new Promise((resolve, reject) => {
     const timeoutId = window.setTimeout(() => {
       pending.delete(id);
-      resetWorker("Plugin execution timed out");
-      reject(new Error("Plugin execution timed out"));
+      resetWorker(`Plugin execution timed out (${timeoutMs} ms)`);
+      reject(new Error(`Plugin execution timed out (${timeoutMs} ms)`));
     }, timeoutMs);
 
     pending.set(id, { resolve, reject, timeoutId });
