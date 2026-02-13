@@ -572,7 +572,7 @@ const PluginsPage: Component = () => {
           selectedFunction === "parseImport" ? undefined : selectedFunction,
         payload,
         meta,
-        timeoutMs: 10000,
+        timeoutMs: 30000,
       });
       setTestResult(JSON.stringify(result, null, 2));
     } catch (error) {
