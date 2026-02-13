@@ -336,7 +336,7 @@ export class FSRSService implements SchedulingService {
    *
    * @param input - Practice session input
    * @param schedule - Next review schedule from FSRS
-   * @param repertoireRef - Playlist reference ID
+   * @param repertoireRef - Repertoire reference ID
    * @returns New practice record ready for database insertion
    */
   createPracticeRecord(

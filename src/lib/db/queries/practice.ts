@@ -135,7 +135,7 @@ export async function clearStaleStagedEvaluations(
   }
 
   console.log(
-    `[clearStaleStagedEvaluations] Removed ${count} stale staged row(s) for user=${userId}, playlist=${repertoireId}, window=${windowStartIso19}`
+    `[clearStaleStagedEvaluations] Removed ${count} stale staged row(s) for user=${userId}, repertoire=${repertoireId}, window=${windowStartIso19}`
   );
 
   return count;
@@ -170,7 +170,7 @@ export interface DueTuneEntry {
  *
  * @param db - SQLite database instance
  * @param userId - User ID (from user_profile.id)
- * @param repertoireId - Playlist to query
+ * @param repertoireId - Repertoire to query
  * @param _delinquencyWindowDays - Unused (kept for API compatibility)
  * @returns Array of practice list rows with queue info (bucket, order_index, completed_at)
  *
@@ -201,7 +201,7 @@ export async function getPracticeList(
   `);
   console.log("[DB identity]", db);
   console.log(
-    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, playlist=${repertoireId}`
+    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, repertoire=${repertoireId}`
   );
 
   // Debug: Check view rows
@@ -212,7 +212,7 @@ export async function getPracticeList(
       AND pls.repertoire_id = ${repertoireId}
   `);
   console.log(
-    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, playlist=${repertoireId}`
+    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, repertoire=${repertoireId}`
   );
 
   // DEBUG: Check what windows exist and which one we're selecting
@@ -366,7 +366,7 @@ export async function getDueTunesLegacy(
       lastModifiedAt: tune.lastModifiedAt,
       deviceId: tune.deviceId,
 
-      // Playlist tune info
+      // Repertoire tune info
       playlistRef: playlistTune.playlistRef,
       scheduled: playlistTune.scheduled, // Next review date for "Add To Review"
 
@@ -777,7 +777,7 @@ export async function getPracticeHistory(
         deviceId: tune.deviceId,
       },
 
-      // Playlist name
+      // Repertoire name
       repertoireName: repertoire.instrumentRef,
     })
     .from(practiceRecord)
@@ -916,7 +916,7 @@ export async function addTunesToPracticeQueue(
   // to ensure new tunes appear immediately in the practice tab when incrementSyncVersion() is called
   if (added > 0) {
     try {
-      // Get userRef from playlist
+      // Get userRef from repertoire
       const playlistData = await db
         .select({ userRef: repertoire.userRef })
         .from(repertoire)
@@ -1020,7 +1020,7 @@ export async function getPracticeRecords(
         deviceId: tune.deviceId,
       },
 
-      // Playlist name
+      // Repertoire name
       repertoireName: repertoire.instrumentRef,
     })
     .from(practiceRecord)

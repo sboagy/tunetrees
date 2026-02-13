@@ -2,13 +2,13 @@
  * Tune User-Specific Data Queries
  *
  * Functions to manage user-specific fields for tunes:
- * - playlist_tune.learned (when user learned the tune in a playlist)
+ * - repertoire_tune.learned (when user learned the tune in a repertoire)
  * - practice_record fields (latest practice data: practiced, quality, FSRS/SM2 fields)
  * - notes (private notes about the tune)
  *
  * These fields are separate from the base tune data to support:
  * - User-specific overrides without modifying public tunes
- * - Per-playlist tracking (same tune in multiple playlists)
+ * - Per-playlist tracking (same tune in multiple repertoires)
  * - Historical practice records
  *
  * @module lib/db/queries/tune-user-data
@@ -20,10 +20,10 @@ import type { SqliteDatabase } from "../client-sqlite";
 import { note, playlistTune, practiceRecord } from "../schema";
 
 /**
- * Update the learned date for a tune in a specific playlist
+ * Update the learned date for a tune in a specific repertoire
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param learnedDate - ISO 8601 timestamp when tune was learned (null to clear)
  */
@@ -55,7 +55,7 @@ export async function updatePlaylistTuneLearned(
  * Update playlist_tune fields (learned, goal, scheduled)
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param data - Fields to update
  */
@@ -101,11 +101,11 @@ export async function updatePlaylistTuneFields(
 /**
  * Update or create a practice record with user-specific fields
  *
- * This updates the LATEST practice record for a tune in a playlist.
+ * This updates the LATEST practice record for a tune in a repertoire.
  * Creates a new record if none exists.
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param data - Practice data to update
  */
@@ -128,7 +128,7 @@ export async function upsertPracticeRecord(
 ): Promise<void> {
   const now = new Date().toISOString();
 
-  // Get the latest practice record for this tune/playlist combination
+  // Get the latest practice record for this tune/repertoire combination
   const existing = await db
     .select()
     .from(practiceRecord)
@@ -206,7 +206,7 @@ export async function upsertPracticeRecord(
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
  * @param userId - User UUID
- * @param playlistId - Optional playlist UUID for context
+ * @param repertoireId - Optional playlist UUID for context
  * @returns Note ID
  */
 export async function getOrCreatePrivateNote(
@@ -287,12 +287,12 @@ export async function updateNoteText(
  *
  * Merges data from:
  * - tune (or tune_override)
- * - playlist_tune (learned, goal, scheduled, current)
+ * - repertoire_tune (learned, goal, scheduled, current)
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
  * @param userId - User UUID
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @returns Complete tune data for editor
  */
 export async function getTuneEditorData(

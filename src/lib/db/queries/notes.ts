@@ -35,7 +35,7 @@ export async function getNotesByTune(
 }
 
 /**
- * Get all notes for a specific playlist
+ * Get all notes for a specific repertoire
  */
 export async function getNotesByPlaylist(
   db: SqliteDatabase,

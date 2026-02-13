@@ -11,7 +11,7 @@ import {
 const DEFAULT_METADATA_TABLES = [
   "user_profile",
   "user_genre_selection",
-  "playlist",
+  "repertoire",
   "instrument",
   "genre", // Required for playlist.genre_default FK
 ];
@@ -50,7 +50,7 @@ export async function preSyncMetadataViaWorker(params: {
         },
       });
 
-      // FK constraints may require multiple passes (e.g., instrument must exist before playlist can reference it)
+      // FK constraints may require multiple passes (e.g., instrument must exist before repertoire can reference it)
       const deferredChanges: typeof response.changes = [];
 
       const applyResult = await applyRemoteChangesToLocalDb({
@@ -106,7 +106,7 @@ async function getEffectiveGenreFilterInitialSync(params: {
   const { db, supabase, userId } = params;
 
   // Query LOCAL db for user genre selection and repertoire defaults
-  // Note: preSyncMetadataViaWorker already synced user_genre_selection, playlist, and instrument
+  // Note: preSyncMetadataViaWorker already synced user_genre_selection, repertoire, and instrument
   const [selectedGenres, playlistDefaultGenres] = await Promise.all([
     getUserGenreSelection(db, userId),
     getPlaylistGenreDefaultsForUser(db, userId),
@@ -186,7 +186,7 @@ export async function buildGenreFilterOverrides(params: {
       `[GenreFilter] ⚠️  No genres selected - for INITIAL sync, returning null means pull ALL public catalog data`
     );
     // For initial sync with no genres: return null to let worker pull all public data
-    // This handles the case where user hasn't selected genres yet or cleared their playlist
+    // This handles the case where user hasn't selected genres yet or cleared their repertoire
     return null;
   }
 
@@ -216,7 +216,7 @@ export async function purgeOrphanedAnnotations(
     throw new Error("SQLite instance not available");
   }
 
-  const tables = ["note", "reference"] as const; // NOT practice_record - filtered by playlist
+  const tables = ["note", "reference"] as const; // NOT practice_record - filtered by repertoire
   const deletedCounts: Record<string, number> = {};
 
   for (const tableName of tables) {

@@ -16,7 +16,7 @@ import { practiceRecord } from "../schema";
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
- * @param repertoireId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @returns Array of practice records, ordered by date (newest first)
  */
 export async function getPracticeRecordsForTune(
@@ -40,7 +40,7 @@ export async function getPracticeRecordsForTune(
  * Create a new practice record
  *
  * @param db - SQLite database instance
- * @param repertoireId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param data - Initial practice data
  * @returns The created practice record ID
