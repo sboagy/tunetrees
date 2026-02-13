@@ -151,7 +151,7 @@ const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-const CURRENT_DB_VERSION = 10; // v10: add plugin goals column
+const CURRENT_DB_VERSION = 11; // v11: rename user_profile key to id
 
 // Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -415,6 +415,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
           "/drizzle/migrations/sqlite/0009_add_plugins.sql",
           "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
+          "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
@@ -463,8 +464,8 @@ export async function initializeDb(
           "CREATE INDEX IF NOT EXISTS idx_sync_change_log_changed_at ON sync_change_log(changed_at)"
         );
 
-        // Note: user_profile.id column eliminated - supabase_user_id is now the PK.
-        // No migration needed: generated schema uses supabaseUserId as PK.
+        // user_profile.id is the canonical user key.
+        // Ensure local helper tables use id-based FKs.
 
         // Backward-compatible adds for hybrid tune fields.
         // Some existing IndexedDB DBs were created before these columns existed,
@@ -496,7 +497,7 @@ export async function initializeDb(
 
         requireSqliteDb().run(`
           CREATE TABLE IF NOT EXISTS user_genre_selection (
-            user_id TEXT NOT NULL REFERENCES user_profile(supabase_user_id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
             genre_id TEXT NOT NULL REFERENCES genre(id) ON DELETE CASCADE,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -25,7 +25,7 @@ export const dailyPracticeQueue = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     userRef: text("user_ref")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     playlistRef: text("playlist_ref").notNull(),
     mode: text("mode"),
     queueDate: text("queue_date"),
@@ -99,9 +99,7 @@ export const instrument = sqliteTable(
       .notNull()
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    privateToUser: text("private_to_user").references(
-      () => userProfile.supabaseUserId
-    ),
+    privateToUser: text("private_to_user").references(() => userProfile.id),
     instrument: text("instrument"),
     description: text("description"),
     genreDefault: text("genre_default"),
@@ -125,7 +123,7 @@ export const note = sqliteTable(
       .notNull()
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    userRef: text("user_ref").references(() => userProfile.supabaseUserId),
+    userRef: text("user_ref").references(() => userProfile.id),
     tuneRef: text("tune_ref")
       .notNull()
       .references(() => tune.id),
@@ -158,7 +156,7 @@ export const playlist = sqliteTable("playlist", {
     .$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref")
     .notNull()
-    .references(() => userProfile.supabaseUserId),
+    .references(() => userProfile.id),
   name: text("name"),
   instrumentRef: text("instrument_ref"),
   genreDefault: text("genre_default").references(() => genre.id),
@@ -195,7 +193,7 @@ export const plugin = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     userRef: text("user_ref")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     name: text("name").notNull(),
     description: text("description"),
     script: text("script").notNull(),
@@ -262,7 +260,7 @@ export const practiceRecord = sqliteTable(
 export const prefsSchedulingOptions = sqliteTable("prefs_scheduling_options", {
   userId: text("user_id")
     .notNull()
-    .references(() => userProfile.supabaseUserId)
+    .references(() => userProfile.id)
     .primaryKey(),
   acceptableDelinquencyWindow: integer("acceptable_delinquency_window")
     .notNull()
@@ -281,7 +279,7 @@ export const prefsSpacedRepetition = sqliteTable(
   {
     userId: text("user_id")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     algType: text("alg_type").notNull(),
     fsrsWeights: text("fsrs_weights"),
     requestRetention: real("request_retention"),
@@ -306,7 +304,7 @@ export const reference = sqliteTable(
     tuneRef: text("tune_ref")
       .notNull()
       .references(() => tune.id),
-    userRef: text("user_ref").references(() => userProfile.supabaseUserId),
+    userRef: text("user_ref").references(() => userProfile.id),
     comment: text("comment"),
     title: text("title"),
     public: integer("public"),
@@ -338,7 +336,7 @@ export const tabGroupMainState = sqliteTable("tab_group_main_state", {
     .$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
-    .references(() => userProfile.supabaseUserId),
+    .references(() => userProfile.id),
   whichTab: text("which_tab").default("practice"),
   playlistId: text("playlist_id"),
   tabSpec: text("tab_spec"),
@@ -353,7 +351,7 @@ export const tableState = sqliteTable(
   {
     userId: text("user_id")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     screenSize: text("screen_size").notNull(),
     purpose: text("purpose").notNull(),
     playlistId: text("playlist_id")
@@ -373,7 +371,7 @@ export const tableTransientData = sqliteTable(
   {
     userId: text("user_id")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     tuneId: text("tune_id")
       .notNull()
       .references(() => tune.id),
@@ -411,7 +409,7 @@ export const tag = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     userRef: text("user_ref")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     tuneRef: text("tune_ref")
       .notNull()
       .references(() => tune.id),
@@ -444,9 +442,7 @@ export const tune = sqliteTable(
     mode: text("mode"),
     incipit: text("incipit"),
     genre: text("genre").references(() => genre.id),
-    privateFor: text("private_for").references(
-      () => userProfile.supabaseUserId
-    ),
+    privateFor: text("private_for").references(() => userProfile.id),
     deleted: integer("deleted").notNull().default(0),
     composer: text("composer"),
     artist: text("artist"),
@@ -466,7 +462,7 @@ export const tuneOverride = sqliteTable("tune_override", {
     .references(() => tune.id),
   userRef: text("user_ref")
     .notNull()
-    .references(() => userProfile.supabaseUserId),
+    .references(() => userProfile.id),
   title: text("title"),
   type: text("type"),
   structure: text("structure"),
@@ -493,7 +489,7 @@ export const userGenreSelection = sqliteTable(
   {
     userId: text("user_id")
       .notNull()
-      .references(() => userProfile.supabaseUserId),
+      .references(() => userProfile.id),
     genreId: text("genre_id")
       .notNull()
       .references(() => genre.id),
@@ -509,21 +505,20 @@ export const userGenreSelection = sqliteTable(
   ]
 );
 
-export const userProfile = sqliteTable(
-  "user_profile",
-  {
-    supabaseUserId: text("supabase_user_id").notNull().primaryKey(),
-    name: text("name"),
-    email: text("email"),
-    srAlgType: text("sr_alg_type"),
-    phone: text("phone"),
-    phoneVerified: text("phone_verified"),
-    acceptableDelinquencyWindow: integer(
-      "acceptable_delinquency_window"
-    ).default(21),
-    avatarUrl: text("avatar_url"),
-    deleted: integer("deleted").notNull().default(0),
-    ...sqliteSyncColumns,
-  },
-  (t) => [uniqueIndex("user_profile_supabase_user_id_key").on(t.supabaseUserId)]
-);
+export const userProfile = sqliteTable("user_profile", {
+  id: text("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name"),
+  email: text("email"),
+  srAlgType: text("sr_alg_type"),
+  phone: text("phone"),
+  phoneVerified: text("phone_verified"),
+  acceptableDelinquencyWindow: integer("acceptable_delinquency_window").default(
+    21
+  ),
+  avatarUrl: text("avatar_url"),
+  deleted: integer("deleted").notNull().default(0),
+  ...sqliteSyncColumns,
+});

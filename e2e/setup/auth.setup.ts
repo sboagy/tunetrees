@@ -112,11 +112,10 @@ setup("authenticate as Alice", async ({ page }) => {
           : "";
       const combined = `${errorMessage}\n${errorStderr}`;
 
-      const looksLikeLateResetFailure =
-        combined.includes("Seeding data from supabase/seed.sql") ||
-        combined.includes("Restarting containers") ||
-        combined.includes("Error status 502") ||
-        combined.includes("UNION types text and uuid cannot be matched");
+      const looksLikeStorageUnionFailure =
+        combined.includes("UNION types text and uuid cannot be matched") ||
+        (combined.includes("Restarting containers") &&
+          combined.includes("Error status 502"));
 
       // Supabase CLI local reset sometimes fails late with a Storage-layer error.
       // Symptom A: Postgres raises: "UNION types text and uuid cannot be matched".
@@ -134,7 +133,7 @@ setup("authenticate as Alice", async ({ page }) => {
       // supabase_admin and normalize storage.buckets_analytics.id (and dependent FK columns) to TEXT.
       // This makes the internal UNION query type-compatible, allowing the reset flow (and subsequent
       // E2E test setup) to proceed.
-      if (looksLikeLateResetFailure) {
+      if (looksLikeStorageUnionFailure) {
         console.warn(
           "⚠️  supabase db reset failed late; attempting workaround..."
         );
@@ -210,6 +209,14 @@ END $$;
         }
 
         console.log("✅ Applied storage UNION workaround");
+
+        console.log("   Retrying supabase db reset after workaround...");
+        const { stdout: retryStdout, stderr: retryStderr } = await execAsync(
+          `cd ${PROJECT_ROOT} && supabase db reset`,
+          { timeout: 60000 }
+        );
+        if (retryStdout) console.log(retryStdout);
+        if (retryStderr) console.error(retryStderr);
       } else {
         console.error("❌ Database reset failed:", error);
         throw error;

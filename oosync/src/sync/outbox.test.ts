@@ -70,10 +70,10 @@ function insertTune(
   `);
 }
 
-function insertUserProfile(supabaseUserId: string): void {
+function insertUserProfile(userId: string): void {
   db.run(sql`
-    INSERT INTO user_profile (supabase_user_id, id, deleted, sync_version, last_modified_at)
-    VALUES (${supabaseUserId}, ${supabaseUserId}, 0, 1, datetime('now'))
+    INSERT INTO user_profile (id, deleted, sync_version, last_modified_at)
+    VALUES (${userId}, 0, 1, datetime('now'))
   `);
 }
 

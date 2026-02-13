@@ -47,25 +47,25 @@ export interface UpdateReferenceData {
  *
  * @param db - Database instance
  * @param tuneId - Tune UUID
- * @param supabaseUserId - Supabase UUID (optional - filters to user's private references if provided)
+ * @param userId - Supabase UUID (optional - filters to user's private references if provided)
  * @returns Array of references
  */
 export async function getReferencesByTune(
   db: SqliteDatabase,
   tuneId: string, // UUID
-  supabaseUserId?: string
+  userId?: string
 ): Promise<Reference[]> {
   // Visibility semantics (ignore `reference.public`):
   // - system/legacy references: user_ref IS NULL
-  // - private references: user_ref = supabaseUserId
+  // - private references: user_ref = userId
   const baseConditions = [
     eq(schema.reference.tuneRef, tuneId),
     eq(schema.reference.deleted, 0),
   ];
 
-  const visibilityCondition = supabaseUserId
+  const visibilityCondition = userId
     ? or(
-        eq(schema.reference.userRef, supabaseUserId),
+        eq(schema.reference.userRef, userId),
         isNull(schema.reference.userRef)
       )
     : isNull(schema.reference.userRef);
@@ -105,13 +105,13 @@ export async function getReferenceById(
  *
  * @param db - Database instance
  * @param data - Reference data
- * @param supabaseUserId - Supabase UUID for the user creating the reference
+ * @param userId - Supabase UUID for the user creating the reference
  * @returns Created reference with ID
  */
 export async function createReference(
   db: SqliteDatabase,
   data: CreateReferenceData,
-  supabaseUserId: string
+  userId: string
 ): Promise<Reference> {
   const now = new Date().toISOString();
 
@@ -121,7 +121,7 @@ export async function createReference(
       id: generateId(),
       url: data.url,
       tuneRef: data.tuneRef,
-      userRef: supabaseUserId,
+      userRef: userId,
       refType: data.refType || null,
       title: data.title || null,
       comment: data.comment || null,

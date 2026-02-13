@@ -35,7 +35,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
     db.run(
       `
       INSERT OR IGNORE INTO user_profile (
-        supabase_user_id, 
+        id,
         email, 
         name, 
         sync_version, 
@@ -46,10 +46,10 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
       [userId, now]
     );
 
-    // After eliminating user_profile.id, userId IS the user identifier (supabase_user_id PK)
+    // userId IS the canonical user identifier (user_profile.id).
     // Verify user_profile exists
     const userProfileResult = db.exec(
-      `SELECT supabase_user_id FROM user_profile WHERE supabase_user_id = ?`,
+      `SELECT id FROM user_profile WHERE id = ?`,
       [userId]
     );
 

@@ -282,7 +282,7 @@ export interface Env {
 
 /** Context passed through sync operations */
 interface SyncContext {
-  /** Supabase auth uid (user_profile.supabase_user_id, the PK). */
+  /** Supabase auth uid (user_profile.id, the PK). */
   userId: string;
   /** Supabase auth uid (JWT sub); same as userId after eliminating user_profile.id. */
   authUserId: string;
@@ -503,8 +503,8 @@ function remapUserRefsForPush(
   data: Record<string, unknown>,
   _ctx: SyncContext
 ): Record<string, unknown> {
-  // After eliminating user_profile.id, userId === authUserId (both are Supabase auth UUID).
-  // No remapping needed - user FKs reference user_profile.supabase_user_id directly.
+  // userId === authUserId (both are Supabase auth UUID).
+  // No remapping needed - user FKs reference user_profile.id directly.
   return data;
 }
 
@@ -516,10 +516,9 @@ function remapUserProfileForPush(
   if (tableName !== "user_profile") return data;
 
   const result = { ...data };
-  // After eliminating user_profile.id, supabase_user_id is the PK.
-  // Ensure it's set to the authenticated user's ID.
+  // user_profile.id is the canonical PK and should match authenticated user id.
   if (ctx.authUserId) {
-    result.supabaseUserId = ctx.authUserId;
+    result.id = ctx.authUserId;
   }
   return result;
 }
@@ -1251,7 +1250,7 @@ async function handleSync(
 
   await db.transaction(async (tx) => {
     // After eliminating user_profile.id, authUserId IS the user identifier.
-    // No resolution needed - user_profile.supabase_user_id is now the PK.
+    // No resolution needed - user_profile.id is the PK.
     const authUserId = userId;
 
     const collections = await loadUserCollections({

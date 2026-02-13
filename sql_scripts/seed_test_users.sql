@@ -102,16 +102,16 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Insert corresponding user_profile records
--- Note: Both id and supabase_user_id are set to the same UUID (Auth user ID)
-INSERT INTO public.user_profile (id, supabase_user_id, name, email, sync_version, last_modified_at) VALUES
-  ('00000000-0000-4000-8000-000000009002', '00000000-0000-4000-8000-000000009002', 'Bob Test', 'bob.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009003', '00000000-0000-4000-8000-000000009003', 'Carol Test', 'carol.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009004', '00000000-0000-4000-8000-000000009004', 'Dave Test', 'dave.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009005', '00000000-0000-4000-8000-000000009005', 'Eve Test', 'eve.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009006', '00000000-0000-4000-8000-000000009006', 'Frank Test', 'frank.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009007', '00000000-0000-4000-8000-000000009007', 'Grace Test', 'grace.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009008', '00000000-0000-4000-8000-000000009008', 'Henry Test', 'henry.test@tunetrees.test', 1, NOW()),
-  ('00000000-0000-4000-8000-000000009009', '00000000-0000-4000-8000-000000009009', 'Iris Test', 'iris.test@tunetrees.test', 1, NOW())
+-- Note: id is the Supabase Auth UUID
+INSERT INTO public.user_profile (id, name, email, sync_version, last_modified_at) VALUES
+  ('00000000-0000-4000-8000-000000009002', 'Bob Test', 'bob.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009003', 'Carol Test', 'carol.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009004', 'Dave Test', 'dave.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009005', 'Eve Test', 'eve.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009006', 'Frank Test', 'frank.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009007', 'Grace Test', 'grace.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009008', 'Henry Test', 'henry.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009009', 'Iris Test', 'iris.test@tunetrees.test', 1, NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Create playlists for each test user (using UUID format from test-data.ts)
@@ -128,5 +128,5 @@ ON CONFLICT (playlist_id) DO NOTHING;
 
 -- Verify users were created
 SELECT id, email FROM auth.users WHERE email LIKE '%.test@tunetrees.test' ORDER BY id;
-SELECT id, supabase_user_id, name, email FROM public.user_profile WHERE id >= '00000000-0000-4000-8000-000000009002' ORDER BY id;
+SELECT id, name, email FROM public.user_profile WHERE id >= '00000000-0000-4000-8000-000000009002' ORDER BY id;
 SELECT playlist_id, user_ref FROM public.playlist WHERE playlist_id >= '00000000-0000-4000-8000-000000019002' ORDER BY playlist_id;

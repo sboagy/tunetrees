@@ -383,7 +383,10 @@ export const userGenreSelection = pgTable("user_genre_selection", {
 });
 
 export const userProfile = pgTable("user_profile", {
-  supabaseUserId: text("supabase_user_id").notNull().primaryKey(),
+  id: text("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
   email: text("email"),
   srAlgType: text("sr_alg_type"),

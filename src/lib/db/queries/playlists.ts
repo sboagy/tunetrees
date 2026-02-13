@@ -56,14 +56,14 @@ async function resolveUserRef(
   while (true) {
     const match = await db
       .select({
-        supabaseUserId: userProfile.supabaseUserId,
+        id: userProfile.id,
       })
       .from(userProfile)
-      .where(eq(userProfile.supabaseUserId, userId))
+      .where(eq(userProfile.id, userId))
       .limit(1);
 
     if (match.length > 0) {
-      // userId IS the user_profile.supabase_user_id (PK)
+      // userId IS user_profile.id (PK)
       userRefCache.set(userId, userId);
       return userId;
     }
@@ -184,7 +184,7 @@ export async function getPlaylistById(
   playlistId: string,
   userId: string
 ): Promise<Playlist | null> {
-  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  // userId is already user_profile.id (Supabase Auth UUID)
   const userRef = userId;
 
   const result = await db
@@ -230,7 +230,7 @@ export async function createPlaylist(
     "playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
   >
 ): Promise<Playlist> {
-  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  // userId is already user_profile.id (Supabase Auth UUID)
   const userRef = userId;
   const now = new Date().toISOString();
 
@@ -648,7 +648,7 @@ export async function getPlaylistTunesStaged(
     throw new Error("Playlist not found or access denied");
   }
 
-  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  // userId is already user_profile.id (Supabase Auth UUID)
   const userRef = userId;
 
   // Query the practice_list_staged view directly

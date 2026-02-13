@@ -105,7 +105,7 @@ export const NotesPanel: Component = () => {
       await createNote(db, {
         tuneRef: tuneId,
         noteText: newNoteContent(),
-        userRef: userId, // Supabase Auth UUID (same as supabase_user_id PK)
+        userRef: userId, // Supabase Auth UUID (same as user_profile.id PK)
       });
 
       // Reset form

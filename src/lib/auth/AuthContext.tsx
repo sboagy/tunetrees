@@ -48,7 +48,7 @@ import {
 interface AuthState {
   /** Current authenticated user (reactive) */
   user: Accessor<User | null>;
-  /** Current authenticated user's UUID from user_profile.supabase_user_id (reactive) */
+  /** Current authenticated user's UUID from user_profile.id (reactive) */
   userIdInt: Accessor<string | null>;
 
   /** Current session (reactive) */
@@ -349,16 +349,16 @@ export const AuthProvider: ParentComponent = (props) => {
     db: SqliteDatabase,
     authUserId: string
   ): Promise<string | null> {
-    // After eliminating user_profile.id, authUserId IS the user identifier (supabase_user_id PK).
+    // authUserId IS the canonical user identifier (user_profile.id PK).
     // No lookup needed - just verify the user exists.
     try {
       const { userProfile } = await import("@/lib/db/schema");
       const { eq } = await import("drizzle-orm");
 
       const result = await db
-        .select({ id: userProfile.supabaseUserId })
+        .select({ id: userProfile.id })
         .from(userProfile)
-        .where(eq(userProfile.supabaseUserId, authUserId))
+        .where(eq(userProfile.id, authUserId))
         .limit(1);
 
       if (result && result.length > 0) {
@@ -979,9 +979,9 @@ export const AuthProvider: ParentComponent = (props) => {
 
         // Check if already exists in local DB
         const existingLocal = await db
-          .select({ id: userProfile.supabaseUserId })
+          .select({ id: userProfile.id })
           .from(userProfile)
-          .where(eq(userProfile.supabaseUserId, anonymousUserId))
+          .where(eq(userProfile.id, anonymousUserId))
           .limit(1);
 
         if (!existingLocal || existingLocal.length === 0) {
@@ -999,7 +999,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
           try {
             await db.insert(userProfile).values({
-              supabaseUserId: anonymousUserId,
+              id: anonymousUserId,
               name: "Anonymous User",
               email: null,
               srAlgType: "fsrs",
@@ -1837,7 +1837,7 @@ export const AuthProvider: ParentComponent = (props) => {
               lastModifiedAt: new Date().toISOString(),
               syncVersion: 2, // Increment to trigger sync
             })
-            .where(eq(userProfile.supabaseUserId, anonymousUserId));
+            .where(eq(userProfile.id, anonymousUserId));
 
           diagLog("✅ Local user_profile updated with email:", email);
         }

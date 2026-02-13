@@ -210,7 +210,7 @@ export async function generateDailyPracticeQueue(
     tzOffsetMinutes = 0,
   } = options;
 
-  // userId is already the Supabase Auth UUID (same as supabase_user_id PK)
+  // userId is already the Supabase Auth UUID (same as user_profile.id PK)
   const userRef = userId;
 
   // Compute scheduling windows
@@ -355,7 +355,7 @@ export async function refillPracticeQueue(
   count = 5,
   sitdownDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
-  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  // userId is already user_profile.id (Supabase Auth UUID)
   const userRef = userId;
 
   if (count <= 0) {
@@ -467,7 +467,7 @@ export async function getQueueBucketCounts(
   playlistId: string, // UUID
   windowStartUtc: string
 ): Promise<Record<number, number>> {
-  // userId is already the supabase_user_id (PK after eliminating user_profile.id)
+  // userId is already user_profile.id (Supabase Auth UUID)
   const userRef = userId;
 
   const queue = await db

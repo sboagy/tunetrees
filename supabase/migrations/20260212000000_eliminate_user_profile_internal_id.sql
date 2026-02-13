@@ -1,11 +1,11 @@
--- Migration: Eliminate internal user_profile.id in favor of Supabase Auth ID
+-- Migration: Eliminate user_profile.supabase_user_id in favor of user_profile.id
 --
--- This migration consolidates user identity to use only Supabase Auth UUIDs,
--- removing the internal user_profile.id and updating all foreign keys.
+-- This migration consolidates user identity to use only user_profile.id,
+-- removing user_profile.supabase_user_id and updating all foreign keys/views.
 --
 -- NOTE: Both user_profile.id and supabase_user_id have always been UUID columns.
--- FK columns (user_ref, user_id, etc.) are already UUIDs pointing to user_profile.id.
--- This migration simply rewires FKs to point to supabase_user_id instead.
+-- FK columns (user_ref, user_id, etc.) use UUID identity values.
+-- This migration keeps id as canonical and removes supabase_user_id.
 --
 -- Affected tables (13 total):
 --   1. tab_group_main_state.user_id
@@ -22,7 +22,7 @@
 --  12. prefs_spaced_repetition.user_id
 --  13. table_transient_data.user_id
 --
--- Strategy: Drop FK constraints, recreate pointing to supabase_user_id, drop id column
+-- Strategy: Drop FK constraints, recreate pointing to id, drop supabase_user_id column
 -- All operations in a single transaction for atomicity
 
 BEGIN;
@@ -48,89 +48,84 @@ ALTER TABLE user_genre_selection DROP CONSTRAINT IF EXISTS user_genre_selection_
 ALTER TABLE plugin DROP CONSTRAINT IF EXISTS plugin_user_ref_fkey;
 
 -- ============================================================================
--- STEP 2: Shift PRIMARY KEY from id to supabase_user_id
+-- STEP 2: Keep PRIMARY KEY on id and remove supabase_user_id
 -- ============================================================================
--- CRITICAL: Must do this BEFORE creating new FK constraints
--- FK constraints require target column to be PRIMARY KEY or UNIQUE
+-- CRITICAL: Ensure id remains the primary key target for FKs.
+ALTER TABLE user_profile DROP CONSTRAINT IF EXISTS user_profile_pkey;
+ALTER TABLE user_profile ADD PRIMARY KEY (id);
 
--- Drop the old primary key constraint
-ALTER TABLE user_profile DROP CONSTRAINT user_profile_pkey;
-
--- Make supabase_user_id the new primary key
-ALTER TABLE user_profile ADD PRIMARY KEY (supabase_user_id);
-
--- Drop the id column (no longer needed) - CASCADE drops dependent policies/views
-ALTER TABLE user_profile DROP COLUMN id CASCADE;
+-- Drop superseded alias column - CASCADE drops dependent policies/views
+ALTER TABLE user_profile DROP COLUMN supabase_user_id CASCADE;
 
 -- ============================================================================
--- STEP 3: Add new foreign key constraints to user_profile.supabase_user_id
+-- STEP 3: Add new foreign key constraints to user_profile.id
 -- ============================================================================
 
 ALTER TABLE tab_group_main_state
   ADD CONSTRAINT tab_group_main_state_user_id_user_profile_fkey
-  FOREIGN KEY (user_id) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_id) REFERENCES user_profile(id);
 
 ALTER TABLE tag
   ADD CONSTRAINT tag_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 ALTER TABLE tune
   ADD CONSTRAINT tune_private_for_user_profile_fkey
-  FOREIGN KEY (private_for) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (private_for) REFERENCES user_profile(id);
 
 ALTER TABLE tune_override
   ADD CONSTRAINT tune_override_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 ALTER TABLE instrument
   ADD CONSTRAINT instrument_private_to_user_user_profile_fkey
-  FOREIGN KEY (private_to_user) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (private_to_user) REFERENCES user_profile(id);
 
 ALTER TABLE daily_practice_queue
   ADD CONSTRAINT daily_practice_queue_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 ALTER TABLE note
   ADD CONSTRAINT note_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 ALTER TABLE playlist
   ADD CONSTRAINT playlist_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 ALTER TABLE prefs_scheduling_options
   ADD CONSTRAINT prefs_scheduling_options_user_id_user_profile_fkey
-  FOREIGN KEY (user_id) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_id) REFERENCES user_profile(id);
 
 ALTER TABLE reference
   ADD CONSTRAINT reference_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 ALTER TABLE table_state
   ADD CONSTRAINT table_state_user_id_user_profile_fkey
-  FOREIGN KEY (user_id) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_id) REFERENCES user_profile(id);
 
 ALTER TABLE prefs_spaced_repetition
   ADD CONSTRAINT prefs_spaced_repetition_user_id_user_profile_fkey
-  FOREIGN KEY (user_id) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_id) REFERENCES user_profile(id);
 
 ALTER TABLE table_transient_data
   ADD CONSTRAINT table_transient_data_user_id_user_profile_fkey
-  FOREIGN KEY (user_id) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_id) REFERENCES user_profile(id);
 
 ALTER TABLE user_genre_selection
   ADD CONSTRAINT user_genre_selection_user_id_user_profile_fkey
-  FOREIGN KEY (user_id) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_id) REFERENCES user_profile(id);
 
 ALTER TABLE plugin
   ADD CONSTRAINT plugin_user_ref_user_profile_fkey
-  FOREIGN KEY (user_ref) REFERENCES user_profile(supabase_user_id);
+  FOREIGN KEY (user_ref) REFERENCES user_profile(id);
 
 -- ============================================================================
 -- STEP 4: Update RLS policies to use auth.uid() directly
 -- ============================================================================
 -- NOTE: Policies updated after FK rewiring is complete
--- Many old policies used subqueries like: SELECT id FROM user_profile WHERE supabase_user_id = auth.uid()
+-- Many old policies used subqueries against user_profile with auth.uid()
 -- These simplify to direct auth.uid() comparisons after FK rewiring
 
 -- Playlist policies
@@ -290,7 +285,7 @@ DROP POLICY IF EXISTS "Delete own tune overrides" ON tune_override;
 -- STEP 4: Drop ALL old policies that reference user_profile.id
 -- ============================================================================
 -- These were created in initial schema with subquery pattern:
--- user_ref IN (SELECT id FROM user_profile WHERE supabase_user_id = auth.uid())
+-- user_ref IN (SELECT id FROM user_profile WHERE id = auth.uid())
 -- Must drop before DROP COLUMN can succeed
 
 -- daily_practice_queue
@@ -671,7 +666,7 @@ SELECT
   dpq.tune_ref
 FROM
   daily_practice_queue dpq
-  LEFT JOIN user_profile up ON up.supabase_user_id = dpq.user_ref
+  LEFT JOIN user_profile up ON up.id = dpq.user_ref
   LEFT JOIN playlist p ON p.playlist_id = dpq.playlist_ref
   LEFT JOIN instrument i ON i.id = p.instrument_ref
   LEFT JOIN tune ON tune.id = dpq.tune_ref
@@ -719,7 +714,7 @@ SELECT
   ttd.device_id
 FROM
   table_transient_data ttd
-  LEFT JOIN user_profile up ON up.supabase_user_id = ttd.user_id
+  LEFT JOIN user_profile up ON up.id = ttd.user_id
   LEFT JOIN tune ON tune.id = ttd.tune_id
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = ttd.user_id
@@ -778,7 +773,7 @@ SELECT
 FROM
   practice_record pr
   LEFT JOIN playlist p ON p.playlist_id = pr.playlist_ref
-  LEFT JOIN user_profile up ON up.supabase_user_id = p.user_ref
+  LEFT JOIN user_profile up ON up.id = p.user_ref
   LEFT JOIN tune ON tune.id = pr.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = p.user_ref
@@ -802,7 +797,7 @@ COMMIT;
 -- WHERE table_name = 'user_profile'
 -- ORDER BY ordinal_position;
 --
--- Verify foreign keys point to supabase_user_id:
+-- Verify foreign keys point to id:
 -- SELECT
 --   tc.table_name,
 --   kcu.column_name,

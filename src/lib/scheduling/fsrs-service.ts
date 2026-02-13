@@ -439,7 +439,7 @@ export function createFSRSService(
  * Excludes deleted playlist or playlist_tune rows.
  *
  * @param db Local SQLite database instance
- * @param userInternalId User UUID (Supabase Auth ID, same as supabase_user_id)
+ * @param playlistRef Playlist UUID
  * @returns Number of tunes in the user's repertoire
  */
 export async function getPlaylistTuneCount(

@@ -47,7 +47,7 @@ export const userGenreSelection = sqliteTable(
   {
     userId: text("user_id")
       .notNull()
-      .references(() => userProfile.supabaseUserId, { onDelete: "cascade" }),
+      .references(() => userProfile.id, { onDelete: "cascade" }),
     genreId: text("genre_id")
       .notNull()
       .references(() => genre.id, { onDelete: "cascade" }),

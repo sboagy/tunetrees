@@ -1342,7 +1342,6 @@ function buildDefaultWorkerConfig(params: {
   > = {};
 
   const ownerCandidates = [
-    "supabase_user_id",
     "user_ref",
     "user_id",
     "private_to_user",
@@ -1386,6 +1385,16 @@ function buildDefaultWorkerConfig(params: {
         tableOwnerColumn.set(tableName, {
           column: overrideOwnerColumn,
           kind,
+        });
+      }
+    }
+
+    if (!tableOwnerColumn.has(tableName) && tableName === "user_profile") {
+      const idCol = colByName.get("id");
+      if (idCol) {
+        tableOwnerColumn.set(tableName, {
+          column: "id",
+          kind: "eqUserId",
         });
       }
     }

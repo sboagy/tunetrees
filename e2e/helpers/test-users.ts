@@ -102,13 +102,14 @@ const clientCache: Map<string, { supabase: SupabaseClient; userId: string }> =
  * Get authenticated Supabase client for a test user
  */
 export async function getTestUserClient(userKey: string) {
-  if (clientCache.has(userKey)) {
-    return clientCache.get(userKey)!;
-  }
-
   const user = TEST_USERS[userKey];
   if (!user) {
     throw new Error(`Unknown test user: ${userKey}`);
+  }
+
+  if (clientCache.has(userKey)) {
+    const cachedClient = clientCache.get(userKey)!;
+    return cachedClient;
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

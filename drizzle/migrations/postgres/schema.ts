@@ -41,7 +41,7 @@ export const tabGroupMainState = pgTable(
     }),
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "tab_group_main_state_user_id_user_profile_fkey",
     }),
     pgPolicy("Users can view own tab group state", {
@@ -123,7 +123,7 @@ export const tag = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "tag_user_ref_user_profile_fkey",
     }),
     unique("tag_user_ref_tune_ref_tag_text_unique").on(
@@ -158,7 +158,7 @@ export const tag = pgTable(
 export const userProfile = pgTable(
   "user_profile",
   {
-    supabaseUserId: uuid("supabase_user_id").primaryKey().notNull(),
+    id: uuid("id").primaryKey().notNull(),
     name: text(),
     email: text(),
     srAlgType: text("sr_alg_type"),
@@ -179,7 +179,7 @@ export const userProfile = pgTable(
       as: "permissive",
       for: "select",
       to: ["public"],
-      using: sql.raw("(auth.uid() = supabase_user_id)"),
+      using: sql.raw("(auth.uid() = id)"),
     }),
     pgPolicy("Users can update own profile", {
       as: "permissive",
@@ -298,7 +298,7 @@ export const tune = pgTable(
     }),
     foreignKey({
       columns: [table.privateFor],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "tune_private_for_user_profile_fkey",
     }),
     pgPolicy("Users can view public or own private tunes", {
@@ -357,7 +357,7 @@ export const tuneOverride = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "tune_override_user_ref_user_profile_fkey",
     }),
     pgPolicy("Users can view own tune overrides", {
@@ -415,7 +415,7 @@ export const instrument = pgTable(
     }),
     foreignKey({
       columns: [table.privateToUser],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "instrument_private_to_user_user_profile_fkey",
     }),
     unique("instrument_private_to_user_instrument_unique").on(
@@ -517,7 +517,7 @@ export const dailyPracticeQueue = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "daily_practice_queue_user_profile_fkey",
     }),
     unique(
@@ -613,7 +613,7 @@ export const note = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "note_user_ref_user_profile_fkey",
     }),
     pgPolicy("Users can view own or public notes", {
@@ -666,7 +666,7 @@ export const playlist = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "playlist_user_ref_user_profile_fkey",
     }),
     unique("playlist_user_ref_instrument_ref_unique").on(
@@ -718,7 +718,7 @@ export const prefsSchedulingOptions = pgTable(
   (table) => [
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "prefs_scheduling_options_user_id_user_profile_fkey",
     }),
     pgPolicy("Users can view own scheduling preferences", {
@@ -788,7 +788,7 @@ export const reference = pgTable(
     }),
     foreignKey({
       columns: [table.userRef],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "reference_user_ref_user_profile_fkey",
     }),
     pgPolicy("Users can view own or system references", {
@@ -876,7 +876,7 @@ export const tableState = pgTable(
     }),
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "table_state_user_id_user_profile_fkey",
     }),
     primaryKey({
@@ -999,7 +999,7 @@ export const prefsSpacedRepetition = pgTable(
   (table) => [
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "prefs_spaced_repetition_user_id_user_profile_fkey",
     }),
     primaryKey({
@@ -1076,7 +1076,7 @@ export const tableTransientData = pgTable(
     }),
     foreignKey({
       columns: [table.userId],
-      foreignColumns: [userProfile.supabaseUserId],
+      foreignColumns: [userProfile.id],
       name: "table_transient_data_user_id_user_profile_fkey",
     }),
     primaryKey({

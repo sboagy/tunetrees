@@ -65,7 +65,7 @@ export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
  * Respects user's genre selection if available (defaults to all genres if no selection)
  *
  * @param db - SQLite database instance
- * @param userId - Supabase Auth user UUID (same as supabase_user_id PK)
+ * @param userId - Supabase Auth user UUID (same as user_profile.id PK)
  * @param showPublic - If true, returns public tune data without overrides. If false (default), returns merged tune + override data
  * @returns Array of tunes with overrides applied (unless showPublic is true), filtered by user's selected genres
  */

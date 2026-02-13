@@ -41,7 +41,7 @@ export interface SpacedRepetitionPrefs {
 }
 
 export interface UserProfileData {
-  supabaseUserId: string;
+  id: string;
   name: string | null;
   email: string | null;
   avatarUrl: string | null;
@@ -303,7 +303,7 @@ export async function getUserProfile(
   const result = await db
     .select()
     .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, userId))
+    .where(eq(userProfile.id, userId))
     .limit(1);
 
   if (result.length === 0) {
@@ -311,7 +311,7 @@ export async function getUserProfile(
   }
 
   return {
-    supabaseUserId: result[0].supabaseUserId,
+    id: result[0].id,
     name: result[0].name,
     email: result[0].email,
     avatarUrl: result[0].avatarUrl,
@@ -325,12 +325,12 @@ export async function getUserProfile(
  */
 export async function updateUserProfile(
   db: SqliteDatabase,
-  data: Partial<UserProfileData> & { supabaseUserId: string }
+  data: Partial<UserProfileData> & { id: string }
 ): Promise<UserProfileData> {
   const now = new Date().toISOString();
 
   // Check if record exists
-  const existing = await getUserProfile(db, data.supabaseUserId);
+  const existing = await getUserProfile(db, data.id);
 
   if (existing) {
     // Update existing record
@@ -366,11 +366,11 @@ export async function updateUserProfile(
                 : existing.phoneVerified)),
         lastModifiedAt: now,
       })
-      .where(eq(userProfile.supabaseUserId, data.supabaseUserId));
+      .where(eq(userProfile.id, data.id));
   } else {
     // Insert new record (should rarely happen with proper auth flow)
     await db.insert(userProfile).values({
-      supabaseUserId: data.supabaseUserId,
+      id: data.id,
       name: data.name === null ? undefined : data.name,
       email: data.email === null ? undefined : data.email,
       avatarUrl: data.avatarUrl === null ? undefined : data.avatarUrl,
@@ -382,7 +382,7 @@ export async function updateUserProfile(
   }
 
   // Return updated data
-  const updated = await getUserProfile(db, data.supabaseUserId);
+  const updated = await getUserProfile(db, data.id);
   if (!updated) {
     throw new Error("Failed to retrieve updated user profile");
   }

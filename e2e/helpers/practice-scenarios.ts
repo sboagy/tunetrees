@@ -311,7 +311,7 @@ async function getInternalUserRef(
   _supabase: any,
   user: TestUser
 ): Promise<string | null> {
-  // In E2E fixtures, TestUser.userId is the Supabase Auth UUID (user_profile.supabase_user_id PK).
+  // In E2E fixtures, TestUser.userId is the Supabase Auth UUID (user_profile.id PK).
   // (Supabase auth uid is available via getTestUserClient, but isn't needed here.)
   if (!internalUserRefCache.has(user.userId)) {
     internalUserRefCache.set(user.userId, user.userId);
@@ -698,7 +698,7 @@ function applyTableQueryFilters(
     // user_genre_selection is keyed by user_id (not user_ref)
     query = query.eq("user_id", user.userId);
   } else if (tableName === "tune_override") {
-    // tune_override.user_ref references user_profile.supabase_user_id (Supabase Auth UUID)
+    // tune_override.user_ref references user_profile.id (Supabase Auth UUID)
     const cached = internalUserRefCache.get(user.userId);
     if (cached) {
       query = query.eq("user_ref", cached);

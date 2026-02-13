@@ -116,7 +116,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
   function getConflictTarget(tableName: string): string[] {
     const meta = TABLE_REGISTRY[tableName];
     if (!meta) throw new Error(`Unknown table: ${tableName}`);
-    if (tableName === "user_profile") return ["supabase_user_id"];
+    if (tableName === "user_profile") return ["id"];
     if (meta.uniqueKeys) return meta.uniqueKeys;
     return Array.isArray(meta.primaryKey) ? meta.primaryKey : [meta.primaryKey];
   }

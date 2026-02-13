@@ -321,17 +321,15 @@ async function getCatalogSelectionDiagnostics() {
 
   const userProfileRows = await db.all<{
     id: string;
-    supabase_user_id: string | null;
   }>(sql`
-    SELECT supabase_user_id AS id, supabase_user_id
+    SELECT id
     FROM user_profile
-    WHERE supabase_user_id = ${userRef}
+    WHERE id = ${userRef}
   `);
 
   const userIds = new Set<string>([userRef]);
   for (const row of userProfileRows) {
     if (row.id) userIds.add(row.id);
-    if (row.supabase_user_id) userIds.add(row.supabase_user_id);
   }
 
   const userIdList = Array.from(userIds)
@@ -753,7 +751,7 @@ async function seedSampleCatalogRow() {
     ["itrad", "Irish Traditional", "Ireland", "Traditional Irish music genre"]
   );
   rawDb.run(
-    "INSERT OR IGNORE INTO user_profile (supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT OR IGNORE INTO user_profile (id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     ["test-user-id", "Test User", null, "fsrs", 0, 1, now, "local"]
   );
   rawDb.run(
@@ -928,7 +926,7 @@ declare global {
       getCatalogSelectionDiagnostics: () => Promise<{
         userRef: string;
         userIdVariants: string[];
-        userProfile: Array<{ id: string; supabase_user_id: string | null }>;
+        userProfile: Array<{ id: string }>;
         selectionRows: Array<{ user_id: string; genre_id: string }>;
         selectedGenreIds: string[];
         playlistDefaults: string[];

@@ -63,8 +63,8 @@ beforeEach(() => {
 
   // Insert test data
   db.run(
-    sql`INSERT INTO user_profile (id, supabase_user_id, email, name, last_modified_at) 
-        VALUES (${TEST_USER_UUID}, ${TEST_USER_UUID}, 'test@example.com', 'Test User', datetime('now'))`
+    sql`INSERT INTO user_profile (id, email, name, last_modified_at) 
+      VALUES (${TEST_USER_UUID}, 'test@example.com', 'Test User', datetime('now'))`
   );
   db.run(
     sql`INSERT INTO playlist (playlist_id, user_ref, last_modified_at) 
