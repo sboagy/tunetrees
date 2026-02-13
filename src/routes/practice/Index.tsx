@@ -33,8 +33,8 @@ import {
 } from "../../components/practice";
 import { RepertoireEmptyState } from "../../components/repertoire";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
-import { getUserPlaylists } from "../../lib/db/queries/playlists";
+import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
+import { getUserRepertoires } from "../../lib/db/queries/repertoires";
 import { dailyPracticeQueue } from "../../lib/db/schema";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
@@ -79,12 +79,12 @@ const PracticeIndex: Component = () => {
     repertoireListChanged,
     incrementRepertoireListChanged,
   } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
-  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
-  const playlistsVersion = createMemo(
+  const { currentRepertoireId } = useCurrentRepertoire();
+  const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
+  const repertoiresVersion = createMemo(
     () => `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`
   );
-  const [playlistsLoadedVersion, setPlaylistsLoadedVersion] = createSignal<
+  const [repertoiresLoadedVersion, setRepertoiresLoadedVersion] = createSignal<
     string | null
   >(null);
 
@@ -119,12 +119,12 @@ const PracticeIndex: Component = () => {
     }
   );
 
-  const [playlists] = createResource(
+  const [repertoires] = createResource(
     () => {
       const db = localDb();
       const currentUser = user();
       const internalUserId = userId();
-      const version = playlistsVersion();
+      const version = repertoiresVersion();
 
       return db && currentUser && internalUserId
         ? { db, userId: currentUser.id, version }
@@ -132,18 +132,18 @@ const PracticeIndex: Component = () => {
     },
     async (params) => {
       if (!params) return [] as PlaylistWithSummary[];
-      return getUserPlaylists(params.db, params.userId);
+      return getUserRepertoires(params.db, params.userId);
     }
   );
 
   createEffect(() => {
     if (!initialSyncComplete() || !user() || !localDb() || !userId()) {
-      setPlaylistsLoadedVersion(null);
+      setRepertoiresLoadedVersion(null);
       return;
     }
 
-    if (!playlists.loading && playlists() !== undefined) {
-      setPlaylistsLoadedVersion(playlistsVersion());
+    if (!repertoires.loading && repertoires() !== undefined) {
+      setRepertoiresLoadedVersion(repertoiresVersion());
     }
   });
 
@@ -177,9 +177,9 @@ const PracticeIndex: Component = () => {
   // This ensures the submit badge and selected values survive tab switches/unmounts.
   const [didHydrateEvaluations, setDidHydrateEvaluations] = createSignal(false);
   createEffect(() => {
-    const playlistId = currentPlaylistId();
-    if (!playlistId) return;
-    // Reset hydration when playlist changes.
+    const repertoireId = currentRepertoireId();
+    if (!repertoireId) return;
+    // Reset hydration when repertoire changes.
     setDidHydrateEvaluations(false);
     setEvaluations({});
   });
@@ -378,7 +378,7 @@ const PracticeIndex: Component = () => {
   const [queueInitialized] = createResource(
     () => {
       const db = localDb();
-      const playlistId = currentPlaylistId();
+      const repertoireId = currentRepertoireId();
       const date = queueDate(); // Use user-controlled queue date, not getPracticeDate()
       const syncReady = initialSyncComplete();
       const isOnline =
@@ -395,8 +395,8 @@ const PracticeIndex: Component = () => {
         return null;
       }
 
-      return db && userId() && playlistId
-        ? { db, userId: userId()!, playlistId, date }
+      return db && userId() && repertoireId
+        ? { db, userId: userId()!, repertoireId, date }
         : null;
     },
     async (params) => {
@@ -411,7 +411,7 @@ const PracticeIndex: Component = () => {
         const created = await ensureDailyQueue(
           params.db,
           params.userId,
-          params.playlistId,
+          params.repertoireId,
           params.date
         );
 
@@ -440,24 +440,24 @@ const PracticeIndex: Component = () => {
   const [practiceListData] = createResource(
     () => {
       const db = localDb();
-      const playlistId = currentPlaylistId();
+      const repertoireId = currentRepertoireId();
       const version = practiceListStagedChanged(); // Refetch when practice list changes
       const initialized = queueInitialized(); // Wait for queue to be ready
       const isQueueLoading = queueInitialized.loading; // Check if queue is currently loading/re-loading
       const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
-        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, playlist=${playlistId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
+        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, repertoire=${repertoireId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
       );
 
       // Only proceed if ALL dependencies are ready (including queue)
       // CRITICAL: Also check that queue is not currently loading to prevent race condition
       // where we fetch practice list while ensureDailyQueue is still running
-      return db && userId() && playlistId && initialized && !isQueueLoading
+      return db && userId() && repertoireId && initialized && !isQueueLoading
         ? {
             db,
             userId: userId()!,
-            playlistId,
+            repertoireId,
             version,
             queueReady: initialized,
             windowStartUtc,
@@ -469,13 +469,13 @@ const PracticeIndex: Component = () => {
       const { getPracticeList } = await import("../../lib/db/queries/practice");
       const delinquencyWindowDays = 7;
       console.log(
-        `[PracticeIndex] Fetching practice list for playlist ${params.playlistId} (queueReady=${params.queueReady})`
+        `[PracticeIndex] Fetching practice list for repertoire ${params.repertoireId} (queueReady=${params.queueReady})`
       );
       // Returns PracticeListStagedWithQueue[] which is compatible with ITuneOverview
       return await getPracticeList(
         params.db,
         params.userId,
-        params.playlistId,
+        params.repertoireId,
         delinquencyWindowDays,
         params.windowStartUtc
       );
@@ -548,15 +548,15 @@ const PracticeIndex: Component = () => {
 
     // 2) Stage/clear in local DB
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
     const userIdVal = await getUserId();
 
-    if (!db || !playlistId || !userIdVal) {
+    if (!db || !repertoireId || !userIdVal) {
       console.warn(
-        "[PracticeIndex] Skipping staging: missing db/playlist/userId",
+        "[PracticeIndex] Skipping staging: missing db/repertoire/userId",
         {
           hasDb: !!db,
-          playlistId,
+          repertoireId,
           userIdVal,
         }
       );
@@ -570,7 +570,7 @@ const PracticeIndex: Component = () => {
     try {
       if (evaluation === "") {
         // Clear staged data when "(Not Set)" selected
-        await clearStagedEvaluation(db, userIdVal, tuneId, playlistId);
+        await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
         console.log(
           `🗑️  [PracticeIndex] Cleared staged evaluation for tune ${tuneId}`
         );
@@ -579,7 +579,7 @@ const PracticeIndex: Component = () => {
         await stagePracticeEvaluation(
           db,
           userIdVal,
-          playlistId,
+          repertoireId,
           tuneId,
           evaluation,
           "recall",
@@ -622,11 +622,11 @@ const PracticeIndex: Component = () => {
   // Handle submit of staged evaluations
   const handleSubmitEvaluations = async () => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
 
-    if (!db || !playlistId) {
+    if (!db || !repertoireId) {
       console.error("Missing required data for submit");
-      toast.error("Cannot submit: Missing database or playlist data");
+      toast.error("Cannot submit: Missing database or repertoire data");
       return;
     }
 
@@ -649,7 +649,7 @@ const PracticeIndex: Component = () => {
     }
 
     console.log(
-      `Submitting ${count} staged evaluations for playlist ${playlistId}`
+      `Submitting ${count} staged evaluations for repertoire ${repertoireId}`
     );
 
     try {
@@ -665,7 +665,7 @@ const PracticeIndex: Component = () => {
       const result = await commitStagedEvaluations(
         db,
         userId,
-        playlistId,
+        repertoireId,
         windowStartUtc
       );
 
@@ -719,11 +719,11 @@ const PracticeIndex: Component = () => {
   // Handle add tunes to queue
   const handleAddTunes = async (count: number) => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
 
-    if (!db || !playlistId) {
+    if (!db || !repertoireId) {
       console.error("Missing required data for add tunes");
-      toast.error("Cannot add tunes: Missing database or playlist data");
+      toast.error("Cannot add tunes: Missing database or repertoire data");
       return;
     }
 
@@ -735,11 +735,11 @@ const PracticeIndex: Component = () => {
     }
 
     console.log(
-      `Adding ${count} tunes to practice queue for playlist ${playlistId}`
+      `Adding ${count} tunes to practice queue for repertoire ${repertoireId}`
     );
 
     try {
-      const added = await addTunesToQueue(db, userId, playlistId, count);
+      const added = await addTunesToQueue(db, userId, repertoireId, count);
 
       if (added.length > 0) {
         toast.success(
@@ -811,9 +811,9 @@ const PracticeIndex: Component = () => {
   const handlePracticeDateRefresh = async () => {
     const practiceDate = getPracticeDate();
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
 
-    if (db && playlistId) {
+    if (db && repertoireId) {
       const userId = await getUserId();
       if (userId) {
         const dayStart = new Date(practiceDate);
@@ -827,7 +827,7 @@ const PracticeIndex: Component = () => {
             .where(
               and(
                 eq(dailyPracticeQueue.userRef, userId),
-                eq(dailyPracticeQueue.playlistRef, playlistId),
+                eq(dailyPracticeQueue.repertoireRef, repertoireId),
                 gte(dailyPracticeQueue.windowStartUtc, dayStart.toISOString()),
                 lt(dailyPracticeQueue.windowStartUtc, nextDay.toISOString())
               )
@@ -869,11 +869,11 @@ const PracticeIndex: Component = () => {
   // Handle queue reset
   const handleQueueReset = async () => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
 
-    if (!db || !playlistId) {
+    if (!db || !repertoireId) {
       console.error("Missing required data for queue reset");
-      toast.error("Cannot reset queue: Missing database or playlist data");
+      toast.error("Cannot reset queue: Missing database or repertoire data");
       return;
     }
 
@@ -884,7 +884,7 @@ const PracticeIndex: Component = () => {
       return;
     }
 
-    console.log(`Resetting active queue for playlist ${playlistId}`);
+    console.log(`Resetting active queue for repertoire ${repertoireId}`);
 
     try {
       // Delete all active queue entries for today
@@ -899,7 +899,7 @@ const PracticeIndex: Component = () => {
         .where(
           and(
             eq(dailyPracticeQueue.userRef, userId),
-            eq(dailyPracticeQueue.playlistRef, playlistId),
+            eq(dailyPracticeQueue.repertoireRef, repertoireId),
             gte(dailyPracticeQueue.windowStartUtc, today.toISOString()),
             lt(dailyPracticeQueue.windowStartUtc, tomorrow.toISOString())
           )
@@ -929,16 +929,16 @@ const PracticeIndex: Component = () => {
   };
 
   const renderPracticeFallback = () => {
-    const playlistsReady = playlistsLoadedVersion() === playlistsVersion();
-    const playlistsLoading =
-      !playlistsReady || playlists.loading || playlists() === undefined;
-    const playlistCount = playlists()?.length ?? 0;
+    const repertoiresReady = repertoiresLoadedVersion() === repertoiresVersion();
+    const repertoiresLoading =
+      !repertoiresReady || repertoires.loading || repertoires() === undefined;
+    const repertoireCount = repertoires()?.length ?? 0;
 
     if (
       initialSyncComplete() &&
-      !currentPlaylistId() &&
-      !playlistsLoading &&
-      playlistCount === 0
+      !currentRepertoireId() &&
+      !repertoiresLoading &&
+      repertoireCount === 0
     ) {
       return (
         <RepertoireEmptyState
@@ -951,7 +951,7 @@ const PracticeIndex: Component = () => {
           }
           primaryAction={{
             label: "Create repertoire",
-            onClick: () => setShowPlaylistDialog(true),
+            onClick: () => setShowRepertoireDialog(true),
           }}
         />
       );
@@ -999,7 +999,7 @@ const PracticeIndex: Component = () => {
           when={
             user() &&
             localDb() &&
-            currentPlaylistId() &&
+            currentRepertoireId() &&
             initialSyncComplete() &&
             !userId.loading &&
             userId()
@@ -1016,13 +1016,13 @@ const PracticeIndex: Component = () => {
                 onRecallEvalChange={handleRecallEvalChange}
                 localDb={localDb}
                 userId={userId()!}
-                playlistId={currentPlaylistId()!}
+                repertoireId={currentRepertoireId()!}
               />
             }
           >
             <TunesGridScheduled
               userId={userId()!}
-              playlistId={currentPlaylistId()!}
+              repertoireId={currentRepertoireId()!}
               tablePurpose="scheduled"
               onRecallEvalChange={handleRecallEvalChange}
               onGoalChange={handleGoalChange}
@@ -1037,13 +1037,13 @@ const PracticeIndex: Component = () => {
         </Show>
       </div>
 
-      <Show when={showPlaylistDialog()}>
+      <Show when={showRepertoireDialog()}>
         <RepertoireEditorDialog
-          isOpen={showPlaylistDialog()}
-          onClose={() => setShowPlaylistDialog(false)}
+          isOpen={showRepertoireDialog()}
+          onClose={() => setShowRepertoireDialog(false)}
           onSaved={() => {
             incrementRepertoireListChanged();
-            setShowPlaylistDialog(false);
+            setShowRepertoireDialog(false);
           }}
         />
       </Show>

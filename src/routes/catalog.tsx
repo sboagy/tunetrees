@@ -29,8 +29,8 @@ import { TunesGridCatalog } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { useAuth } from "../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
-import { getUserPlaylists } from "../lib/db/queries/playlists";
+import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { getTunesForUser } from "../lib/db/queries/tunes";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
@@ -47,7 +47,7 @@ const CatalogPage: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, localDb, catalogListChanged } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get current user ID
@@ -74,7 +74,7 @@ const CatalogPage: Component = () => {
   const [selectedTypes, setSelectedTypes] = createSignal<string[]>([]);
   const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
-  const [selectedPlaylistIds, setSelectedPlaylistIds] = createSignal<string[]>(
+  const [selectedRepertoireIds, setSelectedRepertoireIds] = createSignal<string[]>(
     []
   );
 
@@ -103,7 +103,7 @@ const CatalogPage: Component = () => {
         searchParams.c_types,
         searchParams.c_modes,
         searchParams.c_genres,
-        searchParams.c_playlists,
+        searchParams.c_repertoires,
         searchParams.tab, // Crucial for re-hydration when switching tabs
       ],
       () => {
@@ -112,15 +112,15 @@ const CatalogPage: Component = () => {
         const types = getParamArray(searchParams.c_types);
         const modes = getParamArray(searchParams.c_modes);
         const genres = getParamArray(searchParams.c_genres);
-        const playlists = getParamArray(searchParams.c_playlists);
+        const repertoires = getParamArray(searchParams.c_repertoires);
 
         // 2. Write to signals only if different (essential to prevent infinite loops)
         if (q !== searchQuery()) setSearchQuery(q);
         if (!arraysEqual(types, selectedTypes())) setSelectedTypes(types);
         if (!arraysEqual(modes, selectedModes())) setSelectedModes(modes);
         if (!arraysEqual(genres, selectedGenres())) setSelectedGenres(genres);
-        if (!arraysEqual(playlists, selectedPlaylistIds()))
-          setSelectedPlaylistIds(playlists);
+        if (!arraysEqual(repertoires, selectedRepertoireIds()))
+          setSelectedRepertoireIds(repertoires);
 
         // 3. Set initialization flag *after* the initial hydration is complete
         if (!isInitialized()) {
@@ -141,7 +141,7 @@ const CatalogPage: Component = () => {
       types: getParamArray(searchParams.c_types),
       modes: getParamArray(searchParams.c_modes),
       genres: getParamArray(searchParams.c_genres),
-      playlists: getParamArray(searchParams.c_playlists),
+      repertoires: getParamArray(searchParams.c_repertoires),
     };
 
     const desired = {
@@ -149,7 +149,7 @@ const CatalogPage: Component = () => {
       types: selectedTypes(),
       modes: selectedModes(),
       genres: selectedGenres(),
-      playlists: selectedPlaylistIds(),
+      repertoires: selectedRepertoireIds(),
     };
 
     const needsUpdate =
@@ -157,7 +157,7 @@ const CatalogPage: Component = () => {
       !arraysEqual(desired.types, current.types) ||
       !arraysEqual(desired.modes, current.modes) ||
       !arraysEqual(desired.genres, current.genres) ||
-      !arraysEqual(desired.playlists, current.playlists);
+      !arraysEqual(desired.repertoires, current.repertoires);
 
     if (!needsUpdate) return;
 
@@ -168,8 +168,8 @@ const CatalogPage: Component = () => {
       c_modes: desired.modes.length > 0 ? desired.modes.join(",") : undefined,
       c_genres:
         desired.genres.length > 0 ? desired.genres.join(",") : undefined,
-      c_playlists:
-        desired.playlists.length > 0 ? desired.playlists.join(",") : undefined,
+      c_repertoires:
+        desired.repertoires.length > 0 ? desired.repertoires.join(",") : undefined,
       // Proactively clear other tab's filter keys (Repertoire)
       r_q: undefined,
       r_types: undefined,
@@ -177,6 +177,7 @@ const CatalogPage: Component = () => {
       r_genres: undefined,
       // Clear any legacy/un-namespaced param that may linger from older builds
       playlists: undefined,
+      c_playlists: undefined,
     };
 
     setSearchParams(params as Record<string, string>, { replace: true });
@@ -210,13 +211,13 @@ const CatalogPage: Component = () => {
     }
   );
 
-  // Fetch user playlists for filter options
-  const [userPlaylists] = createResource(
+  // Fetch user repertoires for filter options
+  const [userRepertoires] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = catalogListChanged(); // Refetch when catalog changes (playlists are catalog metadata)
-      log.debug("CATALOG userPlaylists dependency:", {
+      const version = catalogListChanged(); // Refetch when catalog changes (repertoires are catalog metadata)
+      log.debug("CATALOG userRepertoires dependency:", {
         hasDb: !!db,
         userId,
         catalogListChanged: version,
@@ -224,13 +225,13 @@ const CatalogPage: Component = () => {
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      log.debug("CATALOG userPlaylists fetcher:", {
+      log.debug("CATALOG userRepertoires fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
-      const result = await getUserPlaylists(params.db, params.userId);
-      log.debug("CATALOG userPlaylists result:", result.length, "playlists");
+      const result = await getUserRepertoires(params.db, params.userId);
+      log.debug("CATALOG userRepertoires result:", result.length, "repertoires");
       return result;
     }
   );
@@ -327,19 +328,19 @@ const CatalogPage: Component = () => {
           onModesChange={setSelectedModes}
           selectedGenres={selectedGenres()}
           onGenresChange={setSelectedGenres}
-          selectedPlaylistIds={selectedPlaylistIds()}
-          onPlaylistIdsChange={setSelectedPlaylistIds}
+          selectedRepertoireIds={selectedRepertoireIds()}
+          onRepertoireIdsChange={setSelectedRepertoireIds}
           availableTypes={availableTypes()}
           availableModes={availableModes()}
           availableGenres={availableGenres()}
-          availablePlaylists={userPlaylists() || []}
+          availableRepertoires={userRepertoires() || []}
           loading={{
             genres: allGenres.loading,
-            playlists: userPlaylists.loading,
+            repertoires: userRepertoires.loading,
           }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
-          playlistId={currentPlaylistId() || undefined}
+          repertoireId={currentRepertoireId() || undefined}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
@@ -350,14 +351,14 @@ const CatalogPage: Component = () => {
         <Show when={userId()}>
           <TunesGridCatalog
             userId={userId()!}
-            playlistId={currentPlaylistId() || "0"}
+            repertoireId={currentRepertoireId() || "0"}
             tablePurpose="catalog"
             searchQuery={searchQuery()}
             selectedTypes={selectedTypes()}
             selectedModes={selectedModes()}
             selectedGenreNames={selectedGenres()}
             allGenres={allGenres() || []}
-            selectedPlaylistIds={selectedPlaylistIds()}
+            selectedRepertoireIds={selectedRepertoireIds()}
             onTuneSelect={handleTuneSelect}
             onSelectionChange={setSelectedRowsCount}
             onTableReady={setTableInstance}

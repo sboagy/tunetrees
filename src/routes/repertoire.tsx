@@ -31,8 +31,8 @@ import {
   RepertoireToolbar,
 } from "../components/repertoire";
 import { useAuth } from "../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
-import { getPlaylistTunes } from "../lib/db/queries/playlists";
+import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
 
@@ -63,9 +63,9 @@ const RepertoirePage: Component = () => {
     catalogListChanged,
     incrementRepertoireListChanged,
   } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
+  const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
 
   // Get current user ID (supabase UUID)
   const userId = createMemo(() => user()?.id || null);
@@ -195,41 +195,41 @@ const RepertoirePage: Component = () => {
   //   );
   // });
 
-  // Fetch tunes in current playlist for filter options
-  const [playlistTunes] = createResource(
+  // Fetch tunes in current repertoire for filter options
+  const [repertoireTunes] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const playlistId = currentPlaylistId();
+      const repertoireId = currentRepertoireId();
       const version = repertoireListChanged(); // Refetch when repertoire changes
-      log.debug("REPERTOIRE playlistTunes dependency:", {
+      log.debug("REPERTOIRE repertoireTunes dependency:", {
         hasDb: !!db,
         userId,
-        playlistId,
+        repertoireId,
         repertoireListChanged: version,
       });
-      return db && userId && playlistId
-        ? { db, userId, playlistId, version }
+      return db && userId && repertoireId
+        ? { db, userId, repertoireId, version }
         : null;
     },
     async (params) => {
-      log.debug("REPERTOIRE playlistTunes fetcher:", {
+      log.debug("REPERTOIRE repertoireTunes fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
-      const result = await getPlaylistTunes(
+      const result = await getRepertoireTunes(
         params.db,
-        params.playlistId,
+        params.repertoireId,
         params.userId
       );
-      log.debug("REPERTOIRE playlistTunes result:", result.length, "tunes");
+      log.debug("REPERTOIRE repertoireTunes result:", result.length, "tunes");
       return result;
     }
   );
 
   const repertoireIsEmpty = createMemo(
-    () => !playlistTunes.loading && (playlistTunes()?.length ?? 0) === 0
+    () => !repertoireTunes.loading && (repertoireTunes()?.length ?? 0) === 0
   );
 
   // Fetch all genres for proper genre names
@@ -257,7 +257,7 @@ const RepertoirePage: Component = () => {
 
   // Get unique types, modes, genres for filter dropdowns
   const availableTypes = createMemo(() => {
-    const tunes = playlistTunes() || [];
+    const tunes = repertoireTunes() || [];
     const types = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.type) types.add(tune.tune.type);
@@ -266,7 +266,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableModes = createMemo(() => {
-    const tunes = playlistTunes() || [];
+    const tunes = repertoireTunes() || [];
     const modes = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.mode) modes.add(tune.tune.mode);
@@ -275,7 +275,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableGenres = createMemo(() => {
-    const tunes = playlistTunes() || [];
+    const tunes = repertoireTunes() || [];
     const genres = allGenres() || [];
 
     log.debug("REPERTOIRE availableGenres:", {
@@ -321,7 +321,7 @@ const RepertoirePage: Component = () => {
   return (
     <div class="h-full flex flex-col">
       {/* Toolbar with Search and Filters */}
-      <Show when={!playlistTunes.loading && currentPlaylistId()}>
+      <Show when={!repertoireTunes.loading && currentRepertoireId()}>
         <RepertoireToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
@@ -337,7 +337,7 @@ const RepertoirePage: Component = () => {
           loading={{ genres: allGenres.loading }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
-          playlistId={currentPlaylistId() || undefined}
+          repertoireId={currentRepertoireId() || undefined}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
@@ -345,9 +345,9 @@ const RepertoirePage: Component = () => {
 
       {/* Grid wrapper - overflow-hidden constrains grid height */}
       <div class={GRID_CONTENT_CONTAINER}>
-        <Show when={userId() && currentPlaylistId()}>
+        <Show when={userId() && currentRepertoireId()}>
           <Switch>
-            <Match when={playlistTunes.loading}>
+            <Match when={repertoireTunes.loading}>
               <div class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
                 Loading repertoire...
               </div>
@@ -367,7 +367,7 @@ const RepertoirePage: Component = () => {
             <Match when={!repertoireIsEmpty()}>
               <TunesGridRepertoire
                 userId={userId()!}
-                playlistId={currentPlaylistId()!}
+                repertoireId={currentRepertoireId()!}
                 tablePurpose="repertoire"
                 searchQuery={searchQuery()}
                 selectedTypes={selectedTypes()}
@@ -382,8 +382,8 @@ const RepertoirePage: Component = () => {
           </Switch>
         </Show>
 
-        {/* No playlist selected message */}
-        <Show when={!currentPlaylistId()}>
+        {/* No repertoire selected message */}
+        <Show when={!currentRepertoireId()}>
           <RepertoireEmptyState
             title="No current repertoire"
             description={
@@ -394,19 +394,19 @@ const RepertoirePage: Component = () => {
             }
             primaryAction={{
               label: "Create repertoire",
-              onClick: () => setShowPlaylistDialog(true),
+              onClick: () => setShowRepertoireDialog(true),
             }}
           />
         </Show>
       </div>
 
-      <Show when={showPlaylistDialog()}>
+      <Show when={showRepertoireDialog()}>
         <RepertoireEditorDialog
-          isOpen={showPlaylistDialog()}
-          onClose={() => setShowPlaylistDialog(false)}
+          isOpen={showRepertoireDialog()}
+          onClose={() => setShowRepertoireDialog(false)}
           onSaved={() => {
             incrementRepertoireListChanged();
-            setShowPlaylistDialog(false);
+            setShowRepertoireDialog(false);
           }}
         />
       </Show>

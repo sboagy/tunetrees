@@ -24,9 +24,9 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
-import { getPlaylistTunes } from "../../lib/db/queries/playlists";
+import { getRepertoireTunes } from "../../lib/db/queries/repertoires";
 import { getTunesForUser } from "../../lib/db/queries/tunes";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
@@ -38,7 +38,7 @@ import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const { localDb, catalogListChanged, initialSyncComplete, user } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
   // Column visibility is shared with parent (TunesGrid persists internally)
@@ -80,32 +80,32 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     }
   );
 
-  // Fetch tunes from selected playlists (when playlist filter is active)
-  const [playlistTunes] = createResource(
+  // Fetch tunes from selected repertoires (when repertoire filter is active)
+  const [repertoireTunes] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const playlistIds = props.selectedPlaylistIds || [];
-      return db && userId && playlistIds.length > 0
-        ? { db, userId, playlistIds }
+      const repertoireIds = props.selectedRepertoireIds || [];
+      return db && userId && repertoireIds.length > 0
+        ? { db, userId, repertoireIds }
         : null;
     },
     async (params) => {
       if (!params) return [];
 
-      // Fetch tunes from all selected playlists
-      const allPlaylistTunes: Tune[] = [];
-      for (const playlistId of params.playlistIds) {
+      // Fetch tunes from all selected repertoires
+      const allRepertoireTunes: Tune[] = [];
+      for (const repertoireId of params.repertoireIds) {
         try {
-          const playlistData = await getPlaylistTunes(
+          const repertoireData = await getRepertoireTunes(
             params.db,
-            playlistId,
+            repertoireId,
             params.userId
           );
-          // getPlaylistTunes returns PlaylistTuneWithDetails[], but we need the tune data
+          // getRepertoireTunes returns RepertoireTuneWithDetails[], but we need the tune data
           // Let's extract the tune IDs and fetch them separately
-          const tuneIds = playlistData.map((pt) => pt.tuneRef);
-          const playlistTuneData = await Promise.all(
+          const tuneIds = repertoireData.map((pt) => pt.tuneRef);
+          const repertoireTuneData = await Promise.all(
             tuneIds.map(async (tuneId) => {
               const result = await params.db
                 .select()
@@ -115,17 +115,17 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
               return result[0];
             })
           );
-          allPlaylistTunes.push(...playlistTuneData.filter(Boolean));
+          allRepertoireTunes.push(...repertoireTuneData.filter(Boolean));
         } catch (error) {
           console.warn(
-            `Failed to fetch tunes for playlist ${playlistId}:`,
+            `Failed to fetch tunes for repertoire ${repertoireId}:`,
             error
           );
         }
       }
 
-      // Remove duplicates (same tune could be in multiple selected playlists)
-      const uniqueTunes = allPlaylistTunes.filter(
+      // Remove duplicates (same tune could be in multiple selected repertoires)
+      const uniqueTunes = allRepertoireTunes.filter(
         (tune, index, arr) => arr.findIndex((t) => t.id === tune.id) === index
       );
 
@@ -134,12 +134,12 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   );
 
   // Apply client-side filtering
-  // Type Contract: Input is Tune[], Output is Tune[], filtered by search/type/mode/genre/playlist
+  // Type Contract: Input is Tune[], Output is Tune[], filtered by search/type/mode/genre/repertoire
   const filteredTunes = createMemo<Tune[]>(() => {
-    // Determine base tune set: if playlist filter is active, use playlist tunes, otherwise all tunes
+    // Determine base tune set: if repertoire filter is active, use repertoire tunes, otherwise all tunes
     const baseTunes: Tune[] =
-      props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
-        ? playlistTunes() || []
+      props.selectedRepertoireIds && props.selectedRepertoireIds.length > 0
+        ? repertoireTunes() || []
         : tunes() || [];
 
     const query = props.searchQuery?.trim().toLowerCase() || "";
@@ -234,13 +234,13 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     );
   });
 
-  const isPlaylistFilterActive = createMemo(
-    () => !!props.selectedPlaylistIds && props.selectedPlaylistIds.length > 0
+  const isRepertoireFilterActive = createMemo(
+    () => !!props.selectedRepertoireIds && props.selectedRepertoireIds.length > 0
   );
   const isLoading = createMemo(
-    () => tunes.loading || (isPlaylistFilterActive() && playlistTunes.loading)
+    () => tunes.loading || (isRepertoireFilterActive() && repertoireTunes.loading)
   );
-  const loadError = createMemo(() => tunes.error || playlistTunes.error);
+  const loadError = createMemo(() => tunes.error || repertoireTunes.error);
   const hasTunes = createMemo(() => filteredTunes().length > 0);
 
   return (
@@ -269,7 +269,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           <TunesGrid
             tablePurpose="catalog"
             userId={props.userId}
-            playlistId={currentPlaylistId() || undefined}
+            repertoireId={currentRepertoireId() || undefined}
             data={filteredTunes()}
             columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}
@@ -302,8 +302,8 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           variant="empty"
           title="No tunes found"
           description={
-            isPlaylistFilterActive()
-              ? "No tunes in selected playlists match your filters"
+            isRepertoireFilterActive()
+              ? "No tunes in selected repertoires match your filters"
               : "The catalog is empty"
           }
         />
@@ -314,13 +314,13 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           <span>
             {filteredTunes().length}{" "}
             {filteredTunes().length === 1 ? "tune" : "tunes"}
-            {props.selectedPlaylistIds &&
-              props.selectedPlaylistIds.length > 0 && (
+            {props.selectedRepertoireIds &&
+              props.selectedRepertoireIds.length > 0 && (
                 <span class="ml-1 text-gray-500 dark:text-gray-500">
                   in selected{" "}
-                  {props.selectedPlaylistIds.length === 1
-                    ? "playlist"
-                    : "playlists"}
+                  {props.selectedRepertoireIds.length === 1
+                    ? "repertoire"
+                    : "repertoires"}
                 </span>
               )}
           </span>

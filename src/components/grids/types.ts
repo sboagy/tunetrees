@@ -56,7 +56,7 @@ export interface ITableStateExtended {
 export interface ITableStateKey {
   userId: string;
   tablePurpose: TablePurpose;
-  playlistId: string;
+  repertoireId: string;
 }
 
 /**
@@ -64,7 +64,7 @@ export interface ITableStateKey {
  */
 export interface IGridBaseProps {
   userId: string;
-  playlistId: string;
+  repertoireId: string;
   tablePurpose: TablePurpose;
   onTuneSelect?: (tune: ITuneOverview) => void;
   onRecallEvalChange?: (tuneId: string, newValue: string) => void;
@@ -94,7 +94,7 @@ export interface IGridBaseProps {
     region: string | null;
     description: string | null;
   }>;
-  selectedPlaylistIds?: string[];
+  selectedRepertoireIds?: string[];
   // Loading/error state for grid data
   isLoading?: boolean;
   loadError?: unknown;
