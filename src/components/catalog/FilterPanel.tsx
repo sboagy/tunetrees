@@ -27,7 +27,7 @@ const getRepertoireDisplayName = (playlist: PlaylistWithSummary): string => {
     return playlist.name.trim();
   }
   const instrument = playlist.instrumentName || "Unknown";
-  return `${instrument} (${playlist.playlistId})`;
+  return `${instrument} (${playlist.repertoireId})`;
 };
 
 // Filter chip component for selected items
@@ -115,7 +115,7 @@ const FilterDropdown: Component<{
 
   const toggleSelection = (item: any) => {
     if (props.isRepertoire) {
-      const repertoireId = (item as PlaylistWithSummary).playlistId;
+      const repertoireId = (item as PlaylistWithSummary).repertoireId;
       const selected = props.selectedItems;
       if (selected.includes(repertoireId)) {
         props.onSelectionChange(selected.filter((id) => id !== repertoireId));
@@ -135,7 +135,7 @@ const FilterDropdown: Component<{
 
   const isSelected = (item: any): boolean => {
     if (props.isRepertoire) {
-      const repertoireId = (item as PlaylistWithSummary).playlistId;
+      const repertoireId = (item as PlaylistWithSummary).repertoireId;
       return props.selectedItems.includes(repertoireId);
     } else {
       return props.selectedItems.includes(item as string);
@@ -389,7 +389,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
   // Get repertoire display name by ID
   const getRepertoireNameById = (repertoireId: string): string => {
     const repertoire = props.availableRepertoires.find(
-      (p) => p.playlistId === repertoireId
+      (p) => p.repertoireId === repertoireId
     );
     return repertoire
       ? getRepertoireDisplayName(repertoire)

@@ -23,7 +23,7 @@ import type { Component } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb } from "../../lib/db/client-sqlite";
-import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
+import { addTunesToRepertoire } from "../../lib/db/queries/repertoires";
 import type { PlaylistWithSummary } from "../../lib/db/types";
 import {
   TOOLBAR_BUTTON_BASE,
@@ -131,7 +131,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
 
       // Call database function
       const db = getDb();
-      const result = await addTunesToPlaylist(
+      const result = await addTunesToRepertoire(
         db,
         props.repertoireId,
         tuneIds,
