@@ -30,7 +30,7 @@ import {
   getSelectedPlaylistId,
   setSelectedPlaylistId,
 } from "../../lib/services/playlist-service";
-import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
+import { RepertoireManagerDialog } from "../repertoires/RepertoireManagerDialog";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -1545,8 +1545,8 @@ export const TopNav: Component = () => {
         </div>
       </div>
 
-      {/* Playlist Manager Dialog */}
-      <PlaylistManagerDialog
+      {/* Repertoire Manager Dialog */}
+      <RepertoireManagerDialog
         isOpen={showPlaylistManager()}
         onClose={() => setShowPlaylistManager(false)}
       />

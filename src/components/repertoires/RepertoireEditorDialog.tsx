@@ -1,8 +1,8 @@
 /**
- * Playlist Editor Dialog Component
+ * Repertoire Editor Dialog Component
  *
- * Modal dialog for creating and editing playlists.
- * Wraps PlaylistEditor in a modal overlay to avoid route navigation.
+ * Modal dialog for creating and editing repertoires.
+ * Wraps RepertoireEditor in a modal overlay to avoid route navigation.
  *
  * Features:
  * - Modal overlay with backdrop
@@ -11,7 +11,7 @@
  * - Close via X button, backdrop click, or Escape key
  * - Dark mode support
  *
- * @module components/playlists/PlaylistEditorDialog
+ * @module components/repertoires/RepertoireEditorDialog
  */
 
 import { CircleX, Save } from "lucide-solid";
@@ -30,46 +30,46 @@ import {
   updatePlaylist,
 } from "../../lib/db/queries/playlists";
 import type { Playlist } from "../../lib/db/types";
-import { PlaylistEditor } from "./PlaylistEditor";
+import { RepertoireEditor } from "./RepertoireEditor";
 
-interface PlaylistEditorDialogProps {
+interface RepertoireEditorDialogProps {
   /** Whether the dialog is open */
   isOpen: boolean;
   /** Callback when dialog should close */
   onClose: () => void;
-  /** Playlist ID to edit (undefined for new playlist) */
-  playlistId?: string;
+  /** Repertoire ID to edit (undefined for new repertoire) */
+  repertoireId?: string;
   /** Callback after successful save */
   onSaved?: () => void;
 }
 
 /**
- * Playlist Editor Dialog Component
+ * Repertoire Editor Dialog Component
  *
  * @example
  * ```tsx
- * <PlaylistEditorDialog
+ * <RepertoireEditorDialog
  *   isOpen={showEditor()}
  *   onClose={() => setShowEditor(false)}
- *   playlistId={selectedPlaylistId()}
- *   onSaved={() => refetchPlaylists()}
+ *   repertoireId={selectedRepertoireId()}
+ *   onSaved={() => refetchRepertoires()}
  * />
  * ```
  */
-export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
+export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
   props
 ) => {
   const { user, localDb } = useAuth();
 
-  // Fetch playlist data if editing
-  const [playlist] = createResource(
+  // Fetch repertoire data if editing
+  const [repertoire] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
-      const playlistId = props.playlistId;
+      const repertoireId = props.repertoireId;
       const isOpen = props.isOpen; // Track dialog open state
-      return userId && db && playlistId && isOpen
-        ? { userId, db, playlistId }
+      return userId && db && repertoireId && isOpen
+        ? { userId, db, playlistId: repertoireId }
         : null;
     },
     async (params) => {
@@ -105,14 +105,14 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
     const db = localDb();
 
     if (!userId || !db) {
-      console.error("Cannot save playlist: missing user or database");
+      console.error("Cannot save repertoire: missing user or database");
       setError?.("Error: User not authenticated or database not available");
       return;
     }
 
-    // Get form data from PlaylistEditor
-    const playlistData = getFormData?.();
-    if (!playlistData) {
+    // Get form data from RepertoireEditor
+    const repertoireData = getFormData?.();
+    if (!repertoireData) {
       // Validation failed, error already shown in form
       return;
     }
@@ -121,16 +121,16 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
     setError?.(null); // Clear any previous errors
 
     try {
-      if (props.playlistId) {
-        // Update existing playlist
-        await updatePlaylist(db, props.playlistId, userId, playlistData);
+      if (props.repertoireId) {
+        // Update existing repertoire
+        await updatePlaylist(db, props.repertoireId, userId, repertoireData);
       } else {
-        // Create new playlist
+        // Create new repertoire
         await createPlaylist(db, userId, {
-          name: playlistData.name ?? "Untitled Playlist",
-          genreDefault: playlistData.genreDefault ?? null,
-          instrumentRef: playlistData.instrumentRef ?? null,
-          srAlgType: playlistData.srAlgType ?? "fsrs",
+          name: repertoireData.name ?? "Untitled Repertoire",
+          genreDefault: repertoireData.genreDefault ?? null,
+          instrumentRef: repertoireData.instrumentRef ?? null,
+          srAlgType: repertoireData.srAlgType ?? "fsrs",
         });
       }
 
@@ -138,8 +138,8 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
       props.onSaved?.();
       props.onClose();
     } catch (error) {
-      console.error("Failed to save playlist:", error);
-      setError?.("Failed to save playlist. Please try again.");
+      console.error("Failed to save repertoire:", error);
+      setError?.("Failed to save repertoire. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -153,7 +153,7 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
         class="fixed inset-0 z-[60] bg-black/50 dark:bg-black/70 cursor-default"
         onClick={props.onClose}
         aria-label="Close modal backdrop"
-        data-testid="playlist-editor-backdrop"
+        data-testid="repertoire-editor-backdrop"
       />
 
       {/* Dialog - higher z-index to appear over manager dialog */}
@@ -162,17 +162,17 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
         class="fixed left-1/2 top-1/2 z-[70] w-[95vw] max-w-2xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="playlist-editor-title"
+        aria-labelledby="repertoire-editor-title"
         onClick={(e) => e.stopPropagation()}
-        data-testid="playlist-editor-dialog"
+        data-testid="repertoire-editor-dialog"
       >
         {/* Header */}
         <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <h2
-            id="playlist-editor-title"
+            id="repertoire-editor-title"
             class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white"
           >
-            {props.playlistId ? "Edit Repertoire" : "Create New Repertoire"}
+            {props.repertoireId ? "Edit Repertoire" : "Create New Repertoire"}
           </h2>
           <div class="flex items-center gap-4">
             <button
@@ -181,7 +181,7 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
               disabled={isSaving()}
               class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Cancel and close dialog"
-              data-testid="cancel-playlist-button"
+              data-testid="cancel-repertoire-button"
             >
               <div class="flex items-center gap-2">
                 <span>Cancel</span>
@@ -193,8 +193,8 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
               onClick={handleSave}
               disabled={isSaving()}
               class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              aria-label="Save playlist"
-              data-testid="save-playlist-button"
+              aria-label="Save repertoire"
+              data-testid="save-repertoire-button"
             >
               <Show
                 when={isSaving()}
@@ -214,15 +214,15 @@ export const PlaylistEditorDialog: Component<PlaylistEditorDialogProps> = (
         {/* Content - Scrollable */}
         <div class="flex-1 overflow-y-auto p-4 sm:p-6">
           <Show
-            when={!props.playlistId || !playlist.loading}
+            when={!props.repertoireId || !repertoire.loading}
             fallback={
               <div class="flex items-center justify-center py-12">
                 <div class="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full" />
               </div>
             }
           >
-            <PlaylistEditor
-              playlist={playlist() ?? undefined}
+            <RepertoireEditor
+              repertoire={repertoire() ?? undefined}
               onGetFormData={(getter) => {
                 getFormData = getter;
               }}

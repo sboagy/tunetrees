@@ -1,14 +1,14 @@
 /**
- * Playlist Editor Component
+ * Repertoire Editor Component
  *
- * Form for creating and editing playlists (repertoire lists).
+ * Form for creating and editing repertoires (repertoire lists).
  * Fields:
  * - Name (required - e.g., "My Irish Tunes")
- * - Genre Default (optional - default genre for tunes in this playlist)
+ * - Genre Default (optional - default genre for tunes in this repertoire)
  * - Instrument (optional - integer reference, deferred for now)
  * - SR Algorithm Type (optional - default "fsrs")
  *
- * @module components/playlists/PlaylistEditor
+ * @module components/repertoires/RepertoireEditor
  */
 
 import type { Component } from "solid-js";
@@ -25,9 +25,9 @@ import { genre, instrument } from "../../../drizzle/schema-sqlite";
 import { useAuth } from "../../lib/auth/AuthContext";
 import type { Playlist } from "../../lib/db/types";
 
-interface PlaylistEditorProps {
-  /** Playlist to edit (undefined for new playlist) */
-  playlist?: Playlist;
+interface RepertoireEditorProps {
+  /** Repertoire to edit (undefined for new repertoire) */
+  repertoire?: Playlist;
   /** Ref to store function that returns current form data */
   onGetFormData?: (getter: () => Partial<Playlist> | null) => void;
   /** Ref to store function that returns validation state */
@@ -42,18 +42,18 @@ const SR_ALG_TYPES = [
 ];
 
 /**
- * Playlist Editor Component
+ * Repertoire Editor Component
  *
  * @example
  * ```tsx
- * <PlaylistEditor
- *   playlist={existingPlaylist}
+ * <RepertoireEditor
+ *   repertoire={existingRepertoire}
  *   onSave={handleSave}
  *   onCancel={() => navigate(-1)}
  * />
  * ```
  */
-export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
+export const RepertoireEditor: Component<RepertoireEditorProps> = (props) => {
   const { localDb, user } = useAuth();
 
   // Dev-only mount counter to detect unintended multiple mounts
@@ -69,7 +69,7 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
   // Dev-only: warn if component mounts more than once per open
   onMount(() => {
     if (DEV && mounted) {
-      console.warn("[PlaylistEditor] Mounted more than once for a single open");
+      console.warn("[RepertoireEditor] Mounted more than once for a single open");
     }
     mounted = true;
   });
@@ -77,14 +77,14 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
     mounted = false;
   });
 
-  // Update form state when playlist prop changes
+  // Update form state when repertoire prop changes
   createEffect(() => {
-    const playlist = props.playlist;
-    if (playlist) {
-      setName(playlist.name || "");
-      setGenreDefault(playlist.genreDefault ?? null);
-      setInstrumentRef(playlist.instrumentRef ?? null);
-      setSrAlgType(playlist.srAlgType || "fsrs");
+    const repertoire = props.repertoire;
+    if (repertoire) {
+      setName(repertoire.name || "");
+      setGenreDefault(repertoire.genreDefault ?? null);
+      setInstrumentRef(repertoire.instrumentRef ?? null);
+      setSrAlgType(repertoire.srAlgType || "fsrs");
     } else {
       setName("");
       setGenreDefault(null);
@@ -178,14 +178,14 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
             </div>
           </Show>
 
-          {/* Playlist Info */}
-          <Show when={props.playlist}>
+          {/* Repertoire Info */}
+          <Show when={props.repertoire}>
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
               <p class="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Repertoire ID:</strong> {props.playlist?.playlistId}
+                <strong>Repertoire ID:</strong> {props.repertoire?.playlistId}
               </p>
               <p class="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                <strong>User Ref:</strong> {props.playlist?.userRef}
+                <strong>User Ref:</strong> {props.repertoire?.userRef}
               </p>
             </div>
           </Show>
@@ -193,13 +193,13 @@ export const PlaylistEditor: Component<PlaylistEditorProps> = (props) => {
           {/* Repertoire Name */}
           <div class="space-y-2">
             <label
-              for="playlist-name"
+              for="repertoire-name"
               class="block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Repertoire Name <span class="text-red-500">*</span>
             </label>
             <input
-              id="playlist-name"
+              id="repertoire-name"
               type="text"
               value={name()}
               onInput={(e) => setName(e.currentTarget.value)}

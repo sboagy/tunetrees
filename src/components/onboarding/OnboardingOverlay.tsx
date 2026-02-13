@@ -20,7 +20,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
-import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
+import { RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
 
 /**
  * Onboarding Overlay Component
@@ -40,17 +40,17 @@ export const OnboardingOverlay: Component = () => {
     triggerCatalogSync,
   } = useAuth();
   const navigate = useNavigate();
-  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
-  const [playlistCreated, setPlaylistCreated] = createSignal(false);
+  const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
+  const [repertoireCreated, setRepertoireCreated] = createSignal(false);
   const [genres, setGenres] = createSignal<Genre[]>([]);
   const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
   const [isLoadingGenres, setIsLoadingGenres] = createSignal(false);
   const [isSavingGenres, setIsSavingGenres] = createSignal(false);
 
-  const handlePlaylistCreated = () => {
-    setPlaylistCreated(true);
-    setShowPlaylistDialog(false);
-    // Trigger global playlist list refresh so TopNav dropdown updates
+  const handleRepertoireCreated = () => {
+    setRepertoireCreated(true);
+    setShowRepertoireDialog(false);
+    // Trigger global repertoire list refresh so TopNav dropdown updates
     incrementRepertoireListChanged();
     // Move to next step: choose genres (don't navigate yet)
     nextStep();
@@ -179,17 +179,17 @@ export const OnboardingOverlay: Component = () => {
 
   return (
     <>
-      {/* Playlist Editor Dialog */}
-      <Show when={showPlaylistDialog()}>
-        <PlaylistEditorDialog
-          isOpen={showPlaylistDialog()}
+      {/* Repertoire Editor Dialog */}
+      <Show when={showRepertoireDialog()}>
+        <RepertoireEditorDialog
+          isOpen={showRepertoireDialog()}
           onClose={() => {
-            setShowPlaylistDialog(false);
-            if (!playlistCreated()) {
+            setShowRepertoireDialog(false);
+            if (!repertoireCreated()) {
               skipOnboarding(); // If they close without creating, skip onboarding
             }
           }}
-          onSaved={handlePlaylistCreated}
+          onSaved={handleRepertoireCreated}
         />
       </Show>
 
@@ -246,8 +246,8 @@ export const OnboardingOverlay: Component = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setPlaylistCreated(false);
-                        setShowPlaylistDialog(true);
+                        setRepertoireCreated(false);
+                        setShowRepertoireDialog(true);
                       }}
                       class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
                       data-testid="onboarding-create-repertoire"

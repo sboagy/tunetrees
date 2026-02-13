@@ -25,7 +25,7 @@ import {
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
-import { PlaylistEditorDialog } from "../components/playlists/PlaylistEditorDialog";
+import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import {
   RepertoireEmptyState,
   RepertoireToolbar,
@@ -401,7 +401,7 @@ const RepertoirePage: Component = () => {
       </div>
 
       <Show when={showPlaylistDialog()}>
-        <PlaylistEditorDialog
+        <RepertoireEditorDialog
           isOpen={showPlaylistDialog()}
           onClose={() => setShowPlaylistDialog(false)}
           onSaved={() => {

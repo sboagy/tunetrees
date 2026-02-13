@@ -23,7 +23,7 @@ import { TunesGridScheduled } from "../../components/grids";
 import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../../components/grids/types";
-import { PlaylistEditorDialog } from "../../components/playlists/PlaylistEditorDialog";
+import { RepertoireEditorDialog } from "../../components/repertoires/RepertoireEditorDialog";
 import {
   DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
@@ -1038,7 +1038,7 @@ const PracticeIndex: Component = () => {
       </div>
 
       <Show when={showPlaylistDialog()}>
-        <PlaylistEditorDialog
+        <RepertoireEditorDialog
           isOpen={showPlaylistDialog()}
           onClose={() => setShowPlaylistDialog(false)}
           onSaved={() => {
