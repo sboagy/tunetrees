@@ -31,9 +31,9 @@ export interface ITuneOverview {
   private_for: string | null;
   deleted: number;
 
-  // Playlist info
+  // Repertoire info
   user_ref: string;
-  playlist_id: string;
+  repertoire_id: string;
   instrument: string | null;
   learned: number | null;
   scheduled: number | null;

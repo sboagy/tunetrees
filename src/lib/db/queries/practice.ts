@@ -23,8 +23,8 @@ import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
   dailyPracticeQueue,
-  playlist,
-  playlistTune,
+  repertoire as playlist,
+  repertoireTune as playlistTune,
   practiceRecord,
   prefsSchedulingOptions,
   prefsSpacedRepetition,
@@ -89,14 +89,14 @@ export async function clearStaleStagedEvaluations(
     SELECT COUNT(*) as count
     FROM table_transient_data
     WHERE table_transient_data.user_id = ${userId}
-      AND table_transient_data.playlist_id = ${playlistId}
+    AND table_transient_data.repertoire_id = ${playlistId}
 			AND (
 				NOT EXISTS (
 					SELECT 1
 					FROM daily_practice_queue dpq
 					WHERE dpq.tune_ref = table_transient_data.tune_id
 						AND dpq.user_ref = ${userId}
-						AND dpq.playlist_ref = ${playlistId}
+            AND dpq.repertoire_ref = ${playlistId}
 						AND dpq.active = 1
 						AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
 				)
@@ -115,14 +115,14 @@ export async function clearStaleStagedEvaluations(
   await db.run(sql`
     DELETE FROM table_transient_data
     WHERE table_transient_data.user_id = ${userId}
-      AND table_transient_data.playlist_id = ${playlistId}
+    AND table_transient_data.repertoire_id = ${playlistId}
 			AND (
 				NOT EXISTS (
 					SELECT 1
 					FROM daily_practice_queue dpq
 					WHERE dpq.tune_ref = table_transient_data.tune_id
 						AND dpq.user_ref = ${userId}
-						AND dpq.playlist_ref = ${playlistId}
+            AND dpq.repertoire_ref = ${playlistId}
 						AND dpq.active = 1
 						AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
 				)
@@ -196,7 +196,7 @@ export async function getPracticeList(
     SELECT COUNT(*) as count
     FROM daily_practice_queue dpq
     WHERE dpq.user_ref = ${userId}
-      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.repertoire_ref = ${playlistId}
       AND dpq.active = 1
   `);
   console.log("[DB identity]", db);
@@ -209,7 +209,7 @@ export async function getPracticeList(
     SELECT COUNT(*) as count
     FROM practice_list_staged pls
     WHERE pls.user_ref = ${userId}
-      AND pls.playlist_id = ${playlistId}
+      AND pls.repertoire_id = ${playlistId}
   `);
   console.log(
     `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, playlist=${playlistId}`
@@ -223,7 +223,7 @@ export async function getPracticeList(
     SELECT window_start_utc, COUNT(*) as count
     FROM daily_practice_queue
     WHERE user_ref = ${userId}
-      AND playlist_ref = ${playlistId}
+      AND repertoire_ref = ${playlistId}
       AND active = 1
     GROUP BY window_start_utc
     ORDER BY window_start_utc DESC
@@ -252,7 +252,7 @@ export async function getPracticeList(
       SELECT MAX(window_start_utc) as max_window
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
-        AND playlist_ref = ${playlistId}
+        AND repertoire_ref = ${playlistId}
         AND active = 1
     `);
     console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
@@ -292,9 +292,9 @@ export async function getPracticeList(
     INNER JOIN daily_practice_queue dpq 
       ON dpq.tune_ref = pls.id
       AND dpq.user_ref = pls.user_ref
-      AND dpq.playlist_ref = pls.playlist_id
+      AND dpq.repertoire_ref = pls.repertoire_id
     WHERE dpq.user_ref = ${userId}
-      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.repertoire_ref = ${playlistId}
       AND dpq.active = 1
       AND substr(replace(dpq.window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
     GROUP BY pls.id
@@ -367,7 +367,7 @@ export async function getDueTunesLegacy(
       deviceId: tune.deviceId,
 
       // Playlist tune info
-      playlistRef: playlistTune.playlistRef,
+      playlistRef: playlistTune.repertoireRef,
       scheduled: playlistTune.scheduled, // Next review date for "Add To Review"
 
       // Latest practice record info (from subquery)
@@ -375,7 +375,7 @@ export async function getDueTunesLegacy(
         SELECT practiced 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND repertoire_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -383,7 +383,7 @@ export async function getDueTunesLegacy(
         SELECT due 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND repertoire_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -391,7 +391,7 @@ export async function getDueTunesLegacy(
         SELECT stability 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND repertoire_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -399,7 +399,7 @@ export async function getDueTunesLegacy(
         SELECT difficulty 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND repertoire_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -407,7 +407,7 @@ export async function getDueTunesLegacy(
         SELECT state 
         FROM practice_record
         WHERE tune_ref = ${tune.id} 
-          AND playlist_ref = ${playlistId}
+          AND repertoire_ref = ${playlistId}
         ORDER BY practiced DESC 
         LIMIT 1
       )`,
@@ -416,7 +416,7 @@ export async function getDueTunesLegacy(
     .innerJoin(playlistTune, eq(playlistTune.tuneRef, tune.id))
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.deleted, 0),
         eq(tune.deleted, 0)
       )
@@ -585,7 +585,7 @@ export async function getLatestPracticeRecord(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, playlistId)
       )
     )
     .orderBy(desc(practiceRecord.practiced))
@@ -704,7 +704,7 @@ export async function getPracticeHistory(
     .select({
       // Practice record fields
       id: practiceRecord.id,
-      playlistRef: practiceRecord.playlistRef,
+      playlistRef: practiceRecord.repertoireRef,
       tuneRef: practiceRecord.tuneRef,
       practiced: practiceRecord.practiced,
       quality: practiceRecord.quality,
@@ -751,11 +751,11 @@ export async function getPracticeHistory(
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.playlistId, practiceRecord.playlistRef))
+    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.repertoireRef))
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, playlistId)
       )
     )
     .orderBy(desc(practiceRecord.practiced));
@@ -818,7 +818,7 @@ export async function addTunesToPracticeQueue(
         })
         .where(
           and(
-            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.repertoireRef, playlistId),
             eq(playlistTune.tuneRef, tuneId),
             eq(playlistTune.deleted, 0)
           )
@@ -837,7 +837,7 @@ export async function addTunesToPracticeQueue(
           .from(practiceRecord)
           .where(
             and(
-              eq(practiceRecord.playlistRef, playlistId),
+              eq(practiceRecord.repertoireRef, playlistId),
               eq(practiceRecord.tuneRef, tuneId)
             )
           )
@@ -847,7 +847,7 @@ export async function addTunesToPracticeQueue(
         if (!existing || existing.length === 0) {
           await db.insert(practiceRecord).values({
             id: generateId(),
-            playlistRef: playlistId,
+            repertoireRef: playlistId,
             tuneRef: tuneId,
             practiced: null,
             quality: null,
@@ -889,7 +889,7 @@ export async function addTunesToPracticeQueue(
       const playlistData = await db
         .select({ userRef: playlist.userRef })
         .from(playlist)
-        .where(eq(playlist.playlistId, playlistId))
+        .where(eq(playlist.repertoireId, playlistId))
         .limit(1);
 
       if (playlistData && playlistData.length > 0) {
@@ -903,7 +903,7 @@ export async function addTunesToPracticeQueue(
           .where(
             and(
               eq(dailyPracticeQueue.userRef, userRef),
-              eq(dailyPracticeQueue.playlistRef, playlistId),
+              eq(dailyPracticeQueue.repertoireRef, playlistId),
               eq(dailyPracticeQueue.queueDate, queueDate)
             )
           );
@@ -947,7 +947,7 @@ export async function getPracticeRecords(
     .select({
       // Practice record fields
       id: practiceRecord.id,
-      playlistRef: practiceRecord.playlistRef,
+      playlistRef: practiceRecord.repertoireRef,
       tuneRef: practiceRecord.tuneRef,
       practiced: practiceRecord.practiced,
       quality: practiceRecord.quality,
@@ -994,8 +994,8 @@ export async function getPracticeRecords(
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.playlistId, practiceRecord.playlistRef))
-    .where(eq(practiceRecord.playlistRef, playlistId))
+    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.repertoireRef))
+    .where(eq(practiceRecord.repertoireRef, playlistId))
     .orderBy(desc(practiceRecord.practiced))
     .limit(limit);
 

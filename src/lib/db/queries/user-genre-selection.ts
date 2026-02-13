@@ -18,8 +18,8 @@ import {
   dailyPracticeQueue,
   genre,
   note,
-  playlistTune,
   practiceRecord,
+  repertoireTune as playlistTune,
   reference,
   tableTransientData,
   tag,
@@ -203,9 +203,9 @@ export async function getRepertoireTuneGenreIdsForUser(
 ): Promise<string[]> {
   const rows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
-    FROM playlist_tune pt
-    JOIN playlist p
-      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    FROM repertoire_tune pt
+    JOIN repertoire p
+      ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
     JOIN tune t
       ON t.id = pt.tune_ref AND t.deleted = 0
     LEFT JOIN tune_override o
@@ -230,7 +230,7 @@ export async function getUserRepertoireStats(
 ): Promise<{ playlistCount: number; playlistTuneCount: number }> {
   const playlistRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
-    FROM playlist p
+    FROM repertoire p
     WHERE p.deleted = 0
       AND p.user_ref = ${userId}
   `);
@@ -238,9 +238,9 @@ export async function getUserRepertoireStats(
 
   const tuneRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
-    FROM playlist_tune pt
-    JOIN playlist p
-      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    FROM repertoire_tune pt
+    JOIN repertoire p
+      ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
     WHERE pt.deleted = 0
       AND p.user_ref = ${userId}
   `);
@@ -274,9 +274,9 @@ export async function purgeLocalCatalogForGenres(
       AND COALESCE(o.genre, t.genre) IN (${sql.raw(genreList)})
       AND NOT EXISTS (
         SELECT 1
-        FROM playlist_tune pt
-        JOIN playlist p
-          ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+        FROM repertoire_tune pt
+        JOIN repertoire p
+          ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
         WHERE pt.tune_ref = t.id
           AND pt.deleted = 0
           AND p.user_ref = ${userId}

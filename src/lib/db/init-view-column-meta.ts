@@ -74,8 +74,8 @@ const VIEW_COLUMN_DESCRIPTIONS: ViewColumnDescription[] = [
   },
   {
     viewName: "practice_list_staged",
-    columnName: "playlist_id",
-    description: "Playlist ID for this tune row.",
+    columnName: "repertoire_id",
+    description: "Repertoire ID for this tune row.",
   },
   {
     viewName: "practice_list_staged",

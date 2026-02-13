@@ -331,7 +331,7 @@ export function classifyQueueBucket(
 export interface DailyPracticeQueueRow {
   id?: string;
   userRef: string;
-  playlistRef: string;
+  repertoireRef: string;
   windowStartUtc: string;
   windowEndUtc: string;
   tuneRef: string;
@@ -379,7 +379,7 @@ async function fetchExistingActiveQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistRef),
+        eq(dailyPracticeQueue.repertoireRef, playlistRef),
         inArray(dailyPracticeQueue.windowStartUtc, variants),
         eq(dailyPracticeQueue.active, 1)
       )
@@ -444,7 +444,7 @@ function buildQueueRows(
 
     results.push({
       userRef,
-      playlistRef,
+      repertoireRef: playlistRef,
       mode,
       queueDate: mode === "per_day" ? windows.startTs.substring(0, 10) : null,
       windowStartUtc: windows.startTs,
@@ -573,7 +573,7 @@ export async function ensureDailyQueue(
     SELECT 1 as one
     FROM daily_practice_queue
     WHERE user_ref = ${userRef}
-      AND playlist_ref = ${playlistRef}
+      AND repertoire_ref = ${playlistRef}
       AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartUtcIso19}
     LIMIT 1
   `);
@@ -670,7 +670,7 @@ export async function generateOrGetPracticeQueue(
   const stagedExists = await db.all<{ one: number }>(sql`
     SELECT 1 as one
     FROM practice_list_staged
-    WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}
+    WHERE user_ref = ${userRef} AND repertoire_id = ${playlistRef}
     LIMIT 1
   `);
   const hasData = stagedExists.length > 0;
@@ -706,7 +706,7 @@ export async function generateOrGetPracticeQueue(
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, playlistRef),
+          eq(dailyPracticeQueue.repertoireRef, playlistRef),
           inArray(dailyPracticeQueue.windowStartUtc, variants)
         )
       )
@@ -729,7 +729,7 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND (
@@ -744,7 +744,7 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND (
@@ -774,7 +774,7 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND (
@@ -809,7 +809,7 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
-          AND playlist_id = ${playlistRef}
+          AND repertoire_id = ${playlistRef}
           AND deleted = 0
           AND playlist_deleted = 0
           AND scheduled IS NULL
@@ -822,7 +822,7 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
-          AND playlist_id = ${playlistRef}
+          AND repertoire_id = ${playlistRef}
           AND deleted = 0
           AND playlist_deleted = 0
           AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
@@ -853,7 +853,7 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${playlistRef}
         AND deleted = 0
         AND playlist_deleted = 0
         AND scheduled IS NOT NULL
@@ -1025,7 +1025,7 @@ export async function addTunesToQueue(
     SELECT id, scheduled, latest_due
     FROM practice_list_staged
     WHERE user_ref = ${userRef}
-      AND playlist_id = ${playlistRef}
+      AND repertoire_id = ${playlistRef}
       AND deleted = 0
       AND playlist_deleted = 0
       AND (
@@ -1098,7 +1098,7 @@ export async function addTunesToQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistRef),
+        eq(dailyPracticeQueue.repertoireRef, playlistRef),
         inArray(dailyPracticeQueue.windowStartUtc, variants),
         eq(dailyPracticeQueue.active, 1),
         inArray(dailyPracticeQueue.tuneRef, addedTuneIds)

@@ -23,8 +23,8 @@ import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
   instrument,
-  playlist,
-  playlistTune,
+  repertoire as playlist,
+  repertoireTune as playlistTune,
   tune,
   userProfile,
 } from "../schema";
@@ -122,7 +122,7 @@ export async function getUserPlaylists(
   // Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
   const playlists = await db
     .select({
-      playlistId: playlist.playlistId,
+      playlistId: playlist.repertoireId,
       userRef: playlist.userRef,
       name: playlist.name,
       instrumentRef: playlist.instrumentRef,
@@ -137,8 +137,8 @@ export async function getUserPlaylists(
       deviceId: playlist.deviceId,
       tuneCount: sql<number>`(
         SELECT COUNT(*)
-        FROM playlist_tune
-        WHERE playlist_ref = ${playlist.playlistId}
+        FROM repertoire_tune
+        WHERE repertoire_ref = ${playlist.repertoireId}
           AND deleted = 0
       )`,
     })
@@ -191,7 +191,7 @@ export async function getPlaylistById(
     .select()
     .from(playlist)
     .where(
-      and(eq(playlist.playlistId, playlistId), eq(playlist.userRef, userRef))
+      and(eq(playlist.repertoireId, playlistId), eq(playlist.userRef, userRef))
     )
     .limit(1);
 
@@ -305,7 +305,7 @@ export async function updatePlaylist(
   const result = await db
     .update(playlist)
     .set(updateData)
-    .where(eq(playlist.playlistId, playlistId))
+    .where(eq(playlist.repertoireId, playlistId))
     .returning();
 
   if (!result || result.length === 0) {
@@ -361,7 +361,7 @@ export async function deletePlaylist(
       syncVersion: (existing.syncVersion || 0) + 1,
       lastModifiedAt: now,
     })
-    .where(eq(playlist.playlistId, playlistId));
+    .where(eq(playlist.repertoireId, playlistId));
 
   // Soft delete all playlist-tune associations
   await db
@@ -371,7 +371,7 @@ export async function deletePlaylist(
       syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
       lastModifiedAt: now,
     })
-    .where(eq(playlistTune.playlistRef, playlistId));
+    .where(eq(playlistTune.repertoireRef, playlistId));
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 
@@ -417,7 +417,7 @@ export async function addTuneToPlaylist(
     .from(playlistTune)
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.tuneRef, tuneId)
       )
     )
@@ -436,7 +436,7 @@ export async function addTuneToPlaylist(
         })
         .where(
           and(
-            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.repertoireRef, playlistId),
             eq(playlistTune.tuneRef, tuneId)
           )
         )
@@ -452,7 +452,7 @@ export async function addTuneToPlaylist(
   // Create new association
   const now = new Date().toISOString();
   const newAssociation: NewPlaylistTune = {
-    playlistRef: playlistId,
+    repertoireRef: playlistId,
     tuneRef: tuneId,
     current: null,
     learned: null,
@@ -520,7 +520,7 @@ export async function removeTuneFromPlaylist(
     })
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.tuneRef, tuneId)
       )
     )
@@ -566,7 +566,7 @@ export async function getPlaylistTunes(
   const result = await db
     .select({
       // PlaylistTune fields
-      playlistRef: playlistTune.playlistRef,
+      playlistRef: playlistTune.repertoireRef,
       tuneRef: playlistTune.tuneRef,
       current: playlistTune.current,
       learned: playlistTune.learned,
@@ -590,7 +590,7 @@ export async function getPlaylistTunes(
     .innerJoin(tune, eq(playlistTune.tuneRef, tune.id))
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.deleted, 0),
         eq(tune.deleted, 0)
       )
@@ -654,7 +654,7 @@ export async function getPlaylistTunesStaged(
   // Query the practice_list_staged view directly
   const result = await db.all<any>(sql`
     SELECT * FROM practice_list_staged
-    WHERE playlist_id = ${playlistId}
+    WHERE repertoire_id = ${playlistId}
       AND user_ref = ${userRef}
       AND deleted = 0
       AND playlist_deleted = 0
@@ -709,7 +709,7 @@ export async function addTunesToPlaylist(
         .from(playlistTune)
         .where(
           and(
-            eq(playlistTune.playlistRef, playlistId),
+            eq(playlistTune.repertoireRef, playlistId),
             eq(playlistTune.tuneRef, tuneId)
           )
         )

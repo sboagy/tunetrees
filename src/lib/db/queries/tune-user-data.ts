@@ -17,7 +17,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
-import { note, playlistTune, practiceRecord } from "../schema";
+import { note, practiceRecord, repertoireTune as playlistTune } from "../schema";
 
 /**
  * Update the learned date for a tune in a specific playlist
@@ -43,7 +43,7 @@ export async function updatePlaylistTuneLearned(
     })
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.tuneRef, tuneId)
       )
     );
@@ -90,7 +90,7 @@ export async function updatePlaylistTuneFields(
     .set(updateData)
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.tuneRef, tuneId)
       )
     );
@@ -135,7 +135,7 @@ export async function upsertPracticeRecord(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, playlistId)
       )
     )
     .orderBy(
@@ -171,7 +171,7 @@ export async function upsertPracticeRecord(
     // Create new practice record
     await db.insert(practiceRecord).values({
       id: generateId(),
-      playlistRef: playlistId,
+      repertoireRef: playlistId,
       tuneRef: tuneId,
       practiced: data.practiced || null,
       quality: data.quality || null,
@@ -241,7 +241,7 @@ export async function getOrCreatePrivateNote(
       id: generateId(),
       userRef: userId,
       tuneRef: tuneId,
-      playlistRef: playlistId || null,
+      repertoireRef: playlistId || null,
       createdDate: now,
       noteText: "",
       public: 0,
@@ -316,7 +316,7 @@ export async function getTuneEditorData(
     .where(
       and(
         eq(playlistTune.tuneRef, tuneId),
-        eq(playlistTune.playlistRef, playlistId)
+        eq(playlistTune.repertoireRef, playlistId)
       )
     )
     .limit(1);
@@ -328,7 +328,7 @@ export async function getTuneEditorData(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, playlistId)
       )
     )
     .orderBy(desc(practiceRecord.id))

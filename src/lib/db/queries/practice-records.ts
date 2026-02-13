@@ -30,7 +30,7 @@ export async function getPracticeRecordsForTune(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, playlistId)
       )
     )
     .orderBy(desc(practiceRecord.practiced));
@@ -59,7 +59,7 @@ export async function createPracticeRecord(
 
   await db.insert(practiceRecord).values({
     id,
-    playlistRef: playlistId,
+    repertoireRef: playlistId,
     tuneRef: tuneId,
     practiced: data.practiced || now,
     quality: data.quality ?? 3,

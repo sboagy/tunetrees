@@ -27,7 +27,7 @@ export async function getTabState(
   const result = await db
     .select({
       whichTab: tabGroupMainState.whichTab,
-      playlistId: tabGroupMainState.playlistId,
+      playlistId: tabGroupMainState.repertoireId,
       sidebarDockPosition: tabGroupMainState.sidebarDockPosition,
     })
     .from(tabGroupMainState)

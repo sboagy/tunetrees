@@ -28,7 +28,7 @@ import type { SqliteDatabase } from "./client-sqlite";
 const VIEW_PLAYLIST_JOINED = /* sql */ `
 CREATE VIEW IF NOT EXISTS view_playlist_joined AS
 SELECT
-  p.playlist_id,
+  p.repertoire_id AS playlist_id,
   p.user_ref,
   p.deleted AS playlist_deleted,
   p.instrument_ref,
@@ -40,7 +40,7 @@ SELECT
   COALESCE(p.genre_default, i.genre_default) AS genre_default,
   i.deleted AS instrument_deleted
 FROM
-  playlist p
+  repertoire p
   JOIN instrument i ON p.instrument_ref = i.id
 `;
 
@@ -67,10 +67,10 @@ SELECT
   COALESCE(tune_override.genre, tune.genre) AS genre,
   tune.deleted,
   tune.private_for,
-  playlist_tune.learned AS learned,
-  playlist_tune.goal,
-  playlist_tune.scheduled,
-  playlist_tune.current,
+  repertoire_tune.learned AS learned,
+  repertoire_tune.goal,
+  repertoire_tune.scheduled,
+  repertoire_tune.current,
   practice_record.state AS latest_state,
   practice_record.practiced AS latest_practiced,
   practice_record.quality AS latest_quality,
@@ -87,47 +87,47 @@ SELECT
     SELECT GROUP_CONCAT(tag.tag_text, ' ')
     FROM tag
     WHERE tag.tune_ref = tune.id
-      AND tag.user_ref = playlist.user_ref
+      AND tag.user_ref = repertoire.user_ref
   ) AS tags,
-  playlist_tune.playlist_ref,
-  playlist.user_ref,
-  playlist_tune.deleted AS playlist_deleted,
+  repertoire_tune.repertoire_ref,
+  repertoire.user_ref,
+  repertoire_tune.deleted AS playlist_deleted,
   (
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note
     WHERE note.tune_ref = tune.id
-      AND note.user_ref = playlist.user_ref
+      AND note.user_ref = repertoire.user_ref
   ) AS notes,
   (
     SELECT ref.url
     FROM reference ref
     WHERE ref.tune_ref = tune.id
-      AND ref.user_ref = playlist.user_ref
+      AND ref.user_ref = repertoire.user_ref
       AND ref.favorite = 1
     LIMIT 1
   ) AS favorite_url,
   CASE
-    WHEN tune_override.user_ref = playlist.user_ref THEN 1
+    WHEN tune_override.user_ref = repertoire.user_ref THEN 1
     ELSE 0
   END AS has_override
 FROM
   tune
-  LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-  LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+  LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+  LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
+    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   LEFT JOIN (
     SELECT pr.*
     FROM practice_record pr
     INNER JOIN (
-      SELECT tune_ref, playlist_ref, MAX(id) as max_id
+      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
       FROM practice_record
-      GROUP BY tune_ref, playlist_ref
+      GROUP BY tune_ref, repertoire_ref
     ) latest ON pr.tune_ref = latest.tune_ref
-      AND pr.playlist_ref = latest.playlist_ref
+      AND pr.repertoire_ref = latest.repertoire_ref
       AND pr.id = latest.max_id
   ) practice_record ON practice_record.tune_ref = tune.id
-    AND practice_record.playlist_ref = playlist_tune.playlist_ref
+    AND practice_record.repertoire_ref = repertoire_tune.repertoire_ref
 `;
 
 /**
@@ -158,14 +158,14 @@ SELECT
   COALESCE(tune_override.release_year, tune.release_year) AS release_year,
   tune.private_for,
   tune.deleted,
-  playlist_tune.learned,
-  COALESCE(td.goal, playlist_tune.goal) AS goal,
-  playlist_tune.scheduled,
-  playlist_tune.current,
-  playlist.user_ref,
-  playlist.playlist_id,
+  repertoire_tune.learned,
+  COALESCE(td.goal, repertoire_tune.goal) AS goal,
+  repertoire_tune.scheduled,
+  repertoire_tune.current,
+  repertoire.user_ref,
+  repertoire.repertoire_id,
   instrument.instrument,
-  playlist_tune.deleted AS playlist_deleted,
+  repertoire_tune.deleted AS playlist_deleted,
   COALESCE(td.state, pr.state) AS latest_state,
   COALESCE(td.practiced, pr.practiced) AS latest_practiced,
   COALESCE(td.quality, pr.quality) AS latest_quality,
@@ -183,7 +183,7 @@ SELECT
     SELECT GROUP_CONCAT(tag.tag_text, ' ')
     FROM tag
     WHERE tag.tune_ref = tune.id
-      AND tag.user_ref = playlist.user_ref
+      AND tag.user_ref = repertoire.user_ref
   ) AS tags,
   td.purpose,
   td.note_private,
@@ -193,18 +193,18 @@ SELECT
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note
     WHERE note.tune_ref = tune.id
-      AND note.user_ref = playlist.user_ref
+      AND note.user_ref = repertoire.user_ref
   ) AS notes,
   (
     SELECT ref.url
     FROM reference ref
     WHERE ref.tune_ref = tune.id
-      AND ref.user_ref = playlist.user_ref
+      AND ref.user_ref = repertoire.user_ref
       AND ref.favorite = 1
     LIMIT 1
   ) AS favorite_url,
   CASE
-    WHEN tune_override.user_ref = playlist.user_ref THEN 1
+    WHEN tune_override.user_ref = repertoire.user_ref THEN 1
     ELSE 0
   END AS has_override,
   CASE
@@ -224,27 +224,27 @@ SELECT
   END AS has_staged
 FROM
   tune
-  LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-  LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+  LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+  LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
-  LEFT JOIN instrument ON instrument.id = playlist.instrument_ref
+    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
+  LEFT JOIN instrument ON instrument.id = repertoire.instrument_ref
   LEFT JOIN (
     SELECT pr.*
     FROM practice_record pr
     INNER JOIN (
-      SELECT tune_ref, playlist_ref, MAX(id) as max_id
+      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
       FROM practice_record
-      GROUP BY tune_ref, playlist_ref
+      GROUP BY tune_ref, repertoire_ref
     ) latest ON pr.tune_ref = latest.tune_ref
-      AND pr.playlist_ref = latest.playlist_ref
+      AND pr.repertoire_ref = latest.repertoire_ref
       AND pr.id = latest.max_id
   ) pr ON pr.tune_ref = tune.id
-    AND pr.playlist_ref = playlist_tune.playlist_ref
+    AND pr.repertoire_ref = repertoire_tune.repertoire_ref
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
-    AND td.playlist_id = playlist_tune.playlist_ref
-    AND td.user_id = playlist.user_ref
-WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref
+    AND td.repertoire_id = repertoire_tune.repertoire_ref
+    AND td.user_id = repertoire.user_ref
+WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref
 `;
 
 /**
@@ -284,12 +284,12 @@ SELECT
   dpq.scheduled_snapshot,
   dpq.generated_at,
   dpq.user_ref,
-  dpq.playlist_ref,
+  dpq.repertoire_ref,
   dpq.tune_ref
 FROM
   daily_practice_queue dpq
   LEFT JOIN user_profile up ON up.id = dpq.user_ref
-  LEFT JOIN playlist p ON p.playlist_id = dpq.playlist_ref
+  LEFT JOIN repertoire p ON p.repertoire_id = dpq.repertoire_ref
   LEFT JOIN instrument i ON i.id = p.instrument_ref
   LEFT JOIN tune ON tune.id = dpq.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
@@ -308,7 +308,7 @@ SELECT
   COALESCE(tune_override.title, tune.title) AS tune_title,
   ttd.tune_id,
   i.instrument AS playlist_instrument,
-  ttd.playlist_id,
+  ttd.repertoire_id,
   ttd.purpose,
   ttd.note_private,
   ttd.note_public,
@@ -335,7 +335,7 @@ FROM
   LEFT JOIN tune ON tune.id = ttd.tune_id
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = ttd.user_id
-  LEFT JOIN playlist p ON p.playlist_id = ttd.playlist_id
+  LEFT JOIN repertoire p ON p.repertoire_id = ttd.repertoire_id
   LEFT JOIN instrument i ON i.id = p.instrument_ref
 ORDER BY
   ttd.last_modified_at DESC
@@ -355,7 +355,7 @@ SELECT
   COALESCE(tune_override.title, tune.title) AS tune_title,
   pr.tune_ref,
   i.instrument AS playlist_instrument,
-  pr.playlist_ref,
+  pr.repertoire_ref,
   pr.practiced,
   pr.quality,
   CASE pr.quality
@@ -391,7 +391,7 @@ SELECT
   pr.id
 FROM
   practice_record pr
-  LEFT JOIN playlist p ON p.playlist_id = pr.playlist_ref
+  LEFT JOIN repertoire p ON p.repertoire_id = pr.repertoire_ref
   LEFT JOIN user_profile up ON up.id = p.user_ref
   LEFT JOIN tune ON tune.id = pr.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id

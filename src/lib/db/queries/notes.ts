@@ -45,7 +45,7 @@ export async function getNotesByPlaylist(
     .select()
     .from(schema.note)
     .where(
-      and(eq(schema.note.playlistRef, playlistId), eq(schema.note.deleted, 0))
+      and(eq(schema.note.repertoireRef, playlistId), eq(schema.note.deleted, 0))
     )
     .orderBy(asc(schema.note.displayOrder), desc(schema.note.createdDate))
     .all();
@@ -84,7 +84,7 @@ export async function createNote(
       tuneRef: data.tuneRef,
       noteText: data.noteText,
       userRef: data.userRef,
-      playlistRef: data.playlistRef || null,
+      repertoireRef: data.playlistRef || null,
       createdDate: now,
       // `public` is ignored for visibility; all user-created notes are private for now.
       public: 0,
