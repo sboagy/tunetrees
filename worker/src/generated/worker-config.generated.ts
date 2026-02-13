@@ -312,7 +312,7 @@ export const WORKER_SYNC_CONFIG = {
           omitSetProps: ["id"],
           retryMinimalPayloadKeepProps: [
             "id",
-            "playlistRef",
+            "repertoireRef",
             "tuneRef",
             "practiced",
             "quality",

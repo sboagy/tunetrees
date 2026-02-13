@@ -156,7 +156,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     const collections = getWorkerConfig().collections ?? {};
     const result: Record<string, Set<string>> = {};
 
-    // Load user collections (playlists, etc.)
+    // Load user collections (repertoires, etc.)
     for (const [name, cfg] of Object.entries(collections)) {
       const table = params.tables[cfg.table];
       if (!table) {

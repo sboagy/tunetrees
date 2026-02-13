@@ -85,8 +85,8 @@ export const COMMON_KEYS_SNAKE_TO_CAMEL: Record<string, string> = {
   user_id: "userId",
   tune_ref: "tuneRef",
   tune_id: "tuneId",
-  playlist_ref: "playlistRef",
-  playlist_id: "playlistId",
+  repertoire_ref: "repertoireRef",
+  repertoire_id: "repertoireId",
   last_modified_at: "lastModifiedAt",
   sync_version: "syncVersion",
   device_id: "deviceId",
@@ -121,7 +121,7 @@ export const COMMON_KEYS_SNAKE_TO_CAMEL: Record<string, string> = {
   recall_eval: "recallEval",
 
   // practice_record table
-  // tune_ref, playlist_ref already covered
+  // tune_ref, repertoire_ref already covered
   // practiced already covered
 
   // daily_practice_queue table
@@ -142,7 +142,7 @@ export const COMMON_KEYS_SNAKE_TO_CAMEL: Record<string, string> = {
   outcome: "outcome",
   active: "active",
 
-  // playlist table
+  // repertoire table
   name: "name",
   instrument_ref: "instrumentRef",
   genre_default: "genreDefault",

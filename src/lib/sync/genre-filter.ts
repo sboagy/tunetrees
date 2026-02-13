@@ -102,12 +102,12 @@ async function getEffectiveGenreFilterInitialSync(params: {
   db: SqliteDatabase;
   supabase: SupabaseClient;
   userId: string;
-}): Promise<{ effective: string[]; playlistGenres: string[] }> {
+}): Promise<{ effective: string[]; repertoireGenres: string[] }> {
   const { db, supabase, userId } = params;
 
-  // Query LOCAL db for user genre selection and playlist defaults
-  // Note: preSyncMetadataViaWorker already synced user_genre_selection, playlist, and instrument
-  const [selectedGenres, playlistDefaultGenres] = await Promise.all([
+  // Query LOCAL db for user genre selection and repertoire defaults
+  // Note: preSyncMetadataViaWorker already synced user_genre_selection, repertoire, and instrument
+  const [selectedGenres, repertoireDefaultGenres] = await Promise.all([
     getUserGenreSelection(db, userId),
     getPlaylistGenreDefaultsForUser(db, userId),
   ]);
@@ -134,23 +134,23 @@ async function getEffectiveGenreFilterInitialSync(params: {
 
   const effective = new Set([
     ...selectedGenres.map(String),
-    ...playlistDefaultGenres.map(String),
+    ...repertoireDefaultGenres.map(String),
     ...playlistTuneGenres.map(String),
   ]);
 
   return {
     effective: Array.from(effective),
-    playlistGenres: Array.from(new Set(playlistTuneGenres.map(String))),
+    repertoireGenres: Array.from(new Set(playlistTuneGenres.map(String))),
   };
 }
 
 async function getEffectiveGenreFilterIncrementalSync(params: {
   db: SqliteDatabase;
   userId: string;
-}): Promise<{ effective: string[]; playlistGenres: string[] }> {
+}): Promise<{ effective: string[]; repertoireGenres: string[] }> {
   const { db, userId } = params;
 
-  const [selectedGenres, playlistDefaultGenres, playlistTuneGenres] =
+  const [selectedGenres, repertoireDefaultGenres, repertoireTuneGenres] =
     await Promise.all([
       getUserGenreSelection(db, userId),
       getPlaylistGenreDefaultsForUser(db, userId),
@@ -159,13 +159,13 @@ async function getEffectiveGenreFilterIncrementalSync(params: {
 
   const effective = new Set([
     ...selectedGenres.map(String),
-    ...playlistDefaultGenres.map(String),
-    ...playlistTuneGenres.map(String),
+    ...repertoireDefaultGenres.map(String),
+    ...repertoireTuneGenres.map(String),
   ]);
 
   return {
     effective: Array.from(effective),
-    playlistGenres: Array.from(new Set(playlistTuneGenres.map(String))),
+    repertoireGenres: Array.from(new Set(repertoireTuneGenres.map(String))),
   };
 }
 
@@ -177,7 +177,7 @@ export async function buildGenreFilterOverrides(params: {
 }): Promise<SyncRequestOverrides | null> {
   const { db, supabase, userId, isInitialSync } = params;
 
-  const { effective, playlistGenres } = isInitialSync
+  const { effective, repertoireGenres } = isInitialSync
     ? await getEffectiveGenreFilterInitialSync({ db, supabase, userId })
     : await getEffectiveGenreFilterIncrementalSync({ db, userId });
 
@@ -186,14 +186,14 @@ export async function buildGenreFilterOverrides(params: {
       `[GenreFilter] ⚠️  No genres selected - for INITIAL sync, returning null means pull ALL public catalog data`
     );
     // For initial sync with no genres: return null to let worker pull all public data
-    // This handles the case where user hasn't selected genres yet or cleared their playlist
+    // This handles the case where user hasn't selected genres yet or cleared their repertoire
     return null;
   }
 
   return {
     genreFilter: {
       selectedGenreIds: effective,
-      playlistGenreIds: playlistGenres,
+      repertoireGenreIds: repertoireGenres,
     },
   };
 }
@@ -216,7 +216,7 @@ export async function purgeOrphanedAnnotations(
     throw new Error("SQLite instance not available");
   }
 
-  const tables = ["note", "reference"] as const; // NOT practice_record - filtered by playlist
+  const tables = ["note", "reference"] as const; // NOT practice_record - filtered by repertoire
   const deletedCounts: Record<string, number> = {};
 
   for (const tableName of tables) {
