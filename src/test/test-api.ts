@@ -27,7 +27,8 @@ import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
 
 type SeedAddToReviewInput = {
-  playlistId: string; // UUID
+  repertoireId?: string; // UUID
+  playlistId?: string; // UUID (backward compatibility)
   tuneIds: string[]; // UUIDs
   // Optional explicit user id (Supabase Auth UUID). If omitted, we will
   // resolve from current Supabase session via user_profile lookup.
@@ -107,6 +108,11 @@ async function resolveUserId(_db: SqliteDatabase): Promise<string> {
 async function seedAddToReview(input: SeedAddToReviewInput) {
   const db = await ensureDb();
   const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+  const repertoireId = input.repertoireId ?? input.playlistId;
+
+  if (!repertoireId) {
+    throw new Error("seedAddToReview requires repertoireId (or playlistId)");
+  }
 
   const userRef = input.userId ?? (await resolveUserId(db));
 
@@ -122,7 +128,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       })
       .where(
         and(
-          eq(playlistTune.playlistRef, input.playlistId),
+          eq(playlistTune.playlistRef, repertoireId),
           eq(playlistTune.tuneRef, tuneId),
           eq(playlistTune.deleted, 0)
         )
@@ -138,7 +144,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .from(practiceRecord)
       .where(
         and(
-          eq(practiceRecord.playlistRef, input.playlistId),
+          eq(practiceRecord.playlistRef, repertoireId),
           eq(practiceRecord.tuneRef, tuneId)
         )
       )
@@ -149,7 +155,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
         .insert(practiceRecord)
         .values({
           id: generateId(),
-          playlistRef: input.playlistId,
+          playlistRef: repertoireId,
           tuneRef: tuneId,
           practiced: null,
           quality: null,
@@ -181,7 +187,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, input.playlistId),
+        eq(dailyPracticeQueue.playlistRef, repertoireId),
         eq(dailyPracticeQueue.active, 1)
       )
     )
@@ -194,7 +200,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, input.playlistId),
+          eq(dailyPracticeQueue.playlistRef, repertoireId),
           eq(dailyPracticeQueue.windowStartUtc, latestWindow[0].windowStart)
         )
       )
@@ -205,7 +211,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
   const regenerated = await generateOrGetPracticeQueue(
     db,
     userRef,
-    input.playlistId,
+    repertoireId,
     new Date(),
     null,
     "per_day",

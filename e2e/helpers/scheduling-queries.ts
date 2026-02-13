@@ -16,7 +16,8 @@ log.setLevel("info");
 export interface PracticeRecord {
   id: string;
   tune_ref: string;
-  playlist_ref: string;
+  repertoire_ref: string;
+  playlist_ref?: string;
   practiced: string; // ISO timestamp
   due: string; // ISO timestamp - next review date
   quality: number; // 1=Again, 2=Hard, 3=Good, 4=Easy
@@ -33,7 +34,7 @@ export interface PracticeRecord {
 }
 
 /**
- * Scheduled Date Info (from playlist_tune table)
+ * Scheduled Date Info (from repertoire_tune/playlist_tune table)
  */
 export interface ScheduledDateInfo {
   tune_ref: string;
@@ -113,13 +114,13 @@ export async function queryTunesByTitles(
  *
  * @param page - Playwright Page
  * @param tuneId - Tune UUID
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @returns Latest practice record or null if never practiced
  */
 export async function queryLatestPracticeRecord(
   page: Page,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<PracticeRecord | null> {
   log.debug(`📊 Querying latest practice record for tune ${tuneId}`);
 
@@ -135,11 +136,11 @@ export async function queryLatestPracticeRecord(
           // Extra browser-side instrumentation
           // eslint-disable-next-line no-console
           console.debug(
-            `[queryLatestPracticeRecord] Evaluating in browser tuneId=${args.tuneId} playlistId=${args.playlistId}`
+            `[queryLatestPracticeRecord] Evaluating in browser tuneId=${args.tuneId} repertoireId=${args.repertoireId}`
           );
           const res = await api.getLatestPracticeRecord(
             args.tuneId,
-            args.playlistId
+            args.repertoireId
           );
           // eslint-disable-next-line no-console
           console.debug(
@@ -152,7 +153,7 @@ export async function queryLatestPracticeRecord(
           throw e;
         }
       },
-      { tuneId, playlistId }
+      { tuneId, repertoireId }
     );
   } catch (err) {
     log.error(
@@ -171,20 +172,20 @@ export async function queryLatestPracticeRecord(
 }
 
 /**
- * Get scheduled dates for tunes in a playlist
+ * Get scheduled dates for tunes in a repertoire
  *
  * @param page - Playwright Page
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneIds - Optional array of specific tune IDs to query
  * @returns Map of tune_ref → scheduled date info
  */
 export async function queryScheduledDates(
   page: Page,
-  playlistId: string,
+  repertoireId: string,
   tuneIds?: string[]
 ): Promise<Map<string, ScheduledDateInfo>> {
   log.debug(
-    `📊 Querying scheduled dates for playlist ${playlistId}${tuneIds ? ` (${tuneIds.length} tunes)` : ""}`
+    `📊 Querying scheduled dates for repertoire ${repertoireId}${tuneIds ? ` (${tuneIds.length} tunes)` : ""}`
   );
 
   const result = await page.evaluate(
@@ -194,9 +195,9 @@ export async function queryScheduledDates(
         throw new Error("__ttTestApi not available on window");
       }
 
-      return await api.getScheduledDates(args.playlistId, args.tuneIds);
+      return await api.getScheduledDates(args.repertoireId, args.tuneIds);
     },
-    { playlistId, tuneIds }
+    { repertoireId, tuneIds }
   );
 
   const dateMap = new Map<string, ScheduledDateInfo>(Object.entries(result));
@@ -209,17 +210,17 @@ export async function queryScheduledDates(
  * Get current practice queue for a specific window
  *
  * @param page - Playwright Page
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param windowStartUtc - Optional window start (defaults to today)
  * @returns Array of queue items
  */
 export async function queryPracticeQueue(
   page: Page,
-  playlistId: string,
+  repertoireId: string,
   windowStartUtc?: string
 ): Promise<PracticeQueueItem[]> {
   log.debug(
-    `📊 Querying practice queue for playlist ${playlistId}${windowStartUtc ? ` (window: ${windowStartUtc})` : ""}`
+    `📊 Querying practice queue for repertoire ${repertoireId}${windowStartUtc ? ` (window: ${windowStartUtc})` : ""}`
   );
 
   const queue = await page.evaluate(
@@ -229,9 +230,9 @@ export async function queryPracticeQueue(
         throw new Error("__ttTestApi not available on window");
       }
 
-      return await api.getPracticeQueue(args.playlistId, args.windowStartUtc);
+      return await api.getPracticeQueue(args.repertoireId, args.windowStartUtc);
     },
-    { playlistId, windowStartUtc }
+    { repertoireId, windowStartUtc }
   );
 
   log.debug(

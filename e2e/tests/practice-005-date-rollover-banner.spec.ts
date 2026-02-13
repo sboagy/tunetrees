@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import {
   getPrivateTuneIds,
-  TEST_PLAYLIST_IRISH_FIDDLE_NAME,
+  TEST_REPERTOIRE_IRISH_FIDDLE_NAME,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
 import {
@@ -33,7 +33,7 @@ const ROLLOVER_WAIT_MS = 1500;
 const QUEUE_DATE_STORAGE_KEY = "TT_PRACTICE_QUEUE_DATE";
 const QUEUE_DATE_MANUAL_FLAG_KEY = "TT_PRACTICE_QUEUE_DATE_MANUAL";
 
-const PLAYLIST_B_NAME = `${TEST_PLAYLIST_IRISH_FIDDLE_NAME} (E2E)`;
+const REPERTOIRE_B_NAME = `${TEST_REPERTOIRE_IRISH_FIDDLE_NAME} (E2E)`;
 
 let ttPage: TuneTreesPage;
 let currentDate: Date;
@@ -64,18 +64,18 @@ async function waitForTestApi(page: Page) {
   });
 }
 
-async function getQueueRows(page: Page, playlistId: string) {
-  return await page.evaluate(async (pid) => {
+async function getQueueRows(page: Page, repertoireId: string) {
+  return await page.evaluate(async (rid) => {
     const api = (window as any).__ttTestApi;
     if (!api || typeof api.getPracticeQueue !== "function") {
       throw new Error("__ttTestApi.getPracticeQueue is not available");
     }
-    return await api.getPracticeQueue(pid);
-  }, playlistId);
+    return await api.getPracticeQueue(rid);
+  }, repertoireId);
 }
 
-async function getQueueSnapshot(page: Page, playlistId: string) {
-  const rows = await getQueueRows(page, playlistId);
+async function getQueueSnapshot(page: Page, repertoireId: string) {
+  const rows = await getQueueRows(page, repertoireId);
   if (!rows.length) {
     throw new Error("Expected practice queue rows but found none");
   }
@@ -100,8 +100,8 @@ async function getQueueStorage(page: Page) {
   );
 }
 
-async function expectQueueMatchesGrid(page: Page, playlistId: string) {
-  const snapshot = await getQueueSnapshot(page, playlistId);
+async function expectQueueMatchesGrid(page: Page, repertoireId: string) {
+  const snapshot = await getQueueSnapshot(page, repertoireId);
   const rows = ttPage.getRows("scheduled");
   await expect(rows).toHaveCount(snapshot.tuneOrder.length, {
     timeout: 10000,
@@ -123,20 +123,20 @@ async function selectPlaylistByName(page: Page, playlistName: string) {
   await page.waitForLoadState("networkidle", { timeout: 15000 });
 }
 
-async function ensurePlaylistWithTunes(
+async function ensureRepertoireWithTunes(
   userKey: string,
   userId: string,
-  playlistName: string,
+  repertoireName: string,
   tuneIds: string[],
   scheduleBase: Date
 ) {
   const { supabase } = await getTestUserClient(userKey);
-  const playlistId = randomUUID();
+  const repertoireId = randomUUID();
 
   const { error: clearQueueError } = await supabase
     .from("daily_practice_queue")
     .delete()
-    .eq("playlist_ref", playlistId);
+    .eq("repertoire_ref", repertoireId);
   if (clearQueueError) {
     throw new Error(
       `Failed to clear daily_practice_queue: ${clearQueueError.message}`
@@ -146,37 +146,37 @@ async function ensurePlaylistWithTunes(
   const { error: clearPracticeError } = await supabase
     .from("practice_record")
     .delete()
-    .eq("playlist_ref", playlistId);
+    .eq("repertoire_ref", repertoireId);
   if (clearPracticeError) {
     throw new Error(
       `Failed to clear practice_record: ${clearPracticeError.message}`
     );
   }
 
-  const { error: clearPlaylistTunesError } = await supabase
-    .from("playlist_tune")
+  const { error: clearRepertoireTunesError } = await supabase
+    .from("repertoire_tune")
     .delete()
-    .eq("playlist_ref", playlistId);
-  if (clearPlaylistTunesError) {
+    .eq("repertoire_ref", repertoireId);
+  if (clearRepertoireTunesError) {
     throw new Error(
-      `Failed to clear playlist_tune: ${clearPlaylistTunesError.message}`
+      `Failed to clear repertoire_tune: ${clearRepertoireTunesError.message}`
     );
   }
 
-  const { error: playlistError } = await supabase.from("playlist").upsert(
+  const { error: repertoireError } = await supabase.from("repertoire").upsert(
     {
-      playlist_id: playlistId,
+      repertoire_id: repertoireId,
       user_ref: userId,
-      name: playlistName,
+      name: repertoireName,
       deleted: false,
       sync_version: 1,
       last_modified_at: new Date().toISOString(),
       device_id: "test-seed",
     },
-    { onConflict: "playlist_id" }
+    { onConflict: "repertoire_id" }
   );
-  if (playlistError) {
-    throw new Error(`Failed to upsert playlist: ${playlistError.message}`);
+  if (repertoireError) {
+    throw new Error(`Failed to upsert repertoire: ${repertoireError.message}`);
   }
 
   const scheduledDate = new Date(scheduleBase);
@@ -184,9 +184,11 @@ async function ensurePlaylistWithTunes(
   const scheduledIso = scheduledDate.toISOString();
 
   for (const tuneId of tuneIds) {
-    const { error: tuneError } = await supabase.from("playlist_tune").upsert(
+    const { error: tuneError } = await supabase
+      .from("repertoire_tune")
+      .upsert(
       {
-        playlist_ref: playlistId,
+        repertoire_ref: repertoireId,
         tune_ref: tuneId,
         current: null,
         learned: null,
@@ -197,30 +199,33 @@ async function ensurePlaylistWithTunes(
         last_modified_at: new Date().toISOString(),
         device_id: "test-seed",
       },
-      { onConflict: "playlist_ref,tune_ref" }
+      { onConflict: "repertoire_ref,tune_ref" }
     );
 
     if (tuneError) {
-      throw new Error(`Failed to seed playlist_tune: ${tuneError.message}`);
+      throw new Error(`Failed to seed repertoire_tune: ${tuneError.message}`);
     }
   }
 
-  return playlistId;
+  return repertoireId;
 }
 
-async function cleanupPlaylist(userKey: string, playlistId: string) {
+async function cleanupRepertoire(userKey: string, repertoireId: string) {
   const { supabase } = await getTestUserClient(userKey);
 
   await supabase
     .from("daily_practice_queue")
     .delete()
-    .eq("playlist_ref", playlistId);
+    .eq("repertoire_ref", repertoireId);
   await supabase
     .from("practice_record")
     .delete()
-    .eq("playlist_ref", playlistId);
-  await supabase.from("playlist_tune").delete().eq("playlist_ref", playlistId);
-  await supabase.from("playlist").delete().eq("playlist_id", playlistId);
+    .eq("repertoire_ref", repertoireId);
+  await supabase
+    .from("repertoire_tune")
+    .delete()
+    .eq("repertoire_ref", repertoireId);
+  await supabase.from("repertoire").delete().eq("repertoire_id", repertoireId);
 }
 
 test.describe("PRACTICE-005: Date Rollover Banner", () => {
@@ -270,14 +275,14 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
 
     const initialQueue = await expectQueueMatchesGrid(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     const initialStorage = await getQueueStorage(page);
 
     currentDate = await advanceDays(context, 1, currentDate);
     await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
 
-    const afterQueue = await getQueueSnapshot(page, testUser.playlistId);
+    const afterQueue = await getQueueSnapshot(page, testUser.repertoireId);
     const afterStorage = await getQueueStorage(page);
 
     expect(afterQueue.windowStartUtc).toBe(initialQueue.windowStartUtc);
@@ -288,7 +293,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     currentDate = await advanceDays(context, 1, currentDate);
     await page.waitForTimeout(ROLLOVER_WAIT_MS);
 
-    const afterSecondQueue = await getQueueSnapshot(page, testUser.playlistId);
+    const afterSecondQueue = await getQueueSnapshot(page, testUser.repertoireId);
     expect(afterSecondQueue.windowStartUtc).toBe(initialQueue.windowStartUtc);
     expect(afterSecondQueue.tuneOrder).toEqual(initialQueue.tuneOrder);
   });
@@ -300,7 +305,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
   }) => {
     const initialQueue = await expectQueueMatchesGrid(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     const initialStorage = await getQueueStorage(page);
 
@@ -323,14 +328,14 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     await expect
       .poll(
         async () =>
-          (await getQueueSnapshot(page, testUser.playlistId)).windowStartUtc,
+          (await getQueueSnapshot(page, testUser.repertoireId)).windowStartUtc,
         { timeout: 15000, intervals: [200, 500, 1000] }
       )
       .not.toBe(initialQueue.windowStartUtc);
 
     const refreshedQueue = await expectQueueMatchesGrid(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     const refreshedStorage = await getQueueStorage(page);
 
@@ -352,7 +357,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
   }) => {
     const initialQueue = await expectQueueMatchesGrid(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
 
     const rows = ttPage.getRows("scheduled");
@@ -367,7 +372,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     await expect
       .poll(
         async () => {
-          const rows = await getQueueRows(page, testUser.playlistId);
+          const rows = await getQueueRows(page, testUser.repertoireId);
           return rows.every(
             (row: { completed_at: string | null }) => !!row.completed_at
           );
@@ -383,7 +388,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     await expect
       .poll(
         async () =>
-          (await getQueueSnapshot(page, testUser.playlistId)).windowStartUtc,
+          (await getQueueSnapshot(page, testUser.repertoireId)).windowStartUtc,
         { timeout: 15000, intervals: [200, 500, 1000] }
       )
       .not.toBe(initialQueue.windowStartUtc);
@@ -395,7 +400,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     expect(refreshedStorage.manualFlag).toBe("false");
   });
 
-  // This test is skipped because it has side effects on the database, such as creating and deleting playlists,
+  // This test is skipped because it has side effects on the database, such as creating and deleting repertoires,
   // so it needs work to isolate its effects.
   test.skip("should preserve queues when switching repertoires", async ({
     page,
@@ -403,29 +408,29 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     testUserKey,
   }) => {
     const { supabase } = await getTestUserClient(testUserKey);
-    const { data: playlistAData, error: playlistAError } = await supabase
+    const { data: repertoireAData, error: repertoireAError } = await supabase
       .from("view_playlist_joined")
       .select("instrument")
-      .eq("playlist_id", testUser.playlistId)
+      .eq("repertoire_id", testUser.repertoireId)
       .single();
-    if (playlistAError) {
+    if (repertoireAError) {
       throw new Error(
-        `Failed to load primary playlist instrument: ${playlistAError.message}`
+        `Failed to load primary repertoire instrument: ${repertoireAError.message}`
       );
     }
-    const playlistAName = playlistAData?.instrument?.trim() || "";
-    if (!playlistAName) {
+    const repertoireAName = repertoireAData?.instrument?.trim() || "";
+    if (!repertoireAName) {
       throw new Error(
-        "Primary playlist instrument name is empty; cannot select in UI"
+        "Primary repertoire instrument name is empty; cannot select in UI"
       );
     }
 
-    let playlistBId: string | null = null;
+    let repertoireBId: string | null = null;
     try {
-      playlistBId = await ensurePlaylistWithTunes(
+      repertoireBId = await ensureRepertoireWithTunes(
         testUserKey,
         testUser.userId,
-        PLAYLIST_B_NAME,
+        REPERTOIRE_B_NAME,
         [TEST_TUNE_MORRISON_ID],
         currentDate
       );
@@ -435,23 +440,23 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       await waitForTestApi(page);
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
-      await selectPlaylistByName(page, playlistAName);
-      const queueA = await getQueueSnapshot(page, testUser.playlistId);
+      await selectPlaylistByName(page, repertoireAName);
+      const queueA = await getQueueSnapshot(page, testUser.repertoireId);
 
-      await selectPlaylistByName(page, PLAYLIST_B_NAME);
-      if (!playlistBId) {
-        throw new Error("Secondary playlist ID missing after creation");
+      await selectPlaylistByName(page, REPERTOIRE_B_NAME);
+      if (!repertoireBId) {
+        throw new Error("Secondary repertoire ID missing after creation");
       }
-      const queueB = await getQueueSnapshot(page, playlistBId);
+      const queueB = await getQueueSnapshot(page, repertoireBId);
       expect(queueB.tuneOrder).not.toEqual(queueA.tuneOrder);
 
-      await selectPlaylistByName(page, playlistAName);
-      const queueAAfter = await getQueueSnapshot(page, testUser.playlistId);
+      await selectPlaylistByName(page, repertoireAName);
+      const queueAAfter = await getQueueSnapshot(page, testUser.repertoireId);
       expect(queueAAfter.windowStartUtc).toBe(queueA.windowStartUtc);
       expect(queueAAfter.tuneOrder).toEqual(queueA.tuneOrder);
     } finally {
-      if (playlistBId) {
-        await cleanupPlaylist(testUserKey, playlistBId);
+      if (repertoireBId) {
+        await cleanupRepertoire(testUserKey, repertoireBId);
       }
     }
   });

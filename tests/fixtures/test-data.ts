@@ -6,7 +6,7 @@
  *
  * Categories:
  * - 000000000xxx: Users
- * - 0000000010xx: Playlists
+ * - 0000000010xx: Repertoires
  * - 0000000100xx: Test-specific tunes (not catalog tunes)
  * - 0000001000xx: Reference data (genres, instruments, tune types)
  * - 0000010000xx: Practice records
@@ -187,34 +187,58 @@ export const TEST_TUNE_TYPE_WALTZ_ID = "00000000-0000-4000-8000-000000001203";
 export const TEST_TUNE_TYPE_WALTZ_NAME = "Waltz";
 
 // ============================================================
-// PLAYLISTS
+// REPERTOIRES
 // ============================================================
 
-// ============================================================
-// PLAYLISTS
-// ============================================================
-
-export const TEST_PLAYLIST_IRISH_FIDDLE_ID =
+export const TEST_REPERTOIRE_IRISH_FIDDLE_ID =
   "00000000-0000-4000-8000-000000001010";
-export const TEST_PLAYLIST_IRISH_FIDDLE_NAME = "Irish Fiddle Tunes";
+export const TEST_REPERTOIRE_IRISH_FIDDLE_NAME = "Irish Fiddle Tunes";
 
-export const TEST_PLAYLIST_SCOTTISH_FLUTE_ID =
+export const TEST_REPERTOIRE_SCOTTISH_FLUTE_ID =
   "00000000-0000-4000-8000-000000001011";
-export const TEST_PLAYLIST_SCOTTISH_FLUTE_NAME = "Scottish Flute Tunes";
+export const TEST_REPERTOIRE_SCOTTISH_FLUTE_NAME = "Scottish Flute Tunes";
 
-export const TEST_PLAYLIST_ENGLISH_MANDOLIN_ID =
+export const TEST_REPERTOIRE_ENGLISH_MANDOLIN_ID =
   "00000000-0000-4000-8000-000000001012";
-export const TEST_PLAYLIST_ENGLISH_MANDOLIN_NAME = "English Mandolin Tunes";
+export const TEST_REPERTOIRE_ENGLISH_MANDOLIN_NAME = "English Mandolin Tunes";
 
-// Playwright E2E Test User Playlists (matching e2e/helpers/test-users.ts)
-export const TEST_PLAYLIST_ALICE_ID = "00000000-0000-4000-8000-000000019001";
-export const TEST_PLAYLIST_BOB_ID = "00000000-0000-4000-8000-000000019002";
-export const TEST_PLAYLIST_DAVE_ID = "00000000-0000-4000-8000-000000019004";
-export const TEST_PLAYLIST_EVE_ID = "00000000-0000-4000-8000-000000019005";
-export const TEST_PLAYLIST_FRANK_ID = "00000000-0000-4000-8000-000000019006";
-export const TEST_PLAYLIST_GRACE_ID = "00000000-0000-4000-8000-000000019007";
-export const TEST_PLAYLIST_HENRY_ID = "00000000-0000-4000-8000-000000019008";
-export const TEST_PLAYLIST_IRIS_ID = "00000000-0000-4000-8000-000000019009";
+// Playwright E2E test-user repertoires (matching e2e/helpers/test-users.ts)
+export const TEST_REPERTOIRE_ALICE_ID =
+  "00000000-0000-4000-8000-000000019001";
+export const TEST_REPERTOIRE_BOB_ID =
+  "00000000-0000-4000-8000-000000019002";
+export const TEST_REPERTOIRE_DAVE_ID =
+  "00000000-0000-4000-8000-000000019004";
+export const TEST_REPERTOIRE_EVE_ID =
+  "00000000-0000-4000-8000-000000019005";
+export const TEST_REPERTOIRE_FRANK_ID =
+  "00000000-0000-4000-8000-000000019006";
+export const TEST_REPERTOIRE_GRACE_ID =
+  "00000000-0000-4000-8000-000000019007";
+export const TEST_REPERTOIRE_HENRY_ID =
+  "00000000-0000-4000-8000-000000019008";
+export const TEST_REPERTOIRE_IRIS_ID =
+  "00000000-0000-4000-8000-000000019009";
+
+// Backward-compatible aliases for transitional test call sites
+export const TEST_PLAYLIST_IRISH_FIDDLE_ID = TEST_REPERTOIRE_IRISH_FIDDLE_ID;
+export const TEST_PLAYLIST_IRISH_FIDDLE_NAME =
+  TEST_REPERTOIRE_IRISH_FIDDLE_NAME;
+export const TEST_PLAYLIST_SCOTTISH_FLUTE_ID = TEST_REPERTOIRE_SCOTTISH_FLUTE_ID;
+export const TEST_PLAYLIST_SCOTTISH_FLUTE_NAME =
+  TEST_REPERTOIRE_SCOTTISH_FLUTE_NAME;
+export const TEST_PLAYLIST_ENGLISH_MANDOLIN_ID =
+  TEST_REPERTOIRE_ENGLISH_MANDOLIN_ID;
+export const TEST_PLAYLIST_ENGLISH_MANDOLIN_NAME =
+  TEST_REPERTOIRE_ENGLISH_MANDOLIN_NAME;
+export const TEST_PLAYLIST_ALICE_ID = TEST_REPERTOIRE_ALICE_ID;
+export const TEST_PLAYLIST_BOB_ID = TEST_REPERTOIRE_BOB_ID;
+export const TEST_PLAYLIST_DAVE_ID = TEST_REPERTOIRE_DAVE_ID;
+export const TEST_PLAYLIST_EVE_ID = TEST_REPERTOIRE_EVE_ID;
+export const TEST_PLAYLIST_FRANK_ID = TEST_REPERTOIRE_FRANK_ID;
+export const TEST_PLAYLIST_GRACE_ID = TEST_REPERTOIRE_GRACE_ID;
+export const TEST_PLAYLIST_HENRY_ID = TEST_REPERTOIRE_HENRY_ID;
+export const TEST_PLAYLIST_IRIS_ID = TEST_REPERTOIRE_IRIS_ID;
 
 // ============================================================
 // TUNES
@@ -305,12 +329,20 @@ export const TEST_REFERENCE_2_ID = "00000000-0000-4000-8000-000000100202";
 export const TEST_TAB_STATE_ID = "00000000-0000-4000-8000-000000100301";
 
 // ============================================================
-// PLAYLIST_TUNE (Junction Table)
+// REPERTOIRE_TUNE (Junction Table)
 // ============================================================
 
-export const TEST_PLAYLIST_TUNE_1_ID = "00000000-0000-4000-8000-000000030001";
-export const TEST_PLAYLIST_TUNE_2_ID = "00000000-0000-4000-8000-000000030002";
-export const TEST_PLAYLIST_TUNE_3_ID = "00000000-0000-4000-8000-000000030003";
+export const TEST_REPERTOIRE_TUNE_1_ID =
+  "00000000-0000-4000-8000-000000030001";
+export const TEST_REPERTOIRE_TUNE_2_ID =
+  "00000000-0000-4000-8000-000000030002";
+export const TEST_REPERTOIRE_TUNE_3_ID =
+  "00000000-0000-4000-8000-000000030003";
+
+// Backward-compatible aliases for transitional test call sites
+export const TEST_PLAYLIST_TUNE_1_ID = TEST_REPERTOIRE_TUNE_1_ID;
+export const TEST_PLAYLIST_TUNE_2_ID = TEST_REPERTOIRE_TUNE_2_ID;
+export const TEST_PLAYLIST_TUNE_3_ID = TEST_REPERTOIRE_TUNE_3_ID;
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -318,8 +350,8 @@ export const TEST_PLAYLIST_TUNE_3_ID = "00000000-0000-4000-8000-000000030003";
 
 /**
  * Generate a test UUID with a specific index
- * @param category - Category prefix (e.g., "0001" for playlists)
- * @param index - Index within category (e.g., 10 for 10th playlist)
+ * @param category - Category prefix (e.g., "0001" for repertoires)
+ * @param index - Index within category (e.g., 10 for 10th repertoire)
  */
 export function generateTestUUID(category: string, index: number): string {
   const indexStr = index.toString().padStart(4, "0");
@@ -450,9 +482,9 @@ export const TEST_TUNE_BANISH = {
   privateFor: null as string | null,
 };
 
-export const TEST_PLAYLIST_IRISH_FIDDLE = {
-  id: TEST_PLAYLIST_IRISH_FIDDLE_ID,
-  name: TEST_PLAYLIST_IRISH_FIDDLE_NAME,
+export const TEST_REPERTOIRE_IRISH_FIDDLE = {
+  id: TEST_REPERTOIRE_IRISH_FIDDLE_ID,
+  name: TEST_REPERTOIRE_IRISH_FIDDLE_NAME,
   userRef: TEST_USER_ALICE_ID,
   instrument: TEST_INSTRUMENT_FIDDLE_ID,
   genre: TEST_GENRE_IRISH_ID,
@@ -460,6 +492,9 @@ export const TEST_PLAYLIST_IRISH_FIDDLE = {
   createdAt: new Date("2024-01-01T00:00:00Z"),
   updatedAt: new Date("2024-01-01T00:00:00Z"),
 };
+
+// Backward-compatible alias for transitional test call sites
+export const TEST_PLAYLIST_IRISH_FIDDLE = TEST_REPERTOIRE_IRISH_FIDDLE;
 
 // ============================================================
 // COLLECTIONS FOR BULK OPERATIONS

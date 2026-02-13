@@ -424,22 +424,25 @@ export async function setupDeterministicTestParallel(
             table: "table_transient_data",
             column: "tune_id",
             extraFilters: (q) =>
-              q.eq("user_id", user.userId).eq("playlist_id", user.playlistId),
+              q.eq("user_id", user.userId).eq(
+                "repertoire_id",
+                user.repertoireId
+              ),
           },
           {
             table: "daily_practice_queue",
             column: "tune_ref",
-            extraFilters: (q) => q.eq("playlist_ref", user.playlistId),
+            extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
           },
           {
             table: "practice_record",
             column: "tune_ref",
-            extraFilters: (q) => q.eq("playlist_ref", user.playlistId),
+            extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
           },
           {
-            table: "playlist_tune",
+            table: "repertoire_tune",
             column: "tune_ref",
-            extraFilters: (q) => q.eq("playlist_ref", user.playlistId),
+            extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
           },
           { table: "tune_override", column: "tune_ref" },
         ];
@@ -449,7 +452,7 @@ export async function setupDeterministicTestParallel(
               const { error } = await supabase.rpc(
                 "e2e_delete_practice_record_by_tunes",
                 {
-                  target_playlist: user.playlistId,
+                  target_playlist: user.repertoireId,
                   tune_ids: uniqueIds,
                 }
               );
@@ -511,8 +514,8 @@ export async function setupDeterministicTestParallel(
   // Step 1: Clear user's state
   if (opts.clearRepertoire) {
     // Clear user's repertoire via generic table helper and verify
-    await clearUserTable(user, "playlist_tune");
-    whichTables = [...whichTables, "playlist_tune"];
+    await clearUserTable(user, "repertoire_tune");
+    whichTables = [...whichTables, "repertoire_tune"];
   }
   await clearUserTable(user, "user_genre_selection");
   if (opts.clearNotesAndReferences) {
@@ -545,9 +548,9 @@ export async function setupDeterministicTestParallel(
 
     for (const tuneId of opts.scheduleTunes.tuneIds) {
       const { error } = await supabase
-        .from("playlist_tune")
+        .from("repertoire_tune")
         .update({ scheduled: scheduledDateStr })
-        .eq("playlist_ref", user.playlistId)
+        .eq("repertoire_ref", user.repertoireId)
         .eq("tune_ref", tuneId);
 
       if (error) {
@@ -574,7 +577,7 @@ export async function setupDeterministicTestParallel(
   log.debug(`✅ [${user.name}] Deterministic test state ready`);
 }
 
-// clearUserRepertoire removed; use clearUserTable(user, "playlist_tune") + verifyTablesEmpty
+// clearUserRepertoire removed; use clearUserTable(user, "repertoire_tune") + verifyTablesEmpty
 
 /**
  * Seed repertoire for a specific test user (parallel-safe)
@@ -587,9 +590,9 @@ export async function seedUserRepertoire(
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
 
-  // Verify playlist_tune is empty before seeding (consistent helper)
+  // Verify repertoire_tune is empty before seeding (consistent helper)
   if (preCheck) {
-    await verifyTablesEmpty(user, ["playlist_tune"], supabase);
+    await verifyTablesEmpty(user, ["repertoire_tune"], supabase);
   }
 
   const maxAttempts = 5;
@@ -598,9 +601,9 @@ export async function seedUserRepertoire(
     while (true) {
       attempt++;
       const { error } = await supabase
-        .from("playlist_tune")
+        .from("repertoire_tune")
         .upsert({
-          playlist_ref: user.playlistId,
+          repertoire_ref: user.repertoireId,
           tune_ref: tuneId,
           current: null,
           learned: null,
@@ -611,7 +614,7 @@ export async function seedUserRepertoire(
           last_modified_at: new Date().toISOString(),
           device_id: "test-seed",
         })
-        .eq("playlist_ref", user.playlistId)
+        .eq("repertoire_ref", user.repertoireId)
         .eq("tune_ref", tuneId);
 
       if (!error) break;
@@ -642,14 +645,14 @@ export async function seedUserRepertoire(
 
     while (Date.now() - start < timeoutMs) {
       const { count, error } = await supabase
-        .from("playlist_tune")
+        .from("repertoire_tune")
         .select("*", { count: "exact", head: true })
-        .eq("playlist_ref", user.playlistId)
+        .eq("repertoire_ref", user.repertoireId)
         .in("tune_ref", tuneIds);
 
       if (error) {
         console.warn(
-          `[${user.name}] Transient error reading playlist_tune count, retrying:`,
+          `[${user.name}] Transient error reading repertoire_tune count, retrying:`,
           error.message
         );
       } else {
@@ -665,7 +668,7 @@ export async function seedUserRepertoire(
 
     if (!matched) {
       console.warn(
-        `⚠️ [${user.name}] Timed out waiting for playlist_tune to contain ${tuneIds.length} rows`
+        `⚠️ [${user.name}] Timed out waiting for repertoire_tune to contain ${tuneIds.length} rows`
       );
     }
   }
@@ -679,16 +682,16 @@ function applyTableQueryFilters(
   user: TestUser
 ) {
   if (tableName === "daily_practice_queue") {
-    // Belt-and-suspenders: filter by both playlist and user for safety
+    // Belt-and-suspenders: filter by both repertoire and user for safety
     query = query
-      .eq("playlist_ref", user.playlistId)
+      .eq("repertoire_ref", user.repertoireId)
       .eq("user_ref", user.userId);
   } else if (tableName === "practice_record") {
-    // practice_record is keyed by playlist_ref
-    query = query.eq("playlist_ref", user.playlistId);
-  } else if (tableName === "playlist_tune") {
-    // playlist_tune rows are keyed by playlist_ref; no user_ref column
-    query = query.eq("playlist_ref", user.playlistId);
+    // practice_record is keyed by repertoire_ref
+    query = query.eq("repertoire_ref", user.repertoireId);
+  } else if (tableName === "repertoire_tune") {
+    // repertoire_tune rows are keyed by repertoire_ref; no user_ref column
+    query = query.eq("repertoire_ref", user.repertoireId);
   } else if (tableName === "table_transient_data") {
     query = query.eq("user_id", user.userId);
   } else if (tableName === "prefs_scheduling_options") {
@@ -900,7 +903,7 @@ async function clearUserTable(
     const { error: rpcError } = await supabase.rpc(
       "e2e_clear_practice_record",
       {
-        target_playlist: user.playlistId,
+        target_playlist: user.repertoireId,
       }
     );
     error = rpcError;
@@ -980,7 +983,7 @@ export async function setupForPracticeTestsParallel(
     await clearUserTable(user, "plugin");
 
     // 2. Reset repertoire
-    await clearUserTable(user, "playlist_tune");
+    await clearUserTable(user, "repertoire_tune");
     await clearUserTable(user, "user_genre_selection");
 
     await verifyTablesEmpty(user, [
@@ -990,7 +993,7 @@ export async function setupForPracticeTestsParallel(
       "tune_override",
       "prefs_scheduling_options",
       "plugin",
-      "playlist_tune",
+      "repertoire_tune",
       "user_genre_selection",
     ]);
 
@@ -1010,9 +1013,9 @@ export async function setupForPracticeTestsParallel(
 
       for (const tuneId of repertoireTunes) {
         const { error } = await supabase
-          .from("playlist_tune")
+          .from("repertoire_tune")
           .update({ scheduled: scheduleDateStr })
-          .eq("playlist_ref", user.playlistId)
+          .eq("repertoire_ref", user.repertoireId)
           .eq("tune_ref", tuneId);
 
         if (error) {
@@ -1175,7 +1178,7 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "plugin");
 
   // 2. Reset repertoire
-  await clearUserTable(user, "playlist_tune");
+  await clearUserTable(user, "repertoire_tune");
   await clearUserTable(user, "user_genre_selection");
 
   await verifyTablesEmpty(user, [
@@ -1185,7 +1188,7 @@ export async function setupForRepertoireTestsParallel(
     "tune_override",
     "prefs_scheduling_options",
     "plugin",
-    "playlist_tune",
+    "repertoire_tune",
     "user_genre_selection",
   ]);
 
@@ -1201,10 +1204,10 @@ export async function setupForRepertoireTestsParallel(
 
     for (const tuneId of repertoireTunes) {
       const { error } = await supabase
-        .from("playlist_tune")
+        .from("repertoire_tune")
         .update({ scheduled: scheduleDateStr })
         .eq("tune_ref", tuneId)
-        .eq("playlist_ref", user.playlistId);
+        .eq("repertoire_ref", user.repertoireId);
 
       if (error) {
         console.error(
@@ -1325,14 +1328,14 @@ export async function setupForCatalogTestsParallel(
     "table_transient_data",
     "tune_override",
     "prefs_scheduling_options",
-    "playlist_tune",
+    "repertoire_tune",
     "plugin",
   ];
 
   // 1. Clear only user's repertoire (keep catalog!)
   if (emptyRepertoire) {
-    await clearUserTable(user, "playlist_tune");
-    whichTables = [...whichTables, "playlist_tune"];
+    await clearUserTable(user, "repertoire_tune");
+    whichTables = [...whichTables, "repertoire_tune"];
   }
   await clearUserTable(user, "user_genre_selection");
 
@@ -1354,17 +1357,17 @@ export async function setupForCatalogTestsParallel(
     base.setDate(base.getDate() - scheduleDaysAgo);
     const scheduleDateStr = base.toISOString();
 
-    // Fetch repertoire tunes for this playlist
+    // Fetch repertoire tunes for this repertoire
     const { data: repRows, error: repErr } = await supabase
-      .from("playlist_tune")
+      .from("repertoire_tune")
       .select("tune_ref")
-      .eq("playlist_ref", user.playlistId);
+      .eq("repertoire_ref", user.repertoireId);
     if (!repErr && repRows) {
       for (const row of repRows) {
         const { error } = await supabase
-          .from("playlist_tune")
+          .from("repertoire_tune")
           .update({ scheduled: scheduleDateStr })
-          .eq("playlist_ref", user.playlistId)
+          .eq("repertoire_ref", user.repertoireId)
           .eq("tune_ref", row.tune_ref);
         if (error) {
           console.warn(
