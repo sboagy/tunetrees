@@ -39,8 +39,6 @@ export class TuneTreesPage {
   readonly logoDropdownWhatsNewLink: Locator;
   readonly repertoireDropdown: Locator;
   readonly repertoireDropdownButton: Locator;
-  readonly repertoireDropdown: Locator;
-  readonly repertoireDropdownButton: Locator;
   readonly databaseStatusDropdown: Locator;
   readonly databaseStatusButton: Locator;
   readonly userMenuDropdown: Locator;
@@ -72,7 +70,6 @@ export class TuneTreesPage {
   readonly typeFilter: Locator;
   readonly modeFilter: Locator;
   readonly genreFilter: Locator;
-  readonly repertoireFilter: Locator;
   readonly repertoireFilter: Locator;
   readonly clearFilters: Locator;
 
@@ -109,7 +106,6 @@ export class TuneTreesPage {
   readonly flashcardRevealButtonMobile: Locator;
   readonly flashcardFieldsMenu: Locator;
 
-  readonly topNavManageRepertoiresPanel: Locator;
   readonly topNavManageRepertoiresPanel: Locator;
 
   // Tune Editor
@@ -236,9 +232,9 @@ export class TuneTreesPage {
       "logo-dropdown-whats-new-link"
     );
     this.repertoireDropdown = page.getByTestId("repertoire-dropdown");
-    this.repertoireDropdownButton = page.getByTestId("repertoire-dropdown-button");
-    this.repertoireDropdown = this.repertoireDropdown;
-    this.repertoireDropdownButton = this.repertoireDropdownButton;
+    this.repertoireDropdownButton = page.getByTestId(
+      "repertoire-dropdown-button"
+    );
     this.databaseStatusDropdown = page.getByTestId("database-status-dropdown");
     this.databaseStatusButton = page.getByTestId("database-status-button");
     this.userMenuDropdown = page.getByTestId("user-menu-dropdown");
@@ -276,7 +272,6 @@ export class TuneTreesPage {
     this.repertoireFilter = page.locator(
       '[data-testid="filter-dropdown-repertoire"], [data-testid="filter-dropdown-repertoire"]'
     );
-    this.repertoireFilter = this.repertoireFilter;
     this.clearFilters = page.getByRole("button", { name: /^Clear All/i });
 
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
@@ -326,7 +321,6 @@ export class TuneTreesPage {
     this.topNavManageRepertoiresPanel = page.getByTestId(
       "top-nav-manage-repertoires-panel"
     );
-    this.topNavManageRepertoiresPanel = this.topNavManageRepertoiresPanel;
 
     // Tune Editor
     this.tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -563,14 +557,6 @@ export class TuneTreesPage {
   }
 
   /**
-   * Sign in anonymously and complete onboarding by creating a repertoire.
-   * Alias of signInAnonymouslyWithRepertoire for compatibility.
-   */
-  async signInAnonymouslyWithRepertoire(repertoireName = "Test Repertoire") {
-    await this.signInAnonymouslyWithRepertoire(repertoireName);
-  }
-
-  /**
    * Sign in anonymously and stop at the genre selection onboarding step.
    */
   async signInAnonymouslyToGenreSelection(repertoireName = "Test Repertoire") {
@@ -643,19 +629,14 @@ export class TuneTreesPage {
     await this.completeOnboardingWithRepertoireConfig({ name: repertoireName });
   }
 
-  /**
-   * Complete onboarding by creating a repertoire.
-   * Alias of completeOnboardingWithRepertoire for compatibility.
-   */
-  async completeOnboardingWithRepertoire(repertoireName = "Test Repertoire") {
-    await this.completeOnboardingWithRepertoire(repertoireName);
-  }
-
   private async completeOnboardingWithRepertoireConfig(
     opts: OnboardingRepertoireArgs
   ): Promise<boolean> {
     const repertoireName = opts.name?.trim() || "Test Repertoire";
-    const didStart = await this.startOnboardingWithRepertoire(repertoireName, opts);
+    const didStart = await this.startOnboardingWithRepertoire(
+      repertoireName,
+      opts
+    );
     if (!didStart) return false;
 
     await this.applyOnboardingGenreSelection(opts.genres_filter ?? null);

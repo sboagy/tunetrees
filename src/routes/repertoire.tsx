@@ -25,11 +25,11 @@ import {
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
-import { RepertoireEditorDialog as RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import {
   RepertoireEmptyState,
   RepertoireToolbar,
 } from "../components/repertoire";
+import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";

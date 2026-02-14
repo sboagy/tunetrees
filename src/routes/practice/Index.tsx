@@ -23,7 +23,6 @@ import { TunesGridScheduled } from "../../components/grids";
 import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../../components/grids/types";
-import { RepertoireEditorDialog } from "../../components/repertoires/RepertoireEditorDialog";
 import {
   DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
@@ -32,6 +31,7 @@ import {
   PracticeControlBanner,
 } from "../../components/practice";
 import { RepertoireEmptyState } from "../../components/repertoire";
+import { RepertoireEditorDialog } from "../../components/repertoires/RepertoireEditorDialog";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { getUserRepertoires } from "../../lib/db/queries/repertoires";
@@ -966,7 +966,8 @@ const PracticeIndex: Component = () => {
   const renderPracticeFallback = () => {
     const gateBlocked = !isPracticeGateOpen();
     const blockingReasons = practiceGateBlockingReasons();
-    const repertoiresReady = repertoiresLoadedVersion() === repertoiresVersion();
+    const repertoiresReady =
+      repertoiresLoadedVersion() === repertoiresVersion();
     const repertoiresLoading =
       !repertoiresReady || repertoires.loading || repertoires() === undefined;
     const repertoireCount = repertoires()?.length ?? 0;

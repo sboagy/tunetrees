@@ -30,7 +30,7 @@ import {
   getSelectedRepertoireId,
   setSelectedRepertoireId,
 } from "../../lib/services/repertoire-service";
-import { RepertoireManagerDialog as RepertoireManagerDialog } from "../repertoires/RepertoireManagerDialog";
+import { RepertoireManagerDialog } from "../repertoires/RepertoireManagerDialog";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -63,7 +63,9 @@ function formatRelativeTime(isoTs: string): string {
 }
 
 // Helper function to get display name for a repertoire
-const getRepertoireDisplayName = (repertoire: RepertoireWithSummary): string => {
+const getRepertoireDisplayName = (
+  repertoire: RepertoireWithSummary
+): string => {
   // If name exists and is not empty, use it
   if (repertoire.name?.trim()) {
     return repertoire.name.trim();
@@ -581,7 +583,8 @@ const RepertoireDropdown: Component<{
       loading,
       count: repertoiresList?.length || 0,
       repertoires:
-        repertoiresList?.map((p) => ({ id: p.repertoireId, name: p.name })) || [],
+        repertoiresList?.map((p) => ({ id: p.repertoireId, name: p.name })) ||
+        [],
     });
   });
 
@@ -698,7 +701,8 @@ const RepertoireDropdown: Component<{
                       <div class="text-xs text-gray-500 dark:text-gray-400">
                         {repertoire.tuneCount} tune
                         {repertoire.tuneCount !== 1 ? "s" : ""}
-                        {repertoire.genreDefault && ` • ${repertoire.genreDefault}`}
+                        {repertoire.genreDefault &&
+                          ` • ${repertoire.genreDefault}`}
                       </div>
                     </div>
                     <Show

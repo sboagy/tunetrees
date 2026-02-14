@@ -18,9 +18,9 @@ import {
   dailyPracticeQueue,
   genre,
   note,
-  repertoireTune as repertoireTune,
   practiceRecord,
   reference,
+  repertoireTune,
   tableTransientData,
   tag,
   tune,
@@ -303,7 +303,9 @@ export async function purgeLocalCatalogForGenres(
     await db
       .delete(tableTransientData)
       .where(inArray(tableTransientData.tuneId, tuneIds));
-    await db.delete(repertoireTune).where(inArray(repertoireTune.tuneRef, tuneIds));
+    await db
+      .delete(repertoireTune)
+      .where(inArray(repertoireTune.tuneRef, tuneIds));
     await db.delete(tuneOverride).where(inArray(tuneOverride.tuneRef, tuneIds));
     await db.delete(tune).where(inArray(tune.id, tuneIds));
   } finally {

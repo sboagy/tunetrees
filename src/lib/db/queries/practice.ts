@@ -23,11 +23,11 @@ import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
   dailyPracticeQueue,
-  repertoire as repertoire,
-  repertoireTune as repertoireTune,
   practiceRecord,
   prefsSchedulingOptions,
   prefsSpacedRepetition,
+  repertoire,
+  repertoireTune,
   tune,
 } from "../schema";
 import type {

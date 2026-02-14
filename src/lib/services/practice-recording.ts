@@ -25,7 +25,7 @@ import {
   getUserPreferences,
   getUserSchedulingOptions,
 } from "../db/queries/practice";
-import { repertoireTune, practiceRecord } from "../db/schema";
+import { practiceRecord, repertoireTune } from "../db/schema";
 import type {
   NewPracticeRecord,
   NextReviewSchedule,

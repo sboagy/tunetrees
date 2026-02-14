@@ -20,7 +20,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
-import { RepertoireEditorDialog as RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
+import { RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
 
 /**
  * Onboarding Overlay Component
