@@ -1,4 +1,7 @@
-import type { SyncRequestOverrides } from "@oosync/shared/protocol";
+import type {
+  SyncRequestOverrides,
+  SyncResponse,
+} from "@oosync/shared/protocol";
 import { applyRemoteChangesToLocalDb, WorkerClient } from "@oosync/sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
@@ -11,10 +14,19 @@ import {
 const DEFAULT_METADATA_TABLES = [
   "user_profile",
   "user_genre_selection",
-  "playlist",
+  "repertoire",
   "instrument",
-  "genre", // Required for playlist.genre_default FK
+  "genre", // Required for repertoire.genre_default FK
 ];
+
+function isNetworkSyncError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("Failed to fetch") ||
+    message.includes("ERR_INTERNET_DISCONNECTED") ||
+    message.includes("NetworkError")
+  );
+}
 
 export async function preSyncMetadataViaWorker(params: {
   db: SqliteDatabase;
@@ -41,16 +53,27 @@ export async function preSyncMetadataViaWorker(params: {
     let syncStartedAt: string | undefined;
 
     do {
-      const response = await workerClient.sync([], lastSyncAt ?? undefined, {
-        pullCursor,
-        syncStartedAt,
-        pageSize: 200,
-        overrides: {
-          pullTables: tablesToPull,
-        },
-      });
+      let response: SyncResponse;
+      try {
+        response = await workerClient.sync([], lastSyncAt ?? undefined, {
+          pullCursor,
+          syncStartedAt,
+          pageSize: 200,
+          overrides: {
+            pullTables: tablesToPull,
+          },
+        });
+      } catch (error) {
+        if (isNetworkSyncError(error)) {
+          console.warn(
+            "[GenreFilter] Metadata pre-sync skipped due network error; continuing with best-effort local metadata"
+          );
+          return;
+        }
+        throw error;
+      }
 
-      // FK constraints may require multiple passes (e.g., instrument must exist before playlist can reference it)
+      // FK constraints may require multiple passes (e.g., instrument must exist before repertoire can reference it)
       const deferredChanges: typeof response.changes = [];
 
       const applyResult = await applyRemoteChangesToLocalDb({
@@ -122,7 +145,7 @@ async function getEffectiveGenreFilterInitialSync(params: {
   if (error) {
     console.error(`[GenreFilter] RPC error:`, error);
     throw new Error(
-      `[GenreFilter] Failed to query playlist_tune genres: ${error.message}`
+      `[GenreFilter] Failed to query repertoire_tune genres: ${error.message}`
     );
   }
 

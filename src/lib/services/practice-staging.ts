@@ -133,7 +133,7 @@ export async function stagePracticeEvaluation(
     INSERT INTO table_transient_data (
       user_id,
       tune_id,
-      playlist_id,
+      repertoire_id,
       quality,
       difficulty,
       stability,
@@ -167,7 +167,7 @@ export async function stagePracticeEvaluation(
       1,
       ${lastModifiedAt}
     )
-    ON CONFLICT(user_id, tune_id, playlist_id) DO UPDATE SET
+    ON CONFLICT(user_id, tune_id, repertoire_id) DO UPDATE SET
       quality = excluded.quality,
       difficulty = excluded.difficulty,
       stability = excluded.stability,
@@ -219,7 +219,7 @@ export async function clearStagedEvaluation(
     DELETE FROM table_transient_data
     WHERE user_id = ${userId}
       AND tune_id = ${tuneId}
-      AND playlist_id = ${playlistId}
+      AND repertoire_id = ${playlistId}
   `);
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
@@ -244,7 +244,7 @@ export async function clearAllStagedForPlaylist(
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
-    WHERE playlist_id = ${playlistId}
+    WHERE repertoire_id = ${playlistId}
   `);
 
   console.log(`🗑️  Cleared all staged evaluations for playlist ${playlistId}`);

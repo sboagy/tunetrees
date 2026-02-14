@@ -434,9 +434,9 @@ export function createFSRSService(
 }
 
 /**
- * Get the total number of tunes in all of a user's playlists (repertoire size).
- * Counts distinct playlist_tune rows for playlists owned by the user.
- * Excludes deleted playlist or playlist_tune rows.
+ * Get the total number of tunes in a repertoire.
+ * Counts repertoire_tune rows for the provided repertoire.
+ * Excludes deleted repertoire_tune rows.
  *
  * @param db Local SQLite database instance
  * @param playlistRef Playlist UUID
@@ -448,8 +448,8 @@ export async function getPlaylistTuneCount(
 ): Promise<number> {
   const rows = await db.all<{ cnt: number }>(sql`
     SELECT COUNT(*) AS cnt
-    FROM playlist_tune pt
-    WHERE pt.playlist_ref = ${playlistRef}
+    FROM repertoire_tune pt
+    WHERE pt.repertoire_ref = ${playlistRef}
       AND (pt.deleted IS NULL OR pt.deleted = 0)
   `);
   return rows[0]?.cnt ?? 0;

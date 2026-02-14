@@ -811,7 +811,7 @@ export async function addTunesToPracticeQueue(
 
   for (const tuneId of tuneIds) {
     try {
-      // Update playlist_tune.scheduled to make tune immediately available
+      // Update repertoire_tune.scheduled to make tune immediately available
       const result = await db
         .update(playlistTune)
         .set({
@@ -888,7 +888,7 @@ export async function addTunesToPracticeQueue(
   // to ensure new tunes appear immediately in the practice tab when incrementSyncVersion() is called
   if (added > 0) {
     try {
-      // Get userRef from playlist
+      // Get userRef from repertoire
       const playlistData = await db
         .select({ userRef: playlist.userRef })
         .from(playlist)

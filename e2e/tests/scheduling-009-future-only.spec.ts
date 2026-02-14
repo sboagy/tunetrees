@@ -120,7 +120,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         if (ids.length === 0) return;
 
         const cascade = [
-          "playlist_tune",
+          "repertoire_tune",
           "practice_record",
           "daily_practice_queue",
           "tune_override",
@@ -132,7 +132,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
               .delete()
               .in("tune_ref", ids)
               .eq(
-                table === "tune_override" ? "user_ref" : "playlist_ref",
+                table === "tune_override" ? "user_ref" : "repertoire_ref",
                 table === "tune_override"
                   ? (await supabase.auth.getUser()).data.user?.id
                   : testUser.repertoireId

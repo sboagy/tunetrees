@@ -15,7 +15,10 @@ mkdir -p logs
 LOG_FILE="logs/test-e2e-chromium-both-html.log"
 rm -f "$LOG_FILE"
 
+SECONDS=0
 npm run test:e2e:chromium:both:html -- "$@" 2>&1 | tee "$LOG_FILE"
+MINUTES=$(echo "scale=2; $SECONDS / 60" | bc)
+echo "Test completed in ${MINUTES}m" | tee -a "$LOG_FILE"
 
 echo "logs are in $LOG_FILE"
 

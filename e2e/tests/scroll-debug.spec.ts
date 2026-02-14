@@ -89,7 +89,7 @@ test.describe("Scroll Reset Debugger", () => {
   test.beforeEach(async ({ page, testUser }) => {
     currentTestUser = testUser;
 
-    // Ensure there is ample content to scroll: add ~30 tunes to the user's playlist
+    // Ensure there is ample content to scroll: add ~30 tunes to the user's repertoire
     addedTuneIds = await addScrollTestTunes(testUser);
 
     // Bring the app to a known state and land on Practice (ensures grids mount + auth is ready)
@@ -101,7 +101,7 @@ test.describe("Scroll Reset Debugger", () => {
     ttPage = new TuneTreesPage(page);
   });
 
-  // Add tunes to playlist temporarily for scroll testing
+  // Add tunes to repertoire temporarily for scroll testing
   async function addScrollTestTunes(user: TestUser): Promise<string[]> {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -119,15 +119,17 @@ test.describe("Scroll Reset Debugger", () => {
     if (tunesError || !tunes)
       throw new Error(`Failed to fetch tunes: ${tunesError?.message}`);
 
-    // Upsert them into the user's playlist (using UUID strings)
-    const playlistTuneInserts = tunes.map((tune) => ({
-      playlist_ref: user.repertoireId, // UUID string
+    // Upsert them into the user's repertoire (using UUID strings)
+    const repertoireTuneInserts = tunes.map((tune) => ({
+      repertoire_ref: user.repertoireId, // UUID string
       tune_ref: tune.id, // UUID string
       current: null,
     }));
     const { error } = await supabase
-      .from("playlist_tune")
-      .upsert(playlistTuneInserts, { onConflict: "playlist_ref,tune_ref" });
+      .from("repertoire_tune")
+      .upsert(repertoireTuneInserts, {
+        onConflict: "repertoire_ref,tune_ref",
+      });
     if (error) throw new Error(`Failed to add tunes: ${error.message}`);
 
     return tunes.map((t) => t.id); // Return UUID strings
@@ -145,9 +147,9 @@ test.describe("Scroll Reset Debugger", () => {
     // Remove all the added test tunes (UUID strings)
     if (tuneIds.length > 0) {
       const { error } = await supabase
-        .from("playlist_tune")
+        .from("repertoire_tune")
         .delete()
-        .eq("playlist_ref", user.repertoireId)
+        .eq("repertoire_ref", user.repertoireId)
         .in("tune_ref", tuneIds);
       if (error)
         throw new Error(`Failed to remove test tunes: ${error.message}`);

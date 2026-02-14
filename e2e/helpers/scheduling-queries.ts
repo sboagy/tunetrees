@@ -33,7 +33,7 @@ export interface PracticeRecord {
 }
 
 /**
- * Scheduled Date Info (from repertoire_tune/playlist_tune table)
+ * Scheduled Date Info (from repertoire_tune table)
  */
 export interface ScheduledDateInfo {
   tune_ref: string;

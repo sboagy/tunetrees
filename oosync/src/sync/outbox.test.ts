@@ -77,10 +77,10 @@ function insertUserProfile(userId: string): void {
   `);
 }
 
-function insertPlaylist(playlistId: string, userRef: string): void {
+function insertRepertoire(repertoireId: string, userRef: string): void {
   db.run(sql`
-    INSERT INTO playlist (playlist_id, user_ref, deleted, sync_version, last_modified_at)
-    VALUES (${playlistId}, ${userRef}, 0, 1, datetime('now'))
+    INSERT INTO repertoire (repertoire_id, user_ref, deleted, sync_version, last_modified_at)
+    VALUES (${repertoireId}, ${userRef}, 0, 1, datetime('now'))
   `);
 }
 
@@ -110,15 +110,15 @@ describe("Sync Outbox Operations", () => {
   describe("backfillOutboxForTable", () => {
     it("creates outbox rows for recent practice_record rows", async () => {
       insertUserProfile("sb-1");
-      insertPlaylist("pl-1", "sb-1");
+      insertRepertoire("pl-1", "sb-1");
       insertTune("t-1", "Tune", "reel");
 
       db.run(sql`
-        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, sync_version, last_modified_at)
         VALUES ('pr-1', 'pl-1', 't-1', '2025-12-27T00:00:00.000Z', 1, '2025-12-27T00:00:00.000Z')
       `);
       db.run(sql`
-        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, sync_version, last_modified_at)
         VALUES ('pr-2', 'pl-1', 't-1', '2025-12-27T00:00:01.000Z', 1, '2025-12-27T00:00:01.000Z')
       `);
 
@@ -153,11 +153,11 @@ describe("Sync Outbox Operations", () => {
 
     it("is idempotent for already-queued rows", async () => {
       insertUserProfile("sb-1");
-      insertPlaylist("pl-1", "sb-1");
+      insertRepertoire("pl-1", "sb-1");
       insertTune("t-1", "Tune", "reel");
 
       db.run(sql`
-        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, sync_version, last_modified_at)
         VALUES ('pr-3', 'pl-1', 't-1', '2025-12-27T00:00:02.000Z', 1, '2025-12-27T00:00:02.000Z')
       `);
       insertOutboxItem(
@@ -188,7 +188,7 @@ describe("Sync Outbox Operations", () => {
 
     it("creates JSON row_id for composite primary keys (repertoire_tune)", async () => {
       insertUserProfile("sb-1");
-      insertPlaylist("pl-1", "sb-1");
+      insertRepertoire("pl-1", "sb-1");
       insertTune("t-1", "Tune", "reel");
 
       db.run(sql`

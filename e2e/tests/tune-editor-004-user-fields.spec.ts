@@ -14,7 +14,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * TUNE-EDITOR-004: User-Specific Fields
  * Priority: High
  *
- * Tests that user-specific playlist_tune fields (learned, goal, scheduled)
+ * Tests that user-specific repertoire_tune fields (learned, goal, scheduled)
  * are properly saved when editing a tune.
  *
  * Covers:

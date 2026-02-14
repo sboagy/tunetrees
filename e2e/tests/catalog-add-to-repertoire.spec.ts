@@ -162,7 +162,7 @@ test.describe
       // Debug: Query Supabase directly to see what's actually there
       const supabaseCount = await page.evaluate(async (repertoireId) => {
         const response = await fetch(
-          `http://localhost:54321/rest/v1/playlist_tune?playlist_ref=eq.${repertoireId}&select=tune_ref`,
+          `http://localhost:54321/rest/v1/repertoire_tune?repertoire_ref=eq.${repertoireId}&select=tune_ref`,
           {
             headers: {
               apikey:

@@ -104,13 +104,13 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         }
         if (tuneIds.length === 0) return; // Nothing to clean
         const uniqueIds = [...new Set(tuneIds)];
-        // Delete dependent rows first (playlist_tune, practice_record, daily_practice_queue, tune_override)
+        // Delete dependent rows first (repertoire_tune, practice_record, daily_practice_queue, tune_override)
         const cascade: {
           table: string;
           column: string;
           filterPlaylist?: boolean;
         }[] = [
-          { table: "playlist_tune", column: "tune_ref" },
+          { table: "repertoire_tune", column: "tune_ref" },
           {
             table: "practice_record",
             column: "tune_ref",
@@ -138,7 +138,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
           let del = supabase.from(table).delete().in(column, uniqueIds);
           if (filterPlaylist)
-            del = del.eq("playlist_ref", testUser.repertoireId);
+            del = del.eq("repertoire_ref", testUser.repertoireId);
           const { error } = await del;
           if (error) {
             console.warn(
@@ -461,7 +461,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         const ids = (data || []).map((r: any) => r.id).filter(Boolean);
         if (ids.length) {
           // Dependent deletes
-          await supabase.from("playlist_tune").delete().in("tune_ref", ids);
+          await supabase.from("repertoire_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
             target_playlist: testUser.repertoireId,
             tune_ids: ids,
@@ -571,7 +571,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           .eq("title", againTestTitle);
         const ids = (data || []).map((r: any) => r.id).filter(Boolean);
         if (ids.length) {
-          await supabase.from("playlist_tune").delete().in("tune_ref", ids);
+          await supabase.from("repertoire_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
             target_playlist: testUser.repertoireId,
             tune_ids: ids,

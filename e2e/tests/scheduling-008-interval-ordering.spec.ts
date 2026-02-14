@@ -32,7 +32,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  *
  * Full version (later):
  * - Capture stability/difficulty initial metrics
- * - Validate playlist_tune.scheduled mirrors practice_record.due
+ * - Validate repertoire_tune.scheduled mirrors practice_record.due
  * - Add tolerance for potential equal Hard/Good intervals (spec allows Hard == Good in edge cases)
  * - Extend to multi-day second evaluation confirming monotonic growth
  */
@@ -144,7 +144,11 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
           column: string;
           filterPlaylist?: boolean;
         }[] = [
-          { table: "playlist_tune", column: "tune_ref", filterPlaylist: true },
+          {
+            table: "repertoire_tune",
+            column: "tune_ref",
+            filterPlaylist: true,
+          },
           {
             table: "practice_record",
             column: "tune_ref",
@@ -175,7 +179,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
           }
           let del = supabase.from(table).delete().in(column, uniqueIds);
           if (filterPlaylist)
-            del = del.eq("playlist_ref", testUser.repertoireId);
+            del = del.eq("repertoire_ref", testUser.repertoireId);
           const { error: delErr } = await del;
           if (delErr) {
             console.warn(

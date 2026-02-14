@@ -151,7 +151,7 @@ const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-const CURRENT_DB_VERSION = 11; // v11: rename user_profile key to id
+const CURRENT_DB_VERSION = 12; // v12: rename playlist schema objects to repertoire
 
 // Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -416,6 +416,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0009_add_plugins.sql",
           "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
           "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
+          "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
