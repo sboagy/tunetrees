@@ -349,7 +349,7 @@ export class FSRSService implements SchedulingService {
       id: generateId(),
       lastModifiedAt: new Date().toISOString(),
       tuneRef: input.tuneRef,
-      playlistRef: playlistRef,
+      repertoireRef: playlistRef,
       practiced: input.practiced.toISOString(),
       quality: input.quality,
       easiness: 2.5, // Legacy field (not used in FSRS but kept for compatibility)

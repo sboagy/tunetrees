@@ -41,7 +41,6 @@ export type TestUser = {
   name: string;
   userId: string;
   repertoireId: string;
-  playlistId: string;
 };
 
 export const TEST_USERS: Record<string, TestUser> = {
@@ -50,56 +49,48 @@ export const TEST_USERS: Record<string, TestUser> = {
     name: "Bob",
     userId: TEST_USER_BOB_ID,
     repertoireId: TEST_REPERTOIRE_BOB_ID,
-    playlistId: TEST_REPERTOIRE_BOB_ID,
   },
   alice: {
     email: TEST_USER_ALICE_EMAIL,
     name: "Alice",
     userId: TEST_USER_ALICE_ID,
     repertoireId: TEST_REPERTOIRE_ALICE_ID,
-    playlistId: TEST_REPERTOIRE_ALICE_ID,
   },
   dave: {
     email: TEST_USER_DAVE_EMAIL,
     name: "Dave",
     userId: TEST_USER_DAVE_ID,
     repertoireId: TEST_REPERTOIRE_DAVE_ID,
-    playlistId: TEST_REPERTOIRE_DAVE_ID,
   },
   eve: {
     email: TEST_USER_EVE_EMAIL,
     name: "Eve",
     userId: TEST_USER_EVE_ID,
     repertoireId: TEST_REPERTOIRE_EVE_ID,
-    playlistId: TEST_REPERTOIRE_EVE_ID,
   },
   frank: {
     email: TEST_USER_FRANK_EMAIL,
     name: "Frank",
     userId: TEST_USER_FRANK_ID,
     repertoireId: TEST_REPERTOIRE_FRANK_ID,
-    playlistId: TEST_REPERTOIRE_FRANK_ID,
   },
   grace: {
     email: TEST_USER_GRACE_EMAIL,
     name: "Grace",
     userId: TEST_USER_GRACE_ID,
     repertoireId: TEST_REPERTOIRE_GRACE_ID,
-    playlistId: TEST_REPERTOIRE_GRACE_ID,
   },
   henry: {
     email: TEST_USER_HENRY_EMAIL,
     name: "Henry",
     userId: TEST_USER_HENRY_ID,
     repertoireId: TEST_REPERTOIRE_HENRY_ID,
-    playlistId: TEST_REPERTOIRE_HENRY_ID,
   },
   iris: {
     email: TEST_USER_IRIS_EMAIL,
     name: "Iris",
     userId: TEST_USER_IRIS_ID,
     repertoireId: TEST_REPERTOIRE_IRIS_ID,
-    playlistId: TEST_REPERTOIRE_IRIS_ID,
   },
 };
 

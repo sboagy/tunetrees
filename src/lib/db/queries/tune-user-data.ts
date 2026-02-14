@@ -17,7 +17,11 @@
 import { and, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
-import { note, practiceRecord, repertoireTune as playlistTune } from "../schema";
+import {
+  note,
+  repertoireTune as playlistTune,
+  practiceRecord,
+} from "../schema";
 
 /**
  * Update the learned date for a tune in a specific playlist

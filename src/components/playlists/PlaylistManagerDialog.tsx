@@ -64,7 +64,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
 
   const handlePlaylistSelect = (playlist: PlaylistWithSummary) => {
     // Open editor dialog instead of navigating
-    setEditingPlaylistId(playlist.playlistId);
+    setEditingPlaylistId(playlist.repertoireId);
     setShowEditorDialog(true);
   };
 

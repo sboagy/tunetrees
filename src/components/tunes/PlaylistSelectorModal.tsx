@@ -135,12 +135,12 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
                   <button
                     type="button"
                     class={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
-                      selectedPlaylistId() === playlistItem.playlistId
+                      selectedPlaylistId() === playlistItem.repertoireId
                         ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
                         : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
                     }`}
                     onClick={() =>
-                      setSelectedPlaylistId(playlistItem.playlistId)
+                      setSelectedPlaylistId(playlistItem.repertoireId)
                     }
                   >
                     <div class="flex items-center justify-between">
@@ -154,7 +154,7 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
                         </div>
                       </div>
                       <Show
-                        when={selectedPlaylistId() === playlistItem.playlistId}
+                        when={selectedPlaylistId() === playlistItem.repertoireId}
                       >
                         <svg
                           class="h-5 w-5 text-blue-500 dark:text-blue-400"

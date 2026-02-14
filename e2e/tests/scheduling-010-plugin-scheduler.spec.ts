@@ -78,7 +78,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
-      testUser.playlistId
+      testUser.repertoireId
     );
     if (!record) throw new Error("No practice record found after evaluation");
 

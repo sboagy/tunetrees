@@ -49,7 +49,7 @@ export async function ensureDefaultPlaylist(
   });
 
   console.log(
-    `✅ Created default playlist ${defaultPlaylist.playlistId} for user ${userId}`
+    `✅ Created default playlist ${defaultPlaylist.repertoireId} for user ${userId}`
   );
 
   return defaultPlaylist;

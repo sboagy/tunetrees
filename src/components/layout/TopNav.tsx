@@ -580,7 +580,8 @@ const PlaylistDropdown: Component<{
       loading,
       count: playlistsList?.length || 0,
       playlists:
-        playlistsList?.map((p) => ({ id: p.playlistId, name: p.name })) || [],
+        playlistsList?.map((p) => ({ id: p.repertoireId, name: p.name })) ||
+        [],
     });
   });
 
@@ -596,7 +597,7 @@ const PlaylistDropdown: Component<{
       setCurrentPlaylistId(storedId);
     } else if (playlistsList.length > 0) {
       // Default to first playlist
-      const firstId = playlistsList[0].playlistId;
+      const firstId = playlistsList[0].repertoireId;
       setCurrentPlaylistId(firstId);
       setSelectedPlaylistId(userId, firstId);
     }
@@ -620,7 +621,7 @@ const PlaylistDropdown: Component<{
     const id = currentPlaylistId();
     const playlistsList = playlists();
     if (!id || !playlistsList) return null;
-    return playlistsList.find((p) => p.playlistId === id);
+    return playlistsList.find((p) => p.repertoireId === id);
   });
 
   return (
@@ -684,9 +685,9 @@ const PlaylistDropdown: Component<{
                     class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
                     classList={{
                       "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":
-                        currentPlaylistId() === playlist.playlistId,
+                        currentPlaylistId() === playlist.repertoireId,
                     }}
-                    onClick={() => handlePlaylistSelect(playlist.playlistId)}
+                    onClick={() => handlePlaylistSelect(playlist.repertoireId)}
                   >
                     <div class="flex-1">
                       <div class="font-medium">
@@ -698,7 +699,7 @@ const PlaylistDropdown: Component<{
                         {playlist.genreDefault && ` • ${playlist.genreDefault}`}
                       </div>
                     </div>
-                    <Show when={currentPlaylistId() === playlist.playlistId}>
+                    <Show when={currentPlaylistId() === playlist.repertoireId}>
                       <svg
                         class="w-4 h-4 text-blue-600 dark:text-blue-400"
                         fill="currentColor"

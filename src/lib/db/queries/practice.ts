@@ -704,7 +704,7 @@ export async function getPracticeHistory(
     .select({
       // Practice record fields
       id: practiceRecord.id,
-      playlistRef: practiceRecord.repertoireRef,
+      repertoireRef: practiceRecord.repertoireRef,
       tuneRef: practiceRecord.tuneRef,
       practiced: practiceRecord.practiced,
       quality: practiceRecord.quality,
@@ -751,7 +751,10 @@ export async function getPracticeHistory(
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.repertoireRef))
+    .innerJoin(
+      playlist,
+      eq(playlist.repertoireId, practiceRecord.repertoireRef)
+    )
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
@@ -947,7 +950,7 @@ export async function getPracticeRecords(
     .select({
       // Practice record fields
       id: practiceRecord.id,
-      playlistRef: practiceRecord.repertoireRef,
+      repertoireRef: practiceRecord.repertoireRef,
       tuneRef: practiceRecord.tuneRef,
       practiced: practiceRecord.practiced,
       quality: practiceRecord.quality,
@@ -994,7 +997,10 @@ export async function getPracticeRecords(
     })
     .from(practiceRecord)
     .innerJoin(tune, eq(tune.id, practiceRecord.tuneRef))
-    .innerJoin(playlist, eq(playlist.repertoireId, practiceRecord.repertoireRef))
+    .innerJoin(
+      playlist,
+      eq(playlist.repertoireId, practiceRecord.repertoireRef)
+    )
     .where(eq(practiceRecord.repertoireRef, playlistId))
     .orderBy(desc(practiceRecord.practiced))
     .limit(limit);

@@ -37,20 +37,20 @@ describe("createAdapter", () => {
     expect(adapter.primaryKey).toBe("id");
     expect(adapter.conflictKeys).toEqual([
       "tune_ref",
-      "playlist_ref",
+      "repertoire_ref",
       "practiced",
     ]);
   });
 
-  it("creates adapter for playlist (non-standard PK)", () => {
-    const adapter = createAdapter("playlist");
-    expect(adapter.primaryKey).toBe("playlist_id");
+  it("creates adapter for repertoire (non-standard PK)", () => {
+    const adapter = createAdapter("repertoire");
+    expect(adapter.primaryKey).toBe("repertoire_id");
   });
 
   it("creates adapter for table_transient_data (composite PK)", () => {
     const adapter = createAdapter("table_transient_data");
     // Keep ordering consistent with the generated table metadata.
-    expect(adapter.primaryKey).toEqual(["tune_id", "user_id", "playlist_id"]);
+    expect(adapter.primaryKey).toEqual(["tune_id", "user_id", "repertoire_id"]);
   });
 
   it("throws for unregistered table", () => {
@@ -69,15 +69,15 @@ describe("getAdapter (cached)", () => {
 
   it("returns different adapters for different tables", () => {
     const tuneAdapter = getAdapter("tune");
-    const playlistAdapter = getAdapter("playlist");
-    expect(tuneAdapter).not.toBe(playlistAdapter);
+    const repertoireAdapter = getAdapter("repertoire");
+    expect(tuneAdapter).not.toBe(repertoireAdapter);
   });
 });
 
 describe("hasAdapter", () => {
   it("returns true for registered tables", () => {
     expect(hasAdapter("tune")).toBe(true);
-    expect(hasAdapter("playlist")).toBe(true);
+    expect(hasAdapter("repertoire")).toBe(true);
     expect(hasAdapter("daily_practice_queue")).toBe(true);
   });
 
@@ -296,7 +296,7 @@ describe("round-trip transformations", () => {
     const original = {
       id: "pr-1",
       tuneRef: "tune-1",
-      playlistRef: "playlist-1",
+      repertoireRef: "repertoire-1",
       practiced: "2025-01-15T10:00:00Z",
       quality: 4,
       lastModifiedAt: "2025-01-15T10:00:00Z",
@@ -307,7 +307,7 @@ describe("round-trip transformations", () => {
 
     expect(roundTripped.id).toBe(original.id);
     expect(roundTripped.tuneRef).toBe(original.tuneRef);
-    expect(roundTripped.playlistRef).toBe(original.playlistRef);
+    expect(roundTripped.repertoireRef).toBe(original.repertoireRef);
     expect(roundTripped.practiced).toBe(original.practiced);
     expect(roundTripped.quality).toBe(original.quality);
   });
@@ -392,7 +392,7 @@ describe("adapter metadata correctness", () => {
       "user_id",
       "screen_size",
       "purpose",
-      "playlist_id",
+      "repertoire_id",
     ]);
   });
 

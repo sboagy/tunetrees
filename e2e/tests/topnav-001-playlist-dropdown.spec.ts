@@ -32,14 +32,14 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     // Look for playlist button/dropdown in TopNav
     // Adjust selector based on your actual implementation
     const playlistButton = page.locator("button").filter({
-      hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+      hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
     });
 
     await expect(playlistButton).toBeVisible({ timeout: 10000 });
 
     // Should show repertoire name or instrument name
     await expect(playlistButton).toContainText(
-      new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i")
+      new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i")
     );
   });
 
@@ -48,7 +48,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     const playlistButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
     await playlistButton.click();
@@ -91,7 +91,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     const playlistButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
     await playlistButton.click();
@@ -106,7 +106,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     const playlistButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
     await playlistButton.click();
@@ -134,7 +134,7 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     const playlistButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
     await expect(playlistButton).toBeEnabled();

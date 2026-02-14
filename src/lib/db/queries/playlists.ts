@@ -122,6 +122,7 @@ export async function getUserPlaylists(
   // Uses logic similar to view_playlist_joined to resolve genre_default from instrument if needed
   const playlists = await db
     .select({
+      repertoireId: playlist.repertoireId,
       playlistId: playlist.repertoireId,
       userRef: playlist.userRef,
       name: playlist.name,
@@ -227,7 +228,7 @@ export async function createPlaylist(
   userId: string,
   data: Omit<
     NewPlaylist,
-    "playlistId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
+    "repertoireId" | "userRef" | "syncVersion" | "lastModifiedAt" | "deviceId"
   >
 ): Promise<Playlist> {
   // userId is already user_profile.id (Supabase Auth UUID)
@@ -235,7 +236,7 @@ export async function createPlaylist(
   const now = new Date().toISOString();
 
   const newPlaylist: NewPlaylist = {
-    playlistId: generateId(),
+    repertoireId: generateId(),
     userRef,
     name: data.name ?? null,
     genreDefault: data.genreDefault ?? null,

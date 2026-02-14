@@ -42,9 +42,10 @@ beforeEach(async () => {
   `);
 
   db.run(`
-    CREATE TABLE playlist (
-      playlist_id TEXT PRIMARY KEY NOT NULL,
-      name TEXT
+    CREATE TABLE repertoire (
+      repertoire_id TEXT PRIMARY KEY NOT NULL,
+      name TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -52,8 +53,9 @@ beforeEach(async () => {
     CREATE TABLE practice_record (
       id TEXT PRIMARY KEY NOT NULL,
       tune_ref TEXT,
-      playlist_ref TEXT,
-      practiced TEXT
+      repertoire_ref TEXT,
+      practiced TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -82,21 +84,16 @@ beforeEach(async () => {
   db.run(`
     CREATE TABLE note (
       id TEXT PRIMARY KEY NOT NULL,
-      content TEXT
+      content TEXT,
+      last_modified_at TEXT
     )
   `);
 
   db.run(`
     CREATE TABLE reference (
       id TEXT PRIMARY KEY NOT NULL,
-      url TEXT
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE repertoire (
-      id TEXT PRIMARY KEY NOT NULL,
-      tune_ref TEXT
+      url TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -105,7 +102,8 @@ beforeEach(async () => {
       id TEXT PRIMARY KEY NOT NULL,
       user_ref TEXT,
       tune_ref TEXT,
-      tag_text TEXT
+      tag_text TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -114,7 +112,8 @@ beforeEach(async () => {
   db.run(`
     CREATE TABLE user_profile (
       id TEXT PRIMARY KEY NOT NULL,
-      name TEXT
+      name TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -122,14 +121,16 @@ beforeEach(async () => {
     CREATE TABLE daily_practice_queue (
       id TEXT PRIMARY KEY NOT NULL,
       user_ref TEXT,
-      playlist_ref TEXT
+      repertoire_ref TEXT,
+      last_modified_at TEXT
     )
   `);
 
   db.run(`
     CREATE TABLE tab_group_main_state (
       id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT
+      user_id TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -138,9 +139,10 @@ beforeEach(async () => {
       user_id TEXT NOT NULL,
       screen_size TEXT NOT NULL,
       purpose TEXT NOT NULL,
-      playlist_id TEXT NOT NULL,
+      repertoire_id TEXT NOT NULL,
       settings TEXT,
-      PRIMARY KEY (user_id, screen_size, purpose, playlist_id)
+      last_modified_at TEXT,
+      PRIMARY KEY (user_id, screen_size, purpose, repertoire_id)
     )
   `);
 
@@ -148,17 +150,19 @@ beforeEach(async () => {
     CREATE TABLE table_transient_data (
       user_id TEXT NOT NULL,
       tune_id TEXT NOT NULL,
-      playlist_id TEXT NOT NULL,
+      repertoire_id TEXT NOT NULL,
       data TEXT,
-      PRIMARY KEY (user_id, tune_id, playlist_id)
+      last_modified_at TEXT,
+      PRIMARY KEY (user_id, tune_id, repertoire_id)
     )
   `);
 
   db.run(`
-    CREATE TABLE playlist_tune (
-      playlist_ref TEXT NOT NULL,
+    CREATE TABLE repertoire_tune (
+      repertoire_ref TEXT NOT NULL,
       tune_ref TEXT NOT NULL,
-      PRIMARY KEY (playlist_ref, tune_ref)
+      last_modified_at TEXT,
+      PRIMARY KEY (repertoire_ref, tune_ref)
     )
   `);
 
@@ -179,7 +183,8 @@ beforeEach(async () => {
   db.run(`
     CREATE TABLE prefs_scheduling_options (
       user_id TEXT PRIMARY KEY NOT NULL,
-      settings TEXT
+      settings TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -188,6 +193,7 @@ beforeEach(async () => {
       user_id TEXT NOT NULL,
       alg_type TEXT NOT NULL,
       settings TEXT,
+      last_modified_at TEXT,
       PRIMARY KEY (user_id, alg_type)
     )
   `);
@@ -197,7 +203,8 @@ beforeEach(async () => {
       id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT,
       tune_id TEXT,
-      settings TEXT
+      settings TEXT,
+      last_modified_at TEXT
     )
   `);
 
@@ -387,15 +394,15 @@ describe("trigger functionality", () => {
     expect(row?.[3]).toBe("DELETE"); // operation
   });
 
-  it("uses non-standard PK for playlist", () => {
+  it("uses non-standard PK for repertoire", () => {
     db.run(
-      "INSERT INTO playlist (playlist_id, name) VALUES ('pl-1', 'My Playlist')"
+      "INSERT INTO repertoire (repertoire_id, name) VALUES ('rep-1', 'My Repertoire')"
     );
 
     const outbox = db.exec(
-      "SELECT row_id FROM sync_push_queue WHERE table_name = 'playlist'"
+      "SELECT row_id FROM sync_push_queue WHERE table_name = 'repertoire'"
     );
-    expect(outbox[0]?.values[0]?.[0]).toBe("pl-1");
+    expect(outbox[0]?.values[0]?.[0]).toBe("rep-1");
   });
 
   it("uses composite key JSON for genre_tune_type", () => {
@@ -419,12 +426,14 @@ describe("trigger functionality", () => {
 
   it("uses composite key JSON for table_state (4-column PK)", () => {
     db.run("INSERT INTO user_profile (id) VALUES ('user-1')");
-    db.run("INSERT INTO playlist (playlist_id, name) VALUES ('pl-1', 'Test')");
+    db.run(
+      "INSERT INTO repertoire (repertoire_id, name) VALUES ('rep-1', 'Test')"
+    );
     db.run("DELETE FROM sync_push_queue");
 
     db.run(`
-      INSERT INTO table_state (user_id, screen_size, purpose, playlist_id, settings)
-      VALUES ('user-1', 'desktop', 'practice', 'pl-1', '{}')
+      INSERT INTO table_state (user_id, screen_size, purpose, repertoire_id, settings)
+      VALUES ('user-1', 'desktop', 'practice', 'rep-1', '{}')
     `);
 
     const outbox = db.exec(
@@ -436,7 +445,7 @@ describe("trigger functionality", () => {
     expect(parsed.user_id).toBe("user-1");
     expect(parsed.screen_size).toBe("desktop");
     expect(parsed.purpose).toBe("practice");
-    expect(parsed.playlist_id).toBe("pl-1");
+    expect(parsed.repertoire_id).toBe("rep-1");
   });
 
   it("generates unique outbox IDs", () => {
@@ -479,7 +488,7 @@ describe("verifySyncTriggers", () => {
       Object.keys(TABLE_REGISTRY).length
     );
     expect(verification.missingTables).toContain("tune");
-    expect(verification.missingTables).toContain("playlist");
+    expect(verification.missingTables).toContain("repertoire");
     expect(verification.missingTables).toContain("genre_tune_type");
   });
 

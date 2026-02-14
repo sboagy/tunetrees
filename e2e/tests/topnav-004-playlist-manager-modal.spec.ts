@@ -32,7 +32,7 @@ test.describe("TOPNAV-004: Playlist Manager Modal", () => {
     const playlistButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
 

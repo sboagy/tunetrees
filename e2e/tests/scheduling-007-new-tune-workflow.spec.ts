@@ -124,7 +124,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
             const { error } = await supabase.rpc(
               "e2e_delete_practice_record_by_tunes",
               {
-                target_playlist: testUser.playlistId,
+                target_playlist: testUser.repertoireId,
                 tune_ids: uniqueIds,
               }
             );
@@ -137,7 +137,8 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           }
 
           let del = supabase.from(table).delete().in(column, uniqueIds);
-          if (filterPlaylist) del = del.eq("playlist_ref", testUser.playlistId);
+          if (filterPlaylist)
+            del = del.eq("playlist_ref", testUser.repertoireId);
           const { error } = await del;
           if (error) {
             console.warn(
@@ -285,10 +286,10 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       await page.waitForTimeout(2000);
 
       // Query practice record
-      const playlistId = testUser.playlistId; // Use playlistId from TestUser
+      const repertoireId = testUser.repertoireId;
 
       // Get tune ID from scheduled_dates (need to query by title pattern)
-      const scheduledDates = await queryScheduledDates(page, playlistId);
+      const scheduledDates = await queryScheduledDates(page, repertoireId);
       const dateEntries = [...scheduledDates.entries()];
       const tuneEntry = dateEntries[0]; // Only one tune expected in this isolated test
 
@@ -302,7 +303,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       const record = await queryLatestPracticeRecord(
         page,
         newTuneId,
-        playlistId
+        repertoireId
       );
       if (!record)
         throw new Error("Practice record not found after first evaluation");
@@ -416,8 +417,8 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Query practice record
-    const playlistId = testUser.playlistId;
-    const scheduledDates = await queryScheduledDates(page, playlistId);
+    const repertoireId = testUser.repertoireId;
+    const scheduledDates = await queryScheduledDates(page, repertoireId);
     const tuneEntry = [...scheduledDates.entries()][0]; // First/only tune expected
 
     if (!tuneEntry) {
@@ -425,7 +426,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     }
 
     const tuneId = tuneEntry[0];
-    const record = await queryLatestPracticeRecord(page, tuneId, playlistId);
+    const record = await queryLatestPracticeRecord(page, tuneId, repertoireId);
     if (!record)
       throw new Error("Practice record not found after Easy evaluation");
 
@@ -462,7 +463,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           // Dependent deletes
           await supabase.from("playlist_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
-            target_playlist: testUser.playlistId,
+            target_playlist: testUser.repertoireId,
             tune_ids: ids,
           });
           await supabase
@@ -532,11 +533,11 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Query
-    const playlistId = testUser.playlistId;
-    const scheduledDates = await queryScheduledDates(page, playlistId);
+    const repertoireId = testUser.repertoireId;
+    const scheduledDates = await queryScheduledDates(page, repertoireId);
     // Map returned; use Map APIs instead of Object.keys
     const tuneId = [...scheduledDates.keys()][0];
-    const record = await queryLatestPracticeRecord(page, tuneId, playlistId);
+    const record = await queryLatestPracticeRecord(page, tuneId, repertoireId);
     if (!record)
       throw new Error("Practice record not found after Again evaluation");
 
@@ -572,7 +573,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         if (ids.length) {
           await supabase.from("playlist_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
-            target_playlist: testUser.playlistId,
+            target_playlist: testUser.repertoireId,
             tune_ids: ids,
           });
           await supabase

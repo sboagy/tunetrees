@@ -104,7 +104,6 @@ const CatalogPage: Component = () => {
         searchParams.c_modes,
         searchParams.c_genres,
         searchParams.c_repertoires,
-        searchParams.c_playlists,
         searchParams.tab, // Crucial for re-hydration when switching tabs
       ],
       () => {
@@ -113,9 +112,7 @@ const CatalogPage: Component = () => {
         const types = getParamArray(searchParams.c_types);
         const modes = getParamArray(searchParams.c_modes);
         const genres = getParamArray(searchParams.c_genres);
-        const repertoires = getParamArray(
-          searchParams.c_repertoires ?? searchParams.c_playlists
-        );
+        const repertoires = getParamArray(searchParams.c_repertoires);
 
         // 2. Write to signals only if different (essential to prevent infinite loops)
         if (q !== searchQuery()) setSearchQuery(q);
@@ -144,9 +141,7 @@ const CatalogPage: Component = () => {
       types: getParamArray(searchParams.c_types),
       modes: getParamArray(searchParams.c_modes),
       genres: getParamArray(searchParams.c_genres),
-      repertoires: getParamArray(
-        searchParams.c_repertoires ?? searchParams.c_playlists
-      ),
+      repertoires: getParamArray(searchParams.c_repertoires),
     };
 
     const desired = {
@@ -177,7 +172,6 @@ const CatalogPage: Component = () => {
         desired.repertoires.length > 0
           ? desired.repertoires.join(",")
           : undefined,
-      c_playlists: undefined,
       // Proactively clear other tab's filter keys (Repertoire)
       r_q: undefined,
       r_types: undefined,

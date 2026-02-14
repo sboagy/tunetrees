@@ -911,9 +911,7 @@ async function fetchTableForInitialSyncPage(
     collections: ctx.collections,
   });
   if (conditions === null) {
-    debug.log(
-      `[PULL:INITIAL] Skipping ${tableName} (no repertoires for user)`
-    );
+    debug.log(`[PULL:INITIAL] Skipping ${tableName} (no repertoires for user)`);
     return [];
   }
 

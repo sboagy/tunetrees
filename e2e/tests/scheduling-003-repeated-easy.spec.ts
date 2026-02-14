@@ -160,7 +160,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       await diagAuth(page, `day-${day}-after-syncup`);
 
       // Query latest practice record to get FSRS metrics
-      const playlistId = testUser.playlistId;
+      const repertoireId = testUser.repertoireId;
 
       // Debug snapshot: local queue date state vs current frozen date
       const queueDateDebug = await page.evaluate(() => ({
@@ -179,7 +179,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
             const maybe = await queryLatestPracticeRecord(
               page,
               TEST_TUNE_BANISH_ID,
-              playlistId
+              repertoireId
             );
             if (!maybe) {
               console.log(
@@ -202,7 +202,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       const record = await queryLatestPracticeRecord(
         page,
         TEST_TUNE_BANISH_ID,
-        playlistId
+        repertoireId
       );
       if (!record) {
         throw new Error("Practice record not found after Easy evaluation");
@@ -410,11 +410,11 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     await page.waitForTimeout(2000);
 
     // Check scheduled date
-    const playlistId = testUser.playlistId;
+    const repertoireId = testUser.repertoireId;
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
-      playlistId
+      repertoireId
     );
     if (!record)
       throw new Error("Practice record not found after Easy evaluation");

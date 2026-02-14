@@ -91,8 +91,9 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
 
       if (!storedSelection && userPlaylists.length > 0) {
         // Default to first playlist
-        storedSelection = userPlaylists[0].playlistId;
-        setSelectedPlaylistId(currentUser.id, storedSelection);
+        const firstPlaylistId = userPlaylists[0].repertoireId;
+        storedSelection = firstPlaylistId;
+        setSelectedPlaylistId(currentUser.id, firstPlaylistId);
       }
 
       setSelectedPlaylistIdSignal(storedSelection);
@@ -126,7 +127,7 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
   const selectedPlaylist = () => {
     const id = selectedPlaylistId();
     if (!id) return null;
-    return playlists().find((p) => p.playlistId === id);
+    return playlists().find((p) => p.repertoireId === id);
   };
 
   return (
@@ -188,9 +189,9 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
             {(playlist) => (
               <button
                 type="button"
-                onClick={() => handlePlaylistSelect(playlist.playlistId)}
+                onClick={() => handlePlaylistSelect(playlist.repertoireId)}
                 class={`w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                  playlist.playlistId === selectedPlaylistId()
+                  playlist.repertoireId === selectedPlaylistId()
                     ? "bg-blue-50 dark:bg-blue-900/20"
                     : ""
                 }`}
@@ -213,7 +214,7 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
                   </div>
 
                   {/* Selected Checkmark */}
-                  <Show when={playlist.playlistId === selectedPlaylistId()}>
+                  <Show when={playlist.repertoireId === selectedPlaylistId()}>
                     <svg
                       class="w-5 h-5 text-blue-600 dark:text-blue-400"
                       fill="currentColor"

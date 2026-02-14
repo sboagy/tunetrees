@@ -135,7 +135,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
                 table === "tune_override" ? "user_ref" : "playlist_ref",
                 table === "tune_override"
                   ? (await supabase.auth.getUser()).data.user?.id
-                  : testUser.playlistId
+                  : testUser.repertoireId
               );
             await q;
           } catch (e) {
@@ -199,7 +199,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         const record = await queryLatestPracticeRecord(
           page,
           tuneId,
-          testUser.playlistId
+          testUser.repertoireId
         );
         if (!record) throw new Error("Record not found");
 

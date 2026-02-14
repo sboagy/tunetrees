@@ -184,9 +184,7 @@ async function ensureRepertoireWithTunes(
   const scheduledIso = scheduledDate.toISOString();
 
   for (const tuneId of tuneIds) {
-    const { error: tuneError } = await supabase
-      .from("repertoire_tune")
-      .upsert(
+    const { error: tuneError } = await supabase.from("repertoire_tune").upsert(
       {
         repertoire_ref: repertoireId,
         tune_ref: tuneId,
@@ -293,7 +291,10 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     currentDate = await advanceDays(context, 1, currentDate);
     await page.waitForTimeout(ROLLOVER_WAIT_MS);
 
-    const afterSecondQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    const afterSecondQueue = await getQueueSnapshot(
+      page,
+      testUser.repertoireId
+    );
     expect(afterSecondQueue.windowStartUtc).toBe(initialQueue.windowStartUtc);
     expect(afterSecondQueue.tuneOrder).toEqual(initialQueue.tuneOrder);
   });

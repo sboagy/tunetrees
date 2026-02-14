@@ -168,7 +168,6 @@ const RepertoirePage: Component = () => {
       c_modes: undefined,
       c_genres: undefined,
       c_repertoires: undefined,
-      c_playlists: undefined,
       // Clear any legacy/un-namespaced param that may linger from older builds
       playlists: undefined,
     };
@@ -188,7 +187,6 @@ const RepertoirePage: Component = () => {
   //       c_modes: undefined,
   //       r_modes: undefined,
   //       c_genres: undefined,
-  //       c_playlists: undefined,
   //       // Also clear legacy/un-namespaced params on mount
   //       playlists: undefined,
   //     } as unknown as Record<string, string>,

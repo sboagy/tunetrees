@@ -20,7 +20,7 @@ const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
 
   // Otherwise use instrument + id format
   const instrument = playlist.instrumentName || "Unknown";
-  return `${instrument} (${playlist.playlistId})`;
+  return `${instrument} (${playlist.repertoireId})`;
 };
 
 export interface CombinedFilterDropdownProps {
@@ -287,10 +287,10 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                           <input
                             type="checkbox"
                             checked={props.selectedPlaylistIds.includes(
-                              playlist.playlistId
+                              playlist.repertoireId
                             )}
                             onChange={() => {
-                              const playlistId = playlist.playlistId;
+                              const playlistId = playlist.repertoireId;
                               if (
                                 props.selectedPlaylistIds.includes(playlistId)
                               ) {

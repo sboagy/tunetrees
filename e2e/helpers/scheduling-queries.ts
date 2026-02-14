@@ -17,7 +17,6 @@ export interface PracticeRecord {
   id: string;
   tune_ref: string;
   repertoire_ref: string;
-  playlist_ref?: string;
   practiced: string; // ISO timestamp
   due: string; // ISO timestamp - next review date
   quality: number; // 1=Again, 2=Hard, 3=Good, 4=Easy

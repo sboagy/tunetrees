@@ -121,7 +121,7 @@ test.describe("Scroll Reset Debugger", () => {
 
     // Upsert them into the user's playlist (using UUID strings)
     const playlistTuneInserts = tunes.map((tune) => ({
-      playlist_ref: user.playlistId, // UUID string
+      playlist_ref: user.repertoireId, // UUID string
       tune_ref: tune.id, // UUID string
       current: null,
     }));
@@ -147,7 +147,7 @@ test.describe("Scroll Reset Debugger", () => {
       const { error } = await supabase
         .from("playlist_tune")
         .delete()
-        .eq("playlist_ref", user.playlistId)
+        .eq("playlist_ref", user.repertoireId)
         .in("tune_ref", tuneIds);
       if (error)
         throw new Error(`Failed to remove test tunes: ${error.message}`);

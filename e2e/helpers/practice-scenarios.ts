@@ -23,7 +23,7 @@ log.setLevel("info");
  */
 export async function seedAddToReviewLocally(
   page: Page,
-  opts: { playlistId: string; tuneIds: string[]; userIdInt?: string }
+  opts: { repertoireId: string; tuneIds: string[]; userIdInt?: string }
 ) {
   return await page.evaluate(async (input) => {
     if (!(window as any).__ttTestApi) {
@@ -56,13 +56,16 @@ export async function seedSchedulingPluginLocally(
 /**
  * Read the current practice queue size (latest snapshot) from inside the app.
  */
-export async function getPracticeCountLocally(page: Page, playlistId: string) {
+export async function getPracticeCountLocally(
+  page: Page,
+  repertoireId: string
+) {
   return await page.evaluate(async (pid) => {
     if (!(window as any).__ttTestApi) {
       throw new Error("__ttTestApi not attached on window");
     }
     return await (window as any).__ttTestApi.getPracticeCount(pid);
-  }, playlistId);
+  }, repertoireId);
 }
 
 /**
@@ -346,7 +349,7 @@ async function assertHasLocalPlaylists(
   });
 
   throw new Error(
-    `No playlists found locally after sync (count=${playlistCount}). syncVersion=${status.syncVersion} success=${status.syncSuccess} errors=${status.syncErrorCount} summary=${status.syncErrorSummary}`
+    `No repertoires found locally after sync (count=${playlistCount}). syncVersion=${status.syncVersion} success=${status.syncSuccess} errors=${status.syncErrorCount} summary=${status.syncErrorSummary}`
   );
 }
 
@@ -424,10 +427,9 @@ export async function setupDeterministicTestParallel(
             table: "table_transient_data",
             column: "tune_id",
             extraFilters: (q) =>
-              q.eq("user_id", user.userId).eq(
-                "repertoire_id",
-                user.repertoireId
-              ),
+              q
+                .eq("user_id", user.userId)
+                .eq("repertoire_id", user.repertoireId),
           },
           {
             table: "daily_practice_queue",
@@ -1407,7 +1409,7 @@ export async function setupForCatalogTestsParallel(
     timeout: 10000,
   });
 
-  log.debug(`✅ [${user.name}] Playlist title matched: ${expectedTitle}`);
+  log.debug(`✅ [${user.name}] Repertoire title matched: ${expectedTitle}`);
 
   // 6. Navigate to starting tab
   await page.waitForSelector(`[data-testid="tab-${startTab}"]`, {

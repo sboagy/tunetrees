@@ -70,7 +70,7 @@ test.describe("Scroll Position Persistence", () => {
 
     // Add to playlist (using UUID strings)
     const playlistTuneInserts = tunes.map((tune) => ({
-      playlist_ref: user.playlistId, // UUID string
+      playlist_ref: user.repertoireId, // UUID string
       tune_ref: tune.id, // UUID string
       current: null,
     }));
@@ -104,7 +104,7 @@ test.describe("Scroll Position Persistence", () => {
       const { error } = await supabase
         .from("playlist_tune")
         .delete()
-        .eq("playlist_ref", user.playlistId)
+        .eq("playlist_ref", user.repertoireId)
         .in("tune_ref", tuneIds);
 
       if (error)

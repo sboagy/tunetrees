@@ -228,7 +228,7 @@ export async function generateDailyPracticeQueue(
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, playlistId),
+          eq(dailyPracticeQueue.repertoireRef, playlistId),
           eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
           eq(dailyPracticeQueue.active, 1)
         )
@@ -248,7 +248,7 @@ export async function generateDailyPracticeQueue(
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, playlistId),
+          eq(dailyPracticeQueue.repertoireRef, playlistId),
           eq(dailyPracticeQueue.windowStartUtc, windows.startTs)
         )
       );
@@ -285,7 +285,7 @@ export async function generateDailyPracticeQueue(
       id: generateId(), // Generate UUID for queue entry
       lastModifiedAt: now,
       userRef: userRef,
-      playlistRef: playlistId,
+      repertoireRef: playlistId,
       mode: "per_day",
       queueDate: windows.startTs.substring(0, 10), // YYYY-MM-DD
       windowStartUtc: windows.startTs,
@@ -371,7 +371,7 @@ export async function refillPracticeQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistId),
+        eq(dailyPracticeQueue.repertoireRef, playlistId),
         eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
         eq(dailyPracticeQueue.active, 1)
       )
@@ -394,7 +394,7 @@ export async function refillPracticeQueue(
     .from(playlistTune)
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
+        eq(playlistTune.repertoireRef, playlistId),
         eq(playlistTune.deleted, 0),
         lt(playlistTune.current, windows.windowFloorUtc.toISOString())
       )
@@ -418,7 +418,7 @@ export async function refillPracticeQueue(
     id: generateId(), // Generate UUID for queue entry
     lastModifiedAt: now,
     userRef: userRef,
-    playlistRef: playlistId,
+    repertoireRef: playlistId,
     mode: "per_day",
     queueDate: windows.startTs.substring(0, 10),
     windowStartUtc: windows.startTs,
@@ -476,7 +476,7 @@ export async function getQueueBucketCounts(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistId),
+        eq(dailyPracticeQueue.repertoireRef, playlistId),
         eq(dailyPracticeQueue.windowStartUtc, windowStartUtc),
         eq(dailyPracticeQueue.active, 1)
       )

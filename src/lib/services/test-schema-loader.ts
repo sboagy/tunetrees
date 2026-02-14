@@ -102,7 +102,9 @@ export function applyMigrations(db: BetterSQLite3Database): void {
   const queueColumns = db.all<{ name: string }>(
     `PRAGMA table_info('daily_practice_queue')` as any
   );
-  const hasPlaylistRef = queueColumns.some((column) => column.name === "playlist_ref");
+  const hasPlaylistRef = queueColumns.some(
+    (column) => column.name === "playlist_ref"
+  );
   const hasRepertoireRef = queueColumns.some(
     (column) => column.name === "repertoire_ref"
   );

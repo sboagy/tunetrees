@@ -90,7 +90,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
 
     return allPlaylists.filter((playlist: PlaylistWithSummary) => {
       // Search by playlist ID
-      const matchesId = playlist.playlistId.toString().includes(query);
+      const matchesId = playlist.repertoireId.toString().includes(query);
       // Search by instrument
       const matchesInstrument = playlist.instrumentRef
         ? playlist.instrumentRef.toString().includes(query)
@@ -137,7 +137,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   // Define table columns
   const columns: ColumnDef<PlaylistWithSummary>[] = [
     {
-      accessorKey: "playlistId",
+      accessorKey: "repertoireId",
       header: "ID",
       size: 80,
       cell: (info) => {
@@ -234,7 +234,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       size: 100,
       cell: (info) => {
         const playlist = info.row.original;
-        const isDeleting = deletingId() === playlist.playlistId;
+        const isDeleting = deletingId() === playlist.repertoireId;
 
         return (
           <div class="flex gap-2 items-center">
@@ -255,7 +255,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete(playlist.playlistId);
+                handleDelete(playlist.repertoireId);
               }}
               class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
               disabled={isDeleting}

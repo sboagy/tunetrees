@@ -162,7 +162,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
             const { error: delErr } = await supabase.rpc(
               "e2e_delete_practice_record_by_tunes",
               {
-                target_playlist: testUser.playlistId,
+                target_playlist: testUser.repertoireId,
                 tune_ids: uniqueIds,
               }
             );
@@ -174,7 +174,8 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
             continue;
           }
           let del = supabase.from(table).delete().in(column, uniqueIds);
-          if (filterPlaylist) del = del.eq("playlist_ref", testUser.playlistId);
+          if (filterPlaylist)
+            del = del.eq("playlist_ref", testUser.repertoireId);
           const { error: delErr } = await del;
           if (delErr) {
             console.warn(

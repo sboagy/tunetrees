@@ -160,7 +160,7 @@ export async function evaluatePractice(
   const record: NewPracticeRecord = {
     id: generateId(),
     lastModifiedAt: getPracticeDate().toISOString(),
-    playlistRef: normalizedInput.playlistRef,
+    repertoireRef: normalizedInput.playlistRef,
     tuneRef: normalizedInput.tuneRef,
     practiced: normalizedInput.practiced.toISOString(),
     quality: normalizedInput.quality,
@@ -203,7 +203,7 @@ async function persistPracticeRecord(
     })
     .where(
       and(
-        eq(playlistTune.playlistRef, record.playlistRef),
+        eq(playlistTune.repertoireRef, record.repertoireRef),
         eq(playlistTune.tuneRef, record.tuneRef)
       )
     );
@@ -273,7 +273,7 @@ export async function getPracticeStatistics(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, playlistId)
       )
     )
     .orderBy(practiceRecord.practiced);
@@ -762,7 +762,7 @@ export async function undoLastPracticeRating(
       .where(
         and(
           eq(practiceRecord.tuneRef, tuneId),
-          eq(practiceRecord.playlistRef, playlistId)
+          eq(practiceRecord.repertoireRef, playlistId)
         )
       )
       .orderBy(practiceRecord.practiced)
@@ -791,7 +791,7 @@ export async function undoLastPracticeRating(
       })
       .where(
         and(
-          eq(playlistTune.playlistRef, playlistId),
+          eq(playlistTune.repertoireRef, playlistId),
           eq(playlistTune.tuneRef, tuneId)
         )
       );
