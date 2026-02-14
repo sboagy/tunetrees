@@ -812,11 +812,23 @@ async function getSyncOutboxCount(): Promise<number> {
 }
 
 /**
- * Get count of repertoires in local SQLite.
- * Used by E2E to assert repertoire data is present after sync.
+ * Get repertoire counts from local SQLite.
+ * - With `repertoireId`: returns count of tunes in that repertoire.
+ * - Without `repertoireId`: returns count of repertoire rows.
  */
-async function getRepertoireCount(): Promise<number> {
+async function getRepertoireCount(repertoireId?: string): Promise<number> {
   const db = await ensureDb();
+
+  if (repertoireId) {
+    const rows = await db.all<{ count: number }>(sql`
+      SELECT COUNT(*) as count
+      FROM repertoire_tune rt
+      WHERE rt.repertoire_ref = ${repertoireId}
+        AND rt.deleted = 0
+    `);
+    return rows[0]?.count ?? 0;
+  }
+
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count FROM repertoire WHERE deleted = 0
   `);
@@ -1091,7 +1103,7 @@ declare global {
         titles: string[]
       ) => Promise<Array<{ id: string; title: string }>>;
       getSyncOutboxCount: () => Promise<number>;
-      getRepertoireCount: () => Promise<number>;
+      getRepertoireCount: (repertoireId?: string) => Promise<number>;
       isSyncComplete: () => boolean;
       getSyncErrors: () => Promise<string[]>;
       getSupabaseRecord: (
@@ -1367,8 +1379,8 @@ if (typeof window !== "undefined") {
       getSyncOutboxCount: async () => {
         return await getSyncOutboxCount();
       },
-      getRepertoireCount: async () => {
-        return await getRepertoireCount();
+      getRepertoireCount: async (repertoireId?: string) => {
+        return await getRepertoireCount(repertoireId);
       },
       isSyncComplete: () => {
         return isSyncComplete();
