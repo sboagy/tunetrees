@@ -249,7 +249,9 @@ function createDb(env: Env): {
   // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
   const client = postgres(connectionString, {
     prepare: false,
-    max: 1,
+    // Keep a small pool per request to avoid self-contention when sync code issues
+    // parallel reads inside a single request, while still limiting connection fan-out.
+    max: 4,
     connect_timeout: 10,
     idle_timeout: 20,
   });

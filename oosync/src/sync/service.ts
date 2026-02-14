@@ -598,6 +598,13 @@ export class SyncService {
 
       console.log("[SyncService] Running periodic syncDown...");
       void this.syncDown().catch((error) => {
+        if (error instanceof SyncInProgressError) {
+          console.log(
+            "[SyncService] Skipping periodic syncDown - sync already in progress"
+          );
+          return;
+        }
+
         console.error("[SyncService] Periodic syncDown failed:", error);
 
         // Only show error toast for non-network failures
