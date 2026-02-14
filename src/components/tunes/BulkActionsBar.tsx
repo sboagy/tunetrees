@@ -4,7 +4,7 @@
  * Displays bulk action controls when one or more tunes are selected in the table.
  * Features:
  * - Selection count display
- * - Action buttons: Add to Playlist, Add Tags, Delete, Export
+ * - Action buttons: Add to Repertoire, Add Tags, Delete, Export
  * - Sticky positioning for visibility
  * - Dark mode support
  *
@@ -16,8 +16,8 @@ import { type Component, Show } from "solid-js";
 interface BulkActionsBarProps {
   /** Array of selected tunes */
   selectedTunes: any[];
-  /** Callback to add selected tunes to a playlist */
-  onAddToPlaylist?: () => void;
+  /** Callback to add selected tunes to a repertoire */
+  onAddToRepertoire?: () => void;
   /** Callback to add tags to selected tunes */
   onAddTags?: () => void;
   /** Callback to delete selected tunes */
@@ -35,7 +35,7 @@ interface BulkActionsBarProps {
  * ```tsx
  * <BulkActionsBar
  *   selectedTunes={selectedTunes()}
- *   onAddToPlaylist={() => setShowPlaylistModal(true)}
+ *   onAddToRepertoire={() => setShowRepertoireModal(true)}
  *   onAddTags={() => setShowTagModal(true)}
  *   onDelete={() => setShowDeleteModal(true)}
  *   onExport={handleExport}
@@ -64,18 +64,18 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
           <div class="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={props.onAddToPlaylist}
+              onClick={props.onAddToRepertoire}
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
-              title="Add selected tunes to a playlist"
+              title="Add selected tunes to a repertoire"
             >
               <svg
                 class="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-                aria-label="Playlist icon"
+                aria-label="Repertoire icon"
               >
-                <title>Add to Playlist</title>
+                <title>Add to Repertoire</title>
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -83,7 +83,7 @@ export const BulkActionsBar: Component<BulkActionsBarProps> = (props) => {
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
                 />
               </svg>
-              <span>Add to Playlist</span>
+              <span>Add to Repertoire</span>
             </button>
 
             <button

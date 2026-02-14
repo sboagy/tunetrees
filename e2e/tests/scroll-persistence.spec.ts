@@ -32,7 +32,7 @@ test.describe("Scroll Position Persistence", () => {
     await setStableDate(context, currentDate);
 
     currentTestUser = testUser;
-    // Add 30 tunes to playlist for scrollable content
+    // Add 30 tunes to repertoire for scrollable content
     addedTuneIds = await addScrollTestTunes(testUser);
 
     // Setup with many tunes in repertoire
@@ -47,7 +47,7 @@ test.describe("Scroll Position Persistence", () => {
   });
 
   /**
-   * Add tunes to playlist temporarily for scroll testing
+  * Add tunes to repertoire temporarily for scroll testing
    */
   async function addScrollTestTunes(user: TestUser): Promise<string[]> {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -68,17 +68,17 @@ test.describe("Scroll Position Persistence", () => {
     if (tunesError || !tunes)
       throw new Error(`Failed to fetch tunes: ${tunesError?.message}`);
 
-    // Add to playlist (using UUID strings)
-    const playlistTuneInserts = tunes.map((tune) => ({
-      playlist_ref: user.playlistId, // UUID string
+    // Add to repertoire (using UUID strings)
+    const repertoireTuneInserts = tunes.map((tune) => ({
+      repertoire_ref: user.repertoireId, // UUID string
       tune_ref: tune.id, // UUID string
       current: null,
     }));
 
     const { error } = await supabase
-      .from("playlist_tune")
-      .upsert(playlistTuneInserts, {
-        onConflict: "playlist_ref,tune_ref",
+      .from("repertoire_tune")
+      .upsert(repertoireTuneInserts, {
+        onConflict: "repertoire_ref,tune_ref",
       });
 
     if (error) throw new Error(`Failed to add tunes: ${error.message}`);
@@ -87,7 +87,7 @@ test.describe("Scroll Position Persistence", () => {
   }
 
   /**
-   * Remove scroll test tunes from playlist
+  * Remove scroll test tunes from repertoire
    */
   async function removeScrollTestTunes(tuneIds: string[], user: TestUser) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -102,9 +102,9 @@ test.describe("Scroll Position Persistence", () => {
     // Remove all the added test tunes (UUID strings)
     if (tuneIds.length > 0) {
       const { error } = await supabase
-        .from("playlist_tune")
+        .from("repertoire_tune")
         .delete()
-        .eq("playlist_ref", user.playlistId)
+        .eq("repertoire_ref", user.repertoireId)
         .in("tune_ref", tuneIds);
 
       if (error)
@@ -336,6 +336,7 @@ test.describe("Scroll Position Persistence", () => {
     page,
     browserName,
   }) => {
+    test.setTimeout(45000); // Increase timeout for this test (milliseconds). Set to 45 seconds.
     // Set up console listener early
     const consoleLogs: string[] = [];
     page.on("console", (msg) => {

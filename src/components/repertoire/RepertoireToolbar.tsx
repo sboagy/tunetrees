@@ -4,16 +4,6 @@
  * Toolbar for the Repertoire tab with complete controls.
  * Layout: Add To Review | Filter textbox | Filters | Add Tune | Remove From Repertoire | Columns
  *
- * Features:
- * - Add To Review button with icon (left-most)
- * - Responsive filter textbox (min-width 12ch)
- * - Combined filter dropdown (Type, Mode, Genre - NO Playlist filter)
- * - Add Tune button with + icon (opens AddTuneDialog)
- * - Remove From Repertoire button (enabled when rows selected, shows confirmation)
- * - Columns dropdown
- * - Tooltips for all controls
- * - Responsive text labels
- *
  * @module components/repertoire/RepertoireToolbar
  */
 
@@ -23,8 +13,8 @@ import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
-import { removeTuneFromPlaylist } from "../../lib/db/queries/playlists";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
+import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
 import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
@@ -56,39 +46,23 @@ import {
 import { Button } from "../ui/button";
 
 export interface RepertoireToolbarProps {
-  /** Search query */
   searchQuery: string;
-  /** Search change handler */
   onSearchChange: (query: string) => void;
-  /** Selected types */
   selectedTypes: string[];
-  /** Types change handler */
   onTypesChange: (types: string[]) => void;
-  /** Selected modes */
   selectedModes: string[];
-  /** Modes change handler */
   onModesChange: (modes: string[]) => void;
-  /** Selected genres */
   selectedGenres: string[];
-  /** Genres change handler */
   onGenresChange: (genres: string[]) => void;
-  /** Available types */
   availableTypes: string[];
-  /** Available modes */
   availableModes: string[];
-  /** Available genres */
   availableGenres: string[];
-  /** Loading states for async data */
   loading?: {
     genres?: boolean;
   };
-  /** Selected rows count for Remove button state */
   selectedRowsCount?: number;
-  /** Table instance for column visibility control and row selection */
   table?: Table<ITuneOverview>;
-  /** Playlist ID for adding tunes to practice queue */
-  playlistId?: string;
-  /** Controlled state for filter panel expansion */
+  repertoireId?: string;
   filterPanelExpanded?: boolean;
   onFilterPanelExpandedChange?: (expanded: boolean) => void;
 }
@@ -105,22 +79,19 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
   const [isRemoving, setIsRemoving] = createSignal(false);
-  let columnsDropdownRef: HTMLDivElement | undefined;
   let columnsButtonRef: HTMLButtonElement | undefined;
 
   const handleAddToReview = async () => {
     try {
-      // Validation
       if (!props.table) {
         alert("Table not initialized");
         return;
       }
-      if (!props.playlistId) {
-        alert("No active playlist selected");
+      if (!props.repertoireId) {
+        alert("No active repertoire selected");
         return;
       }
 
-      // Get selected rows
       const selectedRows = props.table.getSelectedRowModel().rows;
       if (selectedRows.length === 0) {
         alert(
@@ -129,19 +100,16 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         return;
       }
 
-      // Extract tune IDs
       const tuneIds = selectedRows.map((row) => row.original.id);
       console.log(`Adding ${tuneIds.length} tunes to practice queue:`, tuneIds);
 
-      // Call database function
       const db = getDb();
       const result = await addTunesToPracticeQueue(
         db,
-        props.playlistId,
+        props.repertoireId,
         tuneIds
       );
 
-      // Show feedback
       let message = "";
       if (result.added > 0) {
         message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to practice queue.`;
@@ -151,22 +119,20 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       }
       alert(message || "No tunes were added.");
 
-      // Clear selection
       props.table.resetRowSelection();
 
-      // Regenerate practice queue to include newly added tunes
       console.log("🔄 [AddToReview] Regenerating practice queue...");
       const currentUserIdInt = userIdInt();
-      if (currentUserIdInt && props.playlistId) {
+      if (currentUserIdInt && props.repertoireId) {
         try {
           await generateOrGetPracticeQueue(
             db,
             currentUserIdInt,
-            props.playlistId,
+            props.repertoireId,
             new Date(),
             null,
             "per_day",
-            true // force regeneration to pick up newly added tunes
+            true
           );
           console.log("✅ Practice queue regenerated");
         } catch (err) {
@@ -174,11 +140,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         }
       }
 
-      // Force sync up to Supabase BEFORE triggering UI refresh
       console.log("🔄 [AddToReview] Syncing changes to Supabase...");
       await forceSyncUp();
-
-      // Trigger practice list refresh using view-specific signal
       incrementPracticeListStagedChanged();
 
       console.log("Add to review completed:", result);
@@ -195,8 +158,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   };
 
   const removeSelectedFromRepertoire = async (): Promise<void> => {
-    if (!props.table) return;
-    if (!props.playlistId) return;
+    if (!props.table || !props.repertoireId) return;
 
     const currentUserId = user()?.id;
     if (!currentUserId) return;
@@ -205,26 +167,25 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     if (selectedRows.length === 0) return;
 
     const tuneIds = selectedRows.map((row) => row.original.id);
-
     const db = getDb();
 
     setIsRemoving(true);
     try {
-      // Soft-delete playlist_tune rows so they disappear from repertoire immediately
       await Promise.all(
         tuneIds.map((tuneId) =>
-          removeTuneFromPlaylist(db, props.playlistId!, tuneId, currentUserId)
+          removeTuneFromRepertoire(
+            db,
+            props.repertoireId!,
+            tuneId,
+            currentUserId
+          )
         )
       );
 
-      // Persist local DB to IndexedDB so offline reload keeps the deletion
       await persistDb();
-
-      // Clear selection and refresh repertoire list
       props.table.resetRowSelection();
       incrementRepertoireListChanged();
 
-      // If we happen to be online, push immediately; if offline, outbox will flush later
       if (navigator.onLine) {
         await forceSyncUp();
       }
@@ -243,10 +204,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
   return (
     <div class={TOOLBAR_CONTAINER_CLASSES}>
-      {/* Main toolbar */}
       <div class={TOOLBAR_INNER_CLASSES}>
         <div class={TOOLBAR_BUTTON_GROUP_CLASSES}>
-          {/* Add To Review button - left-most */}
           <button
             type="button"
             onClick={handleAddToReview}
@@ -273,7 +232,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             <span class="hidden sm:inline md:hidden">Review</span>
           </button>
 
-          {/* Search input - visible on larger screens, hidden on mobile (moves to FilterPanel) */}
           <div class={TOOLBAR_SEARCH_CONTAINER}>
             <svg
               class={TOOLBAR_SEARCH_ICON}
@@ -299,7 +257,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             />
           </div>
 
-          {/* FilterPanel - search shows inside on mobile, NO Playlist filter */}
           <FilterPanel
             searchQuery={props.searchQuery}
             onSearchChange={props.onSearchChange}
@@ -312,16 +269,15 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             availableGenres={props.availableGenres}
             selectedGenres={props.selectedGenres}
             onGenresChange={props.onGenresChange}
-            availablePlaylists={[]}
-            selectedPlaylistIds={[]}
-            onPlaylistIdsChange={() => {}}
+            availableRepertoires={[]}
+            selectedRepertoireIds={[]}
+            onRepertoireIdsChange={() => {}}
             loading={props.loading}
-            hidePlaylistFilter={true}
+            hideRepertoireFilter={true}
             isExpanded={props.filterPanelExpanded}
             onExpandedChange={props.onFilterPanelExpandedChange}
           />
 
-          {/* Add Tune button */}
           <button
             type="button"
             onClick={handleAddTune}
@@ -346,7 +302,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             <span class="hidden sm:inline">Add Tune</span>
           </button>
 
-          {/* Remove From Repertoire button */}
           <button
             type="button"
             onClick={handleRemoveFromRepertoire}
@@ -374,11 +329,9 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </button>
         </div>
 
-        {/* Spacer to push Columns to the right */}
         <div class={TOOLBAR_SPACER} />
 
-        {/* Columns dropdown */}
-        <div class="relative" ref={columnsDropdownRef!}>
+        <div class="relative">
           <button
             ref={columnsButtonRef!}
             type="button"
@@ -406,7 +359,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             </svg>
           </button>
 
-          {/* Column visibility menu */}
           <Show when={props.table}>
             <ColumnVisibilityMenu
               table={props.table!}
@@ -418,13 +370,11 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         </div>
       </div>
 
-      {/* Add Tune Dialog */}
       <AddTuneDialog
         open={showAddTuneDialog()}
         onOpenChange={setShowAddTuneDialog}
       />
 
-      {/* Confirm Remove From Repertoire Dialog */}
       <AlertDialog
         open={showRemoveConfirm()}
         onOpenChange={setShowRemoveConfirm}

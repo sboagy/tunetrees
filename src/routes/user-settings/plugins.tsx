@@ -55,8 +55,8 @@ function addDays(isoDate, days) {
 async function getRecentQualities(queryDb, input) {
   const rows = await queryDb(
     "SELECT quality FROM practice_record " +
-      "WHERE playlist_ref = '" +
-      input.playlistRef +
+      "WHERE repertoire_ref = '" +
+      input.repertoireRef +
       "' AND tune_ref = '" +
       input.tuneRef +
       "' ORDER BY practiced DESC LIMIT 6"
@@ -148,7 +148,7 @@ const formatCapabilities = (row: Plugin): string => {
   if (parsed.parseImport) labels.push("parseImport");
   if (parsed.scheduleGoal) {
     const parsedGoals = parseGoals(row.goals);
-    const goals = parsedGoals.length > 0 ? parsedGoals : parsed.goals ?? [];
+    const goals = parsedGoals.length > 0 ? parsedGoals : (parsed.goals ?? []);
     labels.push(
       goals.length > 0 ? `scheduleGoal(${goals.join(", ")})` : "scheduleGoal"
     );
@@ -267,7 +267,7 @@ const PluginsPage: Component = () => {
     processFirstReview: JSON.stringify(
       {
         input: {
-          playlistRef: "playlist-id",
+          repertoireRef: "repertoire-id",
           tuneRef: "tune-id",
           quality: 3,
           practiced: new Date().toISOString(),
@@ -296,7 +296,7 @@ const PluginsPage: Component = () => {
     processReview: JSON.stringify(
       {
         input: {
-          playlistRef: "playlist-id",
+          repertoireRef: "repertoire-id",
           tuneRef: "tune-id",
           quality: 3,
           practiced: new Date().toISOString(),
@@ -305,7 +305,7 @@ const PluginsPage: Component = () => {
         },
         prior: {
           id: "record-id",
-          playlistRef: "playlist-id",
+          repertoireRef: "repertoire-id",
           tuneRef: "tune-id",
           practiced: new Date().toISOString(),
           quality: 3,
@@ -381,7 +381,7 @@ const PluginsPage: Component = () => {
           const goals =
             parsedGoals.length > 0
               ? parsedGoals
-              : parsedCapabilities.goals ?? [];
+              : (parsedCapabilities.goals ?? []);
           setDraft({
             id: updated.id,
             userRef: updated.userRef,
@@ -423,7 +423,7 @@ const PluginsPage: Component = () => {
     const parsedCapabilities = parseCapabilities(plugin.capabilities);
     const parsedGoals = parseGoals(plugin.goals);
     const goals =
-      parsedGoals.length > 0 ? parsedGoals : parsedCapabilities.goals ?? [];
+      parsedGoals.length > 0 ? parsedGoals : (parsedCapabilities.goals ?? []);
     setDraft({
       id: plugin.id,
       userRef: plugin.userRef,
@@ -565,12 +565,14 @@ const PluginsPage: Component = () => {
       const result = await runPluginFunction({
         script: currentDraft.script,
         functionName:
-          selectedFunction === "parseImport" ? "parseImport" : "createScheduler",
+          selectedFunction === "parseImport"
+            ? "parseImport"
+            : "createScheduler",
         methodName:
           selectedFunction === "parseImport" ? undefined : selectedFunction,
         payload,
         meta,
-        timeoutMs: 10000,
+        timeoutMs: 30000,
       });
       setTestResult(JSON.stringify(result, null, 2));
     } catch (error) {

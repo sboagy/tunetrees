@@ -48,8 +48,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * });
  *
  * // Query database (respects RLS policies)
- * const { data: playlists } = await supabase
- *   .from('playlist')
+ * const { data: repertoires } = await supabase
+ *   .from('repertoire')
  *   .select('*')
  *   .eq('user_ref', userId);
  * ```

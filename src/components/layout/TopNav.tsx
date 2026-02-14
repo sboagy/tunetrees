@@ -20,17 +20,17 @@ import {
 import { toast } from "solid-sonner";
 import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { getSqliteInstance } from "../../lib/db/client-sqlite";
-import { getUserPlaylists } from "../../lib/db/queries/playlists";
-import type { PlaylistWithSummary } from "../../lib/db/types";
+import { getUserRepertoires } from "../../lib/db/queries/repertoires";
+import type { RepertoireWithSummary } from "../../lib/db/types";
 import { useClickOutside } from "../../lib/hooks/useClickOutside";
 import { log } from "../../lib/logger";
 import {
-  getSelectedPlaylistId,
-  setSelectedPlaylistId,
-} from "../../lib/services/playlist-service";
-import { PlaylistManagerDialog } from "../playlists/PlaylistManagerDialog";
+  getSelectedRepertoireId,
+  setSelectedRepertoireId,
+} from "../../lib/services/repertoire-service";
+import { RepertoireManagerDialog } from "../repertoires/RepertoireManagerDialog";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -62,15 +62,17 @@ function formatRelativeTime(isoTs: string): string {
   return `${year}y`;
 }
 
-// Helper function to get display name for a playlist
-const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
+// Helper function to get display name for a repertoire
+const getRepertoireDisplayName = (
+  repertoire: RepertoireWithSummary
+): string => {
   // If name exists and is not empty, use it
-  if (playlist.name?.trim()) {
-    return playlist.name.trim();
+  if (repertoire.name?.trim()) {
+    return repertoire.name.trim();
   }
 
   // Otherwise just use instrument name
-  const instrument = playlist.instrumentName || "Unknown Instrument";
+  const instrument = repertoire.instrumentName || "Unknown Instrument";
   return instrument;
 };
 
@@ -79,7 +81,7 @@ const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
  *
  * Features:
  * - App logo and branding
- * - Playlist selector dropdown
+ * - Repertoire selector dropdown
  * - User menu dropdown
  * - Theme switcher
  * - Network/sync status indicator
@@ -291,12 +293,12 @@ const LogoDropdown: Component<{
 };
 
 /**
- * Playlist Dropdown Component
+ * Repertoire Dropdown Component
  *
- * Dropdown for selecting active playlist with "Manage Repertoires..." option
+ * Dropdown for selecting active repertoire with "Manage Repertoires..." option
  */
-const PlaylistDropdown: Component<{
-  onOpenPlaylistManager: () => void;
+const RepertoireDropdown: Component<{
+  onOpenRepertoireManager: () => void;
 }> = (props) => {
   const {
     user,
@@ -304,7 +306,8 @@ const PlaylistDropdown: Component<{
     repertoireListChanged,
     remoteSyncDownCompletionVersion,
   } = useAuth();
-  const { currentPlaylistId, setCurrentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId, setCurrentRepertoireId } =
+    useCurrentRepertoire();
   const [showDropdown, setShowDropdown] = createSignal(false);
   let dropdownContainerRef: HTMLDivElement | undefined;
 
@@ -320,25 +323,25 @@ const PlaylistDropdown: Component<{
     }
   );
 
-  // Fetch user playlists
+  // Fetch user repertoires
   // Fetch immediately if data exists in SQLite, don't wait for sync
-  // repertoireListChanged is tracked as a dependency to trigger refetch after playlist changes
+  // repertoireListChanged is tracked as a dependency to trigger refetch after repertoire changes
   let lastTopNavDiagKey: string | null = null;
-  const [playlists] = createResource(
+  const [repertoires] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`; // Triggers refetch when playlists change or sync completes
+      const version = `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`; // Triggers refetch when repertoires change or sync completes
 
       if (shouldTopNavDiag) {
-        console.log("🔍 [TopNav] Playlists dependency check:", {
+        console.log("🔍 [TopNav] Repertoires dependency check:", {
           hasDb: !!db,
           userId,
           userObject: user(),
           repertoireListChanged: version,
           shouldFetch: !!(db && userId),
         });
-        log.debug("TOPNAV playlists dependency:", {
+        log.debug("TOPNAV repertoires dependency:", {
           hasDb: !!db,
           userId,
           repertoireListChanged: version,
@@ -346,13 +349,13 @@ const PlaylistDropdown: Component<{
       }
 
       // Fetch if database and user are ready
-      // Don't wait for sync - playlists exist in local DB
+      // Don't wait for sync - repertoires exist in local DB
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
       if (shouldTopNavDiag) {
-        console.log("📋 [TopNav] Fetching playlists with params:", params);
-        log.debug("TOPNAV playlists fetcher:", {
+        console.log("📋 [TopNav] Fetching repertoires with params:", params);
+        log.debug("TOPNAV repertoires fetcher:", {
           hasParams: !!params,
           repertoireListChanged: params?.version,
         });
@@ -545,106 +548,107 @@ const PlaylistDropdown: Component<{
 
         if (shouldTopNavDiag) {
           console.log(
-            "🔄 [TopNav] Calling getUserPlaylists with userId:",
+            "🔄 [TopNav] Calling getUserRepertoires with userId:",
             params.userId
           );
         }
-        const result = await getUserPlaylists(params.db, params.userId);
+        const result = await getUserRepertoires(params.db, params.userId);
 
         if (shouldTopNavDiag) {
-          console.log("✅ [TopNav] Got playlists:", result.length, result);
+          console.log("✅ [TopNav] Got repertoires:", result.length, result);
         }
         if (shouldTopNavDump) {
           await collectTopNavDbSnapshot("after");
         }
         if (shouldTopNavDiag) {
-          log.debug("TOPNAV playlists result:", result.length, "playlists");
+          log.debug("TOPNAV repertoires result:", result.length, "repertoires");
         }
         return result;
       } catch (error) {
         if (shouldTopNavDump) {
           await collectTopNavDbSnapshot("afterError", { always: true, error });
         }
-        console.error("❌ [TopNav] Playlist fetch error:", error);
-        log.error("TOPNAV playlists fetch error:", error);
+        console.error("❌ [TopNav] Repertoire fetch error:", error);
+        log.error("TOPNAV repertoires fetch error:", error);
         return [];
       }
     }
   );
 
-  // Additional debug effect to track playlists changes
+  // Additional debug effect to track repertoires changes
   createEffect(() => {
-    const playlistsList = playlists();
-    const loading = playlists.loading;
-    log.debug("TOPNAV playlists changed:", {
+    const repertoiresList = repertoires();
+    const loading = repertoires.loading;
+    log.debug("TOPNAV repertoires changed:", {
       loading,
-      count: playlistsList?.length || 0,
-      playlists:
-        playlistsList?.map((p) => ({ id: p.playlistId, name: p.name })) || [],
+      count: repertoiresList?.length || 0,
+      repertoires:
+        repertoiresList?.map((p) => ({ id: p.repertoireId, name: p.name })) ||
+        [],
     });
   });
 
-  // Load selected playlist from localStorage on mount
+  // Load selected repertoire from localStorage on mount
   createEffect(() => {
     const userId = user()?.id;
-    const playlistsList = playlists();
-    if (!userId || !playlistsList) return;
+    const repertoiresList = repertoires();
+    if (!userId || !repertoiresList) return;
 
-    const storedId = getSelectedPlaylistId(userId);
+    const storedId = getSelectedRepertoireId(userId);
 
     if (storedId) {
-      setCurrentPlaylistId(storedId);
-    } else if (playlistsList.length > 0) {
-      // Default to first playlist
-      const firstId = playlistsList[0].playlistId;
-      setCurrentPlaylistId(firstId);
-      setSelectedPlaylistId(userId, firstId);
+      setCurrentRepertoireId(storedId);
+    } else if (repertoiresList.length > 0) {
+      // Default to first repertoire
+      const firstId = repertoiresList[0].repertoireId;
+      setCurrentRepertoireId(firstId);
+      setSelectedRepertoireId(userId, firstId);
     }
   });
 
-  const handlePlaylistSelect = (playlistId: string) => {
+  const handleRepertoireSelect = (repertoireId: string) => {
     const userId = user()?.id;
     if (!userId) return;
 
-    setCurrentPlaylistId(playlistId);
-    setSelectedPlaylistId(userId, playlistId);
+    setCurrentRepertoireId(repertoireId);
+    setSelectedRepertoireId(userId, repertoireId);
     setShowDropdown(false);
   };
 
-  const handleManagePlaylists = () => {
+  const handleManageRepertoires = () => {
     setShowDropdown(false);
-    props.onOpenPlaylistManager();
+    props.onOpenRepertoireManager();
   };
 
-  const selectedPlaylist = createMemo(() => {
-    const id = currentPlaylistId();
-    const playlistsList = playlists();
-    if (!id || !playlistsList) return null;
-    return playlistsList.find((p) => p.playlistId === id);
+  const selectedRepertoire = createMemo(() => {
+    const id = currentRepertoireId();
+    const repertoiresList = repertoires();
+    if (!id || !repertoiresList) return null;
+    return repertoiresList.find((p) => p.repertoireId === id);
   });
 
   return (
     <div
       class="relative"
-      data-testid="playlist-dropdown"
+      data-testid="repertoire-dropdown"
       ref={dropdownContainerRef}
     >
       <button
         type="button"
         onClick={() => setShowDropdown(!showDropdown())}
         class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-        aria-label="Select playlist"
+        aria-label="Select repertoire"
         aria-expanded={showDropdown()}
-        data-testid="playlist-dropdown-button"
+        data-testid="repertoire-dropdown-button"
       >
         <span class="hidden md:inline font-medium">
-          {selectedPlaylist()
-            ? getPlaylistDisplayName(selectedPlaylist()!)
+          {selectedRepertoire()
+            ? getRepertoireDisplayName(selectedRepertoire()!)
             : "No Repertoire"}
         </span>
         <span class="md:hidden inline-block max-w-[8ch] min-w-0 truncate font-medium">
-          {selectedPlaylist()
-            ? getPlaylistDisplayName(selectedPlaylist()!)
+          {selectedRepertoire()
+            ? getRepertoireDisplayName(selectedRepertoire()!)
             : "No Repertoire"}
         </span>
         <svg
@@ -667,38 +671,43 @@ const PlaylistDropdown: Component<{
       {/* Dropdown Menu */}
       <Show when={showDropdown()}>
         <div class="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-          <div class="py-2" data-testid="top-nav-manage-playlists-panel">
+          <div class="py-2" data-testid="top-nav-manage-repertoires-panel">
             {/* Repertoires List */}
             <Show
-              when={!playlists.loading && playlists()}
+              when={!repertoires.loading && repertoires()}
               fallback={
                 <div class="px-4 py-2 text-sm text-gray-500">
                   Loading repertoires...
                 </div>
               }
             >
-              <For each={playlists()}>
-                {(playlist) => (
+              <For each={repertoires()}>
+                {(repertoire) => (
                   <button
                     type="button"
                     class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
                     classList={{
                       "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":
-                        currentPlaylistId() === playlist.playlistId,
+                        currentRepertoireId() === repertoire.repertoireId,
                     }}
-                    onClick={() => handlePlaylistSelect(playlist.playlistId)}
+                    onClick={() =>
+                      handleRepertoireSelect(repertoire.repertoireId)
+                    }
                   >
                     <div class="flex-1">
                       <div class="font-medium">
-                        {getPlaylistDisplayName(playlist)}
+                        {getRepertoireDisplayName(repertoire)}
                       </div>
                       <div class="text-xs text-gray-500 dark:text-gray-400">
-                        {playlist.tuneCount} tune
-                        {playlist.tuneCount !== 1 ? "s" : ""}
-                        {playlist.genreDefault && ` • ${playlist.genreDefault}`}
+                        {repertoire.tuneCount} tune
+                        {repertoire.tuneCount !== 1 ? "s" : ""}
+                        {repertoire.genreDefault &&
+                          ` • ${repertoire.genreDefault}`}
                       </div>
                     </div>
-                    <Show when={currentPlaylistId() === playlist.playlistId}>
+                    <Show
+                      when={currentRepertoireId() === repertoire.repertoireId}
+                    >
                       <svg
                         class="w-4 h-4 text-blue-600 dark:text-blue-400"
                         fill="currentColor"
@@ -724,7 +733,7 @@ const PlaylistDropdown: Component<{
             <button
               type="button"
               class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-              onClick={handleManagePlaylists}
+              onClick={handleManageRepertoires}
               data-testid="manage-repertoires-button"
             >
               <svg
@@ -772,7 +781,7 @@ export const TopNav: Component = () => {
   const [pendingCount, setPendingCount] = createSignal(0);
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const [showDbMenu, setShowDbMenu] = createSignal(false);
-  const [showPlaylistManager, setShowPlaylistManager] = createSignal(false);
+  const [showRepertoireManager, setShowRepertoireManager] = createSignal(false);
   const [showAboutDialog, setShowAboutDialog] = createSignal(false);
   const [showForceSyncUpConfirm, setShowForceSyncUpConfirm] =
     createSignal(false);
@@ -825,7 +834,7 @@ export const TopNav: Component = () => {
         const result = await db
           .select({ avatarUrl: userProfile.avatarUrl })
           .from(userProfile)
-          .where(eq(userProfile.supabaseUserId, userId))
+          .where(eq(userProfile.id, userId))
           .limit(1);
 
         return result[0]?.avatarUrl || null;
@@ -915,13 +924,13 @@ export const TopNav: Component = () => {
           <div class="flex items-center gap-6">
             {/* App Logo Dropdown */}
             <LogoDropdown onOpenAbout={() => setShowAboutDialog(true)} />
-            {/* Playlist Selector */}
+            {/* Repertoire Selector */}
             <div class="flex items-center gap--1">
               <span class="hidden sm:inline text-sm font-medium text-gray-600 dark:text-gray-400">
                 Current Repertoire:
               </span>
-              <PlaylistDropdown
-                onOpenPlaylistManager={() => setShowPlaylistManager(true)}
+              <RepertoireDropdown
+                onOpenRepertoireManager={() => setShowRepertoireManager(true)}
               />
             </div>
           </div>
@@ -1545,10 +1554,10 @@ export const TopNav: Component = () => {
         </div>
       </div>
 
-      {/* Playlist Manager Dialog */}
-      <PlaylistManagerDialog
-        isOpen={showPlaylistManager()}
-        onClose={() => setShowPlaylistManager(false)}
+      {/* Repertoire Manager Dialog */}
+      <RepertoireManagerDialog
+        isOpen={showRepertoireManager()}
+        onClose={() => setShowRepertoireManager(false)}
       />
 
       {/* About Dialog */}

@@ -1,17 +1,17 @@
 /**
- * Playlist Selector Component
+ * Repertoire Selector Component
  *
- * Dropdown for selecting active playlist.
+ * Dropdown for selecting active repertoire.
  * Persists selection to localStorage and provides callback on change.
  *
  * Features:
- * - Shows all user playlists
+ * - Shows all user repertoires
  * - Displays selected repertoire name
  * - Persists selection across sessions
- * - Loads playlists from local SQLite
- * - Auto-selects default playlist if none selected
+ * - Loads repertoires from local SQLite
+ * - Auto-selects default repertoire if none selected
  *
- * @module components/playlists/PlaylistSelector
+ * @module components/repertoires/RepertoireSelector
  */
 
 import {
@@ -22,18 +22,18 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { getUserPlaylists } from "../../lib/db/queries/playlists";
-import type { PlaylistWithSummary } from "../../lib/db/types";
+import { getUserRepertoires } from "../../lib/db/queries/repertoires";
+import type { RepertoireWithSummary } from "../../lib/db/types";
 import {
-  getSelectedPlaylistId,
-  setSelectedPlaylistId,
-} from "../../lib/services/playlist-service";
+  getSelectedRepertoireId,
+  setSelectedRepertoireId,
+} from "../../lib/services/repertoire-service";
 
-interface PlaylistSelectorProps {
+interface RepertoireSelectorProps {
   /**
-   * Callback when playlist selection changes
+   * Callback when repertoire selection changes
    */
-  onPlaylistChange?: (playlistId: string) => void;
+  onRepertoireChange?: (repertoireId: string) => void;
 
   /**
    * CSS class for styling
@@ -42,37 +42,37 @@ interface PlaylistSelectorProps {
 }
 
 /**
- * Playlist Selector Component
+ * Repertoire Selector Component
  *
  * @example
  * ```tsx
- * <PlaylistSelector
- *   onPlaylistChange={(id) => console.log('Selected:', id)}
+ * <RepertoireSelector
+ *   onRepertoireChange={(id) => console.log('Selected:', id)}
  *   class="w-64"
  * />
  * ```
  */
-export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
+export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) => {
   const { user, localDb } = useAuth();
-  const [playlists, setPlaylists] = createSignal<PlaylistWithSummary[]>([]);
-  const [selectedPlaylistId, setSelectedPlaylistIdSignal] = createSignal<
+  const [repertoires, setRepertoires] = createSignal<RepertoireWithSummary[]>([]);
+  const [selectedRepertoireId, setSelectedRepertoireIdSignal] = createSignal<
     string | null
   >(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [isOpen, setIsOpen] = createSignal(false);
 
-  // Load playlists on mount
+  // Load repertoires on mount
   createEffect(() => {
     const db = localDb();
     const currentUser = user();
 
     if (!db || !currentUser) return;
 
-    loadPlaylists();
+    loadRepertoires();
   });
 
-  async function loadPlaylists() {
+  async function loadRepertoires() {
     const db = localDb();
     const currentUser = user();
 
@@ -82,79 +82,80 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
       setLoading(true);
       setError(null);
 
-      // Get all playlists
-      const userPlaylists = await getUserPlaylists(db, currentUser.id);
-      setPlaylists(userPlaylists);
+      // Get all repertoires
+      const userRepertoires = await getUserRepertoires(db, currentUser.id);
+      setRepertoires(userRepertoires);
 
-      // Get stored selection or default to first playlist
-      let storedSelection = getSelectedPlaylistId(currentUser.id);
+      // Get stored selection or default to first repertoire
+      let storedSelection = getSelectedRepertoireId(currentUser.id);
 
-      if (!storedSelection && userPlaylists.length > 0) {
-        // Default to first playlist
-        storedSelection = userPlaylists[0].playlistId;
-        setSelectedPlaylistId(currentUser.id, storedSelection);
+      if (!storedSelection && userRepertoires.length > 0) {
+        // Default to first repertoire
+        const firstRepertoireId = userRepertoires[0].repertoireId;
+        storedSelection = firstRepertoireId;
+        setSelectedRepertoireId(currentUser.id, firstRepertoireId);
       }
 
-      setSelectedPlaylistIdSignal(storedSelection);
+      setSelectedRepertoireIdSignal(storedSelection);
 
       // Notify parent of initial selection
-      if (storedSelection && props.onPlaylistChange) {
-        props.onPlaylistChange(storedSelection);
+      if (storedSelection && props.onRepertoireChange) {
+        props.onRepertoireChange(storedSelection);
       }
     } catch (err) {
-      console.error("Error loading playlists:", err);
-      setError(err instanceof Error ? err.message : "Failed to load playlists");
+      console.error("Error loading repertoires:", err);
+      setError(err instanceof Error ? err.message : "Failed to load repertoires");
     } finally {
       setLoading(false);
     }
   }
 
-  function handlePlaylistSelect(playlistId: string) {
+  function handleRepertoireSelect(repertoireId: string) {
     const currentUser = user();
     if (!currentUser) return;
 
-    setSelectedPlaylistIdSignal(playlistId);
-    setSelectedPlaylistId(currentUser.id, playlistId);
+    setSelectedRepertoireIdSignal(repertoireId);
+    setSelectedRepertoireId(currentUser.id, repertoireId);
     setIsOpen(false);
 
     // Notify parent
-    if (props.onPlaylistChange) {
-      props.onPlaylistChange(playlistId);
+    if (props.onRepertoireChange) {
+      props.onRepertoireChange(repertoireId);
     }
   }
 
-  const selectedPlaylist = () => {
-    const id = selectedPlaylistId();
+  const selectedRepertoire = () => {
+    const id = selectedRepertoireId();
     if (!id) return null;
-    return playlists().find((p) => p.playlistId === id);
+    return repertoires().find((p) => p.repertoireId === id);
   };
 
   return (
     <div class={`relative ${props.class || ""}`}>
-      {/* Selected Playlist Display / Dropdown Button */}
+      {/* Selected Repertoire Display / Dropdown Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen())}
-        disabled={loading() || playlists().length === 0}
+        disabled={loading() || repertoires().length === 0}
         class="w-full px-4 py-2 text-left bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex justify-between items-center"
       >
         <Show
-          when={!loading() && selectedPlaylist()}
+          when={!loading() && selectedRepertoire()}
           fallback={
             <span class="text-gray-500 dark:text-gray-400">
-              {loading() ? "Loading playlists..." : "No playlists"}
+              {loading() ? "Loading repertoires..." : "No repertoires"}
             </span>
           }
         >
           <div class="flex-1">
             <div class="font-medium text-gray-900 dark:text-white">
-              {selectedPlaylist()?.name ||
-                selectedPlaylist()?.instrumentName ||
-                "Unnamed Playlist"}
+              {selectedRepertoire()?.name ||
+                selectedRepertoire()?.instrumentName ||
+                "Unnamed Repertoire"}
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400">
-              {selectedPlaylist()?.tuneCount || 0} tune
-              {selectedPlaylist()?.tuneCount !== 1 ? "s" : ""}
+              {selectedRepertoire()?.tuneCount || 0} tune
+              {selectedRepertoire()?.tuneCount !== 1 ? "s" : ""}
             </div>
           </div>
         </Show>
@@ -182,15 +183,15 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
       </Show>
 
       {/* Dropdown Menu */}
-      <Show when={isOpen() && playlists().length > 0}>
+      <Show when={isOpen() && repertoires().length > 0}>
         <div class="absolute z-10 w-full mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-          <For each={playlists()}>
-            {(playlist) => (
+          <For each={repertoires()}>
+            {(repertoire) => (
               <button
                 type="button"
-                onClick={() => handlePlaylistSelect(playlist.playlistId)}
+                onClick={() => handleRepertoireSelect(repertoire.repertoireId)}
                 class={`w-full px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-                  playlist.playlistId === selectedPlaylistId()
+                  repertoire.repertoireId === selectedRepertoireId()
                     ? "bg-blue-50 dark:bg-blue-900/20"
                     : ""
                 }`}
@@ -198,22 +199,22 @@ export const PlaylistSelector: Component<PlaylistSelectorProps> = (props) => {
                 <div class="flex justify-between items-start">
                   <div class="flex-1">
                     <div class="font-medium text-gray-900 dark:text-white">
-                      {playlist.name ||
-                        playlist.instrumentName ||
-                        "Unnamed Playlist"}
+                      {repertoire.name ||
+                        repertoire.instrumentName ||
+                        "Unnamed Repertoire"}
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {playlist.tuneCount}{" "}
-                      {playlist.tuneCount === 1 ? "tune" : "tunes"}
-                      <Show when={playlist.genreDefault}>
+                      {repertoire.tuneCount}{" "}
+                      {repertoire.tuneCount === 1 ? "tune" : "tunes"}
+                      <Show when={repertoire.genreDefault}>
                         {" • "}
-                        {playlist.genreDefault}
+                        {repertoire.genreDefault}
                       </Show>
                     </div>
                   </div>
 
                   {/* Selected Checkmark */}
-                  <Show when={playlist.playlistId === selectedPlaylistId()}>
+                  <Show when={repertoire.repertoireId === selectedRepertoireId()}>
                     <svg
                       class="w-5 h-5 text-blue-600 dark:text-blue-400"
                       fill="currentColor"

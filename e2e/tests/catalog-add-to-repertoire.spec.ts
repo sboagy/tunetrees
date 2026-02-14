@@ -160,9 +160,9 @@ test.describe
       await page.waitForTimeout(500);
 
       // Debug: Query Supabase directly to see what's actually there
-      const supabaseCount = await page.evaluate(async (playlistId) => {
+      const supabaseCount = await page.evaluate(async (repertoireId) => {
         const response = await fetch(
-          `http://localhost:54321/rest/v1/playlist_tune?playlist_ref=eq.${playlistId}&select=tune_ref`,
+          `http://localhost:54321/rest/v1/repertoire_tune?repertoire_ref=eq.${repertoireId}&select=tune_ref`,
           {
             headers: {
               apikey:
@@ -173,9 +173,9 @@ test.describe
         );
         const data = await response.json();
         return data.length;
-      }, currentTestUser.playlistId);
+      }, currentTestUser.repertoireId);
       console.log(
-        `🔍 Supabase has ${supabaseCount} tunes for user ${currentTestUser.playlistId}`
+        `🔍 Supabase has ${supabaseCount} tunes for user ${currentTestUser.repertoireId}`
       );
 
       // Grid uses virtualization with spacer rows for scrolling

@@ -19,7 +19,7 @@ import {
 import type { TuneEditorData } from "../../../components/tunes";
 import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../../../lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "../../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
 import {
   getOrCreateTuneOverride,
@@ -28,7 +28,7 @@ import {
 } from "../../../lib/db/queries/tune-overrides";
 import {
   getTuneEditorData,
-  updatePlaylistTuneFields,
+  updateRepertoireTuneFields,
 } from "../../../lib/db/queries/tune-user-data";
 import {
   getTuneForUserById,
@@ -51,7 +51,7 @@ const EditTunePage: Component = () => {
     incrementRepertoireListChanged,
   } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
@@ -65,9 +65,9 @@ const EditTunePage: Component = () => {
       const db = localDb();
       const tuneId = params.id;
       const uid = userIdInt();
-      const playlistId = currentPlaylistId();
-      return db && tuneId && uid && playlistId
-        ? { db, tuneId, uid, playlistId }
+      const repertoireId = currentRepertoireId();
+      return db && tuneId && uid && repertoireId
+        ? { db, tuneId, uid, repertoireId }
         : db && tuneId && uid
           ? { db, tuneId, uid }
           : null;
@@ -75,13 +75,13 @@ const EditTunePage: Component = () => {
     async (params) => {
       if (!params) return null;
 
-      // If we have a playlist context, fetch complete editor data
-      if ("playlistId" in params && params.playlistId) {
+      // If we have a repertoire context, fetch complete editor data
+      if ("repertoireId" in params && params.repertoireId) {
         return await getTuneEditorData(
           params.db,
           params.tuneId,
           params.uid,
-          params.playlistId
+          params.repertoireId
         );
       }
 
@@ -106,7 +106,7 @@ const EditTunePage: Component = () => {
   ): Promise<string | undefined> => {
     const db = localDb();
     const userId = userIdInt();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
 
     if (!db) {
       console.error("Database not initialized");
@@ -193,15 +193,15 @@ const EditTunePage: Component = () => {
         }
       }
 
-      // PART 2: Save user-specific fields if we have a playlist context
-      if (playlistId) {
-        // Update playlist_tune fields (learned, goal, scheduled)
+      // PART 2: Save user-specific fields if we have a repertoire context
+      if (repertoireId) {
+        // Update repertoire_tune fields (learned, goal, scheduled)
         if (
           tuneData.learned !== undefined ||
           tuneData.goal !== undefined ||
           tuneData.scheduled !== undefined
         ) {
-          await updatePlaylistTuneFields(db, playlistId, tuneId, {
+          await updateRepertoireTuneFields(db, repertoireId, tuneId, {
             learned: tuneData.learned || null,
             goal: tuneData.goal || null,
             scheduled: tuneData.scheduled || null,

@@ -15,9 +15,9 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
-import { getPlaylistTunesStaged } from "../../lib/db/queries/playlists";
+import { getRepertoireTunesStaged } from "../../lib/db/queries/repertoires";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
@@ -33,7 +33,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     initialSyncComplete,
     user,
   } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
   // Column visibility shared with parent; TunesGrid also persists internally
@@ -45,24 +45,24 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     props.onColumnVisibilityChange?.(columnVisibility());
   });
 
-  // Fetch tunes for current playlist (practice_list_staged view)
-  const [playlistTunesData] = createResource(
+  // Fetch tunes for current repertoire (practice_list_staged view)
+  const [repertoireTunesData] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const playlistId = currentPlaylistId();
+      const repertoireId = currentRepertoireId();
       const version = repertoireListChanged(); // Refetch when repertoire changes
       const syncComplete = initialSyncComplete();
       if (!syncComplete) return null;
-      return db && userId && playlistId
-        ? { db, userId, playlistId, version }
+      return db && userId && repertoireId
+        ? { db, userId, repertoireId, version }
         : null;
     },
     async (params) => {
       if (!params) return [];
-      return await getPlaylistTunesStaged(
+      return await getRepertoireTunesStaged(
         params.db,
-        params.playlistId,
+        params.repertoireId,
         params.userId
       );
     }
@@ -82,7 +82,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   );
 
   // The view already returns ITuneOverview rows
-  const tunes = createMemo<ITuneOverview[]>(() => playlistTunesData() || []);
+  const tunes = createMemo<ITuneOverview[]>(() => repertoireTunesData() || []);
 
   // Client-side filter (search/type/mode/genre)
   const filteredTunes = createMemo<ITuneOverview[]>(() => {
@@ -138,7 +138,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     );
   });
 
-  const loadError = createMemo(() => playlistTunesData.error);
+  const loadError = createMemo(() => repertoireTunesData.error);
   const hasTunes = createMemo(() => filteredTunes().length > 0);
 
   const [columnDescriptions] = createResource(
@@ -166,7 +166,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Loading */}
-      <Show when={!loadError() && playlistTunesData.loading}>
+      <Show when={!loadError() && repertoireTunesData.loading}>
         <GridStatusMessage
           variant="loading"
           title="Loading repertoire..."
@@ -175,12 +175,12 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Grid */}
-      <Show when={!loadError() && !playlistTunesData.loading && hasTunes()}>
+      <Show when={!loadError() && !repertoireTunesData.loading && hasTunes()}>
         <div class="flex-1 overflow-hidden">
           <TunesGrid
             tablePurpose="repertoire"
             userId={props.userId}
-            playlistId={currentPlaylistId() || undefined}
+            repertoireId={currentRepertoireId() || undefined}
             data={filteredTunes()}
             columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}
@@ -209,7 +209,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Empty state */}
-      <Show when={!loadError() && !playlistTunesData.loading && !hasTunes()}>
+      <Show when={!loadError() && !repertoireTunesData.loading && !hasTunes()}>
         <GridStatusMessage
           variant="empty"
           title="No tunes in repertoire"

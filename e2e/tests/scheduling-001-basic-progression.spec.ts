@@ -116,7 +116,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
       const record = await queryLatestPracticeRecord(
         page,
         TEST_TUNE_BANISH_ID,
-        testUser.playlistId
+        testUser.repertoireId
       );
       if (!record) throw new Error("No practice record found after evaluation");
 
@@ -189,17 +189,17 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
             // Get latest practice record
             const pr = await api.getLatestPracticeRecord(
               args.tuneId,
-              args.playlistId
+              args.repertoireId
             );
 
             // Get ALL queue windows in DB (using new helper)
-            // const allQueues = await api.getAllQueueWindows(args.playlistId);
+            // const allQueues = await api.getAllQueueWindows(args.repertoireId);
 
             // Get current queue (MAX window)
-            const queue = await api.getPracticeQueue(args.playlistId);
+            const queue = await api.getPracticeQueue(args.repertoireId);
 
             // Get practice list staged data
-            const staged = await api.getPracticeListStaged(args.playlistId, [
+            const staged = await api.getPracticeListStaged(args.repertoireId, [
               args.tuneId,
             ]);
 
@@ -226,7 +226,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
               stagedData: staged,
             };
           },
-          { tuneId: TEST_TUNE_BANISH_ID, playlistId: testUser.playlistId }
+          { tuneId: TEST_TUNE_BANISH_ID, repertoireId: testUser.repertoireId }
         );
         await page.evaluate(() => (window as any).__persistDbForTest?.());
 

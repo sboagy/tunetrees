@@ -23,6 +23,11 @@ vi.mock("../../src/lib/sync", () => ({
   queueSync: vi.fn(() => Promise.resolve()),
 }));
 
+// Mock client SQLite persistence side effects used by query helpers
+vi.mock("../../src/lib/db/client-sqlite", () => ({
+  persistDb: vi.fn(() => Promise.resolve()),
+}));
+
 // Test database setup
 let db: BetterSQLite3Database;
 

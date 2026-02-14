@@ -70,17 +70,17 @@ function insertTune(
   `);
 }
 
-function insertUserProfile(supabaseUserId: string): void {
+function insertUserProfile(userId: string): void {
   db.run(sql`
-    INSERT INTO user_profile (supabase_user_id, id, deleted, sync_version, last_modified_at)
-    VALUES (${supabaseUserId}, ${supabaseUserId}, 0, 1, datetime('now'))
+    INSERT INTO user_profile (id, deleted, sync_version, last_modified_at)
+    VALUES (${userId}, 0, 1, datetime('now'))
   `);
 }
 
-function insertPlaylist(playlistId: string, userRef: string): void {
+function insertRepertoire(repertoireId: string, userRef: string): void {
   db.run(sql`
-    INSERT INTO playlist (playlist_id, user_ref, deleted, sync_version, last_modified_at)
-    VALUES (${playlistId}, ${userRef}, 0, 1, datetime('now'))
+    INSERT INTO repertoire (repertoire_id, user_ref, deleted, sync_version, last_modified_at)
+    VALUES (${repertoireId}, ${userRef}, 0, 1, datetime('now'))
   `);
 }
 
@@ -110,15 +110,15 @@ describe("Sync Outbox Operations", () => {
   describe("backfillOutboxForTable", () => {
     it("creates outbox rows for recent practice_record rows", async () => {
       insertUserProfile("sb-1");
-      insertPlaylist("pl-1", "sb-1");
+      insertRepertoire("pl-1", "sb-1");
       insertTune("t-1", "Tune", "reel");
 
       db.run(sql`
-        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, sync_version, last_modified_at)
         VALUES ('pr-1', 'pl-1', 't-1', '2025-12-27T00:00:00.000Z', 1, '2025-12-27T00:00:00.000Z')
       `);
       db.run(sql`
-        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, sync_version, last_modified_at)
         VALUES ('pr-2', 'pl-1', 't-1', '2025-12-27T00:00:01.000Z', 1, '2025-12-27T00:00:01.000Z')
       `);
 
@@ -153,11 +153,11 @@ describe("Sync Outbox Operations", () => {
 
     it("is idempotent for already-queued rows", async () => {
       insertUserProfile("sb-1");
-      insertPlaylist("pl-1", "sb-1");
+      insertRepertoire("pl-1", "sb-1");
       insertTune("t-1", "Tune", "reel");
 
       db.run(sql`
-        INSERT INTO practice_record (id, playlist_ref, tune_ref, practiced, sync_version, last_modified_at)
+        INSERT INTO practice_record (id, repertoire_ref, tune_ref, practiced, sync_version, last_modified_at)
         VALUES ('pr-3', 'pl-1', 't-1', '2025-12-27T00:00:02.000Z', 1, '2025-12-27T00:00:02.000Z')
       `);
       insertOutboxItem(
@@ -186,19 +186,35 @@ describe("Sync Outbox Operations", () => {
       expect(Number(count)).toBe(1);
     });
 
-    it("creates JSON row_id for composite primary keys (playlist_tune)", async () => {
+    it("creates JSON row_id for composite primary keys (repertoire_tune)", async () => {
       insertUserProfile("sb-1");
-      insertPlaylist("pl-1", "sb-1");
+      insertRepertoire("pl-1", "sb-1");
       insertTune("t-1", "Tune", "reel");
 
       db.run(sql`
-        INSERT INTO playlist_tune (playlist_ref, tune_ref, deleted, sync_version, last_modified_at)
+        CREATE TABLE IF NOT EXISTS repertoire_tune (
+          repertoire_ref TEXT NOT NULL,
+          tune_ref TEXT NOT NULL,
+          current TEXT,
+          learned TEXT,
+          scheduled TEXT,
+          goal TEXT,
+          deleted INTEGER NOT NULL DEFAULT 0,
+          sync_version INTEGER NOT NULL DEFAULT 1,
+          last_modified_at TEXT NOT NULL,
+          device_id TEXT,
+          PRIMARY KEY (repertoire_ref, tune_ref)
+        )
+      `);
+
+      db.run(sql`
+        INSERT INTO repertoire_tune (repertoire_ref, tune_ref, deleted, sync_version, last_modified_at)
         VALUES ('pl-1', 't-1', 0, 1, '2025-12-27T00:00:00.000Z')
       `);
 
       const inserted = await backfillOutboxForTable(
         db as any,
-        "playlist_tune",
+        "repertoire_tune",
         "2025-12-26T00:00:00.000Z"
       );
       expect(inserted).toBe(1);
@@ -206,13 +222,13 @@ describe("Sync Outbox Operations", () => {
       const outbox = await db.all(sql`
         SELECT table_name, row_id, status, operation
         FROM sync_push_queue
-        WHERE table_name = 'playlist_tune'
+        WHERE table_name = 'repertoire_tune'
       `);
 
       expect(outbox).toEqual([
         {
-          table_name: "playlist_tune",
-          row_id: JSON.stringify({ playlist_ref: "pl-1", tune_ref: "t-1" }),
+          table_name: "repertoire_tune",
+          row_id: JSON.stringify({ repertoire_ref: "pl-1", tune_ref: "t-1" }),
           status: "pending",
           operation: "UPDATE",
         },

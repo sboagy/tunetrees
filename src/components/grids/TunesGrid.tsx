@@ -49,7 +49,7 @@ import type {
 export interface ITunesGridProps<T extends { id: string | number }> {
   tablePurpose: TablePurpose; // "catalog" | "repertoire" | "scheduled"
   userId: string;
-  playlistId?: string;
+  repertoireId?: string;
   data: T[];
   // Optional override: when omitted, columns are derived via getColumns(tablePurpose, cellCallbacks)
   columns?: ColumnDef<T, unknown>[];
@@ -174,11 +174,13 @@ export const TunesGrid = (<T extends { id: string | number }>(
     };
   };
 
+  const activeRepertoireId = createMemo(() => props.repertoireId ?? "0");
+
   // State persistence key
   const stateKey = createMemo(() => ({
     userId: props.userId,
     tablePurpose: props.tablePurpose,
-    playlistId: props.playlistId ?? "0",
+    repertoireId: activeRepertoireId(),
   }));
 
   // Resolve columns early (used to sanitize persisted state before initializing TanStack)
@@ -220,10 +222,10 @@ export const TunesGrid = (<T extends { id: string | number }>(
     null
   );
 
-  // Restore rowSelection when the storage key changes (user/playlist/tab changes)
+  // Restore rowSelection when the storage key changes (user/repertoire/tab changes)
   createEffect(() => {
     const key = stateKey();
-    const keySignature = `${key.userId}:${key.tablePurpose}:${key.playlistId}`;
+    const keySignature = `${key.userId}:${key.tablePurpose}:${key.repertoireId}`;
     if (keySignature === lastSelectionKey()) return;
     setLastSelectionKey(keySignature);
 
@@ -473,11 +475,12 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const scrollKey = createMemo<string | null>(() => {
     const uid = props.userId;
     if (!uid) return null;
-    const suffix = props.playlistId ? `_${props.playlistId}` : "";
+    const repertoireId = activeRepertoireId();
+    const suffix = repertoireId !== "0" ? `_${repertoireId}` : "";
     return `TT_${props.tablePurpose.toUpperCase()}_SCROLL_${uid}${suffix}`;
   });
 
-  // When the scroll storage key changes (e.g., playlist change), restore once
+  // When the scroll storage key changes (e.g., repertoire change), restore once
   const [lastScrollKey, setLastScrollKey] = createSignal<string | null>(null);
   createEffect(() => {
     const key = scrollKey();

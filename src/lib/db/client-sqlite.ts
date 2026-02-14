@@ -151,7 +151,7 @@ const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
 const OUTBOX_BACKUP_KEY_PREFIX = "tunetrees-outbox-backup";
 // Current serialized database schema version. Increment to force recreation after schema-affecting changes.
-const CURRENT_DB_VERSION = 10; // v10: add plugin goals column
+const CURRENT_DB_VERSION = 12; // v12: rename repertoire schema objects to repertoire
 
 // Sync watermark key prefix used by SyncEngine (duplicated here to avoid import cycles)
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -415,6 +415,8 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
           "/drizzle/migrations/sqlite/0009_add_plugins.sql",
           "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
+          "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
+          "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });
@@ -463,14 +465,8 @@ export async function initializeDb(
           "CREATE INDEX IF NOT EXISTS idx_sync_change_log_changed_at ON sync_change_log(changed_at)"
         );
 
-        // Some historical SQLite schemas used supabase_user_id as PK and did not include an `id` column.
-        // Ensure `id` exists so synced rows (which reference user_profile.id) can be inserted.
-        // Do NOT backfill id = supabase_user_id: server user_profile.id is not the auth UID.
-        ensureColumnExists("user_profile", "id", "id text");
-        // Keep a best-effort uniqueness index; multiple NULLs are allowed in SQLite.
-        requireSqliteDb().run(
-          "CREATE UNIQUE INDEX IF NOT EXISTS user_profile_id_unique ON user_profile(id)"
-        );
+        // user_profile.id is the canonical user key.
+        // Ensure local helper tables use id-based FKs.
 
         // Backward-compatible adds for hybrid tune fields.
         // Some existing IndexedDB DBs were created before these columns existed,

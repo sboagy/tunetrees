@@ -92,7 +92,7 @@ Payload example:
 ```json
 {
   "input": {
-    "playlistRef": "...",
+    "repertoireRef": "...",
     "tuneRef": "...",
     "quality": 3,
     "practiced": "2026-01-20T12:00:00.000Z",

@@ -39,8 +39,8 @@ describe("TABLE_REGISTRY completeness", () => {
 
   it("has the expected number of tables", () => {
     // Update this if adding/removing tables
-    expect(SYNCABLE_TABLES.length).toBe(19);
-    expect(Object.keys(TABLE_REGISTRY).length).toBe(19);
+    expect(SYNCABLE_TABLES.length).toBe(21);
+    expect(Object.keys(TABLE_REGISTRY).length).toBe(21);
   });
 });
 
@@ -56,18 +56,19 @@ describe("COMPOSITE_PK_TABLES", () => {
     expect(COMPOSITE_PK_TABLES).toContain("genre_tune_type");
     expect(COMPOSITE_PK_TABLES).toContain("prefs_spaced_repetition");
     expect(COMPOSITE_PK_TABLES).toContain("table_state");
-    expect(COMPOSITE_PK_TABLES).toContain("playlist_tune");
+    expect(COMPOSITE_PK_TABLES).toContain("repertoire_tune");
     expect(COMPOSITE_PK_TABLES).toContain("table_transient_data");
+    expect(COMPOSITE_PK_TABLES).toContain("user_genre_selection");
   });
 
-  it("has 5 composite key tables", () => {
-    expect(COMPOSITE_PK_TABLES.length).toBe(5);
+  it("has 6 composite key tables", () => {
+    expect(COMPOSITE_PK_TABLES.length).toBe(6);
   });
 });
 
 describe("NON_STANDARD_PK_TABLES", () => {
   it("correctly maps non-standard PK column names", () => {
-    expect(NON_STANDARD_PK_TABLES.playlist).toBe("playlist_id");
+    expect(NON_STANDARD_PK_TABLES.repertoire).toBe("repertoire_id");
     expect(NON_STANDARD_PK_TABLES.prefs_scheduling_options).toBe("user_id");
   });
 
@@ -88,7 +89,7 @@ describe("NON_STANDARD_PK_TABLES", () => {
 describe("getPrimaryKey", () => {
   it("returns string for single-column PK tables", () => {
     expect(getPrimaryKey("tune")).toBe("id");
-    expect(getPrimaryKey("playlist")).toBe("playlist_id");
+    expect(getPrimaryKey("repertoire")).toBe("repertoire_id");
     expect(getPrimaryKey("user_profile")).toBe("id");
   });
 
@@ -100,13 +101,13 @@ describe("getPrimaryKey", () => {
     expect(getPrimaryKey("table_transient_data")).toEqual([
       "tune_id",
       "user_id",
-      "playlist_id",
+      "repertoire_id",
     ]);
     expect(getPrimaryKey("table_state")).toEqual([
       "user_id",
       "screen_size",
       "purpose",
-      "playlist_id",
+      "repertoire_id",
     ]);
   });
 
@@ -120,19 +121,19 @@ describe("getPrimaryKey", () => {
 describe("getUniqueKeys", () => {
   it("returns null for tables without unique constraints", () => {
     expect(getUniqueKeys("tune")).toBeNull();
-    expect(getUniqueKeys("playlist")).toBeNull();
+    expect(getUniqueKeys("repertoire")).toBeNull();
     expect(getUniqueKeys("genre")).toBeNull();
   });
 
   it("returns unique key columns for tables with constraints", () => {
     expect(getUniqueKeys("practice_record")).toEqual([
       "tune_ref",
-      "playlist_ref",
+      "repertoire_ref",
       "practiced",
     ]);
     expect(getUniqueKeys("daily_practice_queue")).toEqual([
       "user_ref",
-      "playlist_ref",
+      "repertoire_ref",
       "window_start_utc",
       "tune_ref",
     ]);
@@ -148,14 +149,14 @@ describe("getConflictTarget", () => {
   it("returns uniqueKeys when available", () => {
     expect(getConflictTarget("practice_record")).toEqual([
       "tune_ref",
-      "playlist_ref",
+      "repertoire_ref",
       "practiced",
     ]);
   });
 
   it("falls back to primaryKey when no uniqueKeys", () => {
     expect(getConflictTarget("tune")).toEqual(["id"]);
-    expect(getConflictTarget("playlist")).toEqual(["playlist_id"]);
+    expect(getConflictTarget("repertoire")).toEqual(["repertoire_id"]);
   });
 
   it("handles composite PK fallback", () => {
@@ -170,7 +171,7 @@ describe("getConflictTarget", () => {
 describe("supportsIncremental", () => {
   it("returns true for tables with last_modified_at", () => {
     expect(supportsIncremental("tune")).toBe(true);
-    expect(supportsIncremental("playlist")).toBe(true);
+    expect(supportsIncremental("repertoire")).toBe(true);
     expect(supportsIncremental("practice_record")).toBe(true);
     expect(supportsIncremental("daily_practice_queue")).toBe(true);
   });
@@ -189,7 +190,7 @@ describe("supportsIncremental", () => {
 describe("hasDeletedFlag", () => {
   it("returns true for tables with soft delete", () => {
     expect(hasDeletedFlag("tune")).toBe(true);
-    expect(hasDeletedFlag("playlist")).toBe(true);
+    expect(hasDeletedFlag("repertoire")).toBe(true);
     expect(hasDeletedFlag("note")).toBe(true);
     expect(hasDeletedFlag("reference")).toBe(true);
     expect(hasDeletedFlag("user_profile")).toBe(true);
@@ -225,7 +226,7 @@ describe("getBooleanColumns", () => {
 describe("getNormalizer", () => {
   it("returns undefined for tables without normalization", () => {
     expect(getNormalizer("tune")).toBeUndefined();
-    expect(getNormalizer("playlist")).toBeUndefined();
+    expect(getNormalizer("repertoire")).toBeUndefined();
     expect(getNormalizer("genre")).toBeUndefined();
   });
 
@@ -257,7 +258,7 @@ describe("getNormalizer", () => {
 describe("isRegisteredTable", () => {
   it("returns true for registered tables", () => {
     expect(isRegisteredTable("tune")).toBe(true);
-    expect(isRegisteredTable("playlist")).toBe(true);
+    expect(isRegisteredTable("repertoire")).toBe(true);
     expect(isRegisteredTable("daily_practice_queue")).toBe(true);
   });
 
@@ -276,7 +277,7 @@ describe("hasCompositePK", () => {
 
   it("returns false for single-column PK tables", () => {
     expect(hasCompositePK("tune")).toBe(false);
-    expect(hasCompositePK("playlist")).toBe(false);
+    expect(hasCompositePK("repertoire")).toBe(false);
     expect(hasCompositePK("note")).toBe(false);
   });
 });
@@ -291,20 +292,22 @@ describe("buildRowIdForOutbox", () => {
     const rowId = buildRowIdForOutbox("table_transient_data", {
       user_id: "user-1",
       tune_id: "tune-2",
-      playlist_id: "playlist-3",
+      repertoire_id: "repertoire-3",
       other_field: "ignored",
     });
     const parsed = JSON.parse(rowId);
     expect(parsed).toEqual({
       user_id: "user-1",
       tune_id: "tune-2",
-      playlist_id: "playlist-3",
+      repertoire_id: "repertoire-3",
     });
   });
 
-  it("handles playlist with non-standard PK name", () => {
-    const rowId = buildRowIdForOutbox("playlist", { playlist_id: "pl-123" });
-    expect(rowId).toBe("pl-123");
+  it("handles repertoire with non-standard PK name", () => {
+    const rowId = buildRowIdForOutbox("repertoire", {
+      repertoire_id: "rep-123",
+    });
+    expect(rowId).toBe("rep-123");
   });
 });
 
@@ -318,13 +321,13 @@ describe("parseOutboxRowId", () => {
     const json = JSON.stringify({
       user_id: "user-1",
       tune_id: "tune-2",
-      playlist_id: "playlist-3",
+      repertoire_id: "repertoire-3",
     });
     const result = parseOutboxRowId("table_transient_data", json);
     expect(result).toEqual({
       user_id: "user-1",
       tune_id: "tune-2",
-      playlist_id: "playlist-3",
+      repertoire_id: "repertoire-3",
     });
   });
 
@@ -339,7 +342,11 @@ describe("specific table metadata correctness", () => {
   it("practice_record has correct metadata", () => {
     const meta = TABLE_REGISTRY.practice_record;
     expect(meta.primaryKey).toBe("id");
-    expect(meta.uniqueKeys).toEqual(["tune_ref", "playlist_ref", "practiced"]);
+    expect(meta.uniqueKeys).toEqual([
+      "tune_ref",
+      "repertoire_ref",
+      "practiced",
+    ]);
     expect(meta.timestamps).toContain("practiced");
     expect(meta.timestamps).toContain("last_modified_at");
     expect(meta.supportsIncremental).toBe(true);
@@ -350,7 +357,7 @@ describe("specific table metadata correctness", () => {
     expect(meta.primaryKey).toBe("id");
     expect(meta.uniqueKeys).toEqual([
       "user_ref",
-      "playlist_ref",
+      "repertoire_ref",
       "window_start_utc",
       "tune_ref",
     ]);
@@ -358,13 +365,13 @@ describe("specific table metadata correctness", () => {
     expect(meta.normalize).toBeDefined();
   });
 
-  it("playlist_tune has correct composite PK", () => {
-    const meta = TABLE_REGISTRY.playlist_tune;
-    expect(meta.primaryKey).toEqual(["playlist_ref", "tune_ref"]);
-    expect(meta.uniqueKeys).toEqual(["playlist_ref", "tune_ref"]);
+  it("repertoire_tune has correct composite PK", () => {
+    const meta = TABLE_REGISTRY.repertoire_tune;
+    expect(meta.primaryKey).toEqual(["repertoire_ref", "tune_ref"]);
+    expect(meta.uniqueKeys).toEqual(["repertoire_ref", "tune_ref"]);
   });
 
-  it("user_profile uses supabase_user_id as PK", () => {
+  it("user_profile uses id as PK", () => {
     const meta = TABLE_REGISTRY.user_profile;
     expect(meta.primaryKey).toBe("id");
   });

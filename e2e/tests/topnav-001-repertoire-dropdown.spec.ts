@@ -5,17 +5,17 @@ import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
- * TOPNAV-001: Playlist dropdown shows user's playlists
+ * TOPNAV-001: Repertoire dropdown shows user's repertoires
  * Priority: Critical
  *
- * Tests that the playlist dropdown in TopNav correctly displays
- * user's playlist with proper details after login.
+ * Tests that the repertoire dropdown in TopNav correctly displays
+ * user's repertoire with proper details after login.
  */
 
 let ttPage: TuneTreesPage;
 let currentTestUser: TestUser;
 
-test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
+test.describe("TOPNAV-001: Repertoire Dropdown Population", () => {
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
     currentTestUser = testUser;
@@ -26,58 +26,60 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
     });
   });
 
-  test("should display default selected playlist in TopNav", async ({
+  test("should display default selected repertoire in TopNav", async ({
     page,
   }) => {
-    // Look for playlist button/dropdown in TopNav
+    // Look for repertoire button/dropdown in TopNav
     // Adjust selector based on your actual implementation
-    const playlistButton = page.locator("button").filter({
-      hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+    const repertoireButton = page.locator("button").filter({
+      hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
     });
 
-    await expect(playlistButton).toBeVisible({ timeout: 10000 });
+    await expect(repertoireButton).toBeVisible({ timeout: 10000 });
 
     // Should show repertoire name or instrument name
-    await expect(playlistButton).toContainText(
-      new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i")
+    await expect(repertoireButton).toContainText(
+      new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i")
     );
   });
 
   test("should open dropdown menu when clicked", async ({ page }) => {
-    // Click the playlist dropdown button
-    const playlistButton = page
+    // Click the repertoire dropdown button
+    const repertoireButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
-    await playlistButton.click();
+    await repertoireButton.click();
 
     // Dropdown menu should be visible
     // This might be a role="menu" or specific class
-    await expect(ttPage.topNavManagePlaylistsPanel).toBeVisible({
+    await expect(ttPage.topNavManageRepertoiresPanel).toBeVisible({
       timeout: 2000,
     });
   });
 
-  test("should show playlist details in dropdown", async ({ page }) => {
-    const playlistButton = page
+  test("should show repertoire details in dropdown", async ({ page }) => {
+    const repertoireButton = page
       .locator("button")
       .filter({
         hasText: "Irish Flute",
       })
       .first();
-    await playlistButton.click();
+    await repertoireButton.click();
 
-    // Should show the playlist item with subtitle
+    // Should show the repertoire item with subtitle
     // Show a tunes count; value may vary depending on previous tests adding tunes
     await expect(
-      ttPage.topNavManagePlaylistsPanel.getByText(/tunes/i, { exact: false })
+      ttPage.topNavManageRepertoiresPanel.getByText(/tunes/i, {
+        exact: false,
+      })
     ).toBeVisible({
       timeout: 2000,
     });
     await expect(
-      ttPage.topNavManagePlaylistsPanel.getByText(/ITRAD/i, {
+      ttPage.topNavManageRepertoiresPanel.getByText(/ITRAD/i, {
         exact: false,
       })
     ).toBeVisible({
@@ -88,13 +90,13 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   test("should show 'Manage Repertoires' button in dropdown", async ({
     page,
   }) => {
-    const playlistButton = page
+    const repertoireButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
-    await playlistButton.click();
+    await repertoireButton.click();
 
     // Look for "Manage Repertoires" button
     await expect(page.getByTestId("manage-repertoires-button")).toBeVisible({
@@ -103,16 +105,16 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   });
 
   test("should close dropdown when clicking outside", async ({ page }) => {
-    const playlistButton = page
+    const repertoireButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
-    await playlistButton.click();
+    await repertoireButton.click();
 
     // Dropdown should be visible
-    const dropdown = ttPage.topNavManagePlaylistsPanel;
+    const dropdown = ttPage.topNavManageRepertoiresPanel;
     await expect(dropdown).toBeVisible();
 
     // Click outside the dropdown
@@ -127,16 +129,18 @@ test.describe("TOPNAV-001: Playlist Dropdown Population", () => {
   }) => {
     await page.waitForTimeout(3000); // Give sync time to complete
 
-    // Should not show "Loading playlists..." text
-    await expect(page.getByText(/Loading playlists/i)).not.toBeVisible();
+    // Should not show loading text for repertoire dropdown
+    await expect(
+      page.getByText(/Loading (repertoires|repertoires)/i)
+    ).not.toBeVisible();
 
-    // Playlist button should be enabled and show content
-    const playlistButton = page
+    // Repertoire button should be enabled and show content
+    const repertoireButton = page
       .locator("button")
       .filter({
-        hasText: new RegExp(`Irish Flute|${currentTestUser.playlistId}`, "i"),
+        hasText: new RegExp(`Irish Flute|${currentTestUser.repertoireId}`, "i"),
       })
       .first();
-    await expect(playlistButton).toBeEnabled();
+    await expect(repertoireButton).toBeEnabled();
   });
 });

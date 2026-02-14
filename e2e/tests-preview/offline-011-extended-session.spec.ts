@@ -40,7 +40,7 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 
 test.describe("OFFLINE-011: Extended Offline Session", () => {
-  async function getLocalRepertoireCount(page: Page, playlistId: string) {
+  async function getLocalRepertoireCount(page: Page, repertoireId: string) {
     return await page.evaluate(async (pid: string) => {
       const api = (window as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
@@ -48,7 +48,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
         throw new Error("getRepertoireCount not available on __ttTestApi");
       }
       return await api.getRepertoireCount(pid);
-    }, playlistId);
+    }, repertoireId);
   }
 
   const repertoire = [
@@ -102,7 +102,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
   }) => {
     let repertoireCount = await getLocalRepertoireCount(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     expect(repertoireCount).toBe(12);
 
@@ -147,7 +147,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     for (let i = 0; i < 2; i++) {
       const beforeDeleteCount = await getLocalRepertoireCount(
         page,
-        testUser.playlistId
+        testUser.repertoireId
       );
 
       const checkbox = ttPage
@@ -170,10 +170,13 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
       await dialog.getByRole("button", { name: /^Remove$/ }).click();
 
       await expect
-        .poll(async () => getLocalRepertoireCount(page, testUser.playlistId), {
-          timeout: 15000,
-          intervals: [250, 500, 1000],
-        })
+        .poll(
+          async () => getLocalRepertoireCount(page, testUser.repertoireId),
+          {
+            timeout: 15000,
+            intervals: [250, 500, 1000],
+          }
+        )
         .toBe(beforeDeleteCount - 1);
       repertoireCount = beforeDeleteCount - 1;
     }
@@ -188,7 +191,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     // Add 3 tunes to repertoire
     const beforeAddCount = await getLocalRepertoireCount(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     for (let i = 0; i < 3; i++) {
       const checkbox = ttPage
@@ -202,7 +205,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     await ttPage.catalogAddToRepertoireButton.click({ timeout: 10000 });
 
     await expect
-      .poll(async () => getLocalRepertoireCount(page, testUser.playlistId), {
+      .poll(async () => getLocalRepertoireCount(page, testUser.repertoireId), {
         timeout: 15000,
         intervals: [250, 500, 1000],
       })
@@ -215,7 +218,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
 
     const intermediateRepertoireCount = await getLocalRepertoireCount(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     console.log(
       `intermediateRepertoireCount: ${intermediateRepertoireCount}, repertoireCount: ${repertoireCount}`
@@ -286,7 +289,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     await ttPage.navigateToTab("repertoire");
     const justBeforeOnlineRepertoireCount = await getLocalRepertoireCount(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     console.log(
       `justBeforeOnlineRepertoireCount: ${justBeforeOnlineRepertoireCount}, repertoireCount: ${repertoireCount}`
@@ -317,7 +320,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect
-      .poll(async () => getLocalRepertoireCount(page, testUser.playlistId), {
+      .poll(async () => getLocalRepertoireCount(page, testUser.repertoireId), {
         timeout: 20000,
         intervals: [250, 500, 1000],
       })
@@ -325,7 +328,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
 
     const finalRepertoireCount = await getLocalRepertoireCount(
       page,
-      testUser.playlistId
+      testUser.repertoireId
     );
     console.log(
       `finalRepertoireCount: ${finalRepertoireCount}, repertoireCount: ${repertoireCount}`

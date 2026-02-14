@@ -134,25 +134,25 @@ sequenceDiagram
     UI->>UI: Trigger component refetch
 
     Note over UI,Supabase: 3. LOCAL WRITE (User Action)
-    UI->>Drizzle: db.update(playlist).set({name: "New Name"})
-    Drizzle->>SQLite: UPDATE playlist SET name='New Name'
+    UI->>Drizzle: db.update(repertoire).set({name: "New Name"})
+    Drizzle->>SQLite: UPDATE repertoire SET name='New Name'
     SQLite-->>Drizzle: Success
-    Drizzle->>Queue: queueSync(db, "playlist", "update", data)
+    Drizzle->>Queue: queueSync(db, "repertoire", "update", data)
     Queue->>SQLite: INSERT INTO sync_queue
     SQLite->>IDB: persistDb() - Auto-save
-    UI->>UI: incrementPlaylistChanged() - Optimistic UI update
+    UI->>UI: incrementRepertoireChanged() - Optimistic UI update
 
     Note over Queue,Supabase: 4. BACKGROUND SYNC UP (Every 5s)
     Engine->>Queue: getPendingSyncItems()
     Queue-->>Engine: Return pending changes
-    Engine->>Supabase: UPSERT INTO playlist VALUES(...)
+    Engine->>Supabase: UPSERT INTO repertoire VALUES(...)
     alt Sync Success
         Supabase-->>Engine: 200 OK
         Engine->>Queue: markSynced(itemId)
         Queue->>SQLite: UPDATE sync_queue SET status='synced'
     else Conflict Detected
         Supabase-->>Engine: 409 Conflict (sync_version mismatch)
-        Engine->>Supabase: SELECT * FROM playlist WHERE id=...
+        Engine->>Supabase: SELECT * FROM repertoire WHERE id=...
         Supabase-->>Engine: Return current remote state
         Engine->>Engine: Compare timestamps (last-write-wins)
         Engine->>Supabase: Force update with new sync_version
@@ -160,11 +160,11 @@ sequenceDiagram
     end
 
     Note over Engine,Realtime: 5. REALTIME SYNC (Optional, when enabled)
-    Realtime->>Engine: WebSocket: "playlist.UPDATE" event
+    Realtime->>Engine: WebSocket: "repertoire.UPDATE" event
     Engine->>Engine: syncDown() - Selective pull
-    Engine->>Supabase: SELECT * FROM playlist WHERE last_modified_at > last_sync
+    Engine->>Supabase: SELECT * FROM repertoire WHERE last_modified_at > last_sync
     Supabase-->>Engine: Return changed records
-    Engine->>SQLite: INSERT OR REPLACE INTO playlist
+    Engine->>SQLite: INSERT OR REPLACE INTO repertoire
     SQLite->>IDB: persistDb()
     Engine-->>UI: onSyncComplete()
     UI->>UI: Increment remoteSyncDownCompletionVersion
@@ -225,8 +225,8 @@ setupAutoPersist(); // Saves every 5 seconds if dirty flag set
 - **Size:** Typically 5-10 MB serialized for active user data
 
 **Critical VIEWs:**
-- `practice_list_staged` - Combines playlist_tune + daily_practice_queue + transient_data
-- `view_playlist_joined` - Joins playlist + instrument + genre
+- `practice_list_staged` - Combines repertoire_tune + daily_practice_queue + transient_data
+- `view_repertoire_joined` - Joins repertoire + instrument + genre
 - `view_daily_practice_queue_readable` - Human-readable queue with tune metadata
 
 **File Location:** [`src/lib/db/client-sqlite.ts`](../src/lib/db/client-sqlite.ts)  
@@ -274,8 +274,8 @@ drizzleDb = drizzle(sqliteDb, { schema: { ...schema, ...relations } });
 **Schema Location:** [`drizzle/schema-sqlite.ts`](../drizzle/schema-sqlite.ts)  
 **Example Table Definition:**
 ```typescript
-export const playlist = sqliteTable("playlist", {
-  playlistId: text("playlist_id").primaryKey(),
+export const repertoire = sqliteTable("repertoire", {
+  repertoireId: text("repertoire_id").primaryKey(),
   userRef: text("user_ref").notNull().references(() => userProfile.supabaseUserId),
   name: text("name"),
   instrumentRef: text("instrument_ref").references(() => instrument.id),
@@ -290,29 +290,29 @@ export const playlist = sqliteTable("playlist", {
 **Query Examples:**
 ```typescript
 // Type-safe SELECT
-const playlists = await db
+const repertoires = await db
   .select()
-  .from(playlist)
-  .where(eq(playlist.userRef, userId))
-  .orderBy(playlist.lastModifiedAt);
+  .from(repertoire)
+  .where(eq(repertoire.userRef, userId))
+  .orderBy(repertoire.lastModifiedAt);
 
 // Type-safe UPDATE
 await db
-  .update(playlist)
+  .update(repertoire)
   .set({ name: "New Name", lastModifiedAt: new Date().toISOString() })
-  .where(eq(playlist.playlistId, playlistId));
+  .where(eq(repertoire.repertoireId, repertoireId));
 
 // Complex JOIN query
 const result = await db
   .select({
-    playlistId: playlist.playlistId,
-    name: playlist.name,
+    repertoireId: repertoire.repertoireId,
+    name: repertoire.name,
     instrumentName: instrument.instrument,
-    tuneCount: sql<number>`(SELECT COUNT(*) FROM playlist_tune WHERE playlist_ref = ${playlist.playlistId})`,
+    tuneCount: sql<number>`(SELECT COUNT(*) FROM repertoire_tune WHERE repertoire_ref = ${repertoire.repertoireId})`,
   })
-  .from(playlist)
-  .leftJoin(instrument, eq(playlist.instrumentRef, instrument.id))
-  .where(eq(playlist.userRef, userId));
+  .from(repertoire)
+  .leftJoin(instrument, eq(repertoire.instrumentRef, instrument.id))
+  .where(eq(repertoire.userRef, userId));
 ```
 
 ---
@@ -327,7 +327,7 @@ const result = await db
 // sync_queue table (stored in local SQLite)
 interface SyncQueueItem {
   id: string;                    // UUID
-  tableName: SyncableTable;      // e.g., "playlist", "tune"
+  tableName: SyncableTable;      // e.g., "repertoire", "tune"
   operation: SyncOperation;      // "insert" | "update" | "delete"
   data: string;                  // JSON.stringify(recordData)
   status: SyncStatus;            // "pending" | "syncing" | "synced" | "failed"
@@ -372,11 +372,11 @@ async function updateSyncStatus(
 **Usage Pattern:**
 ```typescript
 // After local write
-await db.update(playlist).set({ name: "New Name" }).where(...);
+await db.update(repertoire).set({ name: "New Name" }).where(...);
 
 // Queue for sync
-await queueSync(db, "playlist", "update", {
-  playlistId: "123",
+await queueSync(db, "repertoire", "update", {
+  repertoireId: "123",
   name: "New Name",
   lastModifiedAt: new Date().toISOString(),
   syncVersion: currentVersion + 1,
@@ -386,7 +386,7 @@ await queueSync(db, "playlist", "update", {
 await persistDb();
 
 // Trigger optimistic UI update (no wait for sync)
-incrementPlaylistChanged();
+incrementRepertoireChanged();
 ```
 
 ---
@@ -424,9 +424,9 @@ async syncUp(): Promise<SyncResult>
 ```typescript
 // Tables with composite primary keys or unique constraints
 const COMPOSITE_KEY_TABLES: Record<string, string[]> = {
-  table_transient_data: ["user_id", "tune_id", "playlist_id"],
-  playlist_tune: ["playlist_ref", "tune_ref"],
-  daily_practice_queue: ["user_ref", "playlist_ref", "window_start_utc", "tune_ref"],
+  table_transient_data: ["user_id", "tune_id", "repertoire_id"],
+  repertoire_tune: ["repertoire_ref", "tune_ref"],
+  daily_practice_queue: ["user_ref", "repertoire_ref", "window_start_utc", "tune_ref"],
   // ...
 };
 
@@ -475,8 +475,8 @@ const syncOrder: SyncableTable[] = [
   "tab_group_main_state",
   // Core data (depends on references)
   "tune",
-  "playlist",
-  "playlist_tune",
+  "repertoire",
+  "repertoire_tune",
   "note",
   "reference",
   "tag",
@@ -540,7 +540,7 @@ private initializeRealtime(): void {
     this.db,
     {
       enabled: true,
-      tables: ["playlist", "tune", "practice_record", ...],
+      tables: ["repertoire", "tune", "practice_record", ...],
       onTableChange: async (tableName) => {
         // Remote change detected - trigger selective syncDown
         await this.syncDown();
@@ -561,7 +561,7 @@ TuneTrees uses the `sync_version` column for optimistic locking to detect concur
 1. Every syncable table has a `sync_version INTEGER` column
 2. On local update:
    ```typescript
-   await db.update(playlist)
+   await db.update(repertoire)
      .set({
        name: "New Name",
        syncVersion: currentVersion + 1, // Increment
@@ -605,7 +605,7 @@ sequenceDiagram
 
     Engine->>Queue: Get pending item
     Queue-->>Engine: {operation: "update", data: {..., syncVersion: 5}}
-    Engine->>Supabase: UPSERT playlist SET sync_version=5 WHERE id='...'
+    Engine->>Supabase: UPSERT repertoire SET sync_version=5 WHERE id='...'
     
     alt Versions Match
         Supabase-->>Engine: 200 OK (updated)
@@ -643,12 +643,12 @@ const [repertoireListChanged, setRepertoireListChanged] = createSignal(0);
 **Usage Pattern:**
 ```typescript
 // 1. User action handler
-async function handleUpdatePlaylist(playlistId: string, newName: string) {
+async function handleUpdateRepertoire(repertoireId: string, newName: string) {
   // Write to local DB
-  await db.update(playlist).set({ name: newName }).where(...);
+  await db.update(repertoire).set({ name: newName }).where(...);
   
   // Queue for sync
-  await queueSync(db, "playlist", "update", {...});
+  await queueSync(db, "repertoire", "update", {...});
   
   // Persist
   await persistDb();
@@ -660,14 +660,14 @@ async function handleUpdatePlaylist(playlistId: string, newName: string) {
 }
 
 // 2. Component resource (refetches when signal changes)
-const [playlists] = createResource(
+const [repertoires] = createResource(
   () => {
     const db = localDb();
     const version = repertoireListChanged(); // Reactive dependency
     return db && userId ? { db, userId, version } : null;
   },
   async (params) => {
-    return await getUserPlaylists(params.db, params.userId);
+    return await getUserRepertoires(params.db, params.userId);
   }
 );
 ```
@@ -676,7 +676,7 @@ const [playlists] = createResource(
 - `remoteSyncDownCompletionVersion`: Incremented when background `syncDown()` completes
 - `practiceListStagedChanged`: Practice queue operations (evaluations, queue add/reset)
 - `catalogListChanged`: Tune catalog changes (tune add/edit/delete)
-- `repertoireListChanged`: Playlist/repertoire changes (playlist add/edit, tune assignments)
+- `repertoireListChanged`: Repertoire/repertoire changes (repertoire add/edit, tune assignments)
 
 ---
 
@@ -686,7 +686,7 @@ const [playlists] = createResource(
 | File | Purpose | Key Exports |
 |------|---------|------------|
 | [`src/lib/db/client-sqlite.ts`](../src/lib/db/client-sqlite.ts) | SQLite WASM initialization & persistence | `initializeSqliteDb()`, `persistDb()`, `setupAutoPersist()` |
-| [`drizzle/schema-sqlite.ts`](../drizzle/schema-sqlite.ts) | Drizzle schema definitions (20+ tables) | All table definitions (`playlist`, `tune`, etc.) |
+| [`drizzle/schema-sqlite.ts`](../drizzle/schema-sqlite.ts) | Drizzle schema definitions (20+ tables) | All table definitions (`repertoire`, `tune`, etc.) |
 | [`src/lib/db/init-views.ts`](../src/lib/db/init-views.ts) | SQLite VIEW creation logic | `initializeViews()`, `recreateViews()` |
 | [`src/lib/db/migration-version.ts`](../src/lib/db/migration-version.ts) | Schema version tracking & migration logic | `needsMigration()`, `getCurrentSchemaVersion()` |
 
@@ -702,14 +702,14 @@ const [playlists] = createResource(
 | File | Purpose | Key Exports |
 |------|---------|------------|
 | [`src/lib/auth/AuthContext.tsx`](../src/lib/auth/AuthContext.tsx) | Auth state & sync signal management | `useAuth()`, sync version signals, `forceSyncDown()` |
-| [`src/lib/context/CurrentPlaylistContext.tsx`](../src/lib/context/CurrentPlaylistContext.tsx) | Current playlist state management | `useCurrentPlaylist()` |
+| [`src/lib/context/CurrentRepertoireContext.tsx`](../src/lib/context/CurrentRepertoireContext.tsx) | Current repertoire state management | `useCurrentRepertoire()` |
 
 ### Query Layer (Business Logic)
 | File | Purpose | Key Exports |
 |------|---------|------------|
-| [`src/lib/db/queries/playlists.ts`](../src/lib/db/queries/playlists.ts) | Playlist queries | `getUserPlaylists()`, `getPlaylistById()` |
+| [`src/lib/db/queries/repertoires.ts`](../src/lib/db/queries/repertoires.ts) | Repertoire queries | `getUserRepertoires()`, `getRepertoireById()` |
 | [`src/lib/db/queries/practice.ts`](../src/lib/db/queries/practice.ts) | Practice queue queries | `getPracticeList()`, `ensureDailyQueue()` |
-| [`src/lib/db/queries/tunes.ts`](../src/lib/db/queries/tunes.ts) | Tune catalog queries | `getTunesForUser()`, `getPlaylistTunes()` |
+| [`src/lib/db/queries/tunes.ts`](../src/lib/db/queries/tunes.ts) | Tune catalog queries | `getTunesForUser()`, `getRepertoireTunes()` |
 
 ### Service Layer (Write Operations)
 | File | Purpose | Key Exports |
@@ -824,7 +824,7 @@ location.reload();
    - Trade CPU for storage space (especially on mobile)
 
 3. **Selective Table Sync:** Allow users to choose which data to sync offline
-   - "Sync all playlists" vs "Sync current playlist only"
+   - "Sync all repertoires" vs "Sync current repertoire only"
    - Reduce storage for power users with 1000+ tunes
 
 4. **Conflict UI:** Show user conflicts for manual resolution

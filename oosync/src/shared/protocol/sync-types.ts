@@ -24,8 +24,8 @@ export interface SyncCollectionsOverride {
 export interface SyncGenreFilter {
   /** Effective genre list used for filtering catalog pulls. */
   selectedGenreIds: string[];
-  /** Genres inferred from existing playlist_tune relationships. */
-  playlistGenreIds: string[];
+  /** Genres inferred from existing repertoire_tune relationships. */
+  repertoireGenreIds: string[];
 }
 
 export interface SyncRequestOverrides {

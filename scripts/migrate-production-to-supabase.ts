@@ -438,10 +438,10 @@ async function migrateUsers() {
         );
         await sql`
           INSERT INTO user_profile (
-            id, supabase_user_id, name, email, sr_alg_type, phone, phone_verified,
+            id, name, email, sr_alg_type, phone, phone_verified,
             acceptable_delinquency_window, avatar_url, deleted, sync_version, last_modified_at, device_id
           ) VALUES (
-            ${userProfileId}, ${supabaseAuthUserId}, ${user.name}, ${
+            ${userProfileId}, ${user.name}, ${
           user.email
         },
             ${user.sr_alg_type || null}, ${user.phone || null},
@@ -450,7 +450,7 @@ async function migrateUsers() {
           user.avatar_url || null
         }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
           )
-          ON CONFLICT (supabase_user_id) DO UPDATE SET
+          ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,
             email = EXCLUDED.email,
             sr_alg_type = EXCLUDED.sr_alg_type,

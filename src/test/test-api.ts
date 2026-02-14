@@ -17,19 +17,19 @@ import {
   dailyPracticeQueue,
   note,
   plugin,
-  playlistTune,
   practiceRecord,
   reference,
+  repertoireTune,
 } from "@/lib/db/schema";
+import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
-import { serializeCapabilities } from "@/lib/plugins/capabilities";
 
 type SeedAddToReviewInput = {
-  playlistId: string; // UUID
+  repertoireId: string; // UUID
   tuneIds: string[]; // UUIDs
-  // Optional explicit user id (user_profile.id UUID). If omitted, we will
+  // Optional explicit user id (Supabase Auth UUID). If omitted, we will
   // resolve from current Supabase session via user_profile lookup.
   userId?: string;
 };
@@ -88,7 +88,7 @@ async function ensureDb(): Promise<SqliteDatabase> {
   }
 }
 
-async function resolveUserId(db: SqliteDatabase): Promise<string> {
+async function resolveUserId(_db: SqliteDatabase): Promise<string> {
   // First check for injected test user ID (bypasses Supabase entirely)
   if (typeof window !== "undefined" && window.__ttTestUserId) {
     console.log(
@@ -97,40 +97,39 @@ async function resolveUserId(db: SqliteDatabase): Promise<string> {
     return window.__ttTestUserId;
   }
 
-  // Fall back to Supabase auth lookup
+  // After eliminating user_profile.id, just return the Supabase Auth UUID
   const { data } = await supabase.auth.getUser();
   const userId = data.user?.id;
   if (!userId) throw new Error("No authenticated user in test session");
-
-  const result = await db.all<{ id: string }>(
-    sql`SELECT id FROM user_profile WHERE supabase_user_id = ${userId} LIMIT 1`
-  );
-  const id = result[0]?.id;
-  if (!id) throw new Error("user_profile row not found for current user");
-  return id;
+  return userId;
 }
 
 async function seedAddToReview(input: SeedAddToReviewInput) {
   const db = await ensureDb();
   const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+  const repertoireId = input.repertoireId;
+
+  if (!repertoireId) {
+    throw new Error("seedAddToReview requires repertoireId");
+  }
 
   const userRef = input.userId ?? (await resolveUserId(db));
 
-  // 1) Update playlist_tune.scheduled for provided tuneIds
+  // 1) Update repertoire_tune.scheduled for provided tuneIds
   let updated = 0;
   for (const tuneId of input.tuneIds) {
     const res = await db
-      .update(playlistTune)
+      .update(repertoireTune)
       .set({
         scheduled: now,
-        syncVersion: sql.raw(`${playlistTune.syncVersion} + 1`),
+        syncVersion: sql.raw(`${repertoireTune.syncVersion} + 1`),
         lastModifiedAt: new Date().toISOString(),
       })
       .where(
         and(
-          eq(playlistTune.playlistRef, input.playlistId),
-          eq(playlistTune.tuneRef, tuneId),
-          eq(playlistTune.deleted, 0)
+          eq(repertoireTune.repertoireRef, repertoireId),
+          eq(repertoireTune.tuneRef, tuneId),
+          eq(repertoireTune.deleted, 0)
         )
       )
       .returning();
@@ -144,7 +143,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .from(practiceRecord)
       .where(
         and(
-          eq(practiceRecord.playlistRef, input.playlistId),
+          eq(practiceRecord.repertoireRef, repertoireId),
           eq(practiceRecord.tuneRef, tuneId)
         )
       )
@@ -155,7 +154,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
         .insert(practiceRecord)
         .values({
           id: generateId(),
-          playlistRef: input.playlistId,
+          repertoireRef: repertoireId,
           tuneRef: tuneId,
           practiced: null,
           quality: null,
@@ -187,7 +186,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, input.playlistId),
+        eq(dailyPracticeQueue.repertoireRef, repertoireId),
         eq(dailyPracticeQueue.active, 1)
       )
     )
@@ -200,7 +199,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, input.playlistId),
+          eq(dailyPracticeQueue.repertoireRef, repertoireId),
           eq(dailyPracticeQueue.windowStartUtc, latestWindow[0].windowStart)
         )
       )
@@ -211,7 +210,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
   const regenerated = await generateOrGetPracticeQueue(
     db,
     userRef,
-    input.playlistId,
+    repertoireId,
     new Date(),
     null,
     "per_day",
@@ -260,7 +259,7 @@ async function seedSchedulingPlugin(input: SeedSchedulingPluginInput = {}) {
   return created;
 }
 
-async function getPracticeCount(playlistId: string) {
+async function getPracticeCount(repertoireId: string) {
   const db = await ensureDb();
   // Resolve userId
   const userRef = await resolveUserId(db);
@@ -268,23 +267,23 @@ async function getPracticeCount(playlistId: string) {
     SELECT COUNT(*) as count
     FROM daily_practice_queue dpq
     WHERE dpq.user_ref = ${userRef}
-      AND dpq.playlist_ref = ${playlistId}
+      AND dpq.repertoire_ref = ${repertoireId}
       AND dpq.active = 1
       AND dpq.window_start_utc = (
         SELECT MAX(window_start_utc)
         FROM daily_practice_queue
-        WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId} AND active = 1
+        WHERE user_ref = ${userRef} AND repertoire_ref = ${repertoireId} AND active = 1
       )
   `);
   return rows[0]?.count ?? 0;
 }
 
-async function getRepertoireCount(playlistId: string) {
+async function getRepertoireTuneCount(repertoireId: string) {
   const db = await ensureDb();
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
-    FROM playlist_tune pt
-    WHERE pt.playlist_ref = ${playlistId}
+    FROM repertoire_tune pt
+    WHERE pt.repertoire_ref = ${repertoireId}
       AND pt.deleted = 0
   `);
   return rows[0]?.count ?? 0;
@@ -327,17 +326,15 @@ async function getCatalogSelectionDiagnostics() {
 
   const userProfileRows = await db.all<{
     id: string;
-    supabase_user_id: string | null;
   }>(sql`
-    SELECT id, supabase_user_id
+    SELECT id
     FROM user_profile
-    WHERE id = ${userRef} OR supabase_user_id = ${userRef}
+    WHERE id = ${userRef}
   `);
 
   const userIds = new Set<string>([userRef]);
   for (const row of userProfileRows) {
     if (row.id) userIds.add(row.id);
-    if (row.supabase_user_id) userIds.add(row.supabase_user_id);
   }
 
   const userIdList = Array.from(userIds)
@@ -352,9 +349,9 @@ async function getCatalogSelectionDiagnostics() {
     `
   );
 
-  const playlistDefaultsRows = await db.all<{ genre: string | null }>(sql`
+  const repertoireDefaultsRows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT p.genre_default AS genre
-    FROM playlist p
+    FROM repertoire p
     WHERE p.deleted = 0
       AND p.user_ref IN (${sql.raw(userIdList)})
       AND p.genre_default IS NOT NULL
@@ -362,9 +359,9 @@ async function getCatalogSelectionDiagnostics() {
 
   const repertoireGenreRows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
-    FROM playlist_tune pt
-    JOIN playlist p
-      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    FROM repertoire_tune pt
+    JOIN repertoire p
+      ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
     JOIN tune t
       ON t.id = pt.tune_ref AND t.deleted = 0
     LEFT JOIN tune_override o
@@ -375,18 +372,18 @@ async function getCatalogSelectionDiagnostics() {
       AND p.user_ref IN (${sql.raw(userIdList)})
   `);
 
-  const playlistCountRows = await db.all<{ count: number }>(sql`
+  const repertoireCountRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
-    FROM playlist p
+    FROM repertoire p
     WHERE p.deleted = 0
       AND p.user_ref IN (${sql.raw(userIdList)})
   `);
 
-  const playlistTuneCountRows = await db.all<{ count: number }>(sql`
+  const repertoireTuneCountRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
-    FROM playlist_tune pt
-    JOIN playlist p
-      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    FROM repertoire_tune pt
+    JOIN repertoire p
+      ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
     WHERE pt.deleted = 0
       AND p.user_ref IN (${sql.raw(userIdList)})
   `);
@@ -403,15 +400,15 @@ async function getCatalogSelectionDiagnostics() {
     userProfile: userProfileRows,
     selectionRows,
     selectedGenreIds: selectionRows.map((row) => row.genre_id),
-    playlistDefaults: playlistDefaultsRows
+    repertoireDefaults: repertoireDefaultsRows
       .map((row) => row.genre)
       .filter((genreId): genreId is string => !!genreId),
     repertoireGenres: repertoireGenreRows
       .map((row) => row.genre)
       .filter((genreId): genreId is string => !!genreId),
     counts: {
-      playlistCount: Number(playlistCountRows[0]?.count ?? 0),
-      playlistTuneCount: Number(playlistTuneCountRows[0]?.count ?? 0),
+      repertoireCount: Number(repertoireCountRows[0]?.count ?? 0),
+      repertoireTuneCount: Number(repertoireTuneCountRows[0]?.count ?? 0),
       tuneCount: Number(catalogTuneCountRows[0]?.count ?? 0),
     },
   };
@@ -428,7 +425,7 @@ async function getPracticeRecords(tuneIds: string[]) {
   const rows = await db.all<{
     id: string;
     tune_ref: string;
-    playlist_ref: string;
+    repertoire_ref: string;
     practiced: string | null;
     due: string | null;
     quality: number | null;
@@ -444,7 +441,7 @@ async function getPracticeRecords(tuneIds: string[]) {
     lapses: number | null;
   }>(sql`
     SELECT 
-      id, tune_ref, playlist_ref, practiced, due, quality, 
+      id, tune_ref, repertoire_ref, practiced, due, quality,
       interval, repetitions, stability, difficulty, state, step,
       goal, technique, elapsed_days, lapses
     FROM practice_record
@@ -457,23 +454,23 @@ async function getPracticeRecords(tuneIds: string[]) {
 /**
  * Get latest practice record for a single tune
  */
-async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
+async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
   // Instrumentation to aid Playwright debugging (use console.log for visibility in headless)
   // eslint-disable-next-line no-console
   console.log(
-    `[TestApi] getLatestPracticeRecord invoked tuneId=${tuneId} playlistId=${playlistId}`
+    `[TestApi] getLatestPracticeRecord invoked tuneId=${tuneId} repertoireId=${repertoireId}`
   );
   if (!/^[0-9A-Za-z-]+$/.test(tuneId)) {
     throw new Error(`Invalid tuneId format: ${tuneId}`);
   }
-  if (!/^[0-9A-Za-z-]+$/.test(playlistId)) {
-    throw new Error(`Invalid playlistId format: ${playlistId}`);
+  if (!/^[0-9A-Za-z-]+$/.test(repertoireId)) {
+    throw new Error(`Invalid repertoireId format: ${repertoireId}`);
   }
   const db = await ensureDb();
   const rows = await db.all<{
     id: string;
     tune_ref: string;
-    playlist_ref: string;
+    repertoire_ref: string;
     practiced: string | null;
     due: string | null;
     quality: number | null;
@@ -491,12 +488,12 @@ async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
     last_modified_at: string;
   }>(sql`
     SELECT 
-      id, tune_ref, playlist_ref, practiced, due, quality,
+      id, tune_ref, repertoire_ref, practiced, due, quality,
       interval, repetitions, stability, difficulty, state, step,
       goal, technique, elapsed_days, lapses, sync_version, last_modified_at
     FROM practice_record
     WHERE tune_ref = ${sql.raw(`'${tuneId}'`)}
-      AND playlist_ref = ${sql.raw(`'${playlistId}'`)}
+      AND repertoire_ref = ${sql.raw(`'${repertoireId}'`)}
     ORDER BY
       CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
       practiced DESC,
@@ -506,7 +503,7 @@ async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
   // eslint-disable-next-line no-console
   console.log(`[TestApi] getLatestPracticeRecord committedRows=${rows.length}`);
   if (rows.length === 0) {
-    // Additional diagnostic: count total rows for tune regardless of playlist to spot mismatch
+    // Additional diagnostic: count total rows for tune regardless of repertoire to spot mismatch
     const diagRows = await db.all<{ c: number }>(sql`
       SELECT COUNT(*) as c FROM practice_record WHERE tune_ref = ${sql.raw(`'${tuneId}'`)}
     `);
@@ -519,14 +516,14 @@ async function getLatestPracticeRecord(tuneId: string, playlistId: string) {
 }
 
 /**
- * Get scheduled dates for tunes in a playlist
+ * Get scheduled dates for tunes in a repertoire
  */
-async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
+async function getScheduledDates(repertoireId: string, tuneIds?: string[]) {
   const db = await ensureDb();
   const query = sql`
     SELECT tune_ref, scheduled, learned, current
-    FROM playlist_tune
-    WHERE playlist_ref = ${playlistId}
+    FROM repertoire_tune
+    WHERE repertoire_ref = ${repertoireId}
   `;
 
   if (tuneIds && tuneIds.length > 0) {
@@ -538,8 +535,8 @@ async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
       current: string | null;
     }>(sql`
       SELECT tune_ref, scheduled, learned, current
-      FROM playlist_tune
-      WHERE playlist_ref = ${playlistId}
+      FROM repertoire_tune
+      WHERE repertoire_ref = ${repertoireId}
         AND tune_ref IN (${sql.raw(inList)})
     `);
     const result: Record<
@@ -580,14 +577,14 @@ async function getScheduledDates(playlistId: string, tuneIds?: string[]) {
 }
 
 /**
- * Update scheduled dates for tunes in a playlist (local SQLite only)
+ * Update scheduled dates for tunes in a repertoire (local SQLite only)
  * Used by tests to set up specific bucket distributions without going through Supabase sync.
  *
- * @param playlistId - The playlist ID
+ * @param repertoireId - The repertoire ID
  * @param updates - Array of { tuneId, scheduled } where scheduled is ISO string or null
  */
 async function updateScheduledDates(
-  playlistId: string,
+  repertoireId: string,
   updates: Array<{ tuneId: string; scheduled: string | null }>
 ): Promise<{ updated: number }> {
   const db = await ensureDb();
@@ -595,16 +592,16 @@ async function updateScheduledDates(
 
   for (const { tuneId, scheduled } of updates) {
     const result = await db
-      .update(playlistTune)
+      .update(repertoireTune)
       .set({
         scheduled: scheduled,
-        syncVersion: sql.raw(`${playlistTune.syncVersion.name} + 1`),
+        syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
         lastModifiedAt: new Date().toISOString(),
       })
       .where(
         and(
-          eq(playlistTune.playlistRef, playlistId),
-          eq(playlistTune.tuneRef, tuneId)
+          eq(repertoireTune.repertoireRef, repertoireId),
+          eq(repertoireTune.tuneRef, tuneId)
         )
       )
       .returning();
@@ -620,7 +617,7 @@ async function updateScheduledDates(
 /**
  * Get practice queue for a specific window
  */
-async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
+async function getPracticeQueue(repertoireId: string, windowStartUtc?: string) {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
 
@@ -631,7 +628,7 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
              window_end_utc, completed_at, snapshot_coalesced_ts
       FROM daily_practice_queue
       WHERE user_ref = ${userRef}
-        AND playlist_ref = ${playlistId}
+        AND repertoire_ref = ${repertoireId}
         AND window_start_utc = ${windowStartUtc}
         AND active = 1
       ORDER BY bucket ASC, order_index ASC
@@ -644,13 +641,13 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
              window_end_utc, completed_at, snapshot_coalesced_ts
       FROM daily_practice_queue
       WHERE user_ref = ${userRef}
-        AND playlist_ref = ${playlistId}
+        AND repertoire_ref = ${repertoireId}
         AND active = 1
         AND window_start_utc = (
           SELECT window_start_utc
           FROM daily_practice_queue
           WHERE user_ref = ${userRef}
-            AND playlist_ref = ${playlistId}
+            AND repertoire_ref = ${repertoireId}
             AND active = 1
           ORDER BY id DESC
           LIMIT 1
@@ -674,12 +671,12 @@ async function getPracticeQueue(playlistId: string, windowStartUtc?: string) {
 }
 
 /**
- * Get single playlist_tune row (for consistency checks with practice_record)
+ * Get single repertoire_tune row (for consistency checks with practice_record)
  */
-async function getPlaylistTuneRow(playlistId: string, tuneId: string) {
+async function getRepertoireTuneRow(repertoireId: string, tuneId: string) {
   const db = await ensureDb();
   const rows = await db.all<{
-    playlist_ref: string;
+    repertoire_ref: string;
     tune_ref: string;
     scheduled: string | null;
     current: string | null;
@@ -687,34 +684,34 @@ async function getPlaylistTuneRow(playlistId: string, tuneId: string) {
     sync_version: number;
     last_modified_at: string;
   }>(sql`
-    SELECT playlist_ref, tune_ref, scheduled, current, learned, sync_version, last_modified_at
-    FROM playlist_tune
-    WHERE playlist_ref = ${playlistId} AND tune_ref = ${tuneId} AND deleted = 0
+    SELECT repertoire_ref, tune_ref, scheduled, current, learned, sync_version, last_modified_at
+    FROM repertoire_tune
+    WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${tuneId} AND deleted = 0
     LIMIT 1
   `);
   return rows.length > 0 ? rows[0] : null;
 }
 
 /**
- * Count distinct practice_record rows per playlist/tune (duplicate guard)
+ * Count distinct practice_record rows per repertoire/tune (duplicate guard)
  */
 async function getDistinctPracticeRecordCount(
-  playlistId: string,
+  repertoireId: string,
   tuneId: string
 ) {
   const db = await ensureDb();
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM practice_record
-    WHERE playlist_ref = ${playlistId} AND tune_ref = ${tuneId}
+    WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${tuneId}
   `);
   return rows[0]?.count ?? 0;
 }
 
 /**
- * Get all queue window dates for debugging (returns ALL windows for a playlist)
+ * Get all queue window dates for debugging (returns ALL windows for a repertoire)
  */
-async function getAllQueueWindows(playlistId: string) {
+async function getAllQueueWindows(repertoireId: string) {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
   const rows = await db.all<{
@@ -724,7 +721,7 @@ async function getAllQueueWindows(playlistId: string) {
   }>(sql`
     SELECT window_start_utc, COUNT(*) as count, active
     FROM daily_practice_queue
-    WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId}
+    WHERE user_ref = ${userRef} AND repertoire_ref = ${repertoireId}
     GROUP BY window_start_utc, active
     ORDER BY window_start_utc DESC
     LIMIT 20
@@ -759,18 +756,8 @@ async function seedSampleCatalogRow() {
     ["itrad", "Irish Traditional", "Ireland", "Traditional Irish music genre"]
   );
   rawDb.run(
-    "INSERT OR IGNORE INTO user_profile (id, supabase_user_id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [
-      "test-user-id",
-      "test-user-id",
-      "Test User",
-      null,
-      "fsrs",
-      0,
-      1,
-      now,
-      "local",
-    ]
+    "INSERT OR IGNORE INTO user_profile (id, name, email, sr_alg_type, deleted, sync_version, last_modified_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    ["test-user-id", "Test User", null, "fsrs", 0, 1, now, "local"]
   );
   rawDb.run(
     `INSERT OR REPLACE INTO tune (
@@ -825,13 +812,25 @@ async function getSyncOutboxCount(): Promise<number> {
 }
 
 /**
- * Get count of playlists in local SQLite.
- * Used by E2E to assert repertoire data is present after sync.
+ * Get repertoire counts from local SQLite.
+ * - With `repertoireId`: returns count of tunes in that repertoire.
+ * - Without `repertoireId`: returns count of repertoire rows.
  */
-async function getPlaylistCount(): Promise<number> {
+async function getRepertoireCount(repertoireId?: string): Promise<number> {
   const db = await ensureDb();
+
+  if (repertoireId) {
+    const rows = await db.all<{ count: number }>(sql`
+      SELECT COUNT(*) as count
+      FROM repertoire_tune rt
+      WHERE rt.repertoire_ref = ${repertoireId}
+        AND rt.deleted = 0
+    `);
+    return rows[0]?.count ?? 0;
+  }
+
   const rows = await db.all<{ count: number }>(sql`
-    SELECT COUNT(*) as count FROM playlist WHERE deleted = 0
+    SELECT COUNT(*) as count FROM repertoire WHERE deleted = 0
   `);
   return rows[0]?.count ?? 0;
 }
@@ -934,8 +933,8 @@ declare global {
       seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
         id: string;
       }>;
-      getPracticeCount: (playlistId: string) => Promise<number>; // UUID
-      getRepertoireCount: (playlistId: string) => Promise<number>; // UUID
+      getPracticeCount: (repertoireId: string) => Promise<number>; // UUID
+      getRepertoireTuneCount: (repertoireId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
       getCatalogTuneCountsForUser: () => Promise<{
         total: number;
@@ -944,14 +943,14 @@ declare global {
       getCatalogSelectionDiagnostics: () => Promise<{
         userRef: string;
         userIdVariants: string[];
-        userProfile: Array<{ id: string; supabase_user_id: string | null }>;
+        userProfile: Array<{ id: string }>;
         selectionRows: Array<{ user_id: string; genre_id: string }>;
         selectedGenreIds: string[];
-        playlistDefaults: string[];
+        repertoireDefaults: string[];
         repertoireGenres: string[];
         counts: {
-          playlistCount: number;
-          playlistTuneCount: number;
+          repertoireCount: number;
+          repertoireTuneCount: number;
           tuneCount: number;
         };
       }>;
@@ -961,7 +960,7 @@ declare global {
       // Staging & committing helpers
       stageEvaluation: (
         tuneId: string,
-        playlistId: string,
+        repertoireId: string,
         evaluation: string,
         goal?: string,
         technique?: string
@@ -980,16 +979,16 @@ declare global {
         technique: string;
       }>;
       commitStaged: (
-        playlistId: string,
+        repertoireId: string,
         windowStartUtc?: string
       ) => Promise<{ success: boolean; count: number; error?: string }>;
       getPracticeListStaged: (
-        playlistId: string,
+        repertoireId: string,
         tuneIds?: string[]
       ) => Promise<
         Array<{
           id: string;
-          playlist_ref: string;
+          repertoire_ref: string;
           tune_ref: string;
           latest_due: string | null;
           latest_interval: number | null;
@@ -998,14 +997,14 @@ declare global {
           has_staged: number; // 1/0
         }>
       >;
-      getQueueWindows: (playlistId: string) => Promise<string[]>;
+      getQueueWindows: (repertoireId: string) => Promise<string[]>;
       seedSampleCatalogRow: () => Promise<void>;
       // New query functions for scheduling tests
       getPracticeRecords: (tuneIds: string[]) => Promise<
         Array<{
           id: string;
           tune_ref: string;
-          playlist_ref: string;
+          repertoire_ref: string;
           practiced: string | null;
           due: string | null;
           quality: number | null;
@@ -1023,11 +1022,11 @@ declare global {
       >;
       getLatestPracticeRecord: (
         tuneId: string,
-        playlistId: string
+        repertoireId: string
       ) => Promise<{
         id: string;
         tune_ref: string;
-        playlist_ref: string;
+        repertoire_ref: string;
         practiced: string | null;
         due: string | null;
         quality: number | null;
@@ -1045,7 +1044,7 @@ declare global {
         last_modified_at: string;
       } | null>;
       getScheduledDates: (
-        playlistId: string,
+        repertoireId: string,
         tuneIds?: string[]
       ) => Promise<
         Record<
@@ -1059,11 +1058,11 @@ declare global {
         >
       >;
       updateScheduledDates: (
-        playlistId: string,
+        repertoireId: string,
         updates: Array<{ tuneId: string; scheduled: string | null }>
       ) => Promise<{ updated: number }>;
       getPracticeQueue: (
-        playlistId: string,
+        repertoireId: string,
         windowStartUtc?: string
       ) => Promise<
         Array<{
@@ -1077,11 +1076,11 @@ declare global {
           snapshot_coalesced_ts: string | null;
         }>
       >;
-      getPlaylistTuneRow: (
-        playlistId: string,
+      getRepertoireTuneRow: (
+        repertoireId: string,
         tuneId: string
       ) => Promise<{
-        playlist_ref: string;
+        repertoire_ref: string;
         tune_ref: string;
         scheduled: string | null;
         current: string | null;
@@ -1090,10 +1089,10 @@ declare global {
         last_modified_at: string;
       } | null>;
       getDistinctPracticeRecordCount: (
-        playlistId: string,
+        repertoireId: string,
         tuneId: string
       ) => Promise<number>;
-      getAllQueueWindows: (playlistId: string) => Promise<
+      getAllQueueWindows: (repertoireId: string) => Promise<
         Array<{
           window_start_utc: string;
           count: number;
@@ -1104,7 +1103,7 @@ declare global {
         titles: string[]
       ) => Promise<Array<{ id: string; title: string }>>;
       getSyncOutboxCount: () => Promise<number>;
-      getPlaylistCount: () => Promise<number>;
+      getRepertoireCount: (repertoireId?: string) => Promise<number>;
       isSyncComplete: () => boolean;
       getSyncErrors: () => Promise<string[]>;
       getSupabaseRecord: (
@@ -1187,7 +1186,7 @@ if (typeof window !== "undefined") {
       seedAddToReview,
       seedSchedulingPlugin,
       getPracticeCount,
-      getRepertoireCount,
+      getRepertoireTuneCount,
       getTuneOverrideCountForCurrentUser,
       getCatalogTuneCountsForUser,
       getCatalogSelectionDiagnostics,
@@ -1196,13 +1195,13 @@ if (typeof window !== "undefined") {
       getScheduledDates,
       updateScheduledDates,
       getPracticeQueue,
-      getPlaylistTuneRow,
+      getRepertoireTuneRow,
       getDistinctPracticeRecordCount,
       getAllQueueWindows,
       getTunesByTitles,
       stageEvaluation: async (
         tuneId: string,
-        playlistId: string,
+        repertoireId: string,
         evaluation: string,
         goal?: string,
         technique?: string
@@ -1215,14 +1214,14 @@ if (typeof window !== "undefined") {
         return await stagePracticeEvaluation(
           db,
           userRef,
-          playlistId,
+          repertoireId,
           tuneId,
           evaluation,
           goal,
           technique
         );
       },
-      commitStaged: async (playlistId: string, windowStartUtc?: string) => {
+      commitStaged: async (repertoireId: string, windowStartUtc?: string) => {
         const { commitStagedEvaluations } = await import(
           "@/lib/services/practice-recording"
         );
@@ -1231,16 +1230,19 @@ if (typeof window !== "undefined") {
         return await commitStagedEvaluations(
           db,
           userRef,
-          playlistId,
+          repertoireId,
           windowStartUtc
         );
       },
-      getPracticeListStaged: async (playlistId: string, tuneIds?: string[]) => {
+      getPracticeListStaged: async (
+        repertoireId: string,
+        tuneIds?: string[]
+      ) => {
         const db = await ensureDb();
         const userRef = await resolveUserId(db);
         let rows: Array<{
           id: string;
-          playlist_ref: string;
+          repertoire_ref: string;
           tune_ref: string;
           latest_due: string | null;
           latest_interval: number | null;
@@ -1252,7 +1254,7 @@ if (typeof window !== "undefined") {
           const inList = tuneIds.map((id) => `'${id}'`).join(",");
           rows = await db.all<{
             id: string;
-            playlist_ref: string;
+            repertoire_ref: string;
             tune_ref: string;
             latest_due: string | null;
             latest_interval: number | null;
@@ -1262,7 +1264,7 @@ if (typeof window !== "undefined") {
           }>(sql`
             SELECT
               tune.id as id,
-              playlist.playlist_id as playlist_ref,
+              repertoire.repertoire_id as repertoire_ref,
               tune.id as tune_ref,
               COALESCE(td.due, pr.due) AS latest_due,
               COALESCE(td.interval, pr.interval) AS latest_interval,
@@ -1270,25 +1272,25 @@ if (typeof window !== "undefined") {
               COALESCE(td.state, pr.state) AS latest_state,
               CASE WHEN td.practiced IS NOT NULL OR td.due IS NOT NULL THEN 1 ELSE 0 END AS has_staged
             FROM tune
-            LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-            LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+            LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+            LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
             LEFT JOIN (
               SELECT pr.* FROM practice_record pr
               INNER JOIN (
-                SELECT tune_ref, playlist_ref, MAX(id) as max_id
+                SELECT tune_ref, repertoire_ref, MAX(id) as max_id
                 FROM practice_record
-                GROUP BY tune_ref, playlist_ref
+                GROUP BY tune_ref, repertoire_ref
               ) latest ON pr.tune_ref = latest.tune_ref
-                AND pr.playlist_ref = latest.playlist_ref
+                AND pr.repertoire_ref = latest.repertoire_ref
                 AND pr.id = latest.max_id
-            ) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
-            LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref
-            WHERE playlist.playlist_id = ${playlistId} AND playlist.user_ref = ${userRef} AND tune.id IN (${sql.raw(inList)})
+            ) pr ON pr.tune_ref = tune.id AND pr.repertoire_ref = repertoire_tune.repertoire_ref
+            LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.repertoire_id = repertoire_tune.repertoire_ref
+            WHERE repertoire.repertoire_id = ${repertoireId} AND repertoire.user_ref = ${userRef} AND tune.id IN (${sql.raw(inList)})
           `);
         } else {
           rows = await db.all<{
             id: string;
-            playlist_ref: string;
+            repertoire_ref: string;
             tune_ref: string;
             latest_due: string | null;
             latest_interval: number | null;
@@ -1298,7 +1300,7 @@ if (typeof window !== "undefined") {
           }>(sql`
             SELECT
               tune.id as id,
-              playlist.playlist_id as playlist_ref,
+              repertoire.repertoire_id as repertoire_ref,
               tune.id as tune_ref,
               COALESCE(td.due, pr.due) AS latest_due,
               COALESCE(td.interval, pr.interval) AS latest_interval,
@@ -1306,31 +1308,31 @@ if (typeof window !== "undefined") {
               COALESCE(td.state, pr.state) AS latest_state,
               CASE WHEN td.practiced IS NOT NULL OR td.due IS NOT NULL THEN 1 ELSE 0 END AS has_staged
             FROM tune
-            LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-            LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+            LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+            LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
             LEFT JOIN (
               SELECT pr.* FROM practice_record pr
               INNER JOIN (
-                SELECT tune_ref, playlist_ref, MAX(id) as max_id
+                SELECT tune_ref, repertoire_ref, MAX(id) as max_id
                 FROM practice_record
-                GROUP BY tune_ref, playlist_ref
+                GROUP BY tune_ref, repertoire_ref
               ) latest ON pr.tune_ref = latest.tune_ref
-                AND pr.playlist_ref = latest.playlist_ref
+                AND pr.repertoire_ref = latest.repertoire_ref
                 AND pr.id = latest.max_id
-            ) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = playlist_tune.playlist_ref
-            LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.playlist_id = playlist_tune.playlist_ref
-            WHERE playlist.playlist_id = ${playlistId} AND playlist.user_ref = ${userRef}
+            ) pr ON pr.tune_ref = tune.id AND pr.repertoire_ref = repertoire_tune.repertoire_ref
+            LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.repertoire_id = repertoire_tune.repertoire_ref
+            WHERE repertoire.repertoire_id = ${repertoireId} AND repertoire.user_ref = ${userRef}
           `);
         }
         return rows;
       },
-      getQueueWindows: async (playlistId: string) => {
+      getQueueWindows: async (repertoireId: string) => {
         const db = await ensureDb();
         const userRef = await resolveUserId(db);
         const rows = await db.all<{ window_start_utc: string }>(sql`
           SELECT DISTINCT window_start_utc
           FROM daily_practice_queue
-          WHERE user_ref = ${userRef} AND playlist_ref = ${playlistId}
+          WHERE user_ref = ${userRef} AND repertoire_ref = ${repertoireId}
           ORDER BY window_start_utc DESC
         `);
         return rows.map((r) => r.window_start_utc);
@@ -1377,8 +1379,8 @@ if (typeof window !== "undefined") {
       getSyncOutboxCount: async () => {
         return await getSyncOutboxCount();
       },
-      getPlaylistCount: async () => {
-        return await getPlaylistCount();
+      getRepertoireCount: async (repertoireId?: string) => {
+        return await getRepertoireCount(repertoireId);
       },
       isSyncComplete: () => {
         return isSyncComplete();

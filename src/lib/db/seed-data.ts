@@ -16,8 +16,8 @@ import type { Database as SqlJsDatabase } from "sql.js";
  * - Test user
  * - Sample genres and tune types (reference data)
  * - Sample tunes
- * - Test playlist
- * - Playlist-tune relationships
+ * - Test repertoire
+ * - Repertoire-tune relationships
  *
  * @param db - SQL.js database instance
  */
@@ -35,7 +35,7 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
     db.run(
       `
       INSERT OR IGNORE INTO user_profile (
-        supabase_user_id, 
+        id,
         email, 
         name, 
         sync_version, 
@@ -46,9 +46,10 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
       [userId, now]
     );
 
-    // Get the user_profile ID
+    // userId IS the canonical user identifier (user_profile.id).
+    // Verify user_profile exists
     const userProfileResult = db.exec(
-      `SELECT id FROM user_profile WHERE supabase_user_id = ?`,
+      `SELECT id FROM user_profile WHERE id = ?`,
       [userId]
     );
 
@@ -62,12 +63,12 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
 
     const userProfileId = userProfileResult[0].values[0][0] as number;
 
-    // Create playlist (note: instrument_ref is INTEGER, not TEXT)
+    // Create repertoire (note: instrument_ref is INTEGER, not TEXT)
     // For now, we'll leave instrument_ref as NULL since we don't have instrument data
     db.run(
       `
-      INSERT OR IGNORE INTO playlist (
-        playlist_id, 
+      INSERT OR IGNORE INTO repertoire (
+        repertoire_id, 
         user_ref, 
         instrument_ref,
         sync_version, 
@@ -156,11 +157,11 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
         ]
       );
 
-      // Add to playlist
+      // Add to repertoire
       db.run(
         `
-        INSERT OR IGNORE INTO playlist_tune (
-          playlist_ref, 
+        INSERT OR IGNORE INTO repertoire_tune (
+          repertoire_ref, 
           tune_ref, 
           deleted, 
           sync_version,

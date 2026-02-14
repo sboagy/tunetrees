@@ -174,7 +174,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Tune added successfully
 - Console shows local database write
 - Tune appears in Repertoire tab
-- `playlist_tune` entry created with anonymous user's UUID
+- `repertoire_tune` entry created with anonymous user's UUID
 
 #### 3.4 Create Practice Record
 **Steps:**

@@ -1,15 +1,15 @@
 /**
- * Playlist List Component - Table-Centric Design
+ * Repertoire List Component - Table-Centric Design
  *
- * Displays a searchable, sortable table of user's playlists.
+ * Displays a searchable, sortable table of user's repertoires.
  * Features:
  * - TanStack Solid Table for information-dense display
- * - Search by playlist ID
+ * - Search by repertoire ID
  * - Sortable columns
- * - Click rows to edit playlist
+ * - Click rows to edit repertoire
  * - Delete action (soft delete)
  *
- * @module components/playlists/PlaylistList
+ * @module components/repertoires/RepertoireList
  */
 
 import {
@@ -31,29 +31,29 @@ import {
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import {
-  deletePlaylist,
-  getUserPlaylists,
-} from "../../lib/db/queries/playlists";
-import type { PlaylistWithSummary } from "../../lib/db/types";
+  deleteRepertoire,
+  getUserRepertoires,
+} from "../../lib/db/queries/repertoires";
+import type { RepertoireWithSummary } from "../../lib/db/types";
 
-interface PlaylistListProps {
-  /** Callback when a playlist is selected for editing */
-  onPlaylistSelect?: (playlist: PlaylistWithSummary) => void;
-  /** Callback when a playlist is deleted */
-  onPlaylistDeleted?: (playlistId: string) => void;
-  /** Include soft-deleted playlists */
+interface RepertoireListProps {
+  /** Callback when a repertoire is selected for editing */
+  onRepertoireSelect?: (repertoire: RepertoireWithSummary) => void;
+  /** Callback when a repertoire is deleted */
+  onRepertoireDeleted?: (repertoireId: string) => void;
+  /** Include soft-deleted repertoires */
   includeDeleted?: boolean;
 }
 
 /**
- * Playlist List Component
+ * Repertoire List Component
  *
  * @example
  * ```tsx
- * <PlaylistList onPlaylistSelect={(playlist) => navigate(`/playlists/${playlist.playlistId}`)} />
+ * <RepertoireList onRepertoireSelect={(repertoire) => navigate(`/repertoires/${repertoire.repertoireId}`)} />
  * ```
  */
-export const PlaylistList: Component<PlaylistListProps> = (props) => {
+export const RepertoireList: Component<RepertoireListProps> = (props) => {
   const { user, localDb, repertoireListChanged } = useAuth();
 
   // I commented out the search box.  -sb
@@ -61,8 +61,8 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   const [sorting, setSorting] = createSignal<SortingState>([]);
   const [deletingId, setDeletingId] = createSignal<string | null>(null);
 
-  // Fetch playlists from local database
-  const [playlists, { refetch }] = createResource(
+  // Fetch repertoires from local database
+  const [repertoires, { refetch }] = createResource(
     () => {
       const userId = user()?.id;
       const db = localDb();
@@ -71,7 +71,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     },
     async (params) => {
       if (!params) return [];
-      return await getUserPlaylists(
+      return await getUserRepertoires(
         params.db,
         params.userId,
         props.includeDeleted ?? false
@@ -79,21 +79,21 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     }
   );
 
-  // Filter playlists based on search
-  const filteredPlaylists = createMemo(() => {
-    const allPlaylists = playlists() || [];
+  // Filter repertoires based on search
+  const filteredRepertoires = createMemo<RepertoireWithSummary[]>(() => {
+    const allRepertoires = repertoires() || [];
     const query = searchQuery().toLowerCase();
 
     if (!query) {
-      return allPlaylists;
+      return allRepertoires;
     }
 
-    return allPlaylists.filter((playlist: PlaylistWithSummary) => {
-      // Search by playlist ID
-      const matchesId = playlist.playlistId.toString().includes(query);
+    return allRepertoires.filter((repertoire: RepertoireWithSummary) => {
+      // Search by repertoire ID
+      const matchesId = repertoire.repertoireId.toString().includes(query);
       // Search by instrument
-      const matchesInstrument = playlist.instrumentRef
-        ? playlist.instrumentRef.toString().includes(query)
+      const matchesInstrument = repertoire.instrumentRef
+        ? repertoire.instrumentRef.toString().includes(query)
         : false;
 
       return matchesId || matchesInstrument;
@@ -101,33 +101,33 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   });
 
   // Handle delete action
-  const handleDelete = async (playlistId: string) => {
+  const handleDelete = async (repertoireId: string) => {
     const userId = user()?.id;
     const db = localDb();
     if (!userId || !db) {
-      console.error("Cannot delete playlist: missing user or database");
+      console.error("Cannot delete repertoire: missing user or database");
       return;
     }
 
     // Confirm deletion
     const confirmed = window.confirm(
-      "Are you sure you want to delete this playlist? All associated tune assignments will be removed."
+      "Are you sure you want to delete this repertoire? All associated tune assignments will be removed."
     );
     if (!confirmed) return;
 
     try {
-      setDeletingId(playlistId);
-      await deletePlaylist(db, playlistId, userId);
+      setDeletingId(repertoireId);
+      await deleteRepertoire(db, repertoireId, userId);
 
       // Notify parent
-      props.onPlaylistDeleted?.(playlistId);
+      props.onRepertoireDeleted?.(repertoireId);
 
       // Refresh list
       refetch();
     } catch (error) {
-      console.error("Failed to delete playlist:", error);
+      console.error("Failed to delete repertoire:", error);
       alert(
-        `Failed to delete playlist: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to delete repertoire: ${error instanceof Error ? error.message : "Unknown error"}`
       );
     } finally {
       setDeletingId(null);
@@ -135,9 +135,9 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   };
 
   // Define table columns
-  const columns: ColumnDef<PlaylistWithSummary>[] = [
+  const columns: ColumnDef<RepertoireWithSummary>[] = [
     {
-      accessorKey: "playlistId",
+      accessorKey: "repertoireId",
       header: "ID",
       size: 80,
       cell: (info) => {
@@ -233,8 +233,8 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       header: "Actions",
       size: 100,
       cell: (info) => {
-        const playlist = info.row.original;
-        const isDeleting = deletingId() === playlist.playlistId;
+        const repertoire = info.row.original;
+        const isDeleting = deletingId() === repertoire.repertoireId;
 
         return (
           <div class="flex gap-2 items-center">
@@ -242,7 +242,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                props.onPlaylistSelect?.(playlist);
+                props.onRepertoireSelect?.(repertoire);
               }}
               class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors p-1"
               disabled={isDeleting}
@@ -255,12 +255,12 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete(playlist.playlistId);
+                handleDelete(repertoire.repertoireId);
               }}
               class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
               disabled={isDeleting}
-              title={isDeleting ? "Deleting..." : "Delete playlist"}
-              aria-label={isDeleting ? "Deleting playlist" : "Delete playlist"}
+              title={isDeleting ? "Deleting..." : "Delete repertoire"}
+              aria-label={isDeleting ? "Deleting repertoire" : "Delete repertoire"}
             >
               <Trash2 size={16} />
             </button>
@@ -273,7 +273,7 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
   // Create table instance
   const table = createSolidTable({
     get data() {
-      return filteredPlaylists();
+      return filteredRepertoires();
     },
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -286,8 +286,8 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
     onSortingChange: setSorting,
   });
 
-  const handleRowClick = (playlist: PlaylistWithSummary) => {
-    props.onPlaylistSelect?.(playlist);
+  const handleRowClick = (repertoire: RepertoireWithSummary) => {
+    props.onRepertoireSelect?.(repertoire);
   };
 
   return (
@@ -297,17 +297,17 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
         {/* Search Input */}
         {/* <div>
           <label
-            for="playlist-search"
+            for="repertoire-search"
             class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
           >
-            Search Playlists
+            Search Repertoires
           </label>
           <input
-            id="playlist-search"
+            id="repertoire-search"
             type="text"
             value={searchQuery()}
             onInput={(e) => setSearchQuery(e.currentTarget.value)}
-            placeholder="Search by playlist ID or instrument..."
+            placeholder="Search by repertoire ID or instrument..."
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
           />
         </div> */}
@@ -316,10 +316,10 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
         <div class="flex items-center justify-between">
           <div class="text-sm text-gray-600 dark:text-gray-400">
             <Show
-              when={!playlists.loading}
-              fallback={<span>Loading playlists...</span>}
+              when={!repertoires.loading}
+              fallback={<span>Loading repertoires...</span>}
             >
-              Showing {filteredPlaylists().length} of {playlists()?.length || 0}{" "}
+              Showing {filteredRepertoires().length} of {repertoires()?.length || 0}{" "}
               repertoires
             </Show>
           </div>
@@ -329,25 +329,25 @@ export const PlaylistList: Component<PlaylistListProps> = (props) => {
       {/* Table */}
       <div class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <Show
-          when={!playlists.loading}
+          when={!repertoires.loading}
           fallback={
             <div class="text-center py-12 bg-white dark:bg-gray-800">
               <div class="animate-spin h-12 w-12 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
               <p class="mt-4 text-gray-600 dark:text-gray-400">
-                Loading playlists...
+                Loading repertoires...
               </p>
             </div>
           }
         >
           <Show
-            when={filteredPlaylists().length > 0}
+            when={filteredRepertoires().length > 0}
             fallback={
               <div class="text-center py-12 bg-gray-50 dark:bg-gray-800">
                 <p class="text-lg text-gray-600 dark:text-gray-400">
-                  No playlists found
+                  No repertoires found
                 </p>
                 <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                  Create your first playlist to get started
+                  Create your first repertoire to get started
                 </p>
               </div>
             }

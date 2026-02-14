@@ -1,30 +1,30 @@
 /**
- * Playlist Manager Dialog Component
+ * Repertoire Manager Dialog Component
  *
- * Modal dialog for managing user's playlists (create, edit, delete).
- * Replaces the full-page /playlists route with a modal dialog approach
+ * Modal dialog for managing user's repertoires (create, edit, delete).
+ * Replaces the full-page /repertoires route with a modal dialog approach
  * matching the legacy app's "Edit Repertoire List" dialog.
  *
  * Features:
  * - Modal overlay with backdrop
- * - Table-based playlist list display
- * - Create new playlist button
+ * - Table-based repertoire list display
+ * - Create new repertoire button
  * - Edit/Delete actions
  * - Keyboard support (Escape to close)
  * - Dark mode support
  *
- * @module components/playlists/PlaylistManagerDialog
+ * @module components/repertoires/RepertoireManagerDialog
  */
 
 import { X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import type { PlaylistWithSummary } from "../../lib/db/types";
-import { PlaylistEditorDialog } from "./PlaylistEditorDialog";
-import { PlaylistList } from "./PlaylistList";
+import type { RepertoireWithSummary } from "../../lib/db/types";
+import { RepertoireEditorDialog } from "./RepertoireEditorDialog";
+import { RepertoireList } from "./RepertoireList";
 
-interface PlaylistManagerDialogProps {
+interface RepertoireManagerDialogProps {
   /** Whether the dialog is open */
   isOpen: boolean;
   /** Callback when dialog should close */
@@ -32,22 +32,22 @@ interface PlaylistManagerDialogProps {
 }
 
 /**
- * Playlist Manager Dialog Component
+ * Repertoire Manager Dialog Component
  *
  * @example
  * ```tsx
- * <PlaylistManagerDialog
+ * <RepertoireManagerDialog
  *   isOpen={showDialog()}
  *   onClose={() => setShowDialog(false)}
  * />
  * ```
  */
-export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
+export const RepertoireManagerDialog: Component<RepertoireManagerDialogProps> = (
   props
 ) => {
   const { incrementRepertoireListChanged } = useAuth();
   const [showEditorDialog, setShowEditorDialog] = createSignal(false);
-  const [editingPlaylistId, setEditingPlaylistId] = createSignal<
+  const [editingRepertoireId, setEditingRepertoireId] = createSignal<
     string | undefined
   >(undefined);
 
@@ -62,31 +62,31 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
     onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
-  const handlePlaylistSelect = (playlist: PlaylistWithSummary) => {
+  const handleRepertoireSelect = (repertoire: RepertoireWithSummary) => {
     // Open editor dialog instead of navigating
-    setEditingPlaylistId(playlist.playlistId);
+    setEditingRepertoireId(repertoire.repertoireId);
     setShowEditorDialog(true);
   };
 
-  const handlePlaylistDeleted = (playlistId: string) => {
-    console.log("Playlist deleted:", playlistId);
-    // Trigger global playlist list refresh
+  const handleRepertoireDeleted = (repertoireId: string) => {
+    console.log("Repertoire deleted:", repertoireId);
+    // Trigger global repertoire list refresh
     incrementRepertoireListChanged();
   };
 
   const handleCreateNew = () => {
-    // Open editor dialog for new playlist
-    setEditingPlaylistId(undefined);
+    // Open editor dialog for new repertoire
+    setEditingRepertoireId(undefined);
     setShowEditorDialog(true);
   };
 
   const handleEditorClose = () => {
     setShowEditorDialog(false);
-    setEditingPlaylistId(undefined);
+    setEditingRepertoireId(undefined);
   };
 
   const handleEditorSaved = () => {
-    // Trigger global playlist list refresh
+    // Trigger global repertoire list refresh
     incrementRepertoireListChanged();
   };
 
@@ -101,7 +101,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
           if (e.key === "Escape") props.onClose();
         }}
         aria-label="Close modal backdrop"
-        data-testid="playlist-manager-backdrop"
+        data-testid="repertoire-manager-backdrop"
       />
 
       {/* Dialog */}
@@ -110,15 +110,15 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
         class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-4xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="playlist-manager-title"
+        aria-labelledby="repertoire-manager-title"
         onClick={(e) => e.stopPropagation()}
-        data-testid="playlist-manager-dialog"
+        data-testid="repertoire-manager-dialog"
       >
         {/* Header */}
         <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <div class="min-w-0 flex-1">
             <h2
-              id="playlist-manager-title"
+              id="repertoire-manager-title"
               class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate"
             >
               Repertoires
@@ -132,7 +132,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
               type="button"
               onClick={handleCreateNew}
               class="px-3 py-2 sm:px-4 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1 sm:gap-2"
-              data-testid="create-playlist-button"
+              data-testid="create-repertoire-button"
             >
               <svg
                 class="w-4 h-4 sm:w-5 sm:h-5"
@@ -156,7 +156,7 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
               onClick={props.onClose}
               class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               aria-label="Close dialog"
-              data-testid="close-playlist-manager"
+              data-testid="close-repertoire-manager"
             >
               <X size={20} class="sm:hidden" />
               <X size={24} class="hidden sm:block" />
@@ -166,18 +166,18 @@ export const PlaylistManagerDialog: Component<PlaylistManagerDialogProps> = (
 
         {/* Content - Scrollable */}
         <div class="flex-1 overflow-auto p-4 sm:p-6">
-          <PlaylistList
-            onPlaylistSelect={handlePlaylistSelect}
-            onPlaylistDeleted={handlePlaylistDeleted}
+          <RepertoireList
+            onRepertoireSelect={handleRepertoireSelect}
+            onRepertoireDeleted={handleRepertoireDeleted}
           />
         </div>
       </div>
 
       {/* Nested Editor Dialog */}
-      <PlaylistEditorDialog
+      <RepertoireEditorDialog
         isOpen={showEditorDialog()}
         onClose={handleEditorClose}
-        playlistId={editingPlaylistId()}
+        repertoireId={editingRepertoireId()}
         onSaved={handleEditorSaved}
       />
     </Show>

@@ -123,7 +123,7 @@ Generated at `/manifest.webmanifest`:
 - ❌ Initial sign-in
 - ❌ Sign up / password reset
 - ❌ Real-time collaboration
-- ❌ Sharing playlists (planned)
+- ❌ Sharing repertoires (planned)
 
 ### Offline Detection
 

@@ -19,7 +19,7 @@ These views provide human-readable alternatives to UUID-based tables by joining 
 
 **Key Columns**:
 - `user_name`: User's name or email (COALESCE)
-- `playlist_instrument`: Instrument name (e.g., "Irish Flute")
+- `repertoire_instrument`: Instrument name (e.g., "Irish Flute")
 - `tune_title`: Tune title from tune or tune_override
 - Plus all original `daily_practice_queue` columns
 
@@ -30,7 +30,7 @@ These views provide human-readable alternatives to UUID-based tables by joining 
 
 **Example Query**:
 ```sql
-SELECT user_name, playlist_instrument, tune_title, bucket, order_index
+SELECT user_name, repertoire_instrument, tune_title, bucket, order_index
 FROM view_daily_practice_queue_readable
 WHERE queue_date = CURRENT_DATE
   AND active = true
@@ -44,7 +44,7 @@ ORDER BY bucket, order_index;
 **Key Columns**:
 - `user_name`: User's name or email
 - `tune_title`: Tune title from tune or tune_override
-- `playlist_instrument`: Instrument name
+- `repertoire_instrument`: Instrument name
 - Plus all original `table_transient_data` columns
 
 **Use Cases**:
@@ -54,7 +54,7 @@ ORDER BY bucket, order_index;
 
 **Example Query**:
 ```sql
-SELECT user_name, tune_title, playlist_instrument, 
+SELECT user_name, tune_title, repertoire_instrument, 
        purpose, quality, stability, due
 FROM view_transient_data_readable
 WHERE purpose = 'fsrs_preview'
@@ -68,7 +68,7 @@ ORDER BY last_modified_at DESC;
 **Key Columns**:
 - `user_name`: User's name or email
 - `tune_title`: Tune title from tune or tune_override
-- `playlist_instrument`: Instrument name
+- `repertoire_instrument`: Instrument name
 - `quality_label`: Human-readable quality (Again/Hard/Good/Easy)
 - `state_label`: Human-readable state (New/Learning/Review/Relearning)
 - Plus all original `practice_record` columns

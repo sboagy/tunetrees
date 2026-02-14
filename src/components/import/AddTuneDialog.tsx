@@ -304,7 +304,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         pluginId: plugin.id,
         pluginName: plugin.name,
       },
-      timeoutMs: 10000,
+      timeoutMs: 30000,
     });
 
     const normalized = normalizePluginImportData(result);

@@ -12,17 +12,17 @@ import type { SqliteDatabase } from "../client-sqlite";
 import { practiceRecord } from "../schema";
 
 /**
- * Get all practice records for a tune in a playlist
+ * Get all practice records for a tune in a repertoire
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @returns Array of practice records, ordered by date (newest first)
  */
 export async function getPracticeRecordsForTune(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ) {
   return await db
     .select()
@@ -30,7 +30,7 @@ export async function getPracticeRecordsForTune(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, repertoireId)
       )
     )
     .orderBy(desc(practiceRecord.practiced));
@@ -40,14 +40,14 @@ export async function getPracticeRecordsForTune(
  * Create a new practice record
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param data - Initial practice data
  * @returns The created practice record ID
  */
 export async function createPracticeRecord(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   data: {
     practiced?: string | null;
@@ -59,7 +59,7 @@ export async function createPracticeRecord(
 
   await db.insert(practiceRecord).values({
     id,
-    playlistRef: playlistId,
+    repertoireRef: repertoireId,
     tuneRef: tuneId,
     practiced: data.practiced || now,
     quality: data.quality ?? 3,

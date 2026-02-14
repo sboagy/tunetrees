@@ -489,8 +489,7 @@ export const tuneType = sqliteTable("tune_type", {
 export const userProfile = sqliteTable(
   "user_profile",
   {
-    id: integer().primaryKey({ autoIncrement: true }).notNull(),
-    supabaseUserId: text("supabase_user_id").notNull(),
+    id: text("id").primaryKey().notNull(),
     name: text(),
     email: text(),
     srAlgType: text("sr_alg_type"),
@@ -504,9 +503,5 @@ export const userProfile = sqliteTable(
     lastModifiedAt: text("last_modified_at").notNull(),
     deviceId: text("device_id"),
   },
-  (table) => [
-    uniqueIndex("user_profile_supabase_user_id_unique").on(
-      table.supabaseUserId
-    ),
-  ]
+  () => []
 );

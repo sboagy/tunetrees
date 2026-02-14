@@ -107,7 +107,7 @@ import { queueSync } from "./queue";
 await queueSync(db, "practice_record", "insert", {
   id: recordId,
   tuneRef: tuneId,
-  playlistRef: playlistId,
+  repertoireRef: repertoireId,
   practiced: timestamp,
   quality: 3,
   // ... all fields
@@ -173,13 +173,13 @@ Some tables use composite keys:
 
 ```typescript
 const compositeKeyTables = {
-  playlist_tune: ["playlist_ref", "tune_ref"],
-  daily_practice_queue: ["user_ref", "playlist_ref", "window_start_utc", "tune_ref"],
+  repertoire_tune: ["repertoire_ref", "tune_ref"],
+  daily_practice_queue: ["user_ref", "repertoire_ref", "window_start_utc", "tune_ref"],
 };
 
 // Delete with composite key
 await table.delete().match({
-  playlist_ref: data.playlist_ref,
+  repertoire_ref: data.repertoire_ref,
   tune_ref: data.tune_ref,
 });
 ```

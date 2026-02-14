@@ -115,29 +115,29 @@ test.describe
 
       // Update scheduled dates in local SQLite
       const updateResult = await page.evaluate(
-        async ({ playlistId, updates }) => {
+        async ({ repertoireId, updates }) => {
           const api = (window as any).__ttTestApi;
           if (!api?.updateScheduledDates) {
             throw new Error(
               "updateScheduledDates not available on __ttTestApi"
             );
           }
-          return await api.updateScheduledDates(playlistId, updates);
+          return await api.updateScheduledDates(repertoireId, updates);
         },
-        { playlistId: testUser.playlistId, updates }
+        { repertoireId: testUser.repertoireId, updates }
       );
       console.log(`  Updated ${updateResult.updated} tune scheduled dates`);
 
       await ttPage.ensureLoggedIn(testUser.email, testUser.userId);
 
       // Regenerate the queue with correct scheduled dates
-      await page.evaluate(async (playlistId: string) => {
+      await page.evaluate(async (repertoireId: string) => {
         const api = (window as any).__ttTestApi;
         if (!api) return;
 
         // Use seedAddToReview with empty tuneIds to trigger queue regeneration
-        await api.seedAddToReview({ playlistId, tuneIds: [] });
-      }, testUser.playlistId);
+        await api.seedAddToReview({ repertoireId, tuneIds: [] });
+      }, testUser.repertoireId);
 
       await verifyClockFrozen(
         page,
@@ -159,7 +159,7 @@ test.describe
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
       // Query practice queue to examine bucket distribution
-      const queue = await queryPracticeQueue(page, testUser.playlistId);
+      const queue = await queryPracticeQueue(page, testUser.repertoireId);
       console.log(`  Total queue size: ${queue.length}`);
 
       const distribution = getQueueBucketDistribution(queue);
@@ -276,7 +276,7 @@ test.describe
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
       // The first few rows should be Q1 tunes (Due Today)
-      const queue = await queryPracticeQueue(page, testUser.playlistId);
+      const queue = await queryPracticeQueue(page, testUser.repertoireId);
 
       // Sort by order_index to get expected order
       const sortedQueue = [...queue].sort(
@@ -335,7 +335,10 @@ test.describe
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
       // Get initial distribution
-      const initialQueue = await queryPracticeQueue(page, testUser.playlistId);
+      const initialQueue = await queryPracticeQueue(
+        page,
+        testUser.repertoireId
+      );
       const initialDistribution = getQueueBucketDistribution(initialQueue);
       console.log(`  Initial Q1: ${initialDistribution.q1_due_today}`);
       console.log(`  Initial total: ${initialDistribution.total}`);
@@ -362,7 +365,7 @@ test.describe
       // Query the queue again - practiced tunes should be marked completed
       // Note: The queue total might stay the same (items marked completed, not deleted)
       // but the tune should have completed_at set
-      const afterQueue = await queryPracticeQueue(page, testUser.playlistId);
+      const afterQueue = await queryPracticeQueue(page, testUser.repertoireId);
       const afterDistribution = getQueueBucketDistribution(afterQueue);
       console.log(`  After practice Q1: ${afterDistribution.q1_due_today}`);
       console.log(`  After practice total: ${afterDistribution.total}`);

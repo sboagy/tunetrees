@@ -121,7 +121,7 @@ Pull down to refresh on mobile, or click the sync icon in the header.
 - Try a different browser
 
 ### Tunes are missing from my practice queue
-- Verify the correct playlist is selected
+- Verify the correct repertoire is selected
 - Check if there are tunes due today in the Repertoire view
 - Refresh the page to regenerate the queue
 

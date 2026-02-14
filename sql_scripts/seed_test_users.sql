@@ -8,7 +8,7 @@
 -- Bob Test User (9002)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009002',
+  '00000000-0000-4000-8000-000000009002',
   'bob.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -20,7 +20,7 @@ VALUES (
 -- Carol Test User (9003)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009003',
+  '00000000-0000-4000-8000-000000009003',
   'carol.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -32,7 +32,7 @@ VALUES (
 -- Dave Test User (9004)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009004',
+  '00000000-0000-4000-8000-000000009004',
   'dave.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -44,7 +44,7 @@ VALUES (
 -- Eve Test User (9005)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009005',
+  '00000000-0000-4000-8000-000000009005',
   'eve.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -56,7 +56,7 @@ VALUES (
 -- Frank Test User (9006)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009006',
+  '00000000-0000-4000-8000-000000009006',
   'frank.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -68,7 +68,7 @@ VALUES (
 -- Grace Test User (9007)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009007',
+  '00000000-0000-4000-8000-000000009007',
   'grace.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -80,7 +80,7 @@ VALUES (
 -- Henry Test User (9008)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009008',
+  '00000000-0000-4000-8000-000000009008',
   'henry.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -92,7 +92,7 @@ VALUES (
 -- Iris Test User (9009)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
-  '00000000-0000-0000-0000-000000009009',
+  '00000000-0000-4000-8000-000000009009',
   'iris.test@tunetrees.test',
   crypt('TestPassword123!', gen_salt('bf')),
   NOW(),
@@ -101,31 +101,32 @@ VALUES (
   '{"name": "Iris Test"}'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
 
--- Insert corresponding user records in public.user table
-INSERT INTO public.user (id, name, email) VALUES
-  (9002, 'Bob Test', 'bob.test@tunetrees.test'),
-  (9003, 'Carol Test', 'carol.test@tunetrees.test'),
-  (9004, 'Dave Test', 'dave.test@tunetrees.test'),
-  (9005, 'Eve Test', 'eve.test@tunetrees.test'),
-  (9006, 'Frank Test', 'frank.test@tunetrees.test'),
-  (9007, 'Grace Test', 'grace.test@tunetrees.test'),
-  (9008, 'Henry Test', 'henry.test@tunetrees.test'),
-  (9009, 'Iris Test', 'iris.test@tunetrees.test')
+-- Insert corresponding user_profile records
+-- Note: id is the Supabase Auth UUID
+INSERT INTO public.user_profile (id, name, email, sync_version, last_modified_at) VALUES
+  ('00000000-0000-4000-8000-000000009002', 'Bob Test', 'bob.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009003', 'Carol Test', 'carol.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009004', 'Dave Test', 'dave.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009005', 'Eve Test', 'eve.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009006', 'Frank Test', 'frank.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009007', 'Grace Test', 'grace.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009008', 'Henry Test', 'henry.test@tunetrees.test', 1, NOW()),
+  ('00000000-0000-4000-8000-000000009009', 'Iris Test', 'iris.test@tunetrees.test', 1, NOW())
 ON CONFLICT (id) DO NOTHING;
 
--- Create playlists for each test user
-INSERT INTO public.playlist (id, user_ref, instrument, genre, name) VALUES
-  (9002, 9002, 'Flute', 'Irish', 'Bob''s Irish Flute'),
-  (9003, 9003, 'Flute', 'Irish', 'Carol''s Irish Flute'),
-  (9004, 9004, 'Flute', 'Irish', 'Dave''s Irish Flute'),
-  (9005, 9005, 'Flute', 'Irish', 'Eve''s Irish Flute'),
-  (9006, 9006, 'Flute', 'Irish', 'Frank''s Irish Flute'),
-  (9007, 9007, 'Flute', 'Irish', 'Grace''s Irish Flute'),
-  (9008, 9008, 'Flute', 'Irish', 'Henry''s Irish Flute'),
-  (9009, 9009, 'Flute', 'Irish', 'Iris''s Irish Flute')
-ON CONFLICT (id) DO NOTHING;
+-- Create playlists for each test user (using UUID format from test-data.ts)
+INSERT INTO public.playlist (playlist_id, user_ref, instrument_ref, genre_default, deleted, sync_version, last_modified_at) VALUES
+  ('00000000-0000-4000-8000-000000019002', '00000000-0000-4000-8000-000000009002',  '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019003', '00000000-0000-4000-8000-000000009003', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019004', '00000000-0000-4000-8000-000000009004', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019005', '00000000-0000-4000-8000-000000009005', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019006', '00000000-0000-4000-8000-000000009006', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019007', '00000000-0000-4000-8000-000000009007', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019008', '00000000-0000-4000-8000-000000009008', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW()),
+  ('00000000-0000-4000-8000-000000019009', '00000000-0000-4000-8000-000000009009', '019a4531-0c93-70a3-b71e-e80b6d24edc4', 'ITRAD', false, 1, NOW())
+ON CONFLICT (playlist_id) DO NOTHING;
 
 -- Verify users were created
 SELECT id, email FROM auth.users WHERE email LIKE '%.test@tunetrees.test' ORDER BY id;
-SELECT id, name, email FROM public.user WHERE id >= 9002 AND id <= 9009 ORDER BY id;
-SELECT id, name, user_ref FROM public.playlist WHERE id >= 9002 AND id <= 9009 ORDER BY id;
+SELECT id, name, email FROM public.user_profile WHERE id >= '00000000-0000-4000-8000-000000009002' ORDER BY id;
+SELECT playlist_id, user_ref FROM public.playlist WHERE playlist_id >= '00000000-0000-4000-8000-000000019002' ORDER BY playlist_id;

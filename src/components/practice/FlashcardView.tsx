@@ -32,7 +32,7 @@ export interface FlashcardViewProps {
   // For staging to table_transient_data
   localDb?: () => SqliteDatabase | null;
   userId?: string;
-  playlistId?: string;
+  repertoireId?: string;
 }
 
 export const FlashcardView: Component<FlashcardViewProps> = (props) => {

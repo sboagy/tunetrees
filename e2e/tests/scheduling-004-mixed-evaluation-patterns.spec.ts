@@ -185,22 +185,22 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // Query practice records for all tunes
     const easyRecords = await Promise.all(
       EASY_TUNES.map((tuneId) =>
-        queryLatestPracticeRecord(page, tuneId, testUser.playlistId)
+        queryLatestPracticeRecord(page, tuneId, testUser.repertoireId)
       )
     );
     const goodRecords = await Promise.all(
       GOOD_TUNES.map((tuneId) =>
-        queryLatestPracticeRecord(page, tuneId, testUser.playlistId)
+        queryLatestPracticeRecord(page, tuneId, testUser.repertoireId)
       )
     );
     const hardRecords = await Promise.all(
       HARD_TUNES.map((tuneId) =>
-        queryLatestPracticeRecord(page, tuneId, testUser.playlistId)
+        queryLatestPracticeRecord(page, tuneId, testUser.repertoireId)
       )
     );
     const againRecords = await Promise.all(
       AGAIN_TUNES.map((tuneId) =>
-        queryLatestPracticeRecord(page, tuneId, testUser.playlistId)
+        queryLatestPracticeRecord(page, tuneId, testUser.repertoireId)
       )
     );
 
@@ -408,7 +408,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // Query which specific tunes are in queue
     const allRecords = await Promise.all(
       ALL_TUNES.map((tuneId) =>
-        queryLatestPracticeRecord(page, tuneId, testUser.playlistId)
+        queryLatestPracticeRecord(page, tuneId, testUser.repertoireId)
       )
     );
 
@@ -514,7 +514,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       // Query all practice records
       const records = await Promise.all(
         ALL_TUNES.map((tuneId) =>
-          queryLatestPracticeRecord(page, tuneId, testUser.playlistId)
+          queryLatestPracticeRecord(page, tuneId, testUser.repertoireId)
         )
       );
 

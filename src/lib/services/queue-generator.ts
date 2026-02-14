@@ -26,31 +26,9 @@
 import { and, eq, lt } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { getDueTunesLegacy } from "../db/queries/practice";
-import { dailyPracticeQueue, playlistTune, userProfile } from "../db/schema";
+import { dailyPracticeQueue, repertoireTune } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { generateId } from "../utils/uuid";
-
-/**
- * Get user_profile.id from supabase_user_id (UUID)
- * Returns null if user not found
- */
-async function getUserProfileId(
-  db: SqliteDatabase,
-  supabaseUserId: string
-): Promise<string | null> {
-  // Returns UUID string
-  const result = await db
-    .select({ id: userProfile.id })
-    .from(userProfile)
-    .where(eq(userProfile.supabaseUserId, supabaseUserId))
-    .limit(1);
-
-  if (!result || result.length === 0) {
-    return null;
-  }
-
-  return result[0].id; // UUID string
-}
 
 /**
  * Scheduling windows for bucket classification
@@ -200,7 +178,7 @@ export function classifyQueueBucket(
  *
  * @param db - SQLite database instance
  * @param userId - User UUID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param sitdownDate - Practice session date (defaults to now)
  * @param options - Queue generation options
  * @returns Array of daily practice queue entries
@@ -221,7 +199,7 @@ export function classifyQueueBucket(
 export async function generateDailyPracticeQueue(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string, // UUID
+  repertoireId: string, // UUID
   sitdownDate: Date = new Date(),
   options: QueueGenerationOptions = {}
 ): Promise<DailyPracticeQueue[]> {
@@ -232,11 +210,8 @@ export async function generateDailyPracticeQueue(
     tzOffsetMinutes = 0,
   } = options;
 
-  // Map UUID to integer user_profile.id
-  const userRef = await getUserProfileId(db, userId);
-  if (!userRef) {
-    throw new Error(`User not found: ${userId}`);
-  }
+  // userId is already the Supabase Auth UUID (same as user_profile.id PK)
+  const userRef = userId;
 
   // Compute scheduling windows
   const windows = computeSchedulingWindows(
@@ -253,7 +228,7 @@ export async function generateDailyPracticeQueue(
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, playlistId),
+          eq(dailyPracticeQueue.repertoireRef, repertoireId),
           eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
           eq(dailyPracticeQueue.active, 1)
         )
@@ -273,7 +248,7 @@ export async function generateDailyPracticeQueue(
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, playlistId),
+          eq(dailyPracticeQueue.repertoireRef, repertoireId),
           eq(dailyPracticeQueue.windowStartUtc, windows.startTs)
         )
       );
@@ -282,7 +257,7 @@ export async function generateDailyPracticeQueue(
   // Get due tunes
   const dueTunes = await getDueTunesLegacy(
     db,
-    playlistId,
+    repertoireId,
     sitdownDate,
     delinquencyWindowDays
   );
@@ -310,7 +285,7 @@ export async function generateDailyPracticeQueue(
       id: generateId(), // Generate UUID for queue entry
       lastModifiedAt: now,
       userRef: userRef,
-      playlistRef: playlistId,
+      repertoireRef: repertoireId,
       mode: "per_day",
       queueDate: windows.startTs.substring(0, 10), // YYYY-MM-DD
       windowStartUtc: windows.startTs,
@@ -362,7 +337,7 @@ export async function generateDailyPracticeQueue(
  *
  * @param db - SQLite database instance
  * @param userId - User UUID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param count - Number of backfill tunes to add
  * @param sitdownDate - Practice session date (defaults to now)
  * @returns Array of newly added queue entries
@@ -376,15 +351,12 @@ export async function generateDailyPracticeQueue(
 export async function refillPracticeQueue(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string, // UUID
+  repertoireId: string, // UUID
   count = 5,
   sitdownDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
-  // Map user UUID to integer ID
-  const userRef = await getUserProfileId(db, userId);
-  if (!userRef) {
-    throw new Error(`User profile not found for user: ${userId}`);
-  }
+  // userId is already user_profile.id (Supabase Auth UUID)
+  const userRef = userId;
 
   if (count <= 0) {
     return [];
@@ -399,7 +371,7 @@ export async function refillPracticeQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistId),
+        eq(dailyPracticeQueue.repertoireRef, repertoireId),
         eq(dailyPracticeQueue.windowStartUtc, windows.startTs),
         eq(dailyPracticeQueue.active, 1)
       )
@@ -416,15 +388,15 @@ export async function refillPracticeQueue(
   // Query for backfill candidates (tunes not in queue, scheduled before window floor)
   const backfillCandidates = await db
     .select({
-      tuneRef: playlistTune.tuneRef,
-      scheduled: playlistTune.current,
+      tuneRef: repertoireTune.tuneRef,
+      scheduled: repertoireTune.current,
     })
-    .from(playlistTune)
+    .from(repertoireTune)
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
-        eq(playlistTune.deleted, 0),
-        lt(playlistTune.current, windows.windowFloorUtc.toISOString())
+        eq(repertoireTune.repertoireRef, repertoireId),
+        eq(repertoireTune.deleted, 0),
+        lt(repertoireTune.current, windows.windowFloorUtc.toISOString())
       )
     )
     .limit(count + existingTuneIds.length); // Over-fetch to account for filtering
@@ -446,7 +418,7 @@ export async function refillPracticeQueue(
     id: generateId(), // Generate UUID for queue entry
     lastModifiedAt: now,
     userRef: userRef,
-    playlistRef: playlistId,
+    repertoireRef: repertoireId,
     mode: "per_day",
     queueDate: windows.startTs.substring(0, 10),
     windowStartUtc: windows.startTs,
@@ -485,21 +457,18 @@ export async function refillPracticeQueue(
  *
  * @param db - SQLite database instance
  * @param userId - User UUID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param windowStartUtc - Window start timestamp
  * @returns Object with bucket counts { 1: count, 2: count, 3: count }
  */
 export async function getQueueBucketCounts(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string, // UUID
+  repertoireId: string, // UUID
   windowStartUtc: string
 ): Promise<Record<number, number>> {
-  // Map user UUID to integer ID
-  const userRef = await getUserProfileId(db, userId);
-  if (!userRef) {
-    throw new Error(`User profile not found for user: ${userId}`);
-  }
+  // userId is already user_profile.id (Supabase Auth UUID)
+  const userRef = userId;
 
   const queue = await db
     .select({ bucket: dailyPracticeQueue.bucket })
@@ -507,7 +476,7 @@ export async function getQueueBucketCounts(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistId),
+        eq(dailyPracticeQueue.repertoireRef, repertoireId),
         eq(dailyPracticeQueue.windowStartUtc, windowStartUtc),
         eq(dailyPracticeQueue.active, 1)
       )

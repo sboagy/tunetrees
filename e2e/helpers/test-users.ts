@@ -10,14 +10,14 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
 const TEST_PASSWORD = "TestPassword123!";
 
 import {
-  TEST_PLAYLIST_ALICE_ID,
-  TEST_PLAYLIST_BOB_ID,
-  TEST_PLAYLIST_DAVE_ID,
-  TEST_PLAYLIST_EVE_ID,
-  TEST_PLAYLIST_FRANK_ID,
-  TEST_PLAYLIST_GRACE_ID,
-  TEST_PLAYLIST_HENRY_ID,
-  TEST_PLAYLIST_IRIS_ID,
+  TEST_REPERTOIRE_ALICE_ID,
+  TEST_REPERTOIRE_BOB_ID,
+  TEST_REPERTOIRE_DAVE_ID,
+  TEST_REPERTOIRE_EVE_ID,
+  TEST_REPERTOIRE_FRANK_ID,
+  TEST_REPERTOIRE_GRACE_ID,
+  TEST_REPERTOIRE_HENRY_ID,
+  TEST_REPERTOIRE_IRIS_ID,
   TEST_USER_ALICE_EMAIL,
   TEST_USER_ALICE_ID,
   TEST_USER_BOB_EMAIL,
@@ -40,7 +40,7 @@ export type TestUser = {
   email: string;
   name: string;
   userId: string;
-  playlistId: string;
+  repertoireId: string;
 };
 
 export const TEST_USERS: Record<string, TestUser> = {
@@ -48,49 +48,49 @@ export const TEST_USERS: Record<string, TestUser> = {
     email: TEST_USER_BOB_EMAIL,
     name: "Bob",
     userId: TEST_USER_BOB_ID,
-    playlistId: TEST_PLAYLIST_BOB_ID,
+    repertoireId: TEST_REPERTOIRE_BOB_ID,
   },
   alice: {
     email: TEST_USER_ALICE_EMAIL,
     name: "Alice",
     userId: TEST_USER_ALICE_ID,
-    playlistId: TEST_PLAYLIST_ALICE_ID,
+    repertoireId: TEST_REPERTOIRE_ALICE_ID,
   },
   dave: {
     email: TEST_USER_DAVE_EMAIL,
     name: "Dave",
     userId: TEST_USER_DAVE_ID,
-    playlistId: TEST_PLAYLIST_DAVE_ID,
+    repertoireId: TEST_REPERTOIRE_DAVE_ID,
   },
   eve: {
     email: TEST_USER_EVE_EMAIL,
     name: "Eve",
     userId: TEST_USER_EVE_ID,
-    playlistId: TEST_PLAYLIST_EVE_ID,
+    repertoireId: TEST_REPERTOIRE_EVE_ID,
   },
   frank: {
     email: TEST_USER_FRANK_EMAIL,
     name: "Frank",
     userId: TEST_USER_FRANK_ID,
-    playlistId: TEST_PLAYLIST_FRANK_ID,
+    repertoireId: TEST_REPERTOIRE_FRANK_ID,
   },
   grace: {
     email: TEST_USER_GRACE_EMAIL,
     name: "Grace",
     userId: TEST_USER_GRACE_ID,
-    playlistId: TEST_PLAYLIST_GRACE_ID,
+    repertoireId: TEST_REPERTOIRE_GRACE_ID,
   },
   henry: {
     email: TEST_USER_HENRY_EMAIL,
     name: "Henry",
     userId: TEST_USER_HENRY_ID,
-    playlistId: TEST_PLAYLIST_HENRY_ID,
+    repertoireId: TEST_REPERTOIRE_HENRY_ID,
   },
   iris: {
     email: TEST_USER_IRIS_EMAIL,
     name: "Iris",
     userId: TEST_USER_IRIS_ID,
-    playlistId: TEST_PLAYLIST_IRIS_ID,
+    repertoireId: TEST_REPERTOIRE_IRIS_ID,
   },
 };
 
@@ -102,13 +102,14 @@ const clientCache: Map<string, { supabase: SupabaseClient; userId: string }> =
  * Get authenticated Supabase client for a test user
  */
 export async function getTestUserClient(userKey: string) {
-  if (clientCache.has(userKey)) {
-    return clientCache.get(userKey)!;
-  }
-
   const user = TEST_USERS[userKey];
   if (!user) {
     throw new Error(`Unknown test user: ${userKey}`);
+  }
+
+  if (clientCache.has(userKey)) {
+    const cachedClient = clientCache.get(userKey)!;
+    return cachedClient;
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);

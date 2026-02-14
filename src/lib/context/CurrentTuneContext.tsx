@@ -7,7 +7,7 @@ import {
 } from "solid-js";
 
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useCurrentPlaylist } from "@/lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "@/lib/context/CurrentRepertoireContext";
 
 interface CurrentTuneContextValue {
   currentTuneId: () => string | null;
@@ -37,7 +37,7 @@ const CurrentTuneContext = createContext<CurrentTuneContextValue>();
  */
 export const CurrentTuneProvider: ParentComponent = (props) => {
   const { user } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
 
   const [currentTuneId, setCurrentTuneIdInternal] = createSignal<string | null>(
     null
@@ -47,14 +47,14 @@ export const CurrentTuneProvider: ParentComponent = (props) => {
     if (typeof window === "undefined") return null;
     const userId = user()?.id;
     if (!userId) return null;
-    const playlistId = currentPlaylistId();
-    // Scope tune selection to the active playlist when available.
-    return playlistId
-      ? `tunetrees:selectedTune:${userId}:${playlistId}`
+    const repertoireId = currentRepertoireId();
+    // Scope tune selection to the active repertoire when available.
+    return repertoireId
+      ? `tunetrees:selectedTune:${userId}:${repertoireId}`
       : `tunetrees:selectedTune:${userId}`;
   };
 
-  // Restore selection on refresh (and when user/playlist changes).
+  // Restore selection on refresh (and when user/repertoire changes).
   createEffect(() => {
     const key = storageKey();
     if (!key) {

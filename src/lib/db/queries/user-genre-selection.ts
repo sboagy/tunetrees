@@ -18,9 +18,9 @@ import {
   dailyPracticeQueue,
   genre,
   note,
-  playlistTune,
   practiceRecord,
   reference,
+  repertoireTune,
   tableTransientData,
   tag,
   tune,
@@ -157,35 +157,35 @@ export async function getRequiredGenreIdsForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<string[]> {
-  const [playlistDefaults, tuneGenres] = await Promise.all([
-    getPlaylistGenreDefaultsForUser(db, userId),
+  const [repertoireDefaults, tuneGenres] = await Promise.all([
+    getRepertoireGenreDefaultsForUser(db, userId),
     getRepertoireTuneGenreIdsForUser(db, userId),
   ]);
 
-  return Array.from(new Set([...playlistDefaults, ...tuneGenres]));
+  return Array.from(new Set([...repertoireDefaults, ...tuneGenres]));
 }
 
 /**
- * Get genre_default values from user playlists (repertoires).
+ * Get genre_default values from user repertoires (repertoires).
  */
-export async function getPlaylistGenreDefaultsForUser(
+export async function getRepertoireGenreDefaultsForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<string[]> {
   console.log(
-    `[getPlaylistGenreDefaultsForUser] Querying for userId=${userId}`
+    `[getRepertoireGenreDefaultsForUser] Querying for userId=${userId}`
   );
 
   const rows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT v.genre_default AS genre
-    FROM view_playlist_joined v
-    WHERE v.playlist_deleted = 0
+    FROM view_repertoire_joined v
+    WHERE v.repertoire_deleted = 0
       AND v.user_ref = ${userId}
       AND v.genre_default IS NOT NULL
   `);
 
   console.log(
-    `[getPlaylistGenreDefaultsForUser] Found ${rows.length} rows:`,
+    `[getRepertoireGenreDefaultsForUser] Found ${rows.length} rows:`,
     rows
   );
 
@@ -203,9 +203,9 @@ export async function getRepertoireTuneGenreIdsForUser(
 ): Promise<string[]> {
   const rows = await db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
-    FROM playlist_tune pt
-    JOIN playlist p
-      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    FROM repertoire_tune pt
+    JOIN repertoire p
+      ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
     JOIN tune t
       ON t.id = pt.tune_ref AND t.deleted = 0
     LEFT JOIN tune_override o
@@ -222,31 +222,31 @@ export async function getRepertoireTuneGenreIdsForUser(
 }
 
 /**
- * Get counts for user playlists and playlist_tune rows.
+ * Get counts for user repertoires and repertoire_tune rows.
  */
 export async function getUserRepertoireStats(
   db: SqliteDatabase,
   userId: string
-): Promise<{ playlistCount: number; playlistTuneCount: number }> {
-  const playlistRows = await db.all<{ count: number }>(sql`
+): Promise<{ repertoireCount: number; repertoireTuneCount: number }> {
+  const repertoireRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
-    FROM playlist p
+    FROM repertoire p
     WHERE p.deleted = 0
       AND p.user_ref = ${userId}
   `);
-  const playlistCount = Number(playlistRows?.[0]?.count ?? 0);
+  const repertoireCount = Number(repertoireRows?.[0]?.count ?? 0);
 
   const tuneRows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
-    FROM playlist_tune pt
-    JOIN playlist p
-      ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+    FROM repertoire_tune pt
+    JOIN repertoire p
+      ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
     WHERE pt.deleted = 0
       AND p.user_ref = ${userId}
   `);
-  const playlistTuneCount = Number(tuneRows?.[0]?.count ?? 0);
+  const repertoireTuneCount = Number(tuneRows?.[0]?.count ?? 0);
 
-  return { playlistCount, playlistTuneCount };
+  return { repertoireCount, repertoireTuneCount };
 }
 
 /**
@@ -274,9 +274,9 @@ export async function purgeLocalCatalogForGenres(
       AND COALESCE(o.genre, t.genre) IN (${sql.raw(genreList)})
       AND NOT EXISTS (
         SELECT 1
-        FROM playlist_tune pt
-        JOIN playlist p
-          ON p.playlist_id = pt.playlist_ref AND p.deleted = 0
+        FROM repertoire_tune pt
+        JOIN repertoire p
+          ON p.repertoire_id = pt.repertoire_ref AND p.deleted = 0
         WHERE pt.tune_ref = t.id
           AND pt.deleted = 0
           AND p.user_ref = ${userId}
@@ -303,7 +303,9 @@ export async function purgeLocalCatalogForGenres(
     await db
       .delete(tableTransientData)
       .where(inArray(tableTransientData.tuneId, tuneIds));
-    await db.delete(playlistTune).where(inArray(playlistTune.tuneRef, tuneIds));
+    await db
+      .delete(repertoireTune)
+      .where(inArray(repertoireTune.tuneRef, tuneIds));
     await db.delete(tuneOverride).where(inArray(tuneOverride.tuneRef, tuneIds));
     await db.delete(tune).where(inArray(tune.id, tuneIds));
   } finally {

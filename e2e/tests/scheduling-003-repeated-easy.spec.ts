@@ -60,17 +60,17 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
-    // Override playlist size for FSRS testing to ensure max_interval is large enough
-    // (Formula: 3 * (playlistSize / maxReviewsPerDay))
+    // Override repertoire size for FSRS testing to ensure max_interval is large enough
+    // (Formula: 3 * (repertoireSize / maxReviewsPerDay))
     await page.addInitScript(
       (config) => {
-        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = config.playlistSize;
+        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = config.repertoireSize;
         (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
         (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
           config.maxReviews;
       },
       {
-        playlistSize: REPERTOIRE_SIZE,
+        repertoireSize: REPERTOIRE_SIZE,
         enableFuzz: ENABLE_FUZZ,
         maxReviews: MAX_DAILY_TUNES,
       }
@@ -160,7 +160,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       await diagAuth(page, `day-${day}-after-syncup`);
 
       // Query latest practice record to get FSRS metrics
-      const playlistId = testUser.playlistId;
+      const repertoireId = testUser.repertoireId;
 
       // Debug snapshot: local queue date state vs current frozen date
       const queueDateDebug = await page.evaluate(() => ({
@@ -179,7 +179,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
             const maybe = await queryLatestPracticeRecord(
               page,
               TEST_TUNE_BANISH_ID,
-              playlistId
+              repertoireId
             );
             if (!maybe) {
               console.log(
@@ -202,7 +202,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       const record = await queryLatestPracticeRecord(
         page,
         TEST_TUNE_BANISH_ID,
-        playlistId
+        repertoireId
       );
       if (!record) {
         throw new Error("Practice record not found after Easy evaluation");
@@ -410,11 +410,11 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     await page.waitForTimeout(2000);
 
     // Check scheduled date
-    const playlistId = testUser.playlistId;
+    const repertoireId = testUser.repertoireId;
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
-      playlistId
+      repertoireId
     );
     if (!record)
       throw new Error("Practice record not found after Easy evaluation");

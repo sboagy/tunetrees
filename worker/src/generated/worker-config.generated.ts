@@ -22,11 +22,6 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "user_ref",
     },
-    playlistIds: {
-      table: "playlist",
-      idColumn: "playlist_id",
-      ownerColumn: "user_ref",
-    },
     pluginIds: {
       table: "plugin",
       idColumn: "id",
@@ -40,6 +35,11 @@ export const WORKER_SYNC_CONFIG = {
     referenceIds: {
       table: "reference",
       idColumn: "id",
+      ownerColumn: "user_ref",
+    },
+    repertoireIds: {
+      table: "repertoire",
+      idColumn: "repertoire_id",
       ownerColumn: "user_ref",
     },
     tabGroupMainStateIds: {
@@ -65,7 +65,7 @@ export const WORKER_SYNC_CONFIG = {
     userProfileIds: {
       table: "user_profile",
       idColumn: "id",
-      ownerColumn: "supabase_user_id",
+      ownerColumn: "id",
     },
   },
   pull: {
@@ -83,15 +83,6 @@ export const WORKER_SYNC_CONFIG = {
         functionName: "sync_get_user_notes",
         params: ["userId", "genreIds"],
       },
-      playlist: {
-        kind: "eqUserId",
-        column: "user_ref",
-      },
-      playlist_tune: {
-        kind: "inCollection",
-        column: "playlist_ref",
-        collection: "playlistIds",
-      },
       plugin: {
         kind: "orEqUserIdOrTrue",
         column: "user_ref",
@@ -99,8 +90,8 @@ export const WORKER_SYNC_CONFIG = {
       },
       practice_record: {
         kind: "inCollection",
-        column: "playlist_ref",
-        collection: "playlistIds",
+        column: "repertoire_ref",
+        collection: "repertoireIds",
       },
       prefs_scheduling_options: {
         kind: "eqUserId",
@@ -114,6 +105,15 @@ export const WORKER_SYNC_CONFIG = {
         kind: "rpc",
         functionName: "sync_get_user_references",
         params: ["userId", "genreIds"],
+      },
+      repertoire: {
+        kind: "eqUserId",
+        column: "user_ref",
+      },
+      repertoire_tune: {
+        kind: "inCollection",
+        column: "repertoire_ref",
+        collection: "repertoireIds",
       },
       tab_group_main_state: {
         kind: "eqUserId",
@@ -166,7 +166,7 @@ export const WORKER_SYNC_CONFIG = {
       },
       user_profile: {
         kind: "eqUserId",
-        column: "supabase_user_id",
+        column: "id",
       },
     },
   },
@@ -230,26 +230,6 @@ export const WORKER_SYNC_CONFIG = {
               prop: "displayOrder",
               kind: "int",
             },
-            {
-              prop: "syncVersion",
-              kind: "int",
-            },
-          ],
-        },
-      },
-      playlist: {
-        sanitize: {
-          coerceNumericProps: [
-            {
-              prop: "syncVersion",
-              kind: "int",
-            },
-          ],
-        },
-      },
-      playlist_tune: {
-        sanitize: {
-          coerceNumericProps: [
             {
               prop: "syncVersion",
               kind: "int",
@@ -332,7 +312,7 @@ export const WORKER_SYNC_CONFIG = {
           omitSetProps: ["id"],
           retryMinimalPayloadKeepProps: [
             "id",
-            "playlistRef",
+            "repertoireRef",
             "tuneRef",
             "practiced",
             "quality",
@@ -399,6 +379,26 @@ export const WORKER_SYNC_CONFIG = {
               prop: "displayOrder",
               kind: "int",
             },
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      repertoire: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      repertoire_tune: {
+        sanitize: {
+          coerceNumericProps: [
             {
               prop: "syncVersion",
               kind: "int",
