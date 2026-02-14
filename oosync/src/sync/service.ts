@@ -536,7 +536,9 @@ export class SyncService {
               (e) =>
                 e.includes("Failed to fetch") ||
                 e.includes("ERR_INTERNET_DISCONNECTED") ||
-                e.includes("NetworkError")
+                e.includes("NetworkError") ||
+                e.includes("Timed out while waiting for an open slot in the pool") ||
+                e.includes("Sync failed: 503")
             );
 
             if (result.success) {
@@ -603,7 +605,9 @@ export class SyncService {
         const isNetworkError =
           errorMsg.includes("Failed to fetch") ||
           errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
-          errorMsg.includes("NetworkError");
+          errorMsg.includes("NetworkError") ||
+          errorMsg.includes("Timed out while waiting for an open slot in the pool") ||
+          errorMsg.includes("Sync failed: 503");
 
         if (!isNetworkError) {
           toast.error(

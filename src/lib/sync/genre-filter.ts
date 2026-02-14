@@ -24,7 +24,9 @@ function isNetworkSyncError(error: unknown): boolean {
   return (
     message.includes("Failed to fetch") ||
     message.includes("ERR_INTERNET_DISCONNECTED") ||
-    message.includes("NetworkError")
+    message.includes("NetworkError") ||
+    message.includes("Timed out while waiting for an open slot in the pool") ||
+    message.includes("Sync failed: 503")
   );
 }
 
