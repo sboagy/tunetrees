@@ -154,7 +154,9 @@ export const PlaylistSelectorModal: Component<PlaylistSelectorModalProps> = (
                         </div>
                       </div>
                       <Show
-                        when={selectedPlaylistId() === playlistItem.repertoireId}
+                        when={
+                          selectedPlaylistId() === playlistItem.repertoireId
+                        }
                       >
                         <svg
                           class="h-5 w-5 text-blue-500 dark:text-blue-400"

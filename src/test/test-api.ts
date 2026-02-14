@@ -16,10 +16,10 @@ import {
 import {
   dailyPracticeQueue,
   note,
-  repertoireTune,
   plugin,
   practiceRecord,
   reference,
+  repertoireTune,
 } from "@/lib/db/schema";
 import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";

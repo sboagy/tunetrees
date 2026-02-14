@@ -580,8 +580,7 @@ const PlaylistDropdown: Component<{
       loading,
       count: playlistsList?.length || 0,
       playlists:
-        playlistsList?.map((p) => ({ id: p.repertoireId, name: p.name })) ||
-        [],
+        playlistsList?.map((p) => ({ id: p.repertoireId, name: p.name })) || [],
     });
   });
 
