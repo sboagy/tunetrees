@@ -11,8 +11,8 @@
 export * from "../../../drizzle/schema-sqlite";
 
 import {
-  repertoire as playlist,
-  repertoireTune as playlistTune,
+  repertoire as repertoire,
+  repertoireTune as repertoireTune,
 } from "../../../drizzle/schema-sqlite";
 
-export { playlist, playlistTune };
+export { repertoire, repertoireTune };

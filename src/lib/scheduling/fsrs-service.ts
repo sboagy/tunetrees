@@ -78,16 +78,16 @@ const TECHNIQUE_MODIFIERS = {
  */
 export class FSRSService implements SchedulingService {
   private scheduler: ReturnType<typeof fsrs>;
-  private playlistTuneCount: number | null = null; // populated asynchronously
+  private repertoireTuneCount: number | null = null; // populated asynchronously
   /** Accessor for tune count (may be null if not yet loaded) */
-  getPlaylistTuneCountCached(): number | null {
-    return this.playlistTuneCount;
+  getRepertoireTuneCountCached(): number | null {
+    return this.repertoireTuneCount;
   }
 
   constructor(
     prefs: PrefsSpacedRepetition,
     scheduling: IUserSchedulingOptions,
-    options?: { playlistTuneCount?: number | null }
+    options?: { repertoireTuneCount?: number | null }
   ) {
     // Parse FSRS weights from JSON string (stored in database)
     const weights = prefs.fsrsWeights
@@ -102,7 +102,7 @@ export class FSRSService implements SchedulingService {
       ? (JSON.parse(prefs.relearningSteps) as number[]).map((m) => `${m}m`)
       : ["10m"];
 
-    this.playlistTuneCount = options?.playlistTuneCount ?? null;
+    this.repertoireTuneCount = options?.repertoireTuneCount ?? null;
 
     const maxReviewsPerDay =
       scheduling.maxReviewsPerDay && scheduling.maxReviewsPerDay > 0
@@ -112,11 +112,11 @@ export class FSRSService implements SchedulingService {
     // Allow test override via window property
     const tuneCountOverride =
       typeof window !== "undefined"
-        ? (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__
+        ? (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__
         : undefined;
 
     /**
-     * Calculate effective playlist size with bounds for maximum interval calculation.
+     * Calculate effective repertoire size with bounds for maximum interval calculation.
      *
      * RATIONALE:
      * The maximum interval is calculated to ensure ongoing rotation of the user's
@@ -140,10 +140,10 @@ export class FSRSService implements SchedulingService {
      * FORMULA: max_interval = 3 * (effective_tunes / reviews_per_day)
      * This gives roughly 3 full rotations of the repertoire before hitting the cap.
      */
-    const rawPlaylistTuneCount =
-      tuneCountOverride ?? this.playlistTuneCount ?? 400;
-    const effectivePlaylistTuneCount: number = Math.min(
-      Math.max(rawPlaylistTuneCount, 50),
+    const rawRepertoireTuneCount =
+      tuneCountOverride ?? this.repertoireTuneCount ?? 400;
+    const effectiveRepertoireTuneCount: number = Math.min(
+      Math.max(rawRepertoireTuneCount, 50),
       400
     );
 
@@ -154,7 +154,7 @@ export class FSRSService implements SchedulingService {
     const effectiveMaxReviews = testMaxReviewsOverride ?? maxReviewsPerDay;
 
     const calculatedMaxInterval = Math.round(
-      3 * (effectivePlaylistTuneCount / effectiveMaxReviews)
+      3 * (effectiveRepertoireTuneCount / effectiveMaxReviews)
     );
 
     const testRequestRetentionOverride =
@@ -169,7 +169,7 @@ export class FSRSService implements SchedulingService {
 
     if (typeof window !== "undefined") {
       console.log("[FSRSService] Initializing with overrides:", {
-        effectivePlaylistTuneCount,
+        effectiveRepertoireTuneCount,
         effectiveMaxReviews,
         calculatedMaxInterval,
         testRequestRetentionOverride,
@@ -337,19 +337,19 @@ export class FSRSService implements SchedulingService {
    *
    * @param input - Practice session input
    * @param schedule - Next review schedule from FSRS
-   * @param playlistRef - Playlist reference ID
+   * @param repertoireRef - Repertoire reference ID
    * @returns New practice record ready for database insertion
    */
   createPracticeRecord(
     input: RecordPracticeInput,
     schedule: NextReviewSchedule,
-    playlistRef: string
+    repertoireRef: string
   ): NewPracticeRecord {
     return {
       id: generateId(),
       lastModifiedAt: new Date().toISOString(),
       tuneRef: input.tuneRef,
-      repertoireRef: playlistRef,
+      repertoireRef: repertoireRef,
       practiced: input.practiced.toISOString(),
       quality: input.quality,
       easiness: 2.5, // Legacy field (not used in FSRS but kept for compatibility)
@@ -428,7 +428,7 @@ export class FSRSService implements SchedulingService {
 export function createFSRSService(
   prefs: PrefsSpacedRepetition,
   scheduling: IUserSchedulingOptions,
-  options?: { playlistTuneCount?: number | null }
+  options?: { repertoireTuneCount?: number | null }
 ): FSRSService {
   return new FSRSService(prefs, scheduling, options);
 }
@@ -439,21 +439,21 @@ export function createFSRSService(
  * Excludes deleted repertoire_tune rows.
  *
  * @param db Local SQLite database instance
- * @param playlistRef Playlist UUID
+ * @param repertoireRef Repertoire UUID
  * @returns Number of tunes in the user's repertoire
  */
-export async function getPlaylistTuneCount(
+export async function getRepertoireTuneCount(
   db: SqliteDatabase,
-  playlistRef: string
+  repertoireRef: string
 ): Promise<number> {
   const rows = await db.all<{ cnt: number }>(sql`
     SELECT COUNT(*) AS cnt
     FROM repertoire_tune pt
-    WHERE pt.repertoire_ref = ${playlistRef}
+    WHERE pt.repertoire_ref = ${repertoireRef}
       AND (pt.deleted IS NULL OR pt.deleted = 0)
   `);
   return rows[0]?.cnt ?? 0;
 }
 
 // Example usage:
-// const tuneCount = await getPlaylistTuneCount(localDb(), currentPlaylistId()!);
+// const tuneCount = await getRepertoireTuneCount(localDb(), currentRepertoireId()!);

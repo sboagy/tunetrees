@@ -53,13 +53,13 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       name: "Count Practice Records",
       sql: "SELECT COUNT(*) as count FROM practice_record;",
     },
-    { name: "Count Playlists", sql: "SELECT COUNT(*) as count FROM playlist;" },
+    { name: "Count Repertoires", sql: "SELECT COUNT(*) as count FROM repertoire;" },
     {
       name: "Recent Practice Records",
       sql: "SELECT * FROM practice_record ORDER BY id DESC LIMIT 10;",
     },
     { name: "All Tunes", sql: "SELECT * FROM tune ORDER BY title LIMIT 100;" },
-    { name: "Playlists", sql: "SELECT * FROM playlist;" },
+    { name: "Repertoires", sql: "SELECT * FROM repertoire;" },
     {
       name: "Daily Practice Queue",
       sql: "SELECT * FROM daily_practice_queue ORDER BY queue_date DESC LIMIT 20;",
@@ -89,8 +89,8 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       sql: "SELECT * FROM practice_list_staged LIMIT 50;",
     },
     {
-      name: "Playlist (Joined)",
-      sql: "SELECT * FROM view_playlist_joined LIMIT 50;",
+      name: "Repertoire (Joined)",
+      sql: "SELECT * FROM view_repertoire_joined LIMIT 50;",
     },
     {
       name: "Sync Push Queue (All)",

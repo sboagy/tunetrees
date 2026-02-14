@@ -75,7 +75,7 @@ console.log({
 export async function stagePracticeEvaluation(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   evaluation: string,  // "again" | "hard" | "good" | "easy"
   goal: string,
@@ -97,14 +97,14 @@ export async function stagePracticeEvaluation(
 export async function commitStagedEvaluations(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   windowStartUtc?: string
 ): Promise<{ success: boolean; count: number }>
 ```
 
 1. Read staged evaluations from `table_transient_data`
 2. Create `practice_record` for each
-3. Update `playlist_tune.current` (next due date)
+3. Update `repertoire_tune.current` (next due date)
 4. Mark queue items as completed
 5. Clear staging data
 
@@ -117,7 +117,7 @@ Immutable history of all practice events:
 ```sql
 CREATE TABLE practice_record (
   id TEXT PRIMARY KEY,
-  playlist_ref TEXT NOT NULL,
+  repertoire_ref TEXT NOT NULL,
   tune_ref TEXT NOT NULL,
   practiced TEXT NOT NULL,     -- ISO timestamp
   quality INTEGER NOT NULL,    -- 1-4 rating
@@ -132,22 +132,22 @@ CREATE TABLE practice_record (
   lapses INTEGER,              -- forget count
   goal TEXT,                   -- "recall", "fluency"
   technique TEXT,              -- practice technique
-  UNIQUE(tune_ref, playlist_ref, practiced)
+  UNIQUE(tune_ref, repertoire_ref, practiced)
 );
 ```
 
-### playlist_tune
+### repertoire_tune
 
 Current scheduling state:
 
 ```sql
-CREATE TABLE playlist_tune (
-  playlist_ref TEXT NOT NULL,
+CREATE TABLE repertoire_tune (
+  repertoire_ref TEXT NOT NULL,
   tune_ref TEXT NOT NULL,
   scheduled TEXT,              -- next scheduled review
   current TEXT,                -- calculated due date
   learned TEXT,                -- when marked as learned
-  PRIMARY KEY (playlist_ref, tune_ref)
+  PRIMARY KEY (repertoire_ref, tune_ref)
 );
 ```
 
@@ -159,7 +159,7 @@ Frozen daily snapshot:
 CREATE TABLE daily_practice_queue (
   id TEXT PRIMARY KEY,
   user_ref TEXT NOT NULL,
-  playlist_ref TEXT NOT NULL,
+  repertoire_ref TEXT NOT NULL,
   tune_ref TEXT NOT NULL,
   bucket INTEGER NOT NULL,         -- 1=Due, 2=Lapsed, 3=Backfill
   order_index INTEGER NOT NULL,    -- ordering within bucket
@@ -169,7 +169,7 @@ CREATE TABLE daily_practice_queue (
   snapshot_coalesced_ts TEXT,
   scheduled_snapshot TEXT,
   latest_due_snapshot TEXT,
-  UNIQUE(user_ref, playlist_ref, window_start_utc, tune_ref)
+  UNIQUE(user_ref, repertoire_ref, window_start_utc, tune_ref)
 );
 ```
 
@@ -189,7 +189,7 @@ CREATE TABLE daily_practice_queue (
 ### Algorithm
 
 ```typescript
-function generateQueue(userId, playlistId, date):
+function generateQueue(userId, repertoireId, date):
   1. Compute scheduling windows (startTs, endTs, windowFloorTs)
   2. Check if queue exists for today → return if found
   3. Query practice_list_staged VIEW for each bucket
@@ -201,7 +201,7 @@ function generateQueue(userId, playlistId, date):
 ### Queue Stability
 
 The queue is frozen for the entire day:
-- New practice events update `practice_record` and `playlist_tune.scheduled`
+- New practice events update `practice_record` and `repertoire_tune.scheduled`
 - But `daily_practice_queue` ordering doesn't change
 - Completed items marked with `completed_at`
 
@@ -228,7 +228,7 @@ commitStagedEvaluations()
        ↓
 Create practice_record
        ↓
-Update playlist_tune.current
+Update repertoire_tune.current
        ↓
 Mark queue item completed
        ↓
@@ -239,7 +239,7 @@ Clear staging data
 
 The `practice_list_staged` VIEW merges:
 - Tune metadata
-- Playlist association
+- Repertoire association
 - Latest practice_record
 - Staged evaluation (if any)
 
@@ -250,7 +250,7 @@ This allows the UI to show real-time previews before commit.
 SM2 algorithm available as alternative:
 
 ```typescript
-// playlist.sr_alg_type = "sm2"
+// repertoire.sr_alg_type = "sm2"
 ```
 
 Uses classic SuperMemo 2 algorithm with EF (easiness factor).
@@ -282,7 +282,7 @@ function createScheduler({ fsrsScheduler, queryDb }) {
 ```
 
 **Payload:**
-- `input`: `{ playlistRef, tuneRef, quality, practiced, goal, technique }`
+- `input`: `{ repertoireRef, tuneRef, quality, practiced, goal, technique }`
 - `prior`: latest `practice_record` row or `null`
 - `preferences`: user FSRS preferences
 - `scheduling`: user scheduling options
@@ -296,7 +296,7 @@ host normalizes). Use `payload.fallback` as a template.
 - `fsrsScheduler`: full FSRS scheduler interface, callable from plugins for
        fallback results.
 - `queryDb(sql)`: read-only SQL access with a 500-row limit and table allowlist.
-       Allowed tables: `practice_record`, `playlist_tune`, `daily_practice_queue`,
+       Allowed tables: `practice_record`, `repertoire_tune`, `daily_practice_queue`,
        `user_profile`, `prefs_scheduling_options`, `prefs_spaced_repetition`.
 
 ### Serialized Schedule Shape

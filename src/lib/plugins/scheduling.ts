@@ -72,7 +72,7 @@ export function serializeSchedule(
 const QUERY_LIMIT = 500;
 const ALLOWED_TABLES = new Set([
   "practice_record",
-  "playlist_tune",
+  "repertoire_tune",
   "daily_practice_queue",
   "user_profile",
   "prefs_scheduling_options",
@@ -149,15 +149,15 @@ function parsePracticeInput(raw: Record<string, unknown>): RecordPracticeInput {
     throw new Error("Invalid practiced date");
   }
 
-  const playlistRef = String(raw.playlistRef ?? "");
+  const repertoireRef = String(raw.repertoireRef ?? "");
   const tuneRef = String(raw.tuneRef ?? "");
   const quality = Number(raw.quality ?? 0);
-  if (!playlistRef || !tuneRef || !Number.isFinite(quality)) {
+  if (!repertoireRef || !tuneRef || !Number.isFinite(quality)) {
     throw new Error("Missing required practice input fields");
   }
 
   return {
-    playlistRef,
+    repertoireRef,
     tuneRef,
     quality,
     practiced,
@@ -196,7 +196,7 @@ export class PluginSchedulingService implements SchedulingService {
     db: SqliteDatabase;
     preferences: PrefsSpacedRepetition;
     scheduling: IUserSchedulingOptions;
-    playlistTuneCount?: number | null;
+    repertoireTuneCount?: number | null;
   };
 
   constructor(params: {
@@ -204,13 +204,13 @@ export class PluginSchedulingService implements SchedulingService {
     db: SqliteDatabase;
     preferences: PrefsSpacedRepetition;
     scheduling: IUserSchedulingOptions;
-    playlistTuneCount?: number | null;
+    repertoireTuneCount?: number | null;
   }) {
     this.params = params;
     this.fallbackScheduler = new FSRSService(
       params.preferences,
       params.scheduling,
-      { playlistTuneCount: params.playlistTuneCount ?? null }
+      { repertoireTuneCount: params.repertoireTuneCount ?? null }
     );
   }
 
@@ -226,7 +226,7 @@ export class PluginSchedulingService implements SchedulingService {
       scheduling: this.params.scheduling,
       fallback,
       db: this.params.db,
-      playlistTuneCount: this.params.playlistTuneCount,
+      repertoireTuneCount: this.params.repertoireTuneCount,
     });
     return override ?? fallback;
   }
@@ -247,7 +247,7 @@ export class PluginSchedulingService implements SchedulingService {
       scheduling: this.params.scheduling,
       fallback,
       db: this.params.db,
-      playlistTuneCount: this.params.playlistTuneCount,
+      repertoireTuneCount: this.params.repertoireTuneCount,
     });
     return override ?? fallback;
   }
@@ -311,14 +311,14 @@ export async function applySchedulingPlugin(params: {
   scheduling: IUserSchedulingOptions | null;
   fallback: NextReviewSchedule;
   db: SqliteDatabase;
-  playlistTuneCount?: number | null;
+  repertoireTuneCount?: number | null;
 }): Promise<NextReviewSchedule | null> {
   if (!params.preferences || !params.scheduling) {
     return null;
   }
 
   const fsrsService = new FSRSService(params.preferences, params.scheduling, {
-    playlistTuneCount: params.playlistTuneCount ?? null,
+    repertoireTuneCount: params.repertoireTuneCount ?? null,
   });
   const fsrsSchedulerBridge = {
     processFirstReview: async (payload: unknown) => {
@@ -338,7 +338,7 @@ export async function applySchedulingPlugin(params: {
 
   const payload: SchedulingPluginPayload = {
     input: {
-      playlistRef: params.input.playlistRef,
+      repertoireRef: params.input.repertoireRef,
       tuneRef: params.input.tuneRef,
       quality: params.input.quality,
       practiced: params.input.practiced.toISOString(),

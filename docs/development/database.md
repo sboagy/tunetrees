@@ -44,8 +44,8 @@ export const tune = sqliteTable("tune", {
 
 Key tables:
 - `tune` - Tune metadata
-- `playlist` - User playlists
-- `playlist_tune` - Tunes in playlists
+- `repertoire` - User repertoires
+- `repertoire_tune` - Tunes in repertoires
 - `practice_record` - Practice history (no deletes)
 - `daily_practice_queue` - Daily practice snapshot
 - `table_transient_data` - Staging for uncommitted evaluations
@@ -90,8 +90,8 @@ Key differences:
 Each table has policies ensuring users only access their data:
 
 ```sql
-CREATE POLICY "Users can only see their own playlists"
-ON playlist FOR SELECT
+CREATE POLICY "Users can only see their own repertoires"
+ON repertoire FOR SELECT
 USING (user_ref = auth.uid());
 ```
 
@@ -124,8 +124,8 @@ USING (user_ref = auth.uid());
 Local (camelCase) ↔ Remote (snake_case):
 
 ```
-Local:  playlistRef, lastModifiedAt
-Remote: playlist_ref, last_modified_at
+Local:  repertoireRef, lastModifiedAt
+Remote: repertoire_ref, last_modified_at
 ```
 
 Handled by `transformLocalToRemote()` and `transformRemoteToLocal()`.

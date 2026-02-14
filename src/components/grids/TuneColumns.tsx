@@ -541,7 +541,7 @@ export function getRepertoireColumns(
       ),
       cell: (info) => {
         // Scheduling override semantics:
-        // - `playlist_tune.scheduled` is a transient, manual override of the FSRS-derived next due date.
+        // - `repertoire_tune.scheduled` is a transient, manual override of the FSRS-derived next due date.
         // - While an evaluation is STAGED (present in `table_transient_data` / practice_list_staged view),
         //   we intentionally IGNORE any existing override and display the newly computed `latest_due`.
         // - Upon COMMIT (see `commitStagedEvaluations` in `practice-recording.ts`), the override column

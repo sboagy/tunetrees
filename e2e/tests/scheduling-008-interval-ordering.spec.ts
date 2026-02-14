@@ -142,26 +142,26 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         const cascade: {
           table: string;
           column: string;
-          filterPlaylist?: boolean;
+          filterRepertoire?: boolean;
         }[] = [
           {
             table: "repertoire_tune",
             column: "tune_ref",
-            filterPlaylist: true,
+            filterRepertoire: true,
           },
           {
             table: "practice_record",
             column: "tune_ref",
-            filterPlaylist: true,
+            filterRepertoire: true,
           },
           {
             table: "daily_practice_queue",
             column: "tune_ref",
-            filterPlaylist: true,
+            filterRepertoire: true,
           },
           { table: "tune_override", column: "tune_ref" },
         ];
-        for (const { table, column, filterPlaylist } of cascade) {
+        for (const { table, column, filterRepertoire } of cascade) {
           if (table === "practice_record") {
             const { error: delErr } = await supabase.rpc(
               "e2e_delete_practice_record_by_tunes",
@@ -178,7 +178,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
             continue;
           }
           let del = supabase.from(table).delete().in(column, uniqueIds);
-          if (filterPlaylist)
+          if (filterRepertoire)
             del = del.eq("repertoire_ref", testUser.repertoireId);
           const { error: delErr } = await del;
           if (delErr) {

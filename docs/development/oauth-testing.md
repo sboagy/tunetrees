@@ -26,7 +26,7 @@ Before testing OAuth, ensure:
 6. Verify user is logged in (email appears in TopNav)
 7. Verify initial sync completes (database status shows "Synced")
 8. Navigate to Repertoire page
-9. Verify can create playlist
+9. Verify can create repertoire
 10. Sign out
 
 **Expected Results**:
@@ -36,7 +36,7 @@ Before testing OAuth, ensure:
 - ✅ Final redirect to http://localhost:5173/practice or /repertoire
 - ✅ User email visible in TopNav
 - ✅ Database syncs within 5 seconds
-- ✅ Can create and view playlists
+- ✅ Can create and view repertoires
 - ✅ User record created in Supabase auth.users table
 
 **Common Issues**:
@@ -82,12 +82,12 @@ Before testing OAuth, ensure:
 5. Click "Continue with Google"
 6. Google should auto-sign in (or require brief re-auth)
 7. Verify redirect to app
-8. Verify user data persisted (playlists still exist)
+8. Verify user data persisted (repertoires still exist)
 
 **Expected Results**:
 - ✅ OAuth completes faster (cached authorization)
 - ✅ User data loaded from Supabase
-- ✅ Previous playlists/tunes visible
+- ✅ Previous repertoires/tunes visible
 - ✅ Practice history preserved
 
 ---
@@ -99,7 +99,7 @@ Before testing OAuth, ensure:
 **Steps**:
 1. Navigate to http://localhost:5173/login
 2. Click "Use on this Device Only" (anonymous mode)
-3. Create a playlist with some tunes
+3. Create a repertoire with some tunes
 4. Add practice records
 5. Click "Create Account" banner
 6. Click "Continue with Google"
@@ -109,7 +109,7 @@ Before testing OAuth, ensure:
 **Expected Results**:
 - ✅ Anonymous user can complete OAuth
 - ✅ User ID preserved (UUID stays same)
-- ✅ Local playlists/tunes sync to cloud
+- ✅ Local repertoires/tunes sync to cloud
 - ✅ Practice history preserved
 - ✅ User can now sign in from other devices
 

@@ -121,7 +121,7 @@ User rates tune → FSRS calculates → Next review date stored
 
 Key tables:
 - `practice_record` - Historical practice events (immutable)
-- `playlist_tune` - Current scheduling state
+- `repertoire_tune` - Current scheduling state
 - `daily_practice_queue` - Frozen daily snapshot
 
 ## Security

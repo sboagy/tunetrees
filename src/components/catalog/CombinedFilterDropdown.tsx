@@ -1,7 +1,7 @@
 /**
  * Combined Filter Dropdown Component
  *
- * Single dropdown panel that combines Type, Mode, Genre, and Playlist filters.
+ * Single dropdown panel that combines Type, Mode, Genre, and Repertoire filters.
  * Responsive design: 4 columns on desktop, 2 columns on tablet, 1 column on mobile.
  * Matches the design shown in the user's screenshot with upside-down caret.
  *
@@ -9,18 +9,20 @@
  */
 
 import { type Component, createSignal, For, onCleanup, Show } from "solid-js";
-import type { PlaylistWithSummary } from "../../lib/db/types";
+import type { RepertoireWithSummary } from "../../lib/db/queries/repertoires";
 
-// Helper function to get display name for a playlist
-const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
+// Helper function to get display name for a repertoire
+const getRepertoireDisplayName = (
+  repertoire: RepertoireWithSummary
+): string => {
   // If name exists and is not empty, use it
-  if (playlist.name?.trim()) {
-    return playlist.name.trim();
+  if (repertoire.name?.trim()) {
+    return repertoire.name.trim();
   }
 
   // Otherwise use instrument + id format
-  const instrument = playlist.instrumentName || "Unknown";
-  return `${instrument} (${playlist.repertoireId})`;
+  const instrument = repertoire.instrumentName || "Unknown";
+  return `${instrument} (${repertoire.repertoireId})`;
 };
 
 export interface CombinedFilterDropdownProps {
@@ -42,12 +44,12 @@ export interface CombinedFilterDropdownProps {
   selectedGenres: string[];
   /** Genres change handler */
   onGenresChange: (genres: string[]) => void;
-  /** Available playlists */
-  availablePlaylists: PlaylistWithSummary[];
-  /** Selected playlist IDs */
-  selectedPlaylistIds: string[];
-  /** Playlist IDs change handler */
-  onPlaylistIdsChange: (playlistIds: string[]) => void;
+  /** Available repertoires */
+  availableRepertoires: RepertoireWithSummary[];
+  /** Selected repertoire IDs */
+  selectedRepertoireIds: string[];
+  /** Repertoire IDs change handler */
+  onRepertoireIdsChange: (repertoireIds: string[]) => void;
 }
 
 export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
@@ -58,8 +60,8 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
 
   // Debug logging
   console.log(
-    "CombinedFilterDropdown render - availablePlaylists:",
-    props.availablePlaylists?.length || 0
+    "CombinedFilterDropdown render - availableRepertoires:",
+    props.availableRepertoires.length || 0
   );
   console.log(
     "CombinedFilterDropdown render - availableGenres:",
@@ -71,7 +73,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
     props.selectedTypes.length +
     props.selectedModes.length +
     props.selectedGenres.length +
-    props.selectedPlaylistIds.length;
+    props.selectedRepertoireIds.length;
 
   // Handle click outside to close
   const handleClickOutside = (event: MouseEvent) => {
@@ -108,7 +110,7 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
     props.onTypesChange([]);
     props.onModesChange([]);
     props.onGenresChange([]);
-    props.onPlaylistIdsChange([]);
+    props.onRepertoireIdsChange([]);
   };
 
   return (
@@ -267,42 +269,44 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                 </div>
               </div>
 
-              {/* Playlist column */}
+              {/* Repertoire column */}
               <div>
                 <h4 class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Playlist ({props.selectedPlaylistIds.length} selected)
+                  Repertoire ({props.selectedRepertoireIds.length} selected)
                 </h4>
                 <div class="space-y-2 max-h-32 sm:max-h-36 overflow-y-auto">
                   <Show
-                    when={props.availablePlaylists.length > 0}
+                    when={props.availableRepertoires.length > 0}
                     fallback={
                       <span class="text-xs text-gray-500 dark:text-gray-400 italic px-2">
-                        No playlists available
+                        No repertoires available
                       </span>
                     }
                   >
-                    <For each={props.availablePlaylists}>
-                      {(playlist) => (
+                    <For each={props.availableRepertoires}>
+                      {(repertoire) => (
                         <label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 px-2 py-2 rounded touch-manipulation">
                           <input
                             type="checkbox"
-                            checked={props.selectedPlaylistIds.includes(
-                              playlist.repertoireId
+                            checked={props.selectedRepertoireIds.includes(
+                              repertoire.repertoireId
                             )}
                             onChange={() => {
-                              const playlistId = playlist.repertoireId;
+                              const repertoireId = repertoire.repertoireId;
                               if (
-                                props.selectedPlaylistIds.includes(playlistId)
+                                props.selectedRepertoireIds.includes(
+                                  repertoireId
+                                )
                               ) {
-                                props.onPlaylistIdsChange(
-                                  props.selectedPlaylistIds.filter(
-                                    (id) => id !== playlistId
+                                props.onRepertoireIdsChange(
+                                  props.selectedRepertoireIds.filter(
+                                    (id) => id !== repertoireId
                                   )
                                 );
                               } else {
-                                props.onPlaylistIdsChange([
-                                  ...props.selectedPlaylistIds,
-                                  playlistId,
+                                props.onRepertoireIdsChange([
+                                  ...props.selectedRepertoireIds,
+                                  repertoireId,
                                 ]);
                               }
                             }}
@@ -310,9 +314,9 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
                           />
                           <span
                             class="text-gray-900 dark:text-white"
-                            title={`${playlist.tuneCount} tunes`}
+                            title={`${repertoire.tuneCount} tunes`}
                           >
-                            {getPlaylistDisplayName(playlist)}
+                            {getRepertoireDisplayName(repertoire)}
                           </span>
                         </label>
                       )}

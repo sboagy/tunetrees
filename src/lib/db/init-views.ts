@@ -5,7 +5,7 @@
  * These views aggregate data from multiple tables for efficient querying.
  *
  * Views created:
- * 1. view_playlist_joined - Playlists with instrument info
+ * 1. view_repertoire_joined - Repertoires with instrument info
  * 2. practice_list_joined - Tunes with practice records and metadata
  * 3. practice_list_staged - Extended practice view with transient data
  *
@@ -20,19 +20,19 @@
 import type { SqliteDatabase } from "./client-sqlite";
 
 /**
- * View 1: Playlist with Instrument Information
+ * View 1: Repertoire with Instrument Information
  *
- * Joins playlists with their instrument details.
- * Used for playlist selection and display.
+ * Joins repertoires with their instrument details.
+ * Used for repertoire selection and display.
  */
-const VIEW_PLAYLIST_JOINED = /* sql */ `
-CREATE VIEW IF NOT EXISTS view_playlist_joined AS
+const VIEW_REPERTOIRE_JOINED = /* sql */ `
+CREATE VIEW IF NOT EXISTS view_repertoire_joined AS
 SELECT
-  p.repertoire_id AS playlist_id,
+  p.repertoire_id AS repertoire_id,
   p.user_ref,
-  p.deleted AS playlist_deleted,
+  p.deleted AS repertoire_deleted,
   p.instrument_ref,
-  p.genre_default AS playlist_genre_default,
+  p.genre_default AS repertoire_genre_default,
   i.private_to_user,
   i.instrument,
   i.description,
@@ -91,7 +91,7 @@ SELECT
   ) AS tags,
   repertoire_tune.repertoire_ref,
   repertoire.user_ref,
-  repertoire_tune.deleted AS playlist_deleted,
+  repertoire_tune.deleted AS repertoire_deleted,
   (
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note
@@ -165,7 +165,7 @@ SELECT
   repertoire.user_ref,
   repertoire.repertoire_id,
   instrument.instrument,
-  repertoire_tune.deleted AS playlist_deleted,
+  repertoire_tune.deleted AS repertoire_deleted,
   COALESCE(td.state, pr.state) AS latest_state,
   COALESCE(td.practiced, pr.practiced) AS latest_practiced,
   COALESCE(td.quality, pr.quality) AS latest_quality,
@@ -250,13 +250,13 @@ WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user
 /**
  * View 4: Daily Practice Queue with Human-Readable Names
  *
- * Joins daily_practice_queue with user, playlist, and tune information
+ * Joins daily_practice_queue with user, repertoire, and tune information
  * to show readable names instead of UUIDs. Useful for debugging in SQLite browser.
  *
  * Columns:
  * - queue_id: Queue row UUID
  * - user_name: User email/name
- * - playlist_instrument: Instrument name
+ * - repertoire_instrument: Instrument name
  * - tune_title: Tune title
  * - queue_date: Practice date (YYYY-MM-DD)
  * - window_start_utc: Queue window start timestamp
@@ -270,7 +270,7 @@ CREATE VIEW IF NOT EXISTS view_daily_practice_queue_readable AS
 SELECT
   dpq.id AS queue_id,
   COALESCE(up.name, up.email) AS user_name,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   dpq.queue_date,
   dpq.window_start_utc,
@@ -307,7 +307,7 @@ SELECT
   ttd.user_id,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   ttd.tune_id,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   ttd.repertoire_id,
   ttd.purpose,
   ttd.note_private,
@@ -345,7 +345,7 @@ ORDER BY
  * View: view_practice_record_readable
  *
  * Human-readable practice records with resolved foreign keys.
- * Shows user names, tune titles, and playlist instruments instead of UUIDs.
+ * Shows user names, tune titles, and repertoire instruments instead of UUIDs.
  * Useful for debugging and data inspection in SQLite WASM Browser.
  */
 const VIEW_PRACTICE_RECORD_READABLE = /* sql */ `
@@ -354,7 +354,7 @@ SELECT
   COALESCE(up.name, up.email) AS user_name,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   pr.tune_ref,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   pr.repertoire_ref,
   pr.practiced,
   pr.quality,
@@ -471,10 +471,10 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
   console.log("📊 Initializing SQLite database views...");
 
   try {
-    // Create view_playlist_joined
-    await db.run("DROP VIEW IF EXISTS view_playlist_joined");
-    await db.run(VIEW_PLAYLIST_JOINED);
-    console.log("✅ Created view: view_playlist_joined");
+    // Create view_repertoire_joined
+    await db.run("DROP VIEW IF EXISTS view_repertoire_joined");
+    await db.run(VIEW_REPERTOIRE_JOINED);
+    console.log("✅ Created view: view_repertoire_joined");
 
     // Create practice_list_joined
     await db.run(PRACTICE_LIST_JOINED);
@@ -522,7 +522,7 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
     await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
     await db.run("DROP VIEW IF EXISTS practice_list_staged");
     await db.run("DROP VIEW IF EXISTS practice_list_joined");
-    await db.run("DROP VIEW IF EXISTS view_playlist_joined");
+    await db.run("DROP VIEW IF EXISTS view_repertoire_joined");
 
     console.log("✅ All views dropped");
   } catch (error) {

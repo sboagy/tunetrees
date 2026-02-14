@@ -17,6 +17,7 @@ rm -f "$LOG_FILE"
 
 SECONDS=0
 npm run test:e2e:chromium:both:html -- "$@" 2>&1 | tee "$LOG_FILE"
+# npm run test:e2e:chromium:html -- "$@" 2>&1 | tee "$LOG_FILE"
 MINUTES=$(echo "scale=2; $SECONDS / 60" | bc)
 echo "Test completed in ${MINUTES}m" | tee -a "$LOG_FILE"
 

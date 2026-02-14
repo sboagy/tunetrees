@@ -322,19 +322,19 @@ async function getInternalUserRef(
   return user.userId;
 }
 
-async function assertHasLocalPlaylists(
+async function assertHasLocalRepertoires(
   page: Page,
   minCount = 1
 ): Promise<void> {
-  const playlistCount = await page.evaluate(async () => {
+  const repertoireCount = await page.evaluate(async () => {
     const api = (window as any).__ttTestApi;
-    if (!api || typeof api.getPlaylistCount !== "function") {
-      throw new Error("__ttTestApi.getPlaylistCount is not available");
+    if (!api || typeof api.getRepertoireCount !== "function") {
+      throw new Error("__ttTestApi.getRepertoireCount is not available");
     }
-    return await api.getPlaylistCount();
+    return await api.getRepertoireCount();
   });
 
-  if (playlistCount >= minCount) return;
+  if (repertoireCount >= minCount) return;
 
   const status = await page.evaluate(() => {
     const el = document.querySelector(
@@ -349,7 +349,7 @@ async function assertHasLocalPlaylists(
   });
 
   throw new Error(
-    `No repertoires found locally after sync (count=${playlistCount}). syncVersion=${status.syncVersion} success=${status.syncSuccess} errors=${status.syncErrorCount} summary=${status.syncErrorSummary}`
+    `No repertoires found locally after sync (count=${repertoireCount}). syncVersion=${status.syncVersion} success=${status.syncSuccess} errors=${status.syncErrorCount} summary=${status.syncErrorSummary}`
   );
 }
 
@@ -1272,8 +1272,8 @@ export async function setupForRepertoireTestsParallel(
   // 5-6) Reset local DB and trigger a fresh sync from Supabase.
   await resetLocalDbAndResync(page);
 
-  // If playlists didn't sync down, onboarding modal will block UI clicks.
-  await assertHasLocalPlaylists(page, 1);
+  // If repertoires didn't sync down, onboarding modal will block UI clicks.
+  await assertHasLocalRepertoires(page, 1);
 
   // 7. Navigate to repertoire tab
   await page.waitForSelector('[data-testid="tab-repertoire"]', {
@@ -1400,12 +1400,12 @@ export async function setupForCatalogTestsParallel(
   // 4-5) Reset local DB and trigger a fresh sync from Supabase.
   await resetLocalDbAndResync(page);
 
-  // 6. Wait for playlist dropdown to show correct data
-  const playlistLocator = page.getByTestId("playlist-dropdown-button");
-  await playlistLocator.waitFor({ state: "visible", timeout: 10000 });
+  // 6. Wait for repertoire dropdown to show correct data
+  const repertoireLocator = page.getByTestId("repertoire-dropdown-button");
+  await repertoireLocator.waitFor({ state: "visible", timeout: 10000 });
 
   const expectedTitle = `Irish Flute`;
-  await expect(playlistLocator).toContainText(expectedTitle, {
+  await expect(repertoireLocator).toContainText(expectedTitle, {
     timeout: 10000,
   });
 

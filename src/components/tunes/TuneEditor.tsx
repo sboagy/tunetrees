@@ -23,7 +23,7 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useCurrentPlaylist } from "@/lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "@/lib/context/CurrentRepertoireContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
   getAllGenres,
@@ -46,12 +46,12 @@ import {
 import { TagInput } from "./TagInput";
 
 /**
- * Extended tune data for editor (includes playlist_tune fields)
+ * Extended tune data for editor (includes repertoire_tune fields)
  */
 export interface TuneEditorData extends Tune {
   // Additional fields from tune_override
   request_public?: boolean;
-  // playlist_tune fields
+  // repertoire_tune fields
   learned?: string;
   goal?: string;
   scheduled?: string;
@@ -75,7 +75,7 @@ export interface TuneEditorProps {
 }
 export const TuneEditor: Component<TuneEditorProps> = (props) => {
   const { user } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
 
   // Form state signals
   const init = (field: keyof TuneEditorData): string => {
@@ -119,7 +119,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     }
   };
 
-  // User/Repertoire specific fields (playlist_tune)
+  // User/Repertoire specific fields (repertoire_tune)
   const [learned, setLearned] = createSignal(
     formatDateForInput(props.tune?.learned)
   );
@@ -247,23 +247,23 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     return await getAllGenres(db);
   });
 
-  // Load current playlist (to derive default genre) when creating a new tune
-  const [currentPlaylist] = createResource(
+  // Load current repertoire (to derive default genre) when creating a new tune
+  const [currentRepertoire] = createResource(
     () => {
-      if (!currentPlaylistId() || props.tune) return null; // Only for new tunes
+      if (!currentRepertoireId() || props.tune) return null; // Only for new tunes
       const supaUser = user();
       if (!supaUser?.id) return null;
-      return { playlistId: currentPlaylistId()!, userId: supaUser.id };
+      return { repertoireId: currentRepertoireId()!, userId: supaUser.id };
     },
     async (params) => {
       if (!params) return null;
       const db = getDb();
-      const { getPlaylistById } = await import(
-        "../../lib/db/queries/playlists"
+      const { getRepertoireById } = await import(
+        "../../lib/db/queries/repertoires"
       );
-      const pl = await getPlaylistById(db, params.playlistId, params.userId);
+      const pl = await getRepertoireById(db, params.repertoireId, params.userId);
       if (!pl) return null;
-      // If playlist.genreDefault null, attempt instrument fallback
+      // If repertoire.genreDefault null, attempt instrument fallback
       if (!pl.genreDefault && pl.instrumentRef) {
         const { instrument } = await import("../../lib/db/schema");
         const inst = await db
@@ -283,10 +283,10 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     if (
       !props.tune && // new tune
       !genre() && // no existing genre selection
-      currentPlaylist() &&
-      currentPlaylist()!.resolvedGenreDefault
+      currentRepertoire() &&
+      currentRepertoire()!.resolvedGenreDefault
     ) {
-      setGenre(currentPlaylist()!.resolvedGenreDefault || "");
+      setGenre(currentRepertoire()!.resolvedGenreDefault || "");
     }
   });
 
@@ -460,12 +460,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
           if (props.tune?.id) {
             for (const tag of existingTags) {
               if (!newTagTexts.has(tag.tagText)) {
-                await removeTagFromTune(
-                  db,
-                  tuneId,
-                  userId,
-                  tag.tagText
-                );
+                await removeTagFromTune(db, tuneId, userId, tag.tagText);
               }
             }
           }

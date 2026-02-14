@@ -108,18 +108,18 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         const cascade: {
           table: string;
           column: string;
-          filterPlaylist?: boolean;
+          filterRepertoire?: boolean;
         }[] = [
           { table: "repertoire_tune", column: "tune_ref" },
           {
             table: "practice_record",
             column: "tune_ref",
-            filterPlaylist: true,
+            filterRepertoire: true,
           },
           { table: "daily_practice_queue", column: "tune_ref" },
           { table: "tune_override", column: "tune_ref" },
         ];
-        for (const { table, column, filterPlaylist } of cascade) {
+        for (const { table, column, filterRepertoire } of cascade) {
           if (table === "practice_record") {
             const { error } = await supabase.rpc(
               "e2e_delete_practice_record_by_tunes",
@@ -137,7 +137,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           }
 
           let del = supabase.from(table).delete().in(column, uniqueIds);
-          if (filterPlaylist)
+          if (filterRepertoire)
             del = del.eq("repertoire_ref", testUser.repertoireId);
           const { error } = await del;
           if (error) {

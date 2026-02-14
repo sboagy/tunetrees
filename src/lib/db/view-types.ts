@@ -8,7 +8,7 @@
 /**
  * Tune overview data structure from practice_list_staged view.
  *
- * Combines tune data with playlist + practice + transient staging data.
+ * Combines tune data with repertoire + practice + transient staging data.
  *
  * Note: `bucket`/`order_index`/`completed_at` are optional because they come from
  * `daily_practice_queue` when the view is joined against the queue (scheduled
@@ -37,7 +37,7 @@ export interface ITuneOverview {
   instrument: string | null;
   learned: number | null;
   scheduled: number | null;
-  playlist_deleted: number | null;
+  repertoire_deleted: number | null;
 
   // Practice record data (latest or staged)
   latest_state: number | null;

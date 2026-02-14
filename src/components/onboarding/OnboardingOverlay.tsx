@@ -2,7 +2,7 @@
  * Onboarding Overlay Component
  *
  * Displays step-by-step instructions for new users to set up their account.
- * Guides them through creating a playlist and adding tunes from the catalog.
+ * Guides them through creating a repertoire and adding tunes from the catalog.
  *
  * @module components/onboarding/OnboardingOverlay
  */
@@ -20,7 +20,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
-import { PlaylistEditorDialog } from "../playlists/PlaylistEditorDialog";
+import { RepertoireEditorDialog as RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
 
 /**
  * Onboarding Overlay Component
@@ -40,17 +40,17 @@ export const OnboardingOverlay: Component = () => {
     triggerCatalogSync,
   } = useAuth();
   const navigate = useNavigate();
-  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
-  const [playlistCreated, setPlaylistCreated] = createSignal(false);
+  const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
+  const [repertoireCreated, setRepertoireCreated] = createSignal(false);
   const [genres, setGenres] = createSignal<Genre[]>([]);
   const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
   const [isLoadingGenres, setIsLoadingGenres] = createSignal(false);
   const [isSavingGenres, setIsSavingGenres] = createSignal(false);
 
-  const handlePlaylistCreated = () => {
-    setPlaylistCreated(true);
-    setShowPlaylistDialog(false);
-    // Trigger global playlist list refresh so TopNav dropdown updates
+  const handleRepertoireCreated = () => {
+    setRepertoireCreated(true);
+    setShowRepertoireDialog(false);
+    // Trigger global repertoire list refresh so TopNav dropdown updates
     incrementRepertoireListChanged();
     // Move to next step: choose genres (don't navigate yet)
     nextStep();
@@ -78,8 +78,8 @@ export const OnboardingOverlay: Component = () => {
           const { getGenresWithSelection } = await import(
             "@/lib/db/queries/user-genre-selection"
           );
-          const { getUserPlaylists } = await import(
-            "@/lib/db/queries/playlists"
+          const { getUserRepertoires } = await import(
+            "@/lib/db/queries/repertoires"
           );
 
           const genreList = await getGenresWithSelection(db, resolvedUserId);
@@ -96,8 +96,8 @@ export const OnboardingOverlay: Component = () => {
             if (preselected.length > 0) {
               setSelectedGenreIds(preselected);
             } else if (genreList.length > 0) {
-              const playlists = await getUserPlaylists(db, resolvedUserId);
-              const latest = playlists[playlists.length - 1];
+              const repertoires = await getUserRepertoires(db, resolvedUserId);
+              const latest = repertoires[repertoires.length - 1];
               const defaultGenreId = latest?.genreDefault ?? null;
 
               if (
@@ -179,25 +179,25 @@ export const OnboardingOverlay: Component = () => {
 
   return (
     <>
-      {/* Playlist Editor Dialog */}
-      <Show when={showPlaylistDialog()}>
-        <PlaylistEditorDialog
-          isOpen={showPlaylistDialog()}
+      {/* Repertoire Editor Dialog */}
+      <Show when={showRepertoireDialog()}>
+        <RepertoireEditorDialog
+          isOpen={showRepertoireDialog()}
           onClose={() => {
-            setShowPlaylistDialog(false);
-            if (!playlistCreated()) {
+            setShowRepertoireDialog(false);
+            if (!repertoireCreated()) {
               skipOnboarding(); // If they close without creating, skip onboarding
             }
           }}
-          onSaved={handlePlaylistCreated}
+          onSaved={handleRepertoireCreated}
         />
       </Show>
 
       {/* Onboarding Overlays */}
       <Show when={needsOnboarding()}>
         <Switch>
-          {/* Step 1: Create Playlist */}
-          <Match when={onboardingStep() === "create-playlist"}>
+          {/* Step 1: Create Repertoire */}
+          <Match when={onboardingStep() === "create-repertoire"}>
             <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
                 <div class="flex items-start justify-between mb-4">
@@ -246,8 +246,8 @@ export const OnboardingOverlay: Component = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setPlaylistCreated(false);
-                        setShowPlaylistDialog(true);
+                        setRepertoireCreated(false);
+                        setShowRepertoireDialog(true);
                       }}
                       class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
                       data-testid="onboarding-create-repertoire"

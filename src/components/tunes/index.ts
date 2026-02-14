@@ -7,7 +7,7 @@
  */
 
 export { FilterBar } from "./FilterBar";
-export { PlaylistSelectorModal } from "./PlaylistSelectorModal";
+export { RepertoireSelectorModal } from "./RepertoireSelectorModal";
 export { TuneDetail } from "./TuneDetail";
 export type { TuneEditorData } from "./TuneEditor";
 export { TuneEditor } from "./TuneEditor";

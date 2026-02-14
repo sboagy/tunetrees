@@ -8,7 +8,7 @@ The `practice-scenarios.ts` file provides helper functions to set up specific da
 
 The practice queue algorithm has complex behavior based on:
 
-- Whether tunes are scheduled (`playlist_tune.current` field)
+- Whether tunes are scheduled (`repertoire_tune.current` field)
 - How long ago they were scheduled (bucket classification)
 - Whether the practice queue has been generated for today
 
@@ -20,7 +20,7 @@ Each test needs a **specific, repeatable input state** to verify expected behavi
 
 **State:** Tunes exist in repertoire but not scheduled for practice
 
-- `playlist_tune.current = NULL` for all tunes
+- `repertoire_tune.current = NULL` for all tunes
 - Practice queue deleted
 - **Expected behavior:** Empty practice queue (Q1=0, Q2=0, Q3=0)
 - **Use case:** Testing empty state UI, "Add to Review" workflow
@@ -29,7 +29,7 @@ Each test needs a **specific, repeatable input state** to verify expected behavi
 
 **State:** Tunes scheduled 7 days ago (overdue for practice)
 
-- `playlist_tune.current = 7 days ago` for all tunes
+- `repertoire_tune.current = 7 days ago` for all tunes
 - Practice queue deleted (will be regenerated)
 - **Expected behavior:** Tunes appear in Q2 (recently lapsed) bucket
 - **Use case:** Testing lapsed tune handling, queue generation
@@ -38,7 +38,7 @@ Each test needs a **specific, repeatable input state** to verify expected behavi
 
 **State:** Tunes scheduled for today
 
-- `playlist_tune.current = today` for all tunes
+- `repertoire_tune.current = today` for all tunes
 - Practice queue deleted
 - **Expected behavior:** Tunes appear in Q1 (due today) bucket
 - **Use case:** Testing current day practice workflow
@@ -133,7 +133,7 @@ Remove Alice's active practice queue (forces regeneration)
 **Alice's Test Data:**
 
 - User ID: `11111111-1111-1111-1111-111111111111`
-- Playlist ID: `9001`
+- Repertoire ID: `9001`
 - Tunes:
   - `9001`: "Banish Misfortune" (JigD, D Mixolydian)
   - `9002`: "Morrison's Jig" (JigD, E Dorian)
@@ -151,7 +151,7 @@ Remove Alice's active practice queue (forces regeneration)
 ```bash
 # Verify scheduled dates
 PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres \
-  -c "SELECT tune_ref, current FROM playlist_tune WHERE playlist_ref = 9001;"
+  -c "SELECT tune_ref, current FROM repertoire_tune WHERE repertoire_ref = 9001;"
 
 # Check queue state
 PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres \

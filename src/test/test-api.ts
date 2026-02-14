@@ -278,7 +278,7 @@ async function getPracticeCount(repertoireId: string) {
   return rows[0]?.count ?? 0;
 }
 
-async function getRepertoireCount(repertoireId: string) {
+async function getRepertoireTuneCount(repertoireId: string) {
   const db = await ensureDb();
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
@@ -400,15 +400,15 @@ async function getCatalogSelectionDiagnostics() {
     userProfile: userProfileRows,
     selectionRows,
     selectedGenreIds: selectionRows.map((row) => row.genre_id),
-    playlistDefaults: repertoireDefaultsRows
+    repertoireDefaults: repertoireDefaultsRows
       .map((row) => row.genre)
       .filter((genreId): genreId is string => !!genreId),
     repertoireGenres: repertoireGenreRows
       .map((row) => row.genre)
       .filter((genreId): genreId is string => !!genreId),
     counts: {
-      playlistCount: Number(repertoireCountRows[0]?.count ?? 0),
-      playlistTuneCount: Number(repertoireTuneCountRows[0]?.count ?? 0),
+      repertoireCount: Number(repertoireCountRows[0]?.count ?? 0),
+      repertoireTuneCount: Number(repertoireTuneCountRows[0]?.count ?? 0),
       tuneCount: Number(catalogTuneCountRows[0]?.count ?? 0),
     },
   };
@@ -673,7 +673,7 @@ async function getPracticeQueue(repertoireId: string, windowStartUtc?: string) {
 /**
  * Get single repertoire_tune row (for consistency checks with practice_record)
  */
-async function getPlaylistTuneRow(repertoireId: string, tuneId: string) {
+async function getRepertoireTuneRow(repertoireId: string, tuneId: string) {
   const db = await ensureDb();
   const rows = await db.all<{
     repertoire_ref: string;
@@ -812,10 +812,10 @@ async function getSyncOutboxCount(): Promise<number> {
 }
 
 /**
- * Get count of playlists in local SQLite.
+ * Get count of repertoires in local SQLite.
  * Used by E2E to assert repertoire data is present after sync.
  */
-async function getPlaylistCount(): Promise<number> {
+async function getRepertoireCount(): Promise<number> {
   const db = await ensureDb();
   const rows = await db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count FROM repertoire WHERE deleted = 0
@@ -922,7 +922,7 @@ declare global {
         id: string;
       }>;
       getPracticeCount: (repertoireId: string) => Promise<number>; // UUID
-      getRepertoireCount: (repertoireId: string) => Promise<number>; // UUID
+      getRepertoireTuneCount: (repertoireId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
       getCatalogTuneCountsForUser: () => Promise<{
         total: number;
@@ -934,11 +934,11 @@ declare global {
         userProfile: Array<{ id: string }>;
         selectionRows: Array<{ user_id: string; genre_id: string }>;
         selectedGenreIds: string[];
-        playlistDefaults: string[];
+        repertoireDefaults: string[];
         repertoireGenres: string[];
         counts: {
-          playlistCount: number;
-          playlistTuneCount: number;
+          repertoireCount: number;
+          repertoireTuneCount: number;
           tuneCount: number;
         };
       }>;
@@ -1064,7 +1064,7 @@ declare global {
           snapshot_coalesced_ts: string | null;
         }>
       >;
-      getPlaylistTuneRow: (
+      getRepertoireTuneRow: (
         repertoireId: string,
         tuneId: string
       ) => Promise<{
@@ -1091,7 +1091,7 @@ declare global {
         titles: string[]
       ) => Promise<Array<{ id: string; title: string }>>;
       getSyncOutboxCount: () => Promise<number>;
-      getPlaylistCount: () => Promise<number>;
+      getRepertoireCount: () => Promise<number>;
       isSyncComplete: () => boolean;
       getSyncErrors: () => Promise<string[]>;
       getSupabaseRecord: (
@@ -1174,7 +1174,7 @@ if (typeof window !== "undefined") {
       seedAddToReview,
       seedSchedulingPlugin,
       getPracticeCount,
-      getRepertoireCount,
+      getRepertoireTuneCount,
       getTuneOverrideCountForCurrentUser,
       getCatalogTuneCountsForUser,
       getCatalogSelectionDiagnostics,
@@ -1183,7 +1183,7 @@ if (typeof window !== "undefined") {
       getScheduledDates,
       updateScheduledDates,
       getPracticeQueue,
-      getPlaylistTuneRow,
+      getRepertoireTuneRow,
       getDistinctPracticeRecordCount,
       getAllQueueWindows,
       getTunesByTitles,
@@ -1367,8 +1367,8 @@ if (typeof window !== "undefined") {
       getSyncOutboxCount: async () => {
         return await getSyncOutboxCount();
       },
-      getPlaylistCount: async () => {
-        return await getPlaylistCount();
+      getRepertoireCount: async () => {
+        return await getRepertoireCount();
       },
       isSyncComplete: () => {
         return isSyncComplete();

@@ -32,7 +32,7 @@ test.describe("Scroll Position Persistence", () => {
     await setStableDate(context, currentDate);
 
     currentTestUser = testUser;
-    // Add 30 tunes to playlist for scrollable content
+    // Add 30 tunes to repertoire for scrollable content
     addedTuneIds = await addScrollTestTunes(testUser);
 
     // Setup with many tunes in repertoire

@@ -29,8 +29,8 @@ import { TunesGridCatalog } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import { useAuth } from "../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
-import { getUserPlaylists } from "../lib/db/queries/playlists";
+import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { getTunesForUser } from "../lib/db/queries/tunes";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
@@ -47,7 +47,7 @@ const CatalogPage: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, localDb, catalogListChanged } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get current user ID
@@ -178,7 +178,7 @@ const CatalogPage: Component = () => {
       r_modes: undefined,
       r_genres: undefined,
       // Clear any legacy/un-namespaced param that may linger from older builds
-      playlists: undefined,
+      repertoires: undefined,
     };
 
     setSearchParams(params as Record<string, string>, { replace: true });
@@ -212,13 +212,13 @@ const CatalogPage: Component = () => {
     }
   );
 
-  // Fetch user playlists for filter options
-  const [userPlaylists] = createResource(
+  // Fetch user repertoires for filter options
+  const [userRepertoires] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = catalogListChanged(); // Refetch when catalog changes (playlists are catalog metadata)
-      log.debug("CATALOG userPlaylists dependency:", {
+      const version = catalogListChanged(); // Refetch when catalog changes (repertoires are catalog metadata)
+      log.debug("CATALOG userRepertoires dependency:", {
         hasDb: !!db,
         userId,
         catalogListChanged: version,
@@ -226,13 +226,17 @@ const CatalogPage: Component = () => {
       return db && userId ? { db, userId, version } : null;
     },
     async (params) => {
-      log.debug("CATALOG userPlaylists fetcher:", {
+      log.debug("CATALOG userRepertoires fetcher:", {
         hasParams: !!params,
         syncVersion: params?.version,
       });
       if (!params) return [];
-      const result = await getUserPlaylists(params.db, params.userId);
-      log.debug("CATALOG userPlaylists result:", result.length, "playlists");
+      const result = await getUserRepertoires(params.db, params.userId);
+      log.debug(
+        "CATALOG userRepertoires result:",
+        result.length,
+        "repertoires"
+      );
       return result;
     }
   );
@@ -329,19 +333,19 @@ const CatalogPage: Component = () => {
           onModesChange={setSelectedModes}
           selectedGenres={selectedGenres()}
           onGenresChange={setSelectedGenres}
-          selectedPlaylistIds={selectedRepertoireIds()}
-          onPlaylistIdsChange={setSelectedRepertoireIds}
+          selectedRepertoireIds={selectedRepertoireIds()}
+          onRepertoireIdsChange={setSelectedRepertoireIds}
           availableTypes={availableTypes()}
           availableModes={availableModes()}
           availableGenres={availableGenres()}
-          availablePlaylists={userPlaylists() || []}
+          availableRepertoires={userRepertoires() || []}
           loading={{
             genres: allGenres.loading,
-            playlists: userPlaylists.loading,
+            repertoires: userRepertoires.loading,
           }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
-          playlistId={currentPlaylistId() || undefined}
+          repertoireId={currentRepertoireId() || undefined}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
@@ -352,14 +356,14 @@ const CatalogPage: Component = () => {
         <Show when={userId()}>
           <TunesGridCatalog
             userId={userId()!}
-            playlistId={currentPlaylistId() || "0"}
+            repertoireId={currentRepertoireId() || "0"}
             tablePurpose="catalog"
             searchQuery={searchQuery()}
             selectedTypes={selectedTypes()}
             selectedModes={selectedModes()}
             selectedGenreNames={selectedGenres()}
             allGenres={allGenres() || []}
-            selectedPlaylistIds={selectedRepertoireIds()}
+            selectedRepertoireIds={selectedRepertoireIds()}
             onTuneSelect={handleTuneSelect}
             onSelectionChange={setSelectedRowsCount}
             onTableReady={setTableInstance}

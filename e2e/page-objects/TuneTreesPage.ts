@@ -37,8 +37,10 @@ export class TuneTreesPage {
   readonly logoDropdownPanel: Locator;
   readonly logoDropdownAboutButton: Locator;
   readonly logoDropdownWhatsNewLink: Locator;
-  readonly playlistDropdown: Locator;
-  readonly playlistDropdownButton: Locator;
+  readonly repertoireDropdown: Locator;
+  readonly repertoireDropdownButton: Locator;
+  readonly repertoireDropdown: Locator;
+  readonly repertoireDropdownButton: Locator;
   readonly databaseStatusDropdown: Locator;
   readonly databaseStatusButton: Locator;
   readonly userMenuDropdown: Locator;
@@ -70,7 +72,8 @@ export class TuneTreesPage {
   readonly typeFilter: Locator;
   readonly modeFilter: Locator;
   readonly genreFilter: Locator;
-  readonly playlistFilter: Locator;
+  readonly repertoireFilter: Locator;
+  readonly repertoireFilter: Locator;
   readonly clearFilters: Locator;
 
   // Toolbar Buttons - Generic (may not work on all tabs/viewports)
@@ -106,7 +109,8 @@ export class TuneTreesPage {
   readonly flashcardRevealButtonMobile: Locator;
   readonly flashcardFieldsMenu: Locator;
 
-  readonly topNavManagePlaylistsPanel: Locator;
+  readonly topNavManageRepertoiresPanel: Locator;
+  readonly topNavManageRepertoiresPanel: Locator;
 
   // Tune Editor
   readonly tuneEditorForm: Locator;
@@ -231,8 +235,10 @@ export class TuneTreesPage {
     this.logoDropdownWhatsNewLink = page.getByTestId(
       "logo-dropdown-whats-new-link"
     );
-    this.playlistDropdown = page.getByTestId("playlist-dropdown");
-    this.playlistDropdownButton = page.getByTestId("playlist-dropdown-button");
+    this.repertoireDropdown = page.getByTestId("repertoire-dropdown");
+    this.repertoireDropdownButton = page.getByTestId("repertoire-dropdown-button");
+    this.repertoireDropdown = this.repertoireDropdown;
+    this.repertoireDropdownButton = this.repertoireDropdownButton;
     this.databaseStatusDropdown = page.getByTestId("database-status-dropdown");
     this.databaseStatusButton = page.getByTestId("database-status-button");
     this.userMenuDropdown = page.getByTestId("user-menu-dropdown");
@@ -267,7 +273,10 @@ export class TuneTreesPage {
     this.typeFilter = page.getByTestId("filter-dropdown-type");
     this.modeFilter = page.getByTestId("filter-dropdown-mode");
     this.genreFilter = page.getByTestId("filter-dropdown-genre");
-    this.playlistFilter = page.getByTestId("filter-dropdown-playlist");
+    this.repertoireFilter = page.locator(
+      '[data-testid="filter-dropdown-repertoire"], [data-testid="filter-dropdown-repertoire"]'
+    );
+    this.repertoireFilter = this.repertoireFilter;
     this.clearFilters = page.getByRole("button", { name: /^Clear All/i });
 
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
@@ -314,9 +323,10 @@ export class TuneTreesPage {
     );
     this.flashcardFieldsMenu = page.getByTestId("flashcard-fields-menu");
 
-    this.topNavManagePlaylistsPanel = page.getByTestId(
-      "top-nav-manage-playlists-panel"
+    this.topNavManageRepertoiresPanel = page.getByTestId(
+      "top-nav-manage-repertoires-panel"
     );
+    this.topNavManageRepertoiresPanel = this.topNavManageRepertoiresPanel;
 
     // Tune Editor
     this.tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -529,7 +539,7 @@ export class TuneTreesPage {
 
     if (repertoire) {
       const completed =
-        await this.completeOnboardingWithPlaylistConfig(repertoire);
+        await this.completeOnboardingWithRepertoireConfig(repertoire);
       if (!completed) {
         await this.dismissOnboardingIfPresent();
       }
@@ -543,19 +553,27 @@ export class TuneTreesPage {
   }
 
   /**
-   * Sign in anonymously and complete onboarding by creating a playlist.
+   * Sign in anonymously and complete onboarding by creating a repertoire.
    * Use this when tests need to interact with repertoire functionality.
    *
-   * @param playlistName - Name for the new playlist (default: "Test Playlist")
+   * @param repertoireName - Name for the new repertoire (default: "Test Repertoire")
    */
-  async signInAnonymouslyWithPlaylist(playlistName = "Test Playlist") {
-    await this.signInAnonymously({ name: playlistName });
+  async signInAnonymouslyWithRepertoire(repertoireName = "Test Repertoire") {
+    await this.signInAnonymously({ name: repertoireName });
+  }
+
+  /**
+   * Sign in anonymously and complete onboarding by creating a repertoire.
+   * Alias of signInAnonymouslyWithRepertoire for compatibility.
+   */
+  async signInAnonymouslyWithRepertoire(repertoireName = "Test Repertoire") {
+    await this.signInAnonymouslyWithRepertoire(repertoireName);
   }
 
   /**
    * Sign in anonymously and stop at the genre selection onboarding step.
    */
-  async signInAnonymouslyToGenreSelection(playlistName = "Test Playlist") {
+  async signInAnonymouslyToGenreSelection(repertoireName = "Test Repertoire") {
     await this.anonymousSignInButton.click();
     // Wait for redirect to home and app to load
     await this.page.waitForURL(/\/$|\/\?/, { timeout: 15000 });
@@ -563,7 +581,7 @@ export class TuneTreesPage {
     // Wait longer for database initialization and onboarding check
     await this.page.waitForTimeout(1500);
 
-    await this.startOnboardingWithPlaylist(playlistName);
+    await this.startOnboardingWithRepertoire(repertoireName);
     await expect(this.onboardingChooseGenresHeading).toBeVisible({
       timeout: 15000,
     });
@@ -616,20 +634,28 @@ export class TuneTreesPage {
   }
 
   /**
-   * Complete onboarding by creating a playlist (instead of skipping).
+   * Complete onboarding by creating a repertoire (instead of skipping).
    * This is required for tests that need to use repertoire functionality.
    *
-   * @param playlistName - Name for the new playlist (default: "Test Playlist")
+   * @param repertoireName - Name for the new repertoire (default: "Test Repertoire")
    */
-  async completeOnboardingWithPlaylist(playlistName = "Test Playlist") {
-    await this.completeOnboardingWithPlaylistConfig({ name: playlistName });
+  async completeOnboardingWithRepertoire(repertoireName = "Test Repertoire") {
+    await this.completeOnboardingWithRepertoireConfig({ name: repertoireName });
   }
 
-  private async completeOnboardingWithPlaylistConfig(
+  /**
+   * Complete onboarding by creating a repertoire.
+   * Alias of completeOnboardingWithRepertoire for compatibility.
+   */
+  async completeOnboardingWithRepertoire(repertoireName = "Test Repertoire") {
+    await this.completeOnboardingWithRepertoire(repertoireName);
+  }
+
+  private async completeOnboardingWithRepertoireConfig(
     opts: OnboardingRepertoireArgs
   ): Promise<boolean> {
-    const playlistName = opts.name?.trim() || "Test Playlist";
-    const didStart = await this.startOnboardingWithPlaylist(playlistName, opts);
+    const repertoireName = opts.name?.trim() || "Test Repertoire";
+    const didStart = await this.startOnboardingWithRepertoire(repertoireName, opts);
     if (!didStart) return false;
 
     await this.applyOnboardingGenreSelection(opts.genres_filter ?? null);
@@ -738,10 +764,10 @@ export class TuneTreesPage {
   }
 
   /**
-   * Start onboarding by creating a playlist. Returns true if onboarding was shown.
+   * Start onboarding by creating a repertoire. Returns true if onboarding was shown.
    */
-  private async startOnboardingWithPlaylist(
-    playlistName = "Test Playlist",
+  private async startOnboardingWithRepertoire(
+    repertoireName = "Test Repertoire",
     opts?: OnboardingRepertoireArgs
   ): Promise<boolean> {
     // Wait for the app to potentially show onboarding (600ms delay + buffer)
@@ -753,35 +779,35 @@ export class TuneTreesPage {
 
     if (!isVisible) return false;
 
-    // Click "Create Playlist" button to open the playlist editor dialog
+    // Click "Create Repertoire" button to open the repertoire editor dialog
     await this.onboardingCreateRepertoireButton.click({ timeout: 3000 });
 
-    // Wait for playlist editor dialog to appear
-    const playlistDialog = this.page.getByTestId("playlist-editor-dialog");
-    await playlistDialog.waitFor({ state: "visible", timeout: 5000 });
+    // Wait for repertoire editor dialog to appear
+    const repertoireDialog = this.page.getByTestId("repertoire-editor-dialog");
+    await repertoireDialog.waitFor({ state: "visible", timeout: 5000 });
 
     // Fill in the repertoire name
-    const nameInput = playlistDialog.getByLabel(/Repertoire Name|Name/i);
-    await nameInput.fill(playlistName);
+    const nameInput = repertoireDialog.getByLabel(/Repertoire Name|Name/i);
+    await nameInput.fill(repertoireName);
 
     const defaultGenre = opts?.default_genre?.trim();
     if (defaultGenre) {
-      const genreSelect = playlistDialog.locator("#genre-default");
+      const genreSelect = repertoireDialog.locator("#genre-default");
       await this.selectOptionByTextOrValue(genreSelect, defaultGenre);
     }
 
     const instrument = opts?.instrument?.trim();
     if (instrument) {
-      const instrumentSelect = playlistDialog.locator("#instrument-ref");
+      const instrumentSelect = repertoireDialog.locator("#instrument-ref");
       await this.selectOptionByTextOrValue(instrumentSelect, instrument);
     }
 
     // Click "Create" or "Save" button
-    const saveButton = playlistDialog.getByTestId("save-playlist-button");
+    const saveButton = repertoireDialog.getByTestId("save-repertoire-button");
     await saveButton.click({ timeout: 3000 });
 
     // Wait for dialog to close
-    await playlistDialog.waitFor({ state: "hidden", timeout: 5000 });
+    await repertoireDialog.waitFor({ state: "hidden", timeout: 5000 });
     return true;
   }
 
@@ -974,14 +1000,14 @@ export class TuneTreesPage {
 
   async setSchedulingPrefs(
     overrides: {
-      playlistSize?: number;
+      repertoireSize?: number;
       enableFuzz?: boolean;
       maxReviews?: number;
       scheduleNewTunesAutomatically?: boolean;
     } = {}
   ) {
     const config = {
-      playlistSize: overrides.playlistSize ?? this.REPERTOIRE_SIZE,
+      repertoireSize: overrides.repertoireSize ?? this.REPERTOIRE_SIZE,
       enableFuzz: overrides.enableFuzz ?? this.ENABLE_FUZZ,
       maxReviews: overrides.maxReviews ?? this.MAX_DAILY_TUNES,
       scheduleNewTunesAutomatically:
@@ -991,12 +1017,12 @@ export class TuneTreesPage {
 
     await this.page.addInitScript(
       (cfg: {
-        playlistSize: number;
+        repertoireSize: number;
         enableFuzz: boolean;
         maxReviews: number;
         scheduleNewTunesAutomatically: boolean;
       }) => {
-        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = cfg.playlistSize;
+        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = cfg.repertoireSize;
         (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = cfg.enableFuzz;
         (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ = cfg.maxReviews;
         (window as any).__TUNETREES_TEST_SCHEDULE_NEW_TUNES_AUTOMATICALLY__ =
@@ -1542,7 +1568,7 @@ export class TuneTreesPage {
       .not.toBeVisible({ timeout: 2000 })
       .catch(() => {});
 
-    // Wait for filters button to be enabled - it's disabled while genres/playlists load
+    // Wait for filters button to be enabled - it's disabled while genres/repertoires load
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 

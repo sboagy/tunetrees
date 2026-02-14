@@ -1,7 +1,7 @@
 /**
  * Repertoire Page
  *
- * Displays the user's repertoire (tunes in the current playlist).
+ * Displays the user's repertoire (tunes in the current repertoire).
  * Features complete grid with filters, search, and sidebar integration.
  *
  * Port from: legacy/frontend/app/(main)/pages/practice/components/TunesGridRepertoire.tsx
@@ -25,14 +25,14 @@ import {
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
-import { PlaylistEditorDialog } from "../components/playlists/PlaylistEditorDialog";
+import { RepertoireEditorDialog as RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import {
   RepertoireEmptyState,
   RepertoireToolbar,
 } from "../components/repertoire";
 import { useAuth } from "../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../lib/context/CurrentPlaylistContext";
-import { getPlaylistTunes } from "../lib/db/queries/playlists";
+import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
 
@@ -63,9 +63,9 @@ const RepertoirePage: Component = () => {
     catalogListChanged,
     incrementRepertoireListChanged,
   } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [showPlaylistDialog, setShowPlaylistDialog] = createSignal(false);
+  const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
 
   // Get current user ID (supabase UUID)
   const userId = createMemo(() => user()?.id || null);
@@ -169,7 +169,7 @@ const RepertoirePage: Component = () => {
       c_genres: undefined,
       c_repertoires: undefined,
       // Clear any legacy/un-namespaced param that may linger from older builds
-      playlists: undefined,
+      repertoires: undefined,
     };
 
     setSearchParams(params as Record<string, string>, { replace: true });
@@ -188,18 +188,18 @@ const RepertoirePage: Component = () => {
   //       r_modes: undefined,
   //       c_genres: undefined,
   //       // Also clear legacy/un-namespaced params on mount
-  //       playlists: undefined,
+  //       repertoires: undefined,
   //     } as unknown as Record<string, string>,
   //     { replace: true }
   //   );
   // });
 
-  // Fetch tunes in current playlist for filter options
+  // Fetch tunes in current repertoire for filter options
   const [repertoireTunes] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const repertoireId = currentPlaylistId();
+      const repertoireId = currentRepertoireId();
       const version = repertoireListChanged(); // Refetch when repertoire changes
       log.debug("REPERTOIRE repertoireTunes dependency:", {
         hasDb: !!db,
@@ -217,7 +217,7 @@ const RepertoirePage: Component = () => {
         syncVersion: params?.version,
       });
       if (!params) return [];
-      const result = await getPlaylistTunes(
+      const result = await getRepertoireTunes(
         params.db,
         params.repertoireId,
         params.userId
@@ -320,7 +320,7 @@ const RepertoirePage: Component = () => {
   return (
     <div class="h-full flex flex-col">
       {/* Toolbar with Search and Filters */}
-      <Show when={!repertoireTunes.loading && currentPlaylistId()}>
+      <Show when={!repertoireTunes.loading && currentRepertoireId()}>
         <RepertoireToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
@@ -336,7 +336,7 @@ const RepertoirePage: Component = () => {
           loading={{ genres: allGenres.loading }}
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
-          playlistId={currentPlaylistId() || undefined}
+          repertoireId={currentRepertoireId() || undefined}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
@@ -344,7 +344,7 @@ const RepertoirePage: Component = () => {
 
       {/* Grid wrapper - overflow-hidden constrains grid height */}
       <div class={GRID_CONTENT_CONTAINER}>
-        <Show when={userId() && currentPlaylistId()}>
+        <Show when={userId() && currentRepertoireId()}>
           <Switch>
             <Match when={repertoireTunes.loading}>
               <div class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -366,7 +366,7 @@ const RepertoirePage: Component = () => {
             <Match when={!repertoireIsEmpty()}>
               <TunesGridRepertoire
                 userId={userId()!}
-                playlistId={currentPlaylistId()!}
+                repertoireId={currentRepertoireId()!}
                 tablePurpose="repertoire"
                 searchQuery={searchQuery()}
                 selectedTypes={selectedTypes()}
@@ -381,8 +381,8 @@ const RepertoirePage: Component = () => {
           </Switch>
         </Show>
 
-        {/* No playlist selected message */}
-        <Show when={!currentPlaylistId()}>
+        {/* No repertoire selected message */}
+        <Show when={!currentRepertoireId()}>
           <RepertoireEmptyState
             title="No current repertoire"
             description={
@@ -393,19 +393,19 @@ const RepertoirePage: Component = () => {
             }
             primaryAction={{
               label: "Create repertoire",
-              onClick: () => setShowPlaylistDialog(true),
+              onClick: () => setShowRepertoireDialog(true),
             }}
           />
         </Show>
       </div>
 
-      <Show when={showPlaylistDialog()}>
-        <PlaylistEditorDialog
-          isOpen={showPlaylistDialog()}
-          onClose={() => setShowPlaylistDialog(false)}
+      <Show when={showRepertoireDialog()}>
+        <RepertoireEditorDialog
+          isOpen={showRepertoireDialog()}
+          onClose={() => setShowRepertoireDialog(false)}
           onSaved={() => {
             incrementRepertoireListChanged();
-            setShowPlaylistDialog(false);
+            setShowRepertoireDialog(false);
           }}
         />
       </Show>

@@ -8,7 +8,7 @@ export interface CreateNoteData {
   tuneRef: string; // UUID
   noteText: string;
   userRef: string; // UUID (Supabase Auth ID, same as user_profile.id)
-  playlistRef?: string; // UUID
+  repertoireRef?: string; // UUID
   favorite?: boolean;
 }
 
@@ -35,17 +35,17 @@ export async function getNotesByTune(
 }
 
 /**
- * Get all notes for a specific playlist
+ * Get all notes for a specific repertoire
  */
-export async function getNotesByPlaylist(
+export async function getNotesByRepertoire(
   db: SqliteDatabase,
-  playlistId: string // UUID
+  repertoireId: string // UUID
 ): Promise<Note[]> {
   return await db
     .select()
     .from(schema.note)
     .where(
-      and(eq(schema.note.repertoireRef, playlistId), eq(schema.note.deleted, 0))
+      and(eq(schema.note.repertoireRef, repertoireId), eq(schema.note.deleted, 0))
     )
     .orderBy(asc(schema.note.displayOrder), desc(schema.note.createdDate))
     .all();
@@ -84,7 +84,7 @@ export async function createNote(
       tuneRef: data.tuneRef,
       noteText: data.noteText,
       userRef: data.userRef,
-      repertoireRef: data.playlistRef || null,
+      repertoireRef: data.repertoireRef || null,
       createdDate: now,
       // `public` is ignored for visibility; all user-created notes are private for now.
       public: 0,

@@ -25,7 +25,7 @@ import {
   getUserPreferences,
   getUserSchedulingOptions,
 } from "../db/queries/practice";
-import { playlistTune, practiceRecord } from "../db/schema";
+import { repertoireTune, practiceRecord } from "../db/schema";
 import type {
   NewPracticeRecord,
   NextReviewSchedule,
@@ -39,7 +39,7 @@ import {
 import {
   FSRS_QUALITY_MAP,
   FSRSService,
-  getPlaylistTuneCount,
+  getRepertoireTuneCount,
 } from "../scheduling/fsrs-service";
 import { getPracticeDate } from "../utils/practice-date";
 import { generateId } from "../utils/uuid";
@@ -114,17 +114,17 @@ export async function evaluatePractice(
     throw new Error("User FSRS preferences not found");
   }
   const scheduling = await getUserSchedulingOptions(db, userId);
-  const playlistTuneCount = await getPlaylistTuneCount(
+  const repertoireTuneCount = await getRepertoireTuneCount(
     db,
-    normalizedInput.playlistRef
+    normalizedInput.repertoireRef
   );
   const fsrsService = new FSRSService(prefs, scheduling, {
-    playlistTuneCount,
+    repertoireTuneCount,
   });
   const latestRecord = await getLatestPracticeRecord(
     db,
     normalizedInput.tuneRef,
-    normalizedInput.playlistRef
+    normalizedInput.repertoireRef
   );
   const schedule = latestRecord
     ? await fsrsService.processReview(normalizedInput, latestRecord)
@@ -144,7 +144,7 @@ export async function evaluatePractice(
         scheduling,
         fallback: schedule,
         db,
-        playlistTuneCount,
+        repertoireTuneCount,
       })
     : null;
 
@@ -160,7 +160,7 @@ export async function evaluatePractice(
   const record: NewPracticeRecord = {
     id: generateId(),
     lastModifiedAt: getPracticeDate().toISOString(),
-    repertoireRef: normalizedInput.playlistRef,
+    repertoireRef: normalizedInput.repertoireRef,
     tuneRef: normalizedInput.tuneRef,
     practiced: normalizedInput.practiced.toISOString(),
     quality: normalizedInput.quality,
@@ -196,15 +196,15 @@ async function persistPracticeRecord(
   const inserted = insertResult[0];
   if (!inserted) throw new Error("Failed to insert practice record");
   await db
-    .update(playlistTune)
+    .update(repertoireTune)
     .set({
       current: record.due,
       lastModifiedAt: getPracticeDate().toISOString(),
     })
     .where(
       and(
-        eq(playlistTune.repertoireRef, record.repertoireRef),
-        eq(playlistTune.tuneRef, record.tuneRef)
+        eq(repertoireTune.repertoireRef, record.repertoireRef),
+        eq(repertoireTune.tuneRef, record.tuneRef)
       )
     );
   // Sync is handled automatically by SQL triggers populating sync_outbox
@@ -247,7 +247,7 @@ export async function recordPracticeRating(
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @returns Statistics object
  *
  * @example
@@ -260,7 +260,7 @@ export async function recordPracticeRating(
 export async function getPracticeStatistics(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<{
   totalCount: number;
   successRate: number;
@@ -273,7 +273,7 @@ export async function getPracticeStatistics(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.repertoireRef, playlistId)
+        eq(practiceRecord.repertoireRef, repertoireId)
       )
     )
     .orderBy(practiceRecord.practiced);
@@ -327,7 +327,7 @@ export async function getPracticeStatistics(
  * the current practice queue into permanent practice_record entries.
  *
  * Workflow:
- * 1. Fetch all staged evaluations from table_transient_data for current playlist
+ * 1. Fetch all staged evaluations from table_transient_data for current repertoire
  * 2. Filter to only include tunes in daily_practice_queue (current session)
  * 3. For each staged evaluation:
  *    - Create practice_record with unique practiced timestamp
@@ -337,11 +337,11 @@ export async function getPracticeStatistics(
  * 4. Queue all changes for Supabase sync
  * 5. Persist database to IndexedDB
  *
- * Replaces: legacy /practice/commit_staged/{playlist_id} endpoint
+ * Replaces: legacy /practice/commit_staged/{repertoire_id} endpoint
  *
  * @param db - SQLite database instance
  * @param userId - User ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @param windowStartUtc - Optional: specific queue window to commit (defaults to most recent)
  * @returns Result with count of committed evaluations
  *
@@ -356,7 +356,7 @@ export async function getPracticeStatistics(
 export async function commitStagedEvaluations(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   windowStartUtc?: string
 ): Promise<{ success: boolean; count: number; error?: string }> {
   let didStartTransaction = false;
@@ -364,10 +364,10 @@ export async function commitStagedEvaluations(
     console.log("=== commitStagedEvaluations START ===");
     console.log("Parameters:", {
       userId,
-      playlistId,
+      repertoireId,
       windowStartUtc,
       userIdType: typeof userId,
-      playlistIdType: typeof playlistId,
+      repertoireIdType: typeof repertoireId,
     });
 
     const { sql } = await import("drizzle-orm");
@@ -380,12 +380,12 @@ export async function commitStagedEvaluations(
       activeWindowStart = windowStartUtc;
       console.log(`Using provided queue window: ${activeWindowStart}`);
     } else {
-      // Find the most recent queue window for this playlist
+      // Find the most recent queue window for this repertoire
       const latestWindow = await db.get<{ window_start_utc: string }>(sql`
         SELECT window_start_utc
         FROM daily_practice_queue
         WHERE user_ref = ${userId}
-          AND repertoire_ref = ${playlistId}
+          AND repertoire_ref = ${repertoireId}
         ORDER BY window_start_utc DESC
         LIMIT 1
       `);
@@ -418,12 +418,12 @@ export async function commitStagedEvaluations(
       SELECT user_id, tune_id, repertoire_id, practiced
       FROM table_transient_data
       WHERE user_id = ${userId}
-        AND repertoire_id = ${playlistId}
+        AND repertoire_id = ${repertoireId}
         AND practiced IS NOT NULL
     `);
     console.log("DEBUG query result (should match main query):", debugQuery);
 
-    // 1. Fetch all staged evaluations from table_transient_data for this playlist
+    // 1. Fetch all staged evaluations from table_transient_data for this repertoire
     console.log("Querying table_transient_data...");
     const stagedEvaluations = await db.all<{
       tune_id: string;
@@ -458,7 +458,7 @@ export async function commitStagedEvaluations(
         recall_eval
       FROM table_transient_data
       WHERE user_id = ${userId}
-        AND repertoire_id = ${playlistId}
+        AND repertoire_id = ${repertoireId}
         AND practiced IS NOT NULL
     `);
 
@@ -478,7 +478,7 @@ export async function commitStagedEvaluations(
       SELECT DISTINCT tune_ref
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
-        AND repertoire_ref = ${playlistId}
+        AND repertoire_ref = ${repertoireId}
 				AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
     `);
 
@@ -527,7 +527,7 @@ export async function commitStagedEvaluations(
         const existing = await db.all<{ id: string }>(sql`
           SELECT id FROM practice_record
           WHERE tune_ref = ${staged.tune_id}
-            AND repertoire_ref = ${playlistId}
+            AND repertoire_ref = ${repertoireId}
             AND practiced = ${practicedTimestamp}
           LIMIT 1
         `);
@@ -551,14 +551,14 @@ export async function commitStagedEvaluations(
 
       // Insert practice_record
       const recordId = generateId();
-      // Determine prior state & lapses (latest committed record for tune/playlist)
+      // Determine prior state & lapses (latest committed record for tune/repertoire)
       const prior = await db.get<{
         lapses: number | null;
         state: number | null;
       }>(sql`
         SELECT lapses, state
         FROM practice_record
-        WHERE tune_ref = ${staged.tune_id} AND repertoire_ref = ${playlistId}
+        WHERE tune_ref = ${staged.tune_id} AND repertoire_ref = ${repertoireId}
         ORDER BY
           CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
           practiced DESC,
@@ -595,7 +595,7 @@ export async function commitStagedEvaluations(
           last_modified_at
         ) VALUES (
           ${recordId},
-          ${playlistId},
+          ${repertoireId},
           ${staged.tune_id},
           ${practicedTimestamp},
           ${staged.quality},
@@ -627,7 +627,7 @@ export async function commitStagedEvaluations(
         SET current = ${staged.due},
             scheduled = NULL,
             last_modified_at = ${now}
-        WHERE repertoire_ref = ${playlistId}
+        WHERE repertoire_ref = ${repertoireId}
           AND tune_ref = ${staged.tune_id}
       `);
 
@@ -639,7 +639,7 @@ export async function commitStagedEvaluations(
         DELETE FROM table_transient_data
         WHERE user_id = ${userId}
           AND tune_id = ${staged.tune_id}
-          AND repertoire_id = ${playlistId}
+          AND repertoire_id = ${repertoireId}
       `);
 
       // Sync is handled automatically by SQL triggers populating sync_outbox
@@ -653,7 +653,7 @@ export async function commitStagedEvaluations(
         UPDATE daily_practice_queue
         SET completed_at = ${now}
         WHERE user_ref = ${userId}
-          AND repertoire_ref = ${playlistId}
+          AND repertoire_ref = ${repertoireId}
           AND tune_ref = ${staged.tune_id}
 					AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
       `);
@@ -663,7 +663,7 @@ export async function commitStagedEvaluations(
         SELECT completed_at
         FROM daily_practice_queue
         WHERE user_ref = ${userId}
-          AND repertoire_ref = ${playlistId}
+          AND repertoire_ref = ${repertoireId}
           AND tune_ref = ${staged.tune_id}
 					AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
         LIMIT 1
@@ -675,7 +675,7 @@ export async function commitStagedEvaluations(
           {
             verifyQueue,
             userId,
-            playlistId,
+            repertoireId,
             tuneId: staged.tune_id,
             windowStart: activeWindowStart,
           }
@@ -704,7 +704,7 @@ export async function commitStagedEvaluations(
     await persistDb();
 
     console.log(
-      `✅ Committed ${committedTuneIds.length} staged evaluations for playlist ${playlistId}`
+      `✅ Committed ${committedTuneIds.length} staged evaluations for repertoire ${repertoireId}`
     );
     console.log("=== commitStagedEvaluations END ===");
 
@@ -738,7 +738,7 @@ export async function commitStagedEvaluations(
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune ID
- * @param playlistId - Playlist ID
+ * @param repertoireId - Repertoire ID
  * @returns True if undo successful, false otherwise
  *
  * @example
@@ -752,7 +752,7 @@ export async function commitStagedEvaluations(
 export async function undoLastPracticeRating(
   db: SqliteDatabase,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<boolean> {
   try {
     // Get the last two practice records
@@ -762,7 +762,7 @@ export async function undoLastPracticeRating(
       .where(
         and(
           eq(practiceRecord.tuneRef, tuneId),
-          eq(practiceRecord.repertoireRef, playlistId)
+          eq(practiceRecord.repertoireRef, repertoireId)
         )
       )
       .orderBy(practiceRecord.practiced)
@@ -784,15 +784,15 @@ export async function undoLastPracticeRating(
     // Revert repertoire_tune.current to previous due date (or null if no previous)
     const previousDue = previousRecord?.due || null;
     await db
-      .update(playlistTune)
+      .update(repertoireTune)
       .set({
         current: previousDue,
         lastModifiedAt: new Date().toISOString(),
       })
       .where(
         and(
-          eq(playlistTune.repertoireRef, playlistId),
-          eq(playlistTune.tuneRef, tuneId)
+          eq(repertoireTune.repertoireRef, repertoireId),
+          eq(repertoireTune.tuneRef, tuneId)
         )
       );
 

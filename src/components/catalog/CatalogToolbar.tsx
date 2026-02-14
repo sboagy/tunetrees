@@ -23,8 +23,10 @@ import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
-import { addTunesToPlaylist } from "../../lib/db/queries/playlists";
-import type { PlaylistWithSummary } from "../../lib/db/types";
+import {
+  addTunesToRepertoire,
+  type RepertoireWithSummary,
+} from "../../lib/db/queries/repertoires";
 import {
   TOOLBAR_BUTTON_BASE,
   TOOLBAR_BUTTON_DANGER,
@@ -62,34 +64,34 @@ export interface CatalogToolbarProps {
   selectedGenres: string[];
   /** Genres change handler */
   onGenresChange: (genres: string[]) => void;
-  /** Selected playlist IDs */
-  selectedPlaylistIds: string[];
-  /** Playlist IDs change handler */
-  onPlaylistIdsChange: (playlistIds: string[]) => void;
+  /** Selected repertoire IDs */
+  selectedRepertoireIds: string[];
+  /** Repertoire IDs change handler */
+  onRepertoireIdsChange: (repertoireIds: string[]) => void;
   /** Available types */
   availableTypes: string[];
   /** Available modes */
   availableModes: string[];
   /** Available genres */
   availableGenres: string[];
-  /** Available playlists */
-  availablePlaylists: PlaylistWithSummary[];
+  /** Available repertoires */
+  availableRepertoires: RepertoireWithSummary[];
   /** Loading states for async data */
   loading?: {
     genres?: boolean;
-    playlists?: boolean;
+    repertoires?: boolean;
   };
   /** Selected rows count for Delete button state */
   selectedRowsCount?: number;
   /** Table instance for column visibility control and row selection */
   table?: Table<ITuneOverview>;
-  /** Playlist ID for adding tunes to repertoire */
-  playlistId?: string;
+  /** Repertoire ID for adding tunes to repertoire */
+  repertoireId?: string;
   /** Controlled state for filter panel expansion */
   filterPanelExpanded?: boolean;
   onFilterPanelExpandedChange?: (expanded: boolean) => void;
-  /** Hide playlist filter (for Repertoire tab where playlist is implied) */
-  hidePlaylistFilter?: boolean;
+  /** Hide repertoire filter (for Repertoire tab where repertoire is implied) */
+  hideRepertoireFilter?: boolean;
 }
 
 export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
@@ -99,6 +101,8 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
 
+  const activeRepertoireId = () => props.repertoireId;
+
   const handleAddToRepertoire = async () => {
     try {
       // Validation
@@ -106,8 +110,8 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
         alert("Table not initialized");
         return;
       }
-      if (!props.playlistId) {
-        alert("No active playlist selected");
+      if (!activeRepertoireId()) {
+        alert("No active repertoire selected");
         return;
       }
       if (!auth.user()) {
@@ -128,9 +132,9 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
 
       // Call database function
       const db = getDb();
-      const result = await addTunesToPlaylist(
+      const result = await addTunesToRepertoire(
         db,
-        props.playlistId,
+        activeRepertoireId()!,
         tuneIds,
         auth.user()!.id
       );
@@ -249,11 +253,11 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             availableGenres={props.availableGenres}
             selectedGenres={props.selectedGenres}
             onGenresChange={props.onGenresChange}
-            availablePlaylists={props.availablePlaylists}
-            selectedPlaylistIds={props.selectedPlaylistIds}
-            onPlaylistIdsChange={props.onPlaylistIdsChange}
+            availableRepertoires={props.availableRepertoires}
+            selectedRepertoireIds={props.selectedRepertoireIds}
+            onRepertoireIdsChange={props.onRepertoireIdsChange}
             loading={props.loading}
-            hidePlaylistFilter={props.hidePlaylistFilter}
+            hideRepertoireFilter={props.hideRepertoireFilter}
             isExpanded={props.filterPanelExpanded}
             onExpandedChange={props.onFilterPanelExpandedChange}
           />

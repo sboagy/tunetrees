@@ -96,22 +96,19 @@ export function applyMigrations(db: BetterSQLite3Database): void {
   );
 
   // Compatibility shim for Slice C rename rollout:
-  // Legacy SQLite migrations still define daily_practice_queue.playlist_ref,
+  // Legacy SQLite migrations still define daily_practice_queue.repertoire_ref,
   // while generated Drizzle schema now expects daily_practice_queue.repertoire_ref.
   // Align the in-memory unit-test schema to the generated contract.
   const queueColumns = db.all<{ name: string }>(
     `PRAGMA table_info('daily_practice_queue')` as any
   );
-  const hasPlaylistRef = queueColumns.some(
-    (column) => column.name === "playlist_ref"
-  );
   const hasRepertoireRef = queueColumns.some(
     (column) => column.name === "repertoire_ref"
   );
 
-  if (hasPlaylistRef && !hasRepertoireRef) {
-    db.run(
-      `ALTER TABLE daily_practice_queue RENAME COLUMN playlist_ref TO repertoire_ref` as any
+  if (!hasRepertoireRef) {
+    throw new Error(
+      "daily_practice_queue schema missing repertoire_ref column in test loader"
     );
   }
 }
@@ -121,7 +118,7 @@ export function applyMigrations(db: BetterSQLite3Database): void {
  *
  * Loads a simplified version of the production view from a test SQL file.
  * The test view includes only the fields used by the practice queue algorithm
- * (id, title, scheduled, latest_due, deleted, playlist_deleted, user_ref, repertoire_id).
+ * (id, title, scheduled, latest_due, deleted, repertoire_deleted, user_ref, repertoire_id).
  *
  * Production view has 40+ fields with tune_override joins, transient data, tags, notes, etc.
  * See: scripts/create-views-direct.ts for full production implementation.

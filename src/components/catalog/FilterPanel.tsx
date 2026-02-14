@@ -2,7 +2,7 @@
  * Filter Panel Component
  *
  * Implements the new separate dropdowns + filter chips pattern:
- * - 4 separate dropdown buttons (Type, Mode, Genre, Playlist)
+ * - 4 separate dropdown buttons (Type, Mode, Genre, Repertoire)
  * - Selected filter chips displayed below the dropdowns
  * - Each dropdown manages only its own filter type
  * - Clear loading states and proper responsive design
@@ -19,28 +19,30 @@ import {
   Show,
 } from "solid-js";
 import { Portal } from "solid-js/web";
-import type { PlaylistWithSummary } from "../../lib/db/types";
+import type { RepertoireWithSummary } from "../../lib/db/queries/repertoires";
 
-// Helper function to get display name for a playlist
-const getPlaylistDisplayName = (playlist: PlaylistWithSummary): string => {
-  if (playlist.name?.trim()) {
-    return playlist.name.trim();
+// Helper function to get display name for a repertoire
+const getRepertoireDisplayName = (
+  repertoire: RepertoireWithSummary
+): string => {
+  if (repertoire.name?.trim()) {
+    return repertoire.name.trim();
   }
-  const instrument = playlist.instrumentName || "Unknown";
-  return `${instrument} (${playlist.repertoireId})`;
+  const instrument = repertoire.instrumentName || "Unknown";
+  return `${instrument} (${repertoire.repertoireId})`;
 };
 
 // Filter chip component for selected items
 const FilterChip: Component<{
   label: string;
   onRemove: () => void;
-  type: "type" | "mode" | "genre" | "playlist";
+  type: "type" | "mode" | "genre" | "repertoire";
 }> = (props) => {
   const colorClasses = {
     type: "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200",
     mode: "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200",
     genre: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
-    playlist:
+    repertoire:
       "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200",
   };
 
@@ -71,11 +73,12 @@ const FilterChip: Component<{
 // Individual dropdown component
 const FilterDropdown: Component<{
   title: string;
-  items: string[] | PlaylistWithSummary[];
+  testIdKey?: string;
+  items: string[] | RepertoireWithSummary[];
   selectedItems: string[];
   onSelectionChange: (selected: string[]) => void;
   loading?: boolean;
-  isPlaylist?: boolean;
+  isRepertoire?: boolean;
 }> = (props) => {
   const [isOpen, setIsOpen] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
@@ -114,13 +117,13 @@ const FilterDropdown: Component<{
   });
 
   const toggleSelection = (item: any) => {
-    if (props.isPlaylist) {
-      const playlistId = (item as PlaylistWithSummary).repertoireId;
+    if (props.isRepertoire) {
+      const repertoireId = (item as RepertoireWithSummary).repertoireId;
       const selected = props.selectedItems;
-      if (selected.includes(playlistId)) {
-        props.onSelectionChange(selected.filter((id) => id !== playlistId));
+      if (selected.includes(repertoireId)) {
+        props.onSelectionChange(selected.filter((id) => id !== repertoireId));
       } else {
-        props.onSelectionChange([...selected, playlistId]);
+        props.onSelectionChange([...selected, repertoireId]);
       }
     } else {
       const value = item as string;
@@ -134,13 +137,15 @@ const FilterDropdown: Component<{
   };
 
   const isSelected = (item: any): boolean => {
-    if (props.isPlaylist) {
-      const playlistId = (item as PlaylistWithSummary).repertoireId;
-      return props.selectedItems.includes(playlistId);
+    if (props.isRepertoire) {
+      const repertoireId = (item as RepertoireWithSummary).repertoireId;
+      return props.selectedItems.includes(repertoireId);
     } else {
       return props.selectedItems.includes(item as string);
     }
   };
+
+  const menuKey = () => props.testIdKey ?? props.title.toLowerCase();
 
   return (
     <div class="relative" ref={dropdownRef}>
@@ -152,7 +157,7 @@ const FilterDropdown: Component<{
         aria-label={`Filter by ${props.title}`}
         aria-expanded={isOpen()}
         aria-haspopup="listbox"
-        data-testid={`filter-dropdown-${props.title.toLowerCase()}`}
+        data-testid={`filter-dropdown-${menuKey()}`}
       >
         <span>{props.title}</span>
         <Show when={props.loading}>
@@ -181,10 +186,7 @@ const FilterDropdown: Component<{
 
       <Show when={isOpen()}>
         <div class="absolute left-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-          <div
-            class="p-2"
-            data-testid={`filter-dropdown-menu-${props.title.toLowerCase()}`}
-          >
+          <div class="p-2" data-testid={`filter-dropdown-menu-${menuKey()}`}>
             <Show
               when={!props.loading && props.items.length > 0}
               fallback={
@@ -208,13 +210,15 @@ const FilterDropdown: Component<{
                       class="w-4 h-4"
                     />
                     <span class="text-gray-900 dark:text-white flex-1">
-                      {props.isPlaylist
-                        ? getPlaylistDisplayName(item as PlaylistWithSummary)
+                      {props.isRepertoire
+                        ? getRepertoireDisplayName(
+                            item as RepertoireWithSummary
+                          )
                         : (item as string)}
                     </span>
-                    <Show when={props.isPlaylist}>
+                    <Show when={props.isRepertoire}>
                       <span class="text-xs text-gray-500 dark:text-gray-400">
-                        {(item as PlaylistWithSummary).tuneCount}
+                        {(item as RepertoireWithSummary).tuneCount}
                       </span>
                     </Show>
                   </label>
@@ -251,19 +255,19 @@ export interface FilterPanelProps {
   selectedGenres: string[];
   /** Genres change handler */
   onGenresChange: (genres: string[]) => void;
-  /** Available playlists */
-  availablePlaylists: PlaylistWithSummary[];
-  /** Selected playlist IDs */
-  selectedPlaylistIds: string[];
-  /** Playlist IDs change handler */
-  onPlaylistIdsChange: (playlistIds: string[]) => void;
+  /** Available repertoires */
+  availableRepertoires: RepertoireWithSummary[];
+  /** Selected repertoire IDs */
+  selectedRepertoireIds: string[];
+  /** Repertoire IDs change handler */
+  onRepertoireIdsChange: (repertoireIds: string[]) => void;
   /** Loading states */
   loading?: {
     genres?: boolean;
-    playlists?: boolean;
+    repertoires?: boolean;
   };
-  /** Hide playlist filter (for Repertoire tab where playlist is implied) */
-  hidePlaylistFilter?: boolean;
+  /** Hide repertoire filter */
+  hideRepertoireFilter?: boolean;
   /** Controlled state for panel expansion */
   isExpanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
@@ -282,6 +286,9 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
   const setIsExpanded = (value: boolean) => {
     props.onExpandedChange?.(value);
   };
+
+  const hideRepertoireFilter = () => props.hideRepertoireFilter ?? false;
+  const repertoiresLoading = () => props.loading?.repertoires;
 
   // Calculate panel position based on trigger button
   const updatePosition = () => {
@@ -380,20 +387,20 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     props.onGenresChange(props.selectedGenres.filter((g) => g !== genre));
   };
 
-  const removePlaylist = (playlistId: string) => {
-    props.onPlaylistIdsChange(
-      props.selectedPlaylistIds.filter((id) => id !== playlistId)
+  const removeRepertoire = (repertoireId: string) => {
+    props.onRepertoireIdsChange(
+      props.selectedRepertoireIds.filter((id) => id !== repertoireId)
     );
   };
 
-  // Get playlist display name by ID
-  const getPlaylistNameById = (playlistId: string): string => {
-    const playlist = props.availablePlaylists.find(
-      (p) => p.repertoireId === playlistId
+  // Get repertoire display name by ID
+  const getRepertoireNameById = (repertoireId: string): string => {
+    const repertoire = props.availableRepertoires.find(
+      (p) => p.repertoireId === repertoireId
     );
-    return playlist
-      ? getPlaylistDisplayName(playlist)
-      : `Playlist ${playlistId}`;
+    return repertoire
+      ? getRepertoireDisplayName(repertoire)
+      : `Repertoire ${repertoireId}`;
   };
 
   // Clear all selections
@@ -401,21 +408,21 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     props.onTypesChange([]);
     props.onModesChange([]);
     props.onGenresChange([]);
-    if (!props.hidePlaylistFilter) {
-      props.onPlaylistIdsChange([]);
+    if (!hideRepertoireFilter()) {
+      props.onRepertoireIdsChange([]);
     }
   };
 
   // Get total selected count
   const totalSelected = () => {
-    const playlistCount = props.hidePlaylistFilter
+    const repertoireCount = hideRepertoireFilter()
       ? 0
-      : props.selectedPlaylistIds.length;
+      : props.selectedRepertoireIds.length;
     return (
       props.selectedTypes.length +
       props.selectedModes.length +
       props.selectedGenres.length +
-      playlistCount
+      repertoireCount
     );
   };
 
@@ -429,7 +436,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
           setIsExpanded(!isExpanded());
         }}
         title="Open filter options"
-        disabled={props.loading?.genres || props.loading?.playlists}
+        disabled={props.loading?.genres || repertoiresLoading()}
         class="flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors whitespace-nowrap border border-gray-200/50 dark:border-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Filter options"
         aria-expanded={isExpanded()}
@@ -537,17 +544,18 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   loading={props.loading?.genres}
                 />
 
-                {/* Playlist filter - only shown when not hidden */}
-                <Show when={!props.hidePlaylistFilter}>
+                {/* Repertoire filter - only shown when not hidden */}
+                <Show when={!hideRepertoireFilter()}>
                   <FilterDropdown
-                    title="Playlist"
-                    items={props.availablePlaylists}
-                    selectedItems={props.selectedPlaylistIds}
+                    title="Repertoire"
+                    testIdKey="repertoire"
+                    items={props.availableRepertoires}
+                    selectedItems={props.selectedRepertoireIds}
                     onSelectionChange={(selected) =>
-                      props.onPlaylistIdsChange(selected)
+                      props.onRepertoireIdsChange(selected)
                     }
-                    loading={props.loading?.playlists}
-                    isPlaylist={true}
+                    loading={repertoiresLoading()}
+                    isRepertoire={true}
                   />
                 </Show>
 
@@ -596,14 +604,14 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                     )}
                   </For>
 
-                  {/* Playlist chips - only shown when playlist filter not hidden */}
-                  <Show when={!props.hidePlaylistFilter}>
-                    <For each={props.selectedPlaylistIds}>
-                      {(playlistId) => (
+                  {/* Repertoire chips - only shown when filter not hidden */}
+                  <Show when={!hideRepertoireFilter()}>
+                    <For each={props.selectedRepertoireIds}>
+                      {(repertoireId) => (
                         <FilterChip
-                          label={getPlaylistNameById(playlistId)}
-                          onRemove={() => removePlaylist(playlistId)}
-                          type="playlist"
+                          label={getRepertoireNameById(repertoireId)}
+                          onRemove={() => removeRepertoire(repertoireId)}
+                          type="repertoire"
                         />
                       )}
                     </For>

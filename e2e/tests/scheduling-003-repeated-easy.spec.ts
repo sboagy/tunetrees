@@ -60,17 +60,17 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
-    // Override playlist size for FSRS testing to ensure max_interval is large enough
-    // (Formula: 3 * (playlistSize / maxReviewsPerDay))
+    // Override repertoire size for FSRS testing to ensure max_interval is large enough
+    // (Formula: 3 * (repertoireSize / maxReviewsPerDay))
     await page.addInitScript(
       (config) => {
-        (window as any).__TUNETREES_TEST_PLAYLIST_SIZE__ = config.playlistSize;
+        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = config.repertoireSize;
         (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
         (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
           config.maxReviews;
       },
       {
-        playlistSize: REPERTOIRE_SIZE,
+        repertoireSize: REPERTOIRE_SIZE,
         enableFuzz: ENABLE_FUZZ,
         maxReviews: MAX_DAILY_TUNES,
       }

@@ -6,7 +6,7 @@ import { applyRemoteChangesToLocalDb, WorkerClient } from "@oosync/sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import {
-  getPlaylistGenreDefaultsForUser,
+  getRepertoireGenreDefaultsForUser,
   getRepertoireTuneGenreIdsForUser,
   getUserGenreSelection,
 } from "@/lib/db/queries/user-genre-selection";
@@ -132,11 +132,11 @@ async function getEffectiveGenreFilterInitialSync(params: {
   // Note: preSyncMetadataViaWorker already synced user_genre_selection, repertoire, and instrument
   const [selectedGenres, repertoireDefaultGenres] = await Promise.all([
     getUserGenreSelection(db, userId),
-    getPlaylistGenreDefaultsForUser(db, userId),
+    getRepertoireGenreDefaultsForUser(db, userId),
   ]);
 
   const { data, error } = await supabase.rpc(
-    "get_playlist_tune_genres_for_user",
+    "get_repertoire_tune_genres_for_user",
     {
       p_user_id: userId,
     }
@@ -149,7 +149,7 @@ async function getEffectiveGenreFilterInitialSync(params: {
     );
   }
 
-  const playlistTuneGenres = Array.isArray(data)
+  const repertoireTuneGenres = Array.isArray(data)
     ? data
         .map((genre) => (genre == null ? null : String(genre)))
         .filter((genre): genre is string => typeof genre === "string")
@@ -158,12 +158,12 @@ async function getEffectiveGenreFilterInitialSync(params: {
   const effective = new Set([
     ...selectedGenres.map(String),
     ...repertoireDefaultGenres.map(String),
-    ...playlistTuneGenres.map(String),
+    ...repertoireTuneGenres.map(String),
   ]);
 
   return {
     effective: Array.from(effective),
-    repertoireGenres: Array.from(new Set(playlistTuneGenres.map(String))),
+    repertoireGenres: Array.from(new Set(repertoireTuneGenres.map(String))),
   };
 }
 
@@ -176,7 +176,7 @@ async function getEffectiveGenreFilterIncrementalSync(params: {
   const [selectedGenres, repertoireDefaultGenres, repertoireTuneGenres] =
     await Promise.all([
       getUserGenreSelection(db, userId),
-      getPlaylistGenreDefaultsForUser(db, userId),
+      getRepertoireGenreDefaultsForUser(db, userId),
       getRepertoireTuneGenreIdsForUser(db, userId),
     ]);
 

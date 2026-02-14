@@ -13,7 +13,7 @@ This guide covers migrating data from the legacy SQLite database to the new Supa
 
 1. Migrate production data to Supabase PostgreSQL
 2. Set up local SQLite WASM with migrated data
-3. Preserve all user data (tunes, playlists, practice records)
+3. Preserve all user data (tunes, repertoires, practice records)
 4. Maintain data integrity and relationships
 
 ---
@@ -88,8 +88,8 @@ SELECT COUNT(*) FROM tune WHERE deleted = 0;
 -- Practice records count
 SELECT COUNT(*) FROM practice_record;
 
--- Playlists count
-SELECT COUNT(*) FROM playlist WHERE deleted = 0;
+-- Repertoires count
+SELECT COUNT(*) FROM repertoire WHERE deleted = 0;
 
 -- Users count
 SELECT COUNT(*) FROM user_profile;
@@ -183,7 +183,7 @@ npm run migrate:verify
 
 - [ ] All tunes migrated (count matches)
 - [ ] All practice records migrated
-- [ ] All playlists migrated
+- [ ] All repertoires migrated
 - [ ] Foreign key relationships intact
 - [ ] No orphaned records
 - [ ] Dates formatted correctly

@@ -109,15 +109,15 @@ async function expectQueueMatchesGrid(page: Page, repertoireId: string) {
   return snapshot;
 }
 
-async function selectPlaylistByName(page: Page, playlistName: string) {
-  await ttPage.playlistDropdownButton.click();
-  await expect(ttPage.topNavManagePlaylistsPanel).toBeVisible({
+async function selectRepertoireByName(page: Page, repertoireName: string) {
+  await ttPage.repertoireDropdownButton.click();
+  await expect(ttPage.topNavManageRepertoiresPanel).toBeVisible({
     timeout: 10000,
   });
-  await ttPage.topNavManagePlaylistsPanel
-    .getByRole("button", { name: new RegExp(playlistName) })
+  await ttPage.topNavManageRepertoiresPanel
+    .getByRole("button", { name: new RegExp(repertoireName) })
     .click();
-  await expect(ttPage.topNavManagePlaylistsPanel).toBeHidden({
+  await expect(ttPage.topNavManageRepertoiresPanel).toBeHidden({
     timeout: 10000,
   });
   await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -410,7 +410,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
   }) => {
     const { supabase } = await getTestUserClient(testUserKey);
     const { data: repertoireAData, error: repertoireAError } = await supabase
-      .from("view_playlist_joined")
+      .from("view_repertoire_joined")
       .select("instrument")
       .eq("repertoire_id", testUser.repertoireId)
       .single();
@@ -441,17 +441,17 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       await waitForTestApi(page);
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
-      await selectPlaylistByName(page, repertoireAName);
+      await selectRepertoireByName(page, repertoireAName);
       const queueA = await getQueueSnapshot(page, testUser.repertoireId);
 
-      await selectPlaylistByName(page, REPERTOIRE_B_NAME);
+      await selectRepertoireByName(page, REPERTOIRE_B_NAME);
       if (!repertoireBId) {
         throw new Error("Secondary repertoire ID missing after creation");
       }
       const queueB = await getQueueSnapshot(page, repertoireBId);
       expect(queueB.tuneOrder).not.toEqual(queueA.tuneOrder);
 
-      await selectPlaylistByName(page, repertoireAName);
+      await selectRepertoireByName(page, repertoireAName);
       const queueAAfter = await getQueueSnapshot(page, testUser.repertoireId);
       expect(queueAAfter.windowStartUtc).toBe(queueA.windowStartUtc);
       expect(queueAAfter.tuneOrder).toEqual(queueA.tuneOrder);
@@ -473,12 +473,12 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     await ttPage.logoDropdownButton.click();
     await expect(ttPage.logoDropdownPanel).toBeHidden({ timeout: 10000 });
 
-    await ttPage.playlistDropdownButton.click();
-    await expect(ttPage.topNavManagePlaylistsPanel).toBeVisible({
+    await ttPage.repertoireDropdownButton.click();
+    await expect(ttPage.topNavManageRepertoiresPanel).toBeVisible({
       timeout: 10000,
     });
-    await ttPage.playlistDropdownButton.click();
-    await expect(ttPage.topNavManagePlaylistsPanel).toBeHidden({
+    await ttPage.repertoireDropdownButton.click();
+    await expect(ttPage.topNavManageRepertoiresPanel).toBeHidden({
       timeout: 10000,
     });
 
