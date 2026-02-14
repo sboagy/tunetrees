@@ -12,13 +12,13 @@ create or replace function public.e2e_delete_practice_record_by_tunes(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, auth
 as $$
 begin
   -- Ensure caller owns the target playlist (RLS-safe authorization).
   if not exists (
     select 1
-    from public.playlist p
+    from playlist p
     where p.playlist_id = target_playlist
       and p.user_ref = auth.uid()
   ) then
@@ -29,7 +29,7 @@ begin
   perform set_config('app.allow_practice_record_delete', 'on', true);
 
   -- Delete only the matching rows.
-  delete from public.practice_record pr
+  delete from practice_record pr
   where pr.playlist_ref = target_playlist
     and pr.tune_ref = any (tune_ids);
 end;

@@ -9,13 +9,13 @@ create or replace function public.e2e_clear_practice_record(target_playlist uuid
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, auth
 as $$
 begin
   -- Ensure the caller owns the playlist.
   if not exists (
     select 1
-    from public.playlist p
+    from playlist p
     where p.playlist_id = target_playlist
       and p.user_ref = auth.uid()
   ) then
@@ -25,7 +25,7 @@ begin
   -- Enable break-glass delete for this transaction.
   perform set_config('app.allow_practice_record_delete', 'on', true);
 
-  delete from public.practice_record pr
+  delete from practice_record pr
   where pr.playlist_ref = target_playlist;
 end;
 $$;
