@@ -1272,13 +1272,13 @@ async function handleSync(
     `[SYNC] Request: lastSyncAt=${payload.lastSyncAt ?? "null"}, changes=${payload.changes.length}`
   );
 
-  await db.transaction(async (tx) => {
+  const runSyncQueries = async (txLike: Transaction) => {
     // After eliminating user_profile.id, authUserId IS the user identifier.
     // No resolution needed - user_profile.id is the PK.
     const authUserId = userId;
 
     const collections = await loadUserCollections({
-      tx,
+      tx: txLike,
       userId: authUserId,
       tables: getSchemaTables(),
     });
@@ -1323,19 +1323,23 @@ async function handleSync(
     // Genre filter is passed to RPC functions when filtering note/reference tables
 
     // PUSH: Apply client changes
-    await processPushChanges(tx, ctx, payload.changes as IncomingSyncChange[]);
+    await processPushChanges(
+      txLike,
+      ctx,
+      payload.changes as IncomingSyncChange[]
+    );
 
     // PULL: Gather changes for client
     if (payload.lastSyncAt) {
       responseChanges = await processIncrementalSync(
-        tx,
+        txLike,
         payload.lastSyncAt,
         ctx
       );
     } else {
       // Paginate initial sync to avoid oversized payloads / timeouts.
       const page = await processInitialSyncPaged(
-        tx,
+        txLike,
         ctx,
         payload.pullCursor,
         payload.syncStartedAt,
@@ -1363,7 +1367,16 @@ async function handleSync(
 
     // NO GARBAGE COLLECTION NEEDED!
     // sync_change_log now has at most ~20 rows (one per table)
-  });
+  };
+
+  const isPullOnlyRequest = payload.changes.length === 0;
+  if (isPullOnlyRequest) {
+    await runSyncQueries(db as unknown as Transaction);
+  } else {
+    await db.transaction(async (tx) => {
+      await runSyncQueries(tx);
+    });
+  }
 
   debug.log(
     `[SYNC] === Completed ${syncType} sync: returning ${responseChanges.length} changes, syncedAt=${now} ===`
@@ -1468,7 +1481,7 @@ async function fetch(request: Request, env: Env): Promise<Response> {
           env.SYNC_DIAGNOSTICS_USER_ID === userId);
 
       const payload = (await request.json()) as SyncRequest;
-      const maxAttempts = 2;
+      const maxAttempts = payload.changes.length === 0 ? 1 : 2;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         const { db, close } = createDb(env);
