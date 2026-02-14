@@ -549,6 +549,7 @@ export const AuthProvider: ParentComponent = (props) => {
     // Track first completion per worker to ensure view signals fire at least once.
     let firstSyncCompletionHandled = false;
     let metadataPrefetchPromise: Promise<void> | null = null;
+    let metadataPrefetchCompleted = false;
 
     const requestOverridesProvider = async () => {
       try {
@@ -566,18 +567,27 @@ export const AuthProvider: ParentComponent = (props) => {
             authUserId
           ).catch(() => null);
 
-          if (!metadataPrefetchPromise) {
-            metadataPrefetchPromise = preSyncMetadataViaWorker({
-              db,
-              supabase,
-              lastSyncAt,
-              userId: debugUserId ?? undefined,
-            }).finally(() => {
-              metadataPrefetchPromise = null;
-            });
-          }
+          const shouldRunMetadataPrefetch =
+            !metadataPrefetchCompleted && !lastSyncAt;
 
-          await metadataPrefetchPromise;
+          if (shouldRunMetadataPrefetch) {
+            if (!metadataPrefetchPromise) {
+              metadataPrefetchPromise = preSyncMetadataViaWorker({
+                db,
+                supabase,
+                lastSyncAt,
+                userId: debugUserId ?? undefined,
+              })
+                .then(() => {
+                  metadataPrefetchCompleted = true;
+                })
+                .finally(() => {
+                  metadataPrefetchPromise = null;
+                });
+            }
+
+            await metadataPrefetchPromise;
+          }
         }
 
         const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
@@ -664,7 +674,11 @@ export const AuthProvider: ParentComponent = (props) => {
         const isNetworkError =
           errorMsg.includes("Failed to fetch") ||
           errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
-          errorMsg.includes("NetworkError");
+          errorMsg.includes("NetworkError") ||
+          errorMsg.includes(
+            "Timed out while waiting for an open slot in the pool"
+          ) ||
+          errorMsg.includes("Sync failed: 503");
 
         if (isNetworkError) {
           console.warn(

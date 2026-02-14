@@ -24,7 +24,9 @@ function isNetworkSyncError(error: unknown): boolean {
   return (
     message.includes("Failed to fetch") ||
     message.includes("ERR_INTERNET_DISCONNECTED") ||
-    message.includes("NetworkError")
+    message.includes("NetworkError") ||
+    message.includes("Timed out while waiting for an open slot in the pool") ||
+    message.includes("Sync failed: 503")
   );
 }
 
@@ -46,8 +48,8 @@ export async function preSyncMetadataViaWorker(params: {
 
   const workerClient = new WorkerClient(session.access_token);
 
-  const pullTables = async (tablesToPull: string[]): Promise<void> => {
-    if (tablesToPull.length === 0) return;
+  const pullTables = async (tablesToPull: string[]): Promise<boolean> => {
+    if (tablesToPull.length === 0) return true;
 
     let pullCursor: string | undefined;
     let syncStartedAt: string | undefined;
@@ -68,7 +70,7 @@ export async function preSyncMetadataViaWorker(params: {
           console.warn(
             "[GenreFilter] Metadata pre-sync skipped due network error; continuing with best-effort local metadata"
           );
-          return;
+          return false;
         }
         throw error;
       }
@@ -106,6 +108,8 @@ export async function preSyncMetadataViaWorker(params: {
       pullCursor = response.nextCursor;
       syncStartedAt = response.syncStartedAt ?? syncStartedAt;
     } while (pullCursor);
+
+    return true;
   };
 
   const uniqueTables = Array.from(new Set(tables));
@@ -115,7 +119,10 @@ export async function preSyncMetadataViaWorker(params: {
   );
 
   if (hasUserProfile) {
-    await pullTables(["user_profile"]);
+    const userProfilePulled = await pullTables(["user_profile"]);
+    if (!userProfilePulled) {
+      return;
+    }
   }
 
   await pullTables(remainingTables);

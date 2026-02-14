@@ -214,6 +214,23 @@ function formatDbError(error: unknown): string {
   return fallback;
 }
 
+function isRetryableDbPoolError(error: unknown): boolean {
+  const fallback = error instanceof Error ? error.message : String(error);
+  const formatted = formatDbError(error);
+  const combined = `${fallback} ${formatted}`.toLowerCase();
+
+  return (
+    combined.includes("timed out while waiting for an open slot in the pool") ||
+    combined.includes("too many connections") ||
+    combined.includes("code=53300") ||
+    combined.includes("code=57p03")
+  );
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function createDb(env: Env): {
   client: PostgresClient;
   db: DrizzleDb;
@@ -230,7 +247,14 @@ function createDb(env: Env): {
   // IMPORTANT (Cloudflare Workers): Do NOT cache/reuse database clients across requests.
   // Newer Workers runtimes enforce request-scoped I/O; reusing a client can trigger:
   // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
-  const client = postgres(connectionString);
+  const client = postgres(connectionString, {
+    prepare: false,
+    // Keep a small pool per request to avoid self-contention when sync code issues
+    // parallel reads inside a single request, while still limiting connection fan-out.
+    max: 4,
+    connect_timeout: 10,
+    idle_timeout: 20,
+  });
   const db = drizzle(client, { schema: getSchemaTables() });
 
   const close = async () => {
@@ -1443,11 +1467,11 @@ async function fetch(request: Request, env: Env): Promise<Response> {
         (!env.SYNC_DIAGNOSTICS_USER_ID ||
           env.SYNC_DIAGNOSTICS_USER_ID === userId);
 
-      // Connect to database
-      try {
-        const { db, close } = createDb(env);
-        const payload = (await request.json()) as SyncRequest;
+      const payload = (await request.json()) as SyncRequest;
+      const maxAttempts = 2;
 
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const { db, close } = createDb(env);
         try {
           debug.log(`[HTTP] Sync request parsed, calling handleSync`);
           const response = await handleSync(
@@ -1458,13 +1482,28 @@ async function fetch(request: Request, env: Env): Promise<Response> {
           );
           debug.log(`[HTTP] Sync completed successfully`);
           return jsonResponse(response, 200, corsHeaders);
+        } catch (error) {
+          const retryable = isRetryableDbPoolError(error);
+          console.error(
+            `[HTTP] Sync error (attempt ${attempt}/${maxAttempts}):`,
+            error
+          );
+
+          if (!retryable || attempt >= maxAttempts) {
+            return errorResponse(
+              formatDbError(error),
+              retryable ? 503 : 500,
+              corsHeaders
+            );
+          }
+
+          await delay(attempt * 150);
         } finally {
           await close();
         }
-      } catch (error) {
-        console.error("[HTTP] Sync error:", error);
-        return errorResponse(formatDbError(error), 500, corsHeaders);
       }
+
+      return errorResponse("Sync failed after retries", 503, corsHeaders);
     }
 
     return new Response("Not Found", { status: 404, headers: corsHeaders });
