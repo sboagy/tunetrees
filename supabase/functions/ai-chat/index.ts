@@ -9,7 +9,15 @@
  * 5. Returns streaming response with text or tool calls
  */
 
+// @ts-expect-error JSR import is resolved by the Supabase Edge Runtime (Deno), not local Node tsserver.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+
+declare const Deno: {
+  env: {
+    get: (key: string) => string | undefined;
+  };
+  serve: (handler: (req: Request) => Promise<Response> | Response) => void;
+};
 
 // Tool definitions for Gemini Function Calling
 const TOOLS = [
@@ -128,7 +136,23 @@ interface RequestBody {
   history?: Array<{ role: string; content: string }>;
 }
 
-Deno.serve(async (req) => {
+interface TuneRow {
+  id: string;
+  title: string;
+  type: string | null;
+  mode: string | null;
+  genre: string | null;
+}
+
+interface GeminiApiErrorPayload {
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+}
+
+Deno.serve(async (req: Request) => {
   try {
     // CORS headers
     if (req.method === "OPTIONS") {
@@ -190,8 +214,7 @@ Deno.serve(async (req) => {
         title,
         type,
         mode,
-        genre,
-        tune_override!left(key_override)
+        genre
       `
       )
       .or(`private_for.eq.${user.id},private_for.is.null`)
@@ -200,7 +223,10 @@ Deno.serve(async (req) => {
     if (tunesError) {
       console.error("Error fetching tunes:", tunesError);
       return new Response(
-        JSON.stringify({ error: "Failed to fetch repertoire" }),
+        JSON.stringify({
+          error: "Failed to fetch repertoire",
+          details: tunesError.message,
+        }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -226,7 +252,7 @@ Deno.serve(async (req) => {
     }
 
     // Format repertoire context
-    const repertoireContext = tunes
+    const repertoireContext = (tunes as TuneRow[] | null)
       ?.map((tune) => {
         const state = statusMap.get(tune.id);
         const statusLabel =
@@ -276,30 +302,62 @@ Deno.serve(async (req) => {
       },
     ];
 
-    // Call Gemini API
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: messages,
-          tools: [{ functionDeclarations: TOOLS }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          },
-        }),
-      }
+    const requestedModel = Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash";
+    const modelCandidates = Array.from(
+      new Set([requestedModel, "gemini-2.0-flash", "gemini-1.5-flash-latest"])
     );
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API error:", errorText);
+    let geminiResponse: Response | null = null;
+    let geminiErrorMessage = "Unknown Gemini API error";
+
+    for (const model of modelCandidates) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: messages,
+            tools: [{ functionDeclarations: TOOLS }],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 1024,
+            },
+          }),
+        }
+      );
+
+      if (response.ok) {
+        geminiResponse = response;
+        break;
+      }
+
+      const errorText = await response.text();
+      let providerMessage = errorText;
+
+      try {
+        const providerPayload = JSON.parse(errorText) as GeminiApiErrorPayload;
+        providerMessage = providerPayload.error?.message || errorText;
+      } catch {
+        // keep raw text when response is not valid JSON
+      }
+
+      geminiErrorMessage = `Model ${model}: ${providerMessage}`;
+      console.error("Gemini API error:", geminiErrorMessage);
+
+      if (response.status !== 404) {
+        break;
+      }
+    }
+
+    if (!geminiResponse) {
       return new Response(
-        JSON.stringify({ error: "Failed to get AI response" }),
+        JSON.stringify({
+          error: "Failed to get AI response",
+          details: geminiErrorMessage,
+        }),
         {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -312,13 +370,10 @@ Deno.serve(async (req) => {
     // Extract response
     const candidate = geminiData.candidates?.[0];
     if (!candidate) {
-      return new Response(
-        JSON.stringify({ error: "No response from AI" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      return new Response(JSON.stringify({ error: "No response from AI" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Check for function calls

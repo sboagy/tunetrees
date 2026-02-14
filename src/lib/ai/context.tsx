@@ -5,15 +5,14 @@
  */
 
 import {
-  createContext,
-  useContext,
-  type ParentComponent,
-  createSignal,
   type Accessor,
+  createContext,
+  createSignal,
+  type ParentComponent,
+  useContext,
 } from "solid-js";
-import type { Message, ChatState } from "./types";
 import { supabase } from "../supabase/client";
-import type { AIResponse } from "./types";
+import type { AIResponse, ChatState, Message } from "./types";
 
 interface ChatContextValue {
   state: Accessor<ChatState>;
@@ -60,6 +59,19 @@ export const ChatProvider: ParentComponent = (props) => {
         throw new Error("Not authenticated");
       }
 
+      // Validate session against current Supabase project.
+      // This catches stale sessions after switching between local/remote envs.
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) {
+        await supabase.auth.signOut();
+        throw new Error(
+          "Unauthorized. Your session is invalid for this Supabase environment. Please sign in again."
+        );
+      }
+
       // Get function URL
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const functionUrl = `${supabaseUrl}/functions/v1/ai-chat`;
@@ -86,8 +98,37 @@ export const ChatProvider: ParentComponent = (props) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to get AI response");
+        if (response.status === 401) {
+          await supabase.auth.signOut();
+          throw new Error(
+            "Unauthorized. Please sign in again (local and remote Supabase sessions can get mismatched)."
+          );
+        }
+
+        const responseText = await response.text();
+        let errorMessage = `Failed to get AI response (${response.status})`;
+
+        if (responseText) {
+          try {
+            const errorData = JSON.parse(responseText) as {
+              error?: string;
+              message?: string;
+              details?: string;
+            };
+            if (errorData.error && errorData.details) {
+              errorMessage = `${errorData.error}: ${errorData.details}`;
+            } else {
+              errorMessage =
+                errorData.error ||
+                errorData.message ||
+                `${errorMessage}: ${responseText}`;
+            }
+          } catch {
+            errorMessage = `${errorMessage}: ${responseText}`;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const aiResponse: AIResponse = await response.json();

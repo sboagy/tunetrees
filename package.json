@@ -9,6 +9,7 @@
     "dev": "vite",
     "dev:worker": "cd worker && npm run dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
+    "ai:serve:local": "supabase functions serve ai-chat --env-file .env.local --no-verify-jwt",
     "build": "tsc -b && vite build",
     "build:preview-local": "tsc -b && tsx scripts/build-preview-local.ts",
     "preview": "vite preview",

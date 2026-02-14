@@ -24,12 +24,12 @@ import {
   on,
   Show,
 } from "solid-js";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
+import { ChatFAB } from "../components/ai/ChatFAB";
 import { CatalogToolbar } from "../components/catalog";
 import { TunesGridCatalog } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
-import { ChatFAB } from "../components/ai/ChatFAB";
-import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
@@ -386,7 +386,7 @@ const CatalogPage: Component = () => {
         setSelectedTypes={setSelectedTypes}
         setSelectedModes={setSelectedModes}
         setSelectedGenres={setSelectedGenres}
-        currentPlaylistId={currentPlaylistId() || undefined}
+        currentRepertoireId={currentRepertoireId() || undefined}
       />
     </div>
   );

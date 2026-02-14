@@ -5,22 +5,22 @@
  * This is the "hands" that connect AI decisions to app actions.
  */
 
+import type { SqliteDatabase } from "../db/client-sqlite";
+import { createNote, getNotesByTune, updateNote } from "../db/queries/notes";
+import { createPracticeRecord } from "../db/queries/practice-records";
+import { searchTunes } from "../db/queries/tunes";
 import type {
-  FilterTunesArgs,
-  LogPracticeArgs,
   AddNoteArgs,
+  FilterTunesArgs,
   GetTuneDetailsArgs,
+  LogPracticeArgs,
   ToolCall,
 } from "./types";
-import { createPracticeRecord } from "../db/queries/practice-records";
-import { createNote, getNotesByTune, updateNote } from "../db/queries/notes";
-import { searchTunes } from "../db/queries/tunes";
-import type { SqliteDatabase } from "../db/client-sqlite";
 
 interface ToolExecutorContext {
   localDb: SqliteDatabase;
   userId: string;
-  currentPlaylistId?: string;
+  currentRepertoireId?: string;
   setSelectedTypes?: (types: string[]) => void;
   setSelectedModes?: (modes: string[]) => void;
   setSelectedGenres?: (genres: string[]) => void;
@@ -67,8 +67,7 @@ export async function executeToolCall(
     console.error("Tool execution error:", error);
     return {
       success: false,
-      message:
-        error instanceof Error ? error.message : "Tool execution failed",
+      message: error instanceof Error ? error.message : "Tool execution failed",
     };
   }
 }
@@ -122,7 +121,7 @@ async function logPractice(
   args: LogPracticeArgs,
   context: ToolExecutorContext
 ): Promise<ToolExecutionResult> {
-  const { localDb, userId, currentPlaylistId } = context;
+  const { localDb, userId, currentRepertoireId } = context;
 
   // Find tune by title
   const tunes = await searchTunes(localDb, {
@@ -147,19 +146,24 @@ async function logPractice(
     };
   }
 
-  // Use current playlist or return error if none available
-  if (!currentPlaylistId) {
+  // Use current repertoire or return error if none available
+  if (!currentRepertoireId) {
     return {
       success: false,
-      message: "No active playlist. Please select a repertoire first.",
+      message: "No active repertoire. Please select a repertoire first.",
     };
   }
 
   // Create practice record
-  const recordId = await createPracticeRecord(localDb, currentPlaylistId, tune.id, {
-    practiced: new Date().toISOString(),
-    quality: args.quality ?? 3,
-  });
+  const recordId = await createPracticeRecord(
+    localDb,
+    currentRepertoireId,
+    tune.id,
+    {
+      practiced: new Date().toISOString(),
+      quality: args.quality ?? 3,
+    }
+  );
 
   return {
     success: true,

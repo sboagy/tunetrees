@@ -22,6 +22,8 @@ import {
   Show,
   Switch,
 } from "solid-js";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
+import { ChatFAB } from "../components/ai/ChatFAB";
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
@@ -35,8 +37,6 @@ import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import * as schema from "../lib/db/schema";
 import { log } from "../lib/logger";
-import { ChatFAB } from "../components/ai/ChatFAB";
-import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 
 const arraysEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((v, i) => v === b[i]);
@@ -425,7 +425,7 @@ const RepertoirePage: Component = () => {
         setSelectedTypes={setSelectedTypes}
         setSelectedModes={setSelectedModes}
         setSelectedGenres={setSelectedGenres}
-        currentPlaylistId={currentPlaylistId() || undefined}
+        currentRepertoireId={currentRepertoireId() || undefined}
       />
     </div>
   );

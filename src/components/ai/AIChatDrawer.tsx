@@ -7,13 +7,13 @@
  * @module components/ai/AIChatDrawer
  */
 
-import { X, Send, Sparkles, Loader2 } from "lucide-solid";
+import { Loader2, Send, Sparkles, X } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createSignal, Show, For, createEffect } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { toast } from "solid-sonner";
 import { useChat } from "../../lib/ai/context";
 import { executeToolCall } from "../../lib/ai/tool-executor";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { toast } from "solid-sonner";
 
 export interface AIChatDrawerProps {
   /** Whether drawer is open */
@@ -24,7 +24,7 @@ export interface AIChatDrawerProps {
   setSelectedTypes?: (types: string[]) => void;
   setSelectedModes?: (modes: string[]) => void;
   setSelectedGenres?: (genres: string[]) => void;
-  currentPlaylistId?: string;
+  currentRepertoireId?: string;
 }
 
 export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
@@ -32,6 +32,9 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
   const { localDb, user } = useAuth();
   const [input, setInput] = createSignal("");
   const [messagesEndRef, setMessagesEndRef] = createSignal<HTMLDivElement>();
+  const [processedToolMessageIds, setProcessedToolMessageIds] = createSignal<
+    Set<string>
+  >(new Set());
 
   let inputRef: HTMLTextAreaElement | undefined;
 
@@ -55,12 +58,21 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
     const messages = state().messages;
     const lastMessage = messages[messages.length - 1];
 
-    if (lastMessage?.toolCall && lastMessage.role === "assistant") {
-      // Execute tool call
+    if (
+      lastMessage?.toolCall &&
+      lastMessage.role === "assistant" &&
+      !processedToolMessageIds().has(lastMessage.id)
+    ) {
+      setProcessedToolMessageIds((prev) => {
+        const next = new Set(prev);
+        next.add(lastMessage.id);
+        return next;
+      });
+
       executeToolCall(lastMessage.toolCall, {
         localDb: localDb()!,
         userId: user()?.id || "",
-        currentPlaylistId: props.currentPlaylistId,
+        currentRepertoireId: props.currentRepertoireId,
         setSelectedTypes: props.setSelectedTypes,
         setSelectedModes: props.setSelectedModes,
         setSelectedGenres: props.setSelectedGenres,
@@ -105,12 +117,19 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
     }
   };
 
+  const handleClearConversation = () => {
+    clearMessages();
+    setProcessedToolMessageIds(new Set<string>());
+  };
+
   return (
     <Show when={props.isOpen}>
       {/* Backdrop */}
-      <div
+      <button
+        type="button"
         class="fixed inset-0 bg-black/30 z-40"
         onClick={props.onClose}
+        aria-label="Close chat"
       />
 
       {/* Drawer */}
@@ -240,7 +259,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
           <Show when={state().messages.length > 0}>
             <button
               type="button"
-              onClick={clearMessages}
+              onClick={handleClearConversation}
               class="mt-2 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             >
               Clear conversation

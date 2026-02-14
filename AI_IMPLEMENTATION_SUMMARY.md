@@ -82,13 +82,20 @@ To deploy and activate the AI Practice Assistant, follow these steps:
 # Create a free API key (15 requests/minute)
 ```
 
-### 2. Configure Supabase
+### 2. Configure Supabase (Remote)
 ```bash
-# Set the secret (production)
+# Remote project secret for deployed function (uses linked project)
 supabase secrets set GEMINI_API_KEY=your_api_key_here
 
-# Or for local development
-supabase secrets set GEMINI_API_KEY=your_key --env-file .env.local
+# Or target a specific project directly
+supabase secrets set GEMINI_API_KEY=your_api_key_here --project-ref your_project_ref
+
+# Or read values from a production env file and set on linked project
+# (with GEMINI_API_KEY=your_key in .env.local)
+supabase secrets set --env-file .env.production
+
+# For local dev use `--no-verify-jwt` (local runtime can fail on ES256 JWT verification)
+# App-level auth is still enforced in the function via supabase.auth.getUser()
 ```
 
 ### 3. Deploy Edge Function
@@ -98,6 +105,9 @@ supabase functions deploy ai-chat
 
 # Verify deployment
 supabase functions list
+
+# Or run locally (does not deploy)
+npm run ai:serve:local
 ```
 
 ### 4. Test the Feature
@@ -134,7 +144,9 @@ supabase functions list
 ## 🐛 Troubleshooting
 
 ### "Gemini API key not configured"
-**Solution**: Run `supabase secrets set GEMINI_API_KEY=your_key`
+**Solution**:
+- For deployed/remote function: `supabase secrets set GEMINI_API_KEY=your_key`
+- For local serve: ensure `.env.local` has `GEMINI_API_KEY=your_key` and run `npm run ai:serve:local`
 
 ### Function not responding
 **Debug**:
@@ -143,8 +155,14 @@ supabase functions list
 supabase functions logs ai-chat --follow
 
 # Test locally
-supabase functions serve ai-chat
+npm run ai:serve:local
 ```
+
+### "Key for the ES256 algorithm must be of type CryptoKey"
+**Cause**: Local Edge runtime JWT verification mismatch.
+
+**Solution**: Serve locally with:
+`npm run ai:serve:local`
 
 ### Chat drawer not appearing
 1. Ensure you're on Catalog or Repertoire page

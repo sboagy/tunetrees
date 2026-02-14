@@ -18,6 +18,9 @@ supabase secrets set GEMINI_API_KEY=your_gemini_api_key_here
 
 # For local development
 supabase secrets set GEMINI_API_KEY=your_gemini_api_key_here --env-file .env.local
+
+# Optional: set explicit model (default is gemini-2.0-flash)
+supabase secrets set GEMINI_MODEL=gemini-2.0-flash --env-file .env.local
 ```
 
 ### 2. Deploy the Function
@@ -67,7 +70,7 @@ supabase start
 
 ```bash
 # Terminal 1: Serve the function
-supabase functions serve ai-chat
+npm run ai:serve:local
 
 # Terminal 2: Start the frontend dev server
 npm run dev
@@ -104,6 +107,17 @@ supabase secrets set GEMINI_API_KEY=your_key
 1. Ensure user is logged in
 2. Check that `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are correct
 3. Verify Edge Function CORS settings
+
+### "Key for the ES256 algorithm must be of type CryptoKey"
+
+**Cause**: Local Edge runtime JWT verification mismatch when verifying ES256 tokens.
+
+**Solution**:
+```bash
+npm run ai:serve:local
+```
+
+The function still validates user auth via `supabase.auth.getUser()` in handler code.
 
 ### Function not responding
 
