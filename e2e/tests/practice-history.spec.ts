@@ -36,7 +36,7 @@ async function gotoPracticeHistory(page: Page, tuneId: string) {
 
   // Wait for initial practice history query to resolve.
   // The header (incl. Add button) renders immediately, but actions can no-op until
-  // local DB + playlist context are ready.
+  // local DB + repertoire context are ready.
   const container = page.getByTestId("practice-history-container");
   const loading = container.getByText("Loading practice history...");
   await expect(loading).toHaveCount(0, { timeout: 20_000 });

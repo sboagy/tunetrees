@@ -244,7 +244,7 @@ Sync Queue (enqueue change)
 - Browse repertoire and catalog
 - View practice history
 - Edit tune metadata
-- Add/remove from playlists
+- Add/remove from repertoires
 - View ABC notation and notes
 
 **⚠️ Requires Initial Online Session:**
@@ -513,7 +513,7 @@ VitePWA({
 
 - [ ] Conflict resolution UI (user chooses which version)
 - [ ] Device management (view/remove trusted devices)
-- [ ] Selective sync (sync only selected playlists)
+- [ ] Selective sync (sync only selected repertoires)
 - [ ] Sync status dashboard (per-table sync state)
 
 ---

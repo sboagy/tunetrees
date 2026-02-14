@@ -115,7 +115,7 @@ Duration   2.22s
 **Query Layer:**
 - `src/lib/db/queries/` - Type-safe query functions
   - tunes.ts - Tune operations
-  - playlists.ts - Playlist operations
+  - repertoires.ts - Repertoire operations
   - practice.ts - Practice records
   - notes.ts - Note operations
   - references.ts - References/links
@@ -244,7 +244,7 @@ ls src/lib/db/client-sqlite.ts
 While all requirements are met, these could enhance the system:
 
 1. **Additional Test Coverage**
-   - Playlist CRUD tests
+   - Repertoire CRUD tests
    - Note CRUD tests
    - Practice record tests
    - Sync queue tests

@@ -124,11 +124,11 @@ test.describe("Anonymous User Edge Cases", () => {
   });
 
   test("5.4 Anonymous user sign-out clears local data", async ({ page }) => {
-    // Sign in anonymously WITH a playlist (needed for repertoire functionality)
+    // Sign in anonymously WITH a repertoire (needed for repertoire functionality)
     await ttPage.gotoLogin();
     await ttPage.signInAnonymously({
       ...ANON_REPERTOIRE_CONFIG,
-      name: "Sign Out Test Playlist",
+      name: "Sign Out Test Repertoire",
     });
 
     // Add some data - navigate to catalog
@@ -163,29 +163,29 @@ test.describe("Anonymous User Edge Cases", () => {
     // Sign out
     await ttPage.signOut();
 
-    // Sign in anonymously again (new session) - without playlist this time
+    // Sign in anonymously again (new session) - without repertoire this time
     // because a new anonymous session starts fresh
     await ttPage.signInAnonymously();
 
     // Check that we're back on the home page
-    // Note: Without a playlist, repertoire tab shows "No playlist selected"
+    // Note: Without a repertoire, repertoire tab shows "No repertoire selected"
     await ttPage.repertoireTab.click();
 
-    // Expect either the repertoire grid (if playlist persists) or the "no playlist" message
-    const noPlaylistMessage = page.getByText("No playlist selected");
+    // Expect either the repertoire grid (if repertoire persists) or the "no repertoire" message
+    const noRepertoireMessage = page.getByText("No repertoire selected");
     const repertoireGridVisible = await ttPage.repertoireGrid
       .isVisible({ timeout: 2000 })
       .catch(() => false);
-    const noPlaylistVisible = await noPlaylistMessage
+    const noRepertoireVisible = await noRepertoireMessage
       .isVisible({ timeout: 2000 })
       .catch(() => false);
 
-    // Either way is valid - data cleared means no playlist, or data persisted means it's there
-    expect(repertoireGridVisible || noPlaylistVisible).toBe(true);
+    // Either way is valid - data cleared means no repertoire, or data persisted means it's there
+    expect(repertoireGridVisible || noRepertoireVisible).toBe(true);
 
     // Log the state for debugging
     console.log(
-      `After re-login: repertoireGrid=${repertoireGridVisible}, noPlaylist=${noPlaylistVisible}`
+      `After re-login: repertoireGrid=${repertoireGridVisible}, noRepertoire=${noRepertoireVisible}`
     );
   });
 

@@ -289,7 +289,7 @@ interface SyncContext {
   collections: Record<string, Set<string>>;
   pullTables?: Set<string>;
   /** Genre filter from client (effective genre list). */
-  genreFilter?: { selectedGenreIds: string[]; playlistGenreIds: string[] };
+  genreFilter?: { selectedGenreIds: string[]; repertoireGenreIds: string[] };
   now: string;
   diagnosticsEnabled: boolean;
 }
@@ -911,7 +911,7 @@ async function fetchTableForInitialSyncPage(
     collections: ctx.collections,
   });
   if (conditions === null) {
-    debug.log(`[PULL:INITIAL] Skipping ${tableName} (no playlists for user)`);
+    debug.log(`[PULL:INITIAL] Skipping ${tableName} (no repertoires for user)`);
     return [];
   }
 
@@ -1138,8 +1138,8 @@ async function fetchChangedRowsFromTable(
     collections: ctx.collections,
   });
   if (userConditions === null) {
-    debug.log(`[PULL:INCR] Skipping ${tableName} (no playlists for user)`);
-    return []; // Skip table (e.g., no playlists)
+    debug.log(`[PULL:INCR] Skipping ${tableName} (no repertoires for user)`);
+    return []; // Skip table (e.g., no repertoires)
   }
 
   const timeCondition = gt(t.lastModifiedAt, lastSyncAt);
@@ -1269,8 +1269,8 @@ async function handleSync(
 
     if (payload.genreFilter) {
       const selected = payload.genreFilter.selectedGenreIds ?? [];
-      const playlist = payload.genreFilter.playlistGenreIds ?? [];
-      const effective = [...selected, ...playlist].map((g) => String(g));
+      const repertoire = payload.genreFilter.repertoireGenreIds ?? [];
+      const effective = [...selected, ...repertoire].map((g) => String(g));
       collections.selectedGenres = new Set(effective);
     }
 

@@ -14,7 +14,7 @@ import { MainLayout } from "./components/layout";
 import { SidebarDockProvider } from "./components/layout/SidebarDockContext";
 import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
 import { AuthProvider } from "./lib/auth/AuthContext";
-import { CurrentPlaylistProvider } from "./lib/context/CurrentPlaylistContext";
+import { CurrentRepertoireProvider } from "./lib/context/CurrentRepertoireContext";
 import { CurrentTuneProvider } from "./lib/context/CurrentTuneContext";
 import { OnboardingProvider } from "./lib/context/OnboardingContext";
 import { UIPreferencesProvider } from "./lib/context/UIPreferencesContext";
@@ -78,7 +78,7 @@ function App() {
     <AuthProvider>
       <OnboardingProvider>
         <UIPreferencesProvider>
-          <CurrentPlaylistProvider>
+          <CurrentRepertoireProvider>
             <CurrentTuneProvider>
               <SidebarDockProvider>
                 {/* Toast notification provider */}
@@ -212,7 +212,7 @@ function App() {
                 </Router>
               </SidebarDockProvider>
             </CurrentTuneProvider>
-          </CurrentPlaylistProvider>
+          </CurrentRepertoireProvider>
         </UIPreferencesProvider>
       </OnboardingProvider>
     </AuthProvider>

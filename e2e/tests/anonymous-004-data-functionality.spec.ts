@@ -35,7 +35,7 @@ test.describe("Anonymous User Data Functionality", () => {
 
   test("4.1 Anonymous user can view catalog tunes", async ({ page }) => {
     ttPage = new TuneTreesPage(page);
-    // Sign in anonymously (no playlist needed for catalog viewing)
+    // Sign in anonymously (no repertoire needed for catalog viewing)
     await ttPage.gotoLogin();
     await ttPage.signInAnonymously(ANON_REPERTOIRE_CONFIG);
 
@@ -56,11 +56,11 @@ test.describe("Anonymous User Data Functionality", () => {
 
   test("4.2 Anonymous user can add tune to repertoire", async ({ page }) => {
     ttPage = new TuneTreesPage(page);
-    // Sign in anonymously WITH a playlist (needed for repertoire functionality)
+    // Sign in anonymously WITH a repertoire (needed for repertoire functionality)
     await ttPage.gotoLogin();
     await ttPage.signInAnonymously({
       ...ANON_REPERTOIRE_CONFIG,
-      name: "Anon Test Playlist",
+      name: "Anon Test Repertoire",
     });
 
     // Navigate to Catalog tab
@@ -115,7 +115,7 @@ test.describe("Anonymous User Data Functionality", () => {
   }) => {
     test.setTimeout(60_000);
     ttPage = new TuneTreesPage(page);
-    // Sign in anonymously WITH a playlist (needed for repertoire functionality)
+    // Sign in anonymously WITH a repertoire (needed for repertoire functionality)
     await ttPage.gotoLogin();
     await ttPage.signInAnonymously({
       ...ANON_REPERTOIRE_CONFIG,
@@ -194,7 +194,7 @@ test.describe("Anonymous User Data Functionality", () => {
     page,
   }) => {
     ttPage = new TuneTreesPage(page);
-    // Sign in anonymously (no playlist needed for reference data viewing)
+    // Sign in anonymously (no repertoire needed for reference data viewing)
     await ttPage.gotoLogin();
     await ttPage.signInAnonymously(ANON_REPERTOIRE_CONFIG);
 

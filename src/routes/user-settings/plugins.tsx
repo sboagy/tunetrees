@@ -55,8 +55,8 @@ function addDays(isoDate, days) {
 async function getRecentQualities(queryDb, input) {
   const rows = await queryDb(
     "SELECT quality FROM practice_record " +
-      "WHERE playlist_ref = '" +
-      input.playlistRef +
+      "WHERE repertoire_ref = '" +
+      input.repertoireRef +
       "' AND tune_ref = '" +
       input.tuneRef +
       "' ORDER BY practiced DESC LIMIT 6"
@@ -267,7 +267,7 @@ const PluginsPage: Component = () => {
     processFirstReview: JSON.stringify(
       {
         input: {
-          playlistRef: "playlist-id",
+          repertoireRef: "repertoire-id",
           tuneRef: "tune-id",
           quality: 3,
           practiced: new Date().toISOString(),
@@ -296,7 +296,7 @@ const PluginsPage: Component = () => {
     processReview: JSON.stringify(
       {
         input: {
-          playlistRef: "playlist-id",
+          repertoireRef: "repertoire-id",
           tuneRef: "tune-id",
           quality: 3,
           practiced: new Date().toISOString(),
@@ -305,7 +305,7 @@ const PluginsPage: Component = () => {
         },
         prior: {
           id: "record-id",
-          playlistRef: "playlist-id",
+          repertoireRef: "repertoire-id",
           tuneRef: "tune-id",
           practiced: new Date().toISOString(),
           quality: 3,

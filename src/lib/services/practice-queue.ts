@@ -331,7 +331,7 @@ export function classifyQueueBucket(
 export interface DailyPracticeQueueRow {
   id?: string;
   userRef: string;
-  playlistRef: string;
+  repertoireRef: string;
   windowStartUtc: string;
   windowEndUtc: string;
   tuneRef: string;
@@ -362,14 +362,14 @@ export interface DailyPracticeQueueRow {
  *
  * @param db - SQLite database instance
  * @param userRef - Supabase Auth UUID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param windowStartKey - Window start timestamp (YYYY-MM-DD HH:MM:SS)
  * @returns Array of existing active queue rows
  */
 async function fetchExistingActiveQueue(
   db: AnyDatabase,
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   windowStartKey: string
 ): Promise<DailyPracticeQueueRow[]> {
   const variants = buildWindowStartUtcVariants(windowStartKey);
@@ -379,7 +379,7 @@ async function fetchExistingActiveQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistRef),
+        eq(dailyPracticeQueue.repertoireRef, repertoireRef),
         inArray(dailyPracticeQueue.windowStartUtc, variants),
         eq(dailyPracticeQueue.active, 1)
       )
@@ -402,7 +402,7 @@ async function fetchExistingActiveQueue(
  * @param windows - Scheduling windows
  * @param prefs - Scheduling preferences
  * @param userRef - Supabase Auth UUID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param mode - Queue mode ("per_day" or "rolling")
  * @param localTzOffsetMinutes - Timezone offset
  * @param forceBucket - Force all rows to specific bucket (optional, for Q3 override)
@@ -413,7 +413,7 @@ function buildQueueRows(
   windows: SchedulingWindows,
   prefs: PrefsSchedulingOptions,
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   mode: string,
   localTzOffsetMinutes: number | null,
   forceBucket?: number
@@ -444,7 +444,7 @@ function buildQueueRows(
 
     results.push({
       userRef,
-      playlistRef,
+      repertoireRef: repertoireRef,
       mode,
       queueDate: mode === "per_day" ? windows.startTs.substring(0, 10) : null,
       windowStartUtc: windows.startTs,
@@ -483,7 +483,7 @@ function buildQueueRows(
  * @param db - SQLite database instance
  * @param rows - Queue rows to insert
  * @param userRef - Supabase Auth UUID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param windows - Scheduling windows
  * @returns Persisted queue rows (may be existing rows if conflict)
  */
@@ -491,7 +491,7 @@ async function persistQueueRows(
   db: AnyDatabase,
   rows: Omit<DailyPracticeQueueRow, "id">[],
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   windows: SchedulingWindows
 ): Promise<DailyPracticeQueueRow[]> {
   try {
@@ -509,7 +509,7 @@ async function persistQueueRows(
     return await fetchExistingActiveQueue(
       db,
       userRef,
-      playlistRef,
+      repertoireRef,
       windows.startTs
     );
   } catch (error) {
@@ -521,7 +521,7 @@ async function persistQueueRows(
     return await fetchExistingActiveQueue(
       db,
       userRef,
-      playlistRef,
+      repertoireRef,
       windows.startTs
     );
   }
@@ -535,7 +535,7 @@ async function persistQueueRows(
  *
  * @param db - SQLite database instance
  * @param userRef - Supabase Auth UUID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param practiceDate - The practice date (from getPracticeDate())
  * @param localTzOffsetMinutes - Client timezone offset (optional)
  * @returns True if queue was created, false if already existed
@@ -545,7 +545,7 @@ async function persistQueueRows(
  * import { getPracticeDate } from '../utils/practice-date';
  *
  * const practiceDate = getPracticeDate();
- * const created = await ensureDailyQueue(db, userId, playlistId, practiceDate);
+ * const created = await ensureDailyQueue(db, userId, repertoireId, practiceDate);
  * if (created) {
  *   console.log('Created new daily queue');
  * }
@@ -554,7 +554,7 @@ async function persistQueueRows(
 export async function ensureDailyQueue(
   db: AnyDatabase,
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   practiceDate: Date,
   localTzOffsetMinutes: number | null = null
 ): Promise<boolean> {
@@ -573,7 +573,7 @@ export async function ensureDailyQueue(
     SELECT 1 as one
     FROM daily_practice_queue
     WHERE user_ref = ${userRef}
-      AND playlist_ref = ${playlistRef}
+      AND repertoire_ref = ${repertoireRef}
       AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartUtcIso19}
     LIMIT 1
   `);
@@ -593,7 +593,7 @@ export async function ensureDailyQueue(
   await generateOrGetPracticeQueue(
     db,
     userRef,
-    playlistRef,
+    repertoireRef,
     practiceDate,
     localTzOffsetMinutes,
     "per_day",
@@ -619,7 +619,7 @@ export async function ensureDailyQueue(
  *
  * @param db - SQLite database instance
  * @param userRef - Supabase Auth UUID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
  * @param localTzOffsetMinutes - Client timezone offset (optional)
  * @param mode - Queue mode ("per_day" or "rolling")
@@ -631,7 +631,7 @@ export async function ensureDailyQueue(
  * const queue = await generateOrGetPracticeQueue(
  *   db,
  *   1,  // userId
- *   5,  // playlistId
+ *   5,  // repertoireId
  *   new Date(),
  *   -240,  // EDT timezone
  *   "per_day",
@@ -643,7 +643,7 @@ export async function ensureDailyQueue(
 export async function generateOrGetPracticeQueue(
   db: AnyDatabase,
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   reviewSitdownDate: Date = new Date(),
   localTzOffsetMinutes: number | null = null,
   mode: string = "per_day",
@@ -670,7 +670,7 @@ export async function generateOrGetPracticeQueue(
   const stagedExists = await db.all<{ one: number }>(sql`
     SELECT 1 as one
     FROM practice_list_staged
-    WHERE user_ref = ${userRef} AND playlist_id = ${playlistRef}
+    WHERE user_ref = ${userRef} AND repertoire_id = ${repertoireRef}
     LIMIT 1
   `);
   const hasData = stagedExists.length > 0;
@@ -686,7 +686,7 @@ export async function generateOrGetPracticeQueue(
   const existing = await fetchExistingActiveQueue(
     db,
     userRef,
-    playlistRef,
+    repertoireRef,
     windowStartKey
   );
 
@@ -706,7 +706,7 @@ export async function generateOrGetPracticeQueue(
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
-          eq(dailyPracticeQueue.playlistRef, playlistRef),
+          eq(dailyPracticeQueue.repertoireRef, repertoireRef),
           inArray(dailyPracticeQueue.windowStartUtc, variants)
         )
       )
@@ -729,9 +729,9 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${repertoireRef}
         AND deleted = 0
-        AND playlist_deleted = 0
+        AND repertoire_deleted = 0
         AND (
           (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
           OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
@@ -744,9 +744,9 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${repertoireRef}
         AND deleted = 0
-        AND playlist_deleted = 0
+        AND repertoire_deleted = 0
         AND (
           (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
           OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
@@ -774,9 +774,9 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${repertoireRef}
         AND deleted = 0
-        AND playlist_deleted = 0
+        AND repertoire_deleted = 0
         AND (
           (scheduled IS NOT NULL AND scheduled >= ${windows.windowFloorTs} AND scheduled < ${windows.startTs})
           OR (scheduled IS NULL AND latest_due >= ${windows.windowFloorTs} AND latest_due < ${windows.startTs})
@@ -809,9 +809,9 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
-          AND playlist_id = ${playlistRef}
+          AND repertoire_id = ${repertoireRef}
           AND deleted = 0
-          AND playlist_deleted = 0
+          AND repertoire_deleted = 0
           AND scheduled IS NULL
           AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
         ORDER BY id ASC
@@ -822,9 +822,9 @@ export async function generateOrGetPracticeQueue(
         SELECT id, scheduled, latest_due
         FROM practice_list_staged
         WHERE user_ref = ${userRef}
-          AND playlist_id = ${playlistRef}
+          AND repertoire_id = ${repertoireRef}
           AND deleted = 0
-          AND playlist_deleted = 0
+          AND repertoire_deleted = 0
           AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
         ORDER BY id ASC
         LIMIT ${remainingCapacity}
@@ -853,9 +853,9 @@ export async function generateOrGetPracticeQueue(
       SELECT id, scheduled, latest_due
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
-        AND playlist_id = ${playlistRef}
+        AND repertoire_id = ${repertoireRef}
         AND deleted = 0
-        AND playlist_deleted = 0
+        AND repertoire_deleted = 0
         AND scheduled IS NOT NULL
         AND scheduled < ${windows.windowFloorTs}
       ORDER BY scheduled ASC
@@ -883,7 +883,7 @@ export async function generateOrGetPracticeQueue(
     windows,
     prefs,
     userRef,
-    playlistRef,
+    repertoireRef,
     mode,
     localTzOffsetMinutes,
     1 // Force bucket 1 (Due Today)
@@ -894,7 +894,7 @@ export async function generateOrGetPracticeQueue(
     windows,
     prefs,
     userRef,
-    playlistRef,
+    repertoireRef,
     mode,
     localTzOffsetMinutes,
     2 // Force bucket 2 (Recently Lapsed)
@@ -905,7 +905,7 @@ export async function generateOrGetPracticeQueue(
     windows,
     prefs,
     userRef,
-    playlistRef,
+    repertoireRef,
     mode,
     localTzOffsetMinutes,
     3 // Force bucket 3 (New/Unscheduled)
@@ -916,7 +916,7 @@ export async function generateOrGetPracticeQueue(
     windows,
     prefs,
     userRef,
-    playlistRef,
+    repertoireRef,
     mode,
     localTzOffsetMinutes,
     4 // Force bucket 4 (Old Lapsed)
@@ -935,7 +935,7 @@ export async function generateOrGetPracticeQueue(
     db,
     built,
     userRef,
-    playlistRef,
+    repertoireRef,
     windows
   );
 
@@ -957,7 +957,7 @@ export async function generateOrGetPracticeQueue(
  *
  * @param db - SQLite database instance
  * @param userRef - Supabase Auth UUID
- * @param playlistRef - Playlist ID
+ * @param repertoireRef - Repertoire ID
  * @param count - Number of tunes to add (must be >= 1)
  * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
  * @param localTzOffsetMinutes - Client timezone offset (optional)
@@ -972,7 +972,7 @@ export async function generateOrGetPracticeQueue(
 export async function addTunesToQueue(
   db: AnyDatabase,
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   count: number,
   reviewSitdownDate: Date = new Date(),
   localTzOffsetMinutes: number | null = null
@@ -998,7 +998,7 @@ export async function addTunesToQueue(
   const existing = await fetchExistingActiveQueue(
     db,
     userRef,
-    playlistRef,
+    repertoireRef,
     windowStartKey
   );
 
@@ -1025,9 +1025,9 @@ export async function addTunesToQueue(
     SELECT id, scheduled, latest_due
     FROM practice_list_staged
     WHERE user_ref = ${userRef}
-      AND playlist_id = ${playlistRef}
+      AND repertoire_id = ${repertoireRef}
       AND deleted = 0
-      AND playlist_deleted = 0
+      AND repertoire_deleted = 0
       AND (
         (scheduled IS NOT NULL AND scheduled < ${windows.windowFloorTs})
         OR (scheduled IS NULL AND latest_due < ${windows.windowFloorTs})
@@ -1065,7 +1065,7 @@ export async function addTunesToQueue(
     windows,
     prefs,
     userRef,
-    playlistRef,
+    repertoireRef,
     "per_day",
     localTzOffsetMinutes
   );
@@ -1098,7 +1098,7 @@ export async function addTunesToQueue(
     .where(
       and(
         eq(dailyPracticeQueue.userRef, userRef),
-        eq(dailyPracticeQueue.playlistRef, playlistRef),
+        eq(dailyPracticeQueue.repertoireRef, repertoireRef),
         inArray(dailyPracticeQueue.windowStartUtc, variants),
         eq(dailyPracticeQueue.active, 1),
         inArray(dailyPracticeQueue.tuneRef, addedTuneIds)

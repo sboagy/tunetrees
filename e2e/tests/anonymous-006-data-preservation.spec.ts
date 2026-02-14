@@ -46,9 +46,9 @@ test.describe("Data Preservation During Conversion", () => {
   test.fixme(
     "6.1 CRITICAL: Repertoire data preserved after conversion @critical",
     async ({ page }) => {
-      // Step 1: Sign in anonymously WITH a playlist (needed for repertoire functionality)
+      // Step 1: Sign in anonymously WITH a repertoire (needed for repertoire functionality)
       await ttPage.gotoLogin();
-      await ttPage.signInAnonymouslyWithPlaylist("Data Preservation Test");
+      await ttPage.signInAnonymouslyWithRepertoire("Data Preservation Test");
       await page.waitForTimeout(2000);
 
       // Step 2: Navigate to Catalog and add tune to repertoire
@@ -140,9 +140,9 @@ test.describe("Data Preservation During Conversion", () => {
   test.fixme(
     "6.2 Data persists after sign-out and sign-in post-conversion @critical",
     async ({ page }) => {
-      // Step 1: Sign in anonymously WITH a playlist and add data
+      // Step 1: Sign in anonymously WITH a repertoire and add data
       await ttPage.gotoLogin();
-      await ttPage.signInAnonymouslyWithPlaylist("Persistence Test");
+      await ttPage.signInAnonymouslyWithRepertoire("Persistence Test");
       await page.waitForTimeout(2000);
 
       // Add tune to repertoire
@@ -213,9 +213,9 @@ test.describe("Data Preservation During Conversion", () => {
   test.fixme(
     "6.3 Multiple tunes preserved during conversion",
     async ({ page }) => {
-      // Step 1: Sign in anonymously WITH a playlist
+      // Step 1: Sign in anonymously WITH a repertoire
       await ttPage.gotoLogin();
-      await ttPage.signInAnonymouslyWithPlaylist("Multi Tune Test");
+      await ttPage.signInAnonymouslyWithRepertoire("Multi Tune Test");
       await page.waitForTimeout(2000);
 
       // Step 2: Add multiple tunes to repertoire

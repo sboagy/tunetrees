@@ -14,7 +14,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * TUNE-EDITOR-004: User-Specific Fields
  * Priority: High
  *
- * Tests that user-specific playlist_tune fields (learned, goal, scheduled)
+ * Tests that user-specific repertoire_tune fields (learned, goal, scheduled)
  * are properly saved when editing a tune.
  *
  * Covers:
@@ -48,7 +48,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
       ],
     });
 
-    // Navigate to repertoire tab to ensure we have playlist context
+    // Navigate to repertoire tab to ensure we have repertoire context
     await ttPage.repertoireTab.click();
     await expect(ttPage.repertoireTab).toBeVisible({ timeout: 10000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });

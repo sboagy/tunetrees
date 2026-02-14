@@ -11,7 +11,7 @@
 --   - id, title (tune identification)
 --   - scheduled, latest_due (scheduling timestamps)
 --   - deleted, playlist_deleted (soft delete flags)
---   - user_ref, playlist_id (ownership)
+--   - user_ref, repertoire_id (ownership)
 --
 -- Fields omitted (not used by practice queue algorithm):
 --   - type, mode, structure, incipit, genre (tune metadata)
@@ -27,6 +27,7 @@ CREATE VIEW
 SELECT
     t.id,
     t.title,
+    pt.playlist_ref AS repertoire_id,
     pt.playlist_ref AS playlist_id,
     p.user_ref AS user_ref,
     pt.current AS scheduled,

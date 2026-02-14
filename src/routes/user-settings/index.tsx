@@ -93,7 +93,7 @@ const UserSettingsLayout: ParentComponent = (props) => {
 
   const handleClose = () => {
     setIsOpen(false);
-    // Navigate back to preserve tab/playlist context
+    // Navigate back to preserve tab/repertoire context
     if (typeof window !== "undefined") {
       const returnTo = window.sessionStorage.getItem("tt-settings-return");
       if (returnTo) {

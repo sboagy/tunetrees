@@ -13,7 +13,7 @@ export const dailyPracticeQueue = pgTable("daily_practice_queue", {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref").notNull(),
-  playlistRef: text("playlist_ref").notNull(),
+  repertoireRef: text("repertoire_ref").notNull(),
   mode: text("mode"),
   queueDate: text("queue_date"),
   windowStartUtc: text("window_start_utc").notNull(),
@@ -77,7 +77,7 @@ export const note = pgTable("note", {
     .$defaultFn(() => crypto.randomUUID()),
   userRef: text("user_ref"),
   tuneRef: text("tune_ref").notNull(),
-  playlistRef: text("playlist_ref"),
+  repertoireRef: text("repertoire_ref"),
   createdDate: text("created_date"),
   noteText: text("note_text"),
   public: boolean("public").notNull().default(false),
@@ -89,39 +89,6 @@ export const note = pgTable("note", {
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
   displayOrder: integer("display_order").notNull().default(0),
-});
-
-export const playlist = pgTable("playlist", {
-  playlistId: text("playlist_id")
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userRef: text("user_ref").notNull(),
-  name: text("name"),
-  instrumentRef: text("instrument_ref"),
-  genreDefault: text("genre_default"),
-  srAlgType: text("sr_alg_type"),
-  deleted: boolean("deleted").notNull().default(false),
-  syncVersion: integer("sync_version").notNull().default(1),
-  lastModifiedAt: text("last_modified_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-  deviceId: text("device_id"),
-});
-
-export const playlistTune = pgTable("playlist_tune", {
-  playlistRef: text("playlist_ref").notNull(),
-  tuneRef: text("tune_ref").notNull(),
-  current: text("current"),
-  learned: text("learned"),
-  scheduled: text("scheduled"),
-  goal: text("goal").default("recall"),
-  deleted: boolean("deleted").notNull().default(false),
-  syncVersion: integer("sync_version").notNull().default(1),
-  lastModifiedAt: text("last_modified_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-  deviceId: text("device_id"),
 });
 
 export const plugin = pgTable("plugin", {
@@ -151,7 +118,7 @@ export const practiceRecord = pgTable("practice_record", {
     .notNull()
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  playlistRef: text("playlist_ref").notNull(),
+  repertoireRef: text("repertoire_ref").notNull(),
   tuneRef: text("tune_ref").notNull(),
   practiced: text("practiced"),
   quality: integer("quality"),
@@ -231,6 +198,39 @@ export const reference = pgTable("reference", {
   displayOrder: integer("display_order").notNull().default(0),
 });
 
+export const repertoire = pgTable("repertoire", {
+  repertoireId: text("repertoire_id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userRef: text("user_ref").notNull(),
+  name: text("name"),
+  instrumentRef: text("instrument_ref"),
+  genreDefault: text("genre_default"),
+  srAlgType: text("sr_alg_type"),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
+export const repertoireTune = pgTable("repertoire_tune", {
+  repertoireRef: text("repertoire_ref").notNull(),
+  tuneRef: text("tune_ref").notNull(),
+  current: text("current"),
+  learned: text("learned"),
+  scheduled: text("scheduled"),
+  goal: text("goal").default("recall"),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const syncChangeLog = pgTable("sync_change_log", {
   tableName: text("table_name").notNull().primaryKey(),
   changedAt: text("changed_at").notNull(),
@@ -243,7 +243,7 @@ export const tabGroupMainState = pgTable("tab_group_main_state", {
     .$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull(),
   whichTab: text("which_tab").default("practice"),
-  playlistId: text("playlist_id"),
+  repertoireId: text("repertoire_id"),
   tabSpec: text("tab_spec"),
   practiceShowSubmitted: integer("practice_show_submitted").default(0),
   practiceModeFlashcard: integer("practice_mode_flashcard").default(0),
@@ -259,7 +259,7 @@ export const tableState = pgTable("table_state", {
   userId: text("user_id").notNull(),
   screenSize: text("screen_size").notNull(),
   purpose: text("purpose").notNull(),
-  playlistId: text("playlist_id").notNull(),
+  repertoireId: text("repertoire_id").notNull(),
   settings: text("settings"),
   currentTune: text("current_tune"),
   syncVersion: integer("sync_version").notNull().default(1),
@@ -272,7 +272,7 @@ export const tableState = pgTable("table_state", {
 export const tableTransientData = pgTable("table_transient_data", {
   userId: text("user_id").notNull(),
   tuneId: text("tune_id").notNull(),
-  playlistId: text("playlist_id").notNull(),
+  repertoireId: text("repertoire_id").notNull(),
   purpose: text("purpose"),
   notePrivate: text("note_private"),
   notePublic: text("note_public"),
@@ -410,13 +410,13 @@ export const tables = {
   genre_tune_type: genreTuneType,
   instrument: instrument,
   note: note,
-  playlist: playlist,
-  playlist_tune: playlistTune,
   plugin: plugin,
   practice_record: practiceRecord,
   prefs_scheduling_options: prefsSchedulingOptions,
   prefs_spaced_repetition: prefsSpacedRepetition,
   reference: reference,
+  repertoire: repertoire,
+  repertoire_tune: repertoireTune,
   sync_change_log: syncChangeLog,
   tab_group_main_state: tabGroupMainState,
   table_state: tableState,

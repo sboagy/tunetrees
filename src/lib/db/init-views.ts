@@ -5,7 +5,7 @@
  * These views aggregate data from multiple tables for efficient querying.
  *
  * Views created:
- * 1. view_playlist_joined - Playlists with instrument info
+ * 1. view_repertoire_joined - Repertoires with instrument info
  * 2. practice_list_joined - Tunes with practice records and metadata
  * 3. practice_list_staged - Extended practice view with transient data
  *
@@ -20,19 +20,19 @@
 import type { SqliteDatabase } from "./client-sqlite";
 
 /**
- * View 1: Playlist with Instrument Information
+ * View 1: Repertoire with Instrument Information
  *
- * Joins playlists with their instrument details.
- * Used for playlist selection and display.
+ * Joins repertoires with their instrument details.
+ * Used for repertoire selection and display.
  */
-const VIEW_PLAYLIST_JOINED = /* sql */ `
-CREATE VIEW IF NOT EXISTS view_playlist_joined AS
+const VIEW_REPERTOIRE_JOINED = /* sql */ `
+CREATE VIEW IF NOT EXISTS view_repertoire_joined AS
 SELECT
-  p.playlist_id,
+  p.repertoire_id AS repertoire_id,
   p.user_ref,
-  p.deleted AS playlist_deleted,
+  p.deleted AS repertoire_deleted,
   p.instrument_ref,
-  p.genre_default AS playlist_genre_default,
+  p.genre_default AS repertoire_genre_default,
   i.private_to_user,
   i.instrument,
   i.description,
@@ -40,7 +40,7 @@ SELECT
   COALESCE(p.genre_default, i.genre_default) AS genre_default,
   i.deleted AS instrument_deleted
 FROM
-  playlist p
+  repertoire p
   JOIN instrument i ON p.instrument_ref = i.id
 `;
 
@@ -67,10 +67,10 @@ SELECT
   COALESCE(tune_override.genre, tune.genre) AS genre,
   tune.deleted,
   tune.private_for,
-  playlist_tune.learned AS learned,
-  playlist_tune.goal,
-  playlist_tune.scheduled,
-  playlist_tune.current,
+  repertoire_tune.learned AS learned,
+  repertoire_tune.goal,
+  repertoire_tune.scheduled,
+  repertoire_tune.current,
   practice_record.state AS latest_state,
   practice_record.practiced AS latest_practiced,
   practice_record.quality AS latest_quality,
@@ -87,47 +87,47 @@ SELECT
     SELECT GROUP_CONCAT(tag.tag_text, ' ')
     FROM tag
     WHERE tag.tune_ref = tune.id
-      AND tag.user_ref = playlist.user_ref
+      AND tag.user_ref = repertoire.user_ref
   ) AS tags,
-  playlist_tune.playlist_ref,
-  playlist.user_ref,
-  playlist_tune.deleted AS playlist_deleted,
+  repertoire_tune.repertoire_ref,
+  repertoire.user_ref,
+  repertoire_tune.deleted AS repertoire_deleted,
   (
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note
     WHERE note.tune_ref = tune.id
-      AND note.user_ref = playlist.user_ref
+      AND note.user_ref = repertoire.user_ref
   ) AS notes,
   (
     SELECT ref.url
     FROM reference ref
     WHERE ref.tune_ref = tune.id
-      AND ref.user_ref = playlist.user_ref
+      AND ref.user_ref = repertoire.user_ref
       AND ref.favorite = 1
     LIMIT 1
   ) AS favorite_url,
   CASE
-    WHEN tune_override.user_ref = playlist.user_ref THEN 1
+    WHEN tune_override.user_ref = repertoire.user_ref THEN 1
     ELSE 0
   END AS has_override
 FROM
   tune
-  LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-  LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+  LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+  LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
+    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   LEFT JOIN (
     SELECT pr.*
     FROM practice_record pr
     INNER JOIN (
-      SELECT tune_ref, playlist_ref, MAX(id) as max_id
+      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
       FROM practice_record
-      GROUP BY tune_ref, playlist_ref
+      GROUP BY tune_ref, repertoire_ref
     ) latest ON pr.tune_ref = latest.tune_ref
-      AND pr.playlist_ref = latest.playlist_ref
+      AND pr.repertoire_ref = latest.repertoire_ref
       AND pr.id = latest.max_id
   ) practice_record ON practice_record.tune_ref = tune.id
-    AND practice_record.playlist_ref = playlist_tune.playlist_ref
+    AND practice_record.repertoire_ref = repertoire_tune.repertoire_ref
 `;
 
 /**
@@ -158,14 +158,14 @@ SELECT
   COALESCE(tune_override.release_year, tune.release_year) AS release_year,
   tune.private_for,
   tune.deleted,
-  playlist_tune.learned,
-  COALESCE(td.goal, playlist_tune.goal) AS goal,
-  playlist_tune.scheduled,
-  playlist_tune.current,
-  playlist.user_ref,
-  playlist.playlist_id,
+  repertoire_tune.learned,
+  COALESCE(td.goal, repertoire_tune.goal) AS goal,
+  repertoire_tune.scheduled,
+  repertoire_tune.current,
+  repertoire.user_ref,
+  repertoire.repertoire_id,
   instrument.instrument,
-  playlist_tune.deleted AS playlist_deleted,
+  repertoire_tune.deleted AS repertoire_deleted,
   COALESCE(td.state, pr.state) AS latest_state,
   COALESCE(td.practiced, pr.practiced) AS latest_practiced,
   COALESCE(td.quality, pr.quality) AS latest_quality,
@@ -183,7 +183,7 @@ SELECT
     SELECT GROUP_CONCAT(tag.tag_text, ' ')
     FROM tag
     WHERE tag.tune_ref = tune.id
-      AND tag.user_ref = playlist.user_ref
+      AND tag.user_ref = repertoire.user_ref
   ) AS tags,
   td.purpose,
   td.note_private,
@@ -193,18 +193,18 @@ SELECT
     SELECT GROUP_CONCAT(note.note_text, ' ')
     FROM note
     WHERE note.tune_ref = tune.id
-      AND note.user_ref = playlist.user_ref
+      AND note.user_ref = repertoire.user_ref
   ) AS notes,
   (
     SELECT ref.url
     FROM reference ref
     WHERE ref.tune_ref = tune.id
-      AND ref.user_ref = playlist.user_ref
+      AND ref.user_ref = repertoire.user_ref
       AND ref.favorite = 1
     LIMIT 1
   ) AS favorite_url,
   CASE
-    WHEN tune_override.user_ref = playlist.user_ref THEN 1
+    WHEN tune_override.user_ref = repertoire.user_ref THEN 1
     ELSE 0
   END AS has_override,
   CASE
@@ -224,39 +224,39 @@ SELECT
   END AS has_staged
 FROM
   tune
-  LEFT JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-  LEFT JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+  LEFT JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+  LEFT JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
-  LEFT JOIN instrument ON instrument.id = playlist.instrument_ref
+    AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
+  LEFT JOIN instrument ON instrument.id = repertoire.instrument_ref
   LEFT JOIN (
     SELECT pr.*
     FROM practice_record pr
     INNER JOIN (
-      SELECT tune_ref, playlist_ref, MAX(id) as max_id
+      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
       FROM practice_record
-      GROUP BY tune_ref, playlist_ref
+      GROUP BY tune_ref, repertoire_ref
     ) latest ON pr.tune_ref = latest.tune_ref
-      AND pr.playlist_ref = latest.playlist_ref
+      AND pr.repertoire_ref = latest.repertoire_ref
       AND pr.id = latest.max_id
   ) pr ON pr.tune_ref = tune.id
-    AND pr.playlist_ref = playlist_tune.playlist_ref
+    AND pr.repertoire_ref = repertoire_tune.repertoire_ref
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
-    AND td.playlist_id = playlist_tune.playlist_ref
-    AND td.user_id = playlist.user_ref
-WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref
+    AND td.repertoire_id = repertoire_tune.repertoire_ref
+    AND td.user_id = repertoire.user_ref
+WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref
 `;
 
 /**
  * View 4: Daily Practice Queue with Human-Readable Names
  *
- * Joins daily_practice_queue with user, playlist, and tune information
+ * Joins daily_practice_queue with user, repertoire, and tune information
  * to show readable names instead of UUIDs. Useful for debugging in SQLite browser.
  *
  * Columns:
  * - queue_id: Queue row UUID
  * - user_name: User email/name
- * - playlist_instrument: Instrument name
+ * - repertoire_instrument: Instrument name
  * - tune_title: Tune title
  * - queue_date: Practice date (YYYY-MM-DD)
  * - window_start_utc: Queue window start timestamp
@@ -270,7 +270,7 @@ CREATE VIEW IF NOT EXISTS view_daily_practice_queue_readable AS
 SELECT
   dpq.id AS queue_id,
   COALESCE(up.name, up.email) AS user_name,
-  i.instrument AS playlist_instrument,
+  i.instrument AS repertoire_instrument,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   dpq.queue_date,
   dpq.window_start_utc,
@@ -284,12 +284,12 @@ SELECT
   dpq.scheduled_snapshot,
   dpq.generated_at,
   dpq.user_ref,
-  dpq.playlist_ref,
+  dpq.repertoire_ref,
   dpq.tune_ref
 FROM
   daily_practice_queue dpq
   LEFT JOIN user_profile up ON up.id = dpq.user_ref
-  LEFT JOIN playlist p ON p.playlist_id = dpq.playlist_ref
+  LEFT JOIN repertoire p ON p.repertoire_id = dpq.repertoire_ref
   LEFT JOIN instrument i ON i.id = p.instrument_ref
   LEFT JOIN tune ON tune.id = dpq.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
@@ -307,8 +307,8 @@ SELECT
   ttd.user_id,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   ttd.tune_id,
-  i.instrument AS playlist_instrument,
-  ttd.playlist_id,
+  i.instrument AS repertoire_instrument,
+  ttd.repertoire_id,
   ttd.purpose,
   ttd.note_private,
   ttd.note_public,
@@ -335,7 +335,7 @@ FROM
   LEFT JOIN tune ON tune.id = ttd.tune_id
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND tune_override.user_ref = ttd.user_id
-  LEFT JOIN playlist p ON p.playlist_id = ttd.playlist_id
+  LEFT JOIN repertoire p ON p.repertoire_id = ttd.repertoire_id
   LEFT JOIN instrument i ON i.id = p.instrument_ref
 ORDER BY
   ttd.last_modified_at DESC
@@ -345,7 +345,7 @@ ORDER BY
  * View: view_practice_record_readable
  *
  * Human-readable practice records with resolved foreign keys.
- * Shows user names, tune titles, and playlist instruments instead of UUIDs.
+ * Shows user names, tune titles, and repertoire instruments instead of UUIDs.
  * Useful for debugging and data inspection in SQLite WASM Browser.
  */
 const VIEW_PRACTICE_RECORD_READABLE = /* sql */ `
@@ -354,8 +354,8 @@ SELECT
   COALESCE(up.name, up.email) AS user_name,
   COALESCE(tune_override.title, tune.title) AS tune_title,
   pr.tune_ref,
-  i.instrument AS playlist_instrument,
-  pr.playlist_ref,
+  i.instrument AS repertoire_instrument,
+  pr.repertoire_ref,
   pr.practiced,
   pr.quality,
   CASE pr.quality
@@ -391,7 +391,7 @@ SELECT
   pr.id
 FROM
   practice_record pr
-  LEFT JOIN playlist p ON p.playlist_id = pr.playlist_ref
+  LEFT JOIN repertoire p ON p.repertoire_id = pr.repertoire_ref
   LEFT JOIN user_profile up ON up.id = p.user_ref
   LEFT JOIN tune ON tune.id = pr.tune_ref
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
@@ -471,10 +471,10 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
   console.log("📊 Initializing SQLite database views...");
 
   try {
-    // Create view_playlist_joined
-    await db.run("DROP VIEW IF EXISTS view_playlist_joined");
-    await db.run(VIEW_PLAYLIST_JOINED);
-    console.log("✅ Created view: view_playlist_joined");
+    // Create view_repertoire_joined
+    await db.run("DROP VIEW IF EXISTS view_repertoire_joined");
+    await db.run(VIEW_REPERTOIRE_JOINED);
+    console.log("✅ Created view: view_repertoire_joined");
 
     // Create practice_list_joined
     await db.run(PRACTICE_LIST_JOINED);
@@ -522,7 +522,7 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
     await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
     await db.run("DROP VIEW IF EXISTS practice_list_staged");
     await db.run("DROP VIEW IF EXISTS practice_list_joined");
-    await db.run("DROP VIEW IF EXISTS view_playlist_joined");
+    await db.run("DROP VIEW IF EXISTS view_repertoire_joined");
 
     console.log("✅ All views dropped");
   } catch (error) {

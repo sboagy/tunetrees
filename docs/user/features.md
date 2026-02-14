@@ -4,8 +4,8 @@
 
 ### 📚 Repertoire Management
 
-Organize your tunes with flexible playlists:
-- Create multiple playlists for different instruments or genres
+Organize your tunes with flexible repertoires:
+- Create multiple repertoires for different instruments or genres
 - Add tunes from the built-in catalog or create custom entries
 - Track metadata: title, type (jig, reel, etc.), mode, structure
 - Mark tunes as learned, in-progress, or to-learn
@@ -46,13 +46,13 @@ Seamless multi-device experience:
 Your daily practice session. Shows tunes due for review based on spaced repetition scheduling.
 
 ### Repertoire  
-Your personal tune collection. View, edit, and manage tunes in your playlists.
+Your personal tune collection. View, edit, and manage tunes in your repertoires.
 
 ### Catalog
-Browse the master tune database. Search and add tunes to your playlists.
+Browse the master tune database. Search and add tunes to your repertoires.
 
-### Playlists
-Manage your playlists. Create new ones, edit settings, or switch between them.
+### Repertoires
+Manage your repertoires. Create new ones, edit settings, or switch between them.
 
 ## Keyboard Shortcuts
 
@@ -72,7 +72,7 @@ Manage your playlists. Create new ones, edit settings, or switch between them.
 - Light mode
 - Dark mode (follows system by default)
 
-### Playlist Settings
+### Repertoire Settings
 - Default instrument
 - Genre filter
 - Spaced repetition algorithm (FSRS or SM2)

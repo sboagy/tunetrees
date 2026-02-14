@@ -5,7 +5,7 @@ TuneTrees is a practice management app for musicians, featuring spaced repetitio
 ## What is TuneTrees?
 
 TuneTrees helps you:
-- **Track your repertoire** - Organize tunes by playlist and instrument
+- **Track your repertoire** - Organize tunes by repertoire and instrument
 - **Practice efficiently** - Spaced repetition ensures you review tunes at optimal intervals
 - **Work offline** - Full functionality without internet, syncs when connected
 - **Access anywhere** - Install as an app on mobile or desktop
@@ -20,17 +20,17 @@ Go to [tunetrees.com](https://tunetrees.com)
 
 Click **Sign Up** and enter your email and password, or use Google/GitHub sign-in.
 
-### 3. Create Your First Playlist
+### 3. Create Your First Repertoire
 
-1. Click **Playlists** in the navigation
-2. Click **New Playlist**
+1. Click **Repertoires** in the navigation
+2. Click **New Repertoire**
 3. Name it (e.g., "Irish Flute Tunes")
 4. Select your instrument
 
 ### 4. Add Tunes
 
 1. Go to **Catalog** to browse available tunes
-2. Click the **+** button on any tune to add it to your playlist
+2. Click the **+** button on any tune to add it to your repertoire
 3. Or create custom tunes in **Repertoire**
 
 ### 5. Start Practicing

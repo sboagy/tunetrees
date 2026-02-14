@@ -184,7 +184,7 @@ describe("COMMON_KEYS maps", () => {
       "id",
       "user_ref",
       "tune_ref",
-      "playlist_ref",
+      "repertoire_ref",
       "last_modified_at",
       "sync_version",
       "deleted",
@@ -262,7 +262,7 @@ describe("real-world sync scenarios", () => {
     const localRecord = {
       id: "pr-123",
       tuneRef: "tune-456",
-      playlistRef: "playlist-789",
+      repertoireRef: "repertoire-789",
       practiced: "2025-11-30",
       recallEval: 4,
       lastModifiedAt: "2025-11-30T10:00:00Z",
@@ -273,7 +273,7 @@ describe("real-world sync scenarios", () => {
     expect(supabaseRecord).toEqual({
       id: "pr-123",
       tune_ref: "tune-456",
-      playlist_ref: "playlist-789",
+      repertoire_ref: "repertoire-789",
       practiced: "2025-11-30",
       recall_eval: 4,
       last_modified_at: "2025-11-30T10:00:00Z",
@@ -284,7 +284,7 @@ describe("real-world sync scenarios", () => {
     const supabaseRecord = {
       id: "dpq-123",
       user_ref: "user-456",
-      playlist_ref: "playlist-789",
+      repertoire_ref: "repertoire-789",
       window_start_utc: "2025-11-30T00:00:00",
       window_end_utc: "2025-12-01T00:00:00",
       tune_ref: "tune-abc",

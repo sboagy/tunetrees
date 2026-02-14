@@ -95,7 +95,7 @@ await persistDb();
 Type-safe query functions organized by entity:
 
 - `tunes.ts` - Tune CRUD operations
-- `playlists.ts` - Playlist operations
+- `repertoires.ts` - Repertoire operations
 - `practice.ts` - Practice record operations
 - `notes.ts` - Note operations
 - `references.ts` - Reference (link) operations
@@ -201,8 +201,8 @@ This creates:
 - Test user profile
 - Sample genres and tune types
 - Sample tunes
-- Test playlist
-- Playlist-tune relationships
+- Test repertoire
+- Repertoire-tune relationships
 
 ### Option 3: Migration from Legacy SQLite
 
@@ -249,7 +249,7 @@ it("should create a tune", async () => {
 Current test coverage:
 - ✅ Tune CRUD operations (17 tests)
 - ✅ Practice queue generation (32 tests)
-- ⚠️ TODO: Playlist operations
+- ⚠️ TODO: Repertoire operations
 - ⚠️ TODO: Note operations
 - ⚠️ TODO: Practice record operations
 
@@ -418,7 +418,7 @@ await db
 ### Querying with Joins
 
 ```typescript
-const playlistsWithTunes = await db.query.playlist.findMany({
+const repertoiresWithTunes = await db.query.repertoire.findMany({
   with: {
     tunes: {
       with: {

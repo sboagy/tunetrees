@@ -765,7 +765,7 @@ test.describe.serial("REFS-002: References Drag Reorder", () => {
 ### Test Data Cleanup
 - Each test should clean up created notes/references
 - Use soft delete or direct database cleanup
-- Consider using dedicated test playlist/tunes
+- Consider using dedicated test repertoire/tunes
 
 ---
 

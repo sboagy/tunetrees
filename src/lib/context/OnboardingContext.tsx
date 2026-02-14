@@ -2,7 +2,7 @@
  * Onboarding Context for TuneTrees
  *
  * Manages the new user onboarding flow for both anonymous and registered users.
- * Shows onboarding when no playlists exist (instead of using localStorage).
+ * Shows onboarding when no repertoires exist (instead of using localStorage).
  *
  * @module lib/context/OnboardingContext
  */
@@ -43,15 +43,15 @@ interface OnboardingState {
   /** Skip onboarding */
   skipOnboarding: () => void;
 
-  /** Check if user should see onboarding (no playlists) */
-  shouldShowOnboarding: (hasPlaylists: boolean) => boolean;
+  /** Check if user should see onboarding (no repertoires) */
+  shouldShowOnboarding: (hasRepertoires: boolean) => boolean;
 }
 
 /**
  * Onboarding steps
  */
 export type OnboardingStep =
-  | "create-playlist"
+  | "create-repertoire"
   | "choose-genres"
   | "view-catalog"
   | "complete";
@@ -94,10 +94,10 @@ export const OnboardingProvider: ParentComponent = (props) => {
   );
 
   /**
-   * Check if user should see onboarding based on whether they have playlists
+   * Check if user should see onboarding based on whether they have repertoires
    */
-  const shouldShowOnboarding = (hasPlaylists: boolean): boolean => {
-    return !hasPlaylists;
+  const shouldShowOnboarding = (hasRepertoires: boolean): boolean => {
+    return !hasRepertoires;
   };
 
   /**
@@ -112,7 +112,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     }
     console.log("🎓 Starting onboarding flow");
     setNeedsOnboarding(true);
-    setOnboardingStep("create-playlist");
+    setOnboardingStep("create-repertoire");
   };
 
   /**
@@ -122,7 +122,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     const current = onboardingStep();
     console.log("🎓 Onboarding next step from:", current);
 
-    if (current === "create-playlist") {
+    if (current === "create-repertoire") {
       setOnboardingStep("choose-genres");
     } else if (current === "choose-genres") {
       setOnboardingStep("view-catalog");
@@ -154,7 +154,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
   };
 
   /**
-   * Reset onboarding state (useful for testing or after user creates a playlist)
+   * Reset onboarding state (useful for testing or after user creates a repertoire)
    */
 
   // const resetOnboarding = () => {

@@ -2,13 +2,13 @@
  * Tune User-Specific Data Queries
  *
  * Functions to manage user-specific fields for tunes:
- * - playlist_tune.learned (when user learned the tune in a playlist)
+ * - repertoire_tune.learned (when user learned the tune in a repertoire)
  * - practice_record fields (latest practice data: practiced, quality, FSRS/SM2 fields)
  * - notes (private notes about the tune)
  *
  * These fields are separate from the base tune data to support:
  * - User-specific overrides without modifying public tunes
- * - Per-playlist tracking (same tune in multiple playlists)
+ * - Per-repertoire tracking (same tune in multiple repertoires)
  * - Historical practice records
  *
  * @module lib/db/queries/tune-user-data
@@ -17,34 +17,34 @@
 import { and, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
-import { note, playlistTune, practiceRecord } from "../schema";
+import { note, practiceRecord, repertoireTune } from "../schema";
 
 /**
- * Update the learned date for a tune in a specific playlist
+ * Update the learned date for a tune in a specific repertoire
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param learnedDate - ISO 8601 timestamp when tune was learned (null to clear)
  */
-export async function updatePlaylistTuneLearned(
+export async function updateRepertoireTuneLearned(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   learnedDate: string | null
 ): Promise<void> {
   const now = new Date().toISOString();
 
   await db
-    .update(playlistTune)
+    .update(repertoireTune)
     .set({
       learned: learnedDate,
       lastModifiedAt: now,
     })
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
-        eq(playlistTune.tuneRef, tuneId)
+        eq(repertoireTune.repertoireRef, repertoireId),
+        eq(repertoireTune.tuneRef, tuneId)
       )
     );
 
@@ -52,16 +52,16 @@ export async function updatePlaylistTuneLearned(
 }
 
 /**
- * Update playlist_tune fields (learned, goal, scheduled)
+ * Update repertoire_tune fields (learned, goal, scheduled)
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param data - Fields to update
  */
-export async function updatePlaylistTuneFields(
+export async function updateRepertoireTuneFields(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   data: {
     learned?: string | null;
@@ -86,12 +86,12 @@ export async function updatePlaylistTuneFields(
   }
 
   await db
-    .update(playlistTune)
+    .update(repertoireTune)
     .set(updateData)
     .where(
       and(
-        eq(playlistTune.playlistRef, playlistId),
-        eq(playlistTune.tuneRef, tuneId)
+        eq(repertoireTune.repertoireRef, repertoireId),
+        eq(repertoireTune.tuneRef, tuneId)
       )
     );
 
@@ -101,17 +101,17 @@ export async function updatePlaylistTuneFields(
 /**
  * Update or create a practice record with user-specific fields
  *
- * This updates the LATEST practice record for a tune in a playlist.
+ * This updates the LATEST practice record for a tune in a repertoire.
  * Creates a new record if none exists.
  *
  * @param db - SQLite database instance
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @param tuneId - Tune UUID
  * @param data - Practice data to update
  */
 export async function upsertPracticeRecord(
   db: SqliteDatabase,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   data: {
     practiced?: string | null;
@@ -128,14 +128,14 @@ export async function upsertPracticeRecord(
 ): Promise<void> {
   const now = new Date().toISOString();
 
-  // Get the latest practice record for this tune/playlist combination
+  // Get the latest practice record for this tune/repertoire combination
   const existing = await db
     .select()
     .from(practiceRecord)
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, repertoireId)
       )
     )
     .orderBy(
@@ -171,7 +171,7 @@ export async function upsertPracticeRecord(
     // Create new practice record
     await db.insert(practiceRecord).values({
       id: generateId(),
-      playlistRef: playlistId,
+      repertoireRef: repertoireId,
       tuneRef: tuneId,
       practiced: data.practiced || null,
       quality: data.quality || null,
@@ -206,14 +206,14 @@ export async function upsertPracticeRecord(
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
  * @param userId - User UUID
- * @param playlistId - Optional playlist UUID for context
+ * @param repertoireId - Optional repertoire UUID for context
  * @returns Note ID
  */
 export async function getOrCreatePrivateNote(
   db: SqliteDatabase,
   tuneId: string,
   userId: string,
-  playlistId?: string
+  repertoireId?: string
 ): Promise<string> {
   // Look for existing private note
   const existing = await db
@@ -241,7 +241,7 @@ export async function getOrCreatePrivateNote(
       id: generateId(),
       userRef: userId,
       tuneRef: tuneId,
-      playlistRef: playlistId || null,
+      repertoireRef: repertoireId || null,
       createdDate: now,
       noteText: "",
       public: 0,
@@ -287,19 +287,19 @@ export async function updateNoteText(
  *
  * Merges data from:
  * - tune (or tune_override)
- * - playlist_tune (learned, goal, scheduled, current)
+ * - repertoire_tune (learned, goal, scheduled, current)
  *
  * @param db - SQLite database instance
  * @param tuneId - Tune UUID
  * @param userId - User UUID
- * @param playlistId - Playlist UUID
+ * @param repertoireId - Repertoire UUID
  * @returns Complete tune data for editor
  */
 export async function getTuneEditorData(
   db: SqliteDatabase,
   tuneId: string,
   userId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<any> {
   // Get base tune data (with overrides applied)
   const { getTuneForUserById } = await import("./tunes");
@@ -309,14 +309,14 @@ export async function getTuneEditorData(
     return null;
   }
 
-  // Get playlist_tune data (learned, goal, scheduled, current)
-  const playlistTuneData = await db
+  // Get repertoire_tune data (learned, goal, scheduled, current)
+  const repertoireTuneData = await db
     .select()
-    .from(playlistTune)
+    .from(repertoireTune)
     .where(
       and(
-        eq(playlistTune.tuneRef, tuneId),
-        eq(playlistTune.playlistRef, playlistId)
+        eq(repertoireTune.tuneRef, tuneId),
+        eq(repertoireTune.repertoireRef, repertoireId)
       )
     )
     .limit(1);
@@ -328,7 +328,7 @@ export async function getTuneEditorData(
     .where(
       and(
         eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.playlistRef, playlistId)
+        eq(practiceRecord.repertoireRef, repertoireId)
       )
     )
     .orderBy(desc(practiceRecord.id))
@@ -337,10 +337,10 @@ export async function getTuneEditorData(
   // Merge all data
   const result: any = {
     ...tune,
-    learned: playlistTuneData?.[0]?.learned || null,
-    goal: playlistTuneData?.[0]?.goal || "recall",
-    scheduled: playlistTuneData?.[0]?.scheduled || null,
-    current: playlistTuneData?.[0]?.current || null,
+    learned: repertoireTuneData?.[0]?.learned || null,
+    goal: repertoireTuneData?.[0]?.goal || "recall",
+    scheduled: repertoireTuneData?.[0]?.scheduled || null,
+    current: repertoireTuneData?.[0]?.current || null,
     latest_due: latestPractice?.[0]?.due || null,
   };
 

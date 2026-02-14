@@ -36,7 +36,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009001", // auth.users.id
     email: "alice.test@tunetrees.test",
     name: "Alice Test",
-    playlistId: "00000000-0000-4000-8000-000000019001",
+    repertoireId: "00000000-0000-4000-8000-000000019001",
     privateTune1Id: "00000000-0000-4000-8000-000000029001", // Private tune 1
     privateTune2Id: "00000000-0000-4000-8000-000000039001", // Private tune 2
   },
@@ -44,7 +44,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009002",
     email: "bob.test@tunetrees.test",
     name: "Bob Test",
-    playlistId: "00000000-0000-4000-8000-000000019002",
+    repertoireId: "00000000-0000-4000-8000-000000019002",
     privateTune1Id: "00000000-0000-4000-8000-000000029002",
     privateTune2Id: "00000000-0000-4000-8000-000000039002",
   },
@@ -52,7 +52,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009003",
     email: "carol.test@tunetrees.test",
     name: "Carol Test",
-    playlistId: "00000000-0000-4000-8000-000000019003",
+    repertoireId: "00000000-0000-4000-8000-000000019003",
     privateTune1Id: "00000000-0000-4000-8000-000000029003",
     privateTune2Id: "00000000-0000-4000-8000-000000039003",
   },
@@ -60,7 +60,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009004",
     email: "dave.test@tunetrees.test",
     name: "Dave Test",
-    playlistId: "00000000-0000-4000-8000-000000019004",
+    repertoireId: "00000000-0000-4000-8000-000000019004",
     privateTune1Id: "00000000-0000-4000-8000-000000029004",
     privateTune2Id: "00000000-0000-4000-8000-000000039004",
   },
@@ -68,7 +68,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009005",
     email: "eve.test@tunetrees.test",
     name: "Eve Test",
-    playlistId: "00000000-0000-4000-8000-000000019005",
+    repertoireId: "00000000-0000-4000-8000-000000019005",
     privateTune1Id: "00000000-0000-4000-8000-000000029005",
     privateTune2Id: "00000000-0000-4000-8000-000000039005",
   },
@@ -76,7 +76,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009006",
     email: "frank.test@tunetrees.test",
     name: "Frank Test",
-    playlistId: "00000000-0000-4000-8000-000000019006",
+    repertoireId: "00000000-0000-4000-8000-000000019006",
     privateTune1Id: "00000000-0000-4000-8000-000000029006",
     privateTune2Id: "00000000-0000-4000-8000-000000039006",
   },
@@ -84,7 +84,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009007",
     email: "grace.test@tunetrees.test",
     name: "Grace Test",
-    playlistId: "00000000-0000-4000-8000-000000019007",
+    repertoireId: "00000000-0000-4000-8000-000000019007",
     privateTune1Id: "00000000-0000-4000-8000-000000029007",
     privateTune2Id: "00000000-0000-4000-8000-000000039007",
   },
@@ -92,7 +92,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009008",
     email: "henry.test@tunetrees.test",
     name: "Henry Test",
-    playlistId: "00000000-0000-4000-8000-000000019008",
+    repertoireId: "00000000-0000-4000-8000-000000019008",
     privateTune1Id: "00000000-0000-4000-8000-000000029008",
     privateTune2Id: "00000000-0000-4000-8000-000000039008",
   },
@@ -100,7 +100,7 @@ const TEST_USERS = [
     id: "00000000-0000-4000-8000-000000009009",
     email: "iris.test@tunetrees.test",
     name: "Iris Test",
-    playlistId: "00000000-0000-4000-8000-000000019009",
+    repertoireId: "00000000-0000-4000-8000-000000019009",
     privateTune1Id: "00000000-0000-4000-8000-000000029009",
     privateTune2Id: "00000000-0000-4000-8000-000000039009",
   },
@@ -159,11 +159,11 @@ async function setup() {
     console.log(`   ✅ ${userProfiles.length} user profiles created`);
   }
 
-  // Step 3: Create playlists for all users
-  console.log("\n3️⃣  Creating playlists...");
+  // Step 3: Create repertoires for all users
+  console.log("\n3️⃣  Creating repertoires...");
 
-  const playlists = TEST_USERS.map((user) => ({
-    playlist_id: user.playlistId, // UUID schema uses playlist_id, not id
+  const repertoires = TEST_USERS.map((user) => ({
+    repertoire_id: user.repertoireId, // UUID schema uses repertoire_id, not id
     user_ref: user.id, // References user_profile.id
     name: null,
     instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID, // Can be set per-user if needed
@@ -175,14 +175,14 @@ async function setup() {
     device_id: null,
   }));
 
-  const { error: playlistError } = await supabase
-    .from("playlist")
-    .upsert(playlists);
+  const { error: repertoireError } = await supabase
+    .from("repertoire")
+    .upsert(repertoires);
 
-  if (playlistError) {
-    console.error("   ❌ Playlists failed:", playlistError);
+  if (repertoireError) {
+    console.error("   ❌ Repertoires failed:", repertoireError);
   } else {
-    console.log(`   ✅ ${playlists.length} playlists created`);
+    console.log(`   ✅ ${repertoires.length} repertoires created`);
   }
 
   // Step 4: Create private tunes for all users
@@ -223,32 +223,32 @@ async function setup() {
     );
   }
 
-  // Step 5: Link each user's private tunes to their playlist
-  console.log("\n5️⃣  Linking private tunes to playlists...");
+  // Step 5: Link each user's private tunes to their repertoire
+  console.log("\n5️⃣  Linking private tunes to repertoires...");
 
-  const playlistTuneLinks = TEST_USERS.flatMap((user) => [
+  const repertoireTuneLinks = TEST_USERS.flatMap((user) => [
     {
-      playlist_ref: user.playlistId,
+      repertoire_ref: user.repertoireId,
       tune_ref: user.privateTune1Id,
       // NOTE: scheduled (current) is NULL - tunes not yet added to review
       // Tests can use setupPracticeScenario() to schedule tunes as needed
     },
     {
-      playlist_ref: user.playlistId,
+      repertoire_ref: user.repertoireId,
       tune_ref: user.privateTune2Id,
       // NOTE: scheduled (current) is NULL - tunes not yet added to review
     },
   ]);
 
-  const { error: playlistTuneError } = await supabase
-    .from("playlist_tune")
-    .upsert(playlistTuneLinks);
+  const { error: repertoireTuneError } = await supabase
+    .from("repertoire_tune")
+    .upsert(repertoireTuneLinks);
 
-  if (playlistTuneError) {
-    console.error("   ❌ Playlist_tune links failed:", playlistTuneError);
+  if (repertoireTuneError) {
+    console.error("   ❌ Repertoire_tune links failed:", repertoireTuneError);
   } else {
     console.log(
-      `   ✅ ${playlistTuneLinks.length} playlist_tune links created`
+      `   ✅ ${repertoireTuneLinks.length} repertoire_tune links created`
     );
   }
 
@@ -256,7 +256,7 @@ async function setup() {
   console.log("\n📋 Test users created:");
   TEST_USERS.forEach((user) => {
     console.log(
-      `   - ${user.email} (id: ${user.id}, playlist: ${user.playlistId})`
+      `   - ${user.email} (id: ${user.id}, repertoire: ${user.repertoireId})`
     );
   });
 }

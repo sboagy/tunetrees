@@ -18,7 +18,7 @@ import { test } from "../helpers/test-fixture";
  *
  * Test Scenario:
  * - User has 2 specific tunes in their repertoire (user's private tune + one public tune)
- * - Neither tune is scheduled for practice (playlist_tune.scheduled = NULL)
+ * - Neither tune is scheduled for practice (repertoire_tune.scheduled = NULL)
  * - Practice queue should show exactly 2 tunes in Q3 (New) bucket
  * - UI should display grid with bucket labels showing "New"
  *

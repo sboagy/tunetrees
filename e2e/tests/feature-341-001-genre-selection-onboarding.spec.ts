@@ -15,7 +15,7 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
   });
 
   test("requires at least one genre selection", async () => {
-    await ttPage.signInAnonymouslyToGenreSelection("E2E Genre Playlist");
+    await ttPage.signInAnonymouslyToGenreSelection("E2E Genre Repertoire");
 
     await expect(ttPage.onboardingGenreClearAllButton).toBeVisible({
       timeout: 15000,
@@ -33,7 +33,7 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
   });
 
   test("continues to catalog after selecting genres", async ({ page }) => {
-    await ttPage.signInAnonymouslyToGenreSelection("E2E Catalog Playlist");
+    await ttPage.signInAnonymouslyToGenreSelection("E2E Catalog Repertoire");
 
     await expect(ttPage.onboardingGenreClearAllButton).toBeVisible({
       timeout: 15000,

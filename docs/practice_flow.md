@@ -81,19 +81,19 @@ sequenceDiagram
     Note over U,DB_R: PHASE 3: Submission
     U->>UI: Click "Submit" button
     UI->>C: commitStagedEvaluations(windowStartUtc)
-    C->>DB_L: SELECT from table_transient_data<br/>(filter by user/playlist/practiced IS NOT NULL)
+    C->>DB_L: SELECT from table_transient_data<br/>(filter by user/repertoire/practiced IS NOT NULL)
     C->>DB_L: SELECT tune_refs from daily_practice_queue<br/>(filter by windowStartUtc)
     C->>C: Filter staging rows to only current queue
 
     loop For Each Staged Evaluation
-        C->>DB_L: Check for duplicate practice_record<br/>(unique: tune_ref, playlist_ref, practiced)
+        C->>DB_L: Check for duplicate practice_record<br/>(unique: tune_ref, repertoire_ref, practiced)
         alt Duplicate exists
             C->>C: Increment practiced timestamp by 1 second
         end
         C->>DB_L: INSERT practice_record
         C->>SQ: queueSync("practice_record", "update")
-        C->>DB_L: UPDATE playlist_tune.current (next review date)
-        C->>SQ: queueSync("playlist_tune", "update")
+        C->>DB_L: UPDATE repertoire_tune.current (next review date)
+        C->>SQ: queueSync("repertoire_tune", "update")
         C->>DB_L: UPDATE daily_practice_queue.completed_at
         C->>SQ: queueSync("daily_practice_queue", "update")
         C->>DB_L: DELETE from table_transient_data
@@ -177,7 +177,7 @@ const PracticeIndex: Component = () => {
     practiceListStagedChanged,
     initialSyncComplete,
   } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
 
   // Resource to get user ID from user_profile table
   const [userId] = createResource(/* params */, async (params) => {
@@ -207,7 +207,7 @@ const PracticeIndex: Component = () => {
 export async function generateOrGetPracticeQueue(
   db: AnyDatabase,
   userRef: string,
-  playlistRef: string,
+  repertoireRef: string,
   reviewSitdownDate: Date = new Date(),
   localTzOffsetMinutes: number | null = null,
   mode: string = "per_day",
@@ -232,7 +232,7 @@ export async function generateOrGetPracticeQueue(
    ```typescript
    const existing = await db.all(sql`
      SELECT * FROM daily_practice_queue
-     WHERE user_ref = ${userRef} AND playlist_ref = ${playlistRef}
+     WHERE user_ref = ${userRef} AND repertoire_ref = ${repertoireRef}
        AND (window_start_utc = ${isoFormat} OR window_start_utc = ${spaceFormat})
        AND active = 1
    `);
@@ -261,7 +261,7 @@ export async function generateOrGetPracticeQueue(
 
 4. **Build Queue Rows**
    ```typescript
-   const q1Built = buildQueueRows(q1Rows, windows, prefs, userRef, playlistRef, mode, localTzOffsetMinutes, 1);
+   const q1Built = buildQueueRows(q1Rows, windows, prefs, userRef, repertoireRef, mode, localTzOffsetMinutes, 1);
    ```
    - **Function:** `buildQueueRows` in same file
    - **Creates:** `DailyPracticeQueueRow` objects with:
@@ -277,7 +277,7 @@ export async function generateOrGetPracticeQueue(
    ```
    - **Table:** `daily_practice_queue`
    - **Schema:** `drizzle/schema-sqlite.ts`
-   - **Constraint:** UNIQUE (user_ref, playlist_ref, window_start_utc, tune_ref)
+   - **Constraint:** UNIQUE (user_ref, repertoire_ref, window_start_utc, tune_ref)
 
 ### Window Format Utility
 
@@ -314,21 +314,21 @@ const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
 
   // 2) Stage/clear in local DB
   const db = localDb();
-  const playlistId = currentPlaylistId();
+  const repertoireId = currentRepertoireId();
   const userIdVal = await getUserId();
 
-  if (!db || !playlistId || !userIdVal) return;
+  if (!db || !repertoireId || !userIdVal) return;
 
   try {
     if (evaluation === "") {
       // Clear staged data when "(Not Set)" selected
-      await clearStagedEvaluation(db, userIdVal, tuneId, playlistId);
+      await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
     } else {
       // Stage FSRS preview for actual evaluations
       await stagePracticeEvaluation(
         db,
         userIdVal,
-        playlistId,
+        repertoireId,
         tuneId,
         evaluation,
         "recall",
@@ -380,7 +380,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (props) =>
 export async function stagePracticeEvaluation(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   tuneId: string,
   evaluation: string,
   goal: string = "recall",
@@ -394,7 +394,7 @@ export async function stagePracticeEvaluation(
 
 1. **Get Latest Practice Record**
    ```typescript
-   const latestCard = await getLatestPracticeRecord(db, tuneId, playlistId);
+   const latestCard = await getLatestPracticeRecord(db, tuneId, repertoireId);
    ```
    - **Function:** `getLatestPracticeRecord` in same file
    - **Returns:** FSRS `Card` object or null if never practiced
@@ -429,23 +429,23 @@ export async function stagePracticeEvaluation(
    ```typescript
    await db.run(sql`
      INSERT INTO table_transient_data (
-       user_id, tune_id, playlist_id, quality, difficulty, stability, 
+       user_id, tune_id, repertoire_id, quality, difficulty, stability, 
        interval, step, repetitions, practiced, due, state, goal, 
        technique, recall_eval, sync_version, last_modified_at
-     ) VALUES (${userId}, ${tuneId}, ${playlistId}, /* ... */)
-     ON CONFLICT(user_id, tune_id, playlist_id) DO UPDATE SET
+     ) VALUES (${userId}, ${tuneId}, ${repertoireId}, /* ... */)
+     ON CONFLICT(user_id, tune_id, repertoire_id) DO UPDATE SET
        quality = excluded.quality,
        difficulty = excluded.difficulty,
        /* ... all fields ... */
    `);
    ```
    - **Table:** `table_transient_data`
-   - **Constraint:** UNIQUE on (user_id, tune_id, playlist_id)
+   - **Constraint:** UNIQUE on (user_id, tune_id, repertoire_id)
 
 5. **Queue for Sync**
    ```typescript
    await queueSync(db, "table_transient_data", "update", {
-     userId, tuneId, playlistId, ...preview, recallEval: evaluation
+     userId, tuneId, repertoireId, ...preview, recallEval: evaluation
    });
    ```
    - **Function:** `queueSync` in `src/lib/sync/queue.ts`
@@ -464,21 +464,21 @@ export async function clearStagedEvaluation(
   db: SqliteDatabase,
   userId: string,
   tuneId: string,
-  playlistId: string
+  repertoireId: string
 ): Promise<void> {
   await db.run(sql`
     DELETE FROM table_transient_data
-    WHERE user_id = ${userId} AND tune_id = ${tuneId} AND playlist_id = ${playlistId}
+    WHERE user_id = ${userId} AND tune_id = ${tuneId} AND repertoire_id = ${repertoireId}
   `);
   
-  await queueSync(db, "table_transient_data", "delete", { userId, tuneId, playlistId });
+  await queueSync(db, "table_transient_data", "delete", { userId, tuneId, repertoireId });
   await persistDb();
 }
 ```
 
 **When Called:** User selects "(Not Set)" in evaluation dropdown to clear previous staging.);
   
-  await queueSync(db, "table_transient_data", "delete", { userId, tuneId, playlistId });
+  await queueSync(db, "table_transient_data", "delete", { userId, tuneId, repertoireId });
   await persistDb();
 }
 ```
@@ -495,10 +495,10 @@ export async function clearStagedEvaluation(
 ```typescript
 const handleSubmitEvaluations = async () => {
   const db = localDb();
-  const playlistId = currentPlaylistId();
+  const repertoireId = currentRepertoireId();
   const userId = await getUserId();
   
-  if (!db || !playlistId || !userId) {
+  if (!db || !repertoireId || !userId) {
     toast.error("Cannot submit: Missing required data");
     return;
   }
@@ -514,7 +514,7 @@ const handleSubmitEvaluations = async () => {
   const windowStartUtc = formatAsWindowStart(date); // "2025-11-08 00:00:00"
 
   // Call commit service
-  const result = await commitStagedEvaluations(db, userId, playlistId, windowStartUtc);
+  const result = await commitStagedEvaluations(db, userId, repertoireId, windowStartUtc);
 
   if (result.success) {
     toast.success(`Successfully submitted ${result.count} evaluation(s)`);
@@ -552,7 +552,7 @@ fall back to FSRS without breaking the practice flow.
 export async function commitStagedEvaluations(
   db: SqliteDatabase,
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   windowStartUtc?: string
 ): Promise<{ success: boolean; count: number; error?: string }>
 ```
@@ -567,7 +567,7 @@ export async function commitStagedEvaluations(
    } else {
      const latestWindow = await db.get<{ window_start_utc: string }>(sql`
        SELECT window_start_utc FROM daily_practice_queue
-       WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+       WHERE user_ref = ${userId} AND repertoire_ref = ${repertoireId}
        ORDER BY window_start_utc DESC LIMIT 1
      `);
      activeWindowStart = latestWindow.window_start_utc;
@@ -597,7 +597,7 @@ export async function commitStagedEvaluations(
             repetitions, practiced, due, state, goal, technique, recall_eval
      FROM table_transient_data
      WHERE user_id = ${userId}
-       AND playlist_id = ${playlistId}
+       AND repertoire_id = ${repertoireId}
        AND practiced IS NOT NULL
    `);
    ```
@@ -606,7 +606,7 @@ export async function commitStagedEvaluations(
    ```typescript
    const queueTuneIds = await db.all<{ tune_ref: number }>(sql`
      SELECT DISTINCT tune_ref FROM daily_practice_queue
-     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+     WHERE user_ref = ${userId} AND repertoire_ref = ${repertoireId}
        AND window_start_utc = ${activeWindowStart}
    `);
    
@@ -626,7 +626,7 @@ export async function commitStagedEvaluations(
      const existing = await db.all<{ id: number }>(sql`
        SELECT id FROM practice_record
        WHERE tune_ref = ${staged.tune_id}
-         AND playlist_ref = ${playlistId}
+         AND repertoire_ref = ${repertoireId}
          AND practiced = ${practicedTimestamp}
      `);
      
@@ -645,11 +645,11 @@ export async function commitStagedEvaluations(
    const recordId = generateId();
    await db.run(sql`
      INSERT INTO practice_record (
-       id, playlist_ref, tune_ref, practiced, quality, easiness, interval, 
+       id, repertoire_ref, tune_ref, practiced, quality, easiness, interval, 
        repetitions, due, backup_practiced, stability, elapsed_days, lapses, 
        state, difficulty, step, goal, technique, last_modified_at
      ) VALUES (
-       ${recordId}, ${playlistId}, ${staged.tune_id}, ${practicedTimestamp},
+       ${recordId}, ${repertoireId}, ${staged.tune_id}, ${practicedTimestamp},
        ${staged.quality}, NULL, ${staged.interval}, ${staged.repetitions},
        ${staged.due}, NULL, ${staged.stability}, ${staged.elapsed_days ?? null},
        ${staged.lapses ?? 0}, ${staged.state}, ${staged.difficulty},
@@ -662,7 +662,7 @@ export async function commitStagedEvaluations(
    ```typescript
    await queueSync(db, "practice_record", "update", {
      id: recordId,
-     playlistRef: playlistId,
+     repertoireRef: repertoireId,
      tuneRef: staged.tune_id,
      practiced: practicedTimestamp,
      quality: staged.quality,
@@ -670,16 +670,16 @@ export async function commitStagedEvaluations(
    });
    ```
 
-   **d. Update Playlist Tune**
+   **d. Update Repertoire Tune**
    ```typescript
    await db.run(sql`
-     UPDATE playlist_tune
+     UPDATE repertoire_tune
      SET current = ${staged.due}, last_modified_at = ${now}
-     WHERE playlist_ref = ${playlistId} AND tune_ref = ${staged.tune_id}
+     WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${staged.tune_id}
    `);
    
-   await queueSync(db, "playlist_tune", "update", {
-     playlistRef: playlistId,
+   await queueSync(db, "repertoire_tune", "update", {
+     repertoireRef: repertoireId,
      tuneRef: staged.tune_id,
    });
    ```
@@ -690,7 +690,7 @@ export async function commitStagedEvaluations(
      SELECT id, window_start_utc, window_end_utc
      FROM daily_practice_queue
      WHERE user_ref = ${userId}
-       AND playlist_ref = ${playlistId}
+       AND repertoire_ref = ${repertoireId}
        AND tune_ref = ${staged.tune_id}
        AND window_start_utc = ${activeWindowStart}
      LIMIT 1
@@ -700,7 +700,7 @@ export async function commitStagedEvaluations(
      UPDATE daily_practice_queue
      SET completed_at = ${now}
      WHERE user_ref = ${userId}
-       AND playlist_ref = ${playlistId}
+       AND repertoire_ref = ${repertoireId}
        AND tune_ref = ${staged.tune_id}
        AND window_start_utc = ${activeWindowStart}
    `);
@@ -708,7 +708,7 @@ export async function commitStagedEvaluations(
    // Verify the update
    const verifyQueue = await db.get<{ completed_at: string | null }>(sql`
      SELECT completed_at FROM daily_practice_queue
-     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+     WHERE user_ref = ${userId} AND repertoire_ref = ${repertoireId}
        AND tune_ref = ${staged.tune_id} AND window_start_utc = ${activeWindowStart}
      LIMIT 1
    `);
@@ -717,7 +717,7 @@ export async function commitStagedEvaluations(
    await queueSync(db, "daily_practice_queue", "update", {
      id: queueItem.id,
      userRef: userId,
-     playlistRef: playlistId,
+     repertoireRef: repertoireId,
      completedAt: now,
    });
    ```
@@ -727,7 +727,7 @@ export async function commitStagedEvaluations(
    await db.run(sql`
      DELETE FROM table_transient_data
      WHERE user_id = ${userId} AND tune_id = ${staged.tune_id}
-       AND playlist_id = ${playlistId}
+       AND repertoire_id = ${repertoireId}
    `);
    ```
 
@@ -979,14 +979,14 @@ private transformLocalToRemote(record: any): any {
 const [queueInitialized] = createResource(
   () => {
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
     const date = queueDate();
     const syncComplete = initialSyncComplete();
 
     if (!syncComplete) return null;
 
-    return db && userId() && playlistId
-      ? { db, userId: userId()!, playlistId, date }
+    return db && userId() && repertoireId
+      ? { db, userId: userId()!, repertoireId, date }
       : null;
   },
   async (params) => {
@@ -997,7 +997,7 @@ const [queueInitialized] = createResource(
     const created = await ensureDailyQueue(
       params.db,
       params.userId,
-      params.playlistId,
+      params.repertoireId,
       params.date
     );
     
@@ -1007,12 +1007,12 @@ const [queueInitialized] = createResource(
 **File:** `src/lib/db/queries/practice.ts`  
 **Function:** `getPracticeList`
     const db = localDb();
-    const playlistId = currentPlaylistId();
+    const repertoireId = currentRepertoireId();
     const version = practiceListStagedChanged(); // ← Triggers refetch on practice data change
     const initialized = queueInitialized();
     
-    return db && userId() && playlistId && initialized
-      ? { db, userId: userId()!, playlistId, version, queueReady: initialized }
+    return db && userId() && repertoireId && initialized
+      ? { db, userId: userId()!, repertoireId, version, queueReady: initialized }
       : null;
   },
   async (params) => {
@@ -1022,7 +1022,7 @@ const [queueInitialized] = createResource(
     return await getPracticeList(
       params.db,
       params.userId,
-      params.playlistId,
+      params.repertoireId,
       7 // delinquencyWindowDays
     );
   }
@@ -1047,8 +1047,8 @@ const filteredPracticeList = createMemo(() => {
 1. **Debug Queue Status**riggers refetch on change
     const initialized = queueInitialized();
     
-    return db && props.userId && playlistId && initialized
-      ? { db, userId: props.userId, playlistId, version, queueReady: initialized }
+    return db && props.userId && repertoireId && initialized
+      ? { db, userId: props.userId, repertoireId, version, queueReady: initialized }
       : null;
   },
   async (params) => {
@@ -1058,7 +1058,7 @@ const filteredPracticeList = createMemo(() => {
     return await getPracticeList(
       params.db,
       params.userId,
-      params.playlistId,
+      params.repertoireId,
       delinquencyWindowDays
     );
 2. **Get Max Window**
@@ -1076,7 +1076,7 @@ const filteredPracticeList = createMemo(() => {
 export async function getPracticeList(
 3. **Query with GROUP BY**
   userId: string,
-  playlistId: string,
+  repertoireId: string,
   _delinquencyWindowDays: number = 7
 ): Promise<PracticeListStagedWithQueue[]>
 ```
@@ -1087,14 +1087,14 @@ export async function getPracticeList(
    ```typescript
    const queueRows = await db.all<{ count: number }>(sql`
      SELECT COUNT(*) as count FROM daily_practice_queue dpq
-     WHERE dpq.user_ref = ${userId} AND dpq.playlist_ref = ${playlistId}
+     WHERE dpq.user_ref = ${userId} AND dpq.repertoire_ref = ${repertoireId}
        AND dpq.active = 1
    `);
    
    const windowCheck = await db.all<{ window_start_utc: string; count: number }>(sql`
      SELECT window_start_utc, COUNT(*) as count
      FROM daily_practice_queue
-     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+     WHERE user_ref = ${userId} AND repertoire_ref = ${repertoireId}
        AND active = 1
      GROUP BY window_start_utc ORDER BY window_start_utc DESC
    `);
@@ -1105,14 +1105,14 @@ export async function getPracticeList(
    const maxWindow = await db.get<{ max_window: string }>(sql`
      SELECT MAX(window_start_utc) as max_window
      FROM daily_practice_queue
-     WHERE user_ref = ${userId} AND playlist_ref = ${playlistId}
+     WHERE user_ref = ${userId} AND repertoire_ref = ${repertoireId}
        AND active = 1
 ### Practice List Staged VIEW
 
 **File:** `src/lib/db/init-views.ts`  
 **View:** `practice_list_staged`
 
-**Purpose:** Merges all data sources (tune, playlist_tune, practice_record, table_transient_data)
+**Purpose:** Merges all data sources (tune, repertoire_tune, practice_record, table_transient_data)
 3. **Query with GROUP BY** (Lines 246-267)
    ```sql
    SELECT 
@@ -1124,9 +1124,9 @@ export async function getPracticeList(
    INNER JOIN daily_practice_queue dpq 
      ON dpq.tune_ref = pls.id
      AND dpq.user_ref = pls.user_ref
-     AND dpq.playlist_ref = pls.playlist_id
+     AND dpq.repertoire_ref = pls.repertoire_id
    WHERE dpq.user_ref = ${userId}
-     AND dpq.playlist_ref = ${playlistId}
+     AND dpq.repertoire_ref = ${repertoireId}
      AND dpq.active = 1
      AND dpq.completed_at IS NULL
      AND (
@@ -1160,13 +1160,13 @@ SELECT
   COALESCE(tune_override.title, tune.title) AS title,
   COALESCE(tune_override.type, tune.type) AS type,
   COALESCE(tune_override.mode, tune.mode) AS mode,
-  playlist_tune.learned,
+  repertoire_tune.learned,
   
   -- COALESCE staging (table_transient_data) with historical (practice_record)
   COALESCE(td.goal, COALESCE(pr.goal, 'recall')) AS goal,
-  playlist_tune.scheduled,
-  playlist.user_ref,
-  playlist.playlist_id,
+  repertoire_tune.scheduled,
+  repertoire.user_ref,
+  repertoire.repertoire_id,
   
   -- Latest practice state (staging OVERRIDES historical)
   COALESCE(td.state, pr.state) AS latest_state,
@@ -1187,29 +1187,29 @@ SELECT
   CASE WHEN td.tune_id IS NOT NULL THEN 1 ELSE 0 END AS has_staged
   
 FROM tune
-INNER JOIN playlist_tune ON playlist_tune.tune_ref = tune.id
-INNER JOIN playlist ON playlist.playlist_id = playlist_tune.playlist_ref
+INNER JOIN repertoire_tune ON repertoire_tune.tune_ref = tune.id
+INNER JOIN repertoire ON repertoire.repertoire_id = repertoire_tune.repertoire_ref
 LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
-  AND (tune_override.user_ref IS NULL OR tune_override.user_ref = playlist.user_ref)
+  AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   
--- Latest practice_record for this tune/playlist
+-- Latest practice_record for this tune/repertoire
 LEFT JOIN (
   SELECT pr.*
   FROM practice_record pr
   INNER JOIN (
-    SELECT tune_ref, playlist_ref, MAX(id) as max_id
+    SELECT tune_ref, repertoire_ref, MAX(id) as max_id
     FROM practice_record
-    GROUP BY tune_ref, playlist_ref
+    GROUP BY tune_ref, repertoire_ref
   ) latest ON pr.tune_ref = latest.tune_ref
-    AND pr.playlist_ref = latest.playlist_ref
+    AND pr.repertoire_ref = latest.repertoire_ref
     AND pr.id = latest.max_id
 ) practice_record ON practice_record.tune_ref = tune.id
-  AND practice_record.playlist_ref = playlist_tune.playlist_ref
+  AND practice_record.repertoire_ref = repertoire_tune.repertoire_ref
   
 -- Staged/transient data (preview from evaluation staging)
 LEFT JOIN table_transient_data td ON td.tune_id = tune.id
-  AND td.playlist_id = playlist_tune.playlist_ref
-  AND td.user_id = playlist.user_ref
+  AND td.repertoire_id = repertoire_tune.repertoire_ref
+  AND td.user_id = repertoire.user_ref
 ```
 
 **Key Point:** This VIEW does ALL the COALESCE operations. The grid query just filters by queue.
@@ -1221,8 +1221,8 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 ### Core Tables
 
 1. **tune** - Tune metadata (title, type, mode, structure, etc.)
-2. **playlist** - User playlists
-3. **playlist_tune** - Tunes in playlist (scheduled, learned)
+2. **repertoire** - User repertoires
+3. **repertoire_tune** - Tunes in repertoire (scheduled, learned)
 4. **practice_record** - Historical practice events (immutable)
 5. **daily_practice_queue** - Frozen daily snapshot (bucket, order_index, completed_at)
 6. **table_transient_data** - Staging area for uncommitted evaluations
@@ -1236,7 +1236,7 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 **Fields:**
 - `id` (UUID, primary key)
 - `user_ref` (UUID, references user_profile)
-- `playlist_ref` (UUID, references playlist)
+- `repertoire_ref` (UUID, references repertoire)
 - `tune_ref` (UUID, references tune)
 - `bucket` (integer: 1=Due Today, 2=Lapsed, 3=Backfill, 4=Old Lapsed)
 - `order_index` (integer: stable ordering within bucket)
@@ -1250,8 +1250,8 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 - ... (additional FSRS snapshot fields)
 
 **Constraints:**
-- UNIQUE (user_ref, playlist_ref, window_start_utc, tune_ref)
-- Indexes on user/playlist/window/bucket/active
+- UNIQUE (user_ref, repertoire_ref, window_start_utc, tune_ref)
+- Indexes on user/repertoire/window/bucket/active
 
 ### practice_record Schema
 
@@ -1260,14 +1260,14 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 
 **Fields:**
 - `id` (UUID, primary key)
-- `playlist_ref` (UUID)
+- `repertoire_ref` (UUID)
 - `tune_ref` (UUID)
 - `practiced` (timestamp: when evaluation was submitted)
 - `quality` (integer: 1-4 rating from FSRS)
 - `easiness` (real: SM2 field, NULL for FSRS)
 - `interval` (integer: days until next review)
 - `repetitions` (integer: successful review count)
-- `due` (timestamp: next review date - ALSO stored in playlist_tune.current)
+- `due` (timestamp: next review date - ALSO stored in repertoire_tune.current)
 - `stability` (real: FSRS stability metric)
 - `difficulty` (real: FSRS difficulty metric)
 - `state` (integer: 1=Learning, 2=Review, 3=Relearning)
@@ -1278,7 +1278,7 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 - `lapses` (integer: forget events count)
 
 **Constraints:**
-- UNIQUE (tune_ref, playlist_ref, practiced)
+- UNIQUE (tune_ref, repertoire_ref, practiced)
 
 ### table_transient_data Schema
 
@@ -1288,7 +1288,7 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 **Fields:**
 - `user_id` (UUID)
 - `tune_id` (UUID)
-- `playlist_id` (UUID)
+- `repertoire_id` (UUID)
 - `purpose` (text)
 - `recall_eval` (text: "again", "hard", "good", "easy")
 - `practiced` (timestamp)
@@ -1306,7 +1306,7 @@ LEFT JOIN table_transient_data td ON td.tune_id = tune.id
 
 **Purpose:** Listen for changes from other devices via Supabase Realtime websockets
 **Constraints:**
-- UNIQUE (user_id, tune_id, playlist_id)
+- UNIQUE (user_id, tune_id, repertoire_id)
 
 ---
 
@@ -1347,9 +1347,9 @@ public startAutoSync(): void {
    - `daily_practice_queue` rows remain stable throughout the day
 
 2. **Uniqueness:**
-   - `practice_record`: (tune_ref, playlist_ref, practiced) must be unique
-   - `table_transient_data`: (user_id, tune_id, playlist_id) must be unique
-   - `daily_practice_queue`: (user_ref, playlist_ref, window_start_utc, tune_ref) must be unique
+   - `practice_record`: (tune_ref, repertoire_ref, practiced) must be unique
+   - `table_transient_data`: (user_id, tune_id, repertoire_id) must be unique
+   - `daily_practice_queue`: (user_ref, repertoire_ref, window_start_utc, tune_ref) must be unique
 
 3. **Timestamp Formats:**
    - SQLite stores as TEXT (ISO 8601: `'2025-11-08T12:00:00'` with 'T')
@@ -1405,9 +1405,9 @@ public startAutoSync(): void {
    - `daily_practice_queue` rows remain stable throughout the day
 
 2. **Uniqueness:**
-   - `practice_record`: (tune_ref, playlist_ref, practiced) must be unique
-   - `table_transient_data`: (user_id, tune_id, playlist_id) must be unique
-   - `daily_practice_queue`: (user_ref, playlist_ref, window_start_utc, tune_ref) must be unique
+   - `practice_record`: (tune_ref, repertoire_ref, practiced) must be unique
+   - `table_transient_data`: (user_id, tune_id, repertoire_id) must be unique
+   - `daily_practice_queue`: (user_ref, repertoire_ref, window_start_utc, tune_ref) must be unique
 
 3. **Timestamp Formats:**
    - SQLite stores as TEXT (ISO 8601: `'2025-11-08T12:00:00'`)
@@ -1438,8 +1438,8 @@ public startAutoSync(): void {
 **Lines:** 291-389
 
 ```typescript
-if (!db || !playlistId || !userId) {
-  toast.error("Cannot submit: Missing database or playlist data");
+if (!db || !repertoireId || !userId) {
+  toast.error("Cannot submit: Missing database or repertoire data");
   return;
 }
 
@@ -1553,7 +1553,7 @@ if (result.success) {
 ## Performance Considerations
 
 1. **Queue Generation:**
-   - Runs once per day per playlist
+   - Runs once per day per repertoire
    - Guards against empty database (waits for sync)
    - Capacity limits prevent oversized queries (max 10 tunes default)
 

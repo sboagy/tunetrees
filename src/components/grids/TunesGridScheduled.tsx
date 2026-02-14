@@ -17,7 +17,7 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { useCurrentPlaylist } from "../../lib/context/CurrentPlaylistContext";
+import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import { GridStatusMessage } from "./GridStatusMessage";
@@ -27,7 +27,7 @@ import type { IGridBaseProps, ITuneOverview } from "./types";
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // No direct staging here; parent handles DB side-effects.
   const { localDb } = useAuth();
-  const { currentPlaylistId } = useCurrentPlaylist();
+  const { currentRepertoireId } = useCurrentRepertoire();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
 
   // Column visibility: ensure select column hidden and only valid keys propagate
@@ -165,7 +165,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         <TunesGrid
           tablePurpose="scheduled"
           userId={props.userId}
-          playlistId={currentPlaylistId() || undefined}
+          repertoireId={currentRepertoireId() || undefined}
           data={tunes()}
           columnDescriptions={columnDescriptions()}
           currentRowId={currentTuneId() || undefined}
