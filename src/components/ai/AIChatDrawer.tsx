@@ -7,7 +7,7 @@
  * @module components/ai/AIChatDrawer
  */
 
-import { Loader2, Send, Sparkles, X } from "lucide-solid";
+import { Loader2, MessageCircle, Music, Send, X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
@@ -142,7 +142,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
         {/* Header */}
         <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div class="flex items-center gap-2">
-            <Sparkles class="text-blue-500" size={24} />
+            <MessageCircle class="text-blue-500" size={24} />
             <h2
               id="chat-title"
               class="text-lg font-semibold text-gray-900 dark:text-gray-100"
@@ -164,7 +164,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
         <div class="flex-1 overflow-y-auto p-4 space-y-4">
           <Show when={state().messages.length === 0}>
             <div class="text-center text-gray-500 dark:text-gray-400 mt-8">
-              <Sparkles class="mx-auto mb-2" size={32} />
+              <Music class="mx-auto mb-2" size={32} />
               <p class="text-sm">
                 Ask me about your tunes, filter your list, or log practice
                 sessions.

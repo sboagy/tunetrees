@@ -18,12 +18,12 @@ import {
   createResource,
   createSignal,
   Match,
+  onCleanup,
   on,
   Show,
   Switch,
 } from "solid-js";
 import { AIChatDrawer } from "../components/ai/AIChatDrawer";
-import { ChatFAB } from "../components/ai/ChatFAB";
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
@@ -98,6 +98,14 @@ const RepertoirePage: Component = () => {
 
   // Track AI chat drawer state
   const [isChatOpen, setIsChatOpen] = createSignal(false);
+
+  createEffect(() => {
+    const handleOpenAssistant = () => setIsChatOpen(true);
+    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    onCleanup(() => {
+      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    });
+  });
 
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
   // Runs whenever searchParams changes. This resolves the initial race condition
@@ -414,9 +422,6 @@ const RepertoirePage: Component = () => {
           }}
         />
       </Show>
-
-      {/* AI Chat FAB */}
-      <ChatFAB onClick={() => setIsChatOpen(true)} />
 
       {/* AI Chat Drawer */}
       <AIChatDrawer
