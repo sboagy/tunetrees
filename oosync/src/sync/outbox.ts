@@ -8,15 +8,15 @@
  * @module lib/sync/outbox
  */
 
-import { getPrimaryKey } from "../shared/table-meta";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import { getPrimaryKey } from "../shared/table-meta";
 import { toCamelCase } from "./casing";
 import {
   getSyncRuntime,
   type SqliteDatabase,
-  type SyncPushQueueTable,
   type SyncableTableName,
+  type SyncPushQueueTable,
 } from "./runtime-context";
 
 function getRuntime() {

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { debug } from "./debug";
 
@@ -104,7 +104,19 @@ export interface IWorkerSyncConfig {
 }
 
 function eqUserId(column: any, userId: string): unknown {
-  return eq(column, userId);
+  if (!column || typeof column !== "object") {
+    return eq(column, userId);
+  }
+
+  return sql.join(
+    [
+      column,
+      sql.raw(" = CAST("),
+      sql.param(userId),
+      sql.raw(" AS uuid)"),
+    ],
+    sql.raw("")
+  );
 }
 
 function orNullEqUserId(column: any, userId: string): unknown {
