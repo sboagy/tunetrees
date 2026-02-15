@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { debug } from "./debug";
 
@@ -103,26 +103,12 @@ export interface IWorkerSyncConfig {
   push?: IPushConfig;
 }
 
-function eqUserIdAsText(column: any, userId: string): unknown {
-  // Postgres source columns are UUID in production, but generated worker schema
-  // currently models many of them as text. Compare via ::text to avoid
-  // uuid=text operator mismatches while keeping one predicate shape.
-  const columnName =
-    column && typeof column === "object" && typeof column.name === "string"
-      ? column.name
-      : null;
-
-  if (!columnName) {
-    return eq(column, userId);
-  }
-
-  const escapedName = columnName.replaceAll('"', '""');
-  const escapedUserId = userId.replaceAll("'", "''");
-  return sql.raw(`"${escapedName}"::text = '${escapedUserId}'`);
+function eqUserId(column: any, userId: string): unknown {
+  return eq(column, userId);
 }
 
-function orNullEqUserIdAsText(column: any, userId: string): unknown {
-  return or(isNull(column), eqUserIdAsText(column, userId) as any);
+function orNullEqUserId(column: any, userId: string): unknown {
+  return or(isNull(column), eqUserId(column, userId) as any);
 }
 
 type DbErrorLike = {
@@ -293,7 +279,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           .from(table)
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          .where(eqUserIdAsText(ownerCol, params.userId) as any);
+          .where(eqUserId(ownerCol, params.userId) as any);
 
         result[name] = new Set(rows.map((r: any) => String(r.id)));
       } catch (error) {
@@ -375,11 +361,11 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     if (!col) return [];
 
     if (rule.kind === "eqUserId") {
-      return [eqUserIdAsText(col, params.userId)];
+      return [eqUserId(col, params.userId)];
     }
 
     if (rule.kind === "orNullEqUserId") {
-      return [orNullEqUserIdAsText(col, params.userId)];
+      return [orNullEqUserId(col, params.userId)];
     }
 
     if (rule.kind === "inCollection") {
@@ -393,7 +379,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
       const orProp = snakeToCamel(rule.orColumn);
       const orCol = params.table[orProp];
       if (!orCol) return [];
-      return [or(eqUserIdAsText(col, params.userId) as any, eq(orCol, true))];
+      return [or(eqUserId(col, params.userId) as any, eq(orCol, true))];
     }
 
     if (rule.kind === "publicOnly") {
@@ -431,17 +417,13 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     const conditions: unknown[] = [];
 
     if (params.table.userId) {
-      conditions.push(eqUserIdAsText(params.table.userId, params.userId));
+      conditions.push(eqUserId(params.table.userId, params.userId));
     } else if (params.table.userRef) {
-      conditions.push(eqUserIdAsText(params.table.userRef, params.userId));
+      conditions.push(eqUserId(params.table.userRef, params.userId));
     } else if (params.table.privateFor) {
-      conditions.push(
-        orNullEqUserIdAsText(params.table.privateFor, params.userId)
-      );
+      conditions.push(orNullEqUserId(params.table.privateFor, params.userId));
     } else if (params.table.privateToUser) {
-      conditions.push(
-        orNullEqUserIdAsText(params.table.privateToUser, params.userId)
-      );
+      conditions.push(orNullEqUserId(params.table.privateToUser, params.userId));
     }
 
     return conditions;
