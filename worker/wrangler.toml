@@ -16,6 +16,9 @@ localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres
 [vars]
 SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # SUPABASE_JWT_SECRET should be set via `wrangler secret put SUPABASE_JWT_SECRET`
+# Optional: bypass Hyperdrive and use DATABASE_URL directly for troubleshooting.
+# Requires `wrangler secret put DATABASE_URL` in the target environment.
+# BYPASS_HYPERDRIVE = "true"
 
 # Optional: Enable worker debug logging (console.log statements)
 # Set to "true" to enable verbose logging for development/debugging

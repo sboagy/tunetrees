@@ -214,11 +214,17 @@ function formatDbError(error: unknown): string {
   return fallback;
 }
 
-function createDb(env: Env): {
-  client: PostgresClient;
-  db: DrizzleDb;
-  close: () => Promise<void>;
-} {
+function resolveConnectionString(env: Env): string {
+  const bypassHyperdrive = env.BYPASS_HYPERDRIVE === "true";
+  if (bypassHyperdrive) {
+    if (!env.DATABASE_URL) {
+      throw new Error(
+        "Database configuration error: BYPASS_HYPERDRIVE=true requires DATABASE_URL"
+      );
+    }
+    return env.DATABASE_URL;
+  }
+
   const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
   if (!connectionString) {
     const msg = env.HYPERDRIVE
@@ -226,6 +232,16 @@ function createDb(env: Env): {
       : "DATABASE_URL not configured";
     throw new Error(`Database configuration error: ${msg}`);
   }
+
+  return connectionString;
+}
+
+function createDb(env: Env): {
+  client: PostgresClient;
+  db: DrizzleDb;
+  close: () => Promise<void>;
+} {
+  const connectionString = resolveConnectionString(env);
 
   // IMPORTANT (Cloudflare Workers): Do NOT cache/reuse database clients across requests.
   // Newer Workers runtimes enforce request-scoped I/O; reusing a client can trigger:
@@ -270,6 +286,8 @@ function isClientSyncChange(change: IncomingSyncChange): boolean {
 export interface Env {
   HYPERDRIVE?: Hyperdrive;
   DATABASE_URL?: string;
+  /** When "true", ignores HYPERDRIVE and connects via DATABASE_URL directly. */
+  BYPASS_HYPERDRIVE?: string;
   SUPABASE_URL: string;
   SUPABASE_JWT_SECRET: string;
   /** When "true", enables debug logging (console.log statements). */
@@ -1443,24 +1461,21 @@ async function fetch(request: Request, env: Env): Promise<Response> {
         (!env.SYNC_DIAGNOSTICS_USER_ID ||
           env.SYNC_DIAGNOSTICS_USER_ID === userId);
 
+      const payload = (await request.json()) as SyncRequest;
+
       // Connect to database
       try {
+        debug.log(`[HTTP] Sync request parsed, calling handleSync`);
         const { db, close } = createDb(env);
-        const payload = (await request.json()) as SyncRequest;
-
-        try {
-          debug.log(`[HTTP] Sync request parsed, calling handleSync`);
-          const response = await handleSync(
-            db,
-            payload,
-            userId,
-            diagnosticsEnabled
-          );
-          debug.log(`[HTTP] Sync completed successfully`);
-          return jsonResponse(response, 200, corsHeaders);
-        } finally {
-          await close();
-        }
+        const response = await (async () => {
+          try {
+            return await handleSync(db, payload, userId, diagnosticsEnabled);
+          } finally {
+            await close();
+          }
+        })();
+        debug.log(`[HTTP] Sync completed successfully`);
+        return jsonResponse(response, 200, corsHeaders);
       } catch (error) {
         console.error("[HTTP] Sync error:", error);
         return errorResponse(formatDbError(error), 500, corsHeaders);
