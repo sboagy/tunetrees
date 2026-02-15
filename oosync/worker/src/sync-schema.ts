@@ -344,6 +344,14 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
         continue;
       }
 
+      // If the collection identity is self-owned (id column equals owner column),
+      // we can safely scope it to the authenticated user id without a DB round-trip.
+      // This avoids collapsing sync scope when transient DB/Hyperdrive issues occur.
+      if (cfg.idColumn === cfg.ownerColumn) {
+        result[name] = new Set([String(params.userId)]);
+        continue;
+      }
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         const rows = await params.tx

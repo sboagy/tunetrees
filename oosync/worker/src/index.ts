@@ -250,9 +250,12 @@ function createDb(env: Env): {
   // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
   const client = postgres(connectionString, {
     prepare: false,
+    // Avoid startup type-introspection queries (pg_type) that can stall on Hyperdrive nodes.
+    // We only rely on primitive scalar decoding in sync paths.
+    fetch_types: false,
     // Keep a small pool per request to avoid self-contention when sync code issues
     // parallel reads inside a single request, while still limiting connection fan-out.
-    max: 4,
+    max: 2,
     connect_timeout: 10,
     idle_timeout: 20,
   });
