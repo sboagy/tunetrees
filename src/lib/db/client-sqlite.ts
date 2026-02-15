@@ -146,6 +146,7 @@ async function getSqlJs(): Promise<SqlJsStatic> {
  */
 const INDEXEDDB_NAME = "tunetrees-storage";
 const INDEXEDDB_STORE = "databases";
+const INDEXEDDB_OPERATION_TIMEOUT_MS = 5000;
 // Base keys - will be namespaced by user ID
 const DB_KEY_PREFIX = "tunetrees-db";
 const DB_VERSION_KEY_PREFIX = "tunetrees-db-version";
@@ -958,7 +959,34 @@ function ensureColumnExists(
  */
 async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      fn();
+    };
+    const resolveOnce = () => finish(() => resolve());
+    const rejectOnce = (error: unknown) =>
+      finish(() =>
+        reject(
+          error instanceof Error
+            ? error
+            : new Error(error ? String(error) : "IndexedDB save failed")
+        )
+      );
+
+    const timeoutId = setTimeout(() => {
+      rejectOnce(new Error(`[IndexedDB] Save timed out for key: ${key}`));
+    }, INDEXEDDB_OPERATION_TIMEOUT_MS);
+
     const request = indexedDB.open(INDEXEDDB_NAME);
+
+    request.onblocked = () => {
+      rejectOnce(
+        new Error(`[IndexedDB] Open blocked while saving key: ${key}`)
+      );
+    };
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -976,6 +1004,13 @@ async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
         db.close();
 
         const upgradeReq = indexedDB.open(INDEXEDDB_NAME, currentVersion + 1);
+        upgradeReq.onblocked = () => {
+          rejectOnce(
+            new Error(
+              `[IndexedDB] Upgrade blocked while saving key: ${key}`
+            )
+          );
+        };
         upgradeReq.onupgradeneeded = () => {
           const udb = upgradeReq.result;
           if (!udb.objectStoreNames.contains(INDEXEDDB_STORE)) {
@@ -989,14 +1024,21 @@ async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
           store.put(data, key);
           tx.oncomplete = () => {
             udb.close();
-            resolve();
+            resolveOnce();
           };
           tx.onerror = () => {
             udb.close();
-            reject(tx.error);
+            rejectOnce(tx.error ?? new Error("IndexedDB upgrade write failed"));
+          };
+          tx.onabort = () => {
+            udb.close();
+            rejectOnce(tx.error ?? new Error("IndexedDB upgrade write aborted"));
           };
         };
-        upgradeReq.onerror = () => reject(upgradeReq.error);
+        upgradeReq.onerror = () =>
+          rejectOnce(
+            upgradeReq.error ?? new Error("IndexedDB upgrade open failed")
+          );
         return;
       }
 
@@ -1006,15 +1048,20 @@ async function saveToIndexedDB(key: string, data: Uint8Array): Promise<void> {
 
       tx.oncomplete = () => {
         db.close();
-        resolve();
+        resolveOnce();
       };
       tx.onerror = () => {
         db.close();
-        reject(tx.error);
+        rejectOnce(tx.error ?? new Error("IndexedDB write failed"));
+      };
+      tx.onabort = () => {
+        db.close();
+        rejectOnce(tx.error ?? new Error("IndexedDB write aborted"));
       };
     };
 
-    request.onerror = () => reject(request.error);
+    request.onerror = () =>
+      rejectOnce(request.error ?? new Error("IndexedDB open failed"));
   });
 }
 

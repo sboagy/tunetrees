@@ -320,20 +320,21 @@ export class SyncService {
 
       const result = await this.syncEngine.syncDown();
 
+      // Notify callback as soon as pull/apply completes so UI gating is not
+      // blocked by IndexedDB persistence latency.
+      this.config.onSyncComplete?.(result);
+
       // Ensure remote changes survive a quick refresh.
       // Relying solely on `beforeunload`/interval persistence is unreliable because
       // async work may be aborted during navigation.
-      try {
-        await getSyncRuntime().persistDb?.();
-      } catch (error) {
-        console.warn(
-          "[SyncService] Failed to persist DB after syncDown:",
-          error
-        );
-      }
-
-      // Notify callback (same as sync() method)
-      this.config.onSyncComplete?.(result);
+      void getSyncRuntime()
+        .persistDb?.()
+        .catch((error) => {
+          console.warn(
+            "[SyncService] Failed to persist DB after syncDown:",
+            error
+          );
+        });
 
       return result;
     } catch (error) {
