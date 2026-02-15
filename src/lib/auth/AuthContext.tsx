@@ -257,9 +257,9 @@ export const AuthProvider: ParentComponent = (props) => {
   // Track if database is being initialized to prevent double initialization
   let isInitializing = false;
 
-  // Optional one-time sync diagnostics (off by default).
-  // Enable via `VITE_SYNC_DIAGNOSTICS=true` to log row counts after sync.
-  const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+  // Optional one-time sync diagnostics (enabled by default).
+  // Set `VITE_SYNC_DIAGNOSTICS=false` to disable row-count diagnostics.
+  const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS !== "false";
   let syncDiagnosticsRan = false;
 
   const diagLog = (...args: unknown[]): void => {
@@ -552,6 +552,11 @@ export const AuthProvider: ParentComponent = (props) => {
     let metadataPrefetchCompleted = false;
 
     const requestOverridesProvider = async () => {
+      const startedAt = performance.now();
+      diagLog("[AuthContext] requestOverridesProvider start", {
+        user: authUserId,
+        isAnonymousUser,
+      });
       try {
         const { buildGenreFilterOverrides, preSyncMetadataViaWorker } =
           await import("@/lib/sync/genre-filter");
@@ -570,8 +575,16 @@ export const AuthProvider: ParentComponent = (props) => {
           const shouldRunMetadataPrefetch =
             !metadataPrefetchCompleted && !lastSyncAt;
 
+          diagLog("[AuthContext] metadata prefetch decision", {
+            shouldRunMetadataPrefetch,
+            metadataPrefetchCompleted,
+            hasLastSyncAt: !!lastSyncAt,
+            debugUserId,
+          });
+
           if (shouldRunMetadataPrefetch) {
             if (!metadataPrefetchPromise) {
+              diagLog("[AuthContext] metadata prefetch start");
               metadataPrefetchPromise = preSyncMetadataViaWorker({
                 db,
                 supabase,
@@ -580,6 +593,7 @@ export const AuthProvider: ParentComponent = (props) => {
               })
                 .then(() => {
                   metadataPrefetchCompleted = true;
+                  diagLog("[AuthContext] metadata prefetch complete");
                 })
                 .finally(() => {
                   metadataPrefetchPromise = null;
@@ -622,6 +636,10 @@ export const AuthProvider: ParentComponent = (props) => {
             "[AuthContext] 🎯 Anonymous initial sync: Deferring catalog sync until after genre selection. pullTables=",
             pullTablesOverride.pullTables
           );
+          diagLog("[AuthContext] requestOverridesProvider done", {
+            durationMs: Math.round(performance.now() - startedAt),
+            mode: "anonymous-initial-defer-catalog",
+          });
           return pullTablesOverride;
         }
 
@@ -657,18 +675,31 @@ export const AuthProvider: ParentComponent = (props) => {
             userId: internalId,
             isInitialSync,
           });
+          diagLog("[AuthContext] requestOverridesProvider done", {
+            durationMs: Math.round(performance.now() - startedAt),
+            mode: "anonymous-initial-catalog",
+            hasGenreOverrides: !!genreOverrides,
+          });
           return {
             ...catalogTablesOverride,
             ...genreOverrides,
           };
         }
 
-        return await buildGenreFilterOverrides({
+        const overrides = await buildGenreFilterOverrides({
           db,
           supabase,
           userId: internalId,
           isInitialSync,
         });
+        diagLog("[AuthContext] requestOverridesProvider done", {
+          durationMs: Math.round(performance.now() - startedAt),
+          mode: "standard",
+          hasOverrides: !!overrides,
+          hasGenreFilter: !!overrides?.genreFilter,
+          pullTablesCount: overrides?.pullTables?.length ?? 0,
+        });
+        return overrides;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         const isNetworkError =
@@ -688,6 +719,10 @@ export const AuthProvider: ParentComponent = (props) => {
         } else {
           console.error("[AuthContext] Failed to build sync overrides:", error);
         }
+        diagLog("[AuthContext] requestOverridesProvider failed", {
+          durationMs: Math.round(performance.now() - startedAt),
+          error: errorMsg,
+        });
         return null;
       }
     };

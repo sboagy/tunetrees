@@ -65,9 +65,9 @@ let initializeDbPromise: Promise<ReturnType<typeof drizzle>> | null = null;
 let e2ePersistCount = 0;
 let e2eCumulativeExportBytes = 0;
 
-// Optional diagnostics (off by default).
-// Enable via `VITE_SYNC_DIAGNOSTICS=true`.
-const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+// Optional diagnostics (enabled by default).
+// Set `VITE_SYNC_DIAGNOSTICS=false` to disable.
+const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS !== "false";
 
 function diagLog(...args: unknown[]): void {
   if (SYNC_DIAGNOSTICS) console.log(...args);

@@ -57,8 +57,8 @@ function getRuntimeState() {
   } as const;
 }
 
-// Diagnostics flag for collecting sync performance stats (set VITE_SYNC_DIAGNOSTICS=true).
-const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+// Diagnostics flag for collecting sync performance stats (enabled unless VITE_SYNC_DIAGNOSTICS=false).
+const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS !== "false";
 
 /** LocalStorage key prefix for persisting last sync timestamp across app restarts */
 const LAST_SYNC_TIMESTAMP_KEY_PREFIX = "TT_LAST_SYNC_TIMESTAMP";
@@ -430,6 +430,7 @@ export class SyncEngine {
       }
 
       // 3. Call Worker (Push + first Pull page)
+      const firstPullStartedAt = SYNC_DIAGNOSTICS ? performance.now() : 0;
       const firstResponse = await workerClient.sync(
         changes,
         this.lastSyncTimestamp || undefined,
@@ -438,6 +439,13 @@ export class SyncEngine {
           overrides: requestOverrides ?? undefined,
         }
       );
+
+      if (SYNC_DIAGNOSTICS) {
+        const durationMs = Math.round(performance.now() - firstPullStartedAt);
+        console.log(
+          `[SyncDiag] firstPage pulled=${firstResponse.changes.length} nextCursor=${firstResponse.nextCursor ? "yes" : "no"} durationMs=${durationMs}`
+        );
+      }
 
       if (SYNC_DIAGNOSTICS) {
         diagPullPages += 1;
@@ -475,13 +483,30 @@ export class SyncEngine {
 
       // 6. If initial sync is paginated, pull remaining pages (no push)
       if (isInitialSync && pullCursor) {
+        let pageNumber = 1;
         while (pullCursor) {
+          pageNumber += 1;
+          const pageStartedAt = SYNC_DIAGNOSTICS ? performance.now() : 0;
+          if (SYNC_DIAGNOSTICS) {
+            const cursorPreview = pullCursor.slice(0, 16);
+            console.log(
+              `[SyncDiag] pageRequest page=${pageNumber} cursorPrefix=${cursorPreview}...`
+            );
+          }
+
           const pageResponse = await workerClient.sync([], undefined, {
             pullCursor,
             syncStartedAt,
             pageSize: 200,
             overrides: requestOverrides ?? undefined,
           });
+
+          if (SYNC_DIAGNOSTICS) {
+            const durationMs = Math.round(performance.now() - pageStartedAt);
+            console.log(
+              `[SyncDiag] pageResponse page=${pageNumber} pulled=${pageResponse.changes.length} nextCursor=${pageResponse.nextCursor ? "yes" : "no"} durationMs=${durationMs}`
+            );
+          }
 
           pullCursor = pageResponse.nextCursor;
           syncStartedAt = pageResponse.syncStartedAt ?? syncStartedAt;

@@ -20,6 +20,12 @@ const DEFAULT_METADATA_TABLES = [
 ];
 const METADATA_PREFETCH_TIMEOUT_MS = 12_000;
 
+const GF_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS !== "false";
+
+function gfLog(...args: unknown[]): void {
+  if (GF_DIAGNOSTICS) console.log(...args);
+}
+
 function isNetworkSyncError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -40,6 +46,13 @@ export async function preSyncMetadataViaWorker(params: {
   userId?: string; // For debug logging only
 }): Promise<void> {
   const { db, supabase, tables = DEFAULT_METADATA_TABLES, lastSyncAt } = params;
+  const startedAt = performance.now();
+
+  gfLog("[GenreFilter] preSyncMetadataViaWorker start", {
+    tables,
+    lastSyncAt: lastSyncAt ?? null,
+    userId: params.userId ?? null,
+  });
 
   const {
     data: { session },
@@ -53,12 +66,23 @@ export async function preSyncMetadataViaWorker(params: {
   const pullTables = async (tablesToPull: string[]): Promise<boolean> => {
     if (tablesToPull.length === 0) return true;
 
+    gfLog("[GenreFilter] pullTables start", { tablesToPull });
+
     let pullCursor: string | undefined;
     let syncStartedAt: string | undefined;
+    let page = 0;
 
     do {
+      page += 1;
+      const pageStartedAt = performance.now();
       let response: SyncResponse;
       try {
+        gfLog("[GenreFilter] pullTables request", {
+          tablesToPull,
+          page,
+          hasCursor: !!pullCursor,
+          timeoutMs: METADATA_PREFETCH_TIMEOUT_MS,
+        });
         response = await workerClient.sync([], lastSyncAt ?? undefined, {
           pullCursor,
           syncStartedAt,
@@ -68,11 +92,24 @@ export async function preSyncMetadataViaWorker(params: {
             pullTables: tablesToPull,
           },
         });
+
+        gfLog("[GenreFilter] pullTables response", {
+          tablesToPull,
+          page,
+          pulled: response.changes.length,
+          hasNextCursor: !!response.nextCursor,
+          durationMs: Math.round(performance.now() - pageStartedAt),
+        });
       } catch (error) {
         if (isNetworkSyncError(error)) {
           console.warn(
             "[GenreFilter] Metadata pre-sync skipped due network error; continuing with best-effort local metadata"
           );
+          gfLog("[GenreFilter] pullTables network skip", {
+            tablesToPull,
+            page,
+            error: error instanceof Error ? error.message : String(error),
+          });
           return false;
         }
         throw error;
@@ -85,6 +122,14 @@ export async function preSyncMetadataViaWorker(params: {
         localDb: db,
         changes: response.changes,
         deferForeignKeyFailuresTo: deferredChanges,
+      });
+
+      gfLog("[GenreFilter] apply result", {
+        tablesToPull,
+        page,
+        synced: applyResult.synced,
+        failed: applyResult.failed,
+        deferred: deferredChanges.length,
       });
 
       // Check for non-FK failures
@@ -101,6 +146,13 @@ export async function preSyncMetadataViaWorker(params: {
           changes: deferredChanges,
         });
 
+        gfLog("[GenreFilter] deferred apply result", {
+          tablesToPull,
+          page,
+          synced: retryResult.synced,
+          failed: retryResult.failed,
+        });
+
         if (retryResult.failed > 0) {
           console.error(
             `[GenreFilter] Failed to apply ${retryResult.failed} deferred metadata changes after retry`
@@ -111,6 +163,8 @@ export async function preSyncMetadataViaWorker(params: {
       pullCursor = response.nextCursor;
       syncStartedAt = response.syncStartedAt ?? syncStartedAt;
     } while (pullCursor);
+
+    gfLog("[GenreFilter] pullTables complete", { tablesToPull, pages: page });
 
     return true;
   };
@@ -124,11 +178,16 @@ export async function preSyncMetadataViaWorker(params: {
   if (hasUserProfile) {
     const userProfilePulled = await pullTables(["user_profile"]);
     if (!userProfilePulled) {
+      gfLog("[GenreFilter] preSyncMetadataViaWorker early exit (user_profile failed)");
       return;
     }
   }
 
   await pullTables(remainingTables);
+
+  gfLog("[GenreFilter] preSyncMetadataViaWorker complete", {
+    durationMs: Math.round(performance.now() - startedAt),
+  });
 }
 
 async function getEffectiveGenreFilterInitialSync(params: {

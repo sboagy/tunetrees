@@ -1,17 +1,17 @@
 /**
  * Debug logging utilities for worker.
- * Logs are only emitted when WORKER_DEBUG env var is set to "true".
+ * Logs are emitted by default and can be disabled with WORKER_DEBUG="false".
  */
 
 // Global debug state - will be set by setDebugEnabled()
-let debugEnabled = false;
+let debugEnabled = true;
 
 /**
  * Initialize debug logging based on environment variable.
  * Must be called from the fetch handler with the env binding.
  */
 export const setDebugEnabled = (env: { WORKER_DEBUG?: string }) => {
-  debugEnabled = env.WORKER_DEBUG === "true";
+  debugEnabled = env.WORKER_DEBUG !== "false";
 };
 
 export const debug = {

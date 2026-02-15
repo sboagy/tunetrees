@@ -297,9 +297,9 @@ export interface Env {
   DATABASE_URL?: string;
   SUPABASE_URL: string;
   SUPABASE_JWT_SECRET: string;
-  /** When "true", enables debug logging (console.log statements). */
+  /** When not "false", enables debug logging (console.log statements). */
   WORKER_DEBUG?: string;
-  /** When "true", emits extra sync diagnostics logs (initial sync only). */
+  /** When not "false", emits extra sync diagnostics logs. */
   SYNC_DIAGNOSTICS?: string;
   /** Optional: only emit diagnostics when JWT sub matches this value. */
   SYNC_DIAGNOSTICS_USER_ID?: string;
@@ -317,6 +317,7 @@ interface SyncContext {
   genreFilter?: { selectedGenreIds: string[]; repertoireGenreIds: string[] };
   now: string;
   diagnosticsEnabled: boolean;
+  traceId: string;
 }
 
 interface InitialSyncCursorV1 {
@@ -359,6 +360,16 @@ function decodeCursor(raw: string): InitialSyncCursorV1 {
   }
 
   return { v: 1, tableIndex, offset, syncStartedAt };
+}
+
+function summarizeCursor(raw: string | undefined): string {
+  if (!raw) return "none";
+  try {
+    const c = decodeCursor(raw);
+    return `tableIndex=${c.tableIndex} offset=${c.offset}`;
+  } catch {
+    return "invalid";
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1006,7 +1017,17 @@ async function processInitialSyncPaged(
   // Advance until we find a table with rows to return, or we finish.
   while (tableIndex < SYNCABLE_TABLES.length) {
     const tableName = SYNCABLE_TABLES[tableIndex] as SyncableTableName;
+    if (ctx.diagnosticsEnabled) {
+      debug.log(
+        `[PULL:INITIAL] trace=${ctx.traceId} tableIndex=${tableIndex} table=${tableName} offset=${offset} pageSize=${pageSize}`
+      );
+    }
     if (ctx.pullTables && !ctx.pullTables.has(tableName)) {
+      if (ctx.diagnosticsEnabled) {
+        debug.log(
+          `[PULL:INITIAL] trace=${ctx.traceId} skipping table=${tableName} (not in pullTables override)`
+        );
+      }
       tableIndex += 1;
       offset = 0;
       continue;
@@ -1023,7 +1044,7 @@ async function processInitialSyncPaged(
       );
     } catch (error) {
       console.warn(
-        `[PULL:INITIAL] Skipping table ${tableName} due query error: ${formatDbError(error)}`
+        `[PULL:INITIAL] trace=${ctx.traceId} skipping table ${tableName} due query error: ${formatDbError(error)}`
       );
       tableIndex += 1;
       offset = 0;
@@ -1031,6 +1052,11 @@ async function processInitialSyncPaged(
     }
 
     if (changes.length === 0) {
+      if (ctx.diagnosticsEnabled) {
+        debug.log(
+          `[PULL:INITIAL] trace=${ctx.traceId} table=${tableName} no rows at offset=${offset}; advancing table`
+        );
+      }
       // Either table is empty / skipped OR we've paged past the end.
       // Move to next table.
       tableIndex += 1;
@@ -1044,7 +1070,17 @@ async function processInitialSyncPaged(
     if (isLastPageForTable) {
       const nextTableIndex = tableIndex + 1;
       if (nextTableIndex >= SYNCABLE_TABLES.length) {
+        if (ctx.diagnosticsEnabled) {
+          debug.log(
+            `[PULL:INITIAL] trace=${ctx.traceId} table=${tableName} finalPage rows=${changes.length} nextCursor=none`
+          );
+        }
         return { changes, syncStartedAt };
+      }
+      if (ctx.diagnosticsEnabled) {
+        debug.log(
+          `[PULL:INITIAL] trace=${ctx.traceId} table=${tableName} finalPage rows=${changes.length} nextTableIndex=${nextTableIndex}`
+        );
       }
       return {
         changes,
@@ -1056,6 +1092,12 @@ async function processInitialSyncPaged(
           syncStartedAt,
         }),
       };
+    }
+
+    if (ctx.diagnosticsEnabled) {
+      debug.log(
+        `[PULL:INITIAL] trace=${ctx.traceId} table=${tableName} page rows=${changes.length} nextOffset=${nextOffset}`
+      );
     }
 
     return {
@@ -1211,7 +1253,7 @@ async function processIncrementalSync(
   ctx: SyncContext
 ): Promise<SyncChange[]> {
   debug.log(
-    `[PULL:INCR] Starting incremental sync for user ${ctx.userId} since ${lastSyncAt}`
+    `[PULL:INCR] trace=${ctx.traceId} starting incremental sync for user ${ctx.userId} since ${lastSyncAt}`
   );
   const changedTables = await getChangedTables(tx, lastSyncAt);
 
@@ -1240,7 +1282,7 @@ async function processIncrementalSync(
       );
     } catch (error) {
       console.warn(
-        `[PULL:INCR] Skipping table ${tableName} due query error: ${formatDbError(error)}`
+        `[PULL:INCR] trace=${ctx.traceId} skipping table ${tableName} due query error: ${formatDbError(error)}`
       );
       continue;
     }
@@ -1261,7 +1303,8 @@ async function handleSync(
   db: ReturnType<typeof drizzle>,
   payload: SyncRequest,
   userId: string,
-  diagnosticsEnabled: boolean
+  diagnosticsEnabled: boolean,
+  traceId: string
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
   const diag: string[] = [];
@@ -1271,24 +1314,17 @@ async function handleSync(
   const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
 
   if (diagnosticsEnabled) {
-    const cursorSummary = payload.pullCursor
-      ? (() => {
-          try {
-            const c = decodeCursor(payload.pullCursor);
-            return `tableIndex=${c.tableIndex} offset=${c.offset}`;
-          } catch {
-            return "cursor=invalid";
-          }
-        })()
-      : "cursor=none";
+    const cursorSummary = summarizeCursor(payload.pullCursor);
     diag.push(
-      `[WorkerSyncDiag] type=${syncType} changesIn=${payload.changes.length} lastSyncAt=${payload.lastSyncAt ?? "null"} pageSize=${payload.pageSize ?? "null"} ${cursorSummary}`
+      `[WorkerSyncDiag] trace=${traceId} type=${syncType} changesIn=${payload.changes.length} lastSyncAt=${payload.lastSyncAt ?? "null"} pageSize=${payload.pageSize ?? "null"} cursor=${cursorSummary}`
     );
   }
 
-  debug.log(`[SYNC] === Starting ${syncType} sync for user ${userId} ===`);
   debug.log(
-    `[SYNC] Request: lastSyncAt=${payload.lastSyncAt ?? "null"}, changes=${payload.changes.length}`
+    `[SYNC] trace=${traceId} === Starting ${syncType} sync for user ${userId} ===`
+  );
+  debug.log(
+    `[SYNC] trace=${traceId} request: lastSyncAt=${payload.lastSyncAt ?? "null"}, changes=${payload.changes.length}, cursor=${summarizeCursor(payload.pullCursor)}`
   );
 
   const runSyncQueries = async (txLike: Transaction) => {
@@ -1338,6 +1374,7 @@ async function handleSync(
       genreFilter: payload.genreFilter,
       now,
       diagnosticsEnabled,
+      traceId,
     };
 
     // Genre filter is passed to RPC functions when filtering note/reference tables
@@ -1381,7 +1418,7 @@ async function handleSync(
         .map(([t, n]) => `${t}:${n}`)
         .join(",");
       diag.push(
-        `[WorkerSyncDiag] changesOut=${responseChanges.length} nextCursor=${nextCursor ? "yes" : "no"} syncStartedAt=${syncStartedAt ?? "null"} topTables=${top || "(none)"}`
+        `[WorkerSyncDiag] trace=${traceId} changesOut=${responseChanges.length} nextCursor=${nextCursor ? "yes" : "no"} syncStartedAt=${syncStartedAt ?? "null"} topTables=${top || "(none)"}`
       );
     }
 
@@ -1399,7 +1436,7 @@ async function handleSync(
   }
 
   debug.log(
-    `[SYNC] === Completed ${syncType} sync: returning ${responseChanges.length} changes, syncedAt=${now} ===`
+    `[SYNC] trace=${traceId} === Completed ${syncType} sync: returning ${responseChanges.length} changes, syncedAt=${now} ===`
   );
 
   return {
@@ -1425,7 +1462,7 @@ function getCorsHeaders(request: Request): Record<string, string> {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, apikey, x-client-info",
+      "Content-Type, Authorization, apikey, x-client-info, x-client-sync-request-id",
     "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
     "Access-Control-Max-Age": "86400", // 24 hours
@@ -1476,7 +1513,12 @@ async function fetch(request: Request, env: Env): Promise<Response> {
 
     // Sync endpoint
     if (request.method === "POST" && url.pathname === "/api/sync") {
-      debug.log(`[HTTP] POST /api/sync received`);
+      const requestIdHeader = request.headers.get("x-client-sync-request-id");
+      const traceId = requestIdHeader
+        ? `client:${requestIdHeader}`
+        : `worker:${crypto.randomUUID().slice(0, 12)}`;
+
+      debug.log(`[HTTP] trace=${traceId} POST /api/sync received`);
 
       // Validate environment configuration
       if (!env.SUPABASE_JWT_SECRET) {
@@ -1491,34 +1533,40 @@ async function fetch(request: Request, env: Env): Promise<Response> {
         env.SUPABASE_URL
       );
       if (!userId) {
-        debug.log(`[HTTP] Unauthorized - JWT verification failed`);
+        debug.log(`[HTTP] trace=${traceId} unauthorized - JWT verification failed`);
         return errorResponse("Unauthorized", 401, corsHeaders);
       }
 
       const diagnosticsEnabled =
-        env.SYNC_DIAGNOSTICS === "true" &&
+        env.SYNC_DIAGNOSTICS !== "false" &&
         (!env.SYNC_DIAGNOSTICS_USER_ID ||
           env.SYNC_DIAGNOSTICS_USER_ID === userId);
 
       const payload = (await request.json()) as SyncRequest;
+      debug.log(
+        `[HTTP] trace=${traceId} payload parsed changes=${payload.changes.length} lastSyncAt=${payload.lastSyncAt ?? "null"} cursor=${summarizeCursor(payload.pullCursor)}`
+      );
       const maxAttempts = payload.changes.length === 0 ? 1 : 2;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         const { db, close } = createDb(env);
         try {
-          debug.log(`[HTTP] Sync request parsed, calling handleSync`);
+          debug.log(
+            `[HTTP] trace=${traceId} attempt=${attempt}/${maxAttempts} calling handleSync`
+          );
           const response = await handleSync(
             db,
             payload,
             userId,
-            diagnosticsEnabled
+            diagnosticsEnabled,
+            traceId
           );
-          debug.log(`[HTTP] Sync completed successfully`);
+          debug.log(`[HTTP] trace=${traceId} sync completed successfully`);
           return jsonResponse(response, 200, corsHeaders);
         } catch (error) {
           const retryable = isRetryableDbPoolError(error);
           console.error(
-            `[HTTP] Sync error (attempt ${attempt}/${maxAttempts}):`,
+            `[HTTP] trace=${traceId} sync error (attempt ${attempt}/${maxAttempts}):`,
             error
           );
 
