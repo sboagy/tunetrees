@@ -7,6 +7,7 @@ import type {
 
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
 const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+const DEFAULT_SYNC_REQUEST_TIMEOUT_MS = 30_000;
 
 export class WorkerClient {
   private token: string;
@@ -23,6 +24,7 @@ export class WorkerClient {
       syncStartedAt?: string;
       pageSize?: number;
       overrides?: SyncRequestOverrides | null;
+      timeoutMs?: number;
     }
   ): Promise<SyncResponse> {
     const overrides = options?.overrides ?? undefined;
@@ -38,14 +40,32 @@ export class WorkerClient {
       pullTables: overrides?.pullTables,
     };
 
-    const response = await fetch(`${WORKER_URL}/api/sync`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.token}`,
-      },
-      body: JSON.stringify(payload),
-    });
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_SYNC_REQUEST_TIMEOUT_MS;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response: Response;
+    try {
+      response = await fetch(`${WORKER_URL}/api/sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        throw new Error(`Sync request timed out after ${timeoutMs}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const text = await response.text();

@@ -647,6 +647,7 @@ export class SyncEngine {
         errorMsg.includes("Failed to fetch") ||
         errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
         errorMsg.includes("NetworkError") ||
+        errorMsg.includes("Sync request timed out") ||
         errorMsg.includes("Timed out while waiting for an open slot in the pool") ||
         errorMsg.includes("Sync failed: 503");
       if (!isNetworkError) {

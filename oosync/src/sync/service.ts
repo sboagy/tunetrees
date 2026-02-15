@@ -538,6 +538,7 @@ export class SyncService {
                 e.includes("Failed to fetch") ||
                 e.includes("ERR_INTERNET_DISCONNECTED") ||
                 e.includes("NetworkError") ||
+                e.includes("Sync request timed out") ||
                 e.includes(
                   "Timed out while waiting for an open slot in the pool"
                 ) ||
@@ -616,6 +617,7 @@ export class SyncService {
           errorMsg.includes("Failed to fetch") ||
           errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
           errorMsg.includes("NetworkError") ||
+          errorMsg.includes("Sync request timed out") ||
           errorMsg.includes(
             "Timed out while waiting for an open slot in the pool"
           ) ||

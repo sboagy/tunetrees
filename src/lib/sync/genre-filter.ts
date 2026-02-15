@@ -18,6 +18,7 @@ const DEFAULT_METADATA_TABLES = [
   "instrument",
   "genre", // Required for repertoire.genre_default FK
 ];
+const METADATA_PREFETCH_TIMEOUT_MS = 12_000;
 
 function isNetworkSyncError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -25,6 +26,7 @@ function isNetworkSyncError(error: unknown): boolean {
     message.includes("Failed to fetch") ||
     message.includes("ERR_INTERNET_DISCONNECTED") ||
     message.includes("NetworkError") ||
+    message.includes("Sync request timed out") ||
     message.includes("Timed out while waiting for an open slot in the pool") ||
     message.includes("Sync failed: 503")
   );
@@ -61,6 +63,7 @@ export async function preSyncMetadataViaWorker(params: {
           pullCursor,
           syncStartedAt,
           pageSize: 200,
+          timeoutMs: METADATA_PREFETCH_TIMEOUT_MS,
           overrides: {
             pullTables: tablesToPull,
           },
