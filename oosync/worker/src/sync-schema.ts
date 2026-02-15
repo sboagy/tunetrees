@@ -112,13 +112,22 @@ function orNullEqUserId(column: any, userId: string): unknown {
 }
 
 type DbErrorLike = {
+  name?: unknown;
   message?: unknown;
   code?: unknown;
   detail?: unknown;
   hint?: unknown;
+  severity?: unknown;
+  routine?: unknown;
+  where?: unknown;
+  position?: unknown;
+  schema_name?: unknown;
   table_name?: unknown;
   column_name?: unknown;
   constraint_name?: unknown;
+  query?: unknown;
+  params?: unknown;
+  parameters?: unknown;
   cause?: unknown;
 };
 
@@ -126,37 +135,89 @@ function asNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function compactValue(value: unknown, maxLength = 280): string | undefined {
+  if (value === null || value === undefined) return undefined;
+
+  if (typeof value === "string") {
+    if (value.length === 0) return undefined;
+    return value.length > maxLength
+      ? `${value.slice(0, maxLength)}…`
+      : value;
+  }
+
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    if (!serialized || serialized === "{}" || serialized === "[]") {
+      return undefined;
+    }
+    return serialized.length > maxLength
+      ? `${serialized.slice(0, maxLength)}…`
+      : serialized;
+  } catch {
+    return undefined;
+  }
+}
+
 function describeSyncSchemaError(error: unknown): string {
   const fallback = error instanceof Error ? error.message : String(error);
 
+  const chainParts: string[] = [];
   let current: unknown = error;
   for (let depth = 0; depth < 6; depth += 1) {
     if (!current || typeof current !== "object") break;
     const candidate = current as DbErrorLike;
 
+    const name = asNonEmptyString(candidate.name);
     const code = asNonEmptyString(candidate.code);
+    const severity = asNonEmptyString(candidate.severity);
     const detail = asNonEmptyString(candidate.detail);
     const hint = asNonEmptyString(candidate.hint);
+    const routine = asNonEmptyString(candidate.routine);
+    const where = asNonEmptyString(candidate.where);
+    const position = asNonEmptyString(candidate.position);
+    const schema = asNonEmptyString(candidate.schema_name);
     const table = asNonEmptyString(candidate.table_name);
     const column = asNonEmptyString(candidate.column_name);
     const constraint = asNonEmptyString(candidate.constraint_name);
     const message = asNonEmptyString(candidate.message);
+    const query = compactValue(candidate.query);
+    const params = compactValue(candidate.params ?? candidate.parameters);
 
     const parts = [
+      name ? `name=${name}` : undefined,
       code ? `code=${code}` : undefined,
+      severity ? `severity=${severity}` : undefined,
+      routine ? `routine=${routine}` : undefined,
+      schema ? `schema=${schema}` : undefined,
       table ? `table=${table}` : undefined,
       column ? `column=${column}` : undefined,
       constraint ? `constraint=${constraint}` : undefined,
+      position ? `position=${position}` : undefined,
+      where ? `where=${where}` : undefined,
       detail ? `detail=${detail}` : undefined,
       hint ? `hint=${hint}` : undefined,
+      query ? `query=${query}` : undefined,
+      params ? `params=${params}` : undefined,
       message,
     ].filter((part): part is string => typeof part === "string");
 
     if (parts.length > 0) {
-      return parts.join(" | ");
+      chainParts.push(`cause[${depth}] ${parts.join(" | ")}`);
     }
 
     current = candidate.cause;
+  }
+
+  if (chainParts.length > 0) {
+    return chainParts.join(" || ");
   }
 
   return fallback;
