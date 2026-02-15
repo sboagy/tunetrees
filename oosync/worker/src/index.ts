@@ -61,6 +61,7 @@ let loadUserCollections: (params: {
   tx: PgTransaction<any, any, any>;
   userId: string;
   tables: Record<string, any>;
+  pullTables?: Set<string>;
 }) => Promise<Record<string, Set<string>>> = async () =>
   notInitialized("loadUserCollections");
 let minimalPayload: (
@@ -1277,10 +1278,15 @@ async function handleSync(
     // No resolution needed - user_profile.id is the PK.
     const authUserId = userId;
 
+    const pullTables = payload.pullTables
+      ? new Set(payload.pullTables.map((t) => String(t)))
+      : undefined;
+
     const collections = await loadUserCollections({
       tx: txLike,
       userId: authUserId,
       tables: getSchemaTables(),
+      pullTables,
     });
 
     if (
@@ -1297,10 +1303,6 @@ async function handleSync(
       const effective = [...selected, ...repertoire].map((g) => String(g));
       collections.selectedGenres = new Set(effective);
     }
-
-    const pullTables = payload.pullTables
-      ? new Set(payload.pullTables.map((t) => String(t)))
-      : undefined;
 
     if (pullTables) {
       debug.log(

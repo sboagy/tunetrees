@@ -103,6 +103,22 @@ export interface IWorkerSyncConfig {
   push?: IPushConfig;
 }
 
+function collectRuleCollections(
+  rule: PullTableRule,
+  required: Set<string>
+): void {
+  if (rule.kind === "inCollection") {
+    required.add(rule.collection);
+    return;
+  }
+
+  if (rule.kind === "compound") {
+    for (const nested of rule.rules) {
+      collectRuleCollections(nested, required);
+    }
+  }
+}
+
 export function createSyncSchema(deps: SyncSchemaDeps) {
   const SYNCABLE_TABLES = deps.syncableTables;
   const TABLE_REGISTRY: Record<string, TableMeta> = deps.tableRegistryCore;
@@ -152,12 +168,35 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     tx: PgTransaction<any, any, any>;
     userId: string;
     tables: Record<string, any>;
+    pullTables?: Set<string>;
   }): Promise<Record<string, Set<string>>> {
     const collections = getWorkerConfig().collections ?? {};
     const result: Record<string, Set<string>> = {};
 
+    // For pullTables-scoped sync requests, only load collections that are:
+    // 1) directly tied to pulled tables, or
+    // 2) required by inCollection pull rules for pulled tables.
+    const requiredCollections = new Set<string>();
+    if (params.pullTables) {
+      for (const tableName of params.pullTables) {
+        const rule = getPullRule(tableName);
+        if (rule) {
+          collectRuleCollections(rule, requiredCollections);
+        }
+      }
+    }
+
     // Load user collections (repertoires, etc.)
     for (const [name, cfg] of Object.entries(collections)) {
+      if (
+        params.pullTables &&
+        !params.pullTables.has(cfg.table) &&
+        !requiredCollections.has(name)
+      ) {
+        result[name] = new Set();
+        continue;
+      }
+
       const table = params.tables[cfg.table];
       if (!table) {
         result[name] = new Set();
@@ -173,16 +212,24 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
         continue;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      const rows = await params.tx
+      try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        .select({ id: idCol })
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        .from(table)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        .where(eq(ownerCol, params.userId));
+        const rows = await params.tx
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          .select({ id: idCol })
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          .from(table)
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          .where(eq(ownerCol, params.userId));
 
-      result[name] = new Set(rows.map((r: any) => String(r.id)));
+        result[name] = new Set(rows.map((r: any) => String(r.id)));
+      } catch (error) {
+        console.warn(
+          `[SYNC] Failed to load collection ${name} (${cfg.table}); continuing with empty set`,
+          error
+        );
+        result[name] = new Set();
+      }
     }
 
     // Load user's selected genres for catalog filtering
@@ -288,6 +335,16 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     userId: string;
     collections: Record<string, Set<string>>;
   }): unknown[] | null {
+    // Queue rows are repertoire-scoped in practice and this avoids hard dependency
+    // on user_ref for environments where that column may drift/mismatch.
+    if (params.tableName === "daily_practice_queue" && params.table.repertoireRef) {
+      const repertoireIds = params.collections.repertoireIds
+        ? Array.from(params.collections.repertoireIds)
+        : [];
+      if (repertoireIds.length === 0) return null;
+      return [inArray(params.table.repertoireRef, repertoireIds)];
+    }
+
     const rule = getPullRule(params.tableName);
     if (rule) {
       return applyPullRule(rule, params);
