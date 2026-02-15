@@ -1011,14 +1011,24 @@ async function processInitialSyncPaged(
       offset = 0;
       continue;
     }
-    const changes = await fetchTableForInitialSyncPage(
-      tx,
-      tableName,
-      ctx,
-      syncStartedAt,
-      offset,
-      pageSize
-    );
+    let changes: SyncChange[] = [];
+    try {
+      changes = await fetchTableForInitialSyncPage(
+        tx,
+        tableName,
+        ctx,
+        syncStartedAt,
+        offset,
+        pageSize
+      );
+    } catch (error) {
+      console.warn(
+        `[PULL:INITIAL] Skipping table ${tableName} due query error: ${formatDbError(error)}`
+      );
+      tableIndex += 1;
+      offset = 0;
+      continue;
+    }
 
     if (changes.length === 0) {
       // Either table is empty / skipped OR we've paged past the end.
@@ -1220,12 +1230,20 @@ async function processIncrementalSync(
     if (ctx.pullTables && !ctx.pullTables.has(tableName)) {
       continue;
     }
-    const tableChanges = await fetchChangedRowsFromTable(
-      tx,
-      tableName as SyncableTableName,
-      lastSyncAt,
-      ctx
-    );
+    let tableChanges: SyncChange[] = [];
+    try {
+      tableChanges = await fetchChangedRowsFromTable(
+        tx,
+        tableName as SyncableTableName,
+        lastSyncAt,
+        ctx
+      );
+    } catch (error) {
+      console.warn(
+        `[PULL:INCR] Skipping table ${tableName} due query error: ${formatDbError(error)}`
+      );
+      continue;
+    }
     allChanges.push(...tableChanges);
   }
 

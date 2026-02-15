@@ -77,7 +77,11 @@ async function resolveUserRef(
     }
 
     if (Date.now() - startedAt >= waitForMs) {
-      return null;
+      // After user_profile.id canonicalization, userId is the FK value used by
+      // repertoire.userRef. Do not hard-block repertoire queries if user_profile
+      // hasn't been synced locally yet.
+      userRefCache.set(userId, userId);
+      return userId;
     }
 
     await new Promise<void>((resolve) => {

@@ -103,6 +103,57 @@ export interface IWorkerSyncConfig {
   push?: IPushConfig;
 }
 
+type DbErrorLike = {
+  message?: unknown;
+  code?: unknown;
+  detail?: unknown;
+  hint?: unknown;
+  table_name?: unknown;
+  column_name?: unknown;
+  constraint_name?: unknown;
+  cause?: unknown;
+};
+
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function describeSyncSchemaError(error: unknown): string {
+  const fallback = error instanceof Error ? error.message : String(error);
+
+  let current: unknown = error;
+  for (let depth = 0; depth < 6; depth += 1) {
+    if (!current || typeof current !== "object") break;
+    const candidate = current as DbErrorLike;
+
+    const code = asNonEmptyString(candidate.code);
+    const detail = asNonEmptyString(candidate.detail);
+    const hint = asNonEmptyString(candidate.hint);
+    const table = asNonEmptyString(candidate.table_name);
+    const column = asNonEmptyString(candidate.column_name);
+    const constraint = asNonEmptyString(candidate.constraint_name);
+    const message = asNonEmptyString(candidate.message);
+
+    const parts = [
+      code ? `code=${code}` : undefined,
+      table ? `table=${table}` : undefined,
+      column ? `column=${column}` : undefined,
+      constraint ? `constraint=${constraint}` : undefined,
+      detail ? `detail=${detail}` : undefined,
+      hint ? `hint=${hint}` : undefined,
+      message,
+    ].filter((part): part is string => typeof part === "string");
+
+    if (parts.length > 0) {
+      return parts.join(" | ");
+    }
+
+    current = candidate.cause;
+  }
+
+  return fallback;
+}
+
 function collectRuleCollections(
   rule: PullTableRule,
   required: Set<string>
@@ -225,8 +276,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
         result[name] = new Set(rows.map((r: any) => String(r.id)));
       } catch (error) {
         console.warn(
-          `[SYNC] Failed to load collection ${name} (${cfg.table}); continuing with empty set`,
-          error
+          `[SYNC] Failed to load collection ${name} (${cfg.table}); continuing with empty set: ${describeSyncSchemaError(error)}`
         );
         result[name] = new Set();
       }
@@ -248,7 +298,9 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
           `[SYNC] Loaded ${selectedGenreIds.length} selected genres for user ${params.userId}`
         );
       } catch (error) {
-        console.warn("[SYNC] Failed to load user genre selection:", error);
+        console.warn(
+          `[SYNC] Failed to load user genre selection: ${describeSyncSchemaError(error)}`
+        );
         result.selectedGenres = new Set();
       }
     } else {
