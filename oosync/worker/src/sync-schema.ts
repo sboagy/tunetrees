@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { debug } from "./debug";
 
@@ -101,6 +101,28 @@ export interface IWorkerSyncConfig {
   collections?: Record<string, IWorkerCollectionConfig>;
   pull?: IPullConfig;
   push?: IPushConfig;
+}
+
+function eqUserIdAsText(column: any, userId: string): unknown {
+  // Postgres source columns are UUID in production, but generated worker schema
+  // currently models many of them as text. Compare via ::text to avoid
+  // uuid=text operator mismatches while keeping one predicate shape.
+  const columnName =
+    column && typeof column === "object" && typeof column.name === "string"
+      ? column.name
+      : null;
+
+  if (!columnName) {
+    return eq(column, userId);
+  }
+
+  const escapedName = columnName.replaceAll('"', '""');
+  const escapedUserId = userId.replaceAll("'", "''");
+  return sql.raw(`"${escapedName}"::text = '${escapedUserId}'`);
+}
+
+function orNullEqUserIdAsText(column: any, userId: string): unknown {
+  return or(isNull(column), eqUserIdAsText(column, userId) as any);
 }
 
 type DbErrorLike = {
@@ -271,7 +293,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           .from(table)
           // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          .where(eq(ownerCol, params.userId));
+          .where(eqUserIdAsText(ownerCol, params.userId) as any);
 
         result[name] = new Set(rows.map((r: any) => String(r.id)));
       } catch (error) {
@@ -353,11 +375,11 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     if (!col) return [];
 
     if (rule.kind === "eqUserId") {
-      return [eq(col, params.userId)];
+      return [eqUserIdAsText(col, params.userId)];
     }
 
     if (rule.kind === "orNullEqUserId") {
-      return [or(isNull(col), eq(col, params.userId))];
+      return [orNullEqUserIdAsText(col, params.userId)];
     }
 
     if (rule.kind === "inCollection") {
@@ -371,7 +393,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
       const orProp = snakeToCamel(rule.orColumn);
       const orCol = params.table[orProp];
       if (!orCol) return [];
-      return [or(eq(col, params.userId), eq(orCol, true))];
+      return [or(eqUserIdAsText(col, params.userId) as any, eq(orCol, true))];
     }
 
     if (rule.kind === "publicOnly") {
@@ -389,7 +411,10 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
   }): unknown[] | null {
     // Queue rows are repertoire-scoped in practice and this avoids hard dependency
     // on user_ref for environments where that column may drift/mismatch.
-    if (params.tableName === "daily_practice_queue" && params.table.repertoireRef) {
+    if (
+      params.tableName === "daily_practice_queue" &&
+      params.table.repertoireRef
+    ) {
       const repertoireIds = params.collections.repertoireIds
         ? Array.from(params.collections.repertoireIds)
         : [];
@@ -406,22 +431,16 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     const conditions: unknown[] = [];
 
     if (params.table.userId) {
-      conditions.push(eq(params.table.userId, params.userId));
+      conditions.push(eqUserIdAsText(params.table.userId, params.userId));
     } else if (params.table.userRef) {
-      conditions.push(eq(params.table.userRef, params.userId));
+      conditions.push(eqUserIdAsText(params.table.userRef, params.userId));
     } else if (params.table.privateFor) {
       conditions.push(
-        or(
-          isNull(params.table.privateFor),
-          eq(params.table.privateFor, params.userId)
-        )
+        orNullEqUserIdAsText(params.table.privateFor, params.userId)
       );
     } else if (params.table.privateToUser) {
       conditions.push(
-        or(
-          isNull(params.table.privateToUser),
-          eq(params.table.privateToUser, params.userId)
-        )
+        orNullEqUserIdAsText(params.table.privateToUser, params.userId)
       );
     }
 
