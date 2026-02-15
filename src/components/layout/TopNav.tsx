@@ -7,6 +7,8 @@
  * @module components/layout/TopNav
  */
 
+import { useLocation } from "@solidjs/router";
+import { MessageCircle } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -40,6 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
+import { Button } from "../ui/button";
 import { AboutDialog } from "./AboutDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -766,6 +769,7 @@ const RepertoireDropdown: Component<{
 };
 
 export const TopNav: Component = () => {
+  const location = useLocation();
   const {
     user,
     localDb,
@@ -787,6 +791,16 @@ export const TopNav: Component = () => {
     createSignal(false);
   const [pendingDeleteCount, setPendingDeleteCount] = createSignal(0);
   const [forceSyncUpBusy, setForceSyncUpBusy] = createSignal(false);
+
+  const canOpenAssistant = createMemo(() => {
+    const tab = new URLSearchParams(location.search).get("tab");
+    return tab === "catalog" || tab === "repertoire";
+  });
+
+  const handleOpenAssistant = () => {
+    window.dispatchEvent(new CustomEvent("tt-open-ai-assistant"));
+  };
+
   let userMenuContainerRef: HTMLDivElement | undefined;
   let dbMenuContainerRef: HTMLDivElement | undefined;
 
@@ -1550,6 +1564,19 @@ export const TopNav: Component = () => {
                 </div>
               </Show>
             </div>
+
+            <Show when={canOpenAssistant()}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleOpenAssistant}
+                title="Ask Assistant"
+                aria-label="Ask Assistant"
+                data-testid="assistant-button"
+              >
+                <MessageCircle class="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+              </Button>
+            </Show>
           </div>
         </div>
       </div>

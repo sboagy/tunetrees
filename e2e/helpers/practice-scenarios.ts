@@ -454,7 +454,7 @@ export async function setupDeterministicTestParallel(
               const { error } = await supabase.rpc(
                 "e2e_delete_practice_record_by_tunes",
                 {
-                  target_playlist: user.repertoireId,
+                  target_repertoire: user.repertoireId,
                   tune_ids: uniqueIds,
                 }
               );
@@ -905,7 +905,7 @@ async function clearUserTable(
     const { error: rpcError } = await supabase.rpc(
       "e2e_clear_practice_record",
       {
-        target_playlist: user.repertoireId,
+        target_repertoire: user.repertoireId,
       }
     );
     error = rpcError;
