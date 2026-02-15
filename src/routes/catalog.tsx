@@ -21,8 +21,8 @@ import {
   createMemo,
   createResource,
   createSignal,
-  onCleanup,
   on,
+  onCleanup,
   Show,
 } from "solid-js";
 import { AIChatDrawer } from "../components/ai/AIChatDrawer";

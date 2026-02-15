@@ -7,6 +7,8 @@
  * @module components/layout/TopNav
  */
 
+import { useLocation } from "@solidjs/router";
+import { MessageCircle } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -17,8 +19,6 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
-import { useLocation } from "@solidjs/router";
-import { MessageCircle } from "lucide-solid";
 import { toast } from "solid-sonner";
 import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";

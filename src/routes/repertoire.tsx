@@ -18,8 +18,8 @@ import {
   createResource,
   createSignal,
   Match,
-  onCleanup,
   on,
+  onCleanup,
   Show,
   Switch,
 } from "solid-js";
