@@ -19,11 +19,11 @@ SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 
 # Optional: Enable worker debug logging (console.log statements)
 # Set to "true" to enable verbose logging for development/debugging
-# WORKER_DEBUG = "true"
+WORKER_DEBUG = "true"
 
 # Optional: sync diagnostics (debug only)
 # When enabled, the worker includes a `debug[]` array in sync responses.
-# SYNC_DIAGNOSTICS = "true"
+SYNC_DIAGNOSTICS = "true"
 # Optional: restrict diagnostics to a single auth user id (JWT `sub`)
 # SYNC_DIAGNOSTICS_USER_ID = "a70ead77-2dcc-4f12-b543-f24c9b4c0812"
 
