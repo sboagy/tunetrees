@@ -1013,7 +1013,7 @@ async function processInitialSyncPaged(
   syncStartedAt: string;
 }> {
   const MAX_PAGE_SIZE = 500;
-  const DEFAULT_PAGE_SIZE = 200;
+  const DEFAULT_PAGE_SIZE = 500;
   const requested =
     typeof pageSizeHint === "number" && Number.isFinite(pageSizeHint)
       ? Math.max(1, Math.floor(pageSizeHint))
