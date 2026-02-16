@@ -24,6 +24,11 @@ SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # Set to "true" to enable verbose logging for development/debugging
 # WORKER_DEBUG = "true"
 
+# Optional: enable perf timing logs for sync phases (auth/push/pull/per-table pages)
+# WORKER_DEBUG_PERF = "true"
+# Optional: minimum duration threshold (ms) for perf logs; default is 100
+# WORKER_DEBUG_PERF_MIN_MS = "100"
+
 # Optional: sync diagnostics (debug only)
 # When enabled, the worker includes a `debug[]` array in sync responses.
 # SYNC_DIAGNOSTICS = "true"

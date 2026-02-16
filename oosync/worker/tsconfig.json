@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["@cloudflare/workers-types"],
+    "skipLibCheck": true,
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@shared-generated/*": ["shared/generated/*"],
+      "@sync-schema/*": ["shared/sync-schema/*"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "../src/shared/**/*.ts",
+    "../../shared/generated/**/*",
+    "../../shared/sync-schema/**/*"
+  ]
+}
