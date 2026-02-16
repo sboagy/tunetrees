@@ -1845,11 +1845,13 @@ function buildSchemaTs(params: {
 
 function pgBuilderForPgType(
   pgType: string
-): "text" | "integer" | "real" | "boolean" | "jsonb" {
-  // IMPORTANT: the worker stores timestamps/uuids as TEXT (ISO strings)
+): "text" | "integer" | "real" | "boolean" | "jsonb" | "uuid" {
+  // IMPORTANT: the worker stores timestamp-like values as TEXT (ISO strings)
   // for consistency with the client-side SQLite schema.
+  // UUIDs should remain UUID-typed in Postgres worker schema for correct SQL operators.
   switch (pgType) {
     case "uuid":
+      return "uuid";
     case "timestamp":
     case "timestamptz":
     case "date":

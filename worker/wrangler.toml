@@ -16,10 +16,18 @@ localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres
 [vars]
 SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # SUPABASE_JWT_SECRET should be set via `wrangler secret put SUPABASE_JWT_SECRET`
+# Optional: bypass Hyperdrive and use DATABASE_URL directly for troubleshooting.
+# Requires `wrangler secret put DATABASE_URL` in the target environment.
+# BYPASS_HYPERDRIVE = "true"
 
 # Optional: Enable worker debug logging (console.log statements)
 # Set to "true" to enable verbose logging for development/debugging
 # WORKER_DEBUG = "true"
+
+# Optional: enable perf timing logs for sync phases (auth/push/pull/per-table pages)
+# WORKER_DEBUG_PERF = "true"
+# Optional: minimum duration threshold (ms) for perf logs; default is 100
+# WORKER_DEBUG_PERF_MIN_MS = "100"
 
 # Optional: sync diagnostics (debug only)
 # When enabled, the worker includes a `debug[]` array in sync responses.

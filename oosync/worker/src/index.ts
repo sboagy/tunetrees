@@ -214,28 +214,46 @@ function formatDbError(error: unknown): string {
   return fallback;
 }
 
-function isRetryableDbPoolError(error: unknown): boolean {
-  const fallback = error instanceof Error ? error.message : String(error);
-  const formatted = formatDbError(error);
-  const combined = `${fallback} ${formatted}`.toLowerCase();
-
-  return (
-    combined.includes("timed out while waiting for an open slot in the pool") ||
-    combined.includes("too many connections") ||
-    combined.includes("code=53300") ||
-    combined.includes("code=57p03")
-  );
+function perfLog(enabled: boolean, message: string): void {
+  if (enabled) {
+    console.log(`[PERF] ${message}`);
+  }
 }
 
-async function delay(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
+function perfLogDuration(
+  enabled: boolean,
+  minDurationMs: number,
+  durationMs: number,
+  message: string
+): void {
+  if (!enabled || durationMs < minDurationMs) {
+    return;
+  }
+  console.log(`[PERF] ${message} durationMs=${durationMs}`);
 }
 
-function createDb(env: Env): {
-  client: PostgresClient;
-  db: DrizzleDb;
-  close: () => Promise<void>;
-} {
+function parsePerfMinDurationMs(value: string | undefined): number {
+  if (!value) {
+    return 100;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 100;
+  }
+  return Math.floor(parsed);
+}
+
+function resolveConnectionString(env: Env): string {
+  const bypassHyperdrive = env.BYPASS_HYPERDRIVE === "true";
+  if (bypassHyperdrive) {
+    if (!env.DATABASE_URL) {
+      throw new Error(
+        "Database configuration error: BYPASS_HYPERDRIVE=true requires DATABASE_URL"
+      );
+    }
+    return env.DATABASE_URL;
+  }
+
   const connectionString = env.HYPERDRIVE?.connectionString ?? env.DATABASE_URL;
   if (!connectionString) {
     const msg = env.HYPERDRIVE
@@ -244,17 +262,24 @@ function createDb(env: Env): {
     throw new Error(`Database configuration error: ${msg}`);
   }
 
+  return connectionString;
+}
+
+function createDb(env: Env): {
+  client: PostgresClient;
+  db: DrizzleDb;
+  close: () => Promise<void>;
+} {
+  const connectionString = resolveConnectionString(env);
+
   // IMPORTANT (Cloudflare Workers): Do NOT cache/reuse database clients across requests.
   // Newer Workers runtimes enforce request-scoped I/O; reusing a client can trigger:
   // "Cannot perform I/O on behalf of a different request" (I/O type: Writable).
-  const client = postgres(connectionString, {
-    prepare: false,
-    // Keep a small pool per request to avoid self-contention when sync code issues
-    // parallel reads inside a single request, while still limiting connection fan-out.
-    max: 4,
-    connect_timeout: 10,
-    idle_timeout: 20,
-  });
+  // - max: 1 is appropriate here because this handler uses one request-scoped client and
+  //   mostly sequential DB work inside one transaction.
+  // - prepare: false is safer with pooled/proxied connections (Hyperdrive layer), and
+  //   usually avoids prepared-statement churn on short-lived clients.
+  const client = postgres(connectionString, { max: 1, prepare: false });
   const db = drizzle(client, { schema: getSchemaTables() });
 
   const close = async () => {
@@ -294,10 +319,16 @@ function isClientSyncChange(change: IncomingSyncChange): boolean {
 export interface Env {
   HYPERDRIVE?: Hyperdrive;
   DATABASE_URL?: string;
+  /** When "true", ignores HYPERDRIVE and connects via DATABASE_URL directly. */
+  BYPASS_HYPERDRIVE?: string;
   SUPABASE_URL: string;
   SUPABASE_JWT_SECRET: string;
   /** When "true", enables debug logging (console.log statements). */
   WORKER_DEBUG?: string;
+  /** When "true", emits perf timing logs for sync phases. */
+  WORKER_DEBUG_PERF?: string;
+  /** Optional minimum duration threshold (ms) for WORKER_DEBUG_PERF logs. */
+  WORKER_DEBUG_PERF_MIN_MS?: string;
   /** When "true", emits extra sync diagnostics logs (initial sync only). */
   SYNC_DIAGNOSTICS?: string;
   /** Optional: only emit diagnostics when JWT sub matches this value. */
@@ -316,6 +347,8 @@ interface SyncContext {
   genreFilter?: { selectedGenreIds: string[]; repertoireGenreIds: string[] };
   now: string;
   diagnosticsEnabled: boolean;
+  perfDebugEnabled: boolean;
+  perfMinDurationMs: number;
 }
 
 interface InitialSyncCursorV1 {
@@ -1010,6 +1043,7 @@ async function processInitialSyncPaged(
       offset = 0;
       continue;
     }
+    const pageStartedAt = Date.now();
     const changes = await fetchTableForInitialSyncPage(
       tx,
       tableName,
@@ -1017,6 +1051,12 @@ async function processInitialSyncPaged(
       syncStartedAt,
       offset,
       pageSize
+    );
+    perfLogDuration(
+      ctx.perfDebugEnabled,
+      ctx.perfMinDurationMs,
+      Date.now() - pageStartedAt,
+      `initial.page table=${tableName} offset=${offset} limit=${pageSize} rows=${changes.length}`
     );
 
     if (changes.length === 0) {
@@ -1242,7 +1282,9 @@ async function handleSync(
   db: ReturnType<typeof drizzle>,
   payload: SyncRequest,
   userId: string,
-  diagnosticsEnabled: boolean
+  diagnosticsEnabled: boolean,
+  perfDebugEnabled: boolean,
+  perfMinDurationMs: number
 ): Promise<SyncResponse> {
   const now = new Date().toISOString();
   const diag: string[] = [];
@@ -1250,6 +1292,12 @@ async function handleSync(
   let nextCursor: string | undefined;
   let syncStartedAt: string | undefined;
   const syncType = payload.lastSyncAt ? "INCREMENTAL" : "INITIAL";
+  const syncStartedAtMs = Date.now();
+
+  perfLog(
+    perfDebugEnabled,
+    `sync.start type=${syncType} changesIn=${payload.changes.length} lastSyncAt=${payload.lastSyncAt ?? "null"} pageSize=${payload.pageSize ?? "null"} hasCursor=${payload.pullCursor ? "yes" : "no"}`
+  );
 
   if (diagnosticsEnabled) {
     const cursorSummary = payload.pullCursor
@@ -1273,15 +1321,24 @@ async function handleSync(
   );
 
   await db.transaction(async (tx) => {
+    const txStartedAt = Date.now();
+
     // After eliminating user_profile.id, authUserId IS the user identifier.
     // No resolution needed - user_profile.id is the PK.
     const authUserId = userId;
 
+    const collectionsStartedAt = Date.now();
     const collections = await loadUserCollections({
       tx,
       userId: authUserId,
       tables: getSchemaTables(),
     });
+    perfLogDuration(
+      perfDebugEnabled,
+      perfMinDurationMs,
+      Date.now() - collectionsStartedAt,
+      "sync.collections"
+    );
 
     if (
       payload.collectionsOverride &&
@@ -1318,19 +1375,35 @@ async function handleSync(
       genreFilter: payload.genreFilter,
       now,
       diagnosticsEnabled,
+      perfDebugEnabled,
+      perfMinDurationMs,
     };
 
     // Genre filter is passed to RPC functions when filtering note/reference tables
 
     // PUSH: Apply client changes
+    const pushStartedAt = Date.now();
     await processPushChanges(tx, ctx, payload.changes as IncomingSyncChange[]);
+    perfLogDuration(
+      perfDebugEnabled,
+      perfMinDurationMs,
+      Date.now() - pushStartedAt,
+      `sync.push changes=${payload.changes.length}`
+    );
 
     // PULL: Gather changes for client
+    const pullStartedAt = Date.now();
     if (payload.lastSyncAt) {
       responseChanges = await processIncrementalSync(
         tx,
         payload.lastSyncAt,
         ctx
+      );
+      perfLogDuration(
+        perfDebugEnabled,
+        perfMinDurationMs,
+        Date.now() - pullStartedAt,
+        `sync.pull.incremental changesOut=${responseChanges.length}`
       );
     } else {
       // Paginate initial sync to avoid oversized payloads / timeouts.
@@ -1344,6 +1417,12 @@ async function handleSync(
       responseChanges = page.changes;
       nextCursor = page.nextCursor;
       syncStartedAt = page.syncStartedAt;
+      perfLogDuration(
+        perfDebugEnabled,
+        perfMinDurationMs,
+        Date.now() - pullStartedAt,
+        `sync.pull.initial pageChanges=${responseChanges.length} nextCursor=${nextCursor ? "yes" : "no"}`
+      );
     }
 
     if (diagnosticsEnabled) {
@@ -1363,10 +1442,24 @@ async function handleSync(
 
     // NO GARBAGE COLLECTION NEEDED!
     // sync_change_log now has at most ~20 rows (one per table)
+
+    perfLogDuration(
+      perfDebugEnabled,
+      perfMinDurationMs,
+      Date.now() - txStartedAt,
+      `sync.transaction type=${syncType}`
+    );
   });
 
   debug.log(
     `[SYNC] === Completed ${syncType} sync: returning ${responseChanges.length} changes, syncedAt=${now} ===`
+  );
+
+  perfLogDuration(
+    perfDebugEnabled,
+    perfMinDurationMs,
+    Date.now() - syncStartedAtMs,
+    `sync.complete type=${syncType} changesOut=${responseChanges.length} total`
   );
 
   return {
@@ -1421,6 +1514,11 @@ function errorResponse(
 async function fetch(request: Request, env: Env): Promise<Response> {
   // Initialize debug logging based on environment variable
   setDebugEnabled(env);
+  const perfDebugEnabled = env.WORKER_DEBUG_PERF === "true";
+  const perfMinDurationMs = parsePerfMinDurationMs(
+    env.WORKER_DEBUG_PERF_MIN_MS
+  );
+  const requestStartedAt = Date.now();
 
   // Get CORS headers for this request (needed for all responses)
   const corsHeaders = getCorsHeaders(request);
@@ -1444,6 +1542,7 @@ async function fetch(request: Request, env: Env): Promise<Response> {
     // Sync endpoint
     if (request.method === "POST" && url.pathname === "/api/sync") {
       debug.log(`[HTTP] POST /api/sync received`);
+      perfLog(perfDebugEnabled, "http.sync.request.received");
 
       // Validate environment configuration
       if (!env.SUPABASE_JWT_SECRET) {
@@ -1452,10 +1551,17 @@ async function fetch(request: Request, env: Env): Promise<Response> {
       }
 
       // Authenticate
+      const authStartedAt = Date.now();
       const userId = await verifyJwt(
         request,
         env.SUPABASE_JWT_SECRET,
         env.SUPABASE_URL
+      );
+      perfLogDuration(
+        perfDebugEnabled,
+        perfMinDurationMs,
+        Date.now() - authStartedAt,
+        `http.sync.auth authorized=${userId ? "yes" : "no"}`
       );
       if (!userId) {
         debug.log(`[HTTP] Unauthorized - JWT verification failed`);
@@ -1467,40 +1573,72 @@ async function fetch(request: Request, env: Env): Promise<Response> {
         (!env.SYNC_DIAGNOSTICS_USER_ID ||
           env.SYNC_DIAGNOSTICS_USER_ID === userId);
 
+      const payloadStartedAt = Date.now();
       const payload = (await request.json()) as SyncRequest;
-      const maxAttempts = 2;
+      perfLogDuration(
+        perfDebugEnabled,
+        perfMinDurationMs,
+        Date.now() - payloadStartedAt,
+        `http.sync.payload.parse changesIn=${payload.changes.length}`
+      );
 
-      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      // Connect to database
+      try {
+        debug.log(`[HTTP] Sync request parsed, calling handleSync`);
+        const createDbStartedAt = Date.now();
         const { db, close } = createDb(env);
-        try {
-          debug.log(`[HTTP] Sync request parsed, calling handleSync`);
-          const response = await handleSync(
-            db,
-            payload,
-            userId,
-            diagnosticsEnabled
-          );
-          debug.log(`[HTTP] Sync completed successfully`);
-          return jsonResponse(response, 200, corsHeaders);
-        } catch (error) {
-          const retryable = isRetryableDbPoolError(error);
-          console.error(
-            `[HTTP] Sync error (attempt ${attempt}/${maxAttempts}):`,
-            error
-          );
+        perfLogDuration(
+          perfDebugEnabled,
+          perfMinDurationMs,
+          Date.now() - createDbStartedAt,
+          "http.sync.db.create"
+        );
 
-          if (!retryable || attempt >= maxAttempts) {
-            return errorResponse(
-              formatDbError(error),
-              retryable ? 503 : 500,
-              corsHeaders
+        const handleSyncStartedAt = Date.now();
+        const response = await (async () => {
+          try {
+            return await handleSync(
+              db,
+              payload,
+              userId,
+              diagnosticsEnabled,
+              perfDebugEnabled,
+              perfMinDurationMs
+            );
+          } finally {
+            const closeStartedAt = Date.now();
+            await close();
+            perfLogDuration(
+              perfDebugEnabled,
+              perfMinDurationMs,
+              Date.now() - closeStartedAt,
+              "http.sync.db.close"
             );
           }
-
-          await delay(attempt * 150);
-        } finally {
-          await close();
-        }
+        })();
+        perfLogDuration(
+          perfDebugEnabled,
+          perfMinDurationMs,
+          Date.now() - handleSyncStartedAt,
+          "http.sync.handle"
+        );
+        perfLogDuration(
+          perfDebugEnabled,
+          perfMinDurationMs,
+          Date.now() - requestStartedAt,
+          "http.sync.request.total"
+        );
+        debug.log(`[HTTP] Sync completed successfully`);
+        return jsonResponse(response, 200, corsHeaders);
+      } catch (error) {
+        perfLogDuration(
+          perfDebugEnabled,
+          perfMinDurationMs,
+          Date.now() - requestStartedAt,
+          "http.sync.request.failed"
+        );
+        console.error("[HTTP] Sync error:", error);
+        return errorResponse(formatDbError(error), 500, corsHeaders);
       }
 
       return errorResponse("Sync failed after retries", 503, corsHeaders);
