@@ -1515,7 +1515,9 @@ async function fetch(request: Request, env: Env): Promise<Response> {
   // Initialize debug logging based on environment variable
   setDebugEnabled(env);
   const perfDebugEnabled = env.WORKER_DEBUG_PERF === "true";
-  const perfMinDurationMs = parsePerfMinDurationMs(env.WORKER_DEBUG_PERF_MIN_MS);
+  const perfMinDurationMs = parsePerfMinDurationMs(
+    env.WORKER_DEBUG_PERF_MIN_MS
+  );
   const requestStartedAt = Date.now();
 
   // Get CORS headers for this request (needed for all responses)

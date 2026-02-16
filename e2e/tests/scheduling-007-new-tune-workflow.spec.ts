@@ -124,7 +124,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
             const { error } = await supabase.rpc(
               "e2e_delete_practice_record_by_tunes",
               {
-                target_playlist: testUser.repertoireId,
+                target_repertoire: testUser.repertoireId,
                 tune_ids: uniqueIds,
               }
             );
@@ -463,7 +463,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
           // Dependent deletes
           await supabase.from("repertoire_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
-            target_playlist: testUser.repertoireId,
+            target_repertoire: testUser.repertoireId,
             tune_ids: ids,
           });
           await supabase
@@ -573,7 +573,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         if (ids.length) {
           await supabase.from("repertoire_tune").delete().in("tune_ref", ids);
           await supabase.rpc("e2e_delete_practice_record_by_tunes", {
-            target_playlist: testUser.repertoireId,
+            target_repertoire: testUser.repertoireId,
             tune_ids: ids,
           });
           await supabase

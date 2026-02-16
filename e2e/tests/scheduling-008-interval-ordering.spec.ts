@@ -166,7 +166,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
             const { error: delErr } = await supabase.rpc(
               "e2e_delete_practice_record_by_tunes",
               {
-                target_playlist: testUser.repertoireId,
+                target_repertoire: testUser.repertoireId,
                 tune_ids: uniqueIds,
               }
             );

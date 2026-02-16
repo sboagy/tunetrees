@@ -22,8 +22,10 @@ import {
   createResource,
   createSignal,
   on,
+  onCleanup,
   Show,
 } from "solid-js";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 import { CatalogToolbar } from "../components/catalog";
 import { TunesGridCatalog } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
@@ -91,6 +93,17 @@ const CatalogPage: Component = () => {
 
   // Track filter panel expanded state
   const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);
+
+  // Track AI chat drawer state
+  const [isChatOpen, setIsChatOpen] = createSignal(false);
+
+  createEffect(() => {
+    const handleOpenAssistant = () => setIsChatOpen(true);
+    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    onCleanup(() => {
+      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    });
+  });
 
   // === EFFECT 1: HYDRATION (URL -> Signal) ===
   // Runs whenever searchParams changes. This resolves the initial race condition
@@ -370,6 +383,16 @@ const CatalogPage: Component = () => {
           />
         </Show>
       </div>
+
+      {/* AI Chat Drawer */}
+      <AIChatDrawer
+        isOpen={isChatOpen()}
+        onClose={() => setIsChatOpen(false)}
+        setSelectedTypes={setSelectedTypes}
+        setSelectedModes={setSelectedModes}
+        setSelectedGenres={setSelectedGenres}
+        currentRepertoireId={currentRepertoireId() || undefined}
+      />
     </div>
   );
 };

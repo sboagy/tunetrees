@@ -536,7 +536,9 @@ export class SyncService {
               (e) =>
                 e.includes("Failed to fetch") ||
                 e.includes("ERR_INTERNET_DISCONNECTED") ||
-                e.includes("NetworkError")
+                e.includes("NetworkError") ||
+                e.includes("Timed out while waiting for an open slot in the pool") ||
+                e.includes("Sync failed: 503")
             );
 
             if (result.success) {
@@ -596,6 +598,13 @@ export class SyncService {
 
       console.log("[SyncService] Running periodic syncDown...");
       void this.syncDown().catch((error) => {
+        if (error instanceof SyncInProgressError) {
+          console.log(
+            "[SyncService] Skipping periodic syncDown - sync already in progress"
+          );
+          return;
+        }
+
         console.error("[SyncService] Periodic syncDown failed:", error);
 
         // Only show error toast for non-network failures
@@ -603,7 +612,9 @@ export class SyncService {
         const isNetworkError =
           errorMsg.includes("Failed to fetch") ||
           errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
-          errorMsg.includes("NetworkError");
+          errorMsg.includes("NetworkError") ||
+          errorMsg.includes("Timed out while waiting for an open slot in the pool") ||
+          errorMsg.includes("Sync failed: 503");
 
         if (!isNetworkError) {
           toast.error(
