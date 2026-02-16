@@ -1640,8 +1640,6 @@ async function fetch(request: Request, env: Env): Promise<Response> {
         console.error("[HTTP] Sync error:", error);
         return errorResponse(formatDbError(error), 500, corsHeaders);
       }
-
-      return errorResponse("Sync failed after retries", 503, corsHeaders);
     }
 
     return new Response("Not Found", { status: 404, headers: corsHeaders });
