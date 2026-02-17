@@ -152,6 +152,7 @@ const FilterDropdown: Component<{
       <button
         ref={buttonRef}
         type="button"
+        onMouseDown={(event) => event.stopPropagation()}
         onClick={() => setIsOpen(!isOpen())}
         class="flex items-center gap-1.5 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
         aria-label={`Filter by ${props.title}`}

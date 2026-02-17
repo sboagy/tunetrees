@@ -201,6 +201,29 @@ export default defineConfig({
       },
       dependencies: ["preview-setup"], // Ensure setup runs first if authenticated access is needed
     },
+    {
+      name: "chromium-sboagy-1",
+      testDir: "./e2e/tests-sboagy-1",
+      testIgnore: /auth-.*\.spec\.ts/, // Exclude auth tests
+      use: {
+        ...devices["Desktop Chrome"],
+        // headless: true,
+        // channel: "chromium",
+        // storageState is set per-worker by test-fixture.ts
+        launchOptions: {
+          args: [
+            // "--remote-debugging-port=9222",
+            // Set X (Horizontal) and Y (Vertical) coordinates
+            // Example: X=1950, Y=50 (Pushes the window onto the second monitor)
+            // "--window-position=-1950,50",
+            // OPTIONAL: Also set a specific window size
+            // "--window-size=1280,1024",
+            // "--window-size=1728,1117",
+          ],
+        },
+      },
+      // dependencies: ["setup"],
+    },
   ],
 
   /* Run your local dev server before starting the tests */

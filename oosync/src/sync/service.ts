@@ -416,7 +416,7 @@ export class SyncService {
    * Cost when idle: 1 Postgres query of sync_outbox every 2 minutes
    */
   public startAutoSync(): void {
-    if (this.syncIntervalId) {
+    if (this.syncIntervalId || this.syncDownIntervalId) {
       console.warn("[SyncService] Auto sync already running");
       return;
     }
@@ -427,6 +427,10 @@ export class SyncService {
     const syncUpIntervalMs = this.config.syncIntervalMs ?? 30_000; // 30 seconds
     const syncDownIntervalMs = 2 * 60 * 1000; // 2 minutes
 
+    let periodicSyncUpTickInFlight = false;
+    let periodicSyncDownTickInFlight = false;
+    let periodicTimersStarted = false;
+
     // Initial syncDown on startup.
     // IMPORTANT: Never attempt startup sync while offline.
     // - In offline mode, syncDown() may try to syncUp first.
@@ -435,11 +439,186 @@ export class SyncService {
     let initialSyncDownInFlight = false;
     let initialSyncDownCompleted = false;
 
+    const startPeriodicSyncTimers = () => {
+      if (periodicTimersStarted) return;
+      periodicTimersStarted = true;
+
+      // Periodic syncUp (frequent - push local changes to server)
+      // Only runs if there are pending changes to avoid unnecessary network calls
+      if (!this.config.pullOnly) {
+        this.syncIntervalId = window.setInterval(async () => {
+          if (periodicSyncUpTickInFlight) {
+            return;
+          }
+
+          if (this.isSyncing) {
+            return;
+          }
+
+          periodicSyncUpTickInFlight = true;
+          try {
+            // Safety check: ensure database is initialized
+            if (!this.db) {
+              console.warn(
+                "[SyncService] Database not initialized yet, skipping syncUp check"
+              );
+              return;
+            }
+
+            // Check if there are pending changes before syncing (using outbox)
+            const stats = await this.syncEngine.getOutboxStats();
+            const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
+
+            if (hasPendingChanges) {
+              // Skip sync if offline (browser reports no connectivity)
+              if (!navigator.onLine) {
+                // Silently skip - this is expected behavior when offline
+                return;
+              }
+
+              console.log(
+                `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
+              );
+              const result = await this.syncUp();
+              // Only show error toast for non-network failures
+              const hasNetworkError = result.errors.some(
+                (e) =>
+                  e.includes("Failed to fetch") ||
+                  e.includes("ERR_INTERNET_DISCONNECTED") ||
+                  e.includes("NetworkError") ||
+                  e.includes(
+                    "Timed out while waiting for an open slot in the pool"
+                  ) ||
+                  e.includes("Sync failed: 503")
+              );
+
+              if (result.success) {
+                this.consecutiveSyncUpFailures = 0;
+              } else {
+                this.consecutiveSyncUpFailures += 1;
+              }
+
+              // `itemsFailed` reflects local apply failures for pulled changes.
+              // Push failures often surface only in `errors`, so toast on those too.
+              if (!result.success && !hasNetworkError) {
+                const shouldToast =
+                  this.consecutiveSyncUpFailures === 1 ||
+                  this.consecutiveSyncUpFailures === 5 ||
+                  this.consecutiveSyncUpFailures === 10;
+
+                if (shouldToast) {
+                  const summary = result.errors[0] ?? "Unknown server error";
+                  toast.error(
+                    `Sync upload failed (attempt ${this.consecutiveSyncUpFailures}). Your data is still saved locally. ${summary}`,
+                    {
+                      duration: 7000,
+                    }
+                  );
+                }
+              }
+            } else {
+              // Silent - no need to log when there's nothing to sync
+            }
+          } catch (error) {
+            // Silently skip if sync is already in progress (expected on slow connections)
+            if (error instanceof SyncInProgressError) {
+              console.debug(
+                "[SyncService] Skipping periodic syncUp - sync already in progress"
+              );
+              return;
+            }
+
+            console.error("[SyncService] Error in periodic syncUp:", error);
+            toast.error(
+              "Background sync error. Your changes may not be uploaded.",
+              {
+                duration: 5000,
+              }
+            );
+          } finally {
+            periodicSyncUpTickInFlight = false;
+          }
+        }, syncUpIntervalMs);
+      }
+
+      // Periodic syncDown (infrequent - pull remote changes from server)
+      this.syncDownIntervalId = window.setInterval(() => {
+        if (periodicSyncDownTickInFlight) {
+          return;
+        }
+
+        if (this.isSyncing) {
+          return;
+        }
+
+        periodicSyncDownTickInFlight = true;
+        // Skip sync if offline (browser reports no connectivity)
+        if (!navigator.onLine) {
+          // Silently skip - this is expected behavior when offline
+          periodicSyncDownTickInFlight = false;
+          return;
+        }
+
+        console.log("[SyncService] Running periodic syncDown...");
+        void this.syncDown()
+          .catch((error) => {
+            if (error instanceof SyncInProgressError) {
+              console.log(
+                "[SyncService] Skipping periodic syncDown - sync already in progress"
+              );
+              return;
+            }
+
+            console.error("[SyncService] Periodic syncDown failed:", error);
+
+            // Only show error toast for non-network failures
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            const isNetworkError =
+              errorMsg.includes("Failed to fetch") ||
+              errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
+              errorMsg.includes("NetworkError") ||
+              errorMsg.includes(
+                "Timed out while waiting for an open slot in the pool"
+              ) ||
+              errorMsg.includes("Sync failed: 503");
+
+            if (!isNetworkError) {
+              toast.error(
+                "Failed to sync data from server. You may be seeing outdated data.",
+                {
+                  duration: 5000,
+                }
+              );
+            }
+          })
+          .finally(() => {
+            periodicSyncDownTickInFlight = false;
+          });
+      }, syncDownIntervalMs);
+
+      if (this.config.pullOnly) {
+        console.log(
+          `[SyncService] Auto sync started (pull-only):`,
+          `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
+        );
+      } else {
+        console.log(
+          `[SyncService] Auto sync started:`,
+          `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
+          `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
+        );
+      }
+    };
+
     const runInitialSyncDown = () => {
       if (initialSyncDownInFlight || initialSyncDownCompleted) return;
       if (!navigator.onLine) return;
 
       initialSyncDownInFlight = true;
+      console.log(
+        `[SyncDiag] initialSyncDown:start inFlight=${initialSyncDownInFlight} completed=${initialSyncDownCompleted} syncing=${this.isSyncing}`
+      );
       void (async () => {
         const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -459,14 +638,27 @@ export class SyncService {
             );
             await this.syncDown();
             initialSyncDownCompleted = true;
+            startPeriodicSyncTimers();
+            console.log(
+              `[SyncDiag] initialSyncDown:success attempt=${attempt} inFlight=${initialSyncDownInFlight} completed=${initialSyncDownCompleted}`
+            );
             return;
           } catch (error) {
             if (error instanceof SyncInProgressError) {
               // Expected when other sync activity is running; retry shortly without toasting.
+              console.log(
+                `[SyncDiag] initialSyncDown:busy attempt=${attempt} syncing=${this.isSyncing}`
+              );
               await new Promise((r) => setTimeout(r, 250));
               attempt -= 1;
               continue;
             }
+
+            const errorMsg =
+              error instanceof Error ? error.message : String(error);
+            console.log(
+              `[SyncDiag] initialSyncDown:error attempt=${attempt}/${maxAttempts} message=${errorMsg}`
+            );
 
             const delayMs = 500 * attempt;
             const isLastAttempt = attempt === maxAttempts;
@@ -491,6 +683,9 @@ export class SyncService {
         }
       })().finally(() => {
         initialSyncDownInFlight = false;
+        console.log(
+          `[SyncDiag] initialSyncDown:finally inFlight=${initialSyncDownInFlight} completed=${initialSyncDownCompleted} syncing=${this.isSyncing}`
+        );
       });
     };
 
@@ -501,143 +696,6 @@ export class SyncService {
         "[SyncService] Offline on startup - deferring initial syncDown until online"
       );
       window.addEventListener("online", runInitialSyncDown, { once: true });
-    }
-
-    // Periodic syncUp (frequent - push local changes to server)
-    // Only runs if there are pending changes to avoid unnecessary network calls
-    if (!this.config.pullOnly) {
-      this.syncIntervalId = window.setInterval(async () => {
-        try {
-          // Safety check: ensure database is initialized
-          if (!this.db) {
-            console.warn(
-              "[SyncService] Database not initialized yet, skipping syncUp check"
-            );
-            return;
-          }
-
-          // Check if there are pending changes before syncing (using outbox)
-          const stats = await this.syncEngine.getOutboxStats();
-          const hasPendingChanges = stats.pending > 0 || stats.inProgress > 0;
-
-          if (hasPendingChanges) {
-            // Skip sync if offline (browser reports no connectivity)
-            if (!navigator.onLine) {
-              // Silently skip - this is expected behavior when offline
-              return;
-            }
-
-            console.log(
-              `[SyncService] Running periodic syncUp (${stats.pending} pending changes)...`
-            );
-            const result = await this.syncUp();
-            // Only show error toast for non-network failures
-            const hasNetworkError = result.errors.some(
-              (e) =>
-                e.includes("Failed to fetch") ||
-                e.includes("ERR_INTERNET_DISCONNECTED") ||
-                e.includes("NetworkError") ||
-                e.includes("Timed out while waiting for an open slot in the pool") ||
-                e.includes("Sync failed: 503")
-            );
-
-            if (result.success) {
-              this.consecutiveSyncUpFailures = 0;
-            } else {
-              this.consecutiveSyncUpFailures += 1;
-            }
-
-            // `itemsFailed` reflects local apply failures for pulled changes.
-            // Push failures often surface only in `errors`, so toast on those too.
-            if (!result.success && !hasNetworkError) {
-              const shouldToast =
-                this.consecutiveSyncUpFailures === 1 ||
-                this.consecutiveSyncUpFailures === 5 ||
-                this.consecutiveSyncUpFailures === 10;
-
-              if (shouldToast) {
-                const summary = result.errors[0] ?? "Unknown server error";
-                toast.error(
-                  `Sync upload failed (attempt ${this.consecutiveSyncUpFailures}). Your data is still saved locally. ${summary}`,
-                  {
-                    duration: 7000,
-                  }
-                );
-              }
-            }
-          } else {
-            // Silent - no need to log when there's nothing to sync
-          }
-        } catch (error) {
-          // Silently skip if sync is already in progress (expected on slow connections)
-          if (error instanceof SyncInProgressError) {
-            console.debug(
-              "[SyncService] Skipping periodic syncUp - sync already in progress"
-            );
-            return;
-          }
-
-          console.error("[SyncService] Error in periodic syncUp:", error);
-          toast.error(
-            "Background sync error. Your changes may not be uploaded.",
-            {
-              duration: 5000,
-            }
-          );
-        }
-      }, syncUpIntervalMs);
-    }
-
-    // Periodic syncDown (infrequent - pull remote changes from server)
-    this.syncDownIntervalId = window.setInterval(() => {
-      // Skip sync if offline (browser reports no connectivity)
-      if (!navigator.onLine) {
-        // Silently skip - this is expected behavior when offline
-        return;
-      }
-
-      console.log("[SyncService] Running periodic syncDown...");
-      void this.syncDown().catch((error) => {
-        if (error instanceof SyncInProgressError) {
-          console.log(
-            "[SyncService] Skipping periodic syncDown - sync already in progress"
-          );
-          return;
-        }
-
-        console.error("[SyncService] Periodic syncDown failed:", error);
-
-        // Only show error toast for non-network failures
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        const isNetworkError =
-          errorMsg.includes("Failed to fetch") ||
-          errorMsg.includes("ERR_INTERNET_DISCONNECTED") ||
-          errorMsg.includes("NetworkError") ||
-          errorMsg.includes("Timed out while waiting for an open slot in the pool") ||
-          errorMsg.includes("Sync failed: 503");
-
-        if (!isNetworkError) {
-          toast.error(
-            "Failed to sync data from server. You may be seeing outdated data.",
-            {
-              duration: 5000,
-            }
-          );
-        }
-      });
-    }, syncDownIntervalMs);
-
-    if (this.config.pullOnly) {
-      console.log(
-        `[SyncService] Auto sync started (pull-only):`,
-        `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
-      );
-    } else {
-      console.log(
-        `[SyncService] Auto sync started:`,
-        `syncUp every ${syncUpIntervalMs / 1000}s (only if changes pending),`,
-        `syncDown every ${syncDownIntervalMs / 1000 / 60} minutes`
-      );
     }
   }
 

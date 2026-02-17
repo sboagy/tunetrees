@@ -1569,32 +1569,26 @@ export class TuneTreesPage {
 
     console.log(`Filtering by genre: "${genre}"`);
 
-    for (let attempt = 0; attempt < 7; attempt++) {
-      await this.genreFilter
-        .click({ delay: 10, timeout: 2000 })
-        .catch(() => {});
+    let genreDropdownOpened = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await this.genreFilter.click({ timeout: 10000 });
+      await this.page.waitForTimeout(100);
 
-      const isVisible = await option
-        .isVisible({ timeout: 1000 })
-        .catch(() => false);
-      const isEnabled = await option
-        .isEnabled({ timeout: 1000 })
-        .catch(() => false);
-      const panelIsOpen = await dropdownPanel
-        .isVisible({ timeout: 1000 })
-        .catch(() => false);
-      console.log(
-        `isVisible: ${isVisible}, isEnabled: ${isEnabled}, panelIsOpen: ${panelIsOpen}`
-      );
-      if (panelIsOpen && isEnabled && isVisible) {
+      const [isExpanded, isPanelVisible] = await Promise.all([
+        this.genreFilter
+          .getAttribute("aria-expanded")
+          .then((value) => value === "true")
+          .catch(() => false),
+        dropdownPanel.isVisible({ timeout: 500 }).catch(() => false),
+      ]);
+
+      if (isExpanded && isPanelVisible) {
+        genreDropdownOpened = true;
         break;
       }
-
-      console.log(
-        `Genre option "${genre}" not visible/enabled yet, retrying...`
-      );
-      await this.page.waitForTimeout(250);
     }
+
+    expect(genreDropdownOpened).toBe(true);
 
     await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
     await expect(option).toBeVisible({ timeout: 5000 });
@@ -1615,15 +1609,42 @@ export class TuneTreesPage {
    * Filter by type (Jig, Reel, etc.)
    */
   async filterByType(type: string) {
+    await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
+    await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
+
     await this.filtersButton.click();
-    await this.page.waitForTimeout(500);
-    await this.typeFilter.click();
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(250);
 
-    const typePanel = this.page.getByText("AirBDnceFlingFling/");
-    const option = typePanel.getByRole("checkbox", { name: type });
+    await expect(this.typeFilter).toBeVisible({ timeout: 5000 });
+    await expect(this.typeFilter).toBeEnabled({ timeout: 10000 });
 
-    await option.isVisible();
+    const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-type`);
+    const option = dropdownPanel.getByRole("checkbox", { name: type });
+
+    let typeDropdownOpened = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await this.typeFilter.click({ timeout: 10000 });
+      await this.page.waitForTimeout(100);
+
+      const [isExpanded, isPanelVisible] = await Promise.all([
+        this.typeFilter
+          .getAttribute("aria-expanded")
+          .then((value) => value === "true")
+          .catch(() => false),
+        dropdownPanel.isVisible({ timeout: 500 }).catch(() => false),
+      ]);
+
+      if (isExpanded && isPanelVisible) {
+        typeDropdownOpened = true;
+        break;
+      }
+    }
+
+    expect(typeDropdownOpened).toBe(true);
+
+    await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(option).toBeEnabled({ timeout: 10000 });
     await option.setChecked(true);
     await this.page.waitForTimeout(1000);
 
