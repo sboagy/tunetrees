@@ -60,7 +60,8 @@ schema_paths = ["../drizzle/migrations/postgres/*.sql"]
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql", "./seeds/rsTop500.sql", "./seeds/null_irishtune_reference_user_ref.sql"]
+# sql_paths = ["./seed.sql", "./seeds/rsTop500.sql", "./seeds/null_irishtune_reference_user_ref.sql"]
+sql_paths = ["./seeds/baseline_local_20260217.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
