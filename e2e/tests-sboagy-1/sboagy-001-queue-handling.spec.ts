@@ -1,3 +1,7 @@
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   type BrowserContext,
   expect,
@@ -40,6 +44,37 @@ const AGAIN_TUNES = [
 
 const ALL_TUNES = [...EASY_TUNES, ...GOOD_TUNES, ...HARD_TUNES, ...AGAIN_TUNES];
 
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDirPath = dirname(currentFilePath);
+
+const resolveSeedSqlFilePath = (): string => {
+  const preferredPath = resolve(
+    currentDirPath,
+    "backup_20260216_191328Z_data.sql"
+  );
+  if (existsSync(preferredPath)) {
+    return preferredPath;
+  }
+
+  const fallbackPath = resolve(currentDirPath, "20260216_191328Z_data.sql");
+  if (existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+
+  throw new Error(
+    `Could not locate seed SQL file in ${currentDirPath}. Expected backup_20260216_191328Z_data.sql or 20260216_191328Z_data.sql`
+  );
+};
+
+const resetSupabaseAndLoadSeed = (): void => {
+  const sqlFilePath = resolveSeedSqlFilePath();
+  execSync("supabase db reset --local --no-seed", { stdio: "inherit" });
+  execSync(
+    `psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "${sqlFilePath}"`,
+    { stdio: "inherit" }
+  );
+};
+
 test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
   let ttPage: TuneTreesPage;
   let currentDate: Date;
@@ -62,8 +97,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       test.setTimeout(testInfo.timeout * 3);
       ttPage = new TuneTreesPage(page);
 
-      // supabase db reset --local --no-seed
-      // psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f /Users/sboag/gittt/tunetrees/backups/backup_20260216_191328Z_data.sql
+      resetSupabaseAndLoadSeed();
 
       page.on("console", (msg) => {
         const text = msg.text();
