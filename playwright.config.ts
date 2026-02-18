@@ -212,7 +212,7 @@ export default defineConfig({
         // storageState is set per-worker by test-fixture.ts
         launchOptions: {
           args: [
-            // "--remote-debugging-port=9222",
+            "--remote-debugging-port=9222",
             // Set X (Horizontal) and Y (Vertical) coordinates
             // Example: X=1950, Y=50 (Pushes the window onto the second monitor)
             // "--window-position=-1950,50",

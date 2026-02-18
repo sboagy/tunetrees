@@ -15,10 +15,12 @@ import {
   createMemo,
   createResource,
   createSignal,
+  onCleanup,
   onMount,
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { AIChatDrawer } from "../../components/ai/AIChatDrawer";
 import { TunesGridScheduled } from "../../components/grids";
 import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
@@ -85,6 +87,7 @@ const PracticeIndex: Component = () => {
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
+  const [isChatOpen, setIsChatOpen] = createSignal(false);
   const repertoiresVersion = createMemo(
     () => `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`
   );
@@ -187,6 +190,14 @@ const PracticeIndex: Component = () => {
     if (!repertoires.loading && repertoires() !== undefined) {
       setRepertoiresLoadedVersion(repertoiresVersion());
     }
+  });
+
+  createEffect(() => {
+    const handleOpenAssistant = () => setIsChatOpen(true);
+    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    onCleanup(() => {
+      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    });
   });
 
   // Helper to get current user ID (for non-reactive contexts)
@@ -1079,6 +1090,12 @@ const PracticeIndex: Component = () => {
           }}
         />
       </Show>
+
+      <AIChatDrawer
+        isOpen={isChatOpen()}
+        onClose={() => setIsChatOpen(false)}
+        currentRepertoireId={currentRepertoireId() || undefined}
+      />
     </div>
   );
 };
