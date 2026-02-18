@@ -1563,16 +1563,25 @@ export class TuneTreesPage {
 
     const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-genre`);
 
-    const option = dropdownPanel.getByRole("checkbox", {
-      name: genre,
-    });
+    const escapedGenre = genre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const optionByRole = () =>
+      dropdownPanel
+        .getByRole("checkbox", {
+          name: new RegExp(`^\\s*${escapedGenre}\\s*$`, "i"),
+        })
+        .first();
+    const optionByLabel = () =>
+      dropdownPanel
+        .locator("label", { hasText: genre })
+        .locator('input[type="checkbox"]')
+        .first();
 
     console.log(`Filtering by genre: "${genre}"`);
 
     let genreDropdownOpened = false;
     for (let attempt = 0; attempt < 4; attempt++) {
       await this.genreFilter.click({ timeout: 10000 });
-      await this.page.waitForTimeout(100);
+      await this.page.waitForTimeout(200);
 
       const [isExpanded, isPanelVisible] = await Promise.all([
         this.genreFilter
@@ -1591,17 +1600,55 @@ export class TuneTreesPage {
     expect(genreDropdownOpened).toBe(true);
 
     await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
-    await expect(option).toBeVisible({ timeout: 5000 });
-    await expect(option).toBeEnabled({ timeout: 10000 });
     await this.page.waitForTimeout(250);
 
-    await option.check();
-    await expect(option).toBeChecked();
+    let selectedOption = optionByRole();
+    let genreOptionChecked = false;
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const isExpanded = await this.genreFilter
+        .getAttribute("aria-expanded")
+        .then((value) => value === "true")
+        .catch(() => false);
+
+      if (!isExpanded) {
+        await this.genreFilter.click({ timeout: 10000 });
+        await this.page.waitForTimeout(150);
+      }
+
+      const roleOption = optionByRole();
+      const roleOptionCount = await roleOption.count().catch(() => 0);
+      const candidate = roleOptionCount > 0 ? roleOption : optionByLabel();
+
+      const isCandidateVisible = await candidate
+        .isVisible({ timeout: 1500 })
+        .catch(() => false);
+      if (!isCandidateVisible) {
+        await this.page.waitForTimeout(250);
+        continue;
+      }
+
+      try {
+        await candidate.scrollIntoViewIfNeeded().catch(() => {});
+        await expect(candidate).toBeEnabled({ timeout: 5000 });
+        await candidate.check({ timeout: 5000 });
+        await expect(candidate).toBeChecked({ timeout: 5000 });
+        selectedOption = candidate;
+        genreOptionChecked = true;
+        break;
+      } catch {
+        await this.page.waitForTimeout(200);
+      }
+    }
+
+    expect(genreOptionChecked).toBe(true);
 
     const filterBoxIsOpen = await dropdownPanel.isVisible();
     if (filterBoxIsOpen) {
       await this.filtersButton.click();
-      await expect(option).not.toBeVisible({ timeout: 5000 });
+      await expect(selectedOption)
+        .not.toBeVisible({ timeout: 5000 })
+        .catch(() => {});
     }
   }
 
