@@ -724,9 +724,18 @@ export async function generateOrGetPracticeQueue(
 
   // Q1: Due Today (scheduled or latest_due within [startTs, endTs))
   let q1Rows: QueueCandidateRow[];
-  if (maxReviews > 0) {
-    q1Rows = await db.all<QueueCandidateRow>(sql`
-      SELECT id, scheduled, latest_due
+  const q1Limit = maxReviews > 0 ? maxReviews : effectiveMaxReviews;
+  q1Rows = await db.all<QueueCandidateRow>(sql`
+    SELECT id, scheduled, latest_due
+    FROM (
+      SELECT
+        id,
+        scheduled,
+        latest_due,
+        ROW_NUMBER() OVER (
+          PARTITION BY id
+          ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
+        ) as rn
       FROM practice_list_staged
       WHERE user_ref = ${userRef}
         AND repertoire_id = ${repertoireRef}
@@ -736,25 +745,11 @@ export async function generateOrGetPracticeQueue(
           (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
           OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
         )
-      ORDER BY COALESCE(scheduled, latest_due) ASC
-      LIMIT ${maxReviews}
-    `);
-  } else {
-    q1Rows = await db.all<QueueCandidateRow>(sql`
-        SELECT id, scheduled, latest_due
-      FROM practice_list_staged
-      WHERE user_ref = ${userRef}
-        AND repertoire_id = ${repertoireRef}
-        AND deleted = 0
-        AND repertoire_deleted = 0
-        AND (
-          (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
-          OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
-        )
-      ORDER BY COALESCE(scheduled, latest_due) ASC
-        LIMIT ${effectiveMaxReviews}
-    `);
-  }
+    ) dedup
+    WHERE rn = 1
+    ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
+    LIMIT ${q1Limit}
+  `);
 
   for (const row of q1Rows) {
     candidateRows.push(row);
@@ -772,16 +767,27 @@ export async function generateOrGetPracticeQueue(
         : maxReviews - candidateRows.length;
     q2Rows = await db.all<QueueCandidateRow>(sql`
       SELECT id, scheduled, latest_due
-      FROM practice_list_staged
-      WHERE user_ref = ${userRef}
-        AND repertoire_id = ${repertoireRef}
-        AND deleted = 0
-        AND repertoire_deleted = 0
-        AND (
-          (scheduled IS NOT NULL AND scheduled >= ${windows.windowFloorTs} AND scheduled < ${windows.startTs})
-          OR (scheduled IS NULL AND latest_due >= ${windows.windowFloorTs} AND latest_due < ${windows.startTs})
-        )
-      ORDER BY COALESCE(scheduled, latest_due) DESC
+      FROM (
+        SELECT
+          id,
+          scheduled,
+          latest_due,
+          ROW_NUMBER() OVER (
+            PARTITION BY id
+            ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
+          ) as rn
+        FROM practice_list_staged
+        WHERE user_ref = ${userRef}
+          AND repertoire_id = ${repertoireRef}
+          AND deleted = 0
+          AND repertoire_deleted = 0
+          AND (
+            (scheduled IS NOT NULL AND scheduled >= ${windows.windowFloorTs} AND scheduled < ${windows.startTs})
+            OR (scheduled IS NULL AND latest_due >= ${windows.windowFloorTs} AND latest_due < ${windows.startTs})
+          )
+      ) dedup
+      WHERE rn = 1
+      ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
       LIMIT ${remainingCapacity}
     `);
 
@@ -807,25 +813,47 @@ export async function generateOrGetPracticeQueue(
     if (prefs.autoScheduleNew) {
       q3Rows = await db.all<QueueCandidateRow>(sql`
         SELECT id, scheduled, latest_due
-        FROM practice_list_staged
-        WHERE user_ref = ${userRef}
-          AND repertoire_id = ${repertoireRef}
-          AND deleted = 0
-          AND repertoire_deleted = 0
-          AND scheduled IS NULL
-          AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
+        FROM (
+          SELECT
+            id,
+            scheduled,
+            latest_due,
+            ROW_NUMBER() OVER (
+              PARTITION BY id
+              ORDER BY id ASC
+            ) as rn
+          FROM practice_list_staged
+          WHERE user_ref = ${userRef}
+            AND repertoire_id = ${repertoireRef}
+            AND deleted = 0
+            AND repertoire_deleted = 0
+            AND scheduled IS NULL
+            AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
+        ) dedup
+        WHERE rn = 1
         ORDER BY id ASC
         LIMIT ${remainingCapacity}
       `);
     } else {
       q3Rows = await db.all<QueueCandidateRow>(sql`
         SELECT id, scheduled, latest_due
-        FROM practice_list_staged
-        WHERE user_ref = ${userRef}
-          AND repertoire_id = ${repertoireRef}
-          AND deleted = 0
-          AND repertoire_deleted = 0
-          AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
+        FROM (
+          SELECT
+            id,
+            scheduled,
+            latest_due,
+            ROW_NUMBER() OVER (
+              PARTITION BY id
+              ORDER BY id ASC
+            ) as rn
+          FROM practice_list_staged
+          WHERE user_ref = ${userRef}
+            AND repertoire_id = ${repertoireRef}
+            AND deleted = 0
+            AND repertoire_deleted = 0
+            AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
+        ) dedup
+        WHERE rn = 1
         ORDER BY id ASC
         LIMIT ${remainingCapacity}
       `);
@@ -851,14 +879,25 @@ export async function generateOrGetPracticeQueue(
         : maxReviews - candidateRows.length;
     q4Rows = await db.all<QueueCandidateRow>(sql`
       SELECT id, scheduled, latest_due
-      FROM practice_list_staged
-      WHERE user_ref = ${userRef}
-        AND repertoire_id = ${repertoireRef}
-        AND deleted = 0
-        AND repertoire_deleted = 0
-        AND scheduled IS NOT NULL
-        AND scheduled < ${windows.windowFloorTs}
-      ORDER BY scheduled ASC
+      FROM (
+        SELECT
+          id,
+          scheduled,
+          latest_due,
+          ROW_NUMBER() OVER (
+            PARTITION BY id
+            ORDER BY scheduled ASC, id ASC
+          ) as rn
+        FROM practice_list_staged
+        WHERE user_ref = ${userRef}
+          AND repertoire_id = ${repertoireRef}
+          AND deleted = 0
+          AND repertoire_deleted = 0
+          AND scheduled IS NOT NULL
+          AND scheduled < ${windows.windowFloorTs}
+      ) dedup
+      WHERE rn = 1
+      ORDER BY scheduled ASC, id ASC
       LIMIT ${remainingCapacity}
     `);
 
@@ -1023,16 +1062,27 @@ export async function addTunesToQueue(
 
   const backlogRows = await db.all<QueueCandidateRow>(sql`
     SELECT id, scheduled, latest_due
-    FROM practice_list_staged
-    WHERE user_ref = ${userRef}
-      AND repertoire_id = ${repertoireRef}
-      AND deleted = 0
-      AND repertoire_deleted = 0
-      AND (
-        (scheduled IS NOT NULL AND scheduled < ${windows.windowFloorTs})
-        OR (scheduled IS NULL AND latest_due < ${windows.windowFloorTs})
-      )
-    ORDER BY COALESCE(scheduled, latest_due) DESC
+    FROM (
+      SELECT
+        id,
+        scheduled,
+        latest_due,
+        ROW_NUMBER() OVER (
+          PARTITION BY id
+          ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
+        ) as rn
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND repertoire_id = ${repertoireRef}
+        AND deleted = 0
+        AND repertoire_deleted = 0
+        AND (
+          (scheduled IS NOT NULL AND scheduled < ${windows.windowFloorTs})
+          OR (scheduled IS NULL AND latest_due < ${windows.windowFloorTs})
+        )
+    ) dedup
+    WHERE rn = 1
+    ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
     LIMIT ${backlogLimit}
   `);
 
