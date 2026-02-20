@@ -8,15 +8,15 @@
  * @module lib/sync/outbox
  */
 
-import { getPrimaryKey } from "../shared/table-meta";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
+import { getPrimaryKey } from "../shared/table-meta";
 import { toCamelCase } from "./casing";
 import {
   getSyncRuntime,
   type SqliteDatabase,
-  type SyncPushQueueTable,
   type SyncableTableName,
+  type SyncPushQueueTable,
 } from "./runtime-context";
 
 function getRuntime() {
@@ -373,35 +373,29 @@ export async function getOutboxStats(db: SqliteDatabase): Promise<{
   // IMPORTANT: Don't fetch all outbox rows into JS.
   // The outbox can grow large (especially when offline), and selecting all rows
   // will allocate a huge array and can crash the tab.
-  const pendingRows = await db.all(sql`
-    SELECT COUNT(*) AS n
-    FROM sync_push_queue
-    WHERE status = 'pending'
-  `);
-
-  const inProgressRows = await db.all(sql`
-    SELECT COUNT(*) AS n
-    FROM sync_push_queue
-    WHERE status = 'in_progress'
-  `);
-
-  const failedRows = await db.all(sql`
-    SELECT COUNT(*) AS n
-    FROM sync_push_queue
-    WHERE status = 'failed'
-  `);
-
-  const totalRows = await db.all(sql`
-    SELECT COUNT(*) AS n
+  // Also keep this to a single SQL statement to minimize sql.js statement churn.
+  const rows = await db.all(sql`
+    SELECT
+      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+      SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+      COUNT(*) AS total
     FROM sync_push_queue
   `);
 
-  const pending = Number((pendingRows as Array<{ n: unknown }>)[0]?.n ?? 0);
-  const inProgress = Number(
-    (inProgressRows as Array<{ n: unknown }>)[0]?.n ?? 0
-  );
-  const failed = Number((failedRows as Array<{ n: unknown }>)[0]?.n ?? 0);
-  const total = Number((totalRows as Array<{ n: unknown }>)[0]?.n ?? 0);
+  const row = (
+    rows as Array<{
+      pending: unknown;
+      in_progress: unknown;
+      failed: unknown;
+      total: unknown;
+    }>
+  )[0];
+
+  const pending = Number(row?.pending ?? 0);
+  const inProgress = Number(row?.in_progress ?? 0);
+  const failed = Number(row?.failed ?? 0);
+  const total = Number(row?.total ?? 0);
 
   return { pending, inProgress, failed, total };
 }

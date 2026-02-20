@@ -32,6 +32,20 @@ const getRepertoireDisplayName = (
   return `${instrument} (${repertoire.repertoireId})`;
 };
 
+const isPointerEventInside = (
+  event: PointerEvent,
+  element: Element | undefined | null
+): boolean => {
+  if (!element) return false;
+
+  if (typeof event.composedPath === "function") {
+    return event.composedPath().includes(element);
+  }
+
+  const target = event.target as Node | null;
+  return !!target && element.contains(target);
+};
+
 // Filter chip component for selected items
 const FilterChip: Component<{
   label: string;
@@ -84,34 +98,27 @@ const FilterDropdown: Component<{
   let dropdownRef: HTMLDivElement | undefined;
   let buttonRef: HTMLButtonElement | undefined;
 
-  // Handle click outside to close
-  // Only close if the click is within the app container (#root) to avoid
-  // interference from test automation or browser extensions
-  const handleClickOutside = (event: MouseEvent) => {
-    const target = event.target as Node;
-
-    // Only process clicks that occur within the app root
-    const appRoot = document.getElementById("root");
-    if (!appRoot?.contains(target)) {
+  const handlePointerDownOutside = (event: PointerEvent) => {
+    if (
+      isPointerEventInside(event, dropdownRef) ||
+      isPointerEventInside(event, buttonRef)
+    ) {
       return;
     }
 
-    if (
-      dropdownRef &&
-      !dropdownRef.contains(target) &&
-      buttonRef &&
-      !buttonRef.contains(target)
-    ) {
-      setIsOpen(false);
-    }
+    setIsOpen(false);
   };
 
-  // Setup click outside listener
+  // Setup outside-pointer listener
   createEffect(() => {
     if (isOpen()) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("pointerdown", handlePointerDownOutside, true);
       onCleanup(() => {
-        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener(
+          "pointerdown",
+          handlePointerDownOutside,
+          true
+        );
       });
     }
   });
@@ -152,7 +159,7 @@ const FilterDropdown: Component<{
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen())}
+        onClick={() => setIsOpen((open) => !open)}
         class="flex items-center gap-1.5 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
         aria-label={`Filter by ${props.title}`}
         aria-expanded={isOpen()}
@@ -344,32 +351,29 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     }
   });
 
-  // Handle click outside to close panel
-  const handleClickOutside = (event: MouseEvent) => {
-    const target = event.target as Node;
-
-    // Check if click is on the trigger button
-    if (buttonRef?.contains(target)) {
-      return; // Let the button handle its own click
-    }
-
-    // Check if click is inside the Portal-rendered panel content
-    // Use a data attribute to identify our Portal-rendered content
+  const handlePointerDownOutside = (event: PointerEvent) => {
     const portalPanel = document.querySelector('[data-filter-panel="true"]');
-    if (portalPanel?.contains(target)) {
-      return; // Don't close if clicking inside the panel
+
+    if (
+      isPointerEventInside(event, buttonRef) ||
+      isPointerEventInside(event, portalPanel)
+    ) {
+      return;
     }
 
-    // Click is outside - close the panel
     setIsExpanded(false);
   };
 
-  // Setup click outside listener
+  // Setup outside-pointer listener
   createEffect(() => {
     if (isExpanded()) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("pointerdown", handlePointerDownOutside, true);
       onCleanup(() => {
-        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener(
+          "pointerdown",
+          handlePointerDownOutside,
+          true
+        );
       });
     }
   });

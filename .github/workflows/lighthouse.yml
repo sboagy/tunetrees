@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "25"
           cache: "npm"
 
       # 3. Install dependencies
@@ -69,30 +69,30 @@ jobs:
           script: |
             const fs = require('fs');
             const reportPath = '.lighthouseci/manifest.json';
-            
+
             if (!fs.existsSync(reportPath)) {
               console.log('No Lighthouse manifest found');
               return;
             }
-            
+
             const manifest = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
             const reports = manifest.map(report => report.url);
-            
+
             const comment = `## 🔦 Lighthouse CI Results
-            
+
             Lighthouse audits have been completed. View reports:
             ${reports.map((url, i) => `- [Report ${i + 1}](${url})`).join('\n')}
-            
+
             **Performance Targets:**
             - ✅ FCP < 1.5s
             - ✅ LCP < 2.5s
             - ✅ TTI < 3.0s
             - ✅ TBT < 300ms
             - ✅ CLS < 0.1
-            
+
             See workflow artifacts for detailed reports.
             `;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

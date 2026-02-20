@@ -794,7 +794,12 @@ export const TopNav: Component = () => {
 
   const canOpenAssistant = createMemo(() => {
     const tab = new URLSearchParams(location.search).get("tab");
-    return tab === "catalog" || tab === "repertoire";
+    return (
+      tab === "catalog" ||
+      tab === "repertoire" ||
+      tab === "practice" ||
+      tab === "analysis"
+    );
   });
 
   const handleOpenAssistant = () => {

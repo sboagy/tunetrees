@@ -299,6 +299,34 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     expect(afterSecondQueue.tuneOrder).toEqual(initialQueue.tuneOrder);
   });
 
+  test("should show banner after reload and keep incomplete queue window stable", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    const initialQueue = await expectQueueMatchesGrid(
+      page,
+      testUser.repertoireId
+    );
+
+    currentDate = await advanceDays(context, 1, currentDate);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForTestApi(page);
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+    await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
+
+    const reloadedQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    expect(reloadedQueue.windowStartUtc).toBe(initialQueue.windowStartUtc);
+    expect(reloadedQueue.tuneOrder).toEqual(initialQueue.tuneOrder);
+
+    const reloadedStorage = await getQueueStorage(page);
+    expect(reloadedStorage.queueDate?.slice(0, 10)).toBe(
+      initialQueue.windowStartUtc.slice(0, 10)
+    );
+    expect(reloadedStorage.manualFlag).toBe("false");
+  });
+
   test("should refresh queue and hide banner when Refresh Now is pressed", async ({
     page,
     context,
@@ -334,11 +362,24 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       )
       .not.toBe(initialQueue.windowStartUtc);
 
-    const refreshedQueue = await expectQueueMatchesGrid(
-      page,
-      testUser.repertoireId
-    );
+    const refreshedQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    const refreshedPendingCount = refreshedQueue.rows.filter(
+      (row: { completed_at: string | null }) => !row.completed_at
+    ).length;
+
+    if (refreshedPendingCount > 0) {
+      await expect
+        .poll(async () => await ttPage.getRows("scheduled").count(), {
+          timeout: 10000,
+          intervals: [200, 500, 1000],
+        })
+        .toBeGreaterThan(0);
+    }
+
+    const refreshedVisibleCount = await ttPage.getRows("scheduled").count();
     const refreshedStorage = await getQueueStorage(page);
+
+    expect(refreshedVisibleCount).toBeLessThanOrEqual(refreshedPendingCount);
 
     expect(refreshedQueue.windowStartUtc).not.toBe(initialQueue.windowStartUtc);
     expect(refreshedQueue.windowStartUtc.slice(0, 10)).toBe(

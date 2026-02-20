@@ -40,23 +40,37 @@ function resolveBiomeBin(): string {
 
 function formatWithBiome(targetPath: string, content: string): string {
   const biomeBin = resolveBiomeBin();
-  const result = spawnSync(
-    biomeBin,
-    ["format", "--stdin-file-path", targetPath],
-    {
-      input: content,
+  const tempDir = fs.mkdtempSync(path.join(process.cwd(), ".codegen-biome-"));
+  const tempFile = path.join(
+    tempDir,
+    `format${path.extname(targetPath) || ".ts"}`
+  );
+
+  try {
+    fs.writeFileSync(tempFile, content, "utf8");
+    const result = spawnSync(biomeBin, ["format", "--write", tempFile], {
       encoding: "utf8",
       stdio: "pipe",
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      const stderr = result.stderr ? String(result.stderr) : "";
+      throw new Error(
+        `Biome format failed for ${targetPath}: ${stderr || "unknown error"}`
+      );
     }
-  );
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    const stderr = result.stderr ? String(result.stderr) : "";
-    throw new Error(
-      `Biome format failed for ${targetPath}: ${stderr || "unknown error"}`
-    );
+
+    const formatted = fs.readFileSync(tempFile, "utf8");
+    if (content.length > 0 && formatted.length === 0) {
+      throw new Error(
+        `Biome format produced empty output for ${targetPath} with non-empty input.`
+      );
+    }
+
+    return formatted;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   }
-  return result.stdout;
 }
 
 function isLocalSupabaseDatabaseUrl(databaseUrl: string): boolean {

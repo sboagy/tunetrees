@@ -9,7 +9,13 @@
  * @module routes/analysis
  */
 
-import type { Component } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  createSignal,
+  onCleanup,
+} from "solid-js";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 
 /**
  * Analysis Page Component
@@ -28,6 +34,16 @@ import type { Component } from "solid-js";
  * ```
  */
 const AnalysisPage: Component = () => {
+  const [isChatOpen, setIsChatOpen] = createSignal(false);
+
+  createEffect(() => {
+    const handleOpenAssistant = () => setIsChatOpen(true);
+    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    onCleanup(() => {
+      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    });
+  });
+
   return (
     <div class="h-full flex flex-col">
       {/* Page Header */}
@@ -98,6 +114,11 @@ const AnalysisPage: Component = () => {
           </p>
         </div>
       </div>
+
+      <AIChatDrawer
+        isOpen={isChatOpen()}
+        onClose={() => setIsChatOpen(false)}
+      />
     </div>
   );
 };
