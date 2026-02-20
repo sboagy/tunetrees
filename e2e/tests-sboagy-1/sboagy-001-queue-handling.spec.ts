@@ -8,35 +8,34 @@ import {
   type Page,
   type TestInfo,
 } from "@playwright/test";
-import { CATALOG_TUNE_ID_MAP } from "../../src/lib/db/catalog-tune-ids";
+// import { CATALOG_TUNE_ID_MAP } from "../../src/lib/db/catalog-tune-ids";
 import {
   advanceDays,
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
-import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // 10 DISTINCT catalog tunes for testing
-const EASY_TUNES = [
-  CATALOG_TUNE_ID_MAP[482]!, // Wicklow Hornpipe
-];
+// const EASY_TUNES = [
+//   CATALOG_TUNE_ID_MAP[482]!, // Wicklow Hornpipe
+// ];
 
-const GOOD_TUNES = [
-  CATALOG_TUNE_ID_MAP[420]!, // Crosses of Annagh
-];
+// const GOOD_TUNES = [
+//   CATALOG_TUNE_ID_MAP[420]!, // Crosses of Annagh
+// ];
 
-const HARD_TUNES = [
-  CATALOG_TUNE_ID_MAP[1961]!, // Touch me if you Dare
-];
+// const HARD_TUNES = [
+//   CATALOG_TUNE_ID_MAP[1961]!, // Touch me if you Dare
+// ];
 
-const AGAIN_TUNES = [
-  CATALOG_TUNE_ID_MAP[221]!, // Brendan Tonra's
-];
+// const AGAIN_TUNES = [
+//   CATALOG_TUNE_ID_MAP[221]!, // Brendan Tonra's
+// ];
 
-const ALL_TUNES = [...EASY_TUNES, ...GOOD_TUNES, ...HARD_TUNES, ...AGAIN_TUNES];
+// const ALL_TUNES = [...EASY_TUNES, ...GOOD_TUNES, ...HARD_TUNES, ...AGAIN_TUNES];
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirPath = dirname(currentFilePath);
