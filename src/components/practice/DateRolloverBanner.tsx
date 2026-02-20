@@ -66,7 +66,9 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
   // Check for date change every minute
   createEffect(() => {
     const intervalMs = getRolloverIntervalMs();
-    const checkInterval = setInterval(() => {
+    let loggedForCurrentInitialDate = false;
+
+    const checkForDateRollover = () => {
       if (hasPracticeDateChanged(props.initialDate)) {
         const current = getPracticeDate();
         const shouldShow = props.onDateChange?.(current);
@@ -77,11 +79,20 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
 
         setNewDate(current.toLocaleDateString());
         setShowBanner(true);
-        console.log(
-          `🔄 [DateRollover] Practice date changed from ${props.initialDate.toLocaleDateString()} to ${current.toLocaleDateString()}`
-        );
+
+        if (!loggedForCurrentInitialDate) {
+          console.log(
+            `🔄 [DateRollover] Practice date changed from ${props.initialDate.toLocaleDateString()} to ${current.toLocaleDateString()}`
+          );
+          loggedForCurrentInitialDate = true;
+        }
       }
-    }, intervalMs);
+    };
+
+    // Evaluate immediately so reloads and tab restores are handled without waiting.
+    checkForDateRollover();
+
+    const checkInterval = setInterval(checkForDateRollover, intervalMs);
 
     onCleanup(() => clearInterval(checkInterval));
   });
