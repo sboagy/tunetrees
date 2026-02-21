@@ -63,11 +63,24 @@ export interface IWorkerCollectionConfig {
   ownerColumn: string;
 }
 
+export type RpcParamBinding =
+  | { source: "authUserId" }
+  | { source: "collection"; collection: string }
+  | { source: "lastSyncAt" }
+  | { source: "pageLimit" }
+  | { source: "pageOffset" }
+  | { source: "literal"; value: unknown }
+  | { source: "requestOverride"; key?: string };
+
 export type PullTableRule =
   | { kind: "eqUserId"; column: string }
   | { kind: "orNullEqUserId"; column: string }
   | { kind: "inCollection"; column: string; collection: string }
-  | { kind: "rpc"; functionName: string; params: string[] }
+  | {
+      kind: "rpc";
+      functionName: string;
+      paramMap: Record<string, RpcParamBinding>;
+    }
   | { kind: "compound"; rules: PullTableRule[]; operator?: "and" | "or" }
   | { kind: "publicOnly"; column: string }
   | { kind: "orEqUserIdOrTrue"; column: string; orColumn: string };

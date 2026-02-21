@@ -342,6 +342,7 @@ interface SyncContext {
   /** Supabase auth uid (JWT sub); same as userId after eliminating user_profile.id. */
   authUserId: string;
   collections: Record<string, Set<string>>;
+  rpcParamOverrides?: Record<string, Record<string, unknown>>;
   pullTables?: Set<string>;
   now: string;
   diagnosticsEnabled: boolean;
@@ -528,6 +529,59 @@ async function fetchViaRPC(
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`RPC ${functionName} failed: ${message}`);
   }
+}
+
+function resolveRpcParamsForRule(params: {
+  rule: Extract<import("./sync-schema").PullTableRule, { kind: "rpc" }>;
+  ctx: SyncContext;
+  lastSyncAt: string | null;
+  pageLimit: number;
+  pageOffset: number;
+}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const ruleOverrides =
+    params.ctx.rpcParamOverrides?.[params.rule.functionName] ?? {};
+
+  for (const [paramName, binding] of Object.entries(params.rule.paramMap)) {
+    if (Object.hasOwn(ruleOverrides, paramName)) {
+      out[paramName] = ruleOverrides[paramName];
+      continue;
+    }
+
+    switch (binding.source) {
+      case "authUserId":
+        out[paramName] = params.ctx.authUserId;
+        break;
+      case "collection": {
+        const collection = params.ctx.collections[binding.collection];
+        out[paramName] = collection ? Array.from(collection) : [];
+        break;
+      }
+      case "lastSyncAt":
+        out[paramName] = params.lastSyncAt;
+        break;
+      case "pageLimit":
+        out[paramName] = params.pageLimit;
+        break;
+      case "pageOffset":
+        out[paramName] = params.pageOffset;
+        break;
+      case "literal":
+        out[paramName] = binding.value;
+        break;
+      case "requestOverride": {
+        const overrideKey = binding.key ?? paramName;
+        out[paramName] =
+          ruleOverrides[overrideKey as keyof typeof ruleOverrides] ?? null;
+        break;
+      }
+      default:
+        out[paramName] = null;
+        break;
+    }
+  }
+
+  return out;
 }
 
 // ============================================================================
@@ -925,22 +979,13 @@ async function fetchTableForInitialSyncPage(
   const rule = getPullRule(tableName);
   if (rule?.kind === "rpc") {
     // Use RPC to fetch data (handles all filtering server-side)
-    const rpcParams: Record<string, unknown> = {
-      p_user_id: ctx.authUserId,
-    };
-
-    // Map params: "userId" already in p_user_id, add others as needed
-    if (rule.params.includes("genreIds")) {
-      const genreSet = ctx.collections.selectedGenres;
-      rpcParams.p_genre_ids = genreSet ? Array.from(genreSet) : [];
-    }
-
-    // For initial sync, timestamp is NULL (fetch all rows)
-    rpcParams.p_after_timestamp = null;
-
-    // Pass pagination params to RPC
-    rpcParams.p_limit = limit;
-    rpcParams.p_offset = offset;
+    const rpcParams = resolveRpcParamsForRule({
+      rule,
+      ctx,
+      lastSyncAt: null,
+      pageLimit: limit,
+      pageOffset: offset,
+    });
 
     const rows = await fetchViaRPC(tx, rule.functionName, rpcParams);
 
@@ -1150,27 +1195,13 @@ async function fetchChangedRowsFromTable(
   const rule = getPullRule(tableName);
   if (rule?.kind === "rpc") {
     // Use RPC to fetch changed rows (handles all filtering server-side)
-    const rpcParams: Record<string, unknown> = {
-      p_user_id: ctx.authUserId,
-    };
-
-    // Map params - IMPORTANT: maintain order matching function signature
-    if (rule.params.includes("genreIds")) {
-      const effectiveGenres = ctx.collections.selectedGenres
-        ? Array.from(ctx.collections.selectedGenres)
-        : [];
-      rpcParams.p_genre_ids = effectiveGenres;
-      debug.log(
-        `[RPC] ${rule.functionName}: ${effectiveGenres.length} genres from collections`
-      );
-    }
-
-    // Add timestamp param AFTER genreIds to match function signature
-    rpcParams.p_after_timestamp = lastSyncAt; // RPC will filter by last_modified_at > lastSyncAt
-
-    // For incremental sync, use default limit (1000) - should be small
-    rpcParams.p_limit = 1000;
-    rpcParams.p_offset = 0;
+    const rpcParams = resolveRpcParamsForRule({
+      rule,
+      ctx,
+      lastSyncAt,
+      pageLimit: 1000,
+      pageOffset: 0,
+    });
 
     const rows = await fetchViaRPC(tx, rule.functionName, rpcParams);
 
@@ -1344,6 +1375,17 @@ async function handleSync(
       }
     }
 
+    const rpcParamOverrides = payload.rpcParamOverrides
+      ? Object.fromEntries(
+          Object.entries(payload.rpcParamOverrides).map(
+            ([functionName, mapping]) => [
+              functionName,
+              (mapping ?? {}) as Record<string, unknown>,
+            ]
+          )
+        )
+      : undefined;
+
     const pullTables = payload.pullTables
       ? new Set(payload.pullTables.map((t) => String(t)))
       : undefined;
@@ -1360,6 +1402,7 @@ async function handleSync(
       userId: authUserId,
       authUserId,
       collections,
+      rpcParamOverrides,
       pullTables,
       now,
       diagnosticsEnabled,

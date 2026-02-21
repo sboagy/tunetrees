@@ -1343,7 +1343,20 @@ function buildDefaultWorkerConfig(params: {
     | { kind: "eqUserId"; column: string }
     | { kind: "orNullEqUserId"; column: string }
     | { kind: "inCollection"; column: string; collection: string }
-    | { kind: "rpc"; functionName: string; params: string[] }
+    | {
+        kind: "rpc";
+        functionName: string;
+        paramMap: Record<
+          string,
+          | { source: "authUserId" }
+          | { source: "collection"; collection: string }
+          | { source: "lastSyncAt" }
+          | { source: "pageLimit" }
+          | { source: "pageOffset" }
+          | { source: "literal"; value: unknown }
+          | { source: "requestOverride"; key?: string }
+        >;
+      }
   > = {};
   const pushRules: Record<
     string,

@@ -184,6 +184,47 @@ The generator produces **opinionated defaults** based on schema heuristics, then
 
 Important detail: worker sanitization rules operate on **payload prop names** (camelCase), not raw DB column names.
 
+#### RPC pull-rule `paramMap`
+
+For pull rules with `kind: "rpc"`, use `paramMap` (not `params`) to bind each RPC argument explicitly.
+
+```json
+{
+  "kind": "rpc",
+  "functionName": "sync_get_user_notes",
+  "paramMap": {
+    "p_user_id": { "source": "authUserId" },
+    "p_genre_ids": { "source": "collection", "collection": "selectedGenres" },
+    "p_after_timestamp": { "source": "lastSyncAt" },
+    "p_limit": { "source": "pageLimit" },
+    "p_offset": { "source": "pageOffset" }
+  }
+}
+```
+
+Supported binding sources:
+
+- `authUserId`
+  - Uses authenticated user id from JWT.
+- `collection`
+  - Uses values from `collections[collectionName]` (empty array if missing).
+- `lastSyncAt`
+  - Uses incremental watermark (`null` during initial sync pages).
+- `pageLimit`
+  - Uses worker pagination limit for this RPC call.
+- `pageOffset`
+  - Uses worker pagination offset for this RPC call.
+- `literal`
+  - Uses a fixed literal value from config.
+- `requestOverride`
+  - Uses per-request override value from `SyncRequest.rpcParamOverrides[functionName][paramName]`.
+  - If `key` is provided, that key is used instead of `paramName`.
+
+Override precedence:
+
+- If `rpcParamOverrides` provides a value for a param, that value wins.
+- Otherwise the value is resolved from `paramMap` source.
+
 Example (override only what you need):
 
 ```json
