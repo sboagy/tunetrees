@@ -265,3 +265,25 @@ Deliverable: release-ready extraction summary and evidence.
    - `npx tsc -p worker/tsconfig.json --noEmit`
    - `npx vitest run tests/lib/sync/casing.test.ts tests/lib/sync/table-meta.test.ts tests/lib/sync/adapters.test.ts`
 5. Keep standalone repo unchanged; rollback is app-consumer-side only.
+
+### oosync dependency plan (short / medium / long)
+
+#### Short term (now; branch stabilization)
+
+- **Source of truth:** branch-first resolution from current workflow branch (`github.head_ref || github.ref_name`) with deterministic fallback to pinned ref (`6c413b7743a918f7f3113b045098cb8bc6b64177`).
+- **CI/deploy strategy:** in TuneTrees GitHub Actions, resolve matching branch in `sboagy/oosync`; if found, checkout that branch; if not found, checkout fallback ref; then run `npm install --no-save ./.deps/oosync` after `npm ci`.
+- **Local dev strategy:** continue using `npm link` (`npm link` in oosync repo, `npm link oosync` in TuneTrees).
+- **Operational rule:** keep fallback ref updated only after oosync commit passes its own tests and TuneTrees targeted sync checks.
+
+#### Medium term (next 1–2 milestones)
+
+- **Versioned release cadence:** tag oosync releases (`v0.x.y`) and consume immutable tags/SHAs in TuneTrees CI instead of floating branches.
+- **Dependency declaration:** add explicit `oosync` dependency in TuneTrees `package.json` using git tag/SHA (or keep checkout-install path until npm publish is ready).
+- **Automation:** add a small update workflow/script to propose SHA/tag bumps and run TuneTrees smoke checks (`codegen:schema:check`, typecheck, sync-focused tests).
+
+#### Long term (package maturity)
+
+- **Publish target:** scoped npm package (for example `@sboagy/oosync`) with semver.
+- **Publish automation:** GitHub Actions release workflow in `oosync` repo (triggered by tag/release) to publish to npm with provenance.
+- **Consumer end-state:** TuneTrees uses regular semver dependency + plain `npm ci` in CI/deploy, removing multi-checkout install steps.
+- **Safety net:** keep emergency fallback documented (pin to git SHA) for zero-day rollback if npm release introduces regressions.
