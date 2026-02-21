@@ -1,6 +1,5 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
-import { debug } from "./debug";
 
 export function snakeToCamel(snake: string): string {
   return snake.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
@@ -129,7 +128,6 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
   function getConflictTarget(tableName: string): string[] {
     const meta = TABLE_REGISTRY[tableName];
     if (!meta) throw new Error(`Unknown table: ${tableName}`);
-    if (tableName === "user_profile") return ["id"];
     if (meta.uniqueKeys) return meta.uniqueKeys;
     return Array.isArray(meta.primaryKey) ? meta.primaryKey : [meta.primaryKey];
   }
@@ -196,29 +194,6 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
         .where(eq(ownerCol, params.userId));
 
       result[name] = new Set(rows.map((r: any) => String(r.id)));
-    }
-
-    // Load user's selected genres for catalog filtering
-    const userGenreSelectionTable = params.tables.userGenreSelection;
-    if (userGenreSelectionTable) {
-      try {
-        const genreRows = await params.tx
-          .select({ genreId: userGenreSelectionTable.genreId })
-          .from(userGenreSelectionTable)
-          .where(eq(userGenreSelectionTable.userId, params.userId));
-
-        const selectedGenreIds = genreRows.map((r: any) => String(r.genreId));
-        result.selectedGenres = new Set(selectedGenreIds);
-
-        debug.log(
-          `[SYNC] Loaded ${selectedGenreIds.length} selected genres for user ${params.userId}`
-        );
-      } catch (error) {
-        console.warn("[SYNC] Failed to load user genre selection:", error);
-        result.selectedGenres = new Set();
-      }
-    } else {
-      result.selectedGenres = new Set();
     }
 
     return result;

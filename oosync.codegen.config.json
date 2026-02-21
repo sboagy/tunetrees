@@ -47,6 +47,13 @@
   },
   "worker": {
     "config": {
+      "collections": {
+        "selectedGenres": {
+          "table": "user_genre_selection",
+          "idColumn": "genre_id",
+          "ownerColumn": "user_id"
+        }
+      },
       "pull": {
         "tableRules": {
           "plugin": {

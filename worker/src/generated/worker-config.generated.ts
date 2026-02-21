@@ -67,6 +67,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "id",
     },
+    selectedGenres: {
+      table: "user_genre_selection",
+      idColumn: "genre_id",
+      ownerColumn: "user_id",
+    },
   },
   pull: {
     tableRules: {
