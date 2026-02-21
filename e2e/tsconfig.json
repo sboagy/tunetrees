@@ -17,6 +17,6 @@
     "./**/*.ts",
     "../src/**/*.ts",
     "../shared/**/*.ts",
-    "../oosync/src/**/*.ts"
+    "../node_modules/oosync/src/**/*.ts"
   ]
 }

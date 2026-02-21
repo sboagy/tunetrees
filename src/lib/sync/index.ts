@@ -2,35 +2,34 @@
  * Sync Module - Re-export Layer
  *
  * Temporary re-export layer for backward compatibility.
- * All sync functionality has been moved to oosync/src/sync/.
+ * All sync functionality has moved to the linked `oosync` package.
  *
  * TODO: Remove this re-export layer after all imports have been migrated to use
- * `import { ... } from "@oosync"` or `import { ... } from "oosync/src/sync/..."`
+ * `import { ... } from "@oosync/sync"`
  *
  * @module lib/sync
  */
 
 import "./runtime-config";
 
-// Re-export everything from the new oosync location
-export {
-  SyncEngine,
-  SyncService,
-  SyncInProgressError,
-  startSyncWorker,
-  RealtimeManager,
-  clearOldOutboxItems,
-  clearSyncOutbox,
-  getOutboxStats,
-  getFailedOutboxItems,
-  retryOutboxItem,
-} from "@oosync/sync";
-
 export type {
   SyncableTable,
   SyncOperation,
-  SyncStatus,
   SyncResult,
+  SyncStatus,
+} from "@oosync/sync";
+// Re-export everything from the new oosync location
+export {
+  clearOldOutboxItems,
+  clearSyncOutbox,
+  getFailedOutboxItems,
+  getOutboxStats,
+  RealtimeManager,
+  retryOutboxItem,
+  SyncEngine,
+  SyncInProgressError,
+  SyncService,
+  startSyncWorker,
 } from "@oosync/sync";
 
 export { ensureSyncRuntimeConfigured } from "./runtime-config";

@@ -5,17 +5,17 @@
  * schema-agnostic oosync runtime layer.
  */
 import {
-  setSyncRuntime,
   type SyncPushQueueTable,
   type SyncRuntime,
-} from "@oosync/sync/runtime-context";
+  setSyncRuntime,
+} from "@oosync/sync";
+import * as localSchema from "../../../drizzle/schema-sqlite";
 import {
   SYNCABLE_TABLES,
   TABLE_REGISTRY,
   TABLE_SYNC_ORDER,
   TABLE_TO_SCHEMA_KEY,
 } from "../../../shared/table-meta";
-import * as localSchema from "../../../drizzle/schema-sqlite";
 import {
   clearOutboxBackupForUser,
   getSqliteInstance,
@@ -23,20 +23,16 @@ import {
   persistDb,
 } from "../db/client-sqlite";
 import {
-  replayOutboxBackup,
-  type IOutboxBackup as AppOutboxBackup,
-} from "../db/outbox-backup";
-import {
   enableSyncTriggers,
   suppressSyncTriggers,
 } from "../db/install-triggers";
+import {
+  type IOutboxBackup as AppOutboxBackup,
+  replayOutboxBackup,
+} from "../db/outbox-backup";
 import { log } from "../logger";
 
-let configured = false;
-
 export function ensureSyncRuntimeConfigured(): void {
-  if (configured) return;
-
   const runtime: SyncRuntime = {
     schema: {
       syncableTables: SYNCABLE_TABLES,
@@ -58,7 +54,6 @@ export function ensureSyncRuntimeConfigured(): void {
   };
 
   setSyncRuntime(runtime);
-  configured = true;
 }
 
 // Configure immediately on import to keep consumer ergonomics simple.

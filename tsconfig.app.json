@@ -26,10 +26,15 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@oosync/*": ["./oosync/src/*"],
+      "@oosync/*": ["./node_modules/oosync/src/*"],
       "@shared-generated/*": ["./shared/generated/*"],
-      "@sync-schema/*": ["./shared/sync-schema/*"]
+      "@sync-schema/*": ["./shared/sync-schema/*"],
+      "drizzle-orm": ["./node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["./node_modules/drizzle-orm/*"],
+      "@supabase/supabase-js": ["./node_modules/@supabase/supabase-js"],
+      "sql.js": ["./node_modules/@types/sql.js/index.d.ts"],
+      "solid-sonner": ["./node_modules/solid-sonner"]
     }
   },
-  "include": ["src", "shared", "oosync/src"]
+  "include": ["src", "shared"]
 }

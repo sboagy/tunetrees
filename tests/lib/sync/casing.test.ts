@@ -4,7 +4,6 @@
  * @module tests/lib/sync/casing.test
  */
 
-import { describe, expect, it } from "vitest";
 import {
   COMMON_KEYS_CAMEL_TO_SNAKE,
   COMMON_KEYS_SNAKE_TO_CAMEL,
@@ -14,7 +13,8 @@ import {
   snakifyKeysFast,
   toCamelCase,
   toSnakeCase,
-} from "../../../oosync/src/sync/casing";
+} from "@oosync/sync/casing";
+import { describe, expect, it } from "vitest";
 
 describe("toCamelCase", () => {
   it("converts simple snake_case to camelCase", () => {

@@ -48,7 +48,7 @@ Primary components:
 - `src/lib/sync/outbox.ts`: durable local outbox queue.
 - `src/lib/sync/adapters.ts`: per-table transformation rules (camelCase local ↔ snake_case remote).
 - `src/lib/sync/worker-client.ts`: client for the worker endpoint.
-- `worker/`: app-facing Cloudflare Worker package that imports worker implementation from `oosync/worker/*`.
+- `worker/`: app-facing Cloudflare Worker package that imports worker implementation from the linked `oosync` package (`@oosync-worker/*`).
 
 ### Adapter Pattern (Per-Table, Cached)
 
@@ -60,7 +60,7 @@ Primary components:
 
 - `oosync` is an opinionated offline sync library with a code generator (`npm run codegen:schema`).
 - Generated outputs are write-only. If generated schema/metadata is wrong, fix the generator or inputs — do not hand-edit generated files.
-- Boundary rules are enforced in `oosync/AGENTS.md` (core must not import app `src/**`; worker must not import app `src/**`; shared/generated is contract-only).
+- Boundary rules are enforced in the standalone `oosync` repo `AGENTS.md` (core must not import app `src/**`; worker must not import app `src/**`; shared/generated is contract-only).
 
 ## UI Principles (Pointers)
 
