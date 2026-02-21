@@ -66,13 +66,18 @@ jobs:
           echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
           echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
 
-      - name: Checkout pinned oosync dependency
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.OOSYNC_REPOSITORY }}
-          ref: ${{ steps.oosync-ref.outputs.ref }}
-          token: ${{ github.token }}
-          path: .deps/oosync
+      - name: Fetch oosync dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
+          rm -rf .deps/oosync
+          mkdir -p .deps/oosync
+          git -C .deps/oosync init
+          git -C .deps/oosync remote add origin "$REPO_URL"
+          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
+          git -C .deps/oosync checkout --detach FETCH_HEAD
+          test -f .deps/oosync/package.json
 
       - name: AGGRESSIVE DISK CLEANUP
         if: runner.os == 'Linux'
@@ -291,13 +296,18 @@ jobs:
           echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
           echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
 
-      - name: Checkout pinned oosync dependency
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.OOSYNC_REPOSITORY }}
-          ref: ${{ steps.oosync-ref.outputs.ref }}
-          token: ${{ github.token }}
-          path: .deps/oosync
+      - name: Fetch oosync dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
+          rm -rf .deps/oosync
+          mkdir -p .deps/oosync
+          git -C .deps/oosync init
+          git -C .deps/oosync remote add origin "$REPO_URL"
+          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
+          git -C .deps/oosync checkout --detach FETCH_HEAD
+          test -f .deps/oosync/package.json
 
       - name: AGGRESSIVE DISK CLEANUP
         if: runner.os == 'Linux'
@@ -572,13 +582,18 @@ jobs:
           echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
           echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
 
-      - name: Checkout pinned oosync dependency
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.OOSYNC_REPOSITORY }}
-          ref: ${{ steps.oosync-ref.outputs.ref }}
-          token: ${{ github.token }}
-          path: .deps/oosync
+      - name: Fetch oosync dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
+          rm -rf .deps/oosync
+          mkdir -p .deps/oosync
+          git -C .deps/oosync init
+          git -C .deps/oosync remote add origin "$REPO_URL"
+          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
+          git -C .deps/oosync checkout --detach FETCH_HEAD
+          test -f .deps/oosync/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -643,13 +658,18 @@ jobs:
           echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
           echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
 
-      - name: Checkout pinned oosync dependency
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.OOSYNC_REPOSITORY }}
-          ref: ${{ steps.oosync-ref.outputs.ref }}
-          token: ${{ github.token }}
-          path: .deps/oosync
+      - name: Fetch oosync dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
+          rm -rf .deps/oosync
+          mkdir -p .deps/oosync
+          git -C .deps/oosync init
+          git -C .deps/oosync remote add origin "$REPO_URL"
+          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
+          git -C .deps/oosync checkout --detach FETCH_HEAD
+          test -f .deps/oosync/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "25"
