@@ -16,7 +16,7 @@ concurrency:
 
 env:
   OOSYNC_REPOSITORY: sboagy/oosync
-  OOSYNC_FALLBACK_REF: 6c413b7743a918f7f3113b045098cb8bc6b64177
+  OOSYNC_FALLBACK_REF: main
 
 jobs:
   # --------------------------------------------------------------------------
