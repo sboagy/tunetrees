@@ -15,6 +15,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  OOSYNC_REPOSITORY: sboagy/oosync
+  OOSYNC_FALLBACK_REF: 6c413b7743a918f7f3113b045098cb8bc6b64177
+
 jobs:
   lighthouse:
     name: Lighthouse Audit
@@ -24,6 +28,36 @@ jobs:
       # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Resolve oosync ref
+        id: oosync-ref
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
+          CANDIDATES=("$CANDIDATE_REF")
+          if [[ "$CANDIDATE_REF" =~ ^iss-([0-9]+)-oosync-(.+)$ ]]; then
+            CANDIDATES+=("iss-${BASH_REMATCH[1]}-repo-oosync-${BASH_REMATCH[2]}")
+          fi
+          for REF in "${CANDIDATES[@]}"; do
+            if git ls-remote --exit-code --heads "$REPO_URL" "$REF" >/dev/null 2>&1; then
+              echo "ref=$REF" >> "$GITHUB_OUTPUT"
+              echo "Using oosync ref '$REF'"
+              exit 0
+            fi
+          done
+          echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
+          echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
+
+      - name: Checkout pinned oosync dependency
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OOSYNC_REPOSITORY }}
+          ref: ${{ steps.oosync-ref.outputs.ref }}
+          token: ${{ github.token }}
+          path: .deps/oosync
 
       # 2. Setup Node.js
       - name: Setup Node.js
@@ -35,6 +69,9 @@ jobs:
       # 3. Install dependencies
       - name: Install dependencies
         run: npm ci
+
+      - name: Install pinned oosync dependency
+        run: npm install --no-save ./.deps/oosync
 
       # 4. Build production bundle
       - name: Build Application
