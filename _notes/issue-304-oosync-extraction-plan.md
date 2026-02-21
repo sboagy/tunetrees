@@ -195,3 +195,73 @@ Deliverable: release-ready extraction summary and evidence.
 1. **Protocol transition:** hard cut on this branch (no temporary backward compatibility for `genreFilter`).
 2. **Generic RPC param binding:** use explicit mapping objects in generated worker config.
 3. **Test refactor priority:** prioritize runtime extraction and TuneTrees functionality/E2E parity first; de-TuneTrees `oosync` test fixture cleanup is final-phase or follow-up PR work.
+
+---
+
+## Status Update (2026-02-20)
+
+### Phase 6 — Completed
+
+- TuneTrees sync parity validated in branch workflow.
+- Local E2E status (current): broad Playwright run is passing overall (`593` passed, `3` flaky, `54` skipped), with no recurrence of the prior sync runtime bootstrap failure signatures.
+
+### Phase 7 — Completed
+
+- Created standalone `oosync` package workspace in `iss-304-repo-oosync-f2` with:
+  - mirrored `src/` + `worker/` sources,
+  - package manifest (`name: "oosync"`), exports, scripts,
+  - package-local dependency installation for linked execution.
+- Linked package into TuneTrees via `npm link` / `npm link oosync`.
+- Removed TuneTrees direct source coupling for active paths:
+  - TS path aliases now resolve `@oosync/*` and `@oosync-worker/*` through `node_modules/oosync/*`.
+  - Vite `@oosync` alias now resolves to `node_modules/oosync/src`.
+  - Codegen scripts now execute from `node_modules/oosync/src/codegen-schema.ts`.
+  - Sync tests updated to import from `@oosync/*` aliases (no direct `../../../oosync/src/...` imports).
+
+### Validation evidence
+
+- `npm run codegen:schema:check` ✅
+- `npm run typecheck` ✅
+- `npx tsc -p worker/tsconfig.json --noEmit` ✅
+- `npx vitest run tests/lib/sync/casing.test.ts tests/lib/sync/table-meta.test.ts tests/lib/sync/adapters.test.ts` ✅ (`119` passed)
+- `npm run test:e2e:chromium:both` ✅ (`593` passed, `3` flaky, `54` skipped)
+- Standalone repo: `npm test` ✅ (`sync-core-no-table-hacks` guard)
+
+### Remaining
+
+- Phase 8 hardening:
+  - forbidden-term/runtime audit rerun,
+  - final migration note + rollback steps,
+  - optional follow-up to de-couple app-specific `oosync` test fixtures still intentionally deferred by decision.
+- Residual flaky E2E tests remain to be triaged separately (non-blocking for extraction status).
+
+### Phase 8 — Hardening update (2026-02-21)
+
+- Forbidden-term runtime audit rerun in standalone `oosync` (excluding tests/manual/generated):
+  - `grep -RniE "genre|repertoire|playlist|tune|practice_record|user_profile|selectedgenres|genrefilter" src worker/src --exclude='*.test.ts' --exclude='*.manual.ts' --exclude-dir='generated'`
+  - Result: clean (`audit-exit-1`, no matches).
+- Genericity fixes applied to standalone runtime:
+  - removed app-specific project names from schema-agnostic comments,
+  - replaced hardcoded RPC param cast branch (`p_genre_ids`) with generic cast inference in worker runtime.
+- Standalone package compile hardening:
+  - added missing dev dependency `@cloudflare/workers-types` required by `worker/tsconfig.json`.
+
+### Migration note (Phase 7/8 cutover state)
+
+- TuneTrees now consumes `oosync` through `node_modules/oosync/*` aliases and linked package scripts.
+- Standalone `oosync` repo is source for package/runtime evolution; TuneTrees no longer depends on in-repo `./oosync/src` paths for active sync integration.
+
+### Rollback plan (safe fallback)
+
+1. Unlink standalone package in TuneTrees:
+   - `npm unlink oosync`
+   - `npm install`
+2. Restore TuneTrees local-path integration:
+   - revert `tsconfig.app.json`, `tsconfig.node.json`, `worker/tsconfig.json`, `e2e/tsconfig.json`, `vite.config.ts`, `package.json` to `./oosync/...` paths/scripts.
+3. Restore direct local sync test imports where needed (if rollback includes test path rollback).
+4. Validate rollback:
+   - `npm run codegen:schema:check`
+   - `npm run typecheck`
+   - `npx tsc -p worker/tsconfig.json --noEmit`
+   - `npx vitest run tests/lib/sync/casing.test.ts tests/lib/sync/table-meta.test.ts tests/lib/sync/adapters.test.ts`
+5. Keep standalone repo unchanged; rollback is app-consumer-side only.
