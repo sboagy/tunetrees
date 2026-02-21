@@ -16,23 +16,15 @@ export interface SyncChange<TTableName extends string = TableName> {
   lastModifiedAt: string; // ISO timestamp from client
 }
 
-export interface SyncCollectionsOverride {
-  /** Explicit selected genres (snake_case IDs). Empty array = explicit empty selection. */
-  selectedGenres?: string[];
-}
+export type SyncCollectionsOverride = Record<string, string[]>;
 
-export interface SyncGenreFilter {
-  /** Effective genre list used for filtering catalog pulls. */
-  selectedGenreIds: string[];
-  /** Genres inferred from existing repertoire_tune relationships. */
-  repertoireGenreIds: string[];
-}
+export type SyncRpcParamOverrides = Record<string, Record<string, unknown>>;
 
 export interface SyncRequestOverrides {
-  /** Optional per-request collections override (e.g., selected genres). */
+  /** Optional per-request collection values keyed by collection name. */
   collectionsOverride?: SyncCollectionsOverride;
-  /** Optional genre filter for catalog pulls. */
-  genreFilter?: SyncGenreFilter;
+  /** Optional per-request RPC param overrides keyed by RPC function name. */
+  rpcParamOverrides?: SyncRpcParamOverrides;
   /** Optional allowlist of tables to pull for this sync. */
   pullTables?: string[];
 }
@@ -60,10 +52,10 @@ export interface SyncRequest<TTableName extends string = TableName> {
    */
   pageSize?: number;
 
-  /** Optional per-request overrides that affect pull behavior. */
+  /** Optional per-request collection values keyed by collection name. */
   collectionsOverride?: SyncCollectionsOverride;
-  /** Optional genre filter for catalog pulls. */
-  genreFilter?: SyncGenreFilter;
+  /** Optional per-request RPC param overrides keyed by RPC function name. */
+  rpcParamOverrides?: SyncRpcParamOverrides;
   /** Optional allowlist of tables to pull for this sync. */
   pullTables?: string[];
 }

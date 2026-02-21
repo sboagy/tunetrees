@@ -343,8 +343,6 @@ interface SyncContext {
   authUserId: string;
   collections: Record<string, Set<string>>;
   pullTables?: Set<string>;
-  /** Genre filter from client (effective genre list). */
-  genreFilter?: { selectedGenreIds: string[]; repertoireGenreIds: string[] };
   now: string;
   diagnosticsEnabled: boolean;
   perfDebugEnabled: boolean;
@@ -1158,15 +1156,12 @@ async function fetchChangedRowsFromTable(
 
     // Map params - IMPORTANT: maintain order matching function signature
     if (rule.params.includes("genreIds")) {
-      // Use effective genre filter from payload if available, otherwise fall back to ctx.collections
-      const effectiveGenres =
-        ctx.genreFilter?.selectedGenreIds ??
-        (ctx.collections.selectedGenres
-          ? Array.from(ctx.collections.selectedGenres)
-          : []);
+      const effectiveGenres = ctx.collections.selectedGenres
+        ? Array.from(ctx.collections.selectedGenres)
+        : [];
       rpcParams.p_genre_ids = effectiveGenres;
       debug.log(
-        `[RPC] ${rule.functionName}: ${effectiveGenres.length} genres from ${ctx.genreFilter ? "payload" : "collections"}`
+        `[RPC] ${rule.functionName}: ${effectiveGenres.length} genres from collections`
       );
     }
 
@@ -1340,19 +1335,13 @@ async function handleSync(
       "sync.collections"
     );
 
-    if (
-      payload.collectionsOverride &&
-      "selectedGenres" in payload.collectionsOverride
-    ) {
-      const selected = payload.collectionsOverride.selectedGenres ?? [];
-      collections.selectedGenres = new Set(selected.map((g) => String(g)));
-    }
-
-    if (payload.genreFilter) {
-      const selected = payload.genreFilter.selectedGenreIds ?? [];
-      const repertoire = payload.genreFilter.repertoireGenreIds ?? [];
-      const effective = [...selected, ...repertoire].map((g) => String(g));
-      collections.selectedGenres = new Set(effective);
+    if (payload.collectionsOverride) {
+      for (const [collectionName, values] of Object.entries(
+        payload.collectionsOverride
+      )) {
+        const asArray = Array.isArray(values) ? values : [];
+        collections[collectionName] = new Set(asArray.map((v) => String(v)));
+      }
     }
 
     const pullTables = payload.pullTables
@@ -1372,14 +1361,11 @@ async function handleSync(
       authUserId,
       collections,
       pullTables,
-      genreFilter: payload.genreFilter,
       now,
       diagnosticsEnabled,
       perfDebugEnabled,
       perfMinDurationMs,
     };
-
-    // Genre filter is passed to RPC functions when filtering note/reference tables
 
     // PUSH: Apply client changes
     const pushStartedAt = Date.now();
