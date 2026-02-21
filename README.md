@@ -75,6 +75,7 @@ See [Developer Setup](docs/development/setup.md) and [Deployment](docs/developme
 - **[User Guide](docs/user/getting-started.md)** — Getting started, features, FAQ
 - **[Developer Setup](docs/development/setup.md)** — Run locally, contribute
 - **[Architecture](docs/development/architecture.md)** — System design
+- **[oosync Config Reference](oosync/README.md)** — `oosync.codegen.config.json` and worker `paramMap` bindings
 - **[Full Docs](docs/README.md)** — Complete documentation index
 
 ## Scripts

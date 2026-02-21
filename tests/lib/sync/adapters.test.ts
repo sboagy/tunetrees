@@ -4,8 +4,6 @@
  * @module tests/lib/sync/adapters.test
  */
 
-import { SYNCABLE_TABLES } from "@sync-schema/table-meta";
-import { beforeEach, describe, expect, it } from "vitest";
 import {
   batchToLocal,
   batchToRemote,
@@ -14,7 +12,9 @@ import {
   getAdapter,
   getRegisteredTables,
   hasAdapter,
-} from "../../../oosync/src/sync/adapters";
+} from "@oosync/sync/adapters";
+import { SYNCABLE_TABLES } from "@sync-schema/table-meta";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ensureSyncRuntimeConfigured } from "../../../src/lib/sync/runtime-config";
 
 ensureSyncRuntimeConfigured();

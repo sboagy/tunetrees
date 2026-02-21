@@ -37,6 +37,7 @@ import { log } from "../logger";
 import { supabase } from "../supabase/client";
 import {
   clearOldOutboxItems,
+  ensureSyncRuntimeConfigured,
   SyncInProgressError,
   type SyncService,
   startSyncWorker,
@@ -1384,6 +1385,7 @@ export const AuthProvider: ParentComponent = (props) => {
       };
 
       const includeTables = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
+      ensureSyncRuntimeConfigured();
       await collectDbInitSnapshot("beforeClearOldOutboxItems", {
         includeTables,
       });

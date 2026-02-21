@@ -67,6 +67,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "id",
     },
+    selectedGenres: {
+      table: "user_genre_selection",
+      idColumn: "genre_id",
+      ownerColumn: "user_id",
+    },
   },
   pull: {
     tableRules: {
@@ -81,7 +86,24 @@ export const WORKER_SYNC_CONFIG = {
       note: {
         kind: "rpc",
         functionName: "sync_get_user_notes",
-        params: ["userId", "genreIds"],
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       plugin: {
         kind: "orEqUserIdOrTrue",
@@ -104,7 +126,24 @@ export const WORKER_SYNC_CONFIG = {
       reference: {
         kind: "rpc",
         functionName: "sync_get_user_references",
-        params: ["userId", "genreIds"],
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       repertoire: {
         kind: "eqUserId",
@@ -544,6 +583,10 @@ export const WORKER_SYNC_CONFIG = {
               kind: "int",
             },
           ],
+        },
+        bindAuthUserIdProps: ["id"],
+        upsert: {
+          omitSetProps: ["id"],
         },
       },
     },

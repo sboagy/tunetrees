@@ -132,7 +132,7 @@ async function getEffectiveGenreFilterInitialSync(params: {
   db: SqliteDatabase;
   supabase: SupabaseClient;
   userId: string;
-}): Promise<{ effective: string[]; repertoireGenres: string[] }> {
+}): Promise<{ effective: string[] }> {
   const { db, supabase, userId } = params;
 
   // Query LOCAL db for user genre selection and repertoire defaults
@@ -170,14 +170,13 @@ async function getEffectiveGenreFilterInitialSync(params: {
 
   return {
     effective: Array.from(effective),
-    repertoireGenres: Array.from(new Set(repertoireTuneGenres.map(String))),
   };
 }
 
 async function getEffectiveGenreFilterIncrementalSync(params: {
   db: SqliteDatabase;
   userId: string;
-}): Promise<{ effective: string[]; repertoireGenres: string[] }> {
+}): Promise<{ effective: string[] }> {
   const { db, userId } = params;
 
   const [selectedGenres, repertoireDefaultGenres, repertoireTuneGenres] =
@@ -195,7 +194,6 @@ async function getEffectiveGenreFilterIncrementalSync(params: {
 
   return {
     effective: Array.from(effective),
-    repertoireGenres: Array.from(new Set(repertoireTuneGenres.map(String))),
   };
 }
 
@@ -207,7 +205,7 @@ export async function buildGenreFilterOverrides(params: {
 }): Promise<SyncRequestOverrides | null> {
   const { db, supabase, userId, isInitialSync } = params;
 
-  const { effective, repertoireGenres } = isInitialSync
+  const { effective } = isInitialSync
     ? await getEffectiveGenreFilterInitialSync({ db, supabase, userId })
     : await getEffectiveGenreFilterIncrementalSync({ db, userId });
 
@@ -221,9 +219,8 @@ export async function buildGenreFilterOverrides(params: {
   }
 
   return {
-    genreFilter: {
-      selectedGenreIds: effective,
-      repertoireGenreIds: repertoireGenres,
+    collectionsOverride: {
+      selectedGenres: effective,
     },
   };
 }

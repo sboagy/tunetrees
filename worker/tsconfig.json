@@ -12,8 +12,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@oosync/*": ["../oosync/src/*"],
-      "@oosync-worker/*": ["../oosync/worker/src/*"],
+      "@oosync/*": ["../node_modules/oosync/src/*"],
+      "@oosync-worker/*": ["../node_modules/oosync/worker/src/*"],
       "@shared-generated/*": ["../shared/generated/*"],
       "@sync-schema/*": ["../shared/sync-schema/*"]
     }
@@ -21,7 +21,7 @@
   "include": [
     "src/**/*",
     "../shared/generated/**/*",
-    "../oosync/src/**/*",
-    "../oosync/worker/src/**/*"
+    "../node_modules/oosync/src/shared/**/*",
+    "../node_modules/oosync/worker/src/**/*"
   ]
 }

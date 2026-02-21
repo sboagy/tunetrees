@@ -1,5 +1,5 @@
 // Wrangler entrypoint.
-// The worker implementation lives in `oosync/worker/*` (future-extractable),
+// The worker implementation is consumed from the linked `oosync` package (`@oosync-worker/*`),
 // but ALL generated artifacts live in this consumer package.
 
 import createWorker from "@oosync-worker/index";
