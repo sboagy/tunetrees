@@ -48,6 +48,11 @@
   "worker": {
     "config": {
       "collections": {
+        "userProfileIds": {
+          "table": "user_profile",
+          "idColumn": "id",
+          "ownerColumn": "id"
+        },
         "selectedGenres": {
           "table": "user_genre_selection",
           "idColumn": "genre_id",
@@ -113,11 +118,21 @@
               "p_limit": { "source": "pageLimit" },
               "p_offset": { "source": "pageOffset" }
             }
+          },
+          "user_profile": {
+            "kind": "eqUserId",
+            "column": "id"
           }
         }
       },
       "push": {
         "tableRules": {
+          "user_profile": {
+            "bindAuthUserIdProps": ["id"],
+            "upsert": {
+              "omitSetProps": ["id"]
+            }
+          },
           "user_genre_selection": {
             "denyDelete": false
           },

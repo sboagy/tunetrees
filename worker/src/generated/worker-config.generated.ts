@@ -584,6 +584,10 @@ export const WORKER_SYNC_CONFIG = {
             },
           ],
         },
+        bindAuthUserIdProps: ["id"],
+        upsert: {
+          omitSetProps: ["id"],
+        },
       },
     },
   },

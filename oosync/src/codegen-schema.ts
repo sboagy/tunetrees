@@ -1416,16 +1416,6 @@ function buildDefaultWorkerConfig(params: {
       }
     }
 
-    if (!tableOwnerColumn.has(tableName) && tableName === "user_profile") {
-      const idCol = colByName.get("id");
-      if (idCol) {
-        tableOwnerColumn.set(tableName, {
-          column: "id",
-          kind: "eqUserId",
-        });
-      }
-    }
-
     if (!tableOwnerColumn.has(tableName)) {
       for (const cand of ownerCandidates) {
         const c = colByName.get(cand);

@@ -182,9 +182,7 @@ export async function applyRemoteChangesToLocalDb(params: {
                     (k) => (table as any)[toCamelCase(k)]
                   ),
                   set:
-                    change.table === "user_profile" &&
-                    compositeKeys.length === 1 &&
-                    compositeKeys[0] === "id"
+                    compositeKeys.length === 1 && compositeKeys[0] === "id"
                       ? sanitizedData
                       : ((): Record<string, unknown> => {
                           const { id: _ignoredId, ...rest } =

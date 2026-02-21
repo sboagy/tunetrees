@@ -337,9 +337,9 @@ export interface Env {
 
 /** Context passed through sync operations */
 interface SyncContext {
-  /** Supabase auth uid (user_profile.id, the PK). */
+  /** Authenticated user identifier from JWT subject. */
   userId: string;
-  /** Supabase auth uid (JWT sub); same as userId after eliminating user_profile.id. */
+  /** Authenticated user identifier from JWT subject. */
   authUserId: string;
   collections: Record<string, Set<string>>;
   rpcParamOverrides?: Record<string, Record<string, unknown>>;
@@ -612,24 +612,8 @@ function remapUserRefsForPush(
   data: Record<string, unknown>,
   _ctx: SyncContext
 ): Record<string, unknown> {
-  // userId === authUserId (both are Supabase auth UUID).
-  // No remapping needed - user FKs reference user_profile.id directly.
+  // Reserved for optional future generic remapping hooks.
   return data;
-}
-
-function remapUserProfileForPush(
-  tableName: string,
-  data: Record<string, unknown>,
-  ctx: SyncContext
-): Record<string, unknown> {
-  if (tableName !== "user_profile") return data;
-
-  const result = { ...data };
-  // user_profile.id is the canonical PK and should match authenticated user id.
-  if (ctx.authUserId) {
-    result.id = ctx.authUserId;
-  }
-  return result;
 }
 
 /**
@@ -758,7 +742,15 @@ async function applyChange(
     change.data as Record<string, unknown>
   );
   data = remapUserRefsForPush(data, ctx);
-  data = remapUserProfileForPush(change.table, data, ctx);
+
+  const bindAuthUserIdProps = pushRule?.bindAuthUserIdProps ?? [];
+  if (bindAuthUserIdProps.length > 0 && ctx.authUserId) {
+    const boundData = { ...data };
+    for (const prop of bindAuthUserIdProps) {
+      boundData[prop] = ctx.authUserId;
+    }
+    data = boundData;
+  }
 
   // Normalize timestamps for Postgres (add 'Z' suffix if missing, etc.)
   data = normalizeRowForSync(change.table, data);
@@ -791,13 +783,7 @@ async function applyChange(
   } else {
     const omitSetProps = pushRule?.upsert?.omitSetProps;
     const keepProps = pushRule?.upsert?.retryMinimalPayloadKeepProps;
-    const resolvedOmitSetProps =
-      change.table === "user_profile"
-        ? Array.from(new Set([...(omitSetProps ?? []), "id"]))
-        : omitSetProps;
-    const upsertOpts = resolvedOmitSetProps
-      ? ({ omitSetProps: resolvedOmitSetProps } as const)
-      : undefined;
+    const upsertOpts = omitSetProps ? ({ omitSetProps } as const) : undefined;
 
     try {
       // Use a savepoint so a failed statement doesn't abort the outer transaction.
@@ -1007,11 +993,13 @@ async function fetchTableForInitialSyncPage(
   const conditions = buildUserFilter({
     tableName,
     table: t,
-    userId: ctx.userId, // userId === authUserId after eliminating user_profile.id
+    userId: ctx.userId,
     collections: ctx.collections,
   });
   if (conditions === null) {
-    debug.log(`[PULL:INITIAL] Skipping ${tableName} (no repertoires for user)`);
+    debug.log(
+      `[PULL:INITIAL] Skipping ${tableName} (no matching rows for user)`
+    );
     return [];
   }
 
@@ -1224,12 +1212,12 @@ async function fetchChangedRowsFromTable(
   const userConditions = buildUserFilter({
     tableName,
     table: t,
-    userId: ctx.userId, // userId === authUserId after eliminating user_profile.id
+    userId: ctx.userId,
     collections: ctx.collections,
   });
   if (userConditions === null) {
-    debug.log(`[PULL:INCR] Skipping ${tableName} (no repertoires for user)`);
-    return []; // Skip table (e.g., no repertoires)
+    debug.log(`[PULL:INCR] Skipping ${tableName} (no matching rows for user)`);
+    return [];
   }
 
   const timeCondition = gt(t.lastModifiedAt, lastSyncAt);
@@ -1349,8 +1337,7 @@ async function handleSync(
   await db.transaction(async (tx) => {
     const txStartedAt = Date.now();
 
-    // After eliminating user_profile.id, authUserId IS the user identifier.
-    // No resolution needed - user_profile.id is the PK.
+    // JWT subject is used as authenticated user identifier.
     const authUserId = userId;
 
     const collectionsStartedAt = Date.now();

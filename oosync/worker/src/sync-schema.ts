@@ -101,6 +101,8 @@ export interface IPushUpsertRule {
 
 export interface IPushTableRule {
   denyDelete?: boolean;
+  /** Payload properties that must be set to authenticated user id before push. */
+  bindAuthUserIdProps?: string[];
   upsert?: IPushUpsertRule;
   sanitize?: IPushSanitizeRule;
 }
@@ -167,7 +169,7 @@ export function createSyncSchema(deps: SyncSchemaDeps) {
     const collections = getWorkerConfig().collections ?? {};
     const result: Record<string, Set<string>> = {};
 
-    // Load user collections (repertoires, etc.)
+    // Load configured per-user collections.
     for (const [name, cfg] of Object.entries(collections)) {
       const table = params.tables[cfg.table];
       if (!table) {

@@ -73,117 +73,12 @@ export function snakifyKeys<T extends Record<string, unknown>>(
 }
 
 /**
- * Precomputed key maps for performance optimization on hot paths.
- * These avoid repeated regex operations for known table schemas.
+ * Optional key maps for performance optimization on hot paths.
  *
- * Maps: snake_case → camelCase
+ * Kept intentionally empty in core `oosync` to remain schema-agnostic.
+ * Consumer apps may populate equivalent maps in their own layer if needed.
  */
-export const COMMON_KEYS_SNAKE_TO_CAMEL: Record<string, string> = {
-  // Common across many tables
-  id: "id",
-  user_ref: "userRef",
-  user_id: "userId",
-  tune_ref: "tuneRef",
-  tune_id: "tuneId",
-  repertoire_ref: "repertoireRef",
-  repertoire_id: "repertoireId",
-  last_modified_at: "lastModifiedAt",
-  sync_version: "syncVersion",
-  device_id: "deviceId",
-  deleted: "deleted",
-  created_at: "createdAt",
-  updated_at: "updatedAt",
-
-  // tune table
-  private_for: "privateFor",
-  title: "title",
-  type: "type",
-  structure: "structure",
-  mode: "mode",
-  incipit: "incipit",
-  genre: "genre",
-  composer: "composer",
-  artist: "artist",
-  id_foreign: "idForeign",
-  release_year: "releaseYear",
-  learned: "learned",
-  practiced: "practiced",
-  quality: "quality",
-  ease_factor: "easeFactor",
-  interval: "interval",
-  repetitions: "repetitions",
-  review_date: "reviewDate",
-  backup_practiced: "backupPracticed",
-  external_ref: "externalRef",
-  note_private: "notePrivate",
-  note_public: "notePublic",
-  tags: "tags",
-  recall_eval: "recallEval",
-
-  // practice_record table
-  // tune_ref, repertoire_ref already covered
-  // practiced already covered
-
-  // daily_practice_queue table
-  queue_date: "queueDate",
-  window_start_utc: "windowStartUtc",
-  window_end_utc: "windowEndUtc",
-  bucket: "bucket",
-  order_index: "orderIndex",
-  snapshot_coalesced_ts: "snapshotCoalescedTs",
-  scheduled_snapshot: "scheduledSnapshot",
-  latest_due_snapshot: "latestDueSnapshot",
-  acceptable_delinquency_window_snapshot: "acceptableDelinquencyWindowSnapshot",
-  tz_offset_minutes_snapshot: "tzOffsetMinutesSnapshot",
-  generated_at: "generatedAt",
-  completed_at: "completedAt",
-  exposures_required: "exposuresRequired",
-  exposures_completed: "exposuresCompleted",
-  outcome: "outcome",
-  active: "active",
-
-  // repertoire table
-  name: "name",
-  instrument_ref: "instrumentRef",
-  genre_default: "genreDefault",
-  sr_alg_type: "srAlgType",
-
-  // note table
-  created_date: "createdDate",
-  note_text: "noteText",
-  public: "public",
-  favorite: "favorite",
-  display_order: "displayOrder",
-
-  // reference table
-  ref_type: "refType",
-  url: "url",
-  // display_order already covered
-
-  // user_profile table
-  email: "email",
-  avatar_url: "avatarUrl",
-  acceptable_delinquency_window: "acceptableDelinquencyWindow",
-
-  // table_state / table_transient_data
-  screen_size: "screenSize",
-  purpose: "purpose",
-  state_json: "stateJson",
-
-  // prefs tables
-  alg_type: "algType",
-  // various pref fields...
-
-  // genre / tune_type
-  region: "region",
-  description: "description",
-  genre_id: "genreId",
-  tune_type_id: "tuneTypeId",
-
-  // instrument
-  private_to_user: "privateToUser",
-  instrument: "instrument",
-};
+export const COMMON_KEYS_SNAKE_TO_CAMEL: Record<string, string> = {};
 
 /**
  * Precomputed key maps: camelCase → snake_case
@@ -198,7 +93,7 @@ export const COMMON_KEYS_CAMEL_TO_SNAKE: Record<string, string> =
   );
 
 /**
- * Fast camelize using precomputed map with fallback to regex
+ * Fast camelize using optional precomputed map with fallback to regex
  */
 export function camelizeKeysFast<T extends Record<string, unknown>>(
   obj: T
@@ -212,7 +107,7 @@ export function camelizeKeysFast<T extends Record<string, unknown>>(
 }
 
 /**
- * Fast snakify using precomputed map with fallback to regex
+ * Fast snakify using optional precomputed map with fallback to regex
  */
 export function snakifyKeysFast<T extends Record<string, unknown>>(
   obj: T
