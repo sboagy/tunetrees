@@ -17,7 +17,7 @@ concurrency:
 
 env:
   OOSYNC_REPOSITORY: sboagy/oosync
-  OOSYNC_FALLBACK_REF: main
+  OOSYNC_FALLBACK_REF: iss-304-repo-oosync-f2
 
 jobs:
   lighthouse:
