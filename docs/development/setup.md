@@ -158,6 +158,12 @@ npm run typecheck && npm run lint && npm run format && npm run test
 
 ## Troubleshooting
 
+## oosync dependency workflow
+
+For the supported multi-repo workflow (pinned dependency updates, local linking, and CI behavior), see:
+
+- `docs/development/oosync-workflow.md`
+
 ### "Cannot find module" errors
 ```bash
 rm -rf node_modules

@@ -14,10 +14,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  OOSYNC_REPOSITORY: sboagy/oosync
-  OOSYNC_FALLBACK_REF: iss-304-repo-oosync-f2
-
 jobs:
   # --------------------------------------------------------------------------
   # JOB 1: STANDARD SHARDED TESTS (Dev Server)
@@ -44,41 +40,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Resolve oosync ref
-        id: oosync-ref
-        shell: bash
-        env:
-          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          CANDIDATES=("$CANDIDATE_REF")
-          if [[ "$CANDIDATE_REF" =~ ^iss-([0-9]+)-oosync-(.+)$ ]]; then
-            CANDIDATES+=("iss-${BASH_REMATCH[1]}-repo-oosync-${BASH_REMATCH[2]}")
-          fi
-          for REF in "${CANDIDATES[@]}"; do
-            if git ls-remote --exit-code --heads "$REPO_URL" "$REF" >/dev/null 2>&1; then
-              echo "ref=$REF" >> "$GITHUB_OUTPUT"
-              echo "Using oosync ref '$REF'"
-              exit 0
-            fi
-          done
-          echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
-          echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
-
-      - name: Fetch oosync dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          rm -rf .deps/oosync
-          mkdir -p .deps/oosync
-          git -C .deps/oosync init
-          git -C .deps/oosync remote add origin "$REPO_URL"
-          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
-          git -C .deps/oosync checkout --detach FETCH_HEAD
-          test -f .deps/oosync/package.json
-
       - name: AGGRESSIVE DISK CLEANUP
         if: runner.os == 'Linux'
         run: |
@@ -96,9 +57,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install pinned oosync dependency
-        run: npm install --no-save ./.deps/oosync
 
       # --- Supabase Setup ---
       - name: Cache Supabase CLI
@@ -274,41 +232,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Resolve oosync ref
-        id: oosync-ref
-        shell: bash
-        env:
-          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          CANDIDATES=("$CANDIDATE_REF")
-          if [[ "$CANDIDATE_REF" =~ ^iss-([0-9]+)-oosync-(.+)$ ]]; then
-            CANDIDATES+=("iss-${BASH_REMATCH[1]}-repo-oosync-${BASH_REMATCH[2]}")
-          fi
-          for REF in "${CANDIDATES[@]}"; do
-            if git ls-remote --exit-code --heads "$REPO_URL" "$REF" >/dev/null 2>&1; then
-              echo "ref=$REF" >> "$GITHUB_OUTPUT"
-              echo "Using oosync ref '$REF'"
-              exit 0
-            fi
-          done
-          echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
-          echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
-
-      - name: Fetch oosync dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          rm -rf .deps/oosync
-          mkdir -p .deps/oosync
-          git -C .deps/oosync init
-          git -C .deps/oosync remote add origin "$REPO_URL"
-          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
-          git -C .deps/oosync checkout --detach FETCH_HEAD
-          test -f .deps/oosync/package.json
-
       - name: AGGRESSIVE DISK CLEANUP
         if: runner.os == 'Linux'
         run: |
@@ -325,9 +248,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install pinned oosync dependency
-        run: npm install --no-save ./.deps/oosync
 
       # --- Self-Contained Supabase Setup (Required for parallelism) ---
       - name: Cache Supabase CLI
@@ -560,41 +480,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Resolve oosync ref
-        id: oosync-ref
-        shell: bash
-        env:
-          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          CANDIDATES=("$CANDIDATE_REF")
-          if [[ "$CANDIDATE_REF" =~ ^iss-([0-9]+)-oosync-(.+)$ ]]; then
-            CANDIDATES+=("iss-${BASH_REMATCH[1]}-repo-oosync-${BASH_REMATCH[2]}")
-          fi
-          for REF in "${CANDIDATES[@]}"; do
-            if git ls-remote --exit-code --heads "$REPO_URL" "$REF" >/dev/null 2>&1; then
-              echo "ref=$REF" >> "$GITHUB_OUTPUT"
-              echo "Using oosync ref '$REF'"
-              exit 0
-            fi
-          done
-          echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
-          echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
-
-      - name: Fetch oosync dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          rm -rf .deps/oosync
-          mkdir -p .deps/oosync
-          git -C .deps/oosync init
-          git -C .deps/oosync remote add origin "$REPO_URL"
-          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
-          git -C .deps/oosync checkout --detach FETCH_HEAD
-          test -f .deps/oosync/package.json
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -603,9 +488,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install pinned oosync dependency
-        run: npm install --no-save ./.deps/oosync
 
       - name: Build Application
         run: npm run build
@@ -635,48 +517,11 @@ jobs:
     environment: vite_pwa_env
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve oosync ref
-        id: oosync-ref
-        shell: bash
-        env:
-          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          CANDIDATES=("$CANDIDATE_REF")
-          if [[ "$CANDIDATE_REF" =~ ^iss-([0-9]+)-oosync-(.+)$ ]]; then
-            CANDIDATES+=("iss-${BASH_REMATCH[1]}-repo-oosync-${BASH_REMATCH[2]}")
-          fi
-          for REF in "${CANDIDATES[@]}"; do
-            if git ls-remote --exit-code --heads "$REPO_URL" "$REF" >/dev/null 2>&1; then
-              echo "ref=$REF" >> "$GITHUB_OUTPUT"
-              echo "Using oosync ref '$REF'"
-              exit 0
-            fi
-          done
-          echo "ref=${{ env.OOSYNC_FALLBACK_REF }}" >> "$GITHUB_OUTPUT"
-          echo "No matching oosync branch found for '$CANDIDATE_REF'; falling back to '${{ env.OOSYNC_FALLBACK_REF }}'"
-
-      - name: Fetch oosync dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          REPO_URL="https://x-access-token:${{ github.token }}@github.com/${{ env.OOSYNC_REPOSITORY }}.git"
-          rm -rf .deps/oosync
-          mkdir -p .deps/oosync
-          git -C .deps/oosync init
-          git -C .deps/oosync remote add origin "$REPO_URL"
-          git -C .deps/oosync fetch --depth=1 origin "${{ steps.oosync-ref.outputs.ref }}"
-          git -C .deps/oosync checkout --detach FETCH_HEAD
-          test -f .deps/oosync/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: "25"
           cache: "npm"
       - run: npm ci
-      - name: Install pinned oosync dependency
-        run: npm install --no-save ./.deps/oosync
       - name: Install Worker Dependencies
         run: cd worker && npm ci
       - name: Deploy Worker

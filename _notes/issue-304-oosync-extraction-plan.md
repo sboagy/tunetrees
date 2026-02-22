@@ -274,16 +274,21 @@ Deliverable: release-ready extraction summary and evidence.
 
 #### Short term (now; branch stabilization)
 
-- **Source of truth:** branch-first resolution from current workflow branch (`github.head_ref || github.ref_name`) with deterministic fallback to published branch `iss-304-repo-oosync-f2` (currently at commit `6c413b7743a918f7f3113b045098cb8bc6b64177`).
-- **CI/deploy strategy:** in TuneTrees GitHub Actions, resolve matching branch in `sboagy/oosync`; if found, checkout that branch; if not found, checkout fallback ref; then run `npm install --no-save ./.deps/oosync` after `npm ci`.
-- **Local dev strategy:** continue using `npm link` (`npm link` in oosync repo, `npm link oosync` in TuneTrees).
-- **Operational rule:** keep fallback ref updated only after oosync commit passes its own tests and TuneTrees targeted sync checks.
+- **Status:** superseded by medium-term pinned dependency workflow (2026-02-22).
+- **Historical note:** branch-resolution checkout logic was used temporarily for extraction stabilization and is now removed from CI.
 
 #### Medium term (next 1–2 milestones)
 
 - **Versioned release cadence:** tag oosync releases (`v0.x.y`) and consume immutable tags/SHAs in TuneTrees CI instead of floating branches.
 - **Dependency declaration:** add explicit `oosync` dependency in TuneTrees `package.json` using git tag/SHA (or keep checkout-install path until npm publish is ready).
 - **Automation:** add a small update workflow/script to propose SHA/tag bumps and run TuneTrees smoke checks (`codegen:schema:check`, typecheck, sync-focused tests).
+
+#### Medium term implementation status (2026-02-22)
+
+- TuneTrees now declares `oosync` as a pinned immutable tarball dependency in `package.json` (`https://codeload.github.com/sboagy/oosync/tar.gz/<sha>`).
+- CI and Lighthouse workflows now rely on `npm ci` for dependency installation and no longer include custom `.deps/oosync` checkout/fallback steps.
+- Added dependency bump helper script: `npm run deps:oosync:update -- <tag-or-sha>`.
+- Added explicit developer workflow documentation: `docs/development/oosync-workflow.md`.
 
 #### Long term (package maturity)
 
