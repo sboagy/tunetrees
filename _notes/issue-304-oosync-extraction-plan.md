@@ -229,9 +229,9 @@ Deliverable: release-ready extraction summary and evidence.
 
 ### Remaining
 
-- Phase 8 hardening:
-  - forbidden-term/runtime audit rerun,
-  - final migration note + rollback steps,
+- Phase 8 hardening closeout:
+  - ✅ forbidden-term/runtime audit rerun completed,
+  - ✅ final migration note + rollback steps captured,
   - optional follow-up to de-couple app-specific `oosync` test fixtures still intentionally deferred by decision.
 - Residual flaky E2E tests remain to be triaged separately (non-blocking for extraction status).
 
@@ -245,6 +245,10 @@ Deliverable: release-ready extraction summary and evidence.
   - replaced hardcoded RPC param cast branch (`p_genre_ids`) with generic cast inference in worker runtime.
 - Standalone package compile hardening:
   - added missing dev dependency `@cloudflare/workers-types` required by `worker/tsconfig.json`.
+- Fresh revalidation evidence (post-extraction CI stabilization):
+  - `npm --prefix /Users/sboag/gittt/oosync.worktrees/iss-304-repo-oosync-f2 test` ✅ (`sync-core-no-table-hacks` guard)
+  - `npx tsc -p /Users/sboag/gittt/oosync.worktrees/iss-304-repo-oosync-f2/worker/tsconfig.json --noEmit` ✅
+  - Cross-repo CI dependency source now resolves to published branch `iss-304-repo-oosync-f2` (with branch-first matching still preferred).
 
 ### Migration note (Phase 7/8 cutover state)
 
@@ -270,7 +274,7 @@ Deliverable: release-ready extraction summary and evidence.
 
 #### Short term (now; branch stabilization)
 
-- **Source of truth:** branch-first resolution from current workflow branch (`github.head_ref || github.ref_name`) with deterministic fallback to pinned ref (`6c413b7743a918f7f3113b045098cb8bc6b64177`).
+- **Source of truth:** branch-first resolution from current workflow branch (`github.head_ref || github.ref_name`) with deterministic fallback to published branch `iss-304-repo-oosync-f2` (currently at commit `6c413b7743a918f7f3113b045098cb8bc6b64177`).
 - **CI/deploy strategy:** in TuneTrees GitHub Actions, resolve matching branch in `sboagy/oosync`; if found, checkout that branch; if not found, checkout fallback ref; then run `npm install --no-save ./.deps/oosync` after `npm ci`.
 - **Local dev strategy:** continue using `npm link` (`npm link` in oosync repo, `npm link oosync` in TuneTrees).
 - **Operational rule:** keep fallback ref updated only after oosync commit passes its own tests and TuneTrees targeted sync checks.
