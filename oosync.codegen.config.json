@@ -47,6 +47,18 @@
   },
   "worker": {
     "config": {
+      "collections": {
+        "userProfileIds": {
+          "table": "user_profile",
+          "idColumn": "id",
+          "ownerColumn": "id"
+        },
+        "selectedGenres": {
+          "table": "user_genre_selection",
+          "idColumn": "genre_id",
+          "ownerColumn": "user_id"
+        }
+      },
       "pull": {
         "tableRules": {
           "plugin": {
@@ -82,17 +94,45 @@
           "note": {
             "kind": "rpc",
             "functionName": "sync_get_user_notes",
-            "params": ["userId", "genreIds"]
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_genre_ids": {
+                "source": "collection",
+                "collection": "selectedGenres"
+              },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
           },
           "reference": {
             "kind": "rpc",
             "functionName": "sync_get_user_references",
-            "params": ["userId", "genreIds"]
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_genre_ids": {
+                "source": "collection",
+                "collection": "selectedGenres"
+              },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
+          "user_profile": {
+            "kind": "eqUserId",
+            "column": "id"
           }
         }
       },
       "push": {
         "tableRules": {
+          "user_profile": {
+            "bindAuthUserIdProps": ["id"],
+            "upsert": {
+              "omitSetProps": ["id"]
+            }
+          },
           "user_genre_selection": {
             "denyDelete": false
           },

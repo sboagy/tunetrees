@@ -50,7 +50,7 @@ jobs:
           npm install -g @lhci/cli@0.13.x
           lhci autorun
         env:
-          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          LHCI_GITHUB_APP_TOKEN: ${{ github.token }}
 
       # 6. Upload Lighthouse reports
       - name: Upload Lighthouse Reports

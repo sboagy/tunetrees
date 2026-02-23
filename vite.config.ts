@@ -210,9 +210,10 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
-        "@oosync": path.resolve(__dirname, "./oosync/src"),
+        "@oosync": path.resolve(__dirname, "./node_modules/oosync/src"),
         "@sync-schema": path.resolve(__dirname, "./shared/sync-schema"),
         "@shared-generated": path.resolve(__dirname, "./shared/generated"),
+        "solid-sonner": path.resolve(__dirname, "./node_modules/solid-sonner"),
       },
     },
     // Build optimizations

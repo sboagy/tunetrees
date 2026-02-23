@@ -4,7 +4,6 @@
  * @module tests/lib/sync/casing.test
  */
 
-import { describe, expect, it } from "vitest";
 import {
   COMMON_KEYS_CAMEL_TO_SNAKE,
   COMMON_KEYS_SNAKE_TO_CAMEL,
@@ -14,7 +13,8 @@ import {
   snakifyKeysFast,
   toCamelCase,
   toSnakeCase,
-} from "../../../oosync/src/sync/casing";
+} from "@oosync/sync/casing";
+import { describe, expect, it } from "vitest";
 
 describe("toCamelCase", () => {
   it("converts simple snake_case to camelCase", () => {
@@ -179,19 +179,29 @@ describe("COMMON_KEYS maps", () => {
     }
   });
 
-  it("covers common sync fields", () => {
-    const requiredSnakeKeys = [
-      "id",
-      "user_ref",
-      "tune_ref",
-      "repertoire_ref",
-      "last_modified_at",
-      "sync_version",
-      "deleted",
-    ];
-    for (const key of requiredSnakeKeys) {
-      expect(COMMON_KEYS_SNAKE_TO_CAMEL[key]).toBeDefined();
-    }
+  it("common sync fields convert correctly via fast-path helpers", () => {
+    const snakeInput = {
+      id: "abc",
+      user_ref: "u1",
+      tune_ref: "t1",
+      repertoire_ref: "r1",
+      last_modified_at: "2025-01-01T00:00:00Z",
+      sync_version: 3,
+      deleted: 0,
+    };
+
+    const camelized = camelizeKeysFast(snakeInput);
+    expect(camelized).toEqual({
+      id: "abc",
+      userRef: "u1",
+      tuneRef: "t1",
+      repertoireRef: "r1",
+      lastModifiedAt: "2025-01-01T00:00:00Z",
+      syncVersion: 3,
+      deleted: 0,
+    });
+
+    expect(snakifyKeysFast(camelized)).toEqual(snakeInput);
   });
 });
 

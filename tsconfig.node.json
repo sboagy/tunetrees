@@ -10,7 +10,7 @@
     /* Path Aliases (needed for oosync build) */
     "baseUrl": ".",
     "paths": {
-      "@oosync/*": ["./oosync/src/*"],
+      "@oosync/*": ["./node_modules/oosync/src/*"],
       "@shared-generated/*": ["./shared/generated/*"],
       "@sync-schema/*": ["./shared/sync-schema/*"]
     },
@@ -30,5 +30,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "oosync/src/**/*.ts"]
+  "include": ["vite.config.ts"]
 }
