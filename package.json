@@ -91,7 +91,7 @@
     "jose": "^6.1.3",
     "loglevel": "^1.9.2",
     "lucide-solid": "^0.575.0",
-    "oosync": "https://codeload.github.com/sboagy/oosync/tar.gz/12f1eacec9fca72122220a016d647c648a55411a",
+    "oosync": "https://codeload.github.com/sboagy/oosync/tar.gz/v0.0.0-alpha",
     "papaparse": "^5.5.3",
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.11",
