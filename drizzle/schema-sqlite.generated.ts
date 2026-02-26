@@ -92,6 +92,26 @@ export const genreTuneType = sqliteTable(
   (t) => [primaryKey({ columns: [t.genreId, t.tuneTypeId] })]
 );
 
+export const goal = sqliteTable(
+  "goal",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    privateFor: text("private_for").references(() => userProfile.id),
+    defaultTechnique: text("default_technique").notNull().default("fsrs"),
+    baseIntervals: text("base_intervals"),
+    deleted: integer("deleted").notNull().default(0),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    uniqueIndex("goal_name_owner_uniq").on(t.name, t.privateFor),
+    index("idx_goal_private_for").on(t.privateFor),
+  ]
+);
+
 export const instrument = sqliteTable(
   "instrument",
   {

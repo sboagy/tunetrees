@@ -42,6 +42,10 @@ const sidebarNavItems: SidebarNavItem[] = [
     href: "/user-settings/plugins",
   },
   {
+    title: "Goals",
+    href: "/user-settings/goals",
+  },
+  {
     title: "Account",
     href: "/user-settings/account",
   },

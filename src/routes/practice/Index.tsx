@@ -8,7 +8,7 @@
  */
 
 import { useLocation, useNavigate } from "@solidjs/router";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -37,6 +37,8 @@ import { RepertoireEditorDialog } from "../../components/repertoires/RepertoireE
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { getUserRepertoires } from "../../lib/db/queries/repertoires";
+import { type GoalRow, getGoals } from "../../lib/db/queries/user-settings";
+import { repertoireTune } from "../../lib/db/schema";
 import type { RepertoireWithSummary } from "../../lib/db/types";
 import { addTunesToQueue } from "../../lib/services/practice-queue";
 import { commitStagedEvaluations } from "../../lib/services/practice-recording";
@@ -208,6 +210,33 @@ const PracticeIndex: Component = () => {
     // After eliminating user_profile.id, just return the Supabase Auth UUID
     return user()?.id ?? null;
   };
+
+  // Goals: load once per user; used by the GoalBadge dropdown in the grid.
+  const [goalsData] = createResource(
+    () => {
+      const db = localDb();
+      const uid = userId();
+      return db && uid ? { db, uid } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getGoals(params.db, params.uid);
+    }
+  );
+
+  // Memo: goals keyed by name, user-owned rows take precedence over system rows.
+  const goalsMap = createMemo(() => {
+    const map = new Map<string, GoalRow>();
+    const goals = goalsData() ?? [];
+    // Insert system goals first, then user-owned (user overrides system for same name)
+    for (const g of goals) {
+      if (g.privateFor === null) map.set(g.name, g);
+    }
+    for (const g of goals) {
+      if (g.privateFor !== null) map.set(g.name, g);
+    }
+    return map;
+  });
 
   // Track in-flight staging to prevent submit before previews are persisted.
   const [stagingTuneIds, setStagingTuneIds] = createSignal<string[]>([]);
@@ -737,18 +766,25 @@ const PracticeIndex: Component = () => {
           `🗑️  [PracticeIndex] Cleared staged evaluation for tune ${tuneId}`
         );
       } else {
-        // Stage FSRS preview for actual evaluations
+        // Resolve goal and technique from the practice list and goals map.
+        // Falls back to "recall" / "fsrs" if data is not yet loaded.
+        const tuneEntry = practiceListData()?.find((e) => e.id === tuneId);
+        const tuneGoal = tuneEntry?.goal ?? "recall";
+        const goalDef = goalsMap().get(tuneGoal);
+        const technique = goalDef?.defaultTechnique ?? "fsrs";
+
+        // Stage scheduling preview
         await stagePracticeEvaluation(
           db,
           userIdVal,
           repertoireId,
           tuneId,
           evaluation,
-          "recall",
-          "fsrs"
+          tuneGoal,
+          technique
         );
         console.log(
-          `✅ [PracticeIndex] Staged FSRS preview for tune ${tuneId}`
+          `✅ [PracticeIndex] Staged preview for tune ${tuneId} (goal=${tuneGoal}, technique=${technique})`
         );
       }
 
@@ -774,11 +810,33 @@ const PracticeIndex: Component = () => {
     }
   };
 
-  // Handle goal changes
-  const handleGoalChange = (tuneId: string, goal: string | null) => {
-    console.log(`Goal for tune ${tuneId}: ${goal}`);
-    // TODO: Update goal in local DB immediately
-    // TODO: Queue sync to Supabase
+  // Handle goal changes: update DB immediately, clear any stale staged eval,
+  // and refresh the practice list view.
+  const handleGoalChange = async (tuneId: string, goal: string | null) => {
+    const db = localDb();
+    const repertoireId = currentRepertoireId();
+    const userIdVal = await getUserId();
+    if (!db || !repertoireId || !userIdVal) return;
+    try {
+      await db
+        .update(repertoireTune)
+        .set({ goal: goal ?? null })
+        .where(
+          and(
+            eq(repertoireTune.tuneRef, tuneId),
+            eq(repertoireTune.repertoireRef, repertoireId)
+          )
+        );
+      // Discard any staged preview computed under the old goal
+      await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
+      incrementPracticeListStagedChanged();
+    } catch (err) {
+      console.error(
+        `[PracticeIndex] Failed to update goal for tune ${tuneId}:`,
+        err
+      );
+      toast.error("Failed to update goal. Please try again.");
+    }
   };
 
   // Handle submit of staged evaluations

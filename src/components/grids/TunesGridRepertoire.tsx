@@ -18,6 +18,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getRepertoireTunesStaged } from "../../lib/db/queries/repertoires";
+import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
@@ -78,6 +79,19 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     async (params) => {
       if (!params) return [];
       return await params.db.select().from(schema.genre).all();
+    }
+  );
+
+  // Goals: load once per user for the GoalBadge dropdown.
+  const [goalsData] = createResource(
+    () => {
+      const db = localDb();
+      const uid = props.userId;
+      return db && uid ? { db, uid } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getGoals(params.db, params.uid);
     }
   );
 
@@ -192,6 +206,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             cellCallbacks={{
               onRecallEvalChange: props.onRecallEvalChange,
               onGoalChange: props.onGoalChange,
+              goals: () => goalsData() ?? [],
             }}
             onSelectionChange={(count) => {
               console.log(

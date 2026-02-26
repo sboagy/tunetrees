@@ -29,7 +29,8 @@
       "reference": "repertoire",
       "tag": "repertoire",
       "tune_override": "repertoire",
-      "plugin": "user"
+      "plugin": "user",
+      "goal": "user"
     },
     "tableToSchemaKeyOverrides": {
       "plugin": "plugin"
@@ -65,6 +66,14 @@
             "kind": "orEqUserIdOrTrue",
             "column": "user_ref",
             "orColumn": "is_public"
+          },
+          "goal": {
+            "kind": "compound",
+            "operator": "or",
+            "rules": [
+              { "kind": "publicOnly", "column": "private_for" },
+              { "kind": "eqUserId", "column": "private_for" }
+            ]
           },
           "tune": {
             "kind": "compound",
@@ -134,6 +143,10 @@
             }
           },
           "user_genre_selection": {
+            "denyDelete": false
+          },
+          "goal": {
+            "bindAuthUserIdProps": ["private_for"],
             "denyDelete": false
           },
           "table_transient_data": {

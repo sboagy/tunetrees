@@ -7,6 +7,7 @@
 
 import type { ColumnDef, Table } from "@tanstack/solid-table";
 import { type Component, createEffect, Show } from "solid-js";
+import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
@@ -506,25 +507,19 @@ export function getRepertoireColumns(
       accessorKey: "goal",
       header: ({ column }) => <SortableHeader column={column} title="Goal" />,
       cell: (info) => {
+        const row = info.row.original;
+        const tuneId = row.tune_id || row.tune?.id || row.tuneRef || row.id;
         const value = (info.getValue() as string) || "recall";
-        const colors = {
-          recall:
-            "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
-          notes:
-            "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200",
-          technique:
-            "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",
-          backup:
-            "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200",
-        };
-        const colorClass =
-          colors[value as keyof typeof colors] || colors.recall;
         return (
-          <span
-            class={`inline-flex items-center px-2 py-0.5 rounded text-xs ${colorClass}`}
-          >
-            {value}
-          </span>
+          <GoalBadge
+            value={value}
+            goals={callbacks?.goals}
+            onGoalChange={
+              callbacks?.onGoalChange
+                ? (newGoal) => callbacks.onGoalChange!(tuneId, newGoal)
+                : undefined
+            }
+          />
         );
       },
       size: 100,

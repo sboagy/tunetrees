@@ -11,6 +11,7 @@
 
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
+import { and, eq } from "drizzle-orm";
 import {
   type Component,
   createEffect,
@@ -36,6 +37,7 @@ import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import * as schema from "../lib/db/schema";
+import { repertoireTune } from "../lib/db/schema";
 import { log } from "../lib/logger";
 
 const arraysEqual = (a: string[], b: string[]) =>
@@ -319,6 +321,51 @@ const RepertoirePage: Component = () => {
     navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
+  // Handle goal change: update single row, or bulk-update all selected rows.
+  const handleGoalChange = async (tuneId: string, goal: string | null) => {
+    const db = localDb();
+    const repertoireId = currentRepertoireId();
+    if (!db || !repertoireId) return;
+
+    const table = tableInstance();
+    const selectedRows = table?.getSelectedRowModel().rows ?? [];
+
+    // If more than one row is selected AND the changed row is among the selected,
+    // offer to apply to all selected rows; otherwise single-row update.
+    const selectedIds = selectedRows.map((r) =>
+      String((r.original as any).tune_id ?? (r.original as any).id)
+    );
+    const isInSelection =
+      selectedIds.includes(String(tuneId)) && selectedIds.length > 1;
+
+    const targetIds: string[] = isInSelection
+      ? window.confirm(
+          `Apply goal "${goal ?? "recall"}" to all ${selectedIds.length} selected tunes?`
+        )
+        ? selectedIds
+        : [tuneId]
+      : [tuneId];
+
+    try {
+      await db.transaction(async (tx) => {
+        for (const tid of targetIds) {
+          await tx
+            .update(repertoireTune)
+            .set({ goal: goal ?? null })
+            .where(
+              and(
+                eq(repertoireTune.tuneRef, tid),
+                eq(repertoireTune.repertoireRef, repertoireId)
+              )
+            );
+        }
+      });
+      incrementRepertoireListChanged();
+    } catch (err) {
+      console.error("[RepertoirePage] Failed to update goal:", err);
+    }
+  };
+
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
     null
   );
@@ -387,6 +434,7 @@ const RepertoirePage: Component = () => {
                 selectedGenreNames={selectedGenres()}
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
+                onGoalChange={handleGoalChange}
                 onSelectionChange={setSelectedRowsCount}
                 onTableReady={setTableInstance}
               />
