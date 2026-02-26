@@ -40,17 +40,6 @@ test.describe("AVATAR-001: Avatar Picker", () => {
 
     await ttPage.userSettingsAvatarButton.click();
     await page.waitForTimeout(500);
-
-    // FIXME: close of mobile menu should be automatic
-    if (isMobileChrome) {
-      // await ttPage.settingsMenuToggle.click();
-      const { innerWidth, innerHeight } = await page.evaluate(() => ({
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-      }));
-      await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
-      await page.waitForTimeout(300);
-    }
   });
 
   test("should display avatar settings page", async ({ page }) => {

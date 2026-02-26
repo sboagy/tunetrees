@@ -38,15 +38,6 @@ async function openCatalogSync(page: import("@playwright/test").Page) {
   await page.waitForTimeout(500);
   await ttPage.userSettingsCatalogSyncButton.click();
   await page.waitForTimeout(500);
-
-  if (isMobileChrome) {
-    const { innerWidth, innerHeight } = await page.evaluate(() => ({
-      innerWidth: window.innerWidth,
-      innerHeight: window.innerHeight,
-    }));
-    await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
-    await page.waitForTimeout(300);
-  }
 }
 
 /**

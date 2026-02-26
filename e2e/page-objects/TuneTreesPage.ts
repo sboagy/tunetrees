@@ -330,21 +330,17 @@ export class TuneTreesPage {
     this.showPublicToggle = page.getByTestId("override-indicator-title");
     this.userSettingsButton = page.getByTestId("user-settings-button");
 
-    this.userSettingsCatalogSyncButton = page.getByRole("link", {
-      name: "Catalog & Sync",
-    });
-    this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
-      name: "Scheduling Options",
-    });
-    this.userSettingsSpacedRepetitionButton = page.getByRole("link", {
-      name: "Spaced Repetition",
-    });
-    this.userSettingsAccountButton = page.getByRole("link", {
-      name: "Account",
-    });
-    this.userSettingsAvatarButton = page.getByRole("link", {
-      name: "Avatar",
-    });
+    this.userSettingsCatalogSyncButton = page.getByTestId(
+      "settings-tab-catalog-sync"
+    );
+    this.userSettingsSchedulingOptionsButton = page.getByTestId(
+      "settings-tab-scheduling-options"
+    );
+    this.userSettingsSpacedRepetitionButton = page.getByTestId(
+      "settings-tab-spaced-repetition"
+    );
+    this.userSettingsAccountButton = page.getByTestId("settings-tab-account");
+    this.userSettingsAvatarButton = page.getByTestId("settings-tab-avatar");
 
     this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
 
