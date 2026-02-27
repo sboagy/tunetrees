@@ -5,7 +5,7 @@
  */
 
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
-import initSqlJs, { type Database } from "sql.js";
+import type { Database } from "sql.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   areSyncTriggersInstalled,
@@ -18,15 +18,16 @@ import {
   suppressSyncTriggers,
   verifySyncTriggers,
 } from "../../../src/lib/db/install-triggers";
+import { getTestSqlJs } from "./sqljs-test-utils";
 
 let db: Database;
 
 // Initialize SQL.js once for all tests
-let SQL: Awaited<ReturnType<typeof initSqlJs>>;
+let SQL: Awaited<ReturnType<typeof getTestSqlJs>>;
 
 beforeEach(async () => {
   if (!SQL) {
-    SQL = await initSqlJs();
+    SQL = await getTestSqlJs();
   }
   // Create a fresh in-memory database for each test
   db = new SQL.Database();
@@ -177,6 +178,16 @@ beforeEach(async () => {
     CREATE TABLE instrument (
       id TEXT PRIMARY KEY NOT NULL,
       instrument TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE goal (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT,
+      private_for TEXT,
+      deleted INTEGER,
+      last_modified_at TEXT
     )
   `);
 

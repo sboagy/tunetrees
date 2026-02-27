@@ -16,6 +16,30 @@ concurrency:
 
 jobs:
   # --------------------------------------------------------------------------
+  # JOB 0: UNIT TESTS (VITEST)
+  # --------------------------------------------------------------------------
+  test-unit:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "25"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test
+
+  # --------------------------------------------------------------------------
   # JOB 1: STANDARD SHARDED TESTS (Dev Server)
   # --------------------------------------------------------------------------
   test:
@@ -472,7 +496,7 @@ jobs:
   deploy:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
-    needs: [test, test-pwa-offline] # Deploy only if ALL tests pass
+    needs: [test-unit, test, test-pwa-offline] # Deploy only if ALL tests pass
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors')
     environment: vite_pwa_env
 
@@ -512,7 +536,7 @@ jobs:
   deploy-worker:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
-    needs: [test, test-pwa-offline]
+    needs: [test-unit, test, test-pwa-offline]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors')
     environment: vite_pwa_env
     steps:
