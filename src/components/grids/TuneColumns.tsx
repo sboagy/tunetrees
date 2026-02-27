@@ -508,8 +508,11 @@ export function getRepertoireColumns(
       header: ({ column }) => <SortableHeader column={column} title="Goal" />,
       cell: (info) => {
         const row = info.row.original;
-        const tuneId = row.tune_id || row.tune?.id || row.tuneRef || row.id;
-        const value = (info.getValue() as string) || "recall";
+        const tuneId = String(
+          row.tune_id || row.tune?.id || row.tuneRef || row.id
+        );
+        const value =
+          (info.getValue() as string | null | undefined) || "recall";
         return (
           <GoalBadge
             value={value}

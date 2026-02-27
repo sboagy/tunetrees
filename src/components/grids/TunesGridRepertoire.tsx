@@ -96,7 +96,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   );
 
   // The view already returns ITuneOverview rows
-  const tunes = createMemo<ITuneOverview[]>(() => repertoireTunesData() || []);
+  const tunes = createMemo<ITuneOverview[]>(
+    () => repertoireTunesData.latest ?? repertoireTunesData() ?? []
+  );
 
   // Client-side filter (search/type/mode/genre)
   const filteredTunes = createMemo<ITuneOverview[]>(() => {
@@ -153,6 +155,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   });
 
   const loadError = createMemo(() => repertoireTunesData.error);
+  const isInitialLoading = createMemo(
+    () => repertoireTunesData.loading && repertoireTunesData.latest == null
+  );
   const hasTunes = createMemo(() => filteredTunes().length > 0);
 
   const [columnDescriptions] = createResource(
@@ -180,7 +185,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Loading */}
-      <Show when={!loadError() && repertoireTunesData.loading}>
+      <Show when={!loadError() && isInitialLoading()}>
         <GridStatusMessage
           variant="loading"
           title="Loading repertoire..."
@@ -189,7 +194,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Grid */}
-      <Show when={!loadError() && !repertoireTunesData.loading && hasTunes()}>
+      <Show when={!loadError() && !isInitialLoading() && hasTunes()}>
         <div class="flex-1 overflow-hidden">
           <TunesGrid
             tablePurpose="repertoire"
@@ -224,7 +229,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Empty state */}
-      <Show when={!loadError() && !repertoireTunesData.loading && !hasTunes()}>
+      <Show when={!loadError() && !isInitialLoading() && !hasTunes()}>
         <GridStatusMessage
           variant="empty"
           title="No tunes in repertoire"

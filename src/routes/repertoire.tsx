@@ -66,6 +66,7 @@ const RepertoirePage: Component = () => {
     repertoireListChanged,
     catalogListChanged,
     incrementRepertoireListChanged,
+    suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -242,8 +243,16 @@ const RepertoirePage: Component = () => {
     }
   );
 
+  const repertoireTuneRows = createMemo(
+    () => repertoireTunes.latest ?? repertoireTunes() ?? []
+  );
+
+  const isInitialRepertoireLoading = createMemo(
+    () => repertoireTunes.loading && repertoireTunes.latest == null
+  );
+
   const repertoireIsEmpty = createMemo(
-    () => !repertoireTunes.loading && (repertoireTunes()?.length ?? 0) === 0
+    () => !isInitialRepertoireLoading() && repertoireTuneRows().length === 0
   );
 
   // Fetch all genres for proper genre names
@@ -271,7 +280,7 @@ const RepertoirePage: Component = () => {
 
   // Get unique types, modes, genres for filter dropdowns
   const availableTypes = createMemo(() => {
-    const tunes = repertoireTunes() || [];
+    const tunes = repertoireTuneRows();
     const types = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.type) types.add(tune.tune.type);
@@ -280,7 +289,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableModes = createMemo(() => {
-    const tunes = repertoireTunes() || [];
+    const tunes = repertoireTuneRows();
     const modes = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.mode) modes.add(tune.tune.mode);
@@ -289,7 +298,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableGenres = createMemo(() => {
-    const tunes = repertoireTunes() || [];
+    const tunes = repertoireTuneRows();
     const genres = allGenres() || [];
 
     log.debug("REPERTOIRE availableGenres:", {
@@ -347,6 +356,7 @@ const RepertoirePage: Component = () => {
       : [tuneId];
 
     try {
+      suppressNextViewRefresh("repertoire");
       await db.transaction(async (tx) => {
         for (const tid of targetIds) {
           await tx
@@ -380,7 +390,7 @@ const RepertoirePage: Component = () => {
   return (
     <div class="h-full flex flex-col">
       {/* Toolbar with Search and Filters */}
-      <Show when={!repertoireTunes.loading && currentRepertoireId()}>
+      <Show when={!isInitialRepertoireLoading() && currentRepertoireId()}>
         <RepertoireToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
@@ -406,7 +416,7 @@ const RepertoirePage: Component = () => {
       <div class={GRID_CONTENT_CONTAINER}>
         <Show when={userId() && currentRepertoireId()}>
           <Switch>
-            <Match when={repertoireTunes.loading}>
+            <Match when={isInitialRepertoireLoading()}>
               <div class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
                 Loading repertoire...
               </div>

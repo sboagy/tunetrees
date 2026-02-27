@@ -85,6 +85,7 @@ const PracticeIndex: Component = () => {
     syncPracticeScope,
     repertoireListChanged,
     incrementRepertoireListChanged,
+    suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
@@ -689,7 +690,7 @@ const PracticeIndex: Component = () => {
 
   // Count staged evaluations from the practice list view (authoritative source).
   const evaluationsCount = createMemo(() => {
-    const data = practiceListData() || [];
+    const data = practiceListData.latest ?? practiceListData() ?? [];
     return data.reduce((count, tune) => {
       return count + (Number(tune.has_staged) === 1 ? 1 : 0);
     }, 0);
@@ -698,7 +699,8 @@ const PracticeIndex: Component = () => {
   // Filtered practice list - applies showSubmitted filter
   // This is the single source of truth for both grid and flashcard views
   const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
-    const data: ITuneOverview[] = practiceListData() || [];
+    const data: ITuneOverview[] =
+      practiceListData.latest ?? practiceListData() ?? [];
     const shouldShow = showSubmitted();
 
     console.log(
@@ -715,8 +717,12 @@ const PracticeIndex: Component = () => {
     return filtered;
   });
 
-  const practiceListLoading = () =>
-    practiceListData.loading || queueInitialized.loading;
+  const practiceListLoading = () => {
+    const hasCachedRows = practiceListData.latest != null;
+    return (
+      (practiceListData.loading || queueInitialized.loading) && !hasCachedRows
+    );
+  };
   const practiceListError = () =>
     practiceListData.error ||
     (queueInitialized() === false
@@ -768,7 +774,9 @@ const PracticeIndex: Component = () => {
       } else {
         // Resolve goal and technique from the practice list and goals map.
         // Falls back to "recall" / "fsrs" if data is not yet loaded.
-        const tuneEntry = practiceListData()?.find((e) => e.id === tuneId);
+        const practiceRows =
+          practiceListData.latest ?? practiceListData() ?? [];
+        const tuneEntry = practiceRows.find((entry) => entry.id === tuneId);
         const tuneGoal = tuneEntry?.goal ?? "recall";
         const goalDef = goalsMap().get(tuneGoal);
         const technique = goalDef?.defaultTechnique ?? "fsrs";
@@ -810,14 +818,24 @@ const PracticeIndex: Component = () => {
     }
   };
 
-  // Handle goal changes: update DB immediately, clear any stale staged eval,
-  // and refresh the practice list view.
+  // Handle goal changes: update DB immediately and clear stale staged eval.
+  // Keep updates local/optimistic so the grid does not remount.
   const handleGoalChange = async (tuneId: string, goal: string | null) => {
     const db = localDb();
     const repertoireId = currentRepertoireId();
     const userIdVal = await getUserId();
     if (!db || !repertoireId || !userIdVal) return;
+
+    const previousEvaluation = evaluations()[tuneId];
+
+    setEvaluations((prev) => {
+      const next = { ...prev };
+      delete next[tuneId];
+      return next;
+    });
+
     try {
+      suppressNextViewRefresh("repertoire");
       await db
         .update(repertoireTune)
         .set({ goal: goal ?? null })
@@ -831,6 +849,15 @@ const PracticeIndex: Component = () => {
       await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
       incrementPracticeListStagedChanged();
     } catch (err) {
+      setEvaluations((prev) => {
+        const next = { ...prev };
+        if (previousEvaluation === undefined) {
+          delete next[tuneId];
+        } else {
+          next[tuneId] = previousEvaluation;
+        }
+        return next;
+      });
       console.error(
         `[PracticeIndex] Failed to update goal for tune ${tuneId}:`,
         err
