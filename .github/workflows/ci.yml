@@ -45,6 +45,7 @@ jobs:
   test:
     name: Run Playwright Tests
     runs-on: ubuntu-latest
+    needs: [test-unit]
 
     strategy:
       fail-fast: false
@@ -244,7 +245,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: vite_pwa_env
-    # NO "needs: test" here - allows parallel execution
+    needs: [test-unit] # Run after unit tests pass, not in parallel
     env:
       ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
       TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
