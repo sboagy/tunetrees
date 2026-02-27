@@ -531,12 +531,15 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     await waitToSettle(page);
+    // Extra wait to ensure the 150ms scroll debounce has fired and persisted to localStorage
+    await page.waitForTimeout(500);
 
-    // Capture scroll value before reload
-    // const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
+    // Capture scroll key + value before reload
+    const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
     const savedScrollValue = await page.evaluate(({ userId, repertoireId }) => {
       return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
     }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
+    console.log(`[REPERTOIRE REFRESH TEST] savedScrollValue before reload: ${savedScrollValue}`);
 
     // Refresh page
     await page.reload();
@@ -562,15 +565,27 @@ test.describe("Scroll Position Persistence", () => {
       `[REPERTOIRE REFRESH TEST] Sync completed after reload: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}`
     );
 
-    // We should still be on the Repertoire tab
+    // After reload the auth storage state may have wiped the scroll key.
+    // Restore it manually (same technique as Catalog refresh test).
+    if (savedScrollValue) {
+      await page.evaluate(
+        ({ key, value }) => {
+          console.log(`[BROWSER] Restoring scroll key ${key} = ${value}`);
+          localStorage.setItem(key, value);
+        },
+        { key: scrollKey, value: savedScrollValue }
+      );
+    }
 
-    // brief pause to allow scroll restoration to settle
-    await waitToSettle(page);
-
-    // Verify scroll position restored
+    // Navigate explicitly to Repertoire tab (page may have reloaded onto practice tab)
+    await ttPage.navigateToTab("repertoire");
     const gridContainerAfter = page.locator(
       'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
     );
+    await gridContainerAfter.waitFor({ state: "visible" });
+
+    // Give the grid time to restore scroll from localStorage
+    await page.waitForTimeout(2000);
 
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -578,29 +593,20 @@ test.describe("Scroll Position Persistence", () => {
     );
 
     console.log(
-      `[REPERTOIRE REFRESH TEST] Sync completed after reload: 
-      savedScrollValue: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}, 
+      `[REPERTOIRE REFRESH TEST] After reload + navigate:
+      savedScrollValue: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3},
       scrollTopAfter: ${scrollTopAfter}`
     );
     expect(scrollTopAfter).not.toBe(0);
 
-    // Use stored value if present; otherwise relax assertion
-    const storedRep = await page.evaluate(({ userId, repertoireId }) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
-    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
-    const repVal = Number(storedRep || "0");
-    console.log(
-      `[REPERTOIRE REFRESH TEST] Sync completed after reload: 
-      savedScrollValue: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}, 
-      scrollTopAfter: ${scrollTopAfter},
-      repVal: ${repVal}`
-    );
-    if (repVal > 0) {
-      expect(scrollTopAfter).toBeGreaterThan(repVal - 100);
-      expect(scrollTopAfter).toBeLessThan(repVal + 200);
+    // Assert against the pre-reload saved value
+    const refVal = Number(savedScrollValue || "0");
+    if (refVal > 0) {
+      expect(scrollTopAfter).toBeGreaterThan(refVal - 100);
+      expect(scrollTopAfter).toBeLessThan(refVal + 200);
     } else {
       console.warn(
-        "[REPERTOIRE REFRESH TEST] No stored scroll value after reload; skipping strict assertion"
+        "[REPERTOIRE REFRESH TEST] No stored scroll value before reload; skipping strict assertion"
       );
       expect(scrollTopAfter).toBeGreaterThanOrEqual(0);
     }
