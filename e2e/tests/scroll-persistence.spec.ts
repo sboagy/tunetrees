@@ -175,10 +175,10 @@ test.describe("Scroll Position Persistence", () => {
     // Wait for debounce to persist scroll position (300ms + buffer)
     await waitToSettle(page);;
 
-    // Check localStorage - all grids now use integer userId from user_profile table
-    const storedValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage - key includes repertoireId suffix
+    const storedValue = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log("[CATALOG TEST] localStorage value:", storedValue);
     await waitToSettle(page);
 
@@ -302,11 +302,10 @@ test.describe("Scroll Position Persistence", () => {
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
     console.log("[PRACTICE TAB SWITCH TEST] scrollTopBefore:", scrollTopBefore);
 
-    // Check localStorage
-    // Practice grid uses integer userId from user_profile table
-    const storedValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage - key includes repertoireId suffix
+    const storedValue = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log("[PRACTICE TAB SWITCH TEST] localStorage value:", storedValue);
 
     expect(scrollTopBefore).toBeGreaterThan(20);
@@ -397,17 +396,17 @@ test.describe("Scroll Position Persistence", () => {
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
     expect(scrollTopBefore).toBeGreaterThan(500);
 
-    // Check localStorage BEFORE reload (uses integer userId from user_profile)
-    const storedValueBeforeReload = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage BEFORE reload - key includes repertoireId suffix
+    const storedValueBeforeReload = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log(
       "[CATALOG REFRESH TEST] localStorage BEFORE reload:",
       storedValueBeforeReload
     );
 
     // Capture scroll value before reload
-    const scrollKey = `TT_CATALOG_SCROLL_${currentTestUser.userId}`;
+    const scrollKey = `TT_CATALOG_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
     const savedScrollValue = storedValueBeforeReload;
 
     // Refresh page
@@ -467,10 +466,10 @@ test.describe("Scroll Position Persistence", () => {
 
     console.log("[CATALOG REFRESH TEST] Console logs:", consoleLogs);
 
-    // Check localStorage value (uses integer userId from user_profile)
-    const storedValueAfter = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage value - key includes repertoireId suffix
+    const storedValueAfter = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log(
       "[CATALOG REFRESH TEST] localStorage after reload:",
       storedValueAfter
@@ -519,7 +518,7 @@ test.describe("Scroll Position Persistence", () => {
   }) => {
     // Increase timeout for this test (milliseconds). Set to 120s.
     test.setTimeout(120000);
-    ttPage.navigateToTab("repertoire");
+    await ttPage.navigateToTab("repertoire");
     await waitToSettle(page);
     // await waitToSettle(page);
 
@@ -534,17 +533,17 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Capture scroll value before reload
-    // const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}`;
-    const savedScrollValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
+    const savedScrollValue = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
 
     // Refresh page
     await page.reload();
 
-    const savedScrollValue2 = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const savedScrollValue2 = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
 
     // Wait for sync to complete BEFORE navigating to tab
     await page.waitForFunction(
@@ -555,9 +554,9 @@ test.describe("Scroll Position Persistence", () => {
     );
     console.log("[REPERTOIRE REFRESH TEST] Sync completed after reload");
 
-    const savedScrollValue3 = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const savedScrollValue3 = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
 
     console.log(
       `[REPERTOIRE REFRESH TEST] Sync completed after reload: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}`
@@ -586,9 +585,9 @@ test.describe("Scroll Position Persistence", () => {
     expect(scrollTopAfter).not.toBe(0);
 
     // Use stored value if present; otherwise relax assertion
-    const storedRep = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const storedRep = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     const repVal = Number(storedRep || "0");
     console.log(
       `[REPERTOIRE REFRESH TEST] Sync completed after reload: 
@@ -647,9 +646,9 @@ test.describe("Scroll Position Persistence", () => {
       page,
       gridContainerAfter
     );
-    const storedPractice = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const storedPractice = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     const practiceVal = Number(storedPractice || "0");
     if (practiceVal > 0) {
       expect(scrollTopAfter).toBeGreaterThan(practiceVal - 20);
