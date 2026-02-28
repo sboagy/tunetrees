@@ -66,6 +66,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       undefined,
       test.info().project.name
     );
+    await page.waitForTimeout(2000); // Wait for setup to stabilize
   });
 
   test("should ensure due dates are strictly in future across Good/Easy chain", async ({
@@ -87,7 +88,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       await ttPage.selectTypeInTuneEditor("Reel (4/4)");
       const saveButton = page.getByRole("button", { name: /save/i });
       await saveButton.click();
-      await page.waitForLoadState("networkidle", { timeout: 15000 });
+      // await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await page.waitForTimeout(2000);
       // Add to repertoire
       await ttPage.searchForTune(title, ttPage.catalogGrid);
       const checkbox = ttPage.catalogGrid
