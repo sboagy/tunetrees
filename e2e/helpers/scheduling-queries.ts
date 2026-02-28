@@ -128,64 +128,91 @@ export async function queryTunesByTitles(
 export async function queryLatestPracticeRecord(
   page: Page,
   tuneId: string,
-  repertoireId: string
+  repertoireId: string,
+  options: { waitForRecordMs?: number; pollIntervalMs?: number } = {}
 ): Promise<PracticeRecord | null> {
   log.debug(`📊 Querying latest practice record for tune ${tuneId}`);
 
-  let record: PracticeRecord | null = null;
-  const maxAttempts = 3;
+  const waitForRecordMs = options.waitForRecordMs ?? 0;
+  const pollIntervalMs = options.pollIntervalMs ?? 300;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      await waitForTestApi(page, 30000);
-      record = await page.evaluate(
-        async (args) => {
-          try {
-            const api = (window as any).__ttTestApi;
-            if (!api) {
-              throw new Error("__ttTestApi not available on window");
+  const fetchOnce = async (): Promise<PracticeRecord | null> => {
+    let record: PracticeRecord | null = null;
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await waitForTestApi(page, 30000);
+        record = await page.evaluate(
+          async (args) => {
+            try {
+              const api = (window as any).__ttTestApi;
+              if (!api) {
+                throw new Error("__ttTestApi not available on window");
+              }
+              // Extra browser-side instrumentation
+              // eslint-disable-next-line no-console
+              console.debug(
+                `[queryLatestPracticeRecord] Evaluating in browser tuneId=${args.tuneId} repertoireId=${args.repertoireId}`
+              );
+              const res = await api.getLatestPracticeRecord(
+                args.tuneId,
+                args.repertoireId
+              );
+              // eslint-disable-next-line no-console
+              console.debug(
+                `[queryLatestPracticeRecord] Browser result null=${res == null}`
+              );
+              return res;
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.error(
+                `[queryLatestPracticeRecord] Browser-side error:`,
+                e
+              );
+              throw e;
             }
-            // Extra browser-side instrumentation
-            // eslint-disable-next-line no-console
-            console.debug(
-              `[queryLatestPracticeRecord] Evaluating in browser tuneId=${args.tuneId} repertoireId=${args.repertoireId}`
-            );
-            const res = await api.getLatestPracticeRecord(
-              args.tuneId,
-              args.repertoireId
-            );
-            // eslint-disable-next-line no-console
-            console.debug(
-              `[queryLatestPracticeRecord] Browser result null=${res == null}`
-            );
-            return res;
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error(`[queryLatestPracticeRecord] Browser-side error:`, e);
-            throw e;
-          }
-        },
-        { tuneId, repertoireId }
-      );
-      break;
-    } catch (err) {
-      const message = (err as Error).message || "unknown error";
-      const isMissingApi = message.includes("__ttTestApi not available");
-      const isContextRace =
-        message.includes("Execution context was destroyed") ||
-        message.includes("Target page, context or browser has been closed");
-
-      if (attempt < maxAttempts && (isMissingApi || isContextRace)) {
-        log.warn(
-          `⚠️ queryLatestPracticeRecord retry ${attempt}/${maxAttempts} due to transient API/context race: ${message}`
+          },
+          { tuneId, repertoireId }
         );
-        await page.waitForTimeout(300);
-        continue;
-      }
+        break;
+      } catch (err) {
+        const message = (err as Error).message || "unknown error";
+        const isMissingApi = message.includes("__ttTestApi not available");
+        const isContextRace =
+          message.includes("Execution context was destroyed") ||
+          message.includes("Target page, context or browser has been closed");
 
-      log.error(`❌ queryLatestPracticeRecord evaluate failed: ${message}`);
-      throw err; // Re-throw so tests still fail visibly
+        if (attempt < maxAttempts && (isMissingApi || isContextRace)) {
+          log.warn(
+            `⚠️ queryLatestPracticeRecord retry ${attempt}/${maxAttempts} due to transient API/context race: ${message}`
+          );
+          await page.waitForTimeout(300);
+          continue;
+        }
+
+        log.error(`❌ queryLatestPracticeRecord evaluate failed: ${message}`);
+        throw err; // Re-throw so tests still fail visibly
+      }
     }
+
+    return record;
+  };
+
+  const startedAt = Date.now();
+  let record: PracticeRecord | null = null;
+  let shouldContinue = true;
+  while (shouldContinue) {
+    record = await fetchOnce();
+    if (record) {
+      shouldContinue = false;
+      break;
+    }
+    if (waitForRecordMs <= 0 || Date.now() - startedAt >= waitForRecordMs) {
+      shouldContinue = false;
+      break;
+    }
+    await page.waitForTimeout(pollIntervalMs);
   }
 
   if (record) {

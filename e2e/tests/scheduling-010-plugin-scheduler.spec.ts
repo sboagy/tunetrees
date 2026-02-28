@@ -65,7 +65,9 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       row.getByRole("cell", { name: TEST_TUNE_BANISH_TITLE })
     ).toBeVisible({ timeout: 10000 });
 
-    await ttPage.setRowEvaluation(row, "good");
+    await ttPage.enableFlashcardMode();
+    await expect(ttPage.flashcardView).toBeVisible({ timeout: 10000 });
+    await ttPage.selectFlashcardEvaluation("good");
     await ttPage.submitEvaluations({ timeoutMs: 60000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(1200);
@@ -73,7 +75,8 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
-      testUser.repertoireId
+      testUser.repertoireId,
+      { waitForRecordMs: 10000, pollIntervalMs: 300 }
     );
     if (!record) throw new Error("No practice record found after evaluation");
 

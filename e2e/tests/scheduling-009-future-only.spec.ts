@@ -199,7 +199,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         const record = await queryLatestPracticeRecord(
           page,
           tuneId,
-          testUser.repertoireId
+          testUser.repertoireId,
+          { waitForRecordMs: 12000, pollIntervalMs: 300 }
         );
         if (!record) throw new Error("Record not found");
 
