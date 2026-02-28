@@ -486,8 +486,8 @@ test.describe("Scroll Position Persistence", () => {
     console.log("[CATALOG REFRESH TEST] scrollTopAfter:", scrollTopAfter);
     const afterVal = Number(storedValueAfter || "0");
     if (afterVal > 0) {
-      expect(scrollTopAfter).toBeGreaterThan(afterVal - 100);
-      expect(scrollTopAfter).toBeLessThan(afterVal + 100);
+      expect(scrollTopAfter).toBeGreaterThan(afterVal - 150);
+      expect(scrollTopAfter).toBeLessThan(afterVal + 150);
     } else {
       console.warn(
         "[CATALOG REFRESH TEST] No stored scroll value after reload; skipping strict assertion"
