@@ -54,6 +54,10 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       undefined,
       test.info().project.name
     );
+
+    // Wait for any background syncs or plugin initialization to
+    // complete before starting test actions.
+    await page.waitForTimeout(4000);
   });
 
   test("should apply plugin schedule overrides", async ({ page, testUser }) => {
