@@ -1990,10 +1990,12 @@ export class TuneTreesPage {
     }
 
     const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
+    const evalTrigger = this.page.getByTestId(`recall-eval-${tuneId}`);
+    await expect(evalTrigger).toBeVisible({ timeout: 5000 });
 
     for (let attempt = 0; attempt < 3; attempt++) {
       // ACT: Select rating
-      await evalDropdown.click({ delay: 50 });
+      await evalTrigger.click({ delay: 50 });
 
       try {
         await expect(menu).toBeVisible({ timeout: 3000 });
@@ -2032,6 +2034,15 @@ export class TuneTreesPage {
         .toBeHidden({ timeout: 3000 })
         .catch(() => undefined);
 
+      const expectedLabel =
+        evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
+      await expect
+        .poll(async () => (await evalTrigger.textContent()) ?? "", {
+          timeout: 5000,
+          intervals: [100, 250, 500, 1000],
+        })
+        .toMatch(new RegExp(expectedLabel, "i"));
+
       if (doTimeouts) {
         const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
         await this.page.waitForTimeout(delay);
@@ -2057,14 +2068,22 @@ export class TuneTreesPage {
     await expect
       .poll(
         async () => {
-          const [title, enabled] = await Promise.all([
+          const [title, enabled, textContent] = await Promise.all([
             this.submitEvaluationsButton
               .getAttribute("title")
               .catch(() => null),
             this.submitEvaluationsButton.isEnabled().catch(() => false),
+            this.submitEvaluationsButton.textContent().catch(() => null),
           ]);
-          const match = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
-          const count = match ? Number(match[1]) : 0;
+          const titleMatch = title?.match(
+            /Submit\s+(\d+)\s+practice evaluations/i
+          );
+          const textMatch = textContent?.match(/\b(\d+)\b/);
+          const count = titleMatch
+            ? Number(titleMatch[1])
+            : textMatch
+              ? Number(textMatch[1])
+              : 0;
           return enabled && count >= minCount;
         },
         { timeout: timeoutMs, intervals: [100, 250, 500, 1000] }

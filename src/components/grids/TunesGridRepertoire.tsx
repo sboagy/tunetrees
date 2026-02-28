@@ -200,6 +200,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             tablePurpose="repertoire"
             userId={props.userId}
             repertoireId={currentRepertoireId() || undefined}
+            isLoading={repertoireTunesData.loading}
             data={filteredTunes()}
             columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}

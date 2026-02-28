@@ -50,6 +50,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   tablePurpose: TablePurpose; // "catalog" | "repertoire" | "scheduled"
   userId: string;
   repertoireId?: string;
+  isLoading?: boolean;
   data: T[];
   // Optional override: when omitted, columns are derived via getColumns(tablePurpose, cellCallbacks)
   columns?: ColumnDef<T, unknown>[];
@@ -498,7 +499,28 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [isStabilizing, setIsStabilizing] = createSignal(false);
   const [lastRowCount, setLastRowCount] = createSignal(0);
   const [restoreGuardUntil, setRestoreGuardUntil] = createSignal(0);
+  const [wasLoading, setWasLoading] = createSignal(false);
   let stabilizeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  createEffect(() => {
+    const loading = props.isLoading ?? false;
+    const previous = wasLoading();
+
+    if (loading === previous) return;
+    setWasLoading(loading);
+
+    if (loading) {
+      if (targetScroll() > 0) {
+        setRestoreGuardUntil(Date.now() + 8000);
+      }
+      return;
+    }
+
+    if (containerRef && targetScroll() > 0 && containerRef.scrollTop <= 2) {
+      containerRef.scrollTop = targetScroll();
+      setRestoreGuardUntil(Date.now() + 3000);
+    }
+  });
 
   // Watch for row count changes at component level (proper reactive scope)
   createEffect(() => {
@@ -574,10 +596,15 @@ export const TunesGrid = (<T extends { id: string | number }>(
         // During stabilization, if scroll is wrong, re-apply target instead of saving
         const target = targetScroll();
         const stabilizing = isStabilizing();
+        const loading = props.isLoading ?? false;
 
         const inRestoreGuard = restoreGuardUntil() > Date.now();
 
-        if ((stabilizing || inRestoreGuard) && containerRef && target > 0) {
+        if (
+          (stabilizing || inRestoreGuard || loading) &&
+          containerRef &&
+          target > 0
+        ) {
           const currentScroll = containerRef.scrollTop;
           // During refresh/update churn, virtualizer/layout can briefly snap to top.
           // Prevent that transient 0 from overwriting a just-restored non-zero target.
@@ -594,9 +621,17 @@ export const TunesGrid = (<T extends { id: string | number }>(
           const key = scrollKey();
           if (containerRef && key && !isStabilizing()) {
             const scrollPos = containerRef.scrollTop;
+            const loading = props.isLoading ?? false;
 
             const inRestoreGuard = restoreGuardUntil() > Date.now();
             const target = targetScroll();
+            if (loading && target > 0 && scrollPos <= 2) {
+              console.log(
+                `[TunesGrid ${props.tablePurpose}] Skipping top save while loading (target=${target}px)`
+              );
+              containerRef.scrollTop = target;
+              return;
+            }
             if (inRestoreGuard && target > 0 && scrollPos <= 2) {
               console.log(
                 `[TunesGrid ${props.tablePurpose}] Skipping transient top save during restore guard (target=${target}px)`
