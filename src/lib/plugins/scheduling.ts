@@ -313,6 +313,9 @@ export async function applySchedulingPlugin(params: {
   db: SqliteDatabase;
   repertoireTuneCount?: number | null;
 }): Promise<NextReviewSchedule | null> {
+  const shouldSchedulingPluginDiag =
+    import.meta.env.VITE_SCHEDULING_PLUGIN_DIAGNOSTICS === "true";
+
   if (!params.preferences || !params.scheduling) {
     return null;
   }
@@ -352,6 +355,23 @@ export async function applySchedulingPlugin(params: {
   };
 
   const methodName = params.prior ? "processReview" : "processFirstReview";
+  const startedAt = Date.now();
+
+  if (shouldSchedulingPluginDiag) {
+    console.log(
+      `[SchedulingPluginDiag] invoke ${JSON.stringify({
+        pluginId: params.plugin.id,
+        pluginName: params.plugin.name,
+        methodName,
+        tuneRef: params.input.tuneRef,
+        repertoireRef: params.input.repertoireRef,
+        quality: params.input.quality,
+        hasPrior: !!params.prior,
+        fallbackInterval: params.fallback.interval,
+        fallbackNextDue: params.fallback.nextDue.toISOString(),
+      })}`
+    );
+  }
 
   try {
     const result = await runPluginFunction({
@@ -370,8 +390,33 @@ export async function applySchedulingPlugin(params: {
       },
     });
 
-    return normalizeScheduleOutput(result, params.fallback);
+    const normalized = normalizeScheduleOutput(result, params.fallback);
+    if (shouldSchedulingPluginDiag) {
+      console.log(
+        `[SchedulingPluginDiag] result ${JSON.stringify({
+          pluginId: params.plugin.id,
+          methodName,
+          elapsedMs: Date.now() - startedAt,
+          hasRawResult: result != null,
+          normalizedInterval: normalized?.interval ?? null,
+          normalizedNextDue: normalized?.nextDue?.toISOString() ?? null,
+        })}`
+      );
+    }
+
+    return normalized;
   } catch (error) {
+    if (shouldSchedulingPluginDiag) {
+      console.log(
+        `[SchedulingPluginDiag] error ${JSON.stringify({
+          pluginId: params.plugin.id,
+          methodName,
+          elapsedMs: Date.now() - startedAt,
+          error: error instanceof Error ? error.message : String(error),
+        })}`
+      );
+    }
+
     console.warn("Scheduling plugin failed, falling back to FSRS", error);
     const message =
       error instanceof Error ? error.message : "Plugin execution failed";

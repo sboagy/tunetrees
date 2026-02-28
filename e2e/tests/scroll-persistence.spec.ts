@@ -115,6 +115,7 @@ test.describe("Scroll Position Persistence", () => {
   test.afterEach(async () => {
     // Clean up: remove test tunes
     await removeScrollTestTunes(addedTuneIds, currentTestUser);
+    await ttPage.page.waitForTimeout(1000);
   });
 
   async function waitToSettle(page: Page) {

@@ -32,7 +32,7 @@ export default defineConfig({
   /* Retry on CI only */
   /* BUT: Because of the recallEval issue , go ahead and retry locally 3 times also for now. */
   /* Remove local retries once recallEval issue is fixed */
-  retries: process.env.CI ? 3 : 1,
+  retries: process.env.CI ? 0 : 0,
   /* Enable parallel workers - each worker gets dedicated test user to avoid conflicts */
   workers: process.env.CI ? 2 : 8,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
@@ -240,6 +240,8 @@ export default defineConfig({
         // Forward optional diagnostics flags into the Vite server process.
         VITE_SYNC_DIAGNOSTICS: process.env.VITE_SYNC_DIAGNOSTICS || "",
         VITE_SYNC_DEBUG: process.env.VITE_SYNC_DEBUG || "",
+        VITE_SCHEDULING_PLUGIN_DIAGNOSTICS:
+          process.env.VITE_SCHEDULING_PLUGIN_DIAGNOSTICS || "true",
       },
     },
     // 2. Worker/API Server
