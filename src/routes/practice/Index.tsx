@@ -90,9 +90,7 @@ const PracticeIndex: Component = () => {
   const { currentRepertoireId } = useCurrentRepertoire();
   const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
   const [isChatOpen, setIsChatOpen] = createSignal(false);
-  const repertoiresVersion = createMemo(
-    () => `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`
-  );
+  const repertoiresVersion = createMemo(() => `${repertoireListChanged()}`);
   const [repertoiresLoadedVersion, setRepertoiresLoadedVersion] = createSignal<
     string | null
   >(null);
@@ -571,14 +569,8 @@ const PracticeIndex: Component = () => {
       const repertoireId = currentRepertoireId();
       const isQueueDateLoading = resolvedQueueDate.loading;
       const syncReady = initialSyncComplete();
-      const isOnline =
-        typeof navigator !== "undefined" ? navigator.onLine : true;
-      const remoteSyncReady =
-        remoteSyncDownCompletionVersion() > 0 ||
-        !isOnline ||
-        import.meta.env.VITE_DISABLE_SYNC === "true";
 
-      if (!syncReady || !remoteSyncReady || isQueueDateLoading) {
+      if (!syncReady || isQueueDateLoading) {
         console.log(
           "[PracticeIndex] Waiting for queue date resolution + initial sync before initializing queue..."
         );

@@ -304,12 +304,7 @@ const LogoDropdown: Component<{
 const RepertoireDropdown: Component<{
   onOpenRepertoireManager: () => void;
 }> = (props) => {
-  const {
-    user,
-    localDb,
-    repertoireListChanged,
-    remoteSyncDownCompletionVersion,
-  } = useAuth();
+  const { user, localDb, repertoireListChanged } = useAuth();
   const { currentRepertoireId, setCurrentRepertoireId } =
     useCurrentRepertoire();
   const [showDropdown, setShowDropdown] = createSignal(false);
@@ -335,7 +330,7 @@ const RepertoireDropdown: Component<{
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`; // Triggers refetch when repertoires change or sync completes
+      const version = `${repertoireListChanged()}`; // Triggers refetch when repertoires change
 
       if (shouldTopNavDiag) {
         console.log("🔍 [TopNav] Repertoires dependency check:", {
