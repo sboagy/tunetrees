@@ -138,9 +138,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Get the scrollable container (parent of the table)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-catalog");
     await waitToSettle(page);
 
     // Log element properties to debug
@@ -206,8 +204,8 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(3000);
 
     // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-catalog"
     );
     await waitToSettle(page);
     const scrollTopAfter = await pollLocatorForScrollValue(
@@ -226,9 +224,7 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Scroll down (reduced amount for smaller grids)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-repertoire");
     await gridContainer.evaluate((el) => {
       el.scrollTop = 400; // Reduced from 800px
     });
@@ -251,8 +247,8 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-repertoire"
     );
     // Allow extra time for restoration after a full reload
     await page.waitForTimeout(1500);
@@ -272,9 +268,7 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Scroll down (practice grid has less content) - use mouse wheel for real scroll event
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-scheduled");
 
     // Debug: Check grid dimensions
     const gridInfo = await gridContainer.evaluate((el) => ({
@@ -323,8 +317,8 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-scheduled"
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -365,9 +359,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Scroll down (reduced for realistic grid height)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-catalog");
 
     // Use mouse wheel to scroll (triggers real scroll events)
     const box = await gridContainer.boundingBox();
@@ -479,8 +471,8 @@ test.describe("Scroll Position Persistence", () => {
     );
 
     // Verify scroll position restored from localStorage
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-catalog"
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -526,9 +518,7 @@ test.describe("Scroll Position Persistence", () => {
     // await waitToSettle(page);
 
     // Scroll down (reduced)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-repertoire");
     await gridContainer.evaluate((el) => {
       el.scrollTop = 400;
     });
@@ -582,8 +572,8 @@ test.describe("Scroll Position Persistence", () => {
 
     // Navigate explicitly to Repertoire tab (page may have reloaded onto practice tab)
     await ttPage.navigateToTab("repertoire");
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-repertoire"
     );
     await gridContainerAfter.waitFor({ state: "visible" });
 
@@ -625,9 +615,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Scroll down (reduced)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-scheduled");
     await gridContainer.evaluate((el) => {
       el.scrollTop = 25;
     });
@@ -648,8 +636,8 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(500);
 
     // Verify scroll position restored from localStorage
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-scheduled"
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,

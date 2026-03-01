@@ -690,6 +690,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
         ref={(el) => {
           containerRef = el;
         }}
+        data-testid={`tunes-grid-container-${props.tablePurpose}`}
         class={`${CONTAINER_CLASSES} ${
           props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
         }`}
