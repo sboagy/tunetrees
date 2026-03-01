@@ -33,6 +33,133 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
+    await page.addInitScript(() => {
+      const stackTrace = () => {
+        try {
+          throw new Error("ReloadDiag");
+        } catch (error) {
+          if (error instanceof Error && typeof error.stack === "string") {
+            return error.stack;
+          }
+          return String(error);
+        }
+      };
+
+      const logReloadDiag = (
+        event: string,
+        details?: Record<string, unknown>
+      ) => {
+        const payload = {
+          event,
+          href: window.location.href,
+          ts: new Date().toISOString(),
+          details: details ?? null,
+          stack: stackTrace(),
+        };
+
+        try {
+          console.error(`[ReloadDiag] ${JSON.stringify(payload)}`);
+        } catch (error) {
+          console.error(
+            `[ReloadDiag] serialization-failed ${event}: ${String(error)}`
+          );
+        }
+      };
+
+      const locationProto = Object.getPrototypeOf(window.location) as {
+        reload?: (...args: unknown[]) => unknown;
+        assign?: (...args: unknown[]) => unknown;
+        replace?: (...args: unknown[]) => unknown;
+        __ttReloadDiagPatched?: boolean;
+      } | null;
+
+      if (locationProto && !locationProto.__ttReloadDiagPatched) {
+        const originalReload = locationProto.reload?.bind(window.location);
+        const originalAssign = locationProto.assign?.bind(window.location);
+        const originalReplace = locationProto.replace?.bind(window.location);
+
+        if (typeof originalReload === "function") {
+          locationProto.reload = (...args: unknown[]) => {
+            logReloadDiag("location.reload", { argsCount: args.length });
+            return originalReload(...args);
+          };
+        }
+
+        if (typeof originalAssign === "function") {
+          locationProto.assign = (...args: unknown[]) => {
+            logReloadDiag("location.assign", { target: args[0] ?? null });
+            return originalAssign(...args);
+          };
+        }
+
+        if (typeof originalReplace === "function") {
+          locationProto.replace = (...args: unknown[]) => {
+            logReloadDiag("location.replace", { target: args[0] ?? null });
+            return originalReplace(...args);
+          };
+        }
+
+        locationProto.__ttReloadDiagPatched = true;
+        logReloadDiag("location-hooks-installed");
+      }
+
+      const historyAny = window.history as {
+        pushState?: (...args: unknown[]) => unknown;
+        replaceState?: (...args: unknown[]) => unknown;
+        __ttReloadDiagPatched?: boolean;
+      };
+
+      if (!historyAny.__ttReloadDiagPatched) {
+        const originalPushState = historyAny.pushState?.bind(window.history);
+        const originalReplaceState =
+          historyAny.replaceState?.bind(window.history);
+
+        if (typeof originalPushState === "function") {
+          historyAny.pushState = (...args: unknown[]) => {
+            logReloadDiag("history.pushState", { url: args[2] ?? null });
+            return originalPushState(...args);
+          };
+        }
+
+        if (typeof originalReplaceState === "function") {
+          historyAny.replaceState = (...args: unknown[]) => {
+            logReloadDiag("history.replaceState", { url: args[2] ?? null });
+            return originalReplaceState(...args);
+          };
+        }
+
+        historyAny.__ttReloadDiagPatched = true;
+        logReloadDiag("history-hooks-installed");
+      }
+
+      window.addEventListener(
+        "beforeunload",
+        () => {
+          logReloadDiag("event.beforeunload");
+        },
+        { capture: true }
+      );
+
+      window.addEventListener(
+        "pagehide",
+        (event) => {
+          const persisted = (event as { persisted?: boolean }).persisted;
+          logReloadDiag("event.pagehide", { persisted: persisted ?? null });
+        },
+        { capture: true }
+      );
+
+      document.addEventListener(
+        "visibilitychange",
+        () => {
+          if (document.visibilityState === "hidden") {
+            logReloadDiag("event.visibility.hidden");
+          }
+        },
+        { capture: true }
+      );
+    });
+
     ttPage = new TuneTreesPage(page);
     await ttPage.setSchedulingPrefs();
 
