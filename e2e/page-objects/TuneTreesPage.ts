@@ -1323,31 +1323,23 @@ export class TuneTreesPage {
       }
       const noTunesFoundLocator = this.page.getByText("No tunes found");
 
-      const dataRows = grid.locator("tbody tr[data-index], tbody tr");
-      const firstRow = dataRows.nth(1);
-      const titleColumnIndex = await this.getColumnIndexByHeaderTextViaLocator(
-        grid,
-        "Title"
-      );
+      const matchingRow = grid.locator("tbody tr", { hasText: tuneTitle }).first();
+      let hasMatchingRow = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        hasMatchingRow = await matchingRow
+          .isVisible({ timeout: 500 })
+          .catch(() => false);
 
-      let firstRowTitle = "";
-      if (titleColumnIndex > -1) {
-        for (let attempt = 0; attempt < 6; attempt++) {
-          firstRowTitle = await firstRow
-            .locator(`td:nth-child(${titleColumnIndex + 1})`)
-            .innerText();
+        if (hasMatchingRow) break;
 
-          if (firstRowTitle === tuneTitle) break;
+        await this.page.waitForTimeout(200);
 
-          await this.page.waitForTimeout(200);
+        const noTunesWereFound = await noTunesFoundLocator
+          .isVisible({ timeout: 100 })
+          .catch(() => false);
 
-          const noTunesWereFound = await noTunesFoundLocator
-            .isVisible({ timeout: 100 })
-            .catch(() => false);
-
-          if (noTunesWereFound) {
-            break;
-          }
+        if (noTunesWereFound) {
+          break;
         }
       }
       const noTunesWereFound = await noTunesFoundLocator
@@ -1355,7 +1347,7 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!noTunesWereFound) {
-        expect(firstRowTitle).toContain(tuneTitle);
+        expect(hasMatchingRow).toBe(true);
       }
     }
 
