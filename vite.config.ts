@@ -10,6 +10,7 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
+  const disableHmrForE2E = process.env.VITE_DISABLE_HMR_FOR_E2E === "true";
 
   // Get build-time constants
   const getGitCommit = () => {
@@ -31,6 +32,7 @@ export default defineConfig(() => {
   return {
     // Development server configuration
     server: {
+      hmr: disableHmrForE2E ? false : undefined,
       proxy: {
         // Proxy TheSession.org API requests to bypass CORS in development
         // This matches the pattern used by the import utils

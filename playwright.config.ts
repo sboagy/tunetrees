@@ -238,6 +238,8 @@ export default defineConfig({
       env: {
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || "",
         VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || "",
+        VITE_DISABLE_HMR_FOR_E2E:
+          process.env.VITE_DISABLE_HMR_FOR_E2E || "true",
         // Forward optional diagnostics flags into the Vite server process.
         VITE_SYNC_DIAGNOSTICS: process.env.VITE_SYNC_DIAGNOSTICS || "",
         VITE_SYNC_DEBUG: process.env.VITE_SYNC_DEBUG || "",
