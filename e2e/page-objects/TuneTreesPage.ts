@@ -2132,7 +2132,10 @@ export class TuneTreesPage {
         .getByText("Loading practice queue...")
         .isVisible()
         .catch(() => false),
-      this.page.getByText("No tunes available").isVisible().catch(() => false),
+      this.page
+        .getByText("No tunes available")
+        .isVisible()
+        .catch(() => false),
     ]);
     console.log("[TuneTreesPageDiag] submitEvaluations:clicked", {
       elapsedMs: Date.now() - submitStartedAt,
@@ -2218,6 +2221,7 @@ export class TuneTreesPage {
         // Retry a couple of times, and ensure the card back is revealed if needed.
         let menuOpened = false;
         for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
+          await evalButton.focus().catch(() => undefined);
           await evalButton.click({ trial: true, timeout: 5000 });
           await evalButton.click({ timeout: 5000 });
 
@@ -2226,6 +2230,50 @@ export class TuneTreesPage {
             menuOpened = true;
             break;
           } catch {
+            // Mobile/headless runs can report the combobox trigger as visible+enabled
+            // while pointer click doesn't actually toggle the popup (likely focus/overlay
+            // timing). Try keyboard activation first (Enter/Space), then log state and
+            // reset reveal/focus before the next retry.
+            try {
+              await this.page.keyboard.press("Enter");
+              await expect(menu).toBeVisible({ timeout: 1500 });
+              menuOpened = true;
+              break;
+            } catch {}
+
+            try {
+              await this.page.keyboard.press(" ");
+              await expect(menu).toBeVisible({ timeout: 1500 });
+              menuOpened = true;
+              break;
+            } catch {}
+
+            const [ariaExpanded, hasLoadingQueue, hasNoTunes] =
+              await Promise.all([
+                evalButton.getAttribute("aria-expanded").catch(() => null),
+                this.page
+                  .getByText("Loading practice queue...")
+                  .isVisible()
+                  .catch(() => false),
+                this.page
+                  .getByText("No tunes available")
+                  .isVisible()
+                  .catch(() => false),
+              ]);
+            console.log(
+              "[TuneTreesPageDiag] selectFlashcardEvaluation:menu-open-retry",
+              {
+                tuneId,
+                value,
+                outerAttempt,
+                openAttempt,
+                ariaExpanded,
+                hasLoadingQueue,
+                hasNoTunes,
+                url: this.page.url(),
+              }
+            );
+
             try {
               await this.ensureReveal(true);
             } catch {}

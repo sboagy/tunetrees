@@ -4,6 +4,7 @@ import {
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
+import { waitForSyncComplete } from "../helpers/local-db-lifecycle";
 import {
   getTestUserClient,
   setupDeterministicTestParallel,
@@ -257,6 +258,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
             waitUntil: "domcontentloaded",
           });
 
+          await waitForSyncComplete(page, 45000);
+
           await verifyClockFrozen(page, currentDate, undefined, "After Reload");
           await page.waitForTimeout(2000);
 
@@ -275,6 +278,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
           // Force sync down
           await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+          await waitForSyncComplete(page, 45000);
           await page.waitForLoadState("networkidle", { timeout: 15000 });
         }
       }

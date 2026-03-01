@@ -111,8 +111,9 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
 
       if (!historyAny.__ttReloadDiagPatched) {
         const originalPushState = historyAny.pushState?.bind(window.history);
-        const originalReplaceState =
-          historyAny.replaceState?.bind(window.history);
+        const originalReplaceState = historyAny.replaceState?.bind(
+          window.history
+        );
 
         if (typeof originalPushState === "function") {
           historyAny.pushState = (...args: unknown[]) => {
@@ -201,9 +202,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       }
     };
 
-    const onMainFrameNavigated = (
-      frame: import("@playwright/test").Frame
-    ) => {
+    const onMainFrameNavigated = (frame: import("@playwright/test").Frame) => {
       if (frame === page.mainFrame()) {
         stamp("main-frame-navigated", { url: frame.url() });
       }
@@ -223,69 +222,69 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
         url: page.url(),
       });
 
-    await ttPage.navigateToTab("practice");
-    stamp("after-navigate-to-practice", { url: page.url() });
-    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
-    stamp("practice-grid-visible");
+      await ttPage.navigateToTab("practice");
+      stamp("after-navigate-to-practice", { url: page.url() });
+      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+      stamp("practice-grid-visible");
 
-    const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
-    await expect(
-      row.getByRole("cell", { name: TEST_TUNE_BANISH_TITLE })
-    ).toBeVisible({ timeout: 10000 });
-    stamp("target-row-visible", { tuneTitle: TEST_TUNE_BANISH_TITLE });
+      const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+      await expect(
+        row.getByRole("cell", { name: TEST_TUNE_BANISH_TITLE })
+      ).toBeVisible({ timeout: 10000 });
+      stamp("target-row-visible", { tuneTitle: TEST_TUNE_BANISH_TITLE });
 
-    await ttPage.enableFlashcardMode();
-    stamp("flashcard-mode-enabled");
-    await expect(ttPage.flashcardView).toBeVisible({ timeout: 10000 });
-    stamp("flashcard-visible");
+      await ttPage.enableFlashcardMode();
+      stamp("flashcard-mode-enabled");
+      await expect(ttPage.flashcardView).toBeVisible({ timeout: 10000 });
+      stamp("flashcard-visible");
 
-    stamp("before-selectFlashcardEvaluation", {
-      eval: "good",
-      url: page.url(),
-    });
-    await ttPage.selectFlashcardEvaluation("good");
-    stamp("after-selectFlashcardEvaluation");
+      stamp("before-selectFlashcardEvaluation", {
+        eval: "good",
+        url: page.url(),
+      });
+      await ttPage.selectFlashcardEvaluation("good");
+      stamp("after-selectFlashcardEvaluation");
 
-    stamp("before-submitEvaluations", { timeoutMs: 60000, url: page.url() });
-    await ttPage.submitEvaluations({ timeoutMs: 60000 });
-    stamp("after-submitEvaluations");
+      stamp("before-submitEvaluations", { timeoutMs: 60000, url: page.url() });
+      await ttPage.submitEvaluations({ timeoutMs: 60000 });
+      stamp("after-submitEvaluations");
 
-    // await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await page.waitForTimeout(1200);
-    stamp("after-post-submit-wait", {
-      url: page.url(),
-      hasLoadingQueue: await page
-        .getByText("Loading practice queue...")
-        .isVisible()
-        .catch(() => false),
-      hasNoTunes: await page
-        .getByText("No tunes available")
-        .isVisible()
-        .catch(() => false),
-    });
+      // await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await page.waitForTimeout(1200);
+      stamp("after-post-submit-wait", {
+        url: page.url(),
+        hasLoadingQueue: await page
+          .getByText("Loading practice queue...")
+          .isVisible()
+          .catch(() => false),
+        hasNoTunes: await page
+          .getByText("No tunes available")
+          .isVisible()
+          .catch(() => false),
+      });
 
-    const record = await queryLatestPracticeRecord(
-      page,
-      TEST_TUNE_BANISH_ID,
-      testUser.repertoireId,
-      { waitForRecordMs: 10000, pollIntervalMs: 300 }
-    );
-    if (!record) throw new Error("No practice record found after evaluation");
-    stamp("queried-latest-practice-record", {
-      interval: record.interval,
-      practiced: record.practiced,
-      due: record.due,
-    });
+      const record = await queryLatestPracticeRecord(
+        page,
+        TEST_TUNE_BANISH_ID,
+        testUser.repertoireId,
+        { waitForRecordMs: 10000, pollIntervalMs: 300 }
+      );
+      if (!record) throw new Error("No practice record found after evaluation");
+      stamp("queried-latest-practice-record", {
+        interval: record.interval,
+        practiced: record.practiced,
+        due: record.due,
+      });
 
-    expect(record.interval).toBe(1);
+      expect(record.interval).toBe(1);
 
-    const practiced = new Date(record.practiced);
-    const due = new Date(record.due);
-    const diffDays = Math.round(
-      (due.getTime() - practiced.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    expect(diffDays).toBe(1);
-    stamp("assertions-complete", { diffDays, interval: record.interval });
+      const practiced = new Date(record.practiced);
+      const due = new Date(record.due);
+      const diffDays = Math.round(
+        (due.getTime() - practiced.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      expect(diffDays).toBe(1);
+      stamp("assertions-complete", { diffDays, interval: record.interval });
     } finally {
       page.off("console", onConsole);
       page.off("framenavigated", onMainFrameNavigated);

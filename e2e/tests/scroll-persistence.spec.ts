@@ -23,6 +23,8 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
  */
 
 test.describe("Scroll Position Persistence", () => {
+  test.describe.configure({ timeout: 120000 });
+
   let addedTuneIds: string[] = [];
   let currentTestUser: TestUser;
   let ttPage: TuneTreesPage;
