@@ -19,6 +19,7 @@ export const SYNCABLE_TABLES = [
   "daily_practice_queue",
   "genre",
   "genre_tune_type",
+  "goal",
   "instrument",
   "note",
   "plugin",
@@ -108,6 +109,24 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     columnDescriptions: {
       genre_id: "Reference to the genre.",
       tune_type_id: "Reference to the tune type.",
+    },
+  },
+  goal: {
+    primaryKey: "id",
+    uniqueKeys: ["name", "private_for"],
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      base_intervals:
+        "JSON array of day-values; used when default_technique = base_interval.",
+      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
+      device_id: "Device that last modified this record.",
+      last_modified_at: "Timestamp of last modification.",
+      private_for:
+        "Owner user_profile.id; NULL = system goal visible to all users.",
+      sync_version: "Sync version for conflict resolution.",
     },
   },
   instrument: {

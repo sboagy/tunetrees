@@ -299,7 +299,6 @@ export async function clearTunetreesStorageDB(
 // PARALLEL-SAFE SETUP FUNCTIONS (support multiple test users)
 // ============================================================================
 
-import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 import { BASE_URL } from "../test-config";
 import {
   resetLocalDbAndResync,
@@ -678,9 +677,9 @@ export async function seedUserRepertoire(
   log.debug(`✅ [${user.name}] Seeded ${tuneIds.length} tunes in repertoire`);
 }
 
-function applyTableQueryFilters(
+function applyTableQueryFilters<TQuery extends { eq: (column: string, value: unknown) => TQuery }>(
   tableName: string,
-  query: PostgrestFilterBuilder<any, any, any, null, string, unknown, "DELETE">,
+  query: TQuery,
   user: TestUser
 ) {
   if (tableName === "daily_practice_queue") {

@@ -48,16 +48,18 @@ export const FSRS_QUALITY_MAP = {
 } as const;
 
 /**
- * Goal-specific base intervals (in days) for non-recall goals
+ * Goal-specific base intervals (in days) for non-recall goals.
+ * User-defined goals may supply their own intervals via the `base_intervals` DB column;
+ * this constant acts as a compile-time fallback for system goals.
  * Reference: legacy schedule.py _calculate_goal_specific_due
  */
-const GOAL_BASE_INTERVALS = {
+export const GOAL_BASE_INTERVALS: Record<string, ReadonlyArray<number>> = {
   initial_learn: [0.1, 0.5, 1, 2, 4], // Very frequent practice
   fluency: [1, 3, 7, 14, 21], // Building consistency
   session_ready: [0.5, 1, 2, 3, 5], // Intensive short-term
   performance_polish: [2, 5, 10, 15, 21], // Quality refinement
   recall: [], // Uses FSRS algorithm
-} as const;
+};
 
 /**
  * Technique-specific interval modifiers
@@ -290,15 +292,17 @@ export class FSRSService implements SchedulingService {
    */
   calculateGoalSpecificDue(
     input: RecordPracticeInput,
-    latestRecord?: PracticeRecord
+    latestRecord?: PracticeRecord,
+    customBaseIntervals?: ReadonlyArray<number>
   ): Date {
     const goal = input.goal ?? "recall";
     const technique = input.technique;
 
-    // Get base intervals for this goal
-    const baseIntervals = GOAL_BASE_INTERVALS[
-      goal as keyof typeof GOAL_BASE_INTERVALS
-    ] ?? [1, 3, 7, 14, 30];
+    // Custom intervals (from user-defined goal DB row) take precedence over compile-time fallback
+    const baseIntervals: ReadonlyArray<number> =
+      customBaseIntervals && customBaseIntervals.length > 0
+        ? customBaseIntervals
+        : (GOAL_BASE_INTERVALS[goal] ?? [1, 3, 7, 14, 30]);
 
     // Determine current step based on previous repetitions and quality
     let currentStep = 0;
@@ -457,3 +461,31 @@ export async function getRepertoireTuneCount(
 
 // Example usage:
 // const tuneCount = await getRepertoireTuneCount(localDb(), currentRepertoireId()!);
+
+/**
+ * Construct a goal-heuristic override schedule.
+ *
+ * Keeps all FSRS-derived state fields (stability, difficulty, state, reps, lapses,
+ * elapsed_days, scheduled_days, last_review) but replaces `nextDue` and `interval`
+ * with values derived from the goal's base-interval ladder.
+ *
+ * Exported separately for unit testability.
+ *
+ * @param fsrsSchedule - The full FSRS schedule used as the base.
+ * @param goalSpecificDue - The next-due date from the goal's base-interval ladder.
+ * @param practicedAt - The date/time the practice session occurred.
+ * @returns Overridden NextReviewSchedule.
+ */
+export function buildGoalHeuristicOverride(
+  fsrsSchedule: NextReviewSchedule,
+  goalSpecificDue: Date,
+  practicedAt: Date
+): NextReviewSchedule {
+  const intervalMs = goalSpecificDue.getTime() - practicedAt.getTime();
+  const intervalDays = intervalMs / (24 * 60 * 60 * 1000);
+  return {
+    ...fsrsSchedule,
+    nextDue: goalSpecificDue,
+    interval: Math.max(0, intervalDays),
+  };
+}

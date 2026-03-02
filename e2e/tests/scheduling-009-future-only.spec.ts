@@ -4,6 +4,7 @@ import {
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
+import { waitForSyncComplete } from "../helpers/local-db-lifecycle";
 import {
   getTestUserClient,
   setupDeterministicTestParallel,
@@ -66,6 +67,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       undefined,
       test.info().project.name
     );
+    await page.waitForTimeout(2000); // Wait for setup to stabilize
   });
 
   test("should ensure due dates are strictly in future across Good/Easy chain", async ({
@@ -75,7 +77,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
   }) => {
     // Helper to create, configure, and add a tune to review
     async function createAndAddToReview(title: string) {
-      await ttPage.catalogTab.click();
+      await ttPage.navigateToTab("catalog");
       await ttPage.catalogAddTuneButton.click();
       const newButton = page.getByRole("button", { name: /^new$/i });
       await newButton.click();
@@ -87,7 +89,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       await ttPage.selectTypeInTuneEditor("Reel (4/4)");
       const saveButton = page.getByRole("button", { name: /save/i });
       await saveButton.click();
-      await page.waitForLoadState("networkidle", { timeout: 15000 });
+      // await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await page.waitForTimeout(2000);
       // Add to repertoire
       await ttPage.searchForTune(title, ttPage.catalogGrid);
       const checkbox = ttPage.catalogGrid
@@ -97,7 +100,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       await ttPage.catalogAddToRepertoireButton.click();
       await page.waitForTimeout(1000);
       // Add to review
-      await ttPage.repertoireTab.click();
+      await ttPage.navigateToTab("repertoire");
       await ttPage.searchForTune(title, ttPage.repertoireGrid);
       const repCheckbox = ttPage.repertoireGrid
         .locator('input[type="checkbox"]')
@@ -174,7 +177,9 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         );
 
         // Go to practice
-        await ttPage.practiceTab.click();
+        // Use navigateToTab so we avoid re-clicking an already active tab,
+        // which can drop ?practiceDate=YYYY-MM-DD and cause queue/date drift.
+        await ttPage.navigateToTab("practice");
 
         // Wait for loading to complete (sync can take time after reload)
         await expect(
@@ -199,7 +204,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         const record = await queryLatestPracticeRecord(
           page,
           tuneId,
-          testUser.repertoireId
+          testUser.repertoireId,
+          { waitForRecordMs: 12000, pollIntervalMs: 300 }
         );
         if (!record) throw new Error("Record not found");
 
@@ -254,6 +260,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
             waitUntil: "domcontentloaded",
           });
 
+          await waitForSyncComplete(page, 45000);
+
           await verifyClockFrozen(page, currentDate, undefined, "After Reload");
           await page.waitForTimeout(2000);
 
@@ -272,6 +280,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
           // Force sync down
           await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+          await waitForSyncComplete(page, 45000);
           await page.waitForLoadState("networkidle", { timeout: 15000 });
         }
       }

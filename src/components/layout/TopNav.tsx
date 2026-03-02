@@ -20,6 +20,7 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
@@ -303,12 +304,7 @@ const LogoDropdown: Component<{
 const RepertoireDropdown: Component<{
   onOpenRepertoireManager: () => void;
 }> = (props) => {
-  const {
-    user,
-    localDb,
-    repertoireListChanged,
-    remoteSyncDownCompletionVersion,
-  } = useAuth();
+  const { user, localDb, repertoireListChanged } = useAuth();
   const { currentRepertoireId, setCurrentRepertoireId } =
     useCurrentRepertoire();
   const [showDropdown, setShowDropdown] = createSignal(false);
@@ -334,7 +330,7 @@ const RepertoireDropdown: Component<{
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const version = `${repertoireListChanged()}:${remoteSyncDownCompletionVersion()}`; // Triggers refetch when repertoires change or sync completes
+      const version = `${repertoireListChanged()}`; // Triggers refetch when repertoires change
 
       if (shouldTopNavDiag) {
         console.log("🔍 [TopNav] Repertoires dependency check:", {
@@ -770,6 +766,7 @@ const RepertoireDropdown: Component<{
 
 export const TopNav: Component = () => {
   const location = useLocation();
+  const { openUserSettings } = useUserSettingsDialog();
   const {
     user,
     localDb,
@@ -1161,20 +1158,7 @@ export const TopNav: Component = () => {
                         class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                         onClick={() => {
                           setShowUserMenu(false);
-                          try {
-                            const returnTo =
-                              window.location.pathname +
-                              window.location.search +
-                              window.location.hash;
-                            window.sessionStorage.setItem(
-                              "tt-settings-return",
-                              returnTo
-                            );
-                          } catch {
-                            // ignore storage failures
-                          }
-                          window.location.href =
-                            "/user-settings/scheduling-options";
+                          openUserSettings("scheduling-options");
                         }}
                         data-testid="user-settings-button"
                       >

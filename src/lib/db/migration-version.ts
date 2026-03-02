@@ -8,7 +8,7 @@
  * @module lib/db/migration-version
  */
 
-const CURRENT_SCHEMA_VERSION = "2.0.4-view-column-meta"; // Bump this when schema changes
+const CURRENT_SCHEMA_VERSION = "2.0.5-add-goal-table"; // Bump this when schema changes
 
 /**
  * Get the locally stored schema version from localStorage

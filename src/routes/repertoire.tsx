@@ -11,6 +11,7 @@
 
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
+import { and, eq } from "drizzle-orm";
 import {
   type Component,
   createEffect,
@@ -36,6 +37,7 @@ import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import * as schema from "../lib/db/schema";
+import { repertoireTune } from "../lib/db/schema";
 import { log } from "../lib/logger";
 
 const arraysEqual = (a: string[], b: string[]) =>
@@ -64,6 +66,7 @@ const RepertoirePage: Component = () => {
     repertoireListChanged,
     catalogListChanged,
     incrementRepertoireListChanged,
+    suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -240,8 +243,16 @@ const RepertoirePage: Component = () => {
     }
   );
 
+  const repertoireTuneRows = createMemo(
+    () => repertoireTunes.latest ?? repertoireTunes() ?? []
+  );
+
+  const isInitialRepertoireLoading = createMemo(
+    () => repertoireTunes.loading && repertoireTunes.latest == null
+  );
+
   const repertoireIsEmpty = createMemo(
-    () => !repertoireTunes.loading && (repertoireTunes()?.length ?? 0) === 0
+    () => !isInitialRepertoireLoading() && repertoireTuneRows().length === 0
   );
 
   // Fetch all genres for proper genre names
@@ -269,7 +280,7 @@ const RepertoirePage: Component = () => {
 
   // Get unique types, modes, genres for filter dropdowns
   const availableTypes = createMemo(() => {
-    const tunes = repertoireTunes() || [];
+    const tunes = repertoireTuneRows();
     const types = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.type) types.add(tune.tune.type);
@@ -278,7 +289,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableModes = createMemo(() => {
-    const tunes = repertoireTunes() || [];
+    const tunes = repertoireTuneRows();
     const modes = new Set<string>();
     tunes.forEach((tune) => {
       if (tune.tune.mode) modes.add(tune.tune.mode);
@@ -287,7 +298,7 @@ const RepertoirePage: Component = () => {
   });
 
   const availableGenres = createMemo(() => {
-    const tunes = repertoireTunes() || [];
+    const tunes = repertoireTuneRows();
     const genres = allGenres() || [];
 
     log.debug("REPERTOIRE availableGenres:", {
@@ -319,6 +330,52 @@ const RepertoirePage: Component = () => {
     navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
   };
 
+  // Handle goal change: update single row, or bulk-update all selected rows.
+  const handleGoalChange = async (tuneId: string, goal: string | null) => {
+    const db = localDb();
+    const repertoireId = currentRepertoireId();
+    if (!db || !repertoireId) return;
+
+    const table = tableInstance();
+    const selectedRows = table?.getSelectedRowModel().rows ?? [];
+
+    // If more than one row is selected AND the changed row is among the selected,
+    // offer to apply to all selected rows; otherwise single-row update.
+    const selectedIds = selectedRows.map((r) =>
+      String((r.original as any).tune_id ?? (r.original as any).id)
+    );
+    const isInSelection =
+      selectedIds.includes(String(tuneId)) && selectedIds.length > 1;
+
+    const targetIds: string[] = isInSelection
+      ? window.confirm(
+          `Apply goal "${goal ?? "recall"}" to all ${selectedIds.length} selected tunes?`
+        )
+        ? selectedIds
+        : [tuneId]
+      : [tuneId];
+
+    try {
+      suppressNextViewRefresh("repertoire");
+      await db.transaction(async (tx) => {
+        for (const tid of targetIds) {
+          await tx
+            .update(repertoireTune)
+            .set({ goal: goal ?? null })
+            .where(
+              and(
+                eq(repertoireTune.tuneRef, tid),
+                eq(repertoireTune.repertoireRef, repertoireId)
+              )
+            );
+        }
+      });
+      incrementRepertoireListChanged();
+    } catch (err) {
+      console.error("[RepertoirePage] Failed to update goal:", err);
+    }
+  };
+
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
     null
   );
@@ -333,7 +390,7 @@ const RepertoirePage: Component = () => {
   return (
     <div class="h-full flex flex-col">
       {/* Toolbar with Search and Filters */}
-      <Show when={!repertoireTunes.loading && currentRepertoireId()}>
+      <Show when={!isInitialRepertoireLoading() && currentRepertoireId()}>
         <RepertoireToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
@@ -359,7 +416,7 @@ const RepertoirePage: Component = () => {
       <div class={GRID_CONTENT_CONTAINER}>
         <Show when={userId() && currentRepertoireId()}>
           <Switch>
-            <Match when={repertoireTunes.loading}>
+            <Match when={isInitialRepertoireLoading()}>
               <div class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
                 Loading repertoire...
               </div>
@@ -387,6 +444,7 @@ const RepertoirePage: Component = () => {
                 selectedGenreNames={selectedGenres()}
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
+                onGoalChange={handleGoalChange}
                 onSelectionChange={setSelectedRowsCount}
                 onTableReady={setTableInstance}
               />

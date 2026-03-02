@@ -12,6 +12,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "user_ref",
     },
+    goalIds: {
+      table: "goal",
+      idColumn: "id",
+      ownerColumn: "private_for",
+    },
     instrumentIds: {
       table: "instrument",
       idColumn: "id",
@@ -78,6 +83,20 @@ export const WORKER_SYNC_CONFIG = {
       daily_practice_queue: {
         kind: "eqUserId",
         column: "user_ref",
+      },
+      goal: {
+        kind: "compound",
+        operator: "or",
+        rules: [
+          {
+            kind: "publicOnly",
+            column: "private_for",
+          },
+          {
+            kind: "eqUserId",
+            column: "private_for",
+          },
+        ],
       },
       instrument: {
         kind: "orNullEqUserId",
@@ -251,6 +270,18 @@ export const WORKER_SYNC_CONFIG = {
       },
       genre_tune_type: {
         denyDelete: true,
+      },
+      goal: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+        bindAuthUserIdProps: ["private_for"],
+        denyDelete: false,
       },
       instrument: {
         sanitize: {

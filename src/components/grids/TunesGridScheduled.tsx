@@ -19,6 +19,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
+import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
@@ -29,6 +30,19 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const { localDb } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+
+  // Goals: load once per user, used by GoalBadge dropdown in the grid.
+  const [goalsData] = createResource(
+    () => {
+      const db = localDb();
+      const uid = props.userId;
+      return db && uid ? { db, uid } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getGoals(params.db, params.uid);
+    }
+  );
 
   // Column visibility: ensure select column hidden and only valid keys propagate
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
@@ -180,6 +194,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
             onGoalChange: props.onGoalChange,
             getRecallEvalOpen,
             setRecallEvalOpen,
+            goals: () => goalsData() ?? [],
           }}
           onTableReady={(tbl) => {
             props.onTableReady?.(tbl as any);

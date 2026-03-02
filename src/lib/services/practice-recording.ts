@@ -18,14 +18,18 @@
  * @module lib/services/practice-recording
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import {
   getLatestPracticeRecord,
   getUserPreferences,
   getUserSchedulingOptions,
 } from "../db/queries/practice";
-import { practiceRecord, repertoireTune } from "../db/schema";
+import {
+  goal as goalTable,
+  practiceRecord,
+  repertoireTune,
+} from "../db/schema";
 import type {
   NewPracticeRecord,
   NextReviewSchedule,
@@ -37,8 +41,10 @@ import {
   getSchedulingPlugin,
 } from "../plugins/scheduling";
 import {
+  buildGoalHeuristicOverride,
   FSRS_QUALITY_MAP,
   FSRSService,
+  GOAL_BASE_INTERVALS,
   getRepertoireTuneCount,
 } from "../scheduling/fsrs-service";
 import { getPracticeDate } from "../utils/practice-date";
@@ -148,7 +154,48 @@ export async function evaluatePractice(
       })
     : null;
 
-  const resolvedSchedule = pluginSchedule ?? schedule;
+  // Goal heuristic: when goal has base-interval ladder and no plugin override,
+  // replace the FSRS nextDue/interval with the goal-specific schedule.
+  let goalHeuristicSchedule: typeof schedule | null = null;
+  const goalName = normalizedInput.goal ?? "recall";
+  if (!pluginSchedule && goalName !== "recall") {
+    // Look up user-owned goal first, then fall back to system goal (private_for IS NULL).
+    const goalRows = await db
+      .select()
+      .from(goalTable)
+      .where(
+        and(
+          eq(goalTable.name, goalName),
+          or(eq(goalTable.privateFor, userId), isNull(goalTable.privateFor))
+        )
+      )
+      .orderBy(goalTable.privateFor) // user rows sort before NULL
+      .limit(2)
+      .all();
+    // Prefer user-owned row (non-null privateFor), then system
+    const goalRow = goalRows.find((r) => r.privateFor !== null) ?? goalRows[0];
+    const customIntervals: number[] | null = goalRow?.baseIntervals
+      ? (JSON.parse(goalRow.baseIntervals) as number[])
+      : null;
+    const effectiveIntervals: ReadonlyArray<number> =
+      customIntervals && customIntervals.length > 0
+        ? customIntervals
+        : (GOAL_BASE_INTERVALS[goalName] ?? []);
+    if (effectiveIntervals.length > 0) {
+      const goalDue = fsrsService.calculateGoalSpecificDue(
+        normalizedInput,
+        latestRecord ?? undefined,
+        effectiveIntervals
+      );
+      goalHeuristicSchedule = buildGoalHeuristicOverride(
+        schedule,
+        goalDue,
+        normalizedInput.practiced
+      );
+    }
+  }
+
+  const resolvedSchedule = pluginSchedule ?? goalHeuristicSchedule ?? schedule;
 
   // Lapses business rule override (Again only increments when prior state was Review=2)
   const priorState = latestRecord?.state ?? 0;

@@ -9,9 +9,10 @@
  * @module lib/db/queries/user-settings
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import type { SqliteDatabase } from "../client-sqlite";
 import {
+  goal,
   prefsSchedulingOptions,
   prefsSpacedRepetition,
   userProfile,
@@ -387,4 +388,122 @@ export async function updateUserProfile(
     throw new Error("Failed to retrieve updated user profile");
   }
   return updated;
+}
+
+// ============================================================================
+// Goal Queries
+// ============================================================================
+
+/**
+ * Shape returned by goal queries.
+ * Mirrors the goal table columns used by the UI.
+ */
+export interface GoalRow {
+  id: string;
+  name: string;
+  privateFor: string | null;
+  defaultTechnique: string;
+  baseIntervals: string | null;
+  deleted: number;
+}
+
+/**
+ * Returns all non-deleted goals visible to the given user:
+ * - System goals (privateFor IS NULL) sorted first
+ * - User's own private goals sorted by name
+ *
+ * Excludes soft-deleted rows (deleted = 1).
+ */
+export async function getGoals(
+  db: SqliteDatabase,
+  userId: string
+): Promise<GoalRow[]> {
+  const rows = await db
+    .select()
+    .from(goal)
+    .where(
+      and(
+        or(isNull(goal.privateFor), eq(goal.privateFor, userId)),
+        eq(goal.deleted, 0)
+      )
+    );
+
+  // Sort: system goals (privateFor IS NULL) first, then user goals by name
+  return rows.sort((a, b) => {
+    if (a.privateFor === null && b.privateFor !== null) return -1;
+    if (a.privateFor !== null && b.privateFor === null) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/**
+ * Insert a new user-owned goal, or update an existing one if the (name, privateFor)
+ * pair already exists for this user.
+ *
+ * Enforces ownership: privateFor is always set to userId, ignoring any
+ * caller-supplied value.
+ *
+ * @throws if name is empty
+ */
+export async function upsertGoal(
+  db: SqliteDatabase,
+  userId: string,
+  data: {
+    id?: string;
+    name: string;
+    defaultTechnique?: string;
+    baseIntervals?: string | null;
+  }
+): Promise<GoalRow> {
+  if (!data.name.trim()) {
+    throw new Error("Goal name must not be empty");
+  }
+
+  const now = new Date().toISOString();
+  const id = data.id ?? crypto.randomUUID();
+
+  await db
+    .insert(goal)
+    .values({
+      id,
+      name: data.name.trim(),
+      privateFor: userId,
+      defaultTechnique: data.defaultTechnique ?? "fsrs",
+      baseIntervals: data.baseIntervals ?? null,
+      deleted: 0,
+      lastModifiedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [goal.id],
+      set: {
+        name: data.name.trim(),
+        defaultTechnique: data.defaultTechnique ?? "fsrs",
+        baseIntervals: data.baseIntervals ?? null,
+        deleted: 0,
+        lastModifiedAt: now,
+      },
+    });
+
+  const rows = await db.select().from(goal).where(eq(goal.id, id)).limit(1);
+
+  if (rows.length === 0) {
+    throw new Error(`Failed to retrieve goal after upsert (id=${id})`);
+  }
+  return rows[0];
+}
+
+/**
+ * Soft-delete a user-owned goal (sets deleted = 1).
+ * Silently no-ops if the goal doesn't exist or isn't owned by the user
+ * (protects system goals from accidental deletion).
+ */
+export async function softDeleteGoal(
+  db: SqliteDatabase,
+  userId: string,
+  goalId: string
+): Promise<void> {
+  await db
+    .update(goal)
+    .set({ deleted: 1, lastModifiedAt: new Date().toISOString() })
+    .where(and(eq(goal.id, goalId), eq(goal.privateFor, userId)));
 }
