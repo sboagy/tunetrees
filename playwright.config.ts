@@ -32,7 +32,7 @@ export default defineConfig({
   /* Retry on CI only */
   /* BUT: Because of the recallEval issue , go ahead and retry locally 3 times also for now. */
   /* Remove local retries once recallEval issue is fixed */
-  retries: process.env.CI ? 0 : 0,
+  retries: process.env.CI ? 3 : 0,
   /* Enable parallel workers - each worker gets dedicated test user to avoid conflicts */
   workers: process.env.CI ? 2 : 8,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */

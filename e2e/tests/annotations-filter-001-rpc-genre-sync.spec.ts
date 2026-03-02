@@ -59,7 +59,8 @@ async function openCatalogSync(page: import("@playwright/test").Page) {
       await menuToggle.click();
       await expect
         .poll(
-          async () => (await sidebar.boundingBox().catch(() => null))?.width ?? 0,
+          async () =>
+            (await sidebar.boundingBox().catch(() => null))?.width ?? 0,
           { timeout: 5000, intervals: [100, 250, 500] }
         )
         .toBeGreaterThan(150);
