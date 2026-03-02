@@ -94,3 +94,19 @@ The **most impactful near-term change** would be:
 3. **`session_ready` / `performance_polish`**: These benefit from a `targetDate` field on the repertoire-tune association (a "performance date"), which would need a schema addition — but runtime-wise the scheduling math is simple once that date is available.
 
 Would you like me to implement any of these algorithms in fsrs-service.ts, or sketch the schema change needed for deadline-aware scheduling?
+
+## Analysis of what e2e cleanup commits might be removed
+
+...current code does include some experimental/diagnostic complexity you probably do not need long-term.
+
+**Keep (likely functional)**
+- Scheduling/mobile flake fixes in scheduling-009-future-only.spec.ts, scroll-persistence.spec.ts, and TuneTreesPage.ts.
+- Production behavior fixes in TunesGrid.tsx, DateRolloverBanner.tsx, and [src/routes/tunes/[id]/practice-history/index.tsx](src/routes/tunes/[id]/practice-history/index.tsx).
+- E2E stability infra like HMR-off in vite.config.ts and Playwright trace retention in playwright.config.ts.
+
+**Good candidates to trim**
+- Large reload/timeline diagnostics in scheduling-010-plugin-scheduler.spec.ts and scheduling-010-plugin-scheduler.spec.ts.
+- Very verbose always-on page-object logging in TuneTreesPage.ts and TuneTreesPage.ts.
+- Default-on scheduling plugin diagnostics from playwright.config.ts feeding logs in scheduling.ts.
+
+If you want, I can do a cleanup pass now that removes only diagnostics/log noise (no behavior changes), then run the same targeted specs to confirm no regressions.

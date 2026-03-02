@@ -255,10 +255,15 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
           // Navigate with explicit practiceDate param to ensure app sees the correct date
           // (Playwright clock override sometimes fails to affect bundled modules after reload)
-          const nextDateIso = currentDate.toISOString().split("T")[0];
-          await page.goto(`${BASE_URL}/practice?practiceDate=${nextDateIso}`, {
+          const nextPracticeDateIso = encodeURIComponent(
+            currentDate.toISOString()
+          );
+          await page.goto(
+            `${BASE_URL}/practice?practiceDate=${nextPracticeDateIso}`,
+            {
             waitUntil: "domcontentloaded",
-          });
+            }
+          );
 
           await waitForSyncComplete(page, 45000);
 
