@@ -38,12 +38,21 @@ export interface IColumnVisibility {
 }
 
 /**
+ * Column pinning state
+ */
+export interface IColumnPinning {
+  left?: string[];
+  right?: string[];
+}
+
+/**
  * Extended table state with persistence
  */
 export interface ITableStateExtended {
   columnSizing?: IColumnSizing;
   columnOrder?: IColumnOrder;
   columnVisibility?: IColumnVisibility;
+  columnPinning?: IColumnPinning;
   scrollTop?: number;
   sorting?: Array<{ id: string; desc: boolean }>;
   globalFilter?: string;
