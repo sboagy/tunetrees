@@ -1,6 +1,8 @@
 import {
+  type Column,
   type ColumnDef,
   type ColumnOrderState,
+  type ColumnPinningState,
   type ColumnSizingState,
   createSolidTable,
   flexRender,
@@ -171,6 +173,14 @@ export const TunesGrid = (<T extends { id: string | number }>(
       columnSizing: filterByAllowed(state.columnSizing),
       columnOrder: sanitizeOrder(state.columnOrder),
       sorting: sanitizeSorting(state.sorting),
+      columnPinning: {
+        left: (state.columnPinning?.left ?? []).filter((id) =>
+          allowedColumnIds.has(mapColumnId(id))
+        ),
+        right: (state.columnPinning?.right ?? []).filter((id) =>
+          allowedColumnIds.has(mapColumnId(id))
+        ),
+      },
     };
   };
 
@@ -216,6 +226,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
   // Initialize from persisted state first; only adopt prop-driven visibility when it contains keys.
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
     initialState.columnVisibility || {}
+  );
+  const [columnPinning, setColumnPinning] = createSignal<ColumnPinningState>(
+    initialState.columnPinning || { left: [], right: [] }
   );
 
   const [lastSelectionKey, setLastSelectionKey] = createSignal<string | null>(
@@ -357,12 +370,16 @@ export const TunesGrid = (<T extends { id: string | number }>(
       get columnVisibility() {
         return columnVisibility();
       },
+      get columnPinning() {
+        return columnPinning();
+      },
     },
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     onColumnSizingChange: setColumnSizing,
     onColumnOrderChange: setColumnOrder,
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setColumnPinning,
     getRowId: (row) => String((row as any).id),
   });
 
@@ -465,6 +482,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       columnSizing: columnSizing(),
       columnOrder: columnOrder(),
       columnVisibility: columnVisibility(),
+      columnPinning: columnPinning(),
       // Do not persist scrollTop here; handled by scroll persistence logic below
       scrollTop: loadedState?.scrollTop || 0,
     };
@@ -627,6 +645,46 @@ export const TunesGrid = (<T extends { id: string | number }>(
     props.onSelectionChange?.(count);
   });
 
+  // Helpers for pinned column styling
+  const getPinnedBorderClass = (column: Column<T, unknown>): string => {
+    if (
+      column.getIsPinned() === "left" &&
+      column.getPinnedIndex() === table.getLeftLeafColumns().length - 1
+    ) {
+      return " border-r-2 border-blue-300 dark:border-blue-600";
+    }
+    if (column.getIsPinned() === "right" && column.getPinnedIndex() === 0) {
+      return " border-l-2 border-blue-300 dark:border-blue-600";
+    }
+    return "";
+  };
+
+  const getPinnedHeaderStyle = (column: Column<T, unknown>, width: number) => {
+    const isPinned = column.getIsPinned();
+    if (!isPinned) return { width: `${width}px` };
+    return {
+      width: `${width}px`,
+      position: "sticky" as const,
+      ...(isPinned === "left"
+        ? { left: `${column.getStart("left")}px` }
+        : { right: `${column.getAfter("right")}px` }),
+      "z-index": 20,
+    };
+  };
+
+  const getPinnedCellStyle = (column: Column<T, unknown>, width: number) => {
+    const isPinned = column.getIsPinned();
+    if (!isPinned) return { width: `${width}px` };
+    return {
+      width: `${width}px`,
+      position: "sticky" as const,
+      ...(isPinned === "left"
+        ? { left: `${column.getStart("left")}px` }
+        : { right: `${column.getAfter("right")}px` }),
+      "z-index": 1,
+    };
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* Table container with virtualization */}
@@ -642,7 +700,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
         <table
           data-testid={`tunes-grid-${props.tablePurpose}`}
           class={TABLE_CLASSES}
-          style={{ width: `${table.getCenterTotalSize()}px` }}
+          style={{ width: `${table.getTotalSize()}px` }}
         >
           {/* Sticky header */}
           <thead class={HEADER_CLASSES}>
@@ -685,9 +743,12 @@ export const TunesGrid = (<T extends { id: string | number }>(
                               draggedColumnId() !== header.column.id
                                 ? "bg-blue-50 dark:bg-blue-900/20"
                                 : ""
-                            }`
+                            }${header.column.getIsPinned() ? " bg-gray-100 dark:bg-gray-800" : ""}${getPinnedBorderClass(header.column)}`
                           )}
-                          style={{ width: `${header.getSize()}px` }}
+                          style={getPinnedHeaderStyle(
+                            header.column,
+                            header.getSize()
+                          )}
                           onDragOver={(e) =>
                             handleDragOver(
                               e as unknown as DragEvent,
@@ -876,8 +937,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
                     <For each={row.getVisibleCells()}>
                       {(cell) => (
                         <td
-                          class={CELL_CLASSES}
-                          style={{ width: `${cell.column.getSize()}px` }}
+                          class={`${CELL_CLASSES}${cell.column.getIsPinned() ? " bg-white dark:bg-gray-900" : ""}${getPinnedBorderClass(cell.column)}`}
+                          style={getPinnedCellStyle(
+                            cell.column,
+                            cell.column.getSize()
+                          )}
                         >
                           {flexRender(
                             cell.column.columnDef.cell,
