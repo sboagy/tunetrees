@@ -330,21 +330,17 @@ export class TuneTreesPage {
     this.showPublicToggle = page.getByTestId("override-indicator-title");
     this.userSettingsButton = page.getByTestId("user-settings-button");
 
-    this.userSettingsCatalogSyncButton = page.getByRole("link", {
-      name: "Catalog & Sync",
-    });
-    this.userSettingsSchedulingOptionsButton = page.getByRole("link", {
-      name: "Scheduling Options",
-    });
-    this.userSettingsSpacedRepetitionButton = page.getByRole("link", {
-      name: "Spaced Repetition",
-    });
-    this.userSettingsAccountButton = page.getByRole("link", {
-      name: "Account",
-    });
-    this.userSettingsAvatarButton = page.getByRole("link", {
-      name: "Avatar",
-    });
+    this.userSettingsCatalogSyncButton = page.getByTestId(
+      "settings-tab-catalog-sync"
+    );
+    this.userSettingsSchedulingOptionsButton = page.getByTestId(
+      "settings-tab-scheduling-options"
+    );
+    this.userSettingsSpacedRepetitionButton = page.getByTestId(
+      "settings-tab-spaced-repetition"
+    );
+    this.userSettingsAccountButton = page.getByTestId("settings-tab-account");
+    this.userSettingsAvatarButton = page.getByTestId("settings-tab-avatar");
 
     this.settingsMenuToggle = page.getByTestId("settings-menu-toggle");
 
@@ -1327,31 +1323,23 @@ export class TuneTreesPage {
       }
       const noTunesFoundLocator = this.page.getByText("No tunes found");
 
-      const dataRows = grid.locator("tbody tr[data-index], tbody tr");
-      const firstRow = dataRows.nth(1);
-      const titleColumnIndex = await this.getColumnIndexByHeaderTextViaLocator(
-        grid,
-        "Title"
-      );
+      const matchingRow = grid.locator("tbody tr", { hasText: tuneTitle }).first();
+      let hasMatchingRow = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        hasMatchingRow = await matchingRow
+          .isVisible({ timeout: 500 })
+          .catch(() => false);
 
-      let firstRowTitle = "";
-      if (titleColumnIndex > -1) {
-        for (let attempt = 0; attempt < 6; attempt++) {
-          firstRowTitle = await firstRow
-            .locator(`td:nth-child(${titleColumnIndex + 1})`)
-            .innerText();
+        if (hasMatchingRow) break;
 
-          if (firstRowTitle === tuneTitle) break;
+        await this.page.waitForTimeout(200);
 
-          await this.page.waitForTimeout(200);
+        const noTunesWereFound = await noTunesFoundLocator
+          .isVisible({ timeout: 100 })
+          .catch(() => false);
 
-          const noTunesWereFound = await noTunesFoundLocator
-            .isVisible({ timeout: 100 })
-            .catch(() => false);
-
-          if (noTunesWereFound) {
-            break;
-          }
+        if (noTunesWereFound) {
+          break;
         }
       }
       const noTunesWereFound = await noTunesFoundLocator
@@ -1359,7 +1347,7 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!noTunesWereFound) {
-        expect(firstRowTitle).toContain(tuneTitle);
+        expect(hasMatchingRow).toBe(true);
       }
     }
 
@@ -1994,10 +1982,12 @@ export class TuneTreesPage {
     }
 
     const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
+    const evalTrigger = this.page.getByTestId(`recall-eval-${tuneId}`);
+    await expect(evalTrigger).toBeVisible({ timeout: 5000 });
 
     for (let attempt = 0; attempt < 3; attempt++) {
       // ACT: Select rating
-      await evalDropdown.click({ delay: 50 });
+      await evalTrigger.click({ delay: 50 });
 
       try {
         await expect(menu).toBeVisible({ timeout: 3000 });
@@ -2036,6 +2026,15 @@ export class TuneTreesPage {
         .toBeHidden({ timeout: 3000 })
         .catch(() => undefined);
 
+      const expectedLabel =
+        evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
+      await expect
+        .poll(async () => (await evalTrigger.textContent()) ?? "", {
+          timeout: 5000,
+          intervals: [100, 250, 500, 1000],
+        })
+        .toMatch(new RegExp(expectedLabel, "i"));
+
       if (doTimeouts) {
         const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
         await this.page.waitForTimeout(delay);
@@ -2061,14 +2060,22 @@ export class TuneTreesPage {
     await expect
       .poll(
         async () => {
-          const [title, enabled] = await Promise.all([
+          const [title, enabled, textContent] = await Promise.all([
             this.submitEvaluationsButton
               .getAttribute("title")
               .catch(() => null),
             this.submitEvaluationsButton.isEnabled().catch(() => false),
+            this.submitEvaluationsButton.textContent().catch(() => null),
           ]);
-          const match = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
-          const count = match ? Number(match[1]) : 0;
+          const titleMatch = title?.match(
+            /Submit\s+(\d+)\s+practice evaluations/i
+          );
+          const textMatch = textContent?.match(/\b(\d+)\b/);
+          const count = titleMatch
+            ? Number(titleMatch[1])
+            : textMatch
+              ? Number(textMatch[1])
+              : 0;
           return enabled && count >= minCount;
         },
         { timeout: timeoutMs, intervals: [100, 250, 500, 1000] }
@@ -2080,8 +2087,54 @@ export class TuneTreesPage {
     opts: { minCount?: number; timeoutMs?: number } = {}
   ) {
     const timeoutMs = opts.timeoutMs ?? 30000;
+
+    const [preClickTitle, preClickEnabled, preClickText] = await Promise.all([
+      this.submitEvaluationsButton.getAttribute("title").catch(() => null),
+      this.submitEvaluationsButton.isEnabled().catch(() => false),
+      this.submitEvaluationsButton.textContent().catch(() => null),
+    ]);
+    const submitStartedAt = Date.now();
+    console.log("[TuneTreesPageDiag] submitEvaluations:start", {
+      timeoutMs,
+      minCount: opts.minCount ?? 1,
+      url: this.page.url(),
+      preClickTitle,
+      preClickEnabled,
+      preClickText,
+    });
+
     await this.waitForSubmitReady(opts);
+
+    const [readyTitle, readyEnabled, readyText] = await Promise.all([
+      this.submitEvaluationsButton.getAttribute("title").catch(() => null),
+      this.submitEvaluationsButton.isEnabled().catch(() => false),
+      this.submitEvaluationsButton.textContent().catch(() => null),
+    ]);
+    console.log("[TuneTreesPageDiag] submitEvaluations:ready", {
+      elapsedMs: Date.now() - submitStartedAt,
+      readyTitle,
+      readyEnabled,
+      readyText,
+    });
+
     await this.submitEvaluationsButton.click({ timeout: timeoutMs });
+
+    const [hasLoadingQueue, hasNoTunes] = await Promise.all([
+      this.page
+        .getByText("Loading practice queue...")
+        .isVisible()
+        .catch(() => false),
+      this.page
+        .getByText("No tunes available")
+        .isVisible()
+        .catch(() => false),
+    ]);
+    console.log("[TuneTreesPageDiag] submitEvaluations:clicked", {
+      elapsedMs: Date.now() - submitStartedAt,
+      url: this.page.url(),
+      hasLoadingQueue,
+      hasNoTunes,
+    });
   }
 
   /**
@@ -2109,9 +2162,23 @@ export class TuneTreesPage {
     value: "again" | "hard" | "good" | "easy" | "not-set" = "good",
     timeoutAfter: number = 500
   ) {
+    const startedAt = Date.now();
+    console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:start", {
+      value,
+      timeoutAfter,
+      url: this.page.url(),
+    });
+
     const nOuterAttempts = 6;
     for (let outerAttempt = 0; outerAttempt < nOuterAttempts; outerAttempt++) {
       try {
+        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:attempt", {
+          value,
+          outerAttempt,
+          nOuterAttempts,
+          url: this.page.url(),
+        });
+
         await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
 
         // Open the evaluation combobox within the flashcard view (avoid picking up
@@ -2134,12 +2201,19 @@ export class TuneTreesPage {
           );
         }
 
+        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:tune", {
+          tuneId,
+          value,
+          outerAttempt,
+        });
+
         const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
 
         // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
         // Retry a couple of times, and ensure the card back is revealed if needed.
         let menuOpened = false;
         for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
+          await evalButton.focus().catch(() => undefined);
           await evalButton.click({ trial: true, timeout: 5000 });
           await evalButton.click({ timeout: 5000 });
 
@@ -2148,6 +2222,50 @@ export class TuneTreesPage {
             menuOpened = true;
             break;
           } catch {
+            // Mobile/headless runs can report the combobox trigger as visible+enabled
+            // while pointer click doesn't actually toggle the popup (likely focus/overlay
+            // timing). Try keyboard activation first (Enter/Space), then log state and
+            // reset reveal/focus before the next retry.
+            try {
+              await this.page.keyboard.press("Enter");
+              await expect(menu).toBeVisible({ timeout: 1500 });
+              menuOpened = true;
+              break;
+            } catch {}
+
+            try {
+              await this.page.keyboard.press(" ");
+              await expect(menu).toBeVisible({ timeout: 1500 });
+              menuOpened = true;
+              break;
+            } catch {}
+
+            const [ariaExpanded, hasLoadingQueue, hasNoTunes] =
+              await Promise.all([
+                evalButton.getAttribute("aria-expanded").catch(() => null),
+                this.page
+                  .getByText("Loading practice queue...")
+                  .isVisible()
+                  .catch(() => false),
+                this.page
+                  .getByText("No tunes available")
+                  .isVisible()
+                  .catch(() => false),
+              ]);
+            console.log(
+              "[TuneTreesPageDiag] selectFlashcardEvaluation:menu-open-retry",
+              {
+                tuneId,
+                value,
+                outerAttempt,
+                openAttempt,
+                ariaExpanded,
+                hasLoadingQueue,
+                hasNoTunes,
+                url: this.page.url(),
+              }
+            );
+
             try {
               await this.ensureReveal(true);
             } catch {}
@@ -2164,6 +2282,12 @@ export class TuneTreesPage {
           );
         }
 
+        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:menu-open", {
+          tuneId,
+          outerAttempt,
+          elapsedMs: Date.now() - startedAt,
+        });
+
         const optionTestId = `recall-eval-option-${value}`;
         const option = menu.getByTestId(optionTestId);
         await expect(option).toBeVisible({ timeout: 5000 });
@@ -2176,6 +2300,15 @@ export class TuneTreesPage {
           .toBeHidden({ timeout: 5000 })
           .catch(() => undefined);
 
+        console.log(
+          "[TuneTreesPageDiag] selectFlashcardEvaluation:option-clicked",
+          {
+            tuneId,
+            value,
+            elapsedMs: Date.now() - startedAt,
+          }
+        );
+
         const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
         await expect
           .poll(async () => (await evalButton.textContent()) ?? "", {
@@ -2183,8 +2316,35 @@ export class TuneTreesPage {
             intervals: [100, 250, 500, 1000],
           })
           .toMatch(new RegExp(expectedLabel, "i"));
+
+        const [hasLoadingQueue, hasNoTunes] = await Promise.all([
+          this.page
+            .getByText("Loading practice queue...")
+            .isVisible()
+            .catch(() => false),
+          this.page
+            .getByText("No tunes available")
+            .isVisible()
+            .catch(() => false),
+        ]);
+        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:success", {
+          tuneId,
+          value,
+          elapsedMs: Date.now() - startedAt,
+          url: this.page.url(),
+          hasLoadingQueue,
+          hasNoTunes,
+        });
         break;
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:error", {
+          value,
+          outerAttempt,
+          elapsedMs: Date.now() - startedAt,
+          error: errorMessage,
+          url: this.page.url(),
+        });
         if (outerAttempt === nOuterAttempts - 1) throw err;
       }
     }

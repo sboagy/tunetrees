@@ -18,6 +18,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getRepertoireTunesStaged } from "../../lib/db/queries/repertoires";
+import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
@@ -81,8 +82,23 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     }
   );
 
+  // Goals: load once per user for the GoalBadge dropdown.
+  const [goalsData] = createResource(
+    () => {
+      const db = localDb();
+      const uid = props.userId;
+      return db && uid ? { db, uid } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getGoals(params.db, params.uid);
+    }
+  );
+
   // The view already returns ITuneOverview rows
-  const tunes = createMemo<ITuneOverview[]>(() => repertoireTunesData() || []);
+  const tunes = createMemo<ITuneOverview[]>(
+    () => repertoireTunesData.latest ?? repertoireTunesData() ?? []
+  );
 
   // Client-side filter (search/type/mode/genre)
   const filteredTunes = createMemo<ITuneOverview[]>(() => {
@@ -139,6 +155,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   });
 
   const loadError = createMemo(() => repertoireTunesData.error);
+  const isInitialLoading = createMemo(
+    () => repertoireTunesData.loading && repertoireTunesData.latest == null
+  );
   const hasTunes = createMemo(() => filteredTunes().length > 0);
 
   const [columnDescriptions] = createResource(
@@ -166,7 +185,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Loading */}
-      <Show when={!loadError() && repertoireTunesData.loading}>
+      <Show when={!loadError() && isInitialLoading()}>
         <GridStatusMessage
           variant="loading"
           title="Loading repertoire..."
@@ -175,12 +194,13 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Grid */}
-      <Show when={!loadError() && !repertoireTunesData.loading && hasTunes()}>
+      <Show when={!loadError() && !isInitialLoading() && hasTunes()}>
         <div class="flex-1 overflow-hidden">
           <TunesGrid
             tablePurpose="repertoire"
             userId={props.userId}
             repertoireId={currentRepertoireId() || undefined}
+            isLoading={repertoireTunesData.loading}
             data={filteredTunes()}
             columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}
@@ -192,6 +212,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             cellCallbacks={{
               onRecallEvalChange: props.onRecallEvalChange,
               onGoalChange: props.onGoalChange,
+              goals: () => goalsData() ?? [],
             }}
             onSelectionChange={(count) => {
               console.log(
@@ -209,7 +230,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       </Show>
 
       {/* Empty state */}
-      <Show when={!loadError() && !repertoireTunesData.loading && !hasTunes()}>
+      <Show when={!loadError() && !isInitialLoading() && !hasTunes()}>
         <GridStatusMessage
           variant="empty"
           title="No tunes in repertoire"
