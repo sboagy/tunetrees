@@ -93,6 +93,12 @@ interface AuthState {
   /** Increment repertoire list change counter */
   incrementRepertoireListChanged: () => void;
 
+  /** Suppress the next sync-complete view refresh for a category (used for local-write sync echoes) */
+  suppressNextViewRefresh: (
+    category: "repertoire" | "practice" | "catalog",
+    count?: number
+  ) => void;
+
   /** Sign in with email and password */
   signIn: (
     email: string,
@@ -244,6 +250,9 @@ export const AuthProvider: ParentComponent = (props) => {
     createSignal(0);
   const [catalogListChanged, setCatalogListChanged] = createSignal(0);
   const [repertoireListChanged, setRepertoireListChanged] = createSignal(0);
+  const suppressedViewRefreshCounts: Partial<
+    Record<"repertoire" | "practice" | "catalog", number>
+  > = {};
 
   // Sync worker cleanup function and service instance
   let stopSyncWorker: (() => void) | null = null;
@@ -265,6 +274,34 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const diagLog = (...args: unknown[]): void => {
     if (SYNC_DIAGNOSTICS) console.log(...args);
+  };
+
+  const suppressNextViewRefresh = (
+    category: "repertoire" | "practice" | "catalog",
+    count = 1
+  ) => {
+    if (count <= 0) return;
+    suppressedViewRefreshCounts[category] =
+      (suppressedViewRefreshCounts[category] ?? 0) + count;
+    diagLog(
+      `[AuthContext] Suppressing next ${count} sync refresh(es) for category=${category}`
+    );
+  };
+
+  const consumeSuppressedViewRefresh = (
+    category: "repertoire" | "practice" | "catalog"
+  ): boolean => {
+    const remaining = suppressedViewRefreshCounts[category] ?? 0;
+    if (remaining <= 0) return false;
+    if (remaining <= 1) {
+      delete suppressedViewRefreshCounts[category];
+    } else {
+      suppressedViewRefreshCounts[category] = remaining - 1;
+    }
+    diagLog(
+      `[AuthContext] Consumed suppressed sync refresh for category=${category} (remaining=${suppressedViewRefreshCounts[category] ?? 0})`
+    );
+    return true;
   };
 
   async function runSyncDiagnostics(db: SqliteDatabase): Promise<void> {
@@ -851,16 +888,34 @@ export const AuthProvider: ParentComponent = (props) => {
             }
 
             if (categories.has("repertoire")) {
-              log.debug("[AuthContext] Triggering repertoire list refresh");
-              incrementRepertoireListChanged();
+              if (consumeSuppressedViewRefresh("repertoire")) {
+                log.debug(
+                  "[AuthContext] Skipping suppressed repertoire list refresh"
+                );
+              } else {
+                log.debug("[AuthContext] Triggering repertoire list refresh");
+                incrementRepertoireListChanged();
+              }
             }
             if (categories.has("practice")) {
-              log.debug("[AuthContext] Triggering practice list refresh");
-              incrementPracticeListStagedChanged();
+              if (consumeSuppressedViewRefresh("practice")) {
+                log.debug(
+                  "[AuthContext] Skipping suppressed practice list refresh"
+                );
+              } else {
+                log.debug("[AuthContext] Triggering practice list refresh");
+                incrementPracticeListStagedChanged();
+              }
             }
             if (categories.has("catalog")) {
-              log.debug("[AuthContext] Triggering catalog list refresh");
-              incrementCatalogListChanged();
+              if (consumeSuppressedViewRefresh("catalog")) {
+                log.debug(
+                  "[AuthContext] Skipping suppressed catalog list refresh"
+                );
+              } else {
+                log.debug("[AuthContext] Triggering catalog list refresh");
+                incrementCatalogListChanged();
+              }
             }
           }
         } catch (e) {
@@ -2281,6 +2336,7 @@ export const AuthProvider: ParentComponent = (props) => {
     incrementCatalogListChanged,
     repertoireListChanged,
     incrementRepertoireListChanged,
+    suppressNextViewRefresh,
     signIn,
     signUp,
     signInWithOAuth,

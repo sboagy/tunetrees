@@ -382,11 +382,16 @@ export async function deleteTune(
  * Get device ID (browser fingerprint or generate one)
  */
 function getDeviceId(): string {
-  if (typeof window !== "undefined") {
-    let deviceId = localStorage.getItem("tunetrees_device_id");
+  if (
+    typeof window !== "undefined" &&
+    typeof window.localStorage?.getItem === "function" &&
+    typeof window.localStorage?.setItem === "function"
+  ) {
+    const storage = window.localStorage;
+    let deviceId = storage.getItem("tunetrees_device_id");
     if (!deviceId) {
       deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      localStorage.setItem("tunetrees_device_id", deviceId);
+      storage.setItem("tunetrees_device_id", deviceId);
     }
     return deviceId;
   }

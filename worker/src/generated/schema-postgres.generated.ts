@@ -60,6 +60,23 @@ export const genreTuneType = pgTable("genre_tune_type", {
   tuneTypeId: text("tune_type_id").notNull(),
 });
 
+export const goal = pgTable("goal", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  privateFor: uuid("private_for"),
+  defaultTechnique: text("default_technique").notNull().default("fsrs"),
+  baseIntervals: text("base_intervals"),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const instrument = pgTable("instrument", {
   id: uuid("id")
     .notNull()
@@ -415,6 +432,7 @@ export const tables = {
   daily_practice_queue: dailyPracticeQueue,
   genre: genre,
   genre_tune_type: genreTuneType,
+  goal: goal,
   instrument: instrument,
   note: note,
   plugin: plugin,

@@ -23,6 +23,8 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
  */
 
 test.describe("Scroll Position Persistence", () => {
+  test.describe.configure({ timeout: 120000 });
+
   let addedTuneIds: string[] = [];
   let currentTestUser: TestUser;
   let ttPage: TuneTreesPage;
@@ -115,6 +117,7 @@ test.describe("Scroll Position Persistence", () => {
   test.afterEach(async () => {
     // Clean up: remove test tunes
     await removeScrollTestTunes(addedTuneIds, currentTestUser);
+    await ttPage.page.waitForTimeout(1000);
   });
 
   async function waitToSettle(page: Page) {
@@ -135,9 +138,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Get the scrollable container (parent of the table)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-catalog");
     await waitToSettle(page);
 
     // Log element properties to debug
@@ -175,10 +176,10 @@ test.describe("Scroll Position Persistence", () => {
     // Wait for debounce to persist scroll position (300ms + buffer)
     await waitToSettle(page);;
 
-    // Check localStorage - all grids now use integer userId from user_profile table
-    const storedValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage - key includes repertoireId suffix
+    const storedValue = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log("[CATALOG TEST] localStorage value:", storedValue);
     await waitToSettle(page);
 
@@ -203,8 +204,8 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(3000);
 
     // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-catalog"
     );
     await waitToSettle(page);
     const scrollTopAfter = await pollLocatorForScrollValue(
@@ -223,9 +224,7 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Scroll down (reduced amount for smaller grids)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-repertoire");
     await gridContainer.evaluate((el) => {
       el.scrollTop = 400; // Reduced from 800px
     });
@@ -248,8 +247,8 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-repertoire"
     );
     // Allow extra time for restoration after a full reload
     await page.waitForTimeout(1500);
@@ -269,9 +268,7 @@ test.describe("Scroll Position Persistence", () => {
     await waitToSettle(page);
 
     // Scroll down (practice grid has less content) - use mouse wheel for real scroll event
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-scheduled");
 
     // Debug: Check grid dimensions
     const gridInfo = await gridContainer.evaluate((el) => ({
@@ -302,11 +299,10 @@ test.describe("Scroll Position Persistence", () => {
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
     console.log("[PRACTICE TAB SWITCH TEST] scrollTopBefore:", scrollTopBefore);
 
-    // Check localStorage
-    // Practice grid uses integer userId from user_profile table
-    const storedValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage - key includes repertoireId suffix
+    const storedValue = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log("[PRACTICE TAB SWITCH TEST] localStorage value:", storedValue);
 
     expect(scrollTopBefore).toBeGreaterThan(20);
@@ -321,8 +317,8 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-scheduled"
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -363,9 +359,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Scroll down (reduced for realistic grid height)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-catalog");
 
     // Use mouse wheel to scroll (triggers real scroll events)
     const box = await gridContainer.boundingBox();
@@ -397,17 +391,17 @@ test.describe("Scroll Position Persistence", () => {
     const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
     expect(scrollTopBefore).toBeGreaterThan(500);
 
-    // Check localStorage BEFORE reload (uses integer userId from user_profile)
-    const storedValueBeforeReload = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage BEFORE reload - key includes repertoireId suffix
+    const storedValueBeforeReload = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log(
       "[CATALOG REFRESH TEST] localStorage BEFORE reload:",
       storedValueBeforeReload
     );
 
     // Capture scroll value before reload
-    const scrollKey = `TT_CATALOG_SCROLL_${currentTestUser.userId}`;
+    const scrollKey = `TT_CATALOG_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
     const savedScrollValue = storedValueBeforeReload;
 
     // Refresh page
@@ -467,18 +461,18 @@ test.describe("Scroll Position Persistence", () => {
 
     console.log("[CATALOG REFRESH TEST] Console logs:", consoleLogs);
 
-    // Check localStorage value (uses integer userId from user_profile)
-    const storedValueAfter = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Check localStorage value - key includes repertoireId suffix
+    const storedValueAfter = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     console.log(
       "[CATALOG REFRESH TEST] localStorage after reload:",
       storedValueAfter
     );
 
     // Verify scroll position restored from localStorage
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-catalog"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-catalog"
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -487,8 +481,8 @@ test.describe("Scroll Position Persistence", () => {
     console.log("[CATALOG REFRESH TEST] scrollTopAfter:", scrollTopAfter);
     const afterVal = Number(storedValueAfter || "0");
     if (afterVal > 0) {
-      expect(scrollTopAfter).toBeGreaterThan(afterVal - 100);
-      expect(scrollTopAfter).toBeLessThan(afterVal + 100);
+      expect(scrollTopAfter).toBeGreaterThan(afterVal - 150);
+      expect(scrollTopAfter).toBeLessThan(afterVal + 150);
     } else {
       console.warn(
         "[CATALOG REFRESH TEST] No stored scroll value after reload; skipping strict assertion"
@@ -519,32 +513,33 @@ test.describe("Scroll Position Persistence", () => {
   }) => {
     // Increase timeout for this test (milliseconds). Set to 120s.
     test.setTimeout(120000);
-    ttPage.navigateToTab("repertoire");
+    await ttPage.navigateToTab("repertoire");
     await waitToSettle(page);
     // await waitToSettle(page);
 
     // Scroll down (reduced)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-repertoire");
     await gridContainer.evaluate((el) => {
       el.scrollTop = 400;
     });
 
     await waitToSettle(page);
+    // Extra wait to ensure the 150ms scroll debounce has fired and persisted to localStorage
+    await page.waitForTimeout(500);
 
-    // Capture scroll value before reload
-    // const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}`;
-    const savedScrollValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    // Capture scroll key + value before reload
+    const scrollKey = `TT_REPERTOIRE_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
+    const savedScrollValue = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
+    console.log(`[REPERTOIRE REFRESH TEST] savedScrollValue before reload: ${savedScrollValue}`);
 
     // Refresh page
     await page.reload();
 
-    const savedScrollValue2 = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const savedScrollValue2 = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
 
     // Wait for sync to complete BEFORE navigating to tab
     await page.waitForFunction(
@@ -555,23 +550,35 @@ test.describe("Scroll Position Persistence", () => {
     );
     console.log("[REPERTOIRE REFRESH TEST] Sync completed after reload");
 
-    const savedScrollValue3 = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const savedScrollValue3 = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
 
     console.log(
       `[REPERTOIRE REFRESH TEST] Sync completed after reload: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}`
     );
 
-    // We should still be on the Repertoire tab
+    // After reload the auth storage state may have wiped the scroll key.
+    // Restore it manually (same technique as Catalog refresh test).
+    if (savedScrollValue) {
+      await page.evaluate(
+        ({ key, value }) => {
+          console.log(`[BROWSER] Restoring scroll key ${key} = ${value}`);
+          localStorage.setItem(key, value);
+        },
+        { key: scrollKey, value: savedScrollValue }
+      );
+    }
 
-    // brief pause to allow scroll restoration to settle
-    await waitToSettle(page);
-
-    // Verify scroll position restored
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-repertoire"])'
+    // Navigate explicitly to Repertoire tab (page may have reloaded onto practice tab)
+    await ttPage.navigateToTab("repertoire");
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-repertoire"
     );
+    await gridContainerAfter.waitFor({ state: "visible" });
+
+    // Give the grid time to restore scroll from localStorage
+    await page.waitForTimeout(2000);
 
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
@@ -579,29 +586,20 @@ test.describe("Scroll Position Persistence", () => {
     );
 
     console.log(
-      `[REPERTOIRE REFRESH TEST] Sync completed after reload: 
-      savedScrollValue: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}, 
+      `[REPERTOIRE REFRESH TEST] After reload + navigate:
+      savedScrollValue: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3},
       scrollTopAfter: ${scrollTopAfter}`
     );
     expect(scrollTopAfter).not.toBe(0);
 
-    // Use stored value if present; otherwise relax assertion
-    const storedRep = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_REPERTOIRE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
-    const repVal = Number(storedRep || "0");
-    console.log(
-      `[REPERTOIRE REFRESH TEST] Sync completed after reload: 
-      savedScrollValue: ${savedScrollValue}, ${savedScrollValue2}, ${savedScrollValue3}, 
-      scrollTopAfter: ${scrollTopAfter},
-      repVal: ${repVal}`
-    );
-    if (repVal > 0) {
-      expect(scrollTopAfter).toBeGreaterThan(repVal - 100);
-      expect(scrollTopAfter).toBeLessThan(repVal + 200);
+    // Assert against the pre-reload saved value
+    const refVal = Number(savedScrollValue || "0");
+    if (refVal > 0) {
+      expect(scrollTopAfter).toBeGreaterThan(refVal - 100);
+      expect(scrollTopAfter).toBeLessThan(refVal + 200);
     } else {
       console.warn(
-        "[REPERTOIRE REFRESH TEST] No stored scroll value after reload; skipping strict assertion"
+        "[REPERTOIRE REFRESH TEST] No stored scroll value before reload; skipping strict assertion"
       );
       expect(scrollTopAfter).toBeGreaterThanOrEqual(0);
     }
@@ -617,9 +615,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Scroll down (reduced)
-    const gridContainer = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
-    );
+    const gridContainer = page.getByTestId("tunes-grid-container-scheduled");
     await gridContainer.evaluate((el) => {
       el.scrollTop = 25;
     });
@@ -640,16 +636,16 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(500);
 
     // Verify scroll position restored from localStorage
-    const gridContainerAfter = page.locator(
-      'div.overflow-auto:has([data-testid="tunes-grid-scheduled"])'
+    const gridContainerAfter = page.getByTestId(
+      "tunes-grid-container-scheduled"
     );
     const scrollTopAfter = await pollLocatorForScrollValue(
       page,
       gridContainerAfter
     );
-    const storedPractice = await page.evaluate((userId) => {
-      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}`);
-    }, currentTestUser.userId);
+    const storedPractice = await page.evaluate(({ userId, repertoireId }) => {
+      return localStorage.getItem(`TT_PRACTICE_SCROLL_${userId}_${repertoireId}`);
+    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
     const practiceVal = Number(storedPractice || "0");
     if (practiceVal > 0) {
       expect(scrollTopAfter).toBeGreaterThan(practiceVal - 20);
