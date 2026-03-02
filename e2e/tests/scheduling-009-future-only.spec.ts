@@ -177,7 +177,9 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         );
 
         // Go to practice
-        await ttPage.practiceTab.click();
+        // Use navigateToTab so we avoid re-clicking an already active tab,
+        // which can drop ?practiceDate=YYYY-MM-DD and cause queue/date drift.
+        await ttPage.navigateToTab("practice");
 
         // Wait for loading to complete (sync can take time after reload)
         await expect(
