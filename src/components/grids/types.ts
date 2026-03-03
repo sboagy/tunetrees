@@ -38,12 +38,21 @@ export interface IColumnVisibility {
 }
 
 /**
+ * Column pinning state
+ */
+export interface IColumnPinning {
+  left?: string[];
+  right?: string[];
+}
+
+/**
  * Extended table state with persistence
  */
 export interface ITableStateExtended {
   columnSizing?: IColumnSizing;
   columnOrder?: IColumnOrder;
   columnVisibility?: IColumnVisibility;
+  columnPinning?: IColumnPinning;
   scrollTop?: number;
   sorting?: Array<{ id: string; desc: boolean }>;
   globalFilter?: string;
@@ -128,6 +137,15 @@ export type SchedulingState =
   | "reviewed";
 
 /**
+ * Minimal goal descriptor used in grid dropdowns.
+ * Matches the shape returned by getGoals() but avoids a direct DB type import.
+ */
+export interface IGoalOption {
+  id: string;
+  name: string;
+}
+
+/**
  * Cell editor callback signatures
  */
 export interface ICellEditorCallbacks {
@@ -135,6 +153,8 @@ export interface ICellEditorCallbacks {
   onGoalChange?: (tuneId: string, newValue: string | null) => void;
   onNotePrivateChange?: (tuneId: string, newValue: string) => void;
   onNotePublicChange?: (tuneId: string, newValue: string) => void;
+  /** Reactive accessor for the list of available goals (for the GoalBadge dropdown). */
+  goals?: () => IGoalOption[];
   // Optional control for keeping dropdowns open across refreshes
   getRecallEvalOpen?: (tuneId: string) => boolean;
   setRecallEvalOpen?: (tuneId: string, isOpen: boolean) => void;

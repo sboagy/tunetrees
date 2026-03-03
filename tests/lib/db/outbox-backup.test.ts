@@ -1,17 +1,18 @@
-import initSqlJs, { type Database } from "sql.js";
+import type { Database } from "sql.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createOutboxBackup,
   type IOutboxBackup,
   replayOutboxBackup,
 } from "../../../src/lib/db/outbox-backup";
+import { getTestSqlJs } from "./sqljs-test-utils";
 
 let db: Database;
-let SQL: Awaited<ReturnType<typeof initSqlJs>>;
+let SQL: Awaited<ReturnType<typeof getTestSqlJs>>;
 
 beforeEach(async () => {
   if (!SQL) {
-    SQL = await initSqlJs();
+    SQL = await getTestSqlJs();
   }
   db = new SQL.Database();
 

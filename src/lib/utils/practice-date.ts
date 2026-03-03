@@ -35,8 +35,12 @@ export function getPracticeDate(): Date {
     if (testDate) {
       const parsed = new Date(testDate);
       if (!Number.isNaN(parsed.getTime())) {
-        // Set to local noon to avoid timezone drift when comparing dates
-        parsed.setHours(12, 0, 0, 0);
+        // Date-only overrides are normalized to local noon to avoid timezone drift.
+        // Datetime overrides preserve the provided timestamp for time-sensitive E2E flows.
+        const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(testDate.trim());
+        if (isDateOnly) {
+          parsed.setHours(12, 0, 0, 0);
+        }
         console.log(
           `🧪 [PracticeDate] Using URL override: ${testDate} (${parsed.toISOString()})`
         );

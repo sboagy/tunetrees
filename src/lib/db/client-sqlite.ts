@@ -417,6 +417,7 @@ export async function initializeDb(
           "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
           "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
           "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
+          "/drizzle/migrations/sqlite/0013_add_goal_table.sql",
         ];
         for (const migrationPath of migrations) {
           const response = await fetch(migrationPath, { cache: "no-store" });

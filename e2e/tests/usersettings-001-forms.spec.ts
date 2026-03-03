@@ -43,17 +43,6 @@ test.describe("USERSETTINGS-001: Scheduling Options Form", () => {
     await page.waitForTimeout(800);
     await ttPage.userSettingsSchedulingOptionsButton.click();
     await page.waitForTimeout(500);
-
-    // FIXME: close of mobile menu should be automatic
-    if (isMobileChrome) {
-      // await ttPage.settingsMenuToggle.click();
-      const { innerWidth, innerHeight } = await page.evaluate(() => ({
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-      }));
-      await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
-      await page.waitForTimeout(300);
-    }
   });
 
   test("should display scheduling options form", async ({ page }) => {
@@ -203,17 +192,6 @@ test.describe("USERSETTINGS-001: Spaced Repetition Form", () => {
     await page.waitForTimeout(500);
     await ttPage.userSettingsSpacedRepetitionButton.click();
     await page.waitForTimeout(500);
-
-    // FIXME: close of mobile menu should be automatic
-    if (isMobileChrome) {
-      // await ttPage.settingsMenuToggle.click();
-      const { innerWidth, innerHeight } = await page.evaluate(() => ({
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-      }));
-      await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
-      await page.waitForTimeout(300);
-    }
   });
 
   test("should display spaced repetition form", async ({ page }) => {
@@ -339,17 +317,6 @@ test.describe("USERSETTINGS-001: Account Settings Form", () => {
     await page.waitForTimeout(500);
     await ttPage.userSettingsAccountButton.click();
     await page.waitForTimeout(500);
-
-    // FIXME: close of mobile menu should be automatic
-    if (isMobileChrome) {
-      // await ttPage.settingsMenuToggle.click();
-      const { innerWidth, innerHeight } = await page.evaluate(() => ({
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-      }));
-      await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
-      await page.waitForTimeout(300);
-    }
   });
 
   test("should display account settings form", async ({ page }) => {
@@ -447,39 +414,53 @@ test.describe("USERSETTINGS-001: Navigation", () => {
     if (isMobileChrome) {
       await page.waitForTimeout(800);
       await ttPage.settingsMenuToggle.click();
+      await page.waitForTimeout(500); // let sidebar slide-in animation settle
     }
   });
 
   test("should display all settings navigation links", async ({ page }) => {
     await expect(
-      page.getByRole("link", { name: "Scheduling Options" })
+      page.getByTestId("settings-tab-scheduling-options")
     ).toBeVisible({ timeout: 5000 });
     await expect(
-      page.getByRole("link", { name: "Spaced Repetition" })
+      page.getByTestId("settings-tab-spaced-repetition")
     ).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole("link", { name: "Account" })).toBeVisible({
+    await expect(page.getByTestId("settings-tab-account")).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.getByRole("link", { name: "Avatar" })).toBeVisible({
+    await expect(page.getByTestId("settings-tab-avatar")).toBeVisible({
       timeout: 5000,
     });
   });
 
   test("should navigate between settings pages", async ({ page }) => {
-    // Click Scheduling Options
-    await page.getByRole("link", { name: "Scheduling Options" }).click();
+    const ua = await page.evaluate(() => navigator.userAgent);
+    const isMobileChrome = /Android.*Chrome\/\d+/i.test(ua);
+
+    // On mobile the sidebar closes after each tab click, so we must reopen it
+    // via the menu toggle before navigating to the next tab.
+    const openSidebarAndClick = async (testId: string) => {
+      if (isMobileChrome) {
+        await ttPage.settingsMenuToggle.click();
+        await page.waitForTimeout(500);
+      }
+      await page.getByTestId(testId).click();
+    };
+
+    // Click Scheduling Options (beforeEach already opened the sidebar on mobile)
+    await page.getByTestId("settings-tab-scheduling-options").click();
     await expect(
       page.getByRole("heading", { name: "Scheduling Options", level: 3 })
     ).toBeVisible({ timeout: 5000 });
 
     // Click Spaced Repetition
-    await page.getByRole("link", { name: "Spaced Repetition" }).click();
+    await openSidebarAndClick("settings-tab-spaced-repetition");
     await expect(
       page.getByRole("heading", { name: "Spaced Repetition", level: 3 })
     ).toBeVisible({ timeout: 5000 });
 
     // Click Account
-    await page.getByRole("link", { name: "Account" }).click();
+    await openSidebarAndClick("settings-tab-account");
     await expect(
       page.getByRole("heading", { name: "Account", level: 3 })
     ).toBeVisible({ timeout: 5000 });

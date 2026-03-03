@@ -74,6 +74,9 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
         const shouldShow = props.onDateChange?.(current);
 
         if (shouldShow === false) {
+          if (showBanner()) {
+            setShowBanner(false);
+          }
           return;
         }
 

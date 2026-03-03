@@ -46,6 +46,13 @@ const PracticeHistoryPage: Component = () => {
   >(new Map());
   const [deletedIds, setDeletedIds] = createSignal<Set<string>>(new Set());
   const [isSaving, setIsSaving] = createSignal(false);
+  const [dateValidationError, setDateValidationError] = createSignal<
+    string | null
+  >(null);
+  const [invalidDateFields, setInvalidDateFields] = createSignal<Set<string>>(
+    new Set()
+  );
+  const warnedInvalidDateValues = new Set<string>();
 
   // Return path for navigation
   const returnPath = createMemo(() => {
@@ -139,7 +146,20 @@ const PracticeHistoryPage: Component = () => {
     const db = localDb();
     const repertoireId = currentRepertoireId();
     if (!db || !repertoireId) return;
+    if (invalidDateFields().size > 0) {
+      setDateValidationError(
+        "One or more date fields are invalid. Please fix them before saving."
+      );
+      if (import.meta.env.DEV) {
+        console.warn(
+          "[PracticeHistory] Save blocked due to invalid date fields",
+          Array.from(invalidDateFields())
+        );
+      }
+      return;
+    }
 
+    setDateValidationError(null);
     setIsSaving(true);
     try {
       // Delete marked records
@@ -157,8 +177,10 @@ const PracticeHistoryPage: Component = () => {
       // Clear state and refetch
       setEditedRecords(new Map());
       setDeletedIds(new Set<string>());
+      setInvalidDateFields(new Set<string>());
       await refetch();
     } catch (error) {
+      setDateValidationError("Failed to save practice records. Try again.");
       console.error("Error saving practice records:", error);
     } finally {
       setIsSaving(false);
@@ -169,6 +191,8 @@ const PracticeHistoryPage: Component = () => {
   const handleDiscard = () => {
     setEditedRecords(new Map());
     setDeletedIds(new Set<string>());
+    setInvalidDateFields(new Set<string>());
+    setDateValidationError(null);
   };
 
   // Add new practice record
@@ -201,12 +225,72 @@ const PracticeHistoryPage: Component = () => {
     navigate(returnPath());
   };
 
+  const parseDateTimeLocalToIso = (value: string): string | null => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  };
+
+  const updateDateField = (
+    recordId: string,
+    field: "practiced" | "due",
+    value: string
+  ) => {
+    const fieldKey = `${recordId}:${field}`;
+    const isoValue = parseDateTimeLocalToIso(value);
+    if (value && !isoValue) {
+      setInvalidDateFields((prev) => {
+        const next = new Set(prev);
+        next.add(fieldKey);
+        return next;
+      });
+      setDateValidationError(
+        "One or more date fields are invalid. Please fix them before saving."
+      );
+      if (import.meta.env.DEV) {
+        console.warn("[PracticeHistory] Invalid datetime-local input", {
+          recordId,
+          field,
+          value,
+        });
+      }
+      return;
+    }
+
+    setInvalidDateFields((prev) => {
+      const next = new Set(prev);
+      next.delete(fieldKey);
+      if (next.size === 0) {
+        setDateValidationError(null);
+      }
+      return next;
+    });
+
+    updateField(recordId, field, isoValue);
+  };
+
   // Format date for input
   const formatDateForInput = (dateStr: string | null | undefined) => {
     if (!dateStr) return "";
     try {
       const date = new Date(dateStr);
-      return date.toISOString().slice(0, 16);
+      if (Number.isNaN(date.getTime())) {
+        if (import.meta.env.DEV && !warnedInvalidDateValues.has(dateStr)) {
+          warnedInvalidDateValues.add(dateStr);
+          console.warn("[PracticeHistory] Invalid persisted date value", {
+            tuneId: params.id,
+            dateStr,
+          });
+        }
+        return "";
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
     } catch {
       return "";
     }
@@ -280,6 +364,14 @@ const PracticeHistoryPage: Component = () => {
 
           {/* Content */}
           <div class="p-6">
+            <Show when={dateValidationError()}>
+              <div
+                class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                role="alert"
+              >
+                {dateValidationError()}
+              </div>
+            </Show>
             <Show
               when={!practiceRecords.loading}
               fallback={
@@ -356,14 +448,17 @@ const PracticeHistoryPage: Component = () => {
                                   getFieldValue(record, "practiced") as string
                                 )}
                                 onInput={(e) =>
-                                  updateField(
+                                  updateDateField(
                                     record.id,
                                     "practiced",
                                     e.currentTarget.value
-                                      ? new Date(
-                                          e.currentTarget.value
-                                        ).toISOString()
-                                      : null
+                                  )
+                                }
+                                onChange={(e) =>
+                                  updateDateField(
+                                    record.id,
+                                    "practiced",
+                                    e.currentTarget.value
                                   )
                                 }
                                 disabled={deletedIds().has(record.id)}
@@ -418,14 +513,17 @@ const PracticeHistoryPage: Component = () => {
                                   getFieldValue(record, "due") as string
                                 )}
                                 onInput={(e) =>
-                                  updateField(
+                                  updateDateField(
                                     record.id,
                                     "due",
                                     e.currentTarget.value
-                                      ? new Date(
-                                          e.currentTarget.value
-                                        ).toISOString()
-                                      : null
+                                  )
+                                }
+                                onChange={(e) =>
+                                  updateDateField(
+                                    record.id,
+                                    "due",
+                                    e.currentTarget.value
                                   )
                                 }
                                 disabled={deletedIds().has(record.id)}

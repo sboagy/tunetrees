@@ -29,16 +29,6 @@ async function openCatalogSync(page: import("@playwright/test").Page) {
   await page.waitForTimeout(500);
   await ttPage.userSettingsCatalogSyncButton.click();
   await page.waitForTimeout(500);
-
-  // Close mobile sidebar overlay after navigation
-  if (isMobileChrome) {
-    const { innerWidth, innerHeight } = await page.evaluate(() => ({
-      innerWidth: window.innerWidth,
-      innerHeight: window.innerHeight,
-    }));
-    await page.mouse.click(innerWidth - 5, Math.floor(innerHeight / 2));
-    await page.waitForTimeout(300);
-  }
 }
 
 test.describe("USERSETTINGS-002: Catalog & Sync", () => {

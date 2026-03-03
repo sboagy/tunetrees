@@ -311,8 +311,9 @@ test.describe("Scroll Reset Debugger", () => {
               path: `test-results/scroll-debug-catalog-initial-${Date.now()}.png`,
             });
             const stored = await page.evaluate(
-              (uid) => localStorage.getItem(`TT_CATALOG_SCROLL_${uid}`),
-              currentTestUser.userId
+              ({ uid, rid }) =>
+                localStorage.getItem(`TT_CATALOG_SCROLL_${uid}_${rid}`),
+              { uid: currentTestUser.userId, rid: currentTestUser.repertoireId }
             );
             throw new Error(
               `Catalog failed to scroll to >=900 (got ${s1}). stored=${stored}. Attempts=\n${attempts.join("\n")}`
@@ -352,8 +353,9 @@ test.describe("Scroll Reset Debugger", () => {
         if (flow.tab === "catalog") {
           if (s4 < 800) {
             const stored = await page.evaluate(
-              (uid) => localStorage.getItem(`TT_CATALOG_SCROLL_${uid}`),
-              currentTestUser.userId
+              ({ uid, rid }) =>
+                localStorage.getItem(`TT_CATALOG_SCROLL_${uid}_${rid}`),
+              { uid: currentTestUser.userId, rid: currentTestUser.repertoireId }
             );
             await page.screenshot({
               path: `test-results/scroll-debug-catalog-regressed-${Date.now()}.png`,

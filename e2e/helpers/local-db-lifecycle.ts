@@ -148,11 +148,11 @@ export async function waitForSyncComplete(
   timeoutMs = 30000
 ): Promise<void> {
   const startTime = Date.now();
-  let didRetryAfterFetchFailure = false;
+  let didRetryAfterRecoverableFailure = false;
 
   log.debug("⏳ Waiting for initial sync to complete...");
 
-  const isTransientFetchFailure = (summary: string): boolean => {
+  const isRecoverableInitialSyncFailure = (summary: string): boolean => {
     const s = summary.toLowerCase();
     return (
       s.includes("failed to fetch") ||
@@ -160,7 +160,9 @@ export async function waitForSyncComplete(
       s.includes("failed to fet") ||
       s.includes("networkerror") ||
       s.includes("load failed") ||
-      s.includes("fetch")
+      s.includes("fetch") ||
+      s.includes("foreign key constraint failed") ||
+      s.includes("sqlite_constraint_foreignkey")
     );
   };
 
@@ -182,17 +184,18 @@ export async function waitForSyncComplete(
     });
 
     if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
-      if (
-        !didRetryAfterFetchFailure &&
-        isTransientFetchFailure(status.errorSummary)
-      ) {
-        didRetryAfterFetchFailure = true;
+      if (!didRetryAfterRecoverableFailure) {
+        const summary = status.errorSummary || "";
+        const canRecover = isRecoverableInitialSyncFailure(summary);
+        if (canRecover) {
+          didRetryAfterRecoverableFailure = true;
         log.debug(
-          `⚠️ Initial sync failed with transient fetch error; reloading once to retry. ${status.errorSummary}`
+            `⚠️ Initial sync failed with recoverable error; reloading once to retry. ${status.errorSummary}`
         );
         await page.waitForTimeout(500);
         await page.reload({ waitUntil: "domcontentloaded" });
         continue;
+        }
       }
       throw new Error(
         `⚠️ Initial sync completed but failed (success='${status.successStr}', errors=${status.errorCount}). ${status.errorSummary}`

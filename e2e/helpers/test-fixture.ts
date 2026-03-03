@@ -224,6 +224,17 @@ export const test = base.extend<ITuneTreesFixtures>({
       }
     });
     await use(buffer);
+
+    const failed = testInfo.status !== testInfo.expectedStatus;
+    if (failed && buffer.length) {
+      console.log(
+        `${prefix} [FAILED TEST] dumping ${buffer.length} browser console line(s)`
+      );
+      for (const line of buffer) {
+        console.log(`${prefix} ${line}`);
+      }
+    }
+
     if (buffer.length) {
       await testInfo.attach("browser-console", {
         body: buffer.join("\n"),
