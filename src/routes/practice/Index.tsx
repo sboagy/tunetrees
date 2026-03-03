@@ -363,13 +363,26 @@ const PracticeIndex: Component = () => {
       const uid = userId();
       const repertoireId = currentRepertoireId();
       const syncReady = initialSyncComplete();
+      const remoteSyncVersion = remoteSyncDownCompletionVersion();
+      const isOnline =
+        typeof navigator !== "undefined" ? navigator.onLine : true;
+      const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
+      const remoteSyncReady = remoteSyncVersion > 0 || !isOnline || syncDisabled;
+      const hasStoredQueueDate = !!getStoredQueueDate();
 
       if (!syncReady) {
         return null;
       }
 
+      if (!remoteSyncReady && !hasStoredQueueDate) {
+        console.log(
+          "[PracticeIndex] Waiting for first remote sync completion before resolving queue date..."
+        );
+        return null;
+      }
+
       return db && uid && repertoireId
-        ? { db, userId: uid, repertoireId }
+        ? { db, userId: uid, repertoireId, remoteSyncVersion }
         : null;
     },
     async (params): Promise<QueueDateResolution | null> => {
@@ -588,17 +601,18 @@ const PracticeIndex: Component = () => {
     () => {
       const db = localDb();
       const repertoireId = currentRepertoireId();
+      const resolved = resolvedQueueDate();
       const isQueueDateLoading = resolvedQueueDate.loading;
       const syncReady = initialSyncComplete();
 
-      if (!syncReady || isQueueDateLoading) {
+      if (!syncReady || isQueueDateLoading || !resolved) {
         console.log(
           "[PracticeIndex] Waiting for queue date resolution + initial sync before initializing queue..."
         );
         return null;
       }
 
-      const activeQueueDate = queueDate();
+      const activeQueueDate = resolved.date;
 
       return db && userId() && repertoireId
         ? { db, userId: userId()!, repertoireId, date: activeQueueDate }
