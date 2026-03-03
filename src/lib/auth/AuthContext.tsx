@@ -1063,7 +1063,10 @@ export const AuthProvider: ParentComponent = (props) => {
       );
 
       // Initialize user-namespaced database (handles switching automatically)
-      const db = await initializeSqliteDbWithRetry(anonymousUserId, "anonymous");
+      const db = await initializeSqliteDbWithRetry(
+        anonymousUserId,
+        "anonymous"
+      );
       if (!db) {
         return;
       }
