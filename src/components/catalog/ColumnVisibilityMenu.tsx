@@ -3,11 +3,17 @@
  *
  * Dropdown menu for showing/hiding table columns.
  * Displays checkboxes for each toggleable column with their current visibility state.
+ * Also provides pin-left / pin-right / unpin controls per column.
  *
  * @module components/catalog/ColumnVisibilityMenu
  */
 
 import type { Table } from "@tanstack/solid-table";
+import {
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  PinOff,
+} from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -286,34 +292,83 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
           <div class="p-2">
             <For each={getToggleableColumns()}>
               {(column) => (
-                <button
-                  type="button"
-                  class="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded transition-colors w-full text-left"
-                  on:click={(e) => {
-                    // Use native event binding (on:click) to bypass SolidJS delegation
-                    e.stopPropagation();
-                    e.preventDefault();
+                <div class="flex items-center gap-1 px-1 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                  <button
+                    type="button"
+                    class="flex items-center gap-2 text-sm cursor-pointer flex-1 text-left min-w-0"
+                    on:click={(e) => {
+                      // Use native event binding (on:click) to bypass SolidJS delegation
+                      e.stopPropagation();
+                      e.preventDefault();
 
-                    // Toggle column visibility
-                    column.toggleVisibility();
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={column.getIsVisible()}
-                    readOnly
-                    tabIndex={-1}
-                    class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer pointer-events-none"
-                  />
-                  <span class="text-gray-700 dark:text-gray-300 flex-1">
-                    {getColumnDisplayName(column.id)}
-                  </span>
-                  <Show when={!column.getIsVisible()}>
-                    <span class="text-xs text-gray-400 dark:text-gray-500">
-                      Hidden
+                      // Toggle column visibility
+                      column.toggleVisibility();
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={column.getIsVisible()}
+                      readOnly
+                      tabIndex={-1}
+                      class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer pointer-events-none flex-shrink-0"
+                    />
+                    <span class="text-gray-700 dark:text-gray-300 flex-1 truncate">
+                      {getColumnDisplayName(column.id)}
                     </span>
+                    <Show when={!column.getIsVisible()}>
+                      <span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
+                        Hidden
+                      </span>
+                    </Show>
+                  </button>
+                  {/* Pin controls */}
+                  <Show when={column.getCanPin()}>
+                    <div class="flex items-center gap-0.5 flex-shrink-0">
+                      <Show when={column.getIsPinned() !== "left"}>
+                        <button
+                          type="button"
+                          title="Pin left"
+                          class="p-0.5 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded"
+                          on:click={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            column.pin("left");
+                          }}
+                        >
+                          <ArrowLeftToLine size={12} />
+                        </button>
+                      </Show>
+                      <Show when={column.getIsPinned()}>
+                        <button
+                          type="button"
+                          title="Unpin"
+                          class="p-0.5 text-blue-600 dark:text-blue-400 hover:text-gray-400 dark:hover:text-gray-500 transition-colors rounded"
+                          on:click={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            column.pin(false);
+                          }}
+                        >
+                          <PinOff size={12} />
+                        </button>
+                      </Show>
+                      <Show when={column.getIsPinned() !== "right"}>
+                        <button
+                          type="button"
+                          title="Pin right"
+                          class="p-0.5 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded"
+                          on:click={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            column.pin("right");
+                          }}
+                        >
+                          <ArrowRightToLine size={12} />
+                        </button>
+                      </Show>
+                    </div>
                   </Show>
-                </button>
+                </div>
               )}
             </For>
           </div>
@@ -321,7 +376,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
           {/* Footer note */}
           <div class="border-t border-gray-200/30 dark:border-gray-700/30 px-3 py-2 bg-gray-50 dark:bg-gray-900/50">
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              💡 Tip: Drag column headers to reorder
+              💡 Drag headers to reorder · ← → to pin columns
             </p>
           </div>
         </div>
