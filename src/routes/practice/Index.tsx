@@ -461,12 +461,30 @@ const PracticeIndex: Component = () => {
     const queueWindowStart = formatAsWindowStart(queueDate());
     const initialWindowStart = formatAsWindowStart(initialPracticeDate());
     const manualChanged = isManualQueueDate() !== resolved.manual;
+    const storedQueueDate = getStoredQueueDate();
+    const storedWindowStart = storedQueueDate
+      ? formatAsWindowStart(storedQueueDate)
+      : null;
+    const storedManualFlag = getStoredManualQueueDateFlag();
+    const requiresStorageSync =
+      storedWindowStart !== resolvedWindowStart ||
+      storedManualFlag !== resolved.manual;
 
     if (
       resolvedWindowStart === queueWindowStart &&
       resolvedWindowStart === initialWindowStart &&
       !manualChanged
     ) {
+      if (requiresStorageSync) {
+        localStorage.setItem(
+          QUEUE_DATE_STORAGE_KEY,
+          resolved.date.toISOString()
+        );
+        localStorage.setItem(
+          QUEUE_DATE_MANUAL_FLAG_KEY,
+          resolved.manual ? "true" : "false"
+        );
+      }
       return;
     }
 
@@ -485,11 +503,14 @@ const PracticeIndex: Component = () => {
     );
   });
 
-  // Persist queue date to localStorage on change
-  createEffect(() => {
-    const date = queueDate();
-    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, date.toISOString());
-  });
+  // NOTE: Queue date is NOT eagerly written to localStorage here.
+  // Writing today's fallback date before sync completes would cause resolvedQueueDate
+  // to bypass the DB check (it reads localStorage first), resulting in a fresh queue
+  // being generated for today instead of using the synced queue from remote.
+  // localStorage is written explicitly in:
+  //   - resolvedQueueDate resolution effect (line ~449) after DB check
+  //   - handleQueueDateChange (user-initiated date change)
+  //   - handlePracticeDateRefresh (date rollover / refresh action)
 
   createEffect(() => {
     localStorage.setItem(
@@ -1020,6 +1041,7 @@ const PracticeIndex: Component = () => {
     setQueueDate(dateAtNoon);
     setInitialPracticeDate(dateAtNoon);
     setQueueDateLockedByUser(true);
+    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, dateAtNoon.toISOString());
 
     // Set manual flag if not today
     const today = new Date();

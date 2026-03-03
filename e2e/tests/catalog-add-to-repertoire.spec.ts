@@ -197,6 +197,24 @@ test.describe
     test("should handle tunes already in repertoire @side-effects", async ({
       page,
     }) => {
+      const setCatalogRowChecked = async (rowId: string) => {
+        const checkbox = page
+          .getByRole("checkbox", { name: `Select row ${rowId}` })
+          .first();
+
+        for (let attempt = 1; attempt <= 4; attempt += 1) {
+          try {
+            await expect(checkbox).toBeVisible({ timeout: 5000 });
+            await checkbox.setChecked(true, { force: true });
+            await expect(checkbox).toBeChecked({ timeout: 1000 });
+            return;
+          } catch (error) {
+            if (attempt === 4) throw error;
+            await page.waitForTimeout(200);
+          }
+        }
+      };
+
       // const ttPage = new TuneTreesPage(page);
       // First add user's private tune to repertoire
       await ttPage.navigateToTab("catalog");
@@ -212,20 +230,7 @@ test.describe
         ttPage.catalogGrid
       );
       await expect(userPrivateTune).toBeVisible({ timeout: 5000 });
-      const checkbox1 = userPrivateTune
-        .locator('input[type="checkbox"]')
-        .first();
-
-      // Scroll checkbox into center of viewport to avoid overlapping elements
-      await checkbox1.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(300); // Let scroll settle
-
-      // For Mobile Chrome, directly set the checked state programmatically
-      // The UI interactions are unreliable due to overlays and viewport issues
-      await checkbox1.evaluate((el: HTMLInputElement) => {
-        el.checked = true;
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-      });
+      await setCatalogRowChecked(privateTune1Id);
 
       let dialogMessage = "";
       page.on("dialog", async (dialog) => {
@@ -249,14 +254,7 @@ test.describe
         ttPage.catalogGrid
       );
       await expect(userPrivateTuneB).toBeVisible({ timeout: 5000 });
-      const checkbox2 = userPrivateTuneB
-        .locator('input[type="checkbox"]')
-        .first();
-
-      // Same Mobile Chrome overlay issue - use programmatic click
-      await checkbox2.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(300);
-      await checkbox2.dispatchEvent("click");
+      await setCatalogRowChecked(privateTune1Id);
 
       dialogMessage = ""; // Reset
       await page.getByTestId("catalog-add-to-repertoire-button").click();
