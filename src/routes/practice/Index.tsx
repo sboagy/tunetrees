@@ -476,7 +476,10 @@ const PracticeIndex: Component = () => {
       !manualChanged
     ) {
       if (requiresStorageSync) {
-        localStorage.setItem(QUEUE_DATE_STORAGE_KEY, resolved.date.toISOString());
+        localStorage.setItem(
+          QUEUE_DATE_STORAGE_KEY,
+          resolved.date.toISOString()
+        );
         localStorage.setItem(
           QUEUE_DATE_MANUAL_FLAG_KEY,
           resolved.manual ? "true" : "false"

@@ -87,6 +87,18 @@ function isDbInitAbortedError(err: unknown): boolean {
   );
 }
 
+function isTransientDbInitError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("Failed to fetch") ||
+    msg.includes("NetworkError") ||
+    msg.includes("ERR_INTERNET_DISCONNECTED") ||
+    msg.includes("The network connection was lost") ||
+    msg.includes("Load failed") ||
+    msg.includes("callback is no longer runnable")
+  );
+}
+
 async function getSqlJs(): Promise<SqlJsStatic> {
   if (sqlJsModule) return Promise.resolve(sqlJsModule);
   if (sqlJsInitPromise) return sqlJsInitPromise;
@@ -625,6 +637,8 @@ export async function initializeDb(
       // noisy console errors for this expected E2E-only race.
       if (isDbInitAbortedError(err) && (isClearing || isE2eClearInProgress())) {
         console.warn("⚠️ initializeDb aborted during clear", err);
+      } else if (isTransientDbInitError(err)) {
+        console.warn("⚠️ initializeDb transient failure", err);
       } else {
         console.error("❌ initializeDb failed", err);
       }

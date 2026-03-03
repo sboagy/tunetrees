@@ -960,6 +960,54 @@ export const AuthProvider: ParentComponent = (props) => {
     );
   }
 
+  function isTransientDbInitError(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error);
+    return (
+      isDbInitAbortError(error) ||
+      msg.includes("Failed to fetch") ||
+      msg.includes("NetworkError") ||
+      msg.includes("ERR_INTERNET_DISCONNECTED") ||
+      msg.includes("The network connection was lost") ||
+      msg.includes("Load failed") ||
+      msg.includes("callback is no longer runnable")
+    );
+  }
+
+  async function initializeSqliteDbWithRetry(
+    userId: string,
+    context: "anonymous" | "authenticated"
+  ): Promise<SqliteDatabase | null> {
+    const maxAttempts = 4;
+    let attempt = 0;
+    const contextLabel =
+      context === "anonymous" ? "Anonymous DB init" : "DB init";
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      attempt += 1;
+      try {
+        return await initializeSqliteDb(userId);
+      } catch (error) {
+        if (isE2eDbClearInProgress()) {
+          console.warn(
+            `[AuthContext] ${contextLabel} aborted during E2E clear; not retrying`
+          );
+          return null;
+        }
+
+        if (!isTransientDbInitError(error) || attempt >= maxAttempts) {
+          throw error;
+        }
+
+        const delayMs = 75 * attempt;
+        console.warn(
+          `[AuthContext] ${contextLabel} transient failure (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
   function isE2eDbClearInProgress(): boolean {
     return (
       typeof window !== "undefined" &&
@@ -1015,33 +1063,9 @@ export const AuthProvider: ParentComponent = (props) => {
       );
 
       // Initialize user-namespaced database (handles switching automatically)
-      let db: SqliteDatabase;
-      {
-        const maxAttempts = 3;
-        let attempt = 0;
-        // E2E can clear IndexedDB/DB while the app is booting.
-        // Treat "init aborted" as transient and retry briefly.
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          attempt += 1;
-          try {
-            db = await initializeSqliteDb(anonymousUserId);
-            break;
-          } catch (e) {
-            if (isE2eDbClearInProgress()) {
-              console.warn(
-                "[AuthContext] Anonymous DB init aborted during E2E clear; not retrying"
-              );
-              return;
-            }
-            if (!isDbInitAbortError(e) || attempt >= maxAttempts) throw e;
-            const delayMs = 50 * attempt;
-            console.warn(
-              `[AuthContext] Anonymous DB init aborted (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms`
-            );
-            await new Promise((r) => setTimeout(r, delayMs));
-          }
-        }
+      const db = await initializeSqliteDbWithRetry(anonymousUserId, "anonymous");
+      if (!db) {
+        return;
       }
       setLocalDb(db);
       // Set up auto-persistence (ensure we don't leak handlers across re-inits)
@@ -1156,7 +1180,11 @@ export const AuthProvider: ParentComponent = (props) => {
 
       log.info("Anonymous local database initialization complete");
     } catch (error) {
-      log.error("Failed to initialize anonymous local database:", error);
+      if (isTransientDbInitError(error)) {
+        log.warn("Anonymous local DB init transient failure:", error);
+      } else {
+        log.error("Failed to initialize anonymous local database:", error);
+      }
     } finally {
       isInitializing = false;
     }
@@ -1210,33 +1238,9 @@ export const AuthProvider: ParentComponent = (props) => {
       diagLog("🔄 [initializeLocalDatabase] Reset sync state for new user");
 
       // Initialize user-namespaced database (handles user switching automatically)
-      let db: SqliteDatabase;
-      {
-        const maxAttempts = 3;
-        let attempt = 0;
-        // E2E can clear IndexedDB/DB while the app is booting.
-        // Treat "init aborted" as transient and retry briefly.
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          attempt += 1;
-          try {
-            db = await initializeSqliteDb(userId);
-            break;
-          } catch (e) {
-            if (isE2eDbClearInProgress()) {
-              console.warn(
-                "[AuthContext] DB init aborted during E2E clear; not retrying"
-              );
-              return;
-            }
-            if (!isDbInitAbortError(e) || attempt >= maxAttempts) throw e;
-            const delayMs = 50 * attempt;
-            console.warn(
-              `[AuthContext] DB init aborted (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms`
-            );
-            await new Promise((r) => setTimeout(r, delayMs));
-          }
-        }
+      const db = await initializeSqliteDbWithRetry(userId, "authenticated");
+      if (!db) {
+        return;
       }
       setLocalDb(db);
 
@@ -1497,7 +1501,11 @@ export const AuthProvider: ParentComponent = (props) => {
 
       log.info("Local database initialization complete");
     } catch (error) {
-      log.error("Failed to initialize local database:", error);
+      if (isTransientDbInitError(error)) {
+        log.warn("Local database initialization transient failure:", error);
+      } else {
+        log.error("Failed to initialize local database:", error);
+      }
     } finally {
       isInitializing = false;
     }
