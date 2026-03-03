@@ -461,12 +461,27 @@ const PracticeIndex: Component = () => {
     const queueWindowStart = formatAsWindowStart(queueDate());
     const initialWindowStart = formatAsWindowStart(initialPracticeDate());
     const manualChanged = isManualQueueDate() !== resolved.manual;
+    const storedQueueDate = getStoredQueueDate();
+    const storedWindowStart = storedQueueDate
+      ? formatAsWindowStart(storedQueueDate)
+      : null;
+    const storedManualFlag = getStoredManualQueueDateFlag();
+    const requiresStorageSync =
+      storedWindowStart !== resolvedWindowStart ||
+      storedManualFlag !== resolved.manual;
 
     if (
       resolvedWindowStart === queueWindowStart &&
       resolvedWindowStart === initialWindowStart &&
       !manualChanged
     ) {
+      if (requiresStorageSync) {
+        localStorage.setItem(QUEUE_DATE_STORAGE_KEY, resolved.date.toISOString());
+        localStorage.setItem(
+          QUEUE_DATE_MANUAL_FLAG_KEY,
+          resolved.manual ? "true" : "false"
+        );
+      }
       return;
     }
 
