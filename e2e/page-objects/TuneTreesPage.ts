@@ -1323,7 +1323,9 @@ export class TuneTreesPage {
       }
       const noTunesFoundLocator = this.page.getByText("No tunes found");
 
-      const matchingRow = grid.locator("tbody tr", { hasText: tuneTitle }).first();
+      const matchingRow = grid
+        .locator("tbody tr", { hasText: tuneTitle })
+        .first();
       let hasMatchingRow = false;
       for (let attempt = 0; attempt < 6; attempt++) {
         hasMatchingRow = await matchingRow
@@ -1683,7 +1685,22 @@ export class TuneTreesPage {
     await option.setChecked(true);
     await this.page.waitForTimeout(1000);
 
-    await this.filtersButton.click();
+    // Ensure the dropdown is closed so the grid is interactable.
+
+    for (let retry = 0; retry < 3; retry++) {
+      const filterBoxIsOpen = await dropdownPanel.isVisible();
+      if (filterBoxIsOpen) {
+        await this.filtersButton.click();
+        await this.page.waitForTimeout(200);
+        await expect(dropdownPanel)
+          .not.toBeVisible({ timeout: 5000 })
+          .catch(() => {});
+      } else {
+        break;
+      }
+    }
+
+    await this.page.waitForTimeout(500); // Wait a bit for grid to update
   }
 
   /**
