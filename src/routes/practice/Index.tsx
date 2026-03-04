@@ -1091,6 +1091,13 @@ const PracticeIndex: Component = () => {
     const db = localDb();
     const repertoireId = currentRepertoireId();
 
+    // Lock early so queue-date resolution effects can't overwrite refresh intent
+    // while we wait on sync operations.
+    setQueueDateLockedByUser(true);
+    setIsManualQueueDate(false);
+    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
+    localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
+
     const syncEnabled = import.meta.env.VITE_DISABLE_SYNC !== "true";
     if (syncEnabled && typeof navigator !== "undefined" && navigator.onLine) {
       try {
@@ -1103,14 +1110,9 @@ const PracticeIndex: Component = () => {
       }
     }
 
-    // Lock and switch queue date immediately so UI state cannot be reverted
-    // while async queue ensure is running.
-    setQueueDateLockedByUser(true);
+    // Switch queue date after sync-down attempt.
     setQueueDate(practiceDate);
     setInitialPracticeDate(practiceDate);
-    setIsManualQueueDate(false);
-    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
-    localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
 
     if (db && repertoireId) {
       const userId = await getUserId();
