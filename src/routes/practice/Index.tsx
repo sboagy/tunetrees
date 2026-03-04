@@ -83,7 +83,6 @@ const PracticeIndex: Component = () => {
     remoteSyncDownCompletionVersion,
     initialSyncComplete,
     syncPracticeScope,
-    forceSyncDown,
     repertoireListChanged,
     incrementRepertoireListChanged,
     suppressNextViewRefresh,
@@ -355,7 +354,7 @@ const PracticeIndex: Component = () => {
   type QueueDateResolution = {
     date: Date;
     manual: boolean;
-    source: "manual-local" | "stored-local" | "db-incomplete" | "practice-date";
+    source: "manual-local" | "db-incomplete" | "db-latest" | "practice-date";
   };
 
   const [resolvedQueueDate] = createResource(
@@ -369,13 +368,15 @@ const PracticeIndex: Component = () => {
         typeof navigator !== "undefined" ? navigator.onLine : true;
       const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
       const remoteSyncReady = remoteSyncVersion > 0 || !isOnline || syncDisabled;
-      const hasStoredQueueDate = !!getStoredQueueDate();
+      const storedQueueDate = getStoredQueueDate();
+      const hasManualStoredQueueDate =
+        getStoredManualQueueDateFlag() && !!storedQueueDate;
 
       if (!syncReady) {
         return null;
       }
 
-      if (!remoteSyncReady && !hasStoredQueueDate) {
+      if (!remoteSyncReady && !hasManualStoredQueueDate) {
         console.log(
           "[PracticeIndex] Waiting for first remote sync completion before resolving queue date..."
         );
@@ -406,14 +407,6 @@ const PracticeIndex: Component = () => {
         }
       }
 
-      if (storedQueueDate) {
-        return {
-          date: storedQueueDate,
-          manual: false,
-          source: "stored-local",
-        };
-      }
-
       const { getLatestActiveQueueWindow } = await import(
         "../../lib/services/practice-queue"
       );
@@ -424,15 +417,15 @@ const PracticeIndex: Component = () => {
         params.repertoireId
       );
 
-      if (latestWindow.windowStartUtc && latestWindow.hasIncompleteRows) {
-        const queueDateFromDb = parseQueueDateString(
-          latestWindow.windowStartUtc
-        );
+      if (latestWindow.windowStartUtc) {
+        const queueDateFromDb = parseQueueDateString(latestWindow.windowStartUtc);
         if (queueDateFromDb) {
           return {
             date: queueDateFromDb,
             manual: false,
-            source: "db-incomplete",
+            source: latestWindow.hasIncompleteRows
+              ? "db-incomplete"
+              : "db-latest",
           };
         }
       }
@@ -1090,6 +1083,70 @@ const PracticeIndex: Component = () => {
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
+    const userId = await getUserId();
+
+    if (!db || !repertoireId || !userId) {
+      console.warn(
+        "[PracticeIndex] Skipping refresh: missing db/repertoire/userId",
+        {
+          hasDb: !!db,
+          repertoireId,
+          userId,
+        }
+      );
+      return;
+    }
+
+    const { ensureDailyQueue, getLatestActiveQueueWindow } = await import(
+      "../../lib/services/practice-queue"
+    );
+
+    let latestWindowStart: string | null = null;
+    let latestWindowHasIncompleteRows = false;
+    try {
+      const latestWindow = await getLatestActiveQueueWindow(
+        db,
+        userId,
+        repertoireId
+      );
+      latestWindowStart = latestWindow.windowStartUtc;
+      latestWindowHasIncompleteRows = latestWindow.hasIncompleteRows;
+    } catch (error) {
+      console.warn(
+        "[PracticeIndex] Failed to read latest queue window during refresh:",
+        error
+      );
+    }
+
+    const latestWindowDate = latestWindowStart
+      ? parseQueueDateString(latestWindowStart)
+      : null;
+    const todayWindowStart = formatAsWindowStart(practiceDate);
+    const latestWindowStartNormalized = latestWindowDate
+      ? formatAsWindowStart(latestWindowDate)
+      : null;
+    const dateChanged =
+      latestWindowStartNormalized !== null &&
+      latestWindowStartNormalized !== todayWindowStart;
+
+    // Rules:
+    // - Create today's queue only when date has changed AND latest queue is complete.
+    // - If latest queue is incomplete and date changed, keep current queue and show banner.
+    const shouldCreateTodayQueue =
+      !latestWindowStart || (dateChanged && !latestWindowHasIncompleteRows);
+
+    if (!shouldCreateTodayQueue) {
+      console.log(
+        "[PracticeIndex] Skipping refresh: latest queue is incomplete for previous date",
+        {
+          latestWindowStart: latestWindowStartNormalized,
+          todayWindowStart,
+          dateChanged,
+        }
+      );
+      incrementPracticeListStagedChanged();
+      return;
+    }
 
     // Lock early so queue-date resolution effects can't overwrite refresh intent
     // while we wait on sync operations.
@@ -1098,43 +1155,21 @@ const PracticeIndex: Component = () => {
     localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
     localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
 
-    const syncEnabled = import.meta.env.VITE_DISABLE_SYNC !== "true";
-    if (syncEnabled && typeof navigator !== "undefined" && navigator.onLine) {
-      try {
-        await forceSyncDown({ full: true });
-      } catch (error) {
-        console.warn(
-          "[PracticeIndex] Failed to run full sync before refresh:",
-          error
-        );
-      }
-    }
-
-    // Switch queue date after sync-down attempt.
+    // Switch queue date and ensure queue for the new day.
     setQueueDate(practiceDate);
     setInitialPracticeDate(practiceDate);
-
-    if (db && repertoireId) {
-      const userId = await getUserId();
-      if (userId) {
-        try {
-          const { ensureDailyQueue } = await import(
-            "../../lib/services/practice-queue"
-          );
-
-          await ensureDailyQueue(
-            db,
-            userId,
-            repertoireId,
-            practiceDate
-          );
-        } catch (error) {
-          console.warn(
-            "[PracticeIndex] Failed to ensure queue during refresh:",
-            error
-          );
-        }
-      }
+    try {
+      await ensureDailyQueue(
+        db,
+        userId,
+        repertoireId,
+        practiceDate
+      );
+    } catch (error) {
+      console.warn(
+        "[PracticeIndex] Failed to ensure queue during refresh:",
+        error
+      );
     }
 
     console.log(
