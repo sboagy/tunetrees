@@ -354,7 +354,12 @@ const PracticeIndex: Component = () => {
   type QueueDateResolution = {
     date: Date;
     manual: boolean;
-    source: "manual-local" | "db-incomplete" | "db-latest" | "practice-date";
+    source:
+      | "manual-local"
+      | "db-incomplete"
+      | "db-latest"
+      | "stored-local-fallback"
+      | "practice-date";
   };
 
   const [resolvedQueueDate] = createResource(
@@ -428,6 +433,14 @@ const PracticeIndex: Component = () => {
               : "db-latest",
           };
         }
+      }
+
+      if (storedQueueDate) {
+        return {
+          date: storedQueueDate,
+          manual: false,
+          source: "stored-local-fallback",
+        };
       }
 
       return {
@@ -1079,19 +1092,21 @@ const PracticeIndex: Component = () => {
     }
   };
 
-  const handlePracticeDateRefresh = async () => {
+  const handlePracticeDateRefresh = async (
+    mode: "manual" | "auto" = "manual"
+  ) => {
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
-    const userId = await getUserId();
+    const userIdValue = await getUserId();
 
-    if (!db || !repertoireId || !userId) {
+    if (!db || !repertoireId || !userIdValue) {
       console.warn(
         "[PracticeIndex] Skipping refresh: missing db/repertoire/userId",
         {
           hasDb: !!db,
           repertoireId,
-          userId,
+          userIdValue,
         }
       );
       return;
@@ -1106,7 +1121,7 @@ const PracticeIndex: Component = () => {
     try {
       const latestWindow = await getLatestActiveQueueWindow(
         db,
-        userId,
+        userIdValue,
         repertoireId
       );
       latestWindowStart = latestWindow.windowStartUtc;
@@ -1130,18 +1145,22 @@ const PracticeIndex: Component = () => {
       latestWindowStartNormalized !== todayWindowStart;
 
     // Rules:
-    // - Create today's queue only when date has changed AND latest queue is complete.
+    // - Auto rollover creates today's queue only when date has changed AND latest queue is complete.
     // - If latest queue is incomplete and date changed, keep current queue and show banner.
+    // - Manual "Refresh Now" always advances to today's queue when date changed.
     const shouldCreateTodayQueue =
-      !latestWindowStart || (dateChanged && !latestWindowHasIncompleteRows);
+      !latestWindowStart ||
+      (dateChanged && (mode === "manual" || !latestWindowHasIncompleteRows));
 
     if (!shouldCreateTodayQueue) {
       console.log(
-        "[PracticeIndex] Skipping refresh: latest queue is incomplete for previous date",
+        "[PracticeIndex] Skipping refresh: queue rollover preconditions not met",
         {
+          mode,
           latestWindowStart: latestWindowStartNormalized,
           todayWindowStart,
           dateChanged,
+          latestWindowHasIncompleteRows,
         }
       );
       incrementPracticeListStagedChanged();
@@ -1161,7 +1180,7 @@ const PracticeIndex: Component = () => {
     try {
       await ensureDailyQueue(
         db,
-        userId,
+        userIdValue,
         repertoireId,
         practiceDate
       );
@@ -1184,7 +1203,7 @@ const PracticeIndex: Component = () => {
     }
 
     if (isQueueCompleted()) {
-      void handlePracticeDateRefresh();
+      void handlePracticeDateRefresh("auto");
       return false;
     }
 
@@ -1297,7 +1316,7 @@ const PracticeIndex: Component = () => {
       {/* Date Rollover Banner - appears when practice date changes */}
       <DateRolloverBanner
         initialDate={initialPracticeDate()}
-        onRefresh={handlePracticeDateRefresh}
+        onRefresh={() => handlePracticeDateRefresh("manual")}
         onDateChange={handleDateRolloverDetection}
       />
 
