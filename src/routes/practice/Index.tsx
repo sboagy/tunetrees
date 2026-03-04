@@ -83,6 +83,7 @@ const PracticeIndex: Component = () => {
     remoteSyncDownCompletionVersion,
     initialSyncComplete,
     syncPracticeScope,
+    forceSyncDown,
     repertoireListChanged,
     incrementRepertoireListChanged,
     suppressNextViewRefresh,
@@ -602,6 +603,7 @@ const PracticeIndex: Component = () => {
       const db = localDb();
       const repertoireId = currentRepertoireId();
       const resolved = resolvedQueueDate();
+      const lockedByUser = queueDateLockedByUser();
       const isQueueDateLoading = resolvedQueueDate.loading;
       const syncReady = initialSyncComplete();
 
@@ -612,7 +614,7 @@ const PracticeIndex: Component = () => {
         return null;
       }
 
-      const activeQueueDate = resolved.date;
+      const activeQueueDate = lockedByUser ? queueDate() : resolved.date;
 
       return db && userId() && repertoireId
         ? { db, userId: userId()!, repertoireId, date: activeQueueDate }
@@ -1089,8 +1091,20 @@ const PracticeIndex: Component = () => {
     const db = localDb();
     const repertoireId = currentRepertoireId();
 
+    const syncEnabled = import.meta.env.VITE_DISABLE_SYNC !== "true";
+    if (syncEnabled && typeof navigator !== "undefined" && navigator.onLine) {
+      try {
+        await forceSyncDown({ full: true });
+      } catch (error) {
+        console.warn(
+          "[PracticeIndex] Failed to run full sync before refresh:",
+          error
+        );
+      }
+    }
+
     // Lock and switch queue date immediately so UI state cannot be reverted
-    // while async regeneration is running.
+    // while async queue ensure is running.
     setQueueDateLockedByUser(true);
     setQueueDate(practiceDate);
     setInitialPracticeDate(practiceDate);
@@ -1102,22 +1116,19 @@ const PracticeIndex: Component = () => {
       const userId = await getUserId();
       if (userId) {
         try {
-          const { generateOrGetPracticeQueue } = await import(
+          const { ensureDailyQueue } = await import(
             "../../lib/services/practice-queue"
           );
 
-          await generateOrGetPracticeQueue(
+          await ensureDailyQueue(
             db,
             userId,
             repertoireId,
-            practiceDate,
-            null,
-            "per_day",
-            true
+            practiceDate
           );
         } catch (error) {
           console.warn(
-            "[PracticeIndex] Failed to regenerate queue during refresh:",
+            "[PracticeIndex] Failed to ensure queue during refresh:",
             error
           );
         }
