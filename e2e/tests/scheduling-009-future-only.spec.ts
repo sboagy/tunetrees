@@ -188,6 +188,35 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       const ratings: ("good" | "easy")[] = ["good", "good", "easy", "good"];
       const intervals: number[] = [];
 
+      const waitForTuneInPracticeQueue = async () => {
+        await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 30000 });
+        await expect(ttPage.practiceGrid).toBeVisible({ timeout: 30000 });
+        await expect(
+          page.getByText("Loading practice queue...")
+        ).not.toBeVisible({ timeout: 30000 });
+
+        const recallEvalControls = ttPage.practiceGrid.getByTestId(
+          /^recall-eval-[0-9a-f-]+$/i
+        );
+
+        await expect
+          .poll(
+            async () => await recallEvalControls.count(),
+            { timeout: 20000, intervals: [200, 500, 1000] }
+          )
+          .toBeGreaterThan(0);
+
+        const tuneRecallEvalControl = page.getByTestId(`recall-eval-${tuneId}`);
+        await expect
+          .poll(
+            async () => await tuneRecallEvalControl.count(),
+            { timeout: 20000, intervals: [200, 500, 1000] }
+          )
+          .toBeGreaterThan(0);
+
+        await expect(tuneRecallEvalControl).toBeVisible({ timeout: 15000 });
+      };
+
       // 2. Evaluation Loop
       for (let i = 0; i < ratings.length; i++) {
         const rating = ratings[i];
@@ -200,16 +229,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         // which can drop ?practiceDate=YYYY-MM-DD and cause queue/date drift.
         await ttPage.navigateToTab("practice");
 
-        // Wait for loading to complete (sync can take time after reload)
-        await expect(
-          page.getByText("Loading practice queue...")
-        ).not.toBeVisible({ timeout: 30000 });
-
-        await expect(ttPage.practiceGrid).toBeVisible({ timeout: 30000 });
-
-        // Verify tune is present
-        const row = ttPage.practiceGrid.getByText(TUNE_TITLE);
-        await expect(row).toBeVisible({ timeout: 10000 });
+        // Wait for queue generation to settle and for target tune row to be present.
+        await waitForTuneInPracticeQueue();
 
         // Evaluate
         await ttPage.enableFlashcardMode();
