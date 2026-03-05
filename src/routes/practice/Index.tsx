@@ -372,7 +372,8 @@ const PracticeIndex: Component = () => {
       const isOnline =
         typeof navigator !== "undefined" ? navigator.onLine : true;
       const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
-      const remoteSyncReady = remoteSyncVersion > 0 || !isOnline || syncDisabled;
+      const remoteSyncReady =
+        remoteSyncVersion > 0 || !isOnline || syncDisabled;
       const storedQueueDate = getStoredQueueDate();
       const hasManualStoredQueueDate =
         getStoredManualQueueDateFlag() && !!storedQueueDate;
@@ -423,7 +424,9 @@ const PracticeIndex: Component = () => {
       );
 
       if (latestWindow.windowStartUtc) {
-        const queueDateFromDb = parseQueueDateString(latestWindow.windowStartUtc);
+        const queueDateFromDb = parseQueueDateString(
+          latestWindow.windowStartUtc
+        );
         if (queueDateFromDb) {
           return {
             date: queueDateFromDb,
@@ -1178,12 +1181,7 @@ const PracticeIndex: Component = () => {
     setQueueDate(practiceDate);
     setInitialPracticeDate(practiceDate);
     try {
-      await ensureDailyQueue(
-        db,
-        userIdValue,
-        repertoireId,
-        practiceDate
-      );
+      await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
     } catch (error) {
       console.warn(
         "[PracticeIndex] Failed to ensure queue during refresh:",
