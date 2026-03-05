@@ -45,6 +45,9 @@ import { BASE_URL } from "../test-config";
 let ttPage: TuneTreesPage;
 let currentDate: Date;
 const TUNE_TITLE = "SCHED-009 Future Check";
+const REPERTOIRE_SIZE = 419;
+const MAX_DAILY_TUNES = 7;
+const ENABLE_FUZZ = false;
 
 test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", () => {
   test.setTimeout(120000); // Multi-day simulation takes time
@@ -53,6 +56,22 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
     ttPage = new TuneTreesPage(page);
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+
+    // Override FSRS config for deterministic interval assertions.
+    await page.addInitScript(
+      (config) => {
+        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ =
+          config.repertoireSize;
+        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
+        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
+          config.maxReviews;
+      },
+      {
+        repertoireSize: REPERTOIRE_SIZE,
+        enableFuzz: ENABLE_FUZZ,
+        maxReviews: MAX_DAILY_TUNES,
+      }
+    );
 
     // Setup: Clean repertoire
     await setupDeterministicTestParallel(page, testUser, {
@@ -261,7 +280,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
           await page.goto(
             `${BASE_URL}/practice?practiceDate=${nextPracticeDateIso}`,
             {
-            waitUntil: "domcontentloaded",
+              waitUntil: "domcontentloaded",
             }
           );
 
