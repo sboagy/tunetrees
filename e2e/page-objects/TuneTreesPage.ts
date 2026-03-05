@@ -1649,50 +1649,86 @@ export class TuneTreesPage {
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 
-    await this.filtersButton.click();
-    await this.page.waitForTimeout(250);
+    const panelAlreadyOpen = await this.typeFilter
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+
+    if (!panelAlreadyOpen) {
+      await this.filtersButton.click();
+      await this.page.waitForTimeout(250);
+    }
 
     await expect(this.typeFilter).toBeVisible({ timeout: 5000 });
     await expect(this.typeFilter).toBeEnabled({ timeout: 10000 });
 
     const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-type`);
-    const option = dropdownPanel.getByRole("checkbox", { name: type });
+    const escapedType = type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const optionByRole = () =>
+      dropdownPanel
+        .getByRole("checkbox", {
+          name: new RegExp(`^\\s*${escapedType}\\s*$`, "i"),
+        })
+        .first();
+    const optionByLabel = () =>
+      dropdownPanel
+        .locator("label", { hasText: type })
+        .locator('input[type="checkbox"]')
+        .first();
 
-    let typeDropdownOpened = false;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await this.typeFilter.click({ timeout: 10000 });
-      await this.page.waitForTimeout(100);
+    let selectedOption = optionByRole();
+    let typeOptionChecked = false;
 
-      const [isExpanded, isPanelVisible] = await Promise.all([
-        this.typeFilter
-          .getAttribute("aria-expanded")
-          .then((value) => value === "true")
-          .catch(() => false),
-        dropdownPanel.isVisible({ timeout: 500 }).catch(() => false),
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const isExpanded = await this.typeFilter
+        .getAttribute("aria-expanded")
+        .then((value) => value === "true")
+        .catch(() => false);
+
+      if (!isExpanded) {
+        await this.typeFilter.click({ timeout: 10000 });
+        await this.page.waitForTimeout(150);
+      }
+
+      const roleOption = optionByRole();
+      const roleOptionCount = await roleOption.count().catch(() => 0);
+      const candidate = roleOptionCount > 0 ? roleOption : optionByLabel();
+
+      const [isPanelVisible, isCandidateVisible] = await Promise.all([
+        dropdownPanel.isVisible({ timeout: 1000 }).catch(() => false),
+        candidate.isVisible({ timeout: 1000 }).catch(() => false),
       ]);
 
-      if (isExpanded && isPanelVisible) {
-        typeDropdownOpened = true;
+      if (!isPanelVisible || !isCandidateVisible) {
+        await this.page.waitForTimeout(200);
+        continue;
+      }
+
+      try {
+        await candidate.scrollIntoViewIfNeeded().catch(() => {});
+        await expect(candidate).toBeEnabled({ timeout: 5000 });
+        await candidate.check({ timeout: 5000 });
+        await expect(candidate).toBeChecked({ timeout: 5000 });
+        selectedOption = candidate;
+        typeOptionChecked = true;
         break;
+      } catch {
+        await this.page.waitForTimeout(200);
       }
     }
 
-    expect(typeDropdownOpened).toBe(true);
-
-    await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
-    await expect(option).toBeVisible({ timeout: 5000 });
-    await expect(option).toBeEnabled({ timeout: 10000 });
-    await option.setChecked(true);
+    expect(typeOptionChecked).toBe(true);
     await this.page.waitForTimeout(1000);
 
     // Ensure the dropdown is closed so the grid is interactable.
 
     for (let retry = 0; retry < 3; retry++) {
-      const filterBoxIsOpen = await dropdownPanel.isVisible();
+      const filterBoxIsOpen = await this.typeFilter
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
       if (filterBoxIsOpen) {
         await this.filtersButton.click();
         await this.page.waitForTimeout(200);
-        await expect(dropdownPanel)
+        await expect(selectedOption)
           .not.toBeVisible({ timeout: 5000 })
           .catch(() => {});
       } else {
