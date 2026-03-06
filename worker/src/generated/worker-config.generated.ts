@@ -231,7 +231,7 @@ export const WORKER_SYNC_CONFIG = {
   push: {
     tableRules: {
       daily_practice_queue: {
-        denyDelete: true,
+        denyDelete: false,
         sanitize: {
           coerceNumericProps: [
             {
