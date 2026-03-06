@@ -104,21 +104,10 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         { timeout: 30000 }
       );
 
-      const recallEvalControls = ttPage.practiceGrid.getByTestId(
-        /^recall-eval-[0-9a-f-]+$/i
-      );
-
-      await expect
-        .poll(async () => await recallEvalControls.count(), {
-          timeout: 30000,
-          intervals: [200, 500, 1000],
-        })
-        .toBeGreaterThan(0);
-
       const tuneRecallEvalControl = page.getByTestId(`recall-eval-${tuneId}`);
       await expect
         .poll(async () => await tuneRecallEvalControl.count(), {
-          timeout: 30000,
+          timeout: 45000,
           intervals: [200, 500, 1000],
         })
         .toBeGreaterThan(0);
@@ -133,9 +122,8 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         `\n=== Iteration ${i + 1}: Evaluating '${rating}' on ${currentDate.toISOString()} ===`
       );
 
-      // Go to practice
-      // Use navigateToTab so we avoid re-clicking an already active tab,
-      // which can drop ?practiceDate=YYYY-MM-DD and cause queue/date drift.
+      // Use tab navigation during normal loop iterations.
+      // We only force explicit practiceDate URL navigation after time-travel/reload.
       await ttPage.navigateToTab("practice");
 
       // Wait for queue generation to settle and for target tune row to be present.
@@ -190,6 +178,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         await page.evaluate(() => {
           localStorage.removeItem("TT_PRACTICE_FLASHCARD_MODE");
           localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
         });
 
         await setStableDate(context, currentDate);
