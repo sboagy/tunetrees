@@ -4,6 +4,7 @@ import {
   CATALOG_TUNE_COOLEYS_ID,
   CATALOG_TUNE_KESH_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { applyDeterministicFsrsConfig } from "../helpers/fsrs-test-config";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -25,26 +26,6 @@ import { BASE_URL } from "../test-config";
  */
 
 let ttPage: TuneTreesPage;
-const REPERTOIRE_SIZE = 419;
-const MAX_DAILY_TUNES = 7;
-const ENABLE_FUZZ = false;
-
-async function applyDeterministicFsrsConfig(page: Page) {
-  await page.addInitScript(
-    (config) => {
-      (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ =
-        config.repertoireSize;
-      (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
-      (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
-        config.maxReviews;
-    },
-    {
-      repertoireSize: REPERTOIRE_SIZE,
-      enableFuzz: ENABLE_FUZZ,
-      maxReviews: MAX_DAILY_TUNES,
-    }
-  );
-}
 
 async function gotoPracticeHistory(page: Page, tuneId: string) {
   await page.goto(`${BASE_URL}/tunes/${tuneId}/practice-history`, {

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { applyDeterministicFsrsConfig } from "../helpers/fsrs-test-config";
 import {
   clearTunetreesClientStorage,
   gotoE2eOrigin,
@@ -992,21 +993,7 @@ export class TuneTreesPage {
         this.SCHEDULE_NEW_TUNES_AUTOMATICALLY,
     };
 
-    await this.page.addInitScript(
-      (cfg: {
-        repertoireSize: number;
-        enableFuzz: boolean;
-        maxReviews: number;
-        scheduleNewTunesAutomatically: boolean;
-      }) => {
-        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = cfg.repertoireSize;
-        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = cfg.enableFuzz;
-        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ = cfg.maxReviews;
-        (window as any).__TUNETREES_TEST_SCHEDULE_NEW_TUNES_AUTOMATICALLY__ =
-          cfg.scheduleNewTunesAutomatically;
-      },
-      config
-    );
+    await applyDeterministicFsrsConfig(this.page, config);
   }
 
   /**

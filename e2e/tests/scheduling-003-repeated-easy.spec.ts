@@ -5,6 +5,10 @@ import {
   setStableDate,
   verifyClockFrozen,
 } from "../helpers/clock-control";
+import {
+  applyDeterministicFsrsConfig,
+  DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG,
+} from "../helpers/fsrs-test-config";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
   queryLatestPracticeRecord,
@@ -35,9 +39,9 @@ let ttPage: TuneTreesPage;
 let currentDate: Date;
 // CI shortening: set CI_DIAG_FAST=1 to reduce loop days for diagnostics
 const MAX_DAYS = 5;
-const REPERTOIRE_SIZE = 419;
-const MAX_DAILY_TUNES = 7;
-const ENABLE_FUZZ = false;
+const REPERTOIRE_SIZE = DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG.repertoireSize;
+const MAX_DAILY_TUNES = DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG.maxReviews;
+const ENABLE_FUZZ = DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG.enableFuzz;
 
 const MAX_INTERVAL = Math.round(3 * (REPERTOIRE_SIZE / MAX_DAILY_TUNES));
 
@@ -62,19 +66,11 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
     // Override repertoire size for FSRS testing to ensure max_interval is large enough
     // (Formula: 3 * (repertoireSize / maxReviewsPerDay))
-    await page.addInitScript(
-      (config) => {
-        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = config.repertoireSize;
-        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = config.enableFuzz;
-        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ =
-          config.maxReviews;
-      },
-      {
-        repertoireSize: REPERTOIRE_SIZE,
-        enableFuzz: ENABLE_FUZZ,
-        maxReviews: MAX_DAILY_TUNES,
-      }
-    );
+    await applyDeterministicFsrsConfig(page, {
+      repertoireSize: REPERTOIRE_SIZE,
+      enableFuzz: ENABLE_FUZZ,
+      maxReviews: MAX_DAILY_TUNES,
+    });
 
     // Set up ONE tune for repeated evaluation
     await setupForPracticeTestsParallel(page, testUser, {
