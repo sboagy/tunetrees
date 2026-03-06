@@ -904,13 +904,35 @@ async function clearUserTable(
   // their own transaction, so we use an RPC that sets the flag and deletes in
   // one call.
   if (tableName === "practice_record") {
-    const { error: rpcError } = await supabase.rpc(
-      "e2e_clear_practice_record",
-      {
-        target_repertoire: user.repertoireId,
+    const repertoireIds = new Set<string>([user.repertoireId]);
+    const { data: repertoireRows, error: repertoireQueryError } = await supabase
+      .from("repertoire")
+      .select("repertoire_id")
+      .eq("user_ref", user.userId);
+
+    if (repertoireQueryError) {
+      console.warn(
+        `[${user.name}] Failed to query repertoires before clearing practice_record: ${repertoireQueryError.message}`
+      );
+    } else if (repertoireRows) {
+      for (const row of repertoireRows) {
+        if (row?.repertoire_id) {
+          repertoireIds.add(row.repertoire_id);
+        }
       }
-    );
-    error = rpcError;
+    }
+
+    for (const repertoireId of repertoireIds) {
+      const { error: rpcError } = await supabase.rpc(
+        "e2e_clear_practice_record",
+        {
+          target_repertoire: repertoireId,
+        }
+      );
+      if (rpcError && !error) {
+        error = rpcError;
+      }
+    }
   } else {
     // Unified deletion path; RLS ensures only caller's rows are affected.
     let query = supabase.from(tableName).delete();
