@@ -916,7 +916,7 @@ async function clearUserTable(
       );
     } else if (repertoireRows) {
       for (const row of repertoireRows) {
-        if (row?.repertoire_id) {
+        if (row.repertoire_id) {
           repertoireIds.add(row.repertoire_id);
         }
       }
@@ -929,8 +929,13 @@ async function clearUserTable(
           target_repertoire: repertoireId,
         }
       );
-      if (rpcError && !error) {
-        error = rpcError;
+      if (rpcError) {
+        console.warn(
+          `[${user.name}] Failed to clear practice_record for repertoire ${repertoireId}: ${rpcError.message}`
+        );
+        if (!error) {
+          error = rpcError;
+        }
       }
     }
   } else {
