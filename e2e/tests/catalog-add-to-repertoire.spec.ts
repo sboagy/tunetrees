@@ -197,24 +197,6 @@ test.describe
     test("should handle tunes already in repertoire @side-effects", async ({
       page,
     }) => {
-      const setCatalogRowChecked = async (rowId: string) => {
-        const checkbox = page
-          .getByRole("checkbox", { name: `Select row ${rowId}` })
-          .first();
-
-        for (let attempt = 1; attempt <= 4; attempt += 1) {
-          try {
-            await expect(checkbox).toBeVisible({ timeout: 5000 });
-            await checkbox.setChecked(true, { force: true });
-            await expect(checkbox).toBeChecked({ timeout: 1000 });
-            return;
-          } catch (error) {
-            if (attempt === 4) throw error;
-            await page.waitForTimeout(200);
-          }
-        }
-      };
-
       // const ttPage = new TuneTreesPage(page);
       // First add user's private tune to repertoire
       await ttPage.navigateToTab("catalog");
@@ -230,7 +212,7 @@ test.describe
         ttPage.catalogGrid
       );
       await expect(userPrivateTune).toBeVisible({ timeout: 5000 });
-      await setCatalogRowChecked(privateTune1Id);
+      await ttPage.setGridRowChecked(privateTune1Id, ttPage.catalogGrid);
 
       let dialogMessage = "";
       page.on("dialog", async (dialog) => {
@@ -254,7 +236,7 @@ test.describe
         ttPage.catalogGrid
       );
       await expect(userPrivateTuneB).toBeVisible({ timeout: 5000 });
-      await setCatalogRowChecked(privateTune1Id);
+      await ttPage.setGridRowChecked(privateTune1Id, ttPage.catalogGrid);
 
       dialogMessage = ""; // Reset
       await page.getByTestId("catalog-add-to-repertoire-button").click();

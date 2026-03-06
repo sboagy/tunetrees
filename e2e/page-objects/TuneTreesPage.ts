@@ -1392,6 +1392,52 @@ export class TuneTreesPage {
     return grid.locator(`tr:has-text("${tuneId}")`);
   }
 
+  async setGridRowChecked(tuneId: string, grid: Locator, checked = true) {
+    const row = this.getTuneRowById(tuneId, grid).first();
+    await expect(row).toBeVisible({ timeout: 10000 });
+
+    const checkboxByRole = row
+      .getByRole("checkbox", { name: `Select row ${tuneId}` })
+      .first();
+    const checkboxByInput = row
+      .locator(`input[type="checkbox"][aria-label="Select row ${tuneId}"]`)
+      .first();
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const checkbox =
+        (await checkboxByRole.count().catch(() => 0)) > 0
+          ? checkboxByRole
+          : checkboxByInput;
+
+      await row.scrollIntoViewIfNeeded().catch(() => {});
+      await checkbox.scrollIntoViewIfNeeded().catch(() => {});
+      await expect(checkbox).toBeVisible({ timeout: 5000 });
+      await expect(checkbox).toBeEnabled({ timeout: 5000 });
+
+      const isChecked = await checkbox.isChecked().catch(() => false);
+      if (isChecked === checked) {
+        return;
+      }
+
+      try {
+        if (checked) {
+          await checkbox.check({ timeout: 5000 });
+          await expect(checkbox).toBeChecked({ timeout: 5000 });
+        } else {
+          await checkbox.uncheck({ timeout: 5000 });
+          await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+        }
+        return;
+      } catch {
+        await this.page.waitForTimeout(200);
+      }
+    }
+
+    throw new Error(
+      `Failed to ${checked ? "check" : "uncheck"} row selection for tune ${tuneId}`
+    );
+  }
+
   /**
    * Find a tune row by ID in the practice grid.
    * Useful for locating a row when the ID column is not showing.
@@ -2249,6 +2295,55 @@ export class TuneTreesPage {
 
         const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
 
+        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+
+        if (value !== "not-set") {
+          const flashcardHotkeys: Record<"again" | "hard" | "good" | "easy", string> = {
+            again: "1",
+            hard: "2",
+            good: "3",
+            easy: "4",
+          };
+
+          try {
+            await this.page.keyboard.press("Escape").catch(() => undefined);
+            await this.flashcardView.click({ position: { x: 24, y: 24 } });
+            await this.page.keyboard.press(flashcardHotkeys[value]);
+
+            await expect
+              .poll(async () => (await evalButton.textContent()) ?? "", {
+                timeout: 5000,
+                intervals: [100, 250, 500, 1000],
+              })
+              .toMatch(new RegExp(expectedLabel, "i"));
+
+            console.log(
+              "[TuneTreesPageDiag] selectFlashcardEvaluation:shortcut-success",
+              {
+                tuneId,
+                value,
+                elapsedMs: Date.now() - startedAt,
+              }
+            );
+
+            break;
+          } catch (shortcutErr) {
+            console.log(
+              "[TuneTreesPageDiag] selectFlashcardEvaluation:shortcut-fallback",
+              {
+                tuneId,
+                value,
+                outerAttempt,
+                elapsedMs: Date.now() - startedAt,
+                error:
+                  shortcutErr instanceof Error
+                    ? shortcutErr.message
+                    : String(shortcutErr),
+              }
+            );
+          }
+        }
+
         // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
         // Retry a couple of times, and ensure the card back is revealed if needed.
         let menuOpened = false;
@@ -2349,7 +2444,6 @@ export class TuneTreesPage {
           }
         );
 
-        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
         await expect
           .poll(async () => (await evalButton.textContent()) ?? "", {
             timeout: 8000,
