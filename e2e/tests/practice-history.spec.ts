@@ -4,6 +4,7 @@ import {
   CATALOG_TUNE_COOLEYS_ID,
   CATALOG_TUNE_KESH_ID,
 } from "../../src/lib/db/catalog-tune-ids";
+import { applyDeterministicFsrsConfig } from "../helpers/fsrs-test-config";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -44,6 +45,7 @@ async function gotoPracticeHistory(page: Page, tuneId: string) {
 
 test.describe("PRACTICE-HISTORY: Viewing Records", () => {
   test.beforeEach(async ({ page, testUser }) => {
+    await applyDeterministicFsrsConfig(page);
     ttPage = new TuneTreesPage(page);
 
     // Start with clean repertoire
@@ -190,6 +192,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
 
 test.describe("PRACTICE-HISTORY: Adding Records", () => {
   test.beforeEach(async ({ page, testUser }) => {
+    await applyDeterministicFsrsConfig(page);
     ttPage = new TuneTreesPage(page);
 
     await setupDeterministicTestParallel(page, testUser, {
@@ -317,6 +320,7 @@ test.describe("PRACTICE-HISTORY: Adding Records", () => {
 
 test.describe("PRACTICE-HISTORY: Editing Records", () => {
   test.beforeEach(async ({ page, testUser }) => {
+    await applyDeterministicFsrsConfig(page);
     ttPage = new TuneTreesPage(page);
 
     await setupDeterministicTestParallel(page, testUser, {
@@ -406,6 +410,7 @@ test.describe("PRACTICE-HISTORY: Editing Records", () => {
 
     const qualitySelect = grid.locator("select").first();
     await qualitySelect.selectOption("2"); // Hard
+    await expect(qualitySelect).toHaveValue("2");
 
     // Save
     const globalSaveButton = page.getByTestId("practice-history-save-button");
@@ -419,25 +424,33 @@ test.describe("PRACTICE-HISTORY: Editing Records", () => {
     const editQualitySelect = dataRows.first().locator("select").first();
 
     if (await editQualitySelect.isVisible()) {
+      const originalValue = await editQualitySelect.inputValue();
+      expect(originalValue).toBe("2");
+
       await editQualitySelect.selectOption("4"); // Change to Easy
       await page.waitForTimeout(500);
+      await expect(editQualitySelect).toHaveValue("4");
 
       // Discard instead of saving
       const discardButton = page.getByTestId("practice-history-discard-button");
       if (await discardButton.isVisible({ timeout: 2000 })) {
         await discardButton.click();
-        await page.waitForTimeout(500);
       }
 
       // ASSERT: Original value is preserved
-      const currentValue = await editQualitySelect.inputValue();
-      expect(currentValue).toBe("2"); // Still shows "Hard" (2), not "Easy" (4)
+      await expect
+        .poll(async () => await editQualitySelect.inputValue(), {
+          timeout: 5000,
+          intervals: [100, 250, 500],
+        })
+        .toBe(originalValue); // Still shows original quality, not unsaved change
     }
   });
 });
 
 test.describe("PRACTICE-HISTORY: Deleting Records", () => {
   test.beforeEach(async ({ page, testUser }) => {
+    await applyDeterministicFsrsConfig(page);
     ttPage = new TuneTreesPage(page);
 
     await setupDeterministicTestParallel(page, testUser, {
@@ -591,6 +604,7 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
 
 test.describe("PRACTICE-HISTORY: Navigation", () => {
   test.beforeEach(async ({ page, testUser }) => {
+    await applyDeterministicFsrsConfig(page);
     ttPage = new TuneTreesPage(page);
 
     await setupDeterministicTestParallel(page, testUser, {

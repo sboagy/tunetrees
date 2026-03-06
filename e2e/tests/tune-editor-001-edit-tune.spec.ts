@@ -72,10 +72,13 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await expect(titleField).toHaveValue(modifiedTitle);
 
     // Click Cancel
-    const cancelButton = page.getByRole("button", { name: /cancel/i });
+    const cancelButton = ttPage.tuneEditorCancelButton;
     await expect(cancelButton).toBeVisible({ timeout: 5000 });
     await cancelButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(tuneEditorForm).not.toBeVisible({ timeout: 10000 });
+    await expect
+      .poll(() => page.url(), { timeout: 10000 })
+      .not.toContain("/edit");
 
     // ASSERT: Verify we're back to catalog and title unchanged
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });

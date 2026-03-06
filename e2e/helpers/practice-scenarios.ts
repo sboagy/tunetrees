@@ -505,6 +505,7 @@ export async function setupDeterministicTestParallel(
     "practice_record",
     "tune_override",
     "prefs_scheduling_options",
+    "prefs_spaced_repetition",
     "plugin",
   ];
 
@@ -527,6 +528,7 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "practice_record");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "prefs_spaced_repetition");
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "plugin");
 
@@ -677,11 +679,9 @@ export async function seedUserRepertoire(
   log.debug(`✅ [${user.name}] Seeded ${tuneIds.length} tunes in repertoire`);
 }
 
-function applyTableQueryFilters<TQuery extends { eq: (column: string, value: unknown) => TQuery }>(
-  tableName: string,
-  query: TQuery,
-  user: TestUser
-) {
+function applyTableQueryFilters<
+  TQuery extends { eq: (column: string, value: unknown) => TQuery },
+>(tableName: string, query: TQuery, user: TestUser) {
   if (tableName === "daily_practice_queue") {
     // Belt-and-suspenders: filter by both repertoire and user for safety
     query = query
@@ -697,6 +697,9 @@ function applyTableQueryFilters<TQuery extends { eq: (column: string, value: unk
     query = query.eq("user_id", user.userId);
   } else if (tableName === "prefs_scheduling_options") {
     // prefs_scheduling_options is keyed by user_id (not user_ref)
+    query = query.eq("user_id", user.userId);
+  } else if (tableName === "prefs_spaced_repetition") {
+    // prefs_spaced_repetition is keyed by user_id (not user_ref)
     query = query.eq("user_id", user.userId);
   } else if (tableName === "user_genre_selection") {
     // user_genre_selection is keyed by user_id (not user_ref)
@@ -981,6 +984,7 @@ export async function setupForPracticeTestsParallel(
     await clearUserTable(user, "table_transient_data");
     await clearUserTable(user, "tune_override");
     await clearUserTable(user, "prefs_scheduling_options");
+    await clearUserTable(user, "prefs_spaced_repetition");
     await clearUserTable(user, "plugin");
 
     // 2. Reset repertoire
@@ -993,6 +997,7 @@ export async function setupForPracticeTestsParallel(
       "table_transient_data",
       "tune_override",
       "prefs_scheduling_options",
+      "prefs_spaced_repetition",
       "plugin",
       "repertoire_tune",
       "user_genre_selection",
@@ -1176,6 +1181,7 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "prefs_spaced_repetition");
   await clearUserTable(user, "plugin");
 
   // 2. Reset repertoire
@@ -1188,6 +1194,7 @@ export async function setupForRepertoireTestsParallel(
     "table_transient_data",
     "tune_override",
     "prefs_scheduling_options",
+    "prefs_spaced_repetition",
     "plugin",
     "repertoire_tune",
     "user_genre_selection",
@@ -1329,6 +1336,7 @@ export async function setupForCatalogTestsParallel(
     "table_transient_data",
     "tune_override",
     "prefs_scheduling_options",
+    "prefs_spaced_repetition",
     "repertoire_tune",
     "plugin",
   ];
@@ -1346,6 +1354,7 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "table_transient_data");
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
+  await clearUserTable(user, "prefs_spaced_repetition");
   await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { applyDeterministicFsrsConfig } from "../helpers/fsrs-test-config";
 import {
   clearTunetreesClientStorage,
   gotoE2eOrigin,
@@ -992,21 +993,7 @@ export class TuneTreesPage {
         this.SCHEDULE_NEW_TUNES_AUTOMATICALLY,
     };
 
-    await this.page.addInitScript(
-      (cfg: {
-        repertoireSize: number;
-        enableFuzz: boolean;
-        maxReviews: number;
-        scheduleNewTunesAutomatically: boolean;
-      }) => {
-        (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = cfg.repertoireSize;
-        (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = cfg.enableFuzz;
-        (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ = cfg.maxReviews;
-        (window as any).__TUNETREES_TEST_SCHEDULE_NEW_TUNES_AUTOMATICALLY__ =
-          cfg.scheduleNewTunesAutomatically;
-      },
-      config
-    );
+    await applyDeterministicFsrsConfig(this.page, config);
   }
 
   /**
@@ -1405,6 +1392,52 @@ export class TuneTreesPage {
     return grid.locator(`tr:has-text("${tuneId}")`);
   }
 
+  async setGridRowChecked(tuneId: string, grid: Locator, checked = true) {
+    const row = this.getTuneRowById(tuneId, grid).first();
+    await expect(row).toBeVisible({ timeout: 10000 });
+
+    const checkboxByRole = row
+      .getByRole("checkbox", { name: `Select row ${tuneId}` })
+      .first();
+    const checkboxByInput = row
+      .locator(`input[type="checkbox"][aria-label="Select row ${tuneId}"]`)
+      .first();
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const checkbox =
+        (await checkboxByRole.count().catch(() => 0)) > 0
+          ? checkboxByRole
+          : checkboxByInput;
+
+      await row.scrollIntoViewIfNeeded().catch(() => {});
+      await checkbox.scrollIntoViewIfNeeded().catch(() => {});
+      await expect(checkbox).toBeVisible({ timeout: 5000 });
+      await expect(checkbox).toBeEnabled({ timeout: 5000 });
+
+      const isChecked = await checkbox.isChecked().catch(() => false);
+      if (isChecked === checked) {
+        return;
+      }
+
+      try {
+        if (checked) {
+          await checkbox.check({ timeout: 5000 });
+          await expect(checkbox).toBeChecked({ timeout: 5000 });
+        } else {
+          await checkbox.uncheck({ timeout: 5000 });
+          await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+        }
+        return;
+      } catch {
+        await this.page.waitForTimeout(200);
+      }
+    }
+
+    throw new Error(
+      `Failed to ${checked ? "check" : "uncheck"} row selection for tune ${tuneId}`
+    );
+  }
+
   /**
    * Find a tune row by ID in the practice grid.
    * Useful for locating a row when the ID column is not showing.
@@ -1649,50 +1682,86 @@ export class TuneTreesPage {
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 
-    await this.filtersButton.click();
-    await this.page.waitForTimeout(250);
+    const panelAlreadyOpen = await this.typeFilter
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+
+    if (!panelAlreadyOpen) {
+      await this.filtersButton.click();
+      await this.page.waitForTimeout(250);
+    }
 
     await expect(this.typeFilter).toBeVisible({ timeout: 5000 });
     await expect(this.typeFilter).toBeEnabled({ timeout: 10000 });
 
     const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-type`);
-    const option = dropdownPanel.getByRole("checkbox", { name: type });
+    const escapedType = type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const optionByRole = () =>
+      dropdownPanel
+        .getByRole("checkbox", {
+          name: new RegExp(`^\\s*${escapedType}\\s*$`, "i"),
+        })
+        .first();
+    const optionByLabel = () =>
+      dropdownPanel
+        .locator("label", { hasText: type })
+        .locator('input[type="checkbox"]')
+        .first();
 
-    let typeDropdownOpened = false;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await this.typeFilter.click({ timeout: 10000 });
-      await this.page.waitForTimeout(100);
+    let selectedOption = optionByRole();
+    let typeOptionChecked = false;
 
-      const [isExpanded, isPanelVisible] = await Promise.all([
-        this.typeFilter
-          .getAttribute("aria-expanded")
-          .then((value) => value === "true")
-          .catch(() => false),
-        dropdownPanel.isVisible({ timeout: 500 }).catch(() => false),
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const isExpanded = await this.typeFilter
+        .getAttribute("aria-expanded")
+        .then((value) => value === "true")
+        .catch(() => false);
+
+      if (!isExpanded) {
+        await this.typeFilter.click({ timeout: 10000 });
+        await this.page.waitForTimeout(150);
+      }
+
+      const roleOption = optionByRole();
+      const roleOptionCount = await roleOption.count().catch(() => 0);
+      const candidate = roleOptionCount > 0 ? roleOption : optionByLabel();
+
+      const [isPanelVisible, isCandidateVisible] = await Promise.all([
+        dropdownPanel.isVisible({ timeout: 1000 }).catch(() => false),
+        candidate.isVisible({ timeout: 1000 }).catch(() => false),
       ]);
 
-      if (isExpanded && isPanelVisible) {
-        typeDropdownOpened = true;
+      if (!isPanelVisible || !isCandidateVisible) {
+        await this.page.waitForTimeout(200);
+        continue;
+      }
+
+      try {
+        await candidate.scrollIntoViewIfNeeded().catch(() => {});
+        await expect(candidate).toBeEnabled({ timeout: 5000 });
+        await candidate.check({ timeout: 5000 });
+        await expect(candidate).toBeChecked({ timeout: 5000 });
+        selectedOption = candidate;
+        typeOptionChecked = true;
         break;
+      } catch {
+        await this.page.waitForTimeout(200);
       }
     }
 
-    expect(typeDropdownOpened).toBe(true);
-
-    await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
-    await expect(option).toBeVisible({ timeout: 5000 });
-    await expect(option).toBeEnabled({ timeout: 10000 });
-    await option.setChecked(true);
+    expect(typeOptionChecked).toBe(true);
     await this.page.waitForTimeout(1000);
 
     // Ensure the dropdown is closed so the grid is interactable.
 
     for (let retry = 0; retry < 3; retry++) {
-      const filterBoxIsOpen = await dropdownPanel.isVisible();
+      const filterBoxIsOpen = await this.typeFilter
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
       if (filterBoxIsOpen) {
         await this.filtersButton.click();
         await this.page.waitForTimeout(200);
-        await expect(dropdownPanel)
+        await expect(selectedOption)
           .not.toBeVisible({ timeout: 5000 })
           .catch(() => {});
       } else {
@@ -2226,6 +2295,55 @@ export class TuneTreesPage {
 
         const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
 
+        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+
+        if (value !== "not-set") {
+          const flashcardHotkeys: Record<"again" | "hard" | "good" | "easy", string> = {
+            again: "1",
+            hard: "2",
+            good: "3",
+            easy: "4",
+          };
+
+          try {
+            await this.page.keyboard.press("Escape").catch(() => undefined);
+            await this.flashcardView.click({ position: { x: 24, y: 24 } });
+            await this.page.keyboard.press(flashcardHotkeys[value]);
+
+            await expect
+              .poll(async () => (await evalButton.textContent()) ?? "", {
+                timeout: 5000,
+                intervals: [100, 250, 500, 1000],
+              })
+              .toMatch(new RegExp(expectedLabel, "i"));
+
+            console.log(
+              "[TuneTreesPageDiag] selectFlashcardEvaluation:shortcut-success",
+              {
+                tuneId,
+                value,
+                elapsedMs: Date.now() - startedAt,
+              }
+            );
+
+            break;
+          } catch (shortcutErr) {
+            console.log(
+              "[TuneTreesPageDiag] selectFlashcardEvaluation:shortcut-fallback",
+              {
+                tuneId,
+                value,
+                outerAttempt,
+                elapsedMs: Date.now() - startedAt,
+                error:
+                  shortcutErr instanceof Error
+                    ? shortcutErr.message
+                    : String(shortcutErr),
+              }
+            );
+          }
+        }
+
         // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
         // Retry a couple of times, and ensure the card back is revealed if needed.
         let menuOpened = false;
@@ -2326,7 +2444,6 @@ export class TuneTreesPage {
           }
         );
 
-        const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
         await expect
           .poll(async () => (await evalButton.textContent()) ?? "", {
             timeout: 8000,

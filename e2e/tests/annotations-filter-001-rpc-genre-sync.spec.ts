@@ -169,6 +169,13 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
       emptyRepertoire: true,
       startTab: "catalog",
     });
+
+    // Ensure test API user resolution is deterministic even if browser auth
+    // storage/session is stale between local runs.
+    await page.evaluate((userId: string) => {
+      (window as any).__ttTestUserId = userId;
+      (window as any).__ttTestApi?.setTestUserId?.(userId);
+    }, testUser.userId);
   });
 
   test("A: Onboarding filters annotations server-side for selected genres", async ({

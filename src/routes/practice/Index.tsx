@@ -354,7 +354,12 @@ const PracticeIndex: Component = () => {
   type QueueDateResolution = {
     date: Date;
     manual: boolean;
-    source: "manual-local" | "stored-local" | "db-incomplete" | "practice-date";
+    source:
+      | "manual-local"
+      | "db-incomplete"
+      | "db-latest"
+      | "stored-local-fallback"
+      | "practice-date";
   };
 
   const [resolvedQueueDate] = createResource(
@@ -367,14 +372,17 @@ const PracticeIndex: Component = () => {
       const isOnline =
         typeof navigator !== "undefined" ? navigator.onLine : true;
       const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
-      const remoteSyncReady = remoteSyncVersion > 0 || !isOnline || syncDisabled;
-      const hasStoredQueueDate = !!getStoredQueueDate();
+      const remoteSyncReady =
+        remoteSyncVersion > 0 || !isOnline || syncDisabled;
+      const storedQueueDate = getStoredQueueDate();
+      const hasManualStoredQueueDate =
+        getStoredManualQueueDateFlag() && !!storedQueueDate;
 
       if (!syncReady) {
         return null;
       }
 
-      if (!remoteSyncReady && !hasStoredQueueDate) {
+      if (!remoteSyncReady && !hasManualStoredQueueDate) {
         console.log(
           "[PracticeIndex] Waiting for first remote sync completion before resolving queue date..."
         );
@@ -405,14 +413,6 @@ const PracticeIndex: Component = () => {
         }
       }
 
-      if (storedQueueDate) {
-        return {
-          date: storedQueueDate,
-          manual: false,
-          source: "stored-local",
-        };
-      }
-
       const { getLatestActiveQueueWindow } = await import(
         "../../lib/services/practice-queue"
       );
@@ -423,7 +423,7 @@ const PracticeIndex: Component = () => {
         params.repertoireId
       );
 
-      if (latestWindow.windowStartUtc && latestWindow.hasIncompleteRows) {
+      if (latestWindow.windowStartUtc) {
         const queueDateFromDb = parseQueueDateString(
           latestWindow.windowStartUtc
         );
@@ -431,9 +431,19 @@ const PracticeIndex: Component = () => {
           return {
             date: queueDateFromDb,
             manual: false,
-            source: "db-incomplete",
+            source: latestWindow.hasIncompleteRows
+              ? "db-incomplete"
+              : "db-latest",
           };
         }
+      }
+
+      if (storedQueueDate) {
+        return {
+          date: storedQueueDate,
+          manual: false,
+          source: "stored-local-fallback",
+        };
       }
 
       return {
@@ -602,6 +612,7 @@ const PracticeIndex: Component = () => {
       const db = localDb();
       const repertoireId = currentRepertoireId();
       const resolved = resolvedQueueDate();
+      const lockedByUser = queueDateLockedByUser();
       const isQueueDateLoading = resolvedQueueDate.loading;
       const syncReady = initialSyncComplete();
 
@@ -612,7 +623,7 @@ const PracticeIndex: Component = () => {
         return null;
       }
 
-      const activeQueueDate = resolved.date;
+      const activeQueueDate = lockedByUser ? queueDate() : resolved.date;
 
       return db && userId() && repertoireId
         ? { db, userId: userId()!, repertoireId, date: activeQueueDate }
@@ -1084,44 +1095,98 @@ const PracticeIndex: Component = () => {
     }
   };
 
-  const handlePracticeDateRefresh = async () => {
+  const handlePracticeDateRefresh = async (
+    mode: "manual" | "auto" = "manual"
+  ) => {
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
+    const userIdValue = await getUserId();
 
-    // Lock and switch queue date immediately so UI state cannot be reverted
-    // while async regeneration is running.
+    if (!db || !repertoireId || !userIdValue) {
+      console.warn(
+        "[PracticeIndex] Skipping refresh: missing db/repertoire/userId",
+        {
+          hasDb: !!db,
+          repertoireId,
+          userIdValue,
+        }
+      );
+      return;
+    }
+
+    const { ensureDailyQueue, getLatestActiveQueueWindow } = await import(
+      "../../lib/services/practice-queue"
+    );
+
+    let latestWindowStart: string | null = null;
+    let latestWindowHasIncompleteRows = false;
+    try {
+      const latestWindow = await getLatestActiveQueueWindow(
+        db,
+        userIdValue,
+        repertoireId
+      );
+      latestWindowStart = latestWindow.windowStartUtc;
+      latestWindowHasIncompleteRows = latestWindow.hasIncompleteRows;
+    } catch (error) {
+      console.warn(
+        "[PracticeIndex] Failed to read latest queue window during refresh:",
+        error
+      );
+    }
+
+    const latestWindowDate = latestWindowStart
+      ? parseQueueDateString(latestWindowStart)
+      : null;
+    const todayWindowStart = formatAsWindowStart(practiceDate);
+    const latestWindowStartNormalized = latestWindowDate
+      ? formatAsWindowStart(latestWindowDate)
+      : null;
+    const dateChanged =
+      latestWindowStartNormalized !== null &&
+      latestWindowStartNormalized !== todayWindowStart;
+
+    // Rules:
+    // - Auto rollover creates today's queue only when date has changed AND latest queue is complete.
+    // - If latest queue is incomplete and date changed, keep current queue and show banner.
+    // - Manual "Refresh Now" always advances to today's queue when date changed.
+    const shouldCreateTodayQueue =
+      !latestWindowStart ||
+      (dateChanged && (mode === "manual" || !latestWindowHasIncompleteRows));
+
+    if (!shouldCreateTodayQueue) {
+      console.log(
+        "[PracticeIndex] Skipping refresh: queue rollover preconditions not met",
+        {
+          mode,
+          latestWindowStart: latestWindowStartNormalized,
+          todayWindowStart,
+          dateChanged,
+          latestWindowHasIncompleteRows,
+        }
+      );
+      incrementPracticeListStagedChanged();
+      return;
+    }
+
+    // Lock early so queue-date resolution effects can't overwrite refresh intent
+    // while we wait on sync operations.
     setQueueDateLockedByUser(true);
-    setQueueDate(practiceDate);
-    setInitialPracticeDate(practiceDate);
     setIsManualQueueDate(false);
     localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
     localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
 
-    if (db && repertoireId) {
-      const userId = await getUserId();
-      if (userId) {
-        try {
-          const { generateOrGetPracticeQueue } = await import(
-            "../../lib/services/practice-queue"
-          );
-
-          await generateOrGetPracticeQueue(
-            db,
-            userId,
-            repertoireId,
-            practiceDate,
-            null,
-            "per_day",
-            true
-          );
-        } catch (error) {
-          console.warn(
-            "[PracticeIndex] Failed to regenerate queue during refresh:",
-            error
-          );
-        }
-      }
+    // Switch queue date and ensure queue for the new day.
+    setQueueDate(practiceDate);
+    setInitialPracticeDate(practiceDate);
+    try {
+      await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
+    } catch (error) {
+      console.warn(
+        "[PracticeIndex] Failed to ensure queue during refresh:",
+        error
+      );
     }
 
     console.log(
@@ -1136,7 +1201,7 @@ const PracticeIndex: Component = () => {
     }
 
     if (isQueueCompleted()) {
-      void handlePracticeDateRefresh();
+      void handlePracticeDateRefresh("auto");
       return false;
     }
 
@@ -1249,7 +1314,7 @@ const PracticeIndex: Component = () => {
       {/* Date Rollover Banner - appears when practice date changes */}
       <DateRolloverBanner
         initialDate={initialPracticeDate()}
-        onRefresh={handlePracticeDateRefresh}
+        onRefresh={() => handlePracticeDateRefresh("manual")}
         onDateChange={handleDateRolloverDetection}
       />
 

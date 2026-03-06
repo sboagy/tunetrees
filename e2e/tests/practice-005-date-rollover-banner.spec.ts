@@ -87,6 +87,51 @@ async function getQueueSnapshot(page: Page, repertoireId: string) {
   };
 }
 
+function getPendingTuneOrder(
+  rows: Array<{ tune_ref: string; completed_at: string | null }>
+) {
+  return rows.filter((row) => !row.completed_at).map((row) => row.tune_ref);
+}
+
+function getQueueSignature(
+  rows: Array<{
+    tune_ref: string;
+    bucket: number;
+    order_index: number;
+    completed_at: string | null;
+  }>
+) {
+  return rows.map((row) => ({
+    tuneRef: row.tune_ref,
+    bucket: row.bucket,
+    orderIndex: row.order_index,
+    completed: !!row.completed_at,
+  }));
+}
+
+function normalizeWindowStartUtc(value: string) {
+  if (value.includes("T")) {
+    return value;
+  }
+  return `${value.replace(" ", "T")}Z`;
+}
+
+function normalizeRepertoireLabel(value: string) {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+
+  if (compact.length % 2 === 0) {
+    const half = compact.length / 2;
+    const first = compact.slice(0, half);
+    const second = compact.slice(half);
+    if (first === second) {
+      return first.trim();
+    }
+  }
+
+  return compact;
+}
+
 async function getQueueStorage(page: Page) {
   return await page.evaluate(
     (keys) => ({
@@ -114,8 +159,9 @@ async function selectRepertoireByName(page: Page, repertoireName: string) {
   await expect(ttPage.topNavManageRepertoiresPanel).toBeVisible({
     timeout: 10000,
   });
+  const escapedName = repertoireName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   await ttPage.topNavManageRepertoiresPanel
-    .getByRole("button", { name: new RegExp(repertoireName) })
+    .getByRole("button", { name: new RegExp(escapedName) })
     .click();
   await expect(ttPage.topNavManageRepertoiresPanel).toBeHidden({
     timeout: 10000,
@@ -442,31 +488,109 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     expect(refreshedStorage.manualFlag).toBe("false");
   });
 
+  test("should keep incomplete queue stable after local reset and reload", async ({
+    page,
+    testUser,
+  }) => {
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 5000 });
+
+    const firstRow = ttPage.getRows("scheduled").first();
+    await ttPage.setRowEvaluation(firstRow, "again");
+    await ttPage.submitEvaluationsButton.click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect
+      .poll(
+        async () => {
+          const rows = await getQueueRows(page, testUser.repertoireId);
+          return rows.some(
+            (row: { completed_at: string | null }) => !!row.completed_at
+          );
+        },
+        { timeout: 15000, intervals: [200, 500, 1000] }
+      )
+      .toBe(true);
+
+    const afterEvalQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    const expectedPendingOrder = getPendingTuneOrder(afterEvalQueue.rows);
+
+    expect(expectedPendingOrder.length).toBeGreaterThan(0);
+
+    await resetLocalDbAndResync(page);
+    ttPage = new TuneTreesPage(page);
+    await setInjectedTestUserId(page, testUser.userId);
+    await waitForTestApi(page);
+
+    await ttPage.navigateToTab("practice");
+
+    const queueAfterReset = await getQueueSnapshot(page, testUser.repertoireId);
+    const pendingAfterReset = getPendingTuneOrder(queueAfterReset.rows);
+
+    expect(normalizeWindowStartUtc(queueAfterReset.windowStartUtc)).toBe(
+      normalizeWindowStartUtc(afterEvalQueue.windowStartUtc)
+    );
+    expect(pendingAfterReset).toEqual(expectedPendingOrder);
+    expect(getQueueSignature(queueAfterReset.rows)).toEqual(
+      getQueueSignature(afterEvalQueue.rows)
+    );
+  });
+
+  test("should keep incomplete queue stable after rollover then local reset", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 5000 });
+
+    const firstRow = ttPage.getRows("scheduled").first();
+    await ttPage.setRowEvaluation(firstRow, "again");
+    await ttPage.submitEvaluationsButton.click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect
+      .poll(
+        async () => {
+          const rows = await getQueueRows(page, testUser.repertoireId);
+          return rows.some(
+            (row: { completed_at: string | null }) => !!row.completed_at
+          );
+        },
+        { timeout: 15000, intervals: [200, 500, 1000] }
+      )
+      .toBe(true);
+
+    const afterEvalQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    const expectedPendingOrder = getPendingTuneOrder(afterEvalQueue.rows);
+    expect(expectedPendingOrder.length).toBeGreaterThan(0);
+
+    currentDate = await advanceDays(context, 1, currentDate);
+    await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
+
+    await resetLocalDbAndResync(page);
+    ttPage = new TuneTreesPage(page);
+    await setInjectedTestUserId(page, testUser.userId);
+    await waitForTestApi(page);
+
+    await ttPage.navigateToTab("practice");
+    await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
+
+    const queueAfterReset = await getQueueSnapshot(page, testUser.repertoireId);
+    const pendingAfterReset = getPendingTuneOrder(queueAfterReset.rows);
+
+    expect(normalizeWindowStartUtc(queueAfterReset.windowStartUtc)).toBe(
+      normalizeWindowStartUtc(afterEvalQueue.windowStartUtc)
+    );
+    expect(pendingAfterReset).toEqual(expectedPendingOrder);
+    expect(getQueueSignature(queueAfterReset.rows)).toEqual(
+      getQueueSignature(afterEvalQueue.rows)
+    );
+  });
+
   // This test is skipped because it has side effects on the database, such as creating and deleting repertoires,
   // so it needs work to isolate its effects.
-  test.skip("should preserve queues when switching repertoires", async ({
+  test("should preserve queues when switching repertoires", async ({
     page,
     testUser,
     testUserKey,
   }) => {
-    const { supabase } = await getTestUserClient(testUserKey);
-    const { data: repertoireAData, error: repertoireAError } = await supabase
-      .from("view_repertoire_joined")
-      .select("instrument")
-      .eq("repertoire_id", testUser.repertoireId)
-      .single();
-    if (repertoireAError) {
-      throw new Error(
-        `Failed to load primary repertoire instrument: ${repertoireAError.message}`
-      );
-    }
-    const repertoireAName = repertoireAData?.instrument?.trim() || "";
-    if (!repertoireAName) {
-      throw new Error(
-        "Primary repertoire instrument name is empty; cannot select in UI"
-      );
-    }
-
     let repertoireBId: string | null = null;
     try {
       repertoireBId = await ensureRepertoireWithTunes(
@@ -482,7 +606,15 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       await waitForTestApi(page);
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
-      await selectRepertoireByName(page, repertoireAName);
+      const repertoireAName = normalizeRepertoireLabel(
+        (await ttPage.repertoireDropdownButton.textContent()) || ""
+      );
+      if (!repertoireAName) {
+        throw new Error(
+          "Primary repertoire selection is empty; cannot switch back in UI"
+        );
+      }
+
       const queueA = await getQueueSnapshot(page, testUser.repertoireId);
 
       await selectRepertoireByName(page, REPERTOIRE_B_NAME);
