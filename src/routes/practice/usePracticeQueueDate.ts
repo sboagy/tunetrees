@@ -236,8 +236,14 @@ export function usePracticeQueueDate(
 
       let resolvedDate: Date;
       if (latestWindow.windowStartUtc) {
-        const dbDate = parseStoredDate(latestWindow.windowStartUtc);
-        resolvedDate = dbDate ?? getPracticeDate();
+        // Use only the YYYY-MM-DD portion at local noon — do NOT pass through
+        // parseStoredDate, which appends "Z" (UTC midnight) and shifts the date
+        // back one day in timezones behind UTC (e.g. EST sees March 7 as March 6).
+        const datePart = latestWindow.windowStartUtc.substring(0, 10); // "YYYY-MM-DD"
+        const localNoon = new Date(`${datePart}T12:00:00`);
+        resolvedDate = Number.isNaN(localNoon.getTime())
+          ? getPracticeDate()
+          : localNoon;
       } else {
         resolvedDate = getPracticeDate();
       }
