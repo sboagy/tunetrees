@@ -2298,7 +2298,10 @@ export class TuneTreesPage {
         const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
 
         if (value !== "not-set") {
-          const flashcardHotkeys: Record<"again" | "hard" | "good" | "easy", string> = {
+          const flashcardHotkeys: Record<
+            "again" | "hard" | "good" | "easy",
+            string
+          > = {
             again: "1",
             hard: "2",
             good: "3",

@@ -901,6 +901,40 @@ async function getSelectedGenres(): Promise<string[]> {
 }
 
 /**
+ * Get summary of the latest active queue window for a repertoire.
+ *
+ * Returns the most recent window date, how many rows are in it, and how
+ * many of those rows have been completed (completed_at IS NOT NULL).
+ * Useful in sync tests to verify which window the app resolved to.
+ */
+async function getQueueInfo(repertoireId: string): Promise<{
+  windowStartUtc: string;
+  rowCount: number;
+  completedCount: number;
+}> {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+  const rows = await db.all<{
+    windowStartUtc: string;
+    rowCount: number;
+    completedCount: number;
+  }>(sql`
+    SELECT
+      window_start_utc                        AS windowStartUtc,
+      COUNT(*)                                AS rowCount,
+      COUNT(completed_at)                     AS completedCount
+    FROM daily_practice_queue
+    WHERE user_ref        = ${userRef}
+      AND repertoire_ref  = ${repertoireId}
+      AND active          = 1
+    GROUP BY window_start_utc
+    ORDER BY window_start_utc DESC
+    LIMIT 1
+  `);
+  return rows[0] ?? { windowStartUtc: "", rowCount: 0, completedCount: 0 };
+}
+
+/**
  * Get a tune ID by genre
  * Returns the first tune found for the given genre
  */
@@ -1114,6 +1148,11 @@ declare global {
         table: string,
         recordId: string | number
       ) => Promise<any>;
+      getQueueInfo: (repertoireId: string) => Promise<{
+        windowStartUtc: string;
+        rowCount: number;
+        completedCount: number;
+      }>;
       getSelectedGenres: () => Promise<string[]>;
       getTuneIdByGenre: (genre: string) => Promise<string | null>;
       getAnnotationCounts: (options?: {
@@ -1431,6 +1470,7 @@ if (typeof window !== "undefined") {
       },
       getSelectedGenres,
       getTuneIdByGenre,
+      getQueueInfo,
       getOrphanedAnnotationCounts: async () => {
         const db = await ensureDb();
 

@@ -50,6 +50,7 @@ import {
   formatAsWindowStart,
   getPracticeDate,
 } from "../../lib/utils/practice-date";
+import { usePracticeQueueDate } from "./usePracticeQueueDate";
 
 /**
  * Practice Index Page Component
@@ -295,251 +296,20 @@ const PracticeIndex: Component = () => {
     localStorage.setItem(STORAGE_KEY, String(showSubmitted()));
   });
 
-  // Queue Date state - derived from practice date service
-  // In production: uses current date
-  // In test mode: uses ?practiceDate=YYYY-MM-DD from URL
-  const QUEUE_DATE_STORAGE_KEY = "TT_PRACTICE_QUEUE_DATE";
-  const QUEUE_DATE_MANUAL_FLAG_KEY = "TT_PRACTICE_QUEUE_DATE_MANUAL";
-
-  const parseQueueDateString = (
-    value: string | null | undefined
-  ): Date | null => {
-    if (!value) return null;
-
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-
-    const normalized = trimmed.includes("T")
-      ? trimmed
-      : trimmed.replace(" ", "T");
-    const withZone = /(?:Z|[+-]\d{2}:\d{2})$/.test(normalized)
-      ? normalized
-      : `${normalized}Z`;
-
-    const parsed = new Date(withZone);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  };
-
-  const getStoredQueueDate = (): Date | null => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-
-    return parseQueueDateString(localStorage.getItem(QUEUE_DATE_STORAGE_KEY));
-  };
-
-  const getStoredManualQueueDateFlag = (): boolean => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
-  };
-
-  const initialStoredQueueDate = getStoredQueueDate();
-  const fallbackPracticeDate = getPracticeDate();
-
-  const [queueDate, setQueueDate] = createSignal<Date>(
-    initialStoredQueueDate ?? fallbackPracticeDate
-  );
-  const [isManualQueueDate, setIsManualQueueDate] = createSignal(
-    getStoredManualQueueDateFlag()
-  );
-
-  // Store initial practice date for rollover detection
-  const [initialPracticeDate, setInitialPracticeDate] = createSignal<Date>(
-    initialStoredQueueDate ?? fallbackPracticeDate
-  );
-
-  type QueueDateResolution = {
-    date: Date;
-    manual: boolean;
-    source:
-      | "manual-local"
-      | "db-incomplete"
-      | "db-latest"
-      | "stored-local-fallback"
-      | "practice-date";
-  };
-
-  const [resolvedQueueDate] = createResource(
-    () => {
-      const db = localDb();
-      const uid = userId();
-      const repertoireId = currentRepertoireId();
-      const syncReady = initialSyncComplete();
-      const remoteSyncVersion = remoteSyncDownCompletionVersion();
-      const isOnline =
-        typeof navigator !== "undefined" ? navigator.onLine : true;
-      const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
-      const remoteSyncReady =
-        remoteSyncVersion > 0 || !isOnline || syncDisabled;
-      const storedQueueDate = getStoredQueueDate();
-      const hasManualStoredQueueDate =
-        getStoredManualQueueDateFlag() && !!storedQueueDate;
-
-      if (!syncReady) {
-        return null;
-      }
-
-      if (!remoteSyncReady && !hasManualStoredQueueDate) {
-        console.log(
-          "[PracticeIndex] Waiting for first remote sync completion before resolving queue date..."
-        );
-        return null;
-      }
-
-      return db && uid && repertoireId
-        ? { db, userId: uid, repertoireId, remoteSyncVersion }
-        : null;
-    },
-    async (params): Promise<QueueDateResolution | null> => {
-      if (!params) return null;
-
-      const practiceDate = getPracticeDate();
-
-      const storedDateValue = localStorage.getItem(QUEUE_DATE_STORAGE_KEY);
-      const persistedManualFlag =
-        localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true";
-      const storedQueueDate = parseQueueDateString(storedDateValue);
-
-      if (persistedManualFlag) {
-        if (storedQueueDate) {
-          return {
-            date: storedQueueDate,
-            manual: true,
-            source: "manual-local",
-          };
-        }
-      }
-
-      const { getLatestActiveQueueWindow } = await import(
-        "../../lib/services/practice-queue"
-      );
-
-      const latestWindow = await getLatestActiveQueueWindow(
-        params.db,
-        params.userId,
-        params.repertoireId
-      );
-
-      if (latestWindow.windowStartUtc) {
-        const queueDateFromDb = parseQueueDateString(
-          latestWindow.windowStartUtc
-        );
-        if (queueDateFromDb) {
-          return {
-            date: queueDateFromDb,
-            manual: false,
-            source: latestWindow.hasIncompleteRows
-              ? "db-incomplete"
-              : "db-latest",
-          };
-        }
-      }
-
-      if (storedQueueDate) {
-        return {
-          date: storedQueueDate,
-          manual: false,
-          source: "stored-local-fallback",
-        };
-      }
-
-      return {
-        date: practiceDate,
-        manual: false,
-        source: "practice-date",
-      };
-    }
-  );
-
-  const [queueDateLockedByUser, setQueueDateLockedByUser] = createSignal(false);
-  let queueDateScopeKey: string | null = null;
-
-  createEffect(() => {
-    const uid = userId();
-    const repertoireId = currentRepertoireId();
-    const scopeKey = uid && repertoireId ? `${uid}:${repertoireId}` : null;
-
-    if (!scopeKey) {
-      return;
-    }
-
-    if (queueDateScopeKey !== scopeKey) {
-      queueDateScopeKey = scopeKey;
-      setQueueDateLockedByUser(false);
-    }
-  });
-
-  createEffect(() => {
-    const uid = userId();
-    const repertoireId = currentRepertoireId();
-    const scopeKey = uid && repertoireId ? `${uid}:${repertoireId}` : null;
-    const resolved = resolvedQueueDate();
-    if (!resolved || resolvedQueueDate.loading || !scopeKey) return;
-    if (queueDateLockedByUser()) return;
-
-    const resolvedWindowStart = formatAsWindowStart(resolved.date);
-    const queueWindowStart = formatAsWindowStart(queueDate());
-    const initialWindowStart = formatAsWindowStart(initialPracticeDate());
-    const manualChanged = isManualQueueDate() !== resolved.manual;
-    const storedQueueDate = getStoredQueueDate();
-    const storedWindowStart = storedQueueDate
-      ? formatAsWindowStart(storedQueueDate)
-      : null;
-    const storedManualFlag = getStoredManualQueueDateFlag();
-    const requiresStorageSync =
-      storedWindowStart !== resolvedWindowStart ||
-      storedManualFlag !== resolved.manual;
-
-    if (
-      resolvedWindowStart === queueWindowStart &&
-      resolvedWindowStart === initialWindowStart &&
-      !manualChanged
-    ) {
-      if (requiresStorageSync) {
-        localStorage.setItem(
-          QUEUE_DATE_STORAGE_KEY,
-          resolved.date.toISOString()
-        );
-        localStorage.setItem(
-          QUEUE_DATE_MANUAL_FLAG_KEY,
-          resolved.manual ? "true" : "false"
-        );
-      }
-      return;
-    }
-
-    setQueueDate(resolved.date);
-    setInitialPracticeDate(resolved.date);
-    setIsManualQueueDate(resolved.manual);
-
-    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, resolved.date.toISOString());
-    localStorage.setItem(
-      QUEUE_DATE_MANUAL_FLAG_KEY,
-      resolved.manual ? "true" : "false"
-    );
-
-    console.log(
-      `[PracticeIndex] Queue date resolved from ${resolved.source}: ${resolved.date.toLocaleDateString()} (${resolved.manual ? "manual" : "auto"})`
-    );
-  });
-
-  // NOTE: Queue date is NOT eagerly written to localStorage here.
-  // Writing today's fallback date before sync completes would cause resolvedQueueDate
-  // to bypass the DB check (it reads localStorage first), resulting in a fresh queue
-  // being generated for today instead of using the synced queue from remote.
-  // localStorage is written explicitly in:
-  //   - resolvedQueueDate resolution effect (line ~449) after DB check
-  //   - handleQueueDateChange (user-initiated date change)
-  //   - handlePracticeDateRefresh (date rollover / refresh action)
-
-  createEffect(() => {
-    localStorage.setItem(
-      QUEUE_DATE_MANUAL_FLAG_KEY,
-      isManualQueueDate() ? "true" : "false"
-    );
+  // Queue date: owned by composable — DB-first, stale-flag-aware, sync-reactive.
+  // See usePracticeQueueDate.ts for the full resolution logic (fixes issue #427).
+  const {
+    queueDate,
+    isManual,
+    queueReady,
+    setManualDate,
+    clearManualAndSetToday,
+  } = usePracticeQueueDate({
+    localDb,
+    userId,
+    currentRepertoireId,
+    initialSyncComplete,
+    remoteSyncDownCompletionVersion,
   });
 
   // Flashcard Mode state - persisted to localStorage
@@ -604,76 +374,17 @@ const PracticeIndex: Component = () => {
 
   const [tableInstance, setTableInstance] = createSignal<any>(null);
 
-  // Initialize daily practice queue (must run BEFORE fetching practice list)
-  // getPracticeList does INNER JOIN with daily_practice_queue, so queue must exist first
-  // IMPORTANT: Only re-runs when queueDate changes, NOT on every practice list change
-  const [queueInitialized] = createResource(
-    () => {
-      const db = localDb();
-      const repertoireId = currentRepertoireId();
-      const resolved = resolvedQueueDate();
-      const lockedByUser = queueDateLockedByUser();
-      const isQueueDateLoading = resolvedQueueDate.loading;
-      const syncReady = initialSyncComplete();
-
-      if (!syncReady || isQueueDateLoading || !resolved) {
-        console.log(
-          "[PracticeIndex] Waiting for queue date resolution + initial sync before initializing queue..."
-        );
-        return null;
-      }
-
-      const activeQueueDate = lockedByUser ? queueDate() : resolved.date;
-
-      return db && userId() && repertoireId
-        ? { db, userId: userId()!, repertoireId, date: activeQueueDate }
-        : null;
-    },
-    async (params) => {
-      if (!params) return false;
-
-      const { ensureDailyQueue } = await import(
-        "../../lib/services/practice-queue"
-      );
-
-      try {
-        // ensureDailyQueue checks if queue exists and only creates if missing
-        const created = await ensureDailyQueue(
-          params.db,
-          params.userId,
-          params.repertoireId,
-          params.date
-        );
-
-        if (created) {
-          console.log(
-            `[PracticeIndex] ✅ Created new daily queue for ${params.date.toLocaleDateString()}`
-          );
-        } else {
-          console.log(
-            `[PracticeIndex] ✓ Queue already exists for ${params.date.toLocaleDateString()}`
-          );
-        }
-
-        return true;
-      } catch (error) {
-        console.error("[PracticeIndex] Queue initialization failed:", error);
-        return false;
-      }
-    }
-  );
-
   // Fetch practice list (shared between grid and flashcard views)
-  // CRITICAL: Must wait for queueInitialized() to complete before fetching
-  // Also check queueInitialized.loading to prevent race condition where
+  // CRITICAL: Must wait for queueReady() to complete before fetching
+  // Also check queueReady.loading to prevent race condition where
   // practiceListData fetches while queue is being re-initialized
   const [practiceListData] = createResource(
     () => {
       const db = localDb();
       const repertoireId = currentRepertoireId();
       const version = practiceListStagedChanged(); // Refetch when practice list changes
-      const initialized = queueInitialized(); // Wait for queue to be ready
-      const isQueueLoading = queueInitialized.loading; // Check if queue is currently loading/re-loading
+      const initialized = queueReady(); // Wait for queue to be ready
+      const isQueueLoading = queueReady.loading; // Check if queue is currently loading/re-loading
       const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
@@ -757,15 +468,11 @@ const PracticeIndex: Component = () => {
 
   const practiceListLoading = () => {
     const hasCachedRows = practiceListData.latest != null;
-    return (
-      (practiceListData.loading || queueInitialized.loading) && !hasCachedRows
-    );
+    return (practiceListData.loading || queueReady.loading) && !hasCachedRows;
   };
   const practiceListError = () =>
     practiceListData.error ||
-    (queueInitialized() === false
-      ? "Practice queue failed to initialize."
-      : undefined);
+    (queueReady.error ? "Practice queue failed to initialize." : undefined);
 
   // Grid no longer provides a clear-evaluations callback; parent clears evaluations directly
 
@@ -1054,38 +761,19 @@ const PracticeIndex: Component = () => {
   };
 
   // Handle queue date change
-  const handleQueueDateChange = (date: Date, isPreview: boolean) => {
+  const handleQueueDateChange = async (date: Date, isPreview: boolean) => {
     console.log(
       `Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`
     );
 
-    // Set to noon to avoid timezone issues
-    const dateAtNoon = new Date(date);
-    dateAtNoon.setHours(12, 0, 0, 0);
+    // setManualDate normalizes to noon, handles today vs. non-today, and awaits
+    // ensureDailyQueue so the grid can safely re-fetch immediately after.
+    await setManualDate(date);
 
-    setQueueDate(dateAtNoon);
-    setInitialPracticeDate(dateAtNoon);
-    setQueueDateLockedByUser(true);
-    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, dateAtNoon.toISOString());
-
-    // Set manual flag if not today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDay = new Date(dateAtNoon);
-    selectedDay.setHours(0, 0, 0, 0);
-
-    const isToday = selectedDay.getTime() === today.getTime();
-    localStorage.setItem(
-      QUEUE_DATE_MANUAL_FLAG_KEY,
-      isToday ? "false" : "true"
-    );
-    setIsManualQueueDate(!isToday);
-
-    // Trigger grid refresh using view-specific signal
     incrementPracticeListStagedChanged();
 
     // Show appropriate message
-    const dateStr = dateAtNoon.toLocaleDateString();
+    const dateStr = queueDate().toLocaleDateString();
     if (isPreview) {
       toast.info(`Previewing queue for ${dateStr} (changes won't be saved)`, {
         duration: 4000,
@@ -1136,9 +824,13 @@ const PracticeIndex: Component = () => {
       );
     }
 
-    const latestWindowDate = latestWindowStart
-      ? parseQueueDateString(latestWindowStart)
-      : null;
+    const latestWindowDate: Date | null = (() => {
+      if (!latestWindowStart) return null;
+      const s = latestWindowStart.trim().replace(" ", "T");
+      const withZ = /(?:Z|[+-]\d{2}:\d{2})$/.test(s) ? s : `${s}Z`;
+      const d = new Date(withZ);
+      return Number.isNaN(d.getTime()) ? null : d;
+    })();
     const todayWindowStart = formatAsWindowStart(practiceDate);
     const latestWindowStartNormalized = latestWindowDate
       ? formatAsWindowStart(latestWindowDate)
@@ -1170,16 +862,10 @@ const PracticeIndex: Component = () => {
       return;
     }
 
-    // Lock early so queue-date resolution effects can't overwrite refresh intent
-    // while we wait on sync operations.
-    setQueueDateLockedByUser(true);
-    setIsManualQueueDate(false);
-    localStorage.setItem(QUEUE_DATE_STORAGE_KEY, practiceDate.toISOString());
-    localStorage.setItem(QUEUE_DATE_MANUAL_FLAG_KEY, "false");
+    // Update queue date state (clears manual flag, sets to today).
+    clearManualAndSetToday();
 
-    // Switch queue date and ensure queue for the new day.
-    setQueueDate(practiceDate);
-    setInitialPracticeDate(practiceDate);
+    // Ensure the new day's queue exists before triggering the list re-fetch.
     try {
       await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
     } catch (error) {
@@ -1196,7 +882,7 @@ const PracticeIndex: Component = () => {
   };
 
   const handleDateRolloverDetection = () => {
-    if (isManualQueueDate()) {
+    if (isManual()) {
       return true;
     }
 
@@ -1313,7 +999,7 @@ const PracticeIndex: Component = () => {
     <div class="h-full flex flex-col">
       {/* Date Rollover Banner - appears when practice date changes */}
       <DateRolloverBanner
-        initialDate={initialPracticeDate()}
+        initialDate={queueDate()}
         onRefresh={() => handlePracticeDateRefresh("manual")}
         onDateChange={handleDateRolloverDetection}
       />
