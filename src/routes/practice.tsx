@@ -4,7 +4,7 @@
  * Protected route - main practice interface with grid view.
  * Clean layout with sticky control banner and practice queue grid.
  *
- * @module routes/practice/Index
+ * @module routes/practice
  */
 
 import { useLocation, useNavigate } from "@solidjs/router";
@@ -20,37 +20,37 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
-import { AIChatDrawer } from "../../components/ai/AIChatDrawer";
-import { TunesGridScheduled } from "../../components/grids";
-import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
-import { GRID_CONTENT_CONTAINER } from "../../components/grids/shared-toolbar-styles";
-import type { ITuneOverview } from "../../components/grids/types";
+import { AIChatDrawer } from "../components/ai/AIChatDrawer";
+import { TunesGridScheduled } from "../components/grids";
+import { GridStatusMessage } from "../components/grids/GridStatusMessage";
+import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
+import type { ITuneOverview } from "../components/grids/types";
 import {
   DateRolloverBanner,
   type FlashcardFieldVisibilityByFace,
   FlashcardView,
   getDefaultFieldVisibility,
   PracticeControlBanner,
-} from "../../components/practice";
-import { RepertoireEmptyState } from "../../components/repertoire";
-import { RepertoireEditorDialog } from "../../components/repertoires/RepertoireEditorDialog";
-import { useAuth } from "../../lib/auth/AuthContext";
-import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
-import { getUserRepertoires } from "../../lib/db/queries/repertoires";
-import { type GoalRow, getGoals } from "../../lib/db/queries/user-settings";
-import { repertoireTune } from "../../lib/db/schema";
-import type { RepertoireWithSummary } from "../../lib/db/types";
-import { addTunesToQueue } from "../../lib/services/practice-queue";
-import { commitStagedEvaluations } from "../../lib/services/practice-recording";
+} from "../components/practice";
+import { RepertoireEmptyState } from "../components/repertoire";
+import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
+import { useAuth } from "../lib/auth/AuthContext";
+import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { getUserRepertoires } from "../lib/db/queries/repertoires";
+import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
+import { repertoireTune } from "../lib/db/schema";
+import type { RepertoireWithSummary } from "../lib/db/types";
+import { addTunesToQueue } from "../lib/services/practice-queue";
+import { commitStagedEvaluations } from "../lib/services/practice-recording";
 import {
   clearStagedEvaluation,
   stagePracticeEvaluation,
-} from "../../lib/services/practice-staging";
+} from "../lib/services/practice-staging";
 import {
   formatAsWindowStart,
   getPracticeDate,
-} from "../../lib/utils/practice-date";
-import { usePracticeQueueDate } from "./usePracticeQueueDate";
+} from "../lib/utils/practice-date";
+import { usePracticeQueueDate } from "./practice/usePracticeQueueDate";
 
 /**
  * Practice Index Page Component
@@ -64,12 +64,12 @@ import { usePracticeQueueDate } from "./usePracticeQueueDate";
  * ```tsx
  * <Route path="/practice" component={() => (
  *   <ProtectedRoute>
- *     <PracticeIndex />
+ *     <PracticePage />
  *   </ProtectedRoute>
  * )} />
  * ```
  */
-const PracticeIndex: Component = () => {
+const PracticePage: Component = () => {
   const PRACTICE_GATE_DIAGNOSTICS =
     import.meta.env.VITE_PRACTICE_GATE_DIAGNOSTICS === "true";
 
@@ -177,7 +177,7 @@ const PracticeIndex: Component = () => {
 
     if (!isPracticeGateOpen()) {
       console.log(
-        `[PracticeIndexGate] blocked=${practiceGateBlockingReasons().join(",") || "none"} state=${signature}`
+        `[PracticePageGate] blocked=${practiceGateBlockingReasons().join(",") || "none"} state=${signature}`
       );
     }
   });
@@ -388,7 +388,7 @@ const PracticeIndex: Component = () => {
       const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
-        `[PracticeIndex] practiceListData deps: db=${!!db}, userId=${userId()}, repertoire=${repertoireId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
+        `[PracticePage] practiceListData deps: db=${!!db}, userId=${userId()}, repertoire=${repertoireId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
       );
 
       // Only proceed if ALL dependencies are ready (including queue)
@@ -407,10 +407,10 @@ const PracticeIndex: Component = () => {
     },
     async (params) => {
       if (!params) return [];
-      const { getPracticeList } = await import("../../lib/db/queries/practice");
+      const { getPracticeList } = await import("../lib/db/queries/practice");
       const delinquencyWindowDays = 7;
       console.log(
-        `[PracticeIndex] Fetching practice list for repertoire ${params.repertoireId} (queueReady=${params.queueReady})`
+        `[PracticePage] Fetching practice list for repertoire ${params.repertoireId} (queueReady=${params.queueReady})`
       );
       // Returns PracticeListStagedWithQueue[] which is compatible with ITuneOverview
       return await getPracticeList(
@@ -453,7 +453,7 @@ const PracticeIndex: Component = () => {
     const shouldShow = showSubmitted();
 
     console.log(
-      `[PracticeIndex] Filtering practice list: ${data.length} total, showSubmitted=${shouldShow}`
+      `[PracticePage] Filtering practice list: ${data.length} total, showSubmitted=${shouldShow}`
     );
 
     // When showSubmitted is true, show all tunes including completed ones
@@ -462,7 +462,7 @@ const PracticeIndex: Component = () => {
       ? data
       : data.filter((tune) => !tune.completed_at);
 
-    console.log(`[PracticeIndex] After filtering: ${filtered.length} tunes`);
+    console.log(`[PracticePage] After filtering: ${filtered.length} tunes`);
     return filtered;
   });
 
@@ -495,7 +495,7 @@ const PracticeIndex: Component = () => {
 
     if (!db || !repertoireId || !userIdVal) {
       console.warn(
-        "[PracticeIndex] Skipping staging: missing db/repertoire/userId",
+        "[PracticePage] Skipping staging: missing db/repertoire/userId",
         {
           hasDb: !!db,
           repertoireId,
@@ -514,7 +514,7 @@ const PracticeIndex: Component = () => {
         // Clear staged data when "(Not Set)" selected
         await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
         console.log(
-          `🗑️  [PracticeIndex] Cleared staged evaluation for tune ${tuneId}`
+          `🗑️  [PracticePage] Cleared staged evaluation for tune ${tuneId}`
         );
       } else {
         // Resolve goal and technique from the practice list and goals map.
@@ -537,7 +537,7 @@ const PracticeIndex: Component = () => {
           technique
         );
         console.log(
-          `✅ [PracticeIndex] Staged preview for tune ${tuneId} (goal=${tuneGoal}, technique=${technique})`
+          `✅ [PracticePage] Staged preview for tune ${tuneId} (goal=${tuneGoal}, technique=${technique})`
         );
       }
 
@@ -545,7 +545,7 @@ const PracticeIndex: Component = () => {
       incrementPracticeListStagedChanged();
     } catch (error) {
       console.error(
-        `❌ [PracticeIndex] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for ${tuneId}:`,
+        `❌ [PracticePage] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for ${tuneId}:`,
         error
       );
       setEvaluations((prev) => {
@@ -604,7 +604,7 @@ const PracticeIndex: Component = () => {
         return next;
       });
       console.error(
-        `[PracticeIndex] Failed to update goal for tune ${tuneId}:`,
+        `[PracticePage] Failed to update goal for tune ${tuneId}:`,
         err
       );
       toast.error("Failed to update goal. Please try again.");
@@ -793,7 +793,7 @@ const PracticeIndex: Component = () => {
 
     if (!db || !repertoireId || !userIdValue) {
       console.warn(
-        "[PracticeIndex] Skipping refresh: missing db/repertoire/userId",
+        "[PracticePage] Skipping refresh: missing db/repertoire/userId",
         {
           hasDb: !!db,
           repertoireId,
@@ -804,7 +804,7 @@ const PracticeIndex: Component = () => {
     }
 
     const { ensureDailyQueue, getLatestActiveQueueWindow } = await import(
-      "../../lib/services/practice-queue"
+      "../lib/services/practice-queue"
     );
 
     let latestWindowStart: string | null = null;
@@ -819,7 +819,7 @@ const PracticeIndex: Component = () => {
       latestWindowHasIncompleteRows = latestWindow.hasIncompleteRows;
     } catch (error) {
       console.warn(
-        "[PracticeIndex] Failed to read latest queue window during refresh:",
+        "[PracticePage] Failed to read latest queue window during refresh:",
         error
       );
     }
@@ -849,7 +849,7 @@ const PracticeIndex: Component = () => {
 
     if (!shouldCreateTodayQueue) {
       console.log(
-        "[PracticeIndex] Skipping refresh: queue rollover preconditions not met",
+        "[PracticePage] Skipping refresh: queue rollover preconditions not met",
         {
           mode,
           latestWindowStart: latestWindowStartNormalized,
@@ -870,13 +870,13 @@ const PracticeIndex: Component = () => {
       await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
     } catch (error) {
       console.warn(
-        "[PracticeIndex] Failed to ensure queue during refresh:",
+        "[PracticePage] Failed to ensure queue during refresh:",
         error
       );
     }
 
     console.log(
-      `[PracticeIndex] Refreshing queue for ${practiceDate.toLocaleDateString()}`
+      `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
     );
     incrementPracticeListStagedChanged();
   };
@@ -1076,4 +1076,4 @@ const PracticeIndex: Component = () => {
   );
 };
 
-export default PracticeIndex;
+export default PracticePage;
