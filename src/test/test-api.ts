@@ -920,18 +920,24 @@ async function getQueueInfo(repertoireId: string): Promise<{
     completedCount: number;
   }>(sql`
     SELECT
-      window_start_utc                        AS windowStartUtc,
-      COUNT(*)                                AS rowCount,
-      COUNT(completed_at)                     AS completedCount
+      REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') AS windowStartUtc,
+      COUNT(*)                                            AS rowCount,
+      COUNT(completed_at)                                 AS completedCount
     FROM daily_practice_queue
     WHERE user_ref        = ${userRef}
       AND repertoire_ref  = ${repertoireId}
       AND active          = 1
-    GROUP BY window_start_utc
-    ORDER BY window_start_utc DESC
+    GROUP BY REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ')
+    ORDER BY windowStartUtc DESC
     LIMIT 1
   `);
-  return rows[0] ?? { windowStartUtc: "", rowCount: 0, completedCount: 0 };
+  const raw = rows[0];
+  if (!raw) return { windowStartUtc: "", rowCount: 0, completedCount: 0 };
+  return {
+    windowStartUtc: raw.windowStartUtc ?? "",
+    rowCount: Number(raw.rowCount),
+    completedCount: Number(raw.completedCount),
+  };
 }
 
 /**

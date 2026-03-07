@@ -96,15 +96,24 @@ test.describe("SYNC-003: Fresh device picks up synced queue window from Supabase
     testUser,
     testUserKey,
   }) => {
-    // --- Build the "yesterday" window timestamps ---
-    const yesterdayStart = new Date(currentDate);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    // Store as ISO so Supabase accepts it.
-    const windowStartIso = yesterdayStart.toISOString();
-    // window_end_utc = start + 24h
-    const yesterdayEnd = new Date(yesterdayStart);
-    yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
-    const windowEndIso = yesterdayEnd.toISOString();
+    // --- Build the "yesterday" window timestamps (UTC midnight boundaries) ---
+    // Use UTC midnight so the seeded window_start_utc matches the convention
+    // used by formatAsWindowStart() in production, avoiding a mismatch where
+    // ensureDailyQueue misidentifies the window date and creates a duplicate.
+    const yesterdayUtc = new Date(currentDate);
+    yesterdayUtc.setUTCDate(yesterdayUtc.getUTCDate() - 1);
+    const windowStartUtcDate = new Date(
+      Date.UTC(
+        yesterdayUtc.getUTCFullYear(),
+        yesterdayUtc.getUTCMonth(),
+        yesterdayUtc.getUTCDate(),
+        0, 0, 0, 0
+      )
+    );
+    const windowStartIso = windowStartUtcDate.toISOString(); // "2025-07-19T00:00:00.000Z"
+    const windowEndUtcDate = new Date(windowStartUtcDate);
+    windowEndUtcDate.setUTCDate(windowEndUtcDate.getUTCDate() + 1);
+    const windowEndIso = windowEndUtcDate.toISOString(); // "2025-07-20T00:00:00.000Z"
     const nowIso = new Date().toISOString();
 
     // --- Insert queue row directly into Supabase ---

@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_KESH_ID,
@@ -50,8 +50,6 @@ async function getRowCount(page: Page, repertoireId: string): Promise<number> {
     return info.rowCount;
   }, repertoireId);
 }
-
-import type { Page } from "@playwright/test";
 
 test.describe("SYNC-001: Queue row count stable across reloads", () => {
   test.setTimeout(120_000);
