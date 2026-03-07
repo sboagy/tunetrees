@@ -4,10 +4,6 @@ This file intentionally contains only global execution guardrails.
 
 Repository-specific architecture, tech stack details, and patterns (including sync adapters/codegen boundaries) live in the root `AGENTS.md` and scoped `*/AGENTS.md` files.
 
-2. If the requirements I give you are ambiguous, ask clarifying questions before writing any code.
-
-3. After you finish writing any code, list the edge cases and suggest test cases to cover them.
-
 ## 0. Analysis Before Action
 
 - **Clarify Ambiguities:** If the requirements I give you are ambiguous, ask clarifying questions before writing any code.
