@@ -6,12 +6,12 @@ name: CI - Tests
 
 on:
   push:
-    branches: [main, fix/is354_sync_errors, fix-practice-queue-sync-3]
+    branches: [main, fix/is354_sync_errors]
   pull_request:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -498,7 +498,7 @@ jobs:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
     needs: [test-unit, test, test-pwa-offline] # Deploy only if ALL tests pass
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors' || github.ref == 'refs/heads/fix-practice-queue-sync-3')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors')
     environment: vite_pwa_env
 
     steps:
@@ -538,7 +538,7 @@ jobs:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
     needs: [test-unit, test, test-pwa-offline]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors' || github.ref == 'refs/heads/fix-practice-queue-sync-3')
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/is354_sync_errors')
     environment: vite_pwa_env
     steps:
       - uses: actions/checkout@v4
