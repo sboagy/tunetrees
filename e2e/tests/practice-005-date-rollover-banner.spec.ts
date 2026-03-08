@@ -189,10 +189,13 @@ async function ensureRepertoireWithTunes(
     );
   }
 
-  const { error: clearPracticeError } = await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
+  // practice_record deletes are blocked by a DB trigger unless the per-transaction
+  // flag `app.allow_practice_record_delete` is set. Use the RPC that sets the flag
+  // and deletes in one call.
+  const { error: clearPracticeError } = await supabase.rpc(
+    "e2e_clear_practice_record",
+    { target_repertoire: repertoireId }
+  );
   if (clearPracticeError) {
     throw new Error(
       `Failed to clear practice_record: ${clearPracticeError.message}`
@@ -261,10 +264,10 @@ async function cleanupRepertoire(userKey: string, repertoireId: string) {
     .from("daily_practice_queue")
     .delete()
     .eq("repertoire_ref", repertoireId);
-  await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
+  // practice_record deletes require the e2e_clear_practice_record RPC
+  await supabase.rpc("e2e_clear_practice_record", {
+    target_repertoire: repertoireId,
+  });
   await supabase
     .from("repertoire_tune")
     .delete()
