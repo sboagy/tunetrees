@@ -94,12 +94,16 @@ However, the `computeSchedulingWindows` import from `practice.ts → practice-qu
 ```ts
 export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs {
   // Single wall-clock polling signal (replaces DateRolloverBanner's internal interval)
+  // isSameDay compares local YYYY-MM-DD (reuse toLocalDateString from usePracticeQueueDate)
   const [wallClockDate, setWallClockDate] = createSignal(getPracticeDate(), {
-    equals: (a, b) => toLocalDateString(a) === toLocalDateString(b),
+    equals: (a, b) => isSameDay(a, b),
   });
 
-  // Configurable polling interval (test override supported)
-  const intervalMs = getRolloverIntervalMs(); // 60000 in prod, test-overridable
+  // Configurable polling interval (test override supported).
+  // getRolloverIntervalMs(): returns 60000 in production, but checks
+  // window.__TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__ for E2E overrides.
+  // (Moved here from DateRolloverBanner.tsx — same implementation.)
+  const intervalMs = getRolloverIntervalMs();
   const timer = setInterval(() => setWallClockDate(getPracticeDate()), intervalMs);
   onCleanup(() => clearInterval(timer));
 
@@ -114,7 +118,10 @@ export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs 
     return {
       showBanner:        !manual && dateChanged && !completed,
       shouldAutoAdvance: !manual && dateChanged && completed,
-      shouldClearManual: manual && isSameDay(qDate, today),  // Q5 special case
+      // "Q5 special case" from the state machine matrix: when the user set a manual
+      // date but that date is now today, the manual flag is stale — clear it so the
+      // normal auto-advance/banner rules take effect.
+      shouldClearManual: manual && isSameDay(qDate, today),
       dateChanged,
       wallClockDate: today,
     };
@@ -346,7 +353,7 @@ rows.forEach((row, i) => { console.log(...) });                                 
 
 These are development-time debugging aids that execute on every practice list fetch. They should be removed entirely (not gated) since they add overhead and log noise.
 
-**Keep**: The functional `console.log` at line 304 (`"JOIN returned N rows"`) can remain as it's a useful operational log.
+**Keep**: The functional `console.log` at line 304 (`"JOIN returned N rows"`) can remain as it provides row-count telemetry useful for diagnosing "empty grid" issues. The criteria: keep logs that describe *results* of operations (counts, success/failure); remove logs that dump *intermediate state* (DB identity, raw window arrays, per-row debug).
 
 ---
 
