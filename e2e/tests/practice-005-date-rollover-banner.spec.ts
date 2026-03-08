@@ -179,36 +179,6 @@ async function ensureRepertoireWithTunes(
   const { supabase } = await getTestUserClient(userKey);
   const repertoireId = randomUUID();
 
-  const { error: clearQueueError } = await supabase
-    .from("daily_practice_queue")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearQueueError) {
-    throw new Error(
-      `Failed to clear daily_practice_queue: ${clearQueueError.message}`
-    );
-  }
-
-  const { error: clearPracticeError } = await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearPracticeError) {
-    throw new Error(
-      `Failed to clear practice_record: ${clearPracticeError.message}`
-    );
-  }
-
-  const { error: clearRepertoireTunesError } = await supabase
-    .from("repertoire_tune")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearRepertoireTunesError) {
-    throw new Error(
-      `Failed to clear repertoire_tune: ${clearRepertoireTunesError.message}`
-    );
-  }
-
   const { error: repertoireError } = await supabase.from("repertoire").upsert(
     {
       repertoire_id: repertoireId,
@@ -257,19 +227,47 @@ async function ensureRepertoireWithTunes(
 async function cleanupRepertoire(userKey: string, repertoireId: string) {
   const { supabase } = await getTestUserClient(userKey);
 
-  await supabase
+  const { error: clearQueueError } = await supabase
     .from("daily_practice_queue")
     .delete()
     .eq("repertoire_ref", repertoireId);
-  await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  await supabase
+  if (clearQueueError) {
+    throw new Error(
+      `Failed to clear daily_practice_queue during cleanup: ${clearQueueError.message}`
+    );
+  }
+
+  const { error: clearPracticeError } = await supabase.rpc(
+    "e2e_clear_practice_record",
+    {
+      target_repertoire: repertoireId,
+    }
+  );
+  if (clearPracticeError) {
+    throw new Error(
+      `Failed to clear practice_record during cleanup: ${clearPracticeError.message}`
+    );
+  }
+
+  const { error: clearRepertoireTunesError } = await supabase
     .from("repertoire_tune")
     .delete()
     .eq("repertoire_ref", repertoireId);
-  await supabase.from("repertoire").delete().eq("repertoire_id", repertoireId);
+  if (clearRepertoireTunesError) {
+    throw new Error(
+      `Failed to clear repertoire_tune during cleanup: ${clearRepertoireTunesError.message}`
+    );
+  }
+
+  const { error: deleteRepertoireError } = await supabase
+    .from("repertoire")
+    .delete()
+    .eq("repertoire_id", repertoireId);
+  if (deleteRepertoireError) {
+    throw new Error(
+      `Failed to delete repertoire during cleanup: ${deleteRepertoireError.message}`
+    );
+  }
 }
 
 test.describe("PRACTICE-005: Date Rollover Banner", () => {

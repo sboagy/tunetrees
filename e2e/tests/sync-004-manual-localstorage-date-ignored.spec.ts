@@ -5,6 +5,25 @@ import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
+async function setInjectedTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await setCurrentTestUserId(page, userId);
+}
+
+async function setCurrentTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
+
 /**
  * SYNC-004: Manual localStorage date must NOT override DB queue window.
  * Priority: HIGH — deterministic fail with current code.
@@ -57,6 +76,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
   test.beforeEach(async ({ page, context, testUser }) => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+    await setInjectedTestUserId(page, testUser.userId);
 
     ttPage = new TuneTreesPage(page);
     await ttPage.setSchedulingPrefs();
@@ -92,6 +112,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
     // Reload so the injected values are live from the very first script tick.
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 30_000 });
+    await setCurrentTestUserId(page, testUser.userId);
 
     // Wait for the test API to be registered.
     await page.waitForFunction(
@@ -109,9 +130,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
       const api = (
         window as {
           __ttTestApi?: {
-            getQueueInfo: (
-              id: string
-            ) => Promise<{
+            getQueueInfo: (id: string) => Promise<{
               windowStartUtc: string;
               rowCount: number;
               completedCount: number;
