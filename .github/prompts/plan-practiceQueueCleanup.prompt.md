@@ -7,6 +7,39 @@
 
 ---
 
+## Status Update (2026-03-08)
+
+This section tracks implementation status against the phases below. The "Current State Analysis" section that follows describes the pre-refactor starting point.
+
+| Phase | Status | Notes |
+|------|--------|-------|
+| Phase 1 | Complete | `useRolloverStateMachine.ts` was added and preserves the `queueReady()` / `queueReady.loading` gate before banner or auto-advance behavior can fire. |
+| Phase 2 | Complete | `DateRolloverBanner.tsx` is now a pure display component driven by parent props; rollover visibility moved to the route, and existing `data-testid` attributes were preserved. |
+| Phase 3 | Mostly complete | `usePracticeEvaluations.ts`, `usePracticeSubmit.ts`, and `useFlashcardPersistence.ts` were extracted and wired into `practice.tsx`. The route is down to 556 lines, so the extraction work is done, but Success Criteria #4 (`practice.tsx` under 500 lines) is not fully met yet. |
+| Phase 4 | Complete | `handlePracticeDateRefresh` was simplified to trust the state machine for auto-rollover decisions while keeping a queue-readiness guard for auto mode. |
+| Phase 5 | Complete | The heaviest `getPracticeList()` debug queries/logging were removed from `src/lib/db/queries/practice.ts`; result-level telemetry such as the join row count remains. |
+| Phase 6 | Complete for this PR | The canonical scheduling-window helpers were extracted to `src/lib/utils/scheduling-windows.ts`, and `practice-queue.ts` now re-exports them. The older duplicate implementation in `queue-generator.ts` was explicitly deferred rather than changed in the same patch. |
+| Phase 7 | Complete | `DailyPracticeQueueRow` in `src/lib/services/practice-queue.ts` now documents the queue columns and calls out diagnostic-only / future-reserved fields. |
+| Phase 8 | Deferred / not complete | Deprecated practice-query APIs were intentionally left in place because `src/lib/services/queue-generator.ts` still imports `getDueTunesLegacy`, so caller cleanup must happen first. |
+
+### Validation Status
+
+- Complete: `npm run lint`
+- Complete: `npx vitest run src/lib/services/practice-queue.test.ts`
+- Complete: `npm run test:unit`
+- Complete: `npm run build`
+- Complete: `npx playwright test e2e/tests/practice-005-date-rollover-banner.spec.ts --project=chromium --reporter=list`
+
+### Summary
+
+Completed phases: **1, 2, 4, 5, 6, and 7**.
+
+Implemented but not fully at the planned size target: **Phase 3**.
+
+Deferred pending caller cleanup: **Phase 8**.
+
+---
+
 ## Current State Analysis
 
 ### Files Involved (4,080 lines total)

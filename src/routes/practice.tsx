@@ -8,7 +8,6 @@
  */
 
 import { useLocation, useNavigate } from "@solidjs/router";
-import { and, eq, sql } from "drizzle-orm";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -27,9 +26,7 @@ import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-style
 import type { ITuneOverview } from "../components/grids/types";
 import {
   DateRolloverBanner,
-  type FlashcardFieldVisibilityByFace,
   FlashcardView,
-  getDefaultFieldVisibility,
   PracticeControlBanner,
 } from "../components/practice";
 import { RepertoireEmptyState } from "../components/repertoire";
@@ -38,37 +35,18 @@ import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
-import { repertoireTune } from "../lib/db/schema";
 import type { RepertoireWithSummary } from "../lib/db/types";
-import { addTunesToQueue } from "../lib/services/practice-queue";
-import { commitStagedEvaluations } from "../lib/services/practice-recording";
-import {
-  clearStagedEvaluation,
-  stagePracticeEvaluation,
-} from "../lib/services/practice-staging";
+import { ensureDailyQueue } from "../lib/services/practice-queue";
 import {
   formatAsWindowStart,
   getPracticeDate,
 } from "../lib/utils/practice-date";
+import { useFlashcardPersistence } from "./practice/useFlashcardPersistence";
+import { usePracticeEvaluations } from "./practice/usePracticeEvaluations";
 import { usePracticeQueueDate } from "./practice/usePracticeQueueDate";
+import { usePracticeSubmit } from "./practice/usePracticeSubmit";
+import { useRolloverStateMachine } from "./practice/useRolloverStateMachine";
 
-/**
- * Practice Index Page Component
- *
- * Features:
- * - Sticky control banner with actions
- * - TunesGridScheduled with embedded evaluation controls
- * - Shows due tunes based on practice queue
- *
- * @example
- * ```tsx
- * <Route path="/practice" component={() => (
- *   <ProtectedRoute>
- *     <PracticePage />
- *   </ProtectedRoute>
- * )} />
- * ```
- */
 const PracticePage: Component = () => {
   const PRACTICE_GATE_DIAGNOSTICS =
     import.meta.env.VITE_PRACTICE_GATE_DIAGNOSTICS === "true";
@@ -91,13 +69,12 @@ const PracticePage: Component = () => {
   const { currentRepertoireId } = useCurrentRepertoire();
   const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
   const [isChatOpen, setIsChatOpen] = createSignal(false);
+  const [tableInstance, setTableInstance] = createSignal<any>(null);
   const repertoiresVersion = createMemo(() => `${repertoireListChanged()}`);
   const [repertoiresLoadedVersion, setRepertoiresLoadedVersion] = createSignal<
     string | null
   >(null);
 
-  // Canonical user identifier after eliminating user_profile.id.
-  // Prefer AuthContext's resolved ID; fall back to Supabase auth user id.
   const userId = createMemo(() => userIdInt() ?? user()?.id ?? null);
 
   const [repertoires] = createResource(
@@ -201,17 +178,10 @@ const PracticePage: Component = () => {
     });
   });
 
-  // Helper to get current user ID (for non-reactive contexts)
   const getUserId = async (): Promise<string | null> => {
-    // If userId resource is already loaded, use it
-    const id = userId();
-    if (id) return id;
-
-    // After eliminating user_profile.id, just return the Supabase Auth UUID
-    return user()?.id ?? null;
+    return userId() ?? user()?.id ?? null;
   };
 
-  // Goals: load once per user; used by the GoalBadge dropdown in the grid.
   const [goalsData] = createResource(
     () => {
       const db = localDb();
@@ -224,80 +194,32 @@ const PracticePage: Component = () => {
     }
   );
 
-  // Memo: goals keyed by name, user-owned rows take precedence over system rows.
   const goalsMap = createMemo(() => {
     const map = new Map<string, GoalRow>();
     const goals = goalsData() ?? [];
-    // Insert system goals first, then user-owned (user overrides system for same name)
-    for (const g of goals) {
-      if (g.privateFor === null) map.set(g.name, g);
+    for (const goal of goals) {
+      if (goal.privateFor === null) map.set(goal.name, goal);
     }
-    for (const g of goals) {
-      if (g.privateFor !== null) map.set(g.name, g);
+    for (const goal of goals) {
+      if (goal.privateFor !== null) map.set(goal.name, goal);
     }
     return map;
   });
 
-  // Track in-flight staging to prevent submit before previews are persisted.
-  const [stagingTuneIds, setStagingTuneIds] = createSignal<string[]>([]);
-  const isStaging = () => stagingTuneIds().length > 0;
-
-  // Shared evaluation state between grid and flashcard views.
-  // Keys are tune IDs (UUID strings).
-  const [evaluations, setEvaluations] = createSignal<Record<string, string>>(
-    {}
-  );
-
-  // Hydrate once from DB-staged values (table_transient_data via practice list VIEW).
-  // This ensures the submit badge and selected values survive tab switches/unmounts.
-  const [didHydrateEvaluations, setDidHydrateEvaluations] = createSignal(false);
-  createEffect(() => {
-    const repertoireId = currentRepertoireId();
-    if (!repertoireId) return;
-    // Reset hydration when repertoire changes.
-    setDidHydrateEvaluations(false);
-    setEvaluations({});
-  });
-
-  createEffect(() => {
-    if (didHydrateEvaluations()) return;
-    const list = filteredPracticeList();
-    if (!list || list.length === 0) return;
-
-    const hydrated: Record<string, string> = {};
-    for (const tune of list) {
-      const id = String(tune.id);
-      const recallEval = tune.recall_eval;
-      if (typeof recallEval === "string" && recallEval.length > 0) {
-        hydrated[id] = recallEval;
-      }
-    }
-
-    if (Object.keys(hydrated).length > 0) {
-      setEvaluations(hydrated);
-    }
-    setDidHydrateEvaluations(true);
-  });
-
-  // Display Submitted state - persisted to localStorage
-  const STORAGE_KEY = "TT_PRACTICE_SHOW_SUBMITTED";
+  const SHOW_SUBMITTED_STORAGE_KEY = "TT_PRACTICE_SHOW_SUBMITTED";
   const [showSubmitted, setShowSubmitted] = createSignal(false);
 
-  // Load showSubmitted from localStorage on mount
   onMount(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(SHOW_SUBMITTED_STORAGE_KEY);
     if (stored !== null) {
       setShowSubmitted(stored === "true");
     }
   });
 
-  // Persist showSubmitted to localStorage on change
   createEffect(() => {
-    localStorage.setItem(STORAGE_KEY, String(showSubmitted()));
+    localStorage.setItem(SHOW_SUBMITTED_STORAGE_KEY, String(showSubmitted()));
   });
 
-  // Queue date: owned by composable — DB-first, stale-flag-aware, sync-reactive.
-  // See usePracticeQueueDate.ts for the full resolution logic (fixes issue #427).
   const {
     queueDate,
     isManual,
@@ -312,92 +234,35 @@ const PracticePage: Component = () => {
     remoteSyncDownCompletionVersion,
   });
 
-  // Flashcard Mode state - persisted to localStorage
-  const FLASHCARD_MODE_STORAGE_KEY = "TT_PRACTICE_FLASHCARD_MODE";
-  const [flashcardMode, setFlashcardMode] = createSignal(false);
+  const {
+    flashcardMode,
+    setFlashcardMode,
+    flashcardFieldVisibility,
+    setFlashcardFieldVisibility,
+  } = useFlashcardPersistence();
 
-  // Flashcard Field Visibility - persisted to localStorage
-  const FLASHCARD_FIELDS_STORAGE_KEY = "TT_FLASHCARD_FIELD_VISIBILITY";
-  const [flashcardFieldVisibility, setFlashcardFieldVisibility] =
-    createSignal<FlashcardFieldVisibilityByFace>(getDefaultFieldVisibility());
-
-  // Load flashcard mode from localStorage on mount
-  onMount(() => {
-    const stored = localStorage.getItem(FLASHCARD_MODE_STORAGE_KEY);
-    if (stored !== null) {
-      setFlashcardMode(stored === "true");
-    }
-
-    // Load flashcard field visibility from localStorage
-    const storedFields = localStorage.getItem(FLASHCARD_FIELDS_STORAGE_KEY);
-    if (storedFields) {
-      try {
-        const parsed = JSON.parse(storedFields);
-
-        // Check if old format (flat object with 'type' directly) or new format (has 'front'/'back')
-        if (parsed.type !== undefined && !parsed.front) {
-          // Old format - migrate to new per-face structure
-          console.info(
-            "Migrating old flashcard field visibility format to new front/back structure"
-          );
-          setFlashcardFieldVisibility({
-            front: { ...parsed },
-            back: { ...parsed },
-          });
-        } else if (parsed.front && parsed.back) {
-          // New format - use as is
-          setFlashcardFieldVisibility(parsed);
-        } else {
-          // Unrecognized format - use defaults
-          console.warn(
-            "Unrecognized flashcard field visibility format, using defaults"
-          );
-        }
-      } catch (e) {
-        console.error("Failed to parse flashcard field visibility:", e);
-      }
-    }
-  });
-
-  // Persist flashcard mode to localStorage on change
-  createEffect(() => {
-    localStorage.setItem(FLASHCARD_MODE_STORAGE_KEY, String(flashcardMode()));
-  });
-
-  // Persist flashcard field visibility to localStorage on change
-  createEffect(() => {
-    localStorage.setItem(
-      FLASHCARD_FIELDS_STORAGE_KEY,
-      JSON.stringify(flashcardFieldVisibility())
-    );
-  });
-
-  const [tableInstance, setTableInstance] = createSignal<any>(null);
-
-  // Fetch practice list (shared between grid and flashcard views)
-  // CRITICAL: Must wait for queueReady() to complete before fetching
-  // Also check queueReady.loading to prevent race condition where
-  // practiceListData fetches while queue is being re-initialized
   const [practiceListData] = createResource(
     () => {
       const db = localDb();
+      const resolvedUserId = userId();
       const repertoireId = currentRepertoireId();
-      const version = practiceListStagedChanged(); // Refetch when practice list changes
-      const initialized = queueReady(); // Wait for queue to be ready
-      const isQueueLoading = queueReady.loading; // Check if queue is currently loading/re-loading
+      const version = practiceListStagedChanged();
+      const initialized = queueReady();
+      const isQueueLoading = queueReady.loading;
       const windowStartUtc = formatAsWindowStart(queueDate());
 
       console.log(
-        `[PracticePage] practiceListData deps: db=${!!db}, userId=${userId()}, repertoire=${repertoireId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
+        `[PracticePage] practiceListData deps: db=${!!db}, userId=${resolvedUserId}, repertoire=${repertoireId}, version=${version}, queueInit=${initialized}, queueLoading=${isQueueLoading}, window=${windowStartUtc}`
       );
 
-      // Only proceed if ALL dependencies are ready (including queue)
-      // CRITICAL: Also check that queue is not currently loading to prevent race condition
-      // where we fetch practice list while ensureDailyQueue is still running
-      return db && userId() && repertoireId && initialized && !isQueueLoading
+      return db &&
+        resolvedUserId &&
+        repertoireId &&
+        initialized &&
+        !isQueueLoading
         ? {
             db,
-            userId: userId()!,
+            userId: resolvedUserId,
             repertoireId,
             version,
             queueReady: initialized,
@@ -408,56 +273,42 @@ const PracticePage: Component = () => {
     async (params) => {
       if (!params) return [];
       const { getPracticeList } = await import("../lib/db/queries/practice");
-      const delinquencyWindowDays = 7;
       console.log(
         `[PracticePage] Fetching practice list for repertoire ${params.repertoireId} (queueReady=${params.queueReady})`
       );
-      // Returns PracticeListStagedWithQueue[] which is compatible with ITuneOverview
-      return await getPracticeList(
+      return getPracticeList(
         params.db,
         params.userId,
         params.repertoireId,
-        delinquencyWindowDays,
+        7,
         params.windowStartUtc
       );
     }
   );
 
+  const practiceRows = createMemo<ITuneOverview[]>(() => {
+    return practiceListData.latest ?? practiceListData() ?? [];
+  });
+
   const [isQueueCompleted, setIsQueueCompleted] = createSignal(false);
-
   createEffect(() => {
-    const data = practiceListData();
-
+    const data = practiceRows();
     if (!data || data.length === 0) {
       setIsQueueCompleted(false);
       return;
     }
 
-    const allCompleted = data.every((tune) => !!tune.completed_at);
-    setIsQueueCompleted(allCompleted);
+    setIsQueueCompleted(data.every((tune) => !!tune.completed_at));
   });
 
-  // Count staged evaluations from the practice list view (authoritative source).
-  const evaluationsCount = createMemo(() => {
-    const data = practiceListData.latest ?? practiceListData() ?? [];
-    return data.reduce((count, tune) => {
-      return count + (Number(tune.has_staged) === 1 ? 1 : 0);
-    }, 0);
-  });
-
-  // Filtered practice list - applies showSubmitted filter
-  // This is the single source of truth for both grid and flashcard views
   const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
-    const data: ITuneOverview[] =
-      practiceListData.latest ?? practiceListData() ?? [];
+    const data = practiceRows();
     const shouldShow = showSubmitted();
 
     console.log(
       `[PracticePage] Filtering practice list: ${data.length} total, showSubmitted=${shouldShow}`
     );
 
-    // When showSubmitted is true, show all tunes including completed ones
-    // When showSubmitted is false, hide completed tunes (where completed_at is not null)
     const filtered = shouldShow
       ? data
       : data.filter((tune) => !tune.completed_at);
@@ -474,305 +325,45 @@ const PracticePage: Component = () => {
     practiceListData.error ||
     (queueReady.error ? "Practice queue failed to initialize." : undefined);
 
-  // Grid no longer provides a clear-evaluations callback; parent clears evaluations directly
+  const {
+    evaluations,
+    isStaging,
+    evaluationsCount,
+    handleRecallEvalChange,
+    handleGoalChange,
+    clearEvaluations,
+  } = usePracticeEvaluations({
+    localDb,
+    getUserId,
+    currentRepertoireId,
+    practiceListData: practiceRows,
+    filteredPracticeList,
+    goalsMap,
+    incrementPracticeListStagedChanged,
+    suppressNextViewRefresh,
+  });
 
-  // Handle recall evaluation changes (single source of truth)
-  // Children (grid/flashcard) call into this; we optimistically update shared
-  // state, then stage or clear in the local DB, and notify the grid via
-  // incrementPracticeListStagedChanged so the joined view refreshes.
-  const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
-    console.log(`Recall evaluation for tune ${tuneId}: ${evaluation}`);
-
-    // 1) Optimistic shared-state update (drives both grid and flashcard)
-    const previousEvaluation = evaluations()[tuneId];
-    const nextEvaluations = { ...evaluations(), [tuneId]: evaluation };
-    setEvaluations(nextEvaluations);
-
-    // 2) Stage/clear in local DB
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-    const userIdVal = await getUserId();
-
-    if (!db || !repertoireId || !userIdVal) {
-      console.warn(
-        "[PracticePage] Skipping staging: missing db/repertoire/userId",
-        {
-          hasDb: !!db,
-          repertoireId,
-          userIdVal,
-        }
-      );
-      return; // Still keep optimistic state
-    }
-
-    setStagingTuneIds((prev) =>
-      prev.includes(tuneId) ? prev : [...prev, tuneId]
-    );
-
-    try {
-      if (evaluation === "") {
-        // Clear staged data when "(Not Set)" selected
-        await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
-        console.log(
-          `🗑️  [PracticePage] Cleared staged evaluation for tune ${tuneId}`
-        );
-      } else {
-        // Resolve goal and technique from the practice list and goals map.
-        // Falls back to "recall" / "fsrs" if data is not yet loaded.
-        const practiceRows =
-          practiceListData.latest ?? practiceListData() ?? [];
-        const tuneEntry = practiceRows.find((entry) => entry.id === tuneId);
-        const tuneGoal = tuneEntry?.goal ?? "recall";
-        const goalDef = goalsMap().get(tuneGoal);
-        const technique = goalDef?.defaultTechnique ?? "fsrs";
-
-        // Stage scheduling preview
-        await stagePracticeEvaluation(
-          db,
-          userIdVal,
-          repertoireId,
-          tuneId,
-          evaluation,
-          tuneGoal,
-          technique
-        );
-        console.log(
-          `✅ [PracticePage] Staged preview for tune ${tuneId} (goal=${tuneGoal}, technique=${technique})`
-        );
-      }
-
-      // 3) Let grid re-query its VIEW join without forcing dropdown close in child
-      incrementPracticeListStagedChanged();
-    } catch (error) {
-      console.error(
-        `❌ [PracticePage] Failed to ${evaluation === "" ? "clear" : "stage"} evaluation for ${tuneId}:`,
-        error
-      );
-      setEvaluations((prev) => {
-        const restored = { ...prev };
-        if (previousEvaluation === undefined) {
-          delete restored[tuneId];
-        } else {
-          restored[tuneId] = previousEvaluation;
-        }
-        return restored;
-      });
-      toast.error("Failed to stage evaluation. Please try again.");
-    } finally {
-      setStagingTuneIds((prev) => prev.filter((id) => id !== tuneId));
-    }
-  };
-
-  // Handle goal changes: update DB immediately and clear stale staged eval.
-  // Keep updates local/optimistic so the grid does not remount.
-  const handleGoalChange = async (tuneId: string, goal: string | null) => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-    const userIdVal = await getUserId();
-    if (!db || !repertoireId || !userIdVal) return;
-
-    const previousEvaluation = evaluations()[tuneId];
-
-    setEvaluations((prev) => {
-      const next = { ...prev };
-      delete next[tuneId];
-      return next;
+  const { handleSubmitEvaluations, handleAddTunes, handleQueueReset } =
+    usePracticeSubmit({
+      localDb,
+      getUserId,
+      currentRepertoireId,
+      queueDate,
+      evaluationsCount,
+      isStaging,
+      clearEvaluations,
+      incrementPracticeListStagedChanged,
+      syncPracticeScope,
     });
 
-    try {
-      suppressNextViewRefresh("repertoire");
-      await db
-        .update(repertoireTune)
-        .set({ goal: goal ?? null })
-        .where(
-          and(
-            eq(repertoireTune.tuneRef, tuneId),
-            eq(repertoireTune.repertoireRef, repertoireId)
-          )
-        );
-      // Discard any staged preview computed under the old goal
-      await clearStagedEvaluation(db, userIdVal, tuneId, repertoireId);
-      incrementPracticeListStagedChanged();
-    } catch (err) {
-      setEvaluations((prev) => {
-        const next = { ...prev };
-        if (previousEvaluation === undefined) {
-          delete next[tuneId];
-        } else {
-          next[tuneId] = previousEvaluation;
-        }
-        return next;
-      });
-      console.error(
-        `[PracticePage] Failed to update goal for tune ${tuneId}:`,
-        err
-      );
-      toast.error("Failed to update goal. Please try again.");
-    }
-  };
-
-  // Handle submit of staged evaluations
-  const handleSubmitEvaluations = async () => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-
-    if (!db || !repertoireId) {
-      console.error("Missing required data for submit");
-      toast.error("Cannot submit: Missing database or repertoire data");
-      return;
-    }
-
-    const userId = await getUserId();
-    if (!userId) {
-      console.error("Could not determine user ID");
-      toast.error("Cannot submit: User not found");
-      return;
-    }
-
-    if (isStaging()) {
-      toast.warning("Please wait for evaluations to finish staging.");
-      return;
-    }
-
-    const count = evaluationsCount();
-    if (count === 0) {
-      toast.warning("No evaluations to submit");
-      return;
-    }
-
-    console.log(
-      `Submitting ${count} staged evaluations for repertoire ${repertoireId}`
-    );
-
-    try {
-      // Use queue date (which is set from practice date on load)
-      const date = queueDate();
-
-      // Convert to window_start_utc format (YYYY-MM-DD 00:00:00)
-      const windowStartUtc = formatAsWindowStart(date);
-
-      console.log(`Using queue window: ${windowStartUtc}`);
-
-      // Call new commit service with specific queue window
-      const result = await commitStagedEvaluations(
-        db,
-        userId,
-        repertoireId,
-        windowStartUtc
-      );
-
-      if (result.success) {
-        // Success toast (auto-dismiss after 3 seconds)
-        toast.success(
-          `Successfully submitted ${result.count} evaluation${result.count !== 1 ? "s" : ""}`,
-          {
-            duration: 3000,
-          }
-        );
-
-        // Clear shared evaluations state (used by both grid and flashcard)
-        setEvaluations({});
-
-        // Grid reacts via shared evaluations signal; no per-grid callback needed
-
-        // Trigger grid refresh using view-specific signal
-        incrementPracticeListStagedChanged();
-
-        console.log(
-          `✅ Submit complete: ${result.count} evaluations committed`
-        );
-
-        // Fire a scoped practice sync to pull remote updates for just practice tables
-        // (avoids full-table sweep & reduces perceived latency)
-        void syncPracticeScope();
-      } else {
-        // Error toast (requires manual dismiss)
-        toast.error(
-          `Failed to submit evaluations: ${result.error || "Unknown error"}`,
-          {
-            duration: Number.POSITIVE_INFINITY, // Requires manual dismiss
-          }
-        );
-
-        console.error("Submit failed:", result.error);
-      }
-    } catch (error) {
-      // Unexpected error toast
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast.error(`Error during submit: ${errorMessage}`, {
-        duration: Number.POSITIVE_INFINITY,
-      });
-
-      console.error("Error submitting evaluations:", error);
-    }
-  };
-
-  // Handle add tunes to queue
-  const handleAddTunes = async (count: number) => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-
-    if (!db || !repertoireId) {
-      console.error("Missing required data for add tunes");
-      toast.error("Cannot add tunes: Missing database or repertoire data");
-      return;
-    }
-
-    const userId = await getUserId();
-    if (!userId) {
-      console.error("Could not determine user ID");
-      toast.error("Cannot add tunes: User not found");
-      return;
-    }
-
-    console.log(
-      `Adding ${count} tunes to practice queue for repertoire ${repertoireId}`
-    );
-
-    try {
-      const added = await addTunesToQueue(db, userId, repertoireId, count);
-
-      if (added.length > 0) {
-        toast.success(
-          `Added ${added.length} tune${added.length !== 1 ? "s" : ""} to queue`,
-          {
-            duration: 3000,
-          }
-        );
-
-        // Trigger grid refresh using view-specific signal
-        incrementPracticeListStagedChanged();
-
-        console.log(`✅ Added ${added.length} tunes to queue`);
-      } else {
-        toast.warning("No additional tunes available to add");
-        console.log("⚠️ No tunes added - backlog may be empty");
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast.error(`Error adding tunes: ${errorMessage}`, {
-        duration: Number.POSITIVE_INFINITY,
-      });
-
-      console.error("Error adding tunes to queue:", error);
-    }
-  };
-
-  // Handle queue date change
   const handleQueueDateChange = async (date: Date, isPreview: boolean) => {
     console.log(
       `Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`
     );
 
-    // setManualDate normalizes to noon, handles today vs. non-today, and awaits
-    // ensureDailyQueue so the grid can safely re-fetch immediately after.
     await setManualDate(date);
-
     incrementPracticeListStagedChanged();
 
-    // Show appropriate message
     const dateStr = queueDate().toLocaleDateString();
     if (isPreview) {
       toast.info(`Previewing queue for ${dateStr} (changes won't be saved)`, {
@@ -786,6 +377,10 @@ const PracticePage: Component = () => {
   const handlePracticeDateRefresh = async (
     mode: "manual" | "auto" = "manual"
   ) => {
+    if (mode === "auto" && (queueReady() !== true || queueReady.loading)) {
+      return;
+    }
+
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
@@ -803,69 +398,8 @@ const PracticePage: Component = () => {
       return;
     }
 
-    const { ensureDailyQueue, getLatestActiveQueueWindow } = await import(
-      "../lib/services/practice-queue"
-    );
-
-    let latestWindowStart: string | null = null;
-    let latestWindowHasIncompleteRows = false;
-    try {
-      const latestWindow = await getLatestActiveQueueWindow(
-        db,
-        userIdValue,
-        repertoireId
-      );
-      latestWindowStart = latestWindow.windowStartUtc;
-      latestWindowHasIncompleteRows = latestWindow.hasIncompleteRows;
-    } catch (error) {
-      console.warn(
-        "[PracticePage] Failed to read latest queue window during refresh:",
-        error
-      );
-    }
-
-    const latestWindowDate: Date | null = (() => {
-      if (!latestWindowStart) return null;
-      const s = latestWindowStart.trim().replace(" ", "T");
-      const withZ = /(?:Z|[+-]\d{2}:\d{2})$/.test(s) ? s : `${s}Z`;
-      const d = new Date(withZ);
-      return Number.isNaN(d.getTime()) ? null : d;
-    })();
-    const todayWindowStart = formatAsWindowStart(practiceDate);
-    const latestWindowStartNormalized = latestWindowDate
-      ? formatAsWindowStart(latestWindowDate)
-      : null;
-    const dateChanged =
-      latestWindowStartNormalized !== null &&
-      latestWindowStartNormalized !== todayWindowStart;
-
-    // Rules:
-    // - Auto rollover creates today's queue only when date has changed AND latest queue is complete.
-    // - If latest queue is incomplete and date changed, keep current queue and show banner.
-    // - Manual "Refresh Now" always advances to today's queue when date changed.
-    const shouldCreateTodayQueue =
-      !latestWindowStart ||
-      (dateChanged && (mode === "manual" || !latestWindowHasIncompleteRows));
-
-    if (!shouldCreateTodayQueue) {
-      console.log(
-        "[PracticePage] Skipping refresh: queue rollover preconditions not met",
-        {
-          mode,
-          latestWindowStart: latestWindowStartNormalized,
-          todayWindowStart,
-          dateChanged,
-          latestWindowHasIncompleteRows,
-        }
-      );
-      incrementPracticeListStagedChanged();
-      return;
-    }
-
-    // Update queue date state (clears manual flag, sets to today).
     clearManualAndSetToday();
 
-    // Ensure the new day's queue exists before triggering the list re-fetch.
     try {
       await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
     } catch (error) {
@@ -876,75 +410,20 @@ const PracticePage: Component = () => {
     }
 
     console.log(
-      `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
+      `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()} (${mode})`
     );
     incrementPracticeListStagedChanged();
   };
 
-  const handleDateRolloverDetection = () => {
-    if (isManual()) {
-      return true;
-    }
+  const { rolloverStatus } = useRolloverStateMachine({
+    queueDate,
+    isManual,
+    isQueueCompleted,
+    queueReady,
+    onAutoAdvance: () => handlePracticeDateRefresh("auto"),
+    onClearManual: clearManualAndSetToday,
+  });
 
-    if (isQueueCompleted()) {
-      void handlePracticeDateRefresh("auto");
-      return false;
-    }
-
-    return true;
-  };
-
-  // Handle queue reset
-  const handleQueueReset = async () => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-
-    if (!db || !repertoireId) {
-      console.error("Missing required data for queue reset");
-      toast.error("Cannot reset queue: Missing database or repertoire data");
-      return;
-    }
-
-    const userId = await getUserId();
-    if (!userId) {
-      console.error("Could not determine user ID");
-      toast.error("Cannot reset queue: User not found");
-      return;
-    }
-
-    console.log(`Resetting active queue for repertoire ${repertoireId}`);
-
-    try {
-      // Delete all active queue entries for today
-      // This will force regeneration on next access
-      const todayWindowIso19 = formatAsWindowStart(new Date())
-        .replace(" ", "T")
-        .substring(0, 19);
-
-      await db.run(sql`
-        DELETE FROM daily_practice_queue
-        WHERE user_ref = ${userId}
-          AND repertoire_ref = ${repertoireId}
-          AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${todayWindowIso19}
-      `);
-
-      toast.success("Queue reset successfully. It will be regenerated.");
-      console.log(`✅ Queue reset complete`);
-
-      // Trigger grid refresh to regenerate queue
-      incrementPracticeListStagedChanged();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      toast.error(`Error resetting queue: ${errorMessage}`, {
-        duration: Number.POSITIVE_INFINITY,
-      });
-
-      console.error("Error resetting queue:", error);
-    }
-  };
-
-  // Handle tune selection (double-click opens editor)
   const handleTuneSelect = (tune: ITuneOverview) => {
     const fullPath = location.pathname + location.search;
     navigate(`/tunes/${tune.id}/edit`, { state: { from: fullPath } });
@@ -997,14 +476,13 @@ const PracticePage: Component = () => {
 
   return (
     <div class="h-full flex flex-col">
-      {/* Date Rollover Banner - appears when practice date changes */}
-      <DateRolloverBanner
-        initialDate={queueDate()}
-        onRefresh={() => handlePracticeDateRefresh("manual")}
-        onDateChange={handleDateRolloverDetection}
-      />
+      <Show when={rolloverStatus().showBanner}>
+        <DateRolloverBanner
+          newDate={rolloverStatus().wallClockDate}
+          onRefresh={() => handlePracticeDateRefresh("manual")}
+        />
+      </Show>
 
-      {/* Sticky Control Banner */}
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}
         isStaging={isStaging()}
@@ -1022,7 +500,6 @@ const PracticePage: Component = () => {
         onFlashcardFieldVisibilityChange={setFlashcardFieldVisibility}
       />
 
-      {/* Main Content Area - Grid or Flashcard fills remaining space */}
       <div class={GRID_CONTENT_CONTAINER}>
         <Show when={isPracticeGateOpen()} fallback={renderPracticeFallback()}>
           <Show

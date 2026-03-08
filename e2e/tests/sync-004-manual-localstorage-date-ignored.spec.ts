@@ -36,6 +36,18 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 const STALE_DATE_OFFSET_DAYS = 3;
 
+async function setInjectedTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
+
 /** Return ISO date string for N days before today (STANDARD_TEST_DATE). */
 function staleDateIso(daysAgo: number): string {
   const d = new Date(STANDARD_TEST_DATE);
@@ -57,6 +69,8 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
   test.beforeEach(async ({ page, context, testUser }) => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+
+    await setInjectedTestUserId(page, testUser.userId);
 
     ttPage = new TuneTreesPage(page);
     await ttPage.setSchedulingPrefs();
@@ -92,6 +106,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
     // Reload so the injected values are live from the very first script tick.
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 30_000 });
+    await setInjectedTestUserId(page, testUser.userId);
 
     // Wait for the test API to be registered.
     await page.waitForFunction(
@@ -109,9 +124,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
       const api = (
         window as {
           __ttTestApi?: {
-            getQueueInfo: (
-              id: string
-            ) => Promise<{
+            getQueueInfo: (id: string) => Promise<{
               windowStartUtc: string;
               rowCount: number;
               completedCount: number;

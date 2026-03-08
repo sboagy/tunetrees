@@ -18,7 +18,7 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { computeSchedulingWindows } from "../../services/practice-queue";
+import { computeSchedulingWindows } from "../../utils/scheduling-windows";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
@@ -191,45 +191,6 @@ export async function getPracticeList(
   // Query practice_list_staged INNER JOIN daily_practice_queue
   // Queue determines which tunes to practice and their ordering
 
-  // Debug: Check queue rows
-  const queueRows = await db.all<{ count: number }>(sql`
-    SELECT COUNT(*) as count
-    FROM daily_practice_queue dpq
-    WHERE dpq.user_ref = ${userId}
-      AND dpq.repertoire_ref = ${repertoireId}
-      AND dpq.active = 1
-  `);
-  console.log("[DB identity]", db);
-  console.log(
-    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, repertoire=${repertoireId}`
-  );
-
-  // Debug: Check view rows
-  const viewRows = await db.all<{ count: number }>(sql`
-    SELECT COUNT(*) as count
-    FROM practice_list_staged pls
-    WHERE pls.user_ref = ${userId}
-      AND pls.repertoire_id = ${repertoireId}
-  `);
-  console.log(
-    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, repertoire=${repertoireId}`
-  );
-
-  // DEBUG: Check what windows exist and which one we're selecting
-  const windowCheck = await db.all<{
-    window_start_utc: string;
-    count: number;
-  }>(sql`
-    SELECT window_start_utc, COUNT(*) as count
-    FROM daily_practice_queue
-    WHERE user_ref = ${userId}
-      AND repertoire_ref = ${repertoireId}
-      AND active = 1
-    GROUP BY window_start_utc
-    ORDER BY window_start_utc DESC
-  `);
-  console.log(`[getPracticeList] Available windows:`, windowCheck);
-
   // Determine which queue window to query.
   // Prefer the caller-provided window (matches UI-selected queue date),
   // falling back to "most recent active" for backward compatibility.
@@ -238,15 +199,12 @@ export async function getPracticeList(
   // 'YYYY-MM-DDTHH:MM:SS' (ISO with T) and 'YYYY-MM-DD HH:MM:SS' (space format).
   // Match BOTH to avoid split-window mismatches.
   let isoFormat: string | undefined;
-  let spaceFormat: string | undefined;
 
   const requestedWindow = windowStartUtc?.trim();
   if (requestedWindow) {
     isoFormat = requestedWindow.includes("T")
       ? requestedWindow
       : requestedWindow.replace(" ", "T");
-    spaceFormat = isoFormat.replace("T", " ");
-    console.log(`[getPracticeList] Using requested window: ${isoFormat}`);
   } else {
     const maxWindow = await db.get<{ max_window: string }>(sql`
       SELECT MAX(window_start_utc) as max_window
@@ -255,13 +213,8 @@ export async function getPracticeList(
         AND repertoire_ref = ${repertoireId}
         AND active = 1
     `);
-    console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
 
     isoFormat = maxWindow?.max_window; // e.g., '2025-11-08T00:00:00'
-    spaceFormat = isoFormat?.replace("T", " "); // e.g., '2025-11-08 00:00:00'
-    console.log(
-      `[getPracticeList] Matching both formats: ISO='${isoFormat}', Space='${spaceFormat}'`
-    );
   }
 
   // If no window exists, return empty array
@@ -302,13 +255,6 @@ export async function getPracticeList(
   `);
 
   console.log(`[getPracticeList] JOIN returned ${rows.length} rows`);
-
-  // DEBUG: Log completed_at values to verify filter is working
-  rows.forEach((row, i) => {
-    console.log(
-      `[getPracticeList] Row ${i}: tune=${row.id}, completed_at=${row.completed_at}`
-    );
-  });
 
   return rows;
 }

@@ -26,6 +26,15 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 const SEED_TUNES = [TEST_TUNE_BANISH_ID, TEST_TUNE_KESH_ID];
 
+async function setInjectedTestUserId(page: Page, userId: string) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
+
 async function getQueueInfo(
   page: Page,
   repertoireId: string
@@ -38,9 +47,7 @@ async function getQueueInfo(
     const api = (
       window as unknown as {
         __ttTestApi?: {
-          getQueueInfo: (
-            id: string
-          ) => Promise<{
+          getQueueInfo: (id: string) => Promise<{
             windowStartUtc: string;
             rowCount: number;
             completedCount: number;
@@ -64,6 +71,8 @@ test.describe("SYNC-002: Queue date resolved from DB after localStorage wipe", (
   test.beforeEach(async ({ page, context, testUser }) => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+
+    await setInjectedTestUserId(page, testUser.userId);
 
     ttPage = new TuneTreesPage(page);
     await ttPage.setSchedulingPrefs();
@@ -96,6 +105,7 @@ test.describe("SYNC-002: Queue date resolved from DB after localStorage wipe", (
     // Reload so the cleared state takes effect before any app code runs.
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 30_000 });
+    await setInjectedTestUserId(page, testUser.userId);
     await expect(page.getByTestId("practice-columns-button")).toBeVisible({
       timeout: 20_000,
     });
