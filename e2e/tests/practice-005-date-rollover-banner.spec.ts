@@ -189,10 +189,12 @@ async function ensureRepertoireWithTunes(
     );
   }
 
-  const { error: clearPracticeError } = await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
+  const { error: clearPracticeError } = await supabase.rpc(
+    "e2e_clear_practice_record",
+    {
+      target_repertoire: repertoireId,
+    }
+  );
   if (clearPracticeError) {
     throw new Error(
       `Failed to clear practice_record: ${clearPracticeError.message}`
@@ -261,10 +263,9 @@ async function cleanupRepertoire(userKey: string, repertoireId: string) {
     .from("daily_practice_queue")
     .delete()
     .eq("repertoire_ref", repertoireId);
-  await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
+  await supabase.rpc("e2e_clear_practice_record", {
+    target_repertoire: repertoireId,
+  });
   await supabase
     .from("repertoire_tune")
     .delete()
