@@ -23,12 +23,17 @@
  * @module lib/services/queue-generator
  */
 
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
-import { getDueTunesLegacy } from "../db/queries/practice";
 import { dailyPracticeQueue, repertoireTune } from "../db/schema";
 import type { DailyPracticeQueue, NewDailyPracticeQueue } from "../db/types";
 import { generateId } from "../utils/uuid";
+
+interface QueueGenerationCandidate {
+  tuneRef: string;
+  scheduled: string | null;
+  latestDue: string | null;
+}
 
 /**
  * Scheduling windows for bucket classification
@@ -159,6 +164,55 @@ export function classifyQueueBucket(
   }
 }
 
+async function getQueueGenerationCandidates(
+  db: SqliteDatabase,
+  repertoireId: string,
+  sitdownDate: Date,
+  delinquencyWindowDays: number
+): Promise<QueueGenerationCandidate[]> {
+  const windowStart = new Date(sitdownDate);
+  windowStart.setDate(windowStart.getDate() - delinquencyWindowDays);
+  const windowEnd = new Date(sitdownDate);
+  windowEnd.setMinutes(windowEnd.getMinutes() + 1);
+
+  const results = await db.all<QueueGenerationCandidate>(sql`
+    SELECT
+      rt.tune_ref as tuneRef,
+      rt.current as scheduled,
+      (
+        SELECT pr.due
+        FROM practice_record pr
+        WHERE pr.tune_ref = rt.tune_ref
+          AND pr.repertoire_ref = rt.repertoire_ref
+        ORDER BY pr.practiced DESC
+        LIMIT 1
+      ) as latestDue
+    FROM repertoire_tune rt
+    INNER JOIN tune t ON t.id = rt.tune_ref
+    WHERE rt.repertoire_ref = ${repertoireId}
+      AND rt.deleted = 0
+      AND t.deleted = 0
+  `);
+
+  const dueTunes = results.filter((row) => {
+    const nextReview = row.scheduled || row.latestDue;
+    if (!nextReview) {
+      return true;
+    }
+
+    const nextReviewDate = new Date(nextReview);
+    return nextReviewDate <= windowEnd && nextReviewDate >= windowStart;
+  });
+
+  dueTunes.sort((left, right) => {
+    const leftDate = left.latestDue ? new Date(left.latestDue).getTime() : 0;
+    const rightDate = right.latestDue ? new Date(right.latestDue).getTime() : 0;
+    return leftDate - rightDate;
+  });
+
+  return dueTunes;
+}
+
 /**
  * Generate daily practice queue snapshot
  *
@@ -255,7 +309,7 @@ export async function generateDailyPracticeQueue(
   }
 
   // Get due tunes
-  const dueTunes = await getDueTunesLegacy(
+  const dueTunes = await getQueueGenerationCandidates(
     db,
     repertoireId,
     sitdownDate,
@@ -270,8 +324,7 @@ export async function generateDailyPracticeQueue(
     const tune = dueTunes[orderIndex];
 
     // Get coalesced timestamp (scheduled OR latest_due)
-    const coalescedTs =
-      tune.scheduled || tune.schedulingInfo?.due || windows.startTs;
+    const coalescedTs = tune.scheduled || tune.latestDue || windows.startTs;
 
     // Classify into bucket
     const bucket = classifyQueueBucket(coalescedTs, windows);
@@ -295,7 +348,7 @@ export async function generateDailyPracticeQueue(
       orderIndex: orderIndex,
       snapshotCoalescedTs: coalescedTs,
       scheduledSnapshot: tune.scheduled,
-      latestDueSnapshot: tune.schedulingInfo?.due || null,
+      latestDueSnapshot: tune.latestDue,
       acceptableDelinquencyWindowSnapshot: delinquencyWindowDays,
       tzOffsetMinutesSnapshot: tzOffsetMinutes,
       generatedAt: now,
