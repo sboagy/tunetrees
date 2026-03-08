@@ -1,5 +1,5 @@
-import { WORKER_SYNC_CONFIG } from "../../../worker/src/generated/worker-config.generated";
 import { describe, expect, it } from "vitest";
+import { WORKER_SYNC_CONFIG } from "../../../worker/src/generated/worker-config.generated";
 
 describe("worker delete policy overrides", () => {
   it("allows hard deletes for daily_practice_queue", () => {
