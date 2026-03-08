@@ -25,7 +25,7 @@ import { useOnboarding } from "../lib/context/OnboardingContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
-import PracticeIndex from "./practice/Index";
+import PracticePage from "./practice";
 import RepertoirePage from "./repertoire";
 
 /**
@@ -226,7 +226,7 @@ const Home: Component = () => {
         <MainLayout activeTab={activeTab()} onTabChange={handleTabChange}>
           <Switch>
             <Match when={activeTab() === "practice"}>
-              <PracticeIndex />
+              <PracticePage />
             </Match>
             <Match when={activeTab() === "repertoire"}>
               <RepertoirePage />
