@@ -174,12 +174,15 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         // Persist DB before reload
         await page.evaluate(() => (window as any).__persistDbForTest?.());
 
-        // Clear Flashcard Mode persistence to ensure we start in Grid Mode
-        await page.evaluate(() => {
+        // Clear Flashcard Mode persistence to ensure we start in Grid Mode.
+        // Keep the queue date pinned to the advanced practice date so Practice
+        // does not rehydrate the latest completed DB window from the prior day.
+        const nextPracticeDateIsoRaw = currentDate.toISOString();
+        await page.evaluate((iso) => {
           localStorage.removeItem("TT_PRACTICE_FLASHCARD_MODE");
-          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
-          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
-        });
+          localStorage.setItem("TT_PRACTICE_QUEUE_DATE", iso);
+          localStorage.setItem("TT_PRACTICE_QUEUE_DATE_MANUAL", "true");
+        }, nextPracticeDateIsoRaw);
 
         await setStableDate(context, currentDate);
         await verifyClockFrozen(
@@ -191,9 +194,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
         // Navigate with explicit practiceDate param to ensure app sees the correct date
         // (Playwright clock override sometimes fails to affect bundled modules after reload)
-        const nextPracticeDateIso = encodeURIComponent(
-          currentDate.toISOString()
-        );
+        const nextPracticeDateIso = encodeURIComponent(nextPracticeDateIsoRaw);
         await page.goto(
           `${BASE_URL}/practice?practiceDate=${nextPracticeDateIso}`,
           {
