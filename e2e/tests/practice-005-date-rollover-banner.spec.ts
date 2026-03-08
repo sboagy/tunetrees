@@ -179,38 +179,6 @@ async function ensureRepertoireWithTunes(
   const { supabase } = await getTestUserClient(userKey);
   const repertoireId = randomUUID();
 
-  const { error: clearQueueError } = await supabase
-    .from("daily_practice_queue")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearQueueError) {
-    throw new Error(
-      `Failed to clear daily_practice_queue: ${clearQueueError.message}`
-    );
-  }
-
-  const { error: clearPracticeError } = await supabase.rpc(
-    "e2e_clear_practice_record",
-    {
-      target_repertoire: repertoireId,
-    }
-  );
-  if (clearPracticeError) {
-    throw new Error(
-      `Failed to clear practice_record: ${clearPracticeError.message}`
-    );
-  }
-
-  const { error: clearRepertoireTunesError } = await supabase
-    .from("repertoire_tune")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearRepertoireTunesError) {
-    throw new Error(
-      `Failed to clear repertoire_tune: ${clearRepertoireTunesError.message}`
-    );
-  }
-
   const { error: repertoireError } = await supabase.from("repertoire").upsert(
     {
       repertoire_id: repertoireId,
