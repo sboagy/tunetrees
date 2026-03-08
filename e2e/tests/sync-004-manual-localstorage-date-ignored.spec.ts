@@ -12,6 +12,13 @@ async function setInjectedTestUserId(
   await page.addInitScript((id) => {
     (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
+  await setCurrentTestUserId(page, userId);
+}
+
+async function setCurrentTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
   await page.evaluate((id) => {
     (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
@@ -105,7 +112,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
     // Reload so the injected values are live from the very first script tick.
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 30_000 });
-    await setInjectedTestUserId(page, testUser.userId);
+    await setCurrentTestUserId(page, testUser.userId);
 
     // Wait for the test API to be registered.
     await page.waitForFunction(
