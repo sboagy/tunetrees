@@ -1,7 +1,8 @@
 # Plan: Clean Up and Simplify Practice Queue Mechanism
 
-**Issue**: #460 — ♻️ Clean up and simplify practice queue mechanism (and make more declarative)
+**Issue**: #381 — ♻️ Clean up and simplify practice queue mechanism (and make more declarative)
 **Branch**: `copilot/clean-up-practice-queue`
+**PR**: #448 — Declarative practice queue state machine refactoring
 **Constraint**: Must not change features or E2E tests in any way.
 
 ---
@@ -54,6 +55,11 @@
    - 6+ debug queries/logs on every practice list fetch
    - Should be removed or gated behind a debug flag
 
+6. **Scheduling-window logic exists in two service modules**:
+  - `src/lib/services/practice-queue.ts` contains the active four-bucket windowing helpers used by the current queue flow
+  - `src/lib/services/queue-generator.ts` still contains an older copy of `computeSchedulingWindows` / `classifyQueueBucket`
+  - These implementations are not identical, so any extraction must reconcile semantics before calling the move “low risk”
+
 ### Circular Dependencies (Status: Safe but Fragile)
 
 The reported circular dependencies are currently safe (type-only imports in reverse direction):
@@ -70,6 +76,8 @@ However, the `computeSchedulingWindows` import from `practice.ts → practice-qu
 
 **Goal**: Consolidate all 4 state machine locations into a single declarative composable.
 
+**Guardrail**: The composable must preserve the existing `queueReady()` / `queueReady.loading` gate used by `practiceListData`. No rollover banner or auto-advance effect should fire until queue initialization has fully resolved.
+
 **New file**: `src/routes/practice/useRolloverStateMachine.ts`
 
 ```ts
@@ -82,6 +90,7 @@ However, the `computeSchedulingWindows` import from `practice.ts → practice-qu
 
 // Outputs (all reactive):
 //   rolloverStatus: {
+//     ready: boolean                 — queue initialization finished
 //     showBanner: boolean            — date changed, queue incomplete, not manual
 //     shouldAutoAdvance: boolean     — date changed, queue complete, not manual
 //     shouldClearManual: boolean     — manual flag set but stored date = today
@@ -109,13 +118,26 @@ export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs 
 
   // Single memo derives ALL rollover state from the 4 inputs
   const rolloverStatus = createMemo(() => {
+    const ready = props.queueReady() === true && !props.queueReady.loading;
     const manual = props.isManual();
     const completed = props.isQueueCompleted();
     const qDate = props.queueDate();
     const today = wallClockDate();
     const dateChanged = !isSameDay(qDate, today);
 
+    if (!ready) {
+      return {
+        ready: false,
+        showBanner: false,
+        shouldAutoAdvance: false,
+        shouldClearManual: false,
+        dateChanged: false,
+        wallClockDate: today,
+      };
+    }
+
     return {
+      ready,
       showBanner:        !manual && dateChanged && !completed,
       shouldAutoAdvance: !manual && dateChanged && completed,
       // "Q5 special case" from the state machine matrix: when the user set a manual
@@ -144,6 +166,8 @@ export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs 
   return { rolloverStatus, wallClockDate };
 }
 ```
+
+**Implementation note**: Keep `handlePracticeDateRefresh("auto")` idempotent and gated by queue readiness. The state machine may centralize the decision, but it must not remove the existing protection against firing while queue initialization is still in-flight.
 
 **State machine matrix (implemented in ONE place)**:
 
@@ -359,14 +383,20 @@ These are development-time debugging aids that execute on every practice list fe
 
 ### Phase 6: Reduce `computeSchedulingWindows` Coupling
 
-**Goal**: Move pure computation functions out of the service layer to break the tight coupling.
+**Goal**: Move pure computation functions out of the service layer to break the tight coupling, while first reconciling the duplicate implementation that still exists in `src/lib/services/queue-generator.ts`.
 
 **Current import chain**:
 ```
 practice.ts (queries) → practice-queue.ts (services) → computeSchedulingWindows
 ```
 
-**Move** `computeSchedulingWindows`, `classifyQueueBucket`, `SchedulingWindows` interface to:
+**Important prerequisite**:
+- `src/lib/services/practice-queue.ts` and `src/lib/services/queue-generator.ts` both define scheduling-window helpers today.
+- They are not behaviorally identical, so this phase must either:
+  1. make `queue-generator.ts` consume the shared utility and preserve its current semantics explicitly, or
+  2. declare `queue-generator.ts` out of scope for this PR and defer deprecated-code removal until that caller is retired.
+
+**Move** the canonical `computeSchedulingWindows`, `classifyQueueBucket`, `SchedulingWindows` interface to:
 `src/lib/utils/scheduling-windows.ts`
 
 This is a pure function with no dependencies on DB or services. Moving it to `utils/` breaks the coupling chain:
@@ -380,6 +410,8 @@ practice-queue.ts (services) → scheduling-windows.ts (utils) ← pure
 export { computeSchedulingWindows, classifyQueueBucket } from "../utils/scheduling-windows";
 export type { SchedulingWindows } from "../utils/scheduling-windows";
 ```
+
+**Scope note**: Do not remove `queue-generator.ts`-only helpers in the same step unless their remaining callers have been updated in the same patch.
 
 ---
 
@@ -448,16 +480,18 @@ export interface DailyPracticeQueueRow {
 
 ---
 
-### Phase 8: Remove Deprecated Code
+### Phase 8: Retire Deprecated Code Only After Live Callers Are Gone
 
 **File**: `src/lib/db/queries/practice.ts`
 
-Remove deprecated functions that are no longer used:
+Remove deprecated functions only after all live callers have been updated or removed in the same PR:
 - `getDueTunes` (line 320–327) — wrapper that just calls `getPracticeList`
 - `getDueTunesLegacy` (line 334+) — old implementation with manual JOINs
 - `DueTuneEntry` interface (line 148–159) — used only by deprecated functions
 
-**Verify**: Search for callers before removing. If anything still imports these, update or remove the import.
+**Current blocker**: `src/lib/services/queue-generator.ts` still imports `getDueTunesLegacy`, so Phase 8 is conditional, not automatic.
+
+**Verify**: Search for callers before removing. If anything still imports these, update the caller first or defer this phase.
 
 ---
 
@@ -480,6 +514,7 @@ src/components/practice/
 
 src/lib/services/
   ├── practice-queue.ts                           (~1,280 lines, minor changes)
+  ├── queue-generator.ts                          (either updated to consume shared scheduling utility, or explicitly deferred)
   └── ... other services                          (unchanged)
 
 src/lib/db/queries/
@@ -495,18 +530,19 @@ src/lib/utils/
 
 ## Implementation Order
 
-1. **Phase 6** first (move `computeSchedulingWindows` to utils) — safest, isolated change, enables clean imports
+1. **Phase 6** first, but split it into two steps: reconcile `queue-generator.ts` duplication, then extract the shared utility
 2. **Phase 1** (create `useRolloverStateMachine`) — core of the declarative refactor
 3. **Phase 2** (simplify `DateRolloverBanner`) — depends on Phase 1
 4. **Phase 4** (simplify `handlePracticeDateRefresh`) — depends on Phase 1
 5. **Phase 3a–3d** (extract composables from practice.tsx) — independent extractions, can be done in any order
 6. **Phase 5** (clean up debug logging) — independent, low risk
 7. **Phase 7** (add column comments) — documentation only
-8. **Phase 8** (remove deprecated code) — cleanup after verifying no callers
+8. **Phase 8** (remove deprecated code) — only after verifying no live callers remain
 
 Each phase should be followed by:
 - `npm run lint` (Biome check)
-- `npm run test:unit` (Vitest — practice-queue.test.ts)
+- `npx vitest run src/lib/services/practice-queue.test.ts` (service-level queue tests)
+- `npm run test:unit` (Vitest suite under `tests/`)
 - Manual verification that the app builds (`npm run build`)
 - E2E tests should pass after all phases complete
 
@@ -519,11 +555,11 @@ Each phase should be followed by:
 | Phase 1 (state machine) | Medium — changes reactive flow | Keep exact same conditions/outcomes; comprehensive E2E coverage exists |
 | Phase 2 (banner simplification) | Low — display only | `data-testid` attributes preserved; E2E tests validate visibility |
 | Phase 3 (composable extraction) | Low — mechanical move | No logic changes, just moving code between files |
-| Phase 4 (simplify refresh) | Medium — removes safety re-checks | State machine memo already validates conditions before calling |
+| Phase 4 (simplify refresh) | Medium — removes safety re-checks | State machine memo must preserve queueReady gating before calling |
 | Phase 5 (debug logging) | Very Low — removes console.log | No functional impact |
-| Phase 6 (scheduling-windows) | Very Low — move + re-export | Backward-compatible re-exports ensure no breakage |
+| Phase 6 (scheduling-windows) | Medium — duplicate implementations must be reconciled first | Update or explicitly defer `queue-generator.ts`; then re-export from `practice-queue.ts` |
 | Phase 7 (column comments) | None — documentation only | — |
-| Phase 8 (deprecated removal) | Low — dead code removal | Verify no callers before removing |
+| Phase 8 (deprecated removal) | Medium — dead code is still live today | Remove only after caller search is clean |
 
 ---
 
@@ -535,3 +571,38 @@ Each phase should be followed by:
 4. **practice.tsx under 500 lines** — down from 1,079
 5. **No circular dependencies** — verified by import chain analysis
 6. **All `data-testid` attributes preserved** — no E2E locator changes needed
+7. **Validation commands match the repo** — service tests under `src/**` are run explicitly, not assumed via `npm run test:unit`
+8. **Deprecated practice-query APIs are removed only if caller search is clean** — otherwise they stay deferred for a follow-up cleanup
+
+---
+
+## Potential Next Steps
+
+These are intentionally out of scope for the current PR unless a reviewer explicitly pulls them in. They come from issue #381's broader goal of making the practice queue flow simpler and easier for mid-level humans to understand.
+
+1. **Reduce `daily_practice_queue` column surface area**
+  - Audit every read/write of the queue table and classify columns as: core state, diagnostic snapshot, or future-reserved.
+  - If the audit confirms they are unused in live logic, consider a follow-up migration that drops diagnostic-only columns such as `scheduledSnapshot`, `latestDueSnapshot`, `acceptableDelinquencyWindowSnapshot`, and `tzOffsetMinutesSnapshot`.
+  - If roadmap review confirms they are not needed, consider dropping currently reserved columns such as `exposuresRequired`, `exposuresCompleted`, and `outcome`.
+  - Do this only in a dedicated schema-change PR with migration notes, caller search, and queue regeneration/backfill verification.
+
+2. **Collapse duplicate queue-generation code paths**
+  - Decide whether `src/lib/services/queue-generator.ts` should be fully retired, or whether its remaining behavior should be absorbed into `src/lib/services/practice-queue.ts`.
+  - The long-term simplification target should be one canonical queue-generation module, one canonical scheduling-window utility, and one bucket-classification definition.
+
+3. **Make queue state transitions easier to read end-to-end**
+  - After the declarative rollover refactor lands, consider a small follow-up that documents the complete queue lifecycle in one place: queue date resolution, queue creation, staging, submit, completion, rollover, and reset.
+  - A short architecture note or state-transition table near the implementation may do more for human comprehensibility than additional code comments spread across files.
+
+4. **Further decompose `practice.tsx` only where boundaries become clearer**
+  - If the first extraction pass is successful, a later cleanup could move more practice-page concerns into focused composables or subcomponents, but only where the resulting ownership is obvious.
+  - The standard should be improved human readability, not file-count reduction.
+
+5. **Revisit file placement for practice/queue code**
+  - Issue #381 raises whether practice-page composables and queue services should live closer together.
+  - A follow-up could evaluate whether queue-date logic, rollover logic, and queue services are easier to navigate when grouped by domain rather than by current route/service split.
+  - This should be judged by discoverability and dependency clarity, not aesthetics.
+
+6. **Measure complexity only if it helps a real decision**
+  - If future refactors stall on "this still feels too hard to hold in my head," a lightweight complexity snapshot could be useful.
+  - This is optional. It should support human review, not become a tooling project of its own.
