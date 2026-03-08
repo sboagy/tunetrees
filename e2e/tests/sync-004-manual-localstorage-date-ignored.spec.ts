@@ -5,6 +5,25 @@ import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
+async function setInjectedTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await setCurrentTestUserId(page, userId);
+}
+
+async function setCurrentTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
+
 /**
  * SYNC-004: Manual localStorage date must NOT override DB queue window.
  * Priority: HIGH — deterministic fail with current code.
@@ -36,18 +55,6 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 const STALE_DATE_OFFSET_DAYS = 3;
 
-async function setInjectedTestUserId(
-  page: import("@playwright/test").Page,
-  userId: string
-) {
-  await page.addInitScript((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
-  }, userId);
-  await page.evaluate((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
-  }, userId);
-}
-
 /** Return ISO date string for N days before today (STANDARD_TEST_DATE). */
 function staleDateIso(daysAgo: number): string {
   const d = new Date(STANDARD_TEST_DATE);
@@ -69,7 +76,6 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
   test.beforeEach(async ({ page, context, testUser }) => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
-
     await setInjectedTestUserId(page, testUser.userId);
 
     ttPage = new TuneTreesPage(page);
@@ -106,7 +112,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
     // Reload so the injected values are live from the very first script tick.
     await page.reload();
     await page.waitForLoadState("networkidle", { timeout: 30_000 });
-    await setInjectedTestUserId(page, testUser.userId);
+    await setCurrentTestUserId(page, testUser.userId);
 
     // Wait for the test API to be registered.
     await page.waitForFunction(

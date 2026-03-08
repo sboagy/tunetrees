@@ -1,12 +1,12 @@
-import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import {
+  type Accessor,
   createEffect,
   createMemo,
   createResource,
   createSignal,
-  type Accessor,
   type Resource,
 } from "solid-js";
+import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import type { ITuneOverview } from "../../components/grids/types";
 import { formatAsWindowStart } from "../../lib/utils/practice-date";
 
@@ -109,13 +109,17 @@ export function usePracticeListData(
 
   const practiceListLoading = createMemo(() => {
     const hasCachedRows = practiceListData.latest != null;
-    return (practiceListData.loading || props.queueReady.loading) && !hasCachedRows;
+    return (
+      (practiceListData.loading || props.queueReady.loading) && !hasCachedRows
+    );
   });
 
   const practiceListError = createMemo(() => {
     return (
       practiceListData.error ||
-      (props.queueReady.error ? "Practice queue failed to initialize." : undefined)
+      (props.queueReady.error
+        ? "Practice queue failed to initialize."
+        : undefined)
     );
   });
 

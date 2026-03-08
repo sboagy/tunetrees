@@ -1,9 +1,9 @@
 import {
+  type Accessor,
   createEffect,
   createMemo,
-  onCleanup,
-  type Accessor,
   type JSX,
+  onCleanup,
 } from "solid-js";
 import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { RepertoireEmptyState } from "../../components/repertoire";
