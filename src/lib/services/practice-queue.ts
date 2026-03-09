@@ -24,7 +24,15 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
+import {
+  classifyQueueBucket,
+  computeSchedulingWindows,
+  type SchedulingWindows,
+} from "../utils/scheduling-windows";
 import { generateId } from "../utils/uuid";
+
+export { classifyQueueBucket, computeSchedulingWindows };
+export type { SchedulingWindows };
 
 type QueueCandidateRow = Pick<
   PracticeListStagedRow,
@@ -120,238 +128,58 @@ async function getUserSchedulingPrefs(
 }
 
 /**
- * Computed UTC windows for a user's practice sit-down
- *
- * Mirrors legacy SchedulingWindows NamedTuple (lines 24-39).
- */
-export interface SchedulingWindows {
-  startOfDayUtc: Date;
-  endOfDayUtc: Date;
-  windowFloorUtc: Date;
-  startTs: string; // ISO format: YYYY-MM-DD HH:MM:SS
-  endTs: string;
-  windowFloorTs: string;
-  tzOffsetMinutes: number | null;
-}
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000; // $24\times60\times60\times1000$
-const addDays = (d: Date, days: number): Date =>
-  new Date(d.getTime() + days * MS_PER_DAY);
-
-/**
- * Compute scheduling windows from a sit-down instant
- *
- * Derives canonical UTC scheduling windows based on:
- * - User's local timezone (if provided via offset)
- * - Acceptable delinquency window (how far back to look for lapsed tunes)
- *
- * Ported from legacy compute_scheduling_windows() (lines 45-72).
- *
- * @param reviewSitdownDate - Anchor timestamp for this session (UTC)
- * @param acceptableDelinquencyWindow - Days before today to include lapsed tunes
- * @param localTzOffsetMinutes - Client's local offset minutes from UTC (e.g., -300 for UTC-5)
- * @returns Scheduling windows with UTC boundaries and pre-formatted timestamps
- *
- * @example
- * ```typescript
- * const windows = computeSchedulingWindows(
- *   new Date('2025-10-16T14:30:00Z'),
- *   7,  // 7-day delinquency window
- *   -240  // UTC-4 (EDT)
- * );
- * // windows.startOfDayUtc = 2025-10-16T04:00:00Z (midnight in EDT)
- * // windows.windowFloorUtc = 2025-10-09T04:00:00Z (7 days before start)
- * ```
- */
-export function computeSchedulingWindows(
-  reviewSitdownDate: Date,
-  acceptableDelinquencyWindow: number,
-  localTzOffsetMinutes: number | null
-): SchedulingWindows {
-  const sitdownUtc = new Date(reviewSitdownDate.toISOString());
-
-  let startOfDayUtc: Date;
-
-  if (localTzOffsetMinutes !== null) {
-    // Convert UTC to local time
-    const offsetMs = localTzOffsetMinutes * 60 * 1000;
-    const localDt = new Date(sitdownUtc.getTime() + offsetMs);
-
-    // Get midnight in local time (using UTC methods to avoid system timezone)
-    const localStart = new Date(
-      Date.UTC(
-        localDt.getUTCFullYear(),
-        localDt.getUTCMonth(),
-        localDt.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    );
-
-    // Convert back to UTC
-    startOfDayUtc = new Date(localStart.getTime() - offsetMs);
-  } else {
-    startOfDayUtc = new Date(sitdownUtc);
-    startOfDayUtc.setUTCHours(0, 0, 0, 0);
-  }
-
-  const endOfDayUtc: Date = addDays(startOfDayUtc, 1);
-  const windowFloorUtc: Date = addDays(
-    startOfDayUtc,
-    -acceptableDelinquencyWindow
-  );
-
-  // // Format as ISO 8601 UTC up to seconds: YYYY-MM-DDTHH:MM:SSZ
-  // // We keep this "obviously UTC" form to avoid local/UTC ambiguity.
-  // const formatTs = (dt: Date): string => {
-  //   const iso = dt.toISOString();
-  //   // iso is always in UTC, e.g. 2026-05-01T00:00:00.000Z
-  //   return `${iso.substring(0, 19)}Z`;
-  // };
-
-  // Format as YYYY-MM-DD HH:MM:SS (legacy format for lexicographic comparison)
-  const formatTs = (dt: Date): string => {
-    return dt.toISOString().replace("T", " ").substring(0, 19);
-  };
-
-  return {
-    startOfDayUtc,
-    endOfDayUtc,
-    windowFloorUtc,
-    startTs: formatTs(startOfDayUtc),
-    endTs: formatTs(endOfDayUtc),
-    windowFloorTs: formatTs(windowFloorUtc),
-    tzOffsetMinutes: localTzOffsetMinutes,
-  };
-}
-
-/**
- * Classify timestamp vs window boundaries (robust parsing)
- *
- * Returns bucket classification:
- * - Bucket 1: Due Today (timestamp in [startOfDayUtc, endOfDayUtc))
- * - Bucket 2: Recently Lapsed (timestamp in [windowFloorUtc, startOfDayUtc))
- * - Bucket 3: New/Unscheduled (never scheduled, no practice history)
- * - Bucket 4: Old Lapsed (timestamp < windowFloorUtc)
- *
- * Handles various timestamp formats:
- * - ISO 8601 with T separator: "2025-10-16T14:30:00Z"
- * - Space separator: "2025-10-16 14:30:00"
- * - With/without timezone info
- *
- * Any parse failure returns bucket 1 (lenient default).
- *
- * Ported from legacy _classify_queue_bucket() (lines 641-670).
- *
- * @param coalescedRaw - Timestamp string (scheduled OR latest_due)
- * @param windows - Scheduling windows for comparison
- * @returns Bucket integer (1, 2, 3, or 4)
- *
- * @example
- * ```typescript
- * const windows = computeSchedulingWindows(new Date(), 7, null);
- * const bucket = classifyQueueBucket("2025-10-16 10:00:00", windows);
- * // Returns 1 if today, 2 if recent past, 3 if new, 4 if very old
- * ```
- */
-export function classifyQueueBucket(
-  coalescedRaw: string | null | undefined,
-  windows: SchedulingWindows
-): number {
-  if (!coalescedRaw) {
-    return 1; // Lenient default for null/undefined
-  }
-
-  const raw = coalescedRaw.trim();
-  const norm = raw.replace("T", " ");
-  const norm19 = norm.length >= 19 ? norm.substring(0, 19) : norm;
-
-  let dt: Date | null = null;
-
-  // Parse as YYYY-MM-DD HH:MM:SS (assume UTC) - try this FIRST
-  try {
-    const match = norm19.match(
-      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-    );
-    if (match) {
-      const [, year, month, day, hour, minute, second] = match;
-      dt = new Date(
-        Date.UTC(
-          parseInt(year, 10),
-          parseInt(month, 10) - 1,
-          parseInt(day, 10),
-          parseInt(hour, 10),
-          parseInt(minute, 10),
-          parseInt(second, 10)
-        )
-      );
-    }
-  } catch {
-    dt = null;
-  }
-
-  // Fallback: Try ISO format (with timezone)
-  if (!dt) {
-    try {
-      dt = new Date(raw);
-      if (Number.isNaN(dt.getTime())) {
-        dt = null;
-      }
-    } catch {
-      dt = null;
-    }
-  }
-
-  if (!dt || Number.isNaN(dt.getTime())) {
-    return 1; // Invalid date - lenient default
-  }
-
-  // Convert to UTC if needed
-  const dtUtc = new Date(dt.toISOString());
-
-  // Classify into buckets
-  if (dtUtc >= windows.startOfDayUtc && dtUtc < windows.endOfDayUtc) {
-    return 1; // Due Today
-  }
-
-  if (dtUtc >= windows.windowFloorUtc && dtUtc < windows.startOfDayUtc) {
-    return 2; // Recently Lapsed
-  }
-
-  return 4; // Old Lapsed (older than window floor)
-}
-
-/**
  * Daily Practice Queue Row (before enrichment)
  *
  * Represents a queue entry as stored in daily_practice_queue table.
  */
 export interface DailyPracticeQueueRow {
+  /** UUID primary key. */
   id?: string;
+  /** Supabase Auth UUID of the owning user. */
   userRef: string;
+  /** Repertoire this queue entry belongs to. */
   repertoireRef: string;
+  /** UTC start of the scheduling window; defines which queue day this row belongs to. */
   windowStartUtc: string;
+  /** UTC end of the scheduling window. */
   windowEndUtc: string;
+  /** UUID of the tune to practice. */
   tuneRef: string;
+  /** Queue bucket: 1=Due Today, 2=Recently Lapsed, 4=Old Lapsed. */
   bucket: number;
+  /** Stable display order within the queue. */
   orderIndex: number;
+  /** Snapshot of COALESCE(scheduled, latest_due) at queue generation time. */
   snapshotCoalescedTs: string;
+  /** Queue generation mode, typically per_day. */
   mode: string | null;
+  /** Date-only portion of the queue window for per-day mode. */
   queueDate: string | null;
+  /** Snapshot of scheduled at generation time; diagnostic only. */
   scheduledSnapshot: string | null;
+  /** Snapshot of latest_due at generation time; diagnostic only. */
   latestDueSnapshot: string | null;
+  /** Delinquency window used to generate the queue; diagnostic only. */
   acceptableDelinquencyWindowSnapshot: number | null;
+  /** Client timezone offset used for generation; diagnostic only. */
   tzOffsetMinutesSnapshot: number | null;
+  /** ISO timestamp when the queue row was generated. */
   generatedAt: string;
+  /** ISO timestamp when the row was marked complete; null means incomplete. */
   completedAt: string | null;
+  /** Reserved for future multi-exposure behavior. */
   exposuresRequired: number | null;
+  /** Reserved for future multi-exposure behavior. */
   exposuresCompleted: number | null;
+  /** Reserved for future practice outcome capture. */
   outcome: string | null;
+  /** Active flag; 1 means active, 0 means superseded/deactivated. */
   active: number;
+  /** Sync version for offline-first replication. */
   syncVersion: number;
+  /** Last local modification timestamp. */
   lastModifiedAt: string;
+  /** Device id for sync attribution. */
   deviceId: string | null;
 }
 

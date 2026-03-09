@@ -166,22 +166,51 @@ export async function waitForSyncComplete(
     );
   };
 
+  const isRecoverableNavigationError = (error: unknown): boolean => {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    return (
+      message.includes("execution context was destroyed") ||
+      message.includes("cannot find context with specified id") ||
+      message.includes("target closed")
+    );
+  };
+
   while (Date.now() - startTime < timeoutMs) {
-    const status = await page.evaluate(() => {
-      const el = document.querySelector(
-        "[data-auth-initialized]"
-      ) as HTMLElement | null;
-      const versionStr = el?.getAttribute("data-sync-version") || "0";
-      const successStr = el?.getAttribute("data-sync-success") || "";
-      const errorCountStr = el?.getAttribute("data-sync-error-count") || "0";
-      const errorSummary = el?.getAttribute("data-sync-error-summary") || "";
+    let status: {
+      version: number;
+      successStr: string;
+      success: boolean;
+      errorCount: number;
+      errorSummary: string;
+    };
 
-      const version = Number.parseInt(versionStr, 10) || 0;
-      const errorCount = Number.parseInt(errorCountStr, 10) || 0;
-      const success = successStr === "true";
+    try {
+      status = await page.evaluate(() => {
+        const el = document.querySelector(
+          "[data-auth-initialized]"
+        ) as HTMLElement | null;
+        const versionStr = el?.getAttribute("data-sync-version") || "0";
+        const successStr = el?.getAttribute("data-sync-success") || "";
+        const errorCountStr = el?.getAttribute("data-sync-error-count") || "0";
+        const errorSummary = el?.getAttribute("data-sync-error-summary") || "";
 
-      return { version, successStr, success, errorCount, errorSummary };
-    });
+        const version = Number.parseInt(versionStr, 10) || 0;
+        const errorCount = Number.parseInt(errorCountStr, 10) || 0;
+        const success = successStr === "true";
+
+        return { version, successStr, success, errorCount, errorSummary };
+      });
+    } catch (error) {
+      if (isRecoverableNavigationError(error)) {
+        log.debug(
+          "⏳ waitForSyncComplete saw a transient navigation/context reset; retrying"
+        );
+        await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+        await page.waitForTimeout(200);
+        continue;
+      }
+      throw error;
+    }
 
     if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
       if (!didRetryAfterRecoverableFailure) {
@@ -189,12 +218,12 @@ export async function waitForSyncComplete(
         const canRecover = isRecoverableInitialSyncFailure(summary);
         if (canRecover) {
           didRetryAfterRecoverableFailure = true;
-        log.debug(
+          log.debug(
             `⚠️ Initial sync failed with recoverable error; reloading once to retry. ${status.errorSummary}`
-        );
-        await page.waitForTimeout(500);
-        await page.reload({ waitUntil: "domcontentloaded" });
-        continue;
+          );
+          await page.waitForTimeout(500);
+          await page.reload({ waitUntil: "domcontentloaded" });
+          continue;
         }
       }
       throw new Error(
