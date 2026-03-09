@@ -2352,7 +2352,9 @@ export class TuneTreesPage {
 
           try {
             await this.page.keyboard.press("Escape").catch(() => undefined);
+            await this.page.waitForTimeout(200); // Small delay to ensure UI updates
             await this.flashcardView.click({ position: { x: 24, y: 24 } });
+            await this.page.waitForTimeout(100); // Small delay to ensure UI updates
             await this.page.keyboard.press(flashcardHotkeys[value]);
 
             await expect
