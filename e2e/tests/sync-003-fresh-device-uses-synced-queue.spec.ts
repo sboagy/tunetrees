@@ -33,6 +33,19 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * assertions are deliberately omitted to avoid sensitivity to the exact UI state.
  */
 
+async function setInjectedTestUserId(page: Page, userId: string) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await setCurrentTestUserId(page, userId);
+}
+
+async function setCurrentTestUserId(page: Page, userId: string) {
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
+
 /** Extract YYYY-MM-DD portion of an ISO/timestamp string (UTC). */
 function dateOnly(isoOrTs: string): string {
   // Handles both "2025-07-19T14:00:00.000Z" and "2025-07-19 14:00:00"
@@ -75,6 +88,7 @@ test.describe("SYNC-003: Fresh device picks up synced queue window from Supabase
   test.beforeEach(async ({ page, context, testUser }) => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+    await setInjectedTestUserId(page, testUser.userId);
 
     ttPage = new TuneTreesPage(page);
     await ttPage.setSchedulingPrefs();
@@ -107,7 +121,10 @@ test.describe("SYNC-003: Fresh device picks up synced queue window from Supabase
         yesterdayUtc.getUTCFullYear(),
         yesterdayUtc.getUTCMonth(),
         yesterdayUtc.getUTCDate(),
-        0, 0, 0, 0
+        0,
+        0,
+        0,
+        0
       )
     );
     const windowStartIso = windowStartUtcDate.toISOString(); // "2025-07-19T00:00:00.000Z"
@@ -142,7 +159,9 @@ test.describe("SYNC-003: Fresh device picks up synced queue window from Supabase
 
     // --- Wipe local state and resync from Supabase ---
     // resetLocalDbAndResync: clears IndexedDB → navigates to app → waits for sync.
+    await setInjectedTestUserId(page, testUser.userId);
     await resetLocalDbAndResync(page);
+    await setCurrentTestUserId(page, testUser.userId);
 
     // Wait for practice panel to settle (may show rollover banner or empty-state
     // since tune has no schedule → that's fine, we only care about the DB row).

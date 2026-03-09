@@ -1576,10 +1576,47 @@ export class TuneTreesPage {
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 
-    await this.filtersButton.click();
+    let filtersPanelReady = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const genreFilterVisible = await this.genreFilter
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+      if (genreFilterVisible) {
+        filtersPanelReady = true;
+        break;
+      }
 
-    await this.page.waitForTimeout(250);
+      const panelExpanded = await this.filtersButton
+        .getAttribute("aria-expanded")
+        .then((value) => value === "true")
+        .catch(() => false);
 
+      if (!panelExpanded) {
+        await this.filtersButton.click({ timeout: 10000 });
+      }
+
+      await this.page.waitForTimeout(250);
+
+      const panelReadyNow = await this.genreFilter
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (panelReadyNow) {
+        filtersPanelReady = true;
+        break;
+      }
+
+      const stillExpanded = await this.filtersButton
+        .getAttribute("aria-expanded")
+        .then((value) => value === "true")
+        .catch(() => false);
+
+      if (stillExpanded) {
+        await this.page.keyboard.press("Escape").catch(() => {});
+        await this.page.waitForTimeout(150);
+      }
+    }
+
+    expect(filtersPanelReady).toBe(true);
     await expect(this.genreFilter).toBeVisible({ timeout: 5000 });
     await expect(this.genreFilter).toBeEnabled({ timeout: 10000 });
     await this.page.waitForTimeout(250);
@@ -1599,44 +1636,49 @@ export class TuneTreesPage {
         .locator('input[type="checkbox"]')
         .first();
 
+    const ensureGenreDropdownOpen = async (): Promise<boolean> => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const genreFilterVisible = await this.genreFilter
+          .isVisible({ timeout: 300 })
+          .catch(() => false);
+
+        if (!genreFilterVisible) {
+          await this.filtersButton.click({ timeout: 10000 }).catch(() => {});
+          await this.page.waitForTimeout(200);
+        }
+
+        const [isExpanded, isPanelVisible] = await Promise.all([
+          this.genreFilter
+            .getAttribute("aria-expanded")
+            .then((value) => value === "true")
+            .catch(() => false),
+          dropdownPanel.isVisible({ timeout: 400 }).catch(() => false),
+        ]);
+
+        if (isExpanded && isPanelVisible) {
+          return true;
+        }
+
+        await this.genreFilter.click({ timeout: 10000 }).catch(() => {});
+        await this.page.waitForTimeout(200);
+      }
+
+      return false;
+    };
+
     console.log(`Filtering by genre: "${genre}"`);
 
-    let genreDropdownOpened = false;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      await this.genreFilter.click({ timeout: 10000 });
-      await this.page.waitForTimeout(200);
-
-      const [isExpanded, isPanelVisible] = await Promise.all([
-        this.genreFilter
-          .getAttribute("aria-expanded")
-          .then((value) => value === "true")
-          .catch(() => false),
-        dropdownPanel.isVisible({ timeout: 500 }).catch(() => false),
-      ]);
-
-      if (isExpanded && isPanelVisible) {
-        genreDropdownOpened = true;
-        break;
-      }
-    }
-
+    const genreDropdownOpened = await ensureGenreDropdownOpen();
     expect(genreDropdownOpened).toBe(true);
-
-    await expect(dropdownPanel).toBeVisible({ timeout: 10000 });
-    await this.page.waitForTimeout(250);
 
     let selectedOption = optionByRole();
     let genreOptionChecked = false;
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const isExpanded = await this.genreFilter
-        .getAttribute("aria-expanded")
-        .then((value) => value === "true")
-        .catch(() => false);
-
-      if (!isExpanded) {
-        await this.genreFilter.click({ timeout: 10000 });
-        await this.page.waitForTimeout(150);
+      const isOpen = await ensureGenreDropdownOpen();
+      if (!isOpen) {
+        await this.page.waitForTimeout(250);
+        continue;
       }
 
       const roleOption = optionByRole();

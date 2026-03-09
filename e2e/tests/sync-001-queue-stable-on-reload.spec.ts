@@ -30,6 +30,15 @@ const SEED_TUNES = [
 ];
 const RELOAD_COUNT = 3;
 
+async function setInjectedTestUserId(page: Page, userId: string) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
+
 async function getRowCount(page: Page, repertoireId: string): Promise<number> {
   return await page.evaluate(async (rid) => {
     const api = (
@@ -60,6 +69,7 @@ test.describe("SYNC-001: Queue row count stable across reloads", () => {
   test.beforeEach(async ({ page, context, testUser }) => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+    await setInjectedTestUserId(page, testUser.userId);
 
     ttPage = new TuneTreesPage(page);
     await ttPage.setSchedulingPrefs();
@@ -87,6 +97,12 @@ test.describe("SYNC-001: Queue row count stable across reloads", () => {
     for (let i = 1; i <= RELOAD_COUNT; i++) {
       await page.reload();
       await page.waitForLoadState("networkidle", { timeout: 30_000 });
+      await setInjectedTestUserId(page, testUser.userId);
+      await page.waitForFunction(
+        () => !!(window as { __ttTestApi?: unknown }).__ttTestApi,
+        { timeout: 20_000 }
+      );
+
       // Wait for practice grid to settle.
       await expect(page.getByTestId("practice-columns-button")).toBeVisible({
         timeout: 20_000,
