@@ -695,7 +695,10 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
         staleDate.getUTCFullYear(),
         staleDate.getUTCMonth(),
         staleDate.getUTCDate(),
-        0, 0, 0, 0
+        0,
+        0,
+        0,
+        0
       )
     );
     const staleWindowStartIso = staleWindowStart.toISOString();
@@ -706,10 +709,11 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
 
     // Use a catalog tune that's not in the current queue to avoid conflicts
     const staleTuneRef = TEST_TUNE_MORRISON_ID;
+    const staleRowId = randomUUID();
     const { error: insertError } = await supabase
       .from("daily_practice_queue")
       .insert({
-        id: randomUUID(),
+        id: staleRowId,
         user_ref: testUser.userId,
         repertoire_ref: testUser.repertoireId,
         tune_ref: staleTuneRef,
@@ -792,12 +796,17 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     // Should be on today's date (the advanced date)
     expect(refreshedDatePortion).toBe(currentDate.toISOString().slice(0, 10));
 
-    // Clean up: remove the stale queue row
-    await supabase
+    // Clean up: remove the stale queue row (scoped to this test's inserted id)
+    const { data: deletedStaleRows, error: deleteStaleError } = await supabase
       .from("daily_practice_queue")
       .delete()
-      .eq("repertoire_ref", testUser.repertoireId)
-      .eq("window_start_utc", staleWindowStartIso);
+      .eq("id", staleRowId)
+      .eq("user_ref", testUser.userId)
+      .select("id");
+
+    // Ensure cleanup behaved as expected and only removed this test's row
+    expect(deleteStaleError).toBeNull();
+    expect(deletedStaleRows?.length).toBe(1);
   });
 
   /**
@@ -829,7 +838,10 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
         currentDate.getUTCFullYear(),
         currentDate.getUTCMonth(),
         currentDate.getUTCDate(),
-        0, 0, 0, 0
+        0,
+        0,
+        0,
+        0
       )
     );
     const todayWindowStartIso = todayWindowStart.toISOString();
@@ -838,10 +850,11 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     const todayWindowEndIso = todayWindowEnd.toISOString();
     const nowIso = currentDate.toISOString();
 
+    const todayRowId = randomUUID();
     const { error: insertError } = await supabase
       .from("daily_practice_queue")
       .insert({
-        id: randomUUID(),
+        id: todayRowId,
         user_ref: testUser.userId,
         repertoire_ref: testUser.repertoireId,
         tune_ref: primaryTuneIds[0],
@@ -877,11 +890,16 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       currentDate.toISOString().slice(0, 10)
     );
 
-    // Clean up: remove the inserted queue row
-    await supabase
+    // Clean up: remove the inserted queue row (scoped to this test's inserted id)
+    const { data: deletedTodayRows, error: deleteTodayError } = await supabase
       .from("daily_practice_queue")
       .delete()
-      .eq("repertoire_ref", testUser.repertoireId)
-      .eq("window_start_utc", todayWindowStartIso);
+      .eq("id", todayRowId)
+      .eq("user_ref", testUser.userId)
+      .select("id");
+
+    // Ensure cleanup behaved as expected and only removed this test's row
+    expect(deleteTodayError).toBeNull();
+    expect(deletedTodayRows?.length).toBe(1);
   });
 });

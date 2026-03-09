@@ -2352,9 +2352,13 @@ export class TuneTreesPage {
 
           try {
             await this.page.keyboard.press("Escape").catch(() => undefined);
-            await this.page.waitForTimeout(200); // Small delay to ensure UI updates
+            // Wait for any open dropdown to close before interacting with the flashcard view
+            await expect(menu)
+              .toBeHidden({ timeout: 3000 })
+              .catch(() => undefined);
             await this.flashcardView.click({ position: { x: 24, y: 24 } });
-            await this.page.waitForTimeout(100); // Small delay to ensure UI updates
+            // Wait for the flashcard view to be ready before sending keyboard shortcuts
+            await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
             await this.page.keyboard.press(flashcardHotkeys[value]);
 
             await expect
