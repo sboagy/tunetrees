@@ -44,3 +44,4 @@ Repository-specific architecture, tech stack details, and patterns (including sy
 
 - **No Commits / Pushes:** Never commit, push, or open PRs unless explicitly requested.
 - **Validate Changes:** When making code changes, run the smallest relevant checks (typecheck/lint/tests) when practical and report results.
+- **Keep Architecture Docs Current:** If a task changes architecture, sync boundaries, codegen outputs, runtime wiring, or repository responsibilities, read `ARCHITECTURE.md` before editing and update it in the same change unless the architecture document remains accurate without modification.
