@@ -227,6 +227,8 @@ export const AuthProvider: ParentComponent = (props) => {
     createSignal(0);
   const [initialSyncComplete, setInitialSyncComplete] = createSignal(false);
   const [catalogSyncPending, setCatalogSyncPending] = createSignal(false);
+  const [anonymousCatalogSyncRequested, setAnonymousCatalogSyncRequested] =
+    createSignal(false);
   const [isAnonymous, setIsAnonymous] = createSignal(false);
   // Track last successful syncDown timestamp (used for displaying sync recency)
   const [lastSyncTimestamp, setLastSyncTimestamp] = createSignal<string | null>(
@@ -666,7 +668,7 @@ export const AuthProvider: ParentComponent = (props) => {
         // For anonymous users doing catalog sync after genre selection:
         // Pull only the catalog tables that were excluded from initial sync.
         // This is a "partial initial sync" for catalog tables with genre filter applied.
-        if (isAnonymousUser && isInitialSync && !catalogSyncPending()) {
+        if (isAnonymousUser && anonymousCatalogSyncRequested()) {
           const catalogTablesOverride = {
             pullTables: [
               "tune",
@@ -2363,12 +2365,16 @@ export const AuthProvider: ParentComponent = (props) => {
           "[AuthContext] Triggering catalog sync after genre selection"
         );
         setCatalogSyncPending(false);
+        setAnonymousCatalogSyncRequested(true);
 
-        // Use full:true to make this an "initial sync" so requestOverridesProvider
-        // can apply the catalog-only pullTables override (condition #2).
-        // Without full:true, this would be an incremental sync and the pullTables condition
-        // wouldn't match (because isInitialSync would be false).
-        await forceSyncDown({ full: true });
+        try {
+          await forceSyncDown({ full: true });
+        } catch (error) {
+          setCatalogSyncPending(true);
+          throw error;
+        } finally {
+          setAnonymousCatalogSyncRequested(false);
+        }
       }
     },
     lastSyncTimestamp,
