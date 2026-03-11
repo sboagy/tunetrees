@@ -904,13 +904,40 @@ async function clearUserTable(
   // their own transaction, so we use an RPC that sets the flag and deletes in
   // one call.
   if (tableName === "practice_record") {
-    const { error: rpcError } = await supabase.rpc(
-      "e2e_clear_practice_record",
-      {
-        target_repertoire: user.repertoireId,
+    const repertoireIds = new Set<string>([user.repertoireId]);
+    const { data: repertoireRows, error: repertoireQueryError } = await supabase
+      .from("repertoire")
+      .select("repertoire_id")
+      .eq("user_ref", user.userId);
+
+    if (repertoireQueryError) {
+      console.warn(
+        `[${user.name}] Failed to query repertoires before clearing practice_record: ${repertoireQueryError.message}`
+      );
+    } else if (repertoireRows) {
+      for (const row of repertoireRows) {
+        if (row.repertoire_id) {
+          repertoireIds.add(row.repertoire_id);
+        }
       }
-    );
-    error = rpcError;
+    }
+
+    for (const repertoireId of repertoireIds) {
+      const { error: rpcError } = await supabase.rpc(
+        "e2e_clear_practice_record",
+        {
+          target_repertoire: repertoireId,
+        }
+      );
+      if (rpcError) {
+        console.warn(
+          `[${user.name}] Failed to clear practice_record for repertoire ${repertoireId}: ${rpcError.message}`
+        );
+        if (!error) {
+          error = rpcError;
+        }
+      }
+    }
   } else {
     // Unified deletion path; RLS ensures only caller's rows are affected.
     let query = supabase.from(tableName).delete();
@@ -1137,6 +1164,20 @@ export async function setupForPracticeTestsParallel(
       log.debug(
         `[${user.name}] Queue ready: ${lastCount} tunes in practice grid`
       );
+
+      // Some tests later simulate a fresh device by wiping local SQLite and
+      // re-syncing from Supabase. When this helper explicitly seeded a due queue,
+      // flush that queue upstream so the fresh-device step sees the same latest
+      // queue window instead of silently losing it with the local wipe.
+      if (scheduleDaysAgo !== undefined) {
+        await page.evaluate(async () => {
+          const forceSyncUp = (window as any).__forceSyncUpForTest;
+          if (typeof forceSyncUp !== "function") {
+            throw new Error("__forceSyncUpForTest not available");
+          }
+          await forceSyncUp();
+        });
+      }
     }
   }
 

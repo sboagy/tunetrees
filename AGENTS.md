@@ -4,6 +4,8 @@ Scope: repository-specific architecture, patterns, and invariants for TuneTrees.
 
 Global execution guardrails (loop prevention, patch hygiene, type-safety defaults) live in `.github/copilot-instructions.md`. Treat this file as the canonical source for “how TuneTrees works”.
 
+`ARCHITECTURE.md` is the top-level cross-cutting architecture guide for agents. Read it before making changes that affect sync/codegen boundaries, runtime data flow, generated artifacts, or repository responsibilities. If those areas change, update `ARCHITECTURE.md` in the same change unless it remains accurate as written.
+
 ## Instruction Hierarchy
 
 Root (this file) → `src/AGENTS.md` (UI) → `tests/AGENTS.md` (unit) → `e2e/AGENTS.md` (E2E) → `oosync/AGENTS.md` (sync codegen + worker boundaries) → `sql_scripts/AGENTS.md` (views/migrations).
@@ -75,6 +77,7 @@ Primary components:
 
 ## What To Read First For Changes
 
+- Architecture / repo-boundary changes: start with `ARCHITECTURE.md`, then this file, then the relevant scoped `AGENTS.md`.
 - Sync changes: start with `oosync/AGENTS.md`, then `src/lib/sync/*`, then generated artifacts.
 - DB schema changes: check `drizzle/` + regenerate schema contract, then verify sync + views.
 - UI changes: follow `src/AGENTS.md` and ensure E2E selectors remain stable.

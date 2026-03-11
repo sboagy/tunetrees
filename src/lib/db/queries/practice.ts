@@ -18,7 +18,7 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { computeSchedulingWindows } from "../../services/practice-queue";
+import { computeSchedulingWindows } from "../../utils/scheduling-windows";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
@@ -36,8 +36,6 @@ import type {
   PracticeRecord,
   PracticeRecordWithTune,
   PrefsSpacedRepetition,
-  Tune,
-  TuneSchedulingInfo,
 } from "../types";
 import type { ITuneOverview } from "../view-types";
 
@@ -142,23 +140,6 @@ export async function clearStaleStagedEvaluations(
 }
 
 /**
- * DEPRECATED: Old interface - remove after migration
- * @deprecated Use PracticeListStagedWithQueue instead
- */
-export interface DueTuneEntry {
-  tuneRef: string;
-  repertoireRef: string;
-  title: string | null;
-  type: string | null;
-  mode: string | null;
-  structure: string | null;
-  scheduled: string | null;
-  latest_practiced: string | null;
-  tune: Tune;
-  schedulingInfo?: TuneSchedulingInfo;
-}
-
-/**
  * Get practice list filtered by daily practice queue
  *
  * Queries practice_list_staged VIEW JOINed with daily_practice_queue.
@@ -191,45 +172,6 @@ export async function getPracticeList(
   // Query practice_list_staged INNER JOIN daily_practice_queue
   // Queue determines which tunes to practice and their ordering
 
-  // Debug: Check queue rows
-  const queueRows = await db.all<{ count: number }>(sql`
-    SELECT COUNT(*) as count
-    FROM daily_practice_queue dpq
-    WHERE dpq.user_ref = ${userId}
-      AND dpq.repertoire_ref = ${repertoireId}
-      AND dpq.active = 1
-  `);
-  console.log("[DB identity]", db);
-  console.log(
-    `[getPracticeList] Queue has ${queueRows[0]?.count || 0} active rows for user=${userId}, repertoire=${repertoireId}`
-  );
-
-  // Debug: Check view rows
-  const viewRows = await db.all<{ count: number }>(sql`
-    SELECT COUNT(*) as count
-    FROM practice_list_staged pls
-    WHERE pls.user_ref = ${userId}
-      AND pls.repertoire_id = ${repertoireId}
-  `);
-  console.log(
-    `[getPracticeList] View has ${viewRows[0]?.count || 0} rows for user=${userId}, repertoire=${repertoireId}`
-  );
-
-  // DEBUG: Check what windows exist and which one we're selecting
-  const windowCheck = await db.all<{
-    window_start_utc: string;
-    count: number;
-  }>(sql`
-    SELECT window_start_utc, COUNT(*) as count
-    FROM daily_practice_queue
-    WHERE user_ref = ${userId}
-      AND repertoire_ref = ${repertoireId}
-      AND active = 1
-    GROUP BY window_start_utc
-    ORDER BY window_start_utc DESC
-  `);
-  console.log(`[getPracticeList] Available windows:`, windowCheck);
-
   // Determine which queue window to query.
   // Prefer the caller-provided window (matches UI-selected queue date),
   // falling back to "most recent active" for backward compatibility.
@@ -238,15 +180,12 @@ export async function getPracticeList(
   // 'YYYY-MM-DDTHH:MM:SS' (ISO with T) and 'YYYY-MM-DD HH:MM:SS' (space format).
   // Match BOTH to avoid split-window mismatches.
   let isoFormat: string | undefined;
-  let spaceFormat: string | undefined;
 
   const requestedWindow = windowStartUtc?.trim();
   if (requestedWindow) {
     isoFormat = requestedWindow.includes("T")
       ? requestedWindow
       : requestedWindow.replace(" ", "T");
-    spaceFormat = isoFormat.replace("T", " ");
-    console.log(`[getPracticeList] Using requested window: ${isoFormat}`);
   } else {
     const maxWindow = await db.get<{ max_window: string }>(sql`
       SELECT MAX(window_start_utc) as max_window
@@ -255,13 +194,8 @@ export async function getPracticeList(
         AND repertoire_ref = ${repertoireId}
         AND active = 1
     `);
-    console.log(`[getPracticeList] Using max window: ${maxWindow?.max_window}`);
 
     isoFormat = maxWindow?.max_window; // e.g., '2025-11-08T00:00:00'
-    spaceFormat = isoFormat?.replace("T", " "); // e.g., '2025-11-08 00:00:00'
-    console.log(
-      `[getPracticeList] Matching both formats: ISO='${isoFormat}', Space='${spaceFormat}'`
-    );
   }
 
   // If no window exists, return empty array
@@ -303,231 +237,7 @@ export async function getPracticeList(
 
   console.log(`[getPracticeList] JOIN returned ${rows.length} rows`);
 
-  // DEBUG: Log completed_at values to verify filter is working
-  rows.forEach((row, i) => {
-    console.log(
-      `[getPracticeList] Row ${i}: tune=${row.id}, completed_at=${row.completed_at}`
-    );
-  });
-
   return rows;
-}
-
-/**
- * DEPRECATED: Use getPracticeList instead
- * Keeping for backward compatibility during migration
- */
-export async function getDueTunes(
-  db: SqliteDatabase,
-  userId: string,
-  repertoireId: string,
-  delinquencyWindowDays: number = 7
-): Promise<PracticeListStagedWithQueue[]> {
-  return getPracticeList(db, userId, repertoireId, delinquencyWindowDays);
-}
-
-/**
- * DEPRECATED: Old implementation with manual JOINs
- * Keeping signature for backward compatibility during migration
- * @deprecated
- */
-export async function getDueTunesLegacy(
-  db: SqliteDatabase,
-  repertoireId: string,
-  sitdownDate: Date,
-  delinquencyWindowDays = 7
-): Promise<DueTuneEntry[]> {
-  // Calculate window boundaries
-  const windowStart = new Date(sitdownDate);
-  windowStart.setDate(windowStart.getDate() - delinquencyWindowDays);
-  const windowEnd = new Date(sitdownDate);
-  // Add 1 minute buffer to windowEnd to account for timing issues when tunes are added "now"
-  windowEnd.setMinutes(windowEnd.getMinutes() + 1);
-
-  // Query practice_list_joined view or build joined query
-  // This gets all tunes in the repertoire with their latest practice info
-  const results = await db
-    .select({
-      // Tune info
-      tuneRef: tune.id,
-      idForeign: tune.idForeign,
-      title: tune.title,
-      type: tune.type,
-      mode: tune.mode,
-      structure: tune.structure,
-      genre: tune.genre,
-      incipit: tune.incipit,
-      composer: tune.composer,
-      artist: tune.artist,
-      releaseYear: tune.releaseYear,
-      deleted: tune.deleted,
-      privateFor: tune.privateFor,
-      syncVersion: tune.syncVersion,
-      lastModifiedAt: tune.lastModifiedAt,
-      deviceId: tune.deviceId,
-
-      // Repertoire tune info
-      repertoireRef: repertoireTune.repertoireRef,
-      scheduled: repertoireTune.scheduled, // Next review date for "Add To Review"
-
-      // Latest practice record info (from subquery)
-      latest_practiced: sql<string | null>`(
-        SELECT practiced 
-        FROM practice_record
-        WHERE tune_ref = ${tune.id} 
-          AND repertoire_ref = ${repertoireId}
-        ORDER BY practiced DESC 
-        LIMIT 1
-      )`,
-      latest_due: sql<string | null>`(
-        SELECT due 
-        FROM practice_record
-        WHERE tune_ref = ${tune.id} 
-          AND repertoire_ref = ${repertoireId}
-        ORDER BY practiced DESC 
-        LIMIT 1
-      )`,
-      latest_stability: sql<number | null>`(
-        SELECT stability 
-        FROM practice_record
-        WHERE tune_ref = ${tune.id} 
-          AND repertoire_ref = ${repertoireId}
-        ORDER BY practiced DESC 
-        LIMIT 1
-      )`,
-      latest_difficulty: sql<number | null>`(
-        SELECT difficulty 
-        FROM practice_record
-        WHERE tune_ref = ${tune.id} 
-          AND repertoire_ref = ${repertoireId}
-        ORDER BY practiced DESC 
-        LIMIT 1
-      )`,
-      latest_state: sql<number | null>`(
-        SELECT state 
-        FROM practice_record
-        WHERE tune_ref = ${tune.id} 
-          AND repertoire_ref = ${repertoireId}
-        ORDER BY practiced DESC 
-        LIMIT 1
-      )`,
-    })
-    .from(tune)
-    .innerJoin(repertoireTune, eq(repertoireTune.tuneRef, tune.id))
-    .where(
-      and(
-        eq(repertoireTune.repertoireRef, repertoireId),
-        eq(repertoireTune.deleted, 0),
-        eq(tune.deleted, 0)
-      )
-    );
-
-  // Filter for due tunes and enrich with scheduling info
-  const dueTunes: DueTuneEntry[] = [];
-
-  for (const row of results) {
-    // Use scheduled if available, otherwise fall back to latest_due
-    const nextReview = row.scheduled || row.latest_due;
-
-    if (!nextReview) {
-      // New tune never practiced - include it
-      dueTunes.push({
-        tuneRef: row.tuneRef,
-        repertoireRef: row.repertoireRef,
-        title: row.title,
-        type: row.type,
-        mode: row.mode,
-        structure: row.structure,
-        scheduled: null,
-        latest_practiced: row.latest_practiced,
-        tune: {
-          id: row.tuneRef,
-          idForeign: row.idForeign,
-          primaryOrigin: null, // Not available in practice_list_staged view
-          title: row.title,
-          type: row.type,
-          mode: row.mode,
-          structure: row.structure,
-          genre: row.genre,
-          incipit: row.incipit,
-          composer: row.composer,
-          artist: row.artist,
-          releaseYear: row.releaseYear,
-          deleted: row.deleted,
-          privateFor: row.privateFor,
-          syncVersion: row.syncVersion,
-          lastModifiedAt: row.lastModifiedAt,
-          deviceId: row.deviceId,
-        },
-        schedulingInfo: {
-          stability: row.latest_stability,
-          difficulty: row.latest_difficulty,
-          elapsed_days: null,
-          state: row.latest_state ?? 0, // 0 = New
-          due: null,
-          repetitions: null,
-          lapses: null,
-        },
-      });
-      continue;
-    }
-
-    // Check if due within window
-    const nextReviewDate = new Date(nextReview);
-    if (nextReviewDate <= windowEnd && nextReviewDate >= windowStart) {
-      dueTunes.push({
-        tuneRef: row.tuneRef,
-        repertoireRef: row.repertoireRef,
-        title: row.title,
-        type: row.type,
-        mode: row.mode,
-        structure: row.structure,
-        scheduled: nextReview,
-        latest_practiced: row.latest_practiced,
-        tune: {
-          id: row.tuneRef,
-          idForeign: row.idForeign,
-          primaryOrigin: null, // Not available in practice_list_staged view
-          title: row.title,
-          type: row.type,
-          mode: row.mode,
-          structure: row.structure,
-          genre: row.genre,
-          incipit: row.incipit,
-          composer: row.composer,
-          artist: row.artist,
-          releaseYear: row.releaseYear,
-          deleted: row.deleted,
-          privateFor: row.privateFor,
-          syncVersion: row.syncVersion,
-          lastModifiedAt: row.lastModifiedAt,
-          deviceId: row.deviceId,
-        },
-        schedulingInfo: {
-          stability: row.latest_stability,
-          difficulty: row.latest_difficulty,
-          elapsed_days: null,
-          state: row.latest_state ?? 2, // 2 = Review
-          due: nextReview,
-          repetitions: null,
-          lapses: null,
-        },
-      });
-    }
-  }
-
-  // Sort by next review date (oldest first)
-  dueTunes.sort((a, b) => {
-    const aDate = a.schedulingInfo?.due
-      ? new Date(a.schedulingInfo.due).getTime()
-      : 0;
-    const bDate = b.schedulingInfo?.due
-      ? new Date(b.schedulingInfo.due).getTime()
-      : 0;
-    return aDate - bDate;
-  });
-
-  return dueTunes;
 }
 
 /**

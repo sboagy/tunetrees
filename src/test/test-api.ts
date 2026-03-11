@@ -620,37 +620,51 @@ async function updateScheduledDates(
 async function getPracticeQueue(repertoireId: string, windowStartUtc?: string) {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
+  const normalizedWindowStartUtc = windowStartUtc
+    ? windowStartUtc.replace(" ", "T").substring(0, 19)
+    : undefined;
 
   let query: any;
   if (windowStartUtc) {
     query = sql`
-      SELECT id, tune_ref, bucket, order_index, window_start_utc, 
-             window_end_utc, completed_at, snapshot_coalesced_ts
+      SELECT id, tune_ref, bucket, order_index,
+             REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') AS window_start_utc,
+             REPLACE(SUBSTR(window_end_utc, 1, 19), 'T', ' ') AS window_end_utc,
+             completed_at,
+             snapshot_coalesced_ts
       FROM daily_practice_queue
       WHERE user_ref = ${userRef}
         AND repertoire_ref = ${repertoireId}
-        AND window_start_utc = ${windowStartUtc}
+        AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${normalizedWindowStartUtc}
         AND active = 1
       ORDER BY bucket ASC, order_index ASC
     `;
   } else {
-    // When no explicit windowStartUtc is provided, select the latest
-    // queue window using the UUIDv7 id ordering (monotonic by time).
+    // When no explicit windowStartUtc is provided, select the chronologically
+    // latest queue window. UUIDv7 insertion order is not a valid proxy because
+    // an older window can be inserted later during sync/regression scenarios.
     query = sql`
-      SELECT id, tune_ref, bucket, order_index, window_start_utc,
-             window_end_utc, completed_at, snapshot_coalesced_ts
+          SELECT id, tune_ref, bucket, order_index,
+            REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') AS window_start_utc,
+            REPLACE(SUBSTR(window_end_utc, 1, 19), 'T', ' ') AS window_end_utc,
+            completed_at,
+            snapshot_coalesced_ts
       FROM daily_practice_queue
       WHERE user_ref = ${userRef}
         AND repertoire_ref = ${repertoireId}
         AND active = 1
-        AND window_start_utc = (
-          SELECT window_start_utc
-          FROM daily_practice_queue
-          WHERE user_ref = ${userRef}
-            AND repertoire_ref = ${repertoireId}
-            AND active = 1
-          ORDER BY id DESC
-          LIMIT 1
+        AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = (
+          SELECT latest_window.normalized_window_start_utc
+          FROM (
+            SELECT REPLACE(SUBSTR(window_start_utc, 1, 19), ' ', 'T') AS normalized_window_start_utc
+            FROM daily_practice_queue
+            WHERE user_ref = ${userRef}
+              AND repertoire_ref = ${repertoireId}
+              AND active = 1
+            GROUP BY REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ')
+            ORDER BY REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') DESC
+            LIMIT 1
+          ) latest_window
         )
       ORDER BY bucket ASC, order_index ASC
     `;
@@ -901,6 +915,46 @@ async function getSelectedGenres(): Promise<string[]> {
 }
 
 /**
+ * Get summary of the latest active queue window for a repertoire.
+ *
+ * Returns the most recent window date, how many rows are in it, and how
+ * many of those rows have been completed (completed_at IS NOT NULL).
+ * Useful in sync tests to verify which window the app resolved to.
+ */
+async function getQueueInfo(repertoireId: string): Promise<{
+  windowStartUtc: string;
+  rowCount: number;
+  completedCount: number;
+}> {
+  const db = await ensureDb();
+  const userRef = await resolveUserId(db);
+  const rows = await db.all<{
+    windowStartUtc: string;
+    rowCount: number;
+    completedCount: number;
+  }>(sql`
+    SELECT
+      REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') AS windowStartUtc,
+      COUNT(*)                                            AS rowCount,
+      COUNT(completed_at)                                 AS completedCount
+    FROM daily_practice_queue
+    WHERE user_ref        = ${userRef}
+      AND repertoire_ref  = ${repertoireId}
+      AND active          = 1
+    GROUP BY REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ')
+    ORDER BY windowStartUtc DESC
+    LIMIT 1
+  `);
+  const raw = rows[0];
+  if (!raw) return { windowStartUtc: "", rowCount: 0, completedCount: 0 };
+  return {
+    windowStartUtc: raw.windowStartUtc ?? "",
+    rowCount: Number(raw.rowCount),
+    completedCount: Number(raw.completedCount),
+  };
+}
+
+/**
  * Get a tune ID by genre
  * Returns the first tune found for the given genre
  */
@@ -1114,6 +1168,11 @@ declare global {
         table: string,
         recordId: string | number
       ) => Promise<any>;
+      getQueueInfo: (repertoireId: string) => Promise<{
+        windowStartUtc: string;
+        rowCount: number;
+        completedCount: number;
+      }>;
       getSelectedGenres: () => Promise<string[]>;
       getTuneIdByGenre: (genre: string) => Promise<string | null>;
       getAnnotationCounts: (options?: {
@@ -1431,6 +1490,7 @@ if (typeof window !== "undefined") {
       },
       getSelectedGenres,
       getTuneIdByGenre,
+      getQueueInfo,
       getOrphanedAnnotationCounts: async () => {
         const db = await ensureDb();
 

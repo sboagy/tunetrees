@@ -179,36 +179,6 @@ async function ensureRepertoireWithTunes(
   const { supabase } = await getTestUserClient(userKey);
   const repertoireId = randomUUID();
 
-  const { error: clearQueueError } = await supabase
-    .from("daily_practice_queue")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearQueueError) {
-    throw new Error(
-      `Failed to clear daily_practice_queue: ${clearQueueError.message}`
-    );
-  }
-
-  const { error: clearPracticeError } = await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearPracticeError) {
-    throw new Error(
-      `Failed to clear practice_record: ${clearPracticeError.message}`
-    );
-  }
-
-  const { error: clearRepertoireTunesError } = await supabase
-    .from("repertoire_tune")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  if (clearRepertoireTunesError) {
-    throw new Error(
-      `Failed to clear repertoire_tune: ${clearRepertoireTunesError.message}`
-    );
-  }
-
   const { error: repertoireError } = await supabase.from("repertoire").upsert(
     {
       repertoire_id: repertoireId,
@@ -257,19 +227,47 @@ async function ensureRepertoireWithTunes(
 async function cleanupRepertoire(userKey: string, repertoireId: string) {
   const { supabase } = await getTestUserClient(userKey);
 
-  await supabase
+  const { error: clearQueueError } = await supabase
     .from("daily_practice_queue")
     .delete()
     .eq("repertoire_ref", repertoireId);
-  await supabase
-    .from("practice_record")
-    .delete()
-    .eq("repertoire_ref", repertoireId);
-  await supabase
+  if (clearQueueError) {
+    throw new Error(
+      `Failed to clear daily_practice_queue during cleanup: ${clearQueueError.message}`
+    );
+  }
+
+  const { error: clearPracticeError } = await supabase.rpc(
+    "e2e_clear_practice_record",
+    {
+      target_repertoire: repertoireId,
+    }
+  );
+  if (clearPracticeError) {
+    throw new Error(
+      `Failed to clear practice_record during cleanup: ${clearPracticeError.message}`
+    );
+  }
+
+  const { error: clearRepertoireTunesError } = await supabase
     .from("repertoire_tune")
     .delete()
     .eq("repertoire_ref", repertoireId);
-  await supabase.from("repertoire").delete().eq("repertoire_id", repertoireId);
+  if (clearRepertoireTunesError) {
+    throw new Error(
+      `Failed to clear repertoire_tune during cleanup: ${clearRepertoireTunesError.message}`
+    );
+  }
+
+  const { error: deleteRepertoireError } = await supabase
+    .from("repertoire")
+    .delete()
+    .eq("repertoire_id", repertoireId);
+  if (deleteRepertoireError) {
+    throw new Error(
+      `Failed to delete repertoire during cleanup: ${deleteRepertoireError.message}`
+    );
+  }
 }
 
 test.describe("PRACTICE-005: Date Rollover Banner", () => {
@@ -664,5 +662,244 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     await expect(ttPage.databaseDropdownPanel).toBeVisible({ timeout: 10000 });
     await ttPage.databaseStatusButton.click();
     await expect(ttPage.databaseDropdownPanel).toBeHidden({ timeout: 10000 });
+  });
+
+  /**
+   * Regression test for the bug where completing all tunes in the current queue
+   * caused the UI to jump to a stale old queue date (e.g. 2/25) because
+   * getLatestActiveQueueWindow preferred the latest *incomplete* window over
+   * the chronologically latest window.
+   *
+   * Scenario: An old queue (12 days ago) has one incomplete row. The current
+   * queue (today) is fully completed. On date rollover, the queue should
+   * auto-advance to today+1, NOT jump back to the old date.
+   */
+  test("should not jump to stale queue when current queue is complete and old queue has incomplete rows", async ({
+    page,
+    context,
+    testUser,
+    testUserKey,
+  }) => {
+    const initialQueue = await expectQueueMatchesGrid(
+      page,
+      testUser.repertoireId
+    );
+
+    // Insert a stale old queue row with an incomplete entry via Supabase.
+    // This simulates a previous queue that was never fully completed.
+    const { supabase } = await getTestUserClient(testUserKey);
+    const staleDate = new Date(currentDate);
+    staleDate.setUTCDate(staleDate.getUTCDate() - 12);
+    const staleWindowStart = new Date(
+      Date.UTC(
+        staleDate.getUTCFullYear(),
+        staleDate.getUTCMonth(),
+        staleDate.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    const staleWindowStartIso = staleWindowStart.toISOString();
+    const staleWindowEnd = new Date(staleWindowStart);
+    staleWindowEnd.setUTCDate(staleWindowEnd.getUTCDate() + 1);
+    const staleWindowEndIso = staleWindowEnd.toISOString();
+    const nowIso = currentDate.toISOString();
+
+    // Use a catalog tune that's not in the current queue to avoid conflicts
+    const staleTuneRef = TEST_TUNE_MORRISON_ID;
+    const staleRowId = randomUUID();
+    const { error: insertError } = await supabase
+      .from("daily_practice_queue")
+      .insert({
+        id: staleRowId,
+        user_ref: testUser.userId,
+        repertoire_ref: testUser.repertoireId,
+        tune_ref: staleTuneRef,
+        window_start_utc: staleWindowStartIso,
+        window_end_utc: staleWindowEndIso,
+        bucket: 1,
+        order_index: 0,
+        snapshot_coalesced_ts: staleWindowStartIso,
+        generated_at: nowIso,
+        active: true,
+        sync_version: 1,
+        last_modified_at: nowIso,
+        // completed_at is NULL → this row is "incomplete"
+      });
+    expect(
+      insertError,
+      `Failed to insert stale queue row: ${insertError?.message}`
+    ).toBeNull();
+
+    // Resync so the stale row appears in local DB
+    await resetLocalDbAndResync(page);
+    ttPage = new TuneTreesPage(page);
+    await setInjectedTestUserId(page, testUser.userId);
+    await waitForTestApi(page);
+    await ttPage.navigateToTab("practice");
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+
+    // Queue should still be on the current date, not the stale one
+    const queueAfterSync = await getQueueSnapshot(page, testUser.repertoireId);
+    expect(queueAfterSync.windowStartUtc).toBe(initialQueue.windowStartUtc);
+
+    // Complete all tunes in the current queue
+    const rows = ttPage.getRows("scheduled");
+    const rowCount = await rows.count();
+    for (let i = 0; i < rowCount; i++) {
+      await ttPage.setRowEvaluation(rows.nth(i), "good");
+    }
+    await ttPage.submitEvaluationsButton.click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+    // Confirm all rows are completed
+    await expect
+      .poll(
+        async () => {
+          const queueRows = await getQueueRows(page, testUser.repertoireId);
+          return queueRows.every(
+            (row: { completed_at: string | null }) => !!row.completed_at
+          );
+        },
+        { timeout: 15000, intervals: [200, 500, 1000] }
+      )
+      .toBe(true);
+
+    // Advance date — should auto-advance, NOT jump to the stale old queue
+    currentDate = await advanceDays(context, 1, currentDate);
+    await page.waitForTimeout(ROLLOVER_WAIT_MS);
+
+    // Banner should be hidden (auto-advance because queue was complete)
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
+
+    // The queue window should have advanced to today, NOT to the stale date
+    await expect
+      .poll(
+        async () =>
+          (await getQueueSnapshot(page, testUser.repertoireId)).windowStartUtc,
+        { timeout: 15000, intervals: [200, 500, 1000] }
+      )
+      .not.toBe(initialQueue.windowStartUtc);
+
+    const refreshedQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    const refreshedDatePortion = refreshedQueue.windowStartUtc.slice(0, 10);
+    const staleDatePortion = staleWindowStartIso.slice(0, 10);
+
+    // CRITICAL: must NOT have jumped to the stale old queue date
+    expect(
+      refreshedDatePortion,
+      `Queue jumped to stale date ${staleDatePortion} instead of advancing to today`
+    ).not.toBe(staleDatePortion);
+
+    // Should be on today's date (the advanced date)
+    expect(refreshedDatePortion).toBe(currentDate.toISOString().slice(0, 10));
+
+    // Clean up: remove the stale queue row (scoped to this test's inserted id)
+    const { data: deletedStaleRows, error: deleteStaleError } = await supabase
+      .from("daily_practice_queue")
+      .delete()
+      .eq("id", staleRowId)
+      .eq("user_ref", testUser.userId)
+      .select("id");
+
+    // Ensure cleanup behaved as expected and only removed this test's row
+    expect(deleteStaleError).toBeNull();
+    expect(deletedStaleRows?.length).toBe(1);
+  });
+
+  /**
+   * Regression test for the bug where the DateRolloverBanner did not clear
+   * when another device created a new queue for today (delivered via sync).
+   *
+   * Scenario: Queue is incomplete, date advances, banner appears. Then a new
+   * queue for "today" is inserted via Supabase (simulating another device)
+   * and synced. After resync, the banner should clear because the queue date
+   * now matches the wall-clock date.
+   */
+  test("should clear banner when sync delivers a new queue for today", async ({
+    page,
+    context,
+    testUser,
+    testUserKey,
+  }) => {
+    // Verify banner is initially hidden
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 5000 });
+
+    // Advance date — banner should appear (queue is incomplete)
+    currentDate = await advanceDays(context, 1, currentDate);
+    await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
+
+    // Simulate another device creating a new queue for "today" via Supabase
+    const { supabase } = await getTestUserClient(testUserKey);
+    const todayWindowStart = new Date(
+      Date.UTC(
+        currentDate.getUTCFullYear(),
+        currentDate.getUTCMonth(),
+        currentDate.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    const todayWindowStartIso = todayWindowStart.toISOString();
+    const todayWindowEnd = new Date(todayWindowStart);
+    todayWindowEnd.setUTCDate(todayWindowEnd.getUTCDate() + 1);
+    const todayWindowEndIso = todayWindowEnd.toISOString();
+    const nowIso = currentDate.toISOString();
+
+    const todayRowId = randomUUID();
+    const { error: insertError } = await supabase
+      .from("daily_practice_queue")
+      .insert({
+        id: todayRowId,
+        user_ref: testUser.userId,
+        repertoire_ref: testUser.repertoireId,
+        tune_ref: primaryTuneIds[0],
+        window_start_utc: todayWindowStartIso,
+        window_end_utc: todayWindowEndIso,
+        bucket: 1,
+        order_index: 0,
+        snapshot_coalesced_ts: todayWindowStartIso,
+        generated_at: nowIso,
+        active: true,
+        sync_version: 1,
+        last_modified_at: nowIso,
+      });
+    expect(
+      insertError,
+      `Failed to insert today's queue row: ${insertError?.message}`
+    ).toBeNull();
+
+    // Resync to pick up the new queue from "another device"
+    await resetLocalDbAndResync(page);
+    ttPage = new TuneTreesPage(page);
+    await setInjectedTestUserId(page, testUser.userId);
+    await waitForTestApi(page);
+    await ttPage.navigateToTab("practice");
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+
+    // The queue date should now be today (matching wall clock) so banner should be hidden
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
+
+    // Verify the queue resolved to today's date
+    const queueAfterSync = await getQueueSnapshot(page, testUser.repertoireId);
+    expect(queueAfterSync.windowStartUtc.slice(0, 10)).toBe(
+      currentDate.toISOString().slice(0, 10)
+    );
+
+    // Clean up: remove the inserted queue row (scoped to this test's inserted id)
+    const { data: deletedTodayRows, error: deleteTodayError } = await supabase
+      .from("daily_practice_queue")
+      .delete()
+      .eq("id", todayRowId)
+      .eq("user_ref", testUser.userId)
+      .select("id");
+
+    // Ensure cleanup behaved as expected and only removed this test's row
+    expect(deleteTodayError).toBeNull();
+    expect(deletedTodayRows?.length).toBe(1);
   });
 });

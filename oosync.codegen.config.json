@@ -136,6 +136,9 @@
       },
       "push": {
         "tableRules": {
+          "daily_practice_queue": {
+            "denyDelete": false
+          },
           "user_profile": {
             "bindAuthUserIdProps": ["id"],
             "upsert": {
