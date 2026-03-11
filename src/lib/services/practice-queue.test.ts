@@ -24,6 +24,7 @@ import {
   classifyQueueBucket,
   computeSchedulingWindows,
   generateOrGetPracticeQueue,
+  getLatestActiveQueueWindow,
 } from "./practice-queue";
 import {
   applyMigrations,
@@ -758,5 +759,113 @@ describe("addTunesToQueue - Refill Functionality", () => {
       5
     );
     expect(added).toEqual([]);
+  });
+});
+
+describe("getLatestActiveQueueWindow", () => {
+  // Helper to insert a queue row directly for testing
+  function insertQueueRow(
+    id: string,
+    tuneRef: string,
+    windowStartUtc: string,
+    completedAt: string | null = null,
+    active = 1
+  ) {
+    db.run(sql`
+      INSERT INTO daily_practice_queue (
+        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+        window_start_utc, window_end_utc, active, completed_at,
+        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+      ) VALUES (
+        ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
+        1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
+        datetime('now'), datetime('now'), datetime('now'), 1
+      )
+    `);
+  }
+
+  it("should return the chronologically latest window even when fully complete", async () => {
+    // Old queue (2/25) with an incomplete row
+    insertQueueRow("q1", tuneId(1), "2026-02-25 00:00:00", null);
+    insertQueueRow("q2", tuneId(2), "2026-02-25 00:00:00", "2026-02-25 10:00:00");
+
+    // Latest queue (3/7) fully complete
+    insertQueueRow("q3", tuneId(3), "2026-03-07 00:00:00", "2026-03-07 10:00:00");
+    insertQueueRow("q4", tuneId(4), "2026-03-07 00:00:00", "2026-03-07 11:00:00");
+
+    const result = await getLatestActiveQueueWindow(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+
+    // Must return 3/7 (latest by date), NOT 2/25 (latest with incomplete rows)
+    expect(result.windowStartUtc).toBe("2026-03-07 00:00:00");
+    expect(result.hasIncompleteRows).toBe(false);
+    expect(result.rowCount).toBe(2);
+  });
+
+  it("should return the latest window with incomplete rows flagged correctly", async () => {
+    // Old complete queue
+    insertQueueRow("q1", tuneId(1), "2026-02-25 00:00:00", "2026-02-25 10:00:00");
+
+    // Latest queue with incomplete rows
+    insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", "2026-03-07 10:00:00");
+    insertQueueRow("q3", tuneId(3), "2026-03-07 00:00:00", null);
+
+    const result = await getLatestActiveQueueWindow(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+
+    expect(result.windowStartUtc).toBe("2026-03-07 00:00:00");
+    expect(result.hasIncompleteRows).toBe(true);
+    expect(result.rowCount).toBe(2);
+  });
+
+  it("should return null windowStartUtc when no active queues exist", async () => {
+    const result = await getLatestActiveQueueWindow(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+
+    expect(result.windowStartUtc).toBeNull();
+    expect(result.hasIncompleteRows).toBe(false);
+    expect(result.rowCount).toBe(0);
+  });
+
+  it("should ignore inactive queue rows", async () => {
+    // Inactive (deleted) queue for a newer date
+    insertQueueRow("q1", tuneId(1), "2026-03-10 00:00:00", null, 0);
+
+    // Active queue for an older date
+    insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", "2026-03-07 10:00:00");
+
+    const result = await getLatestActiveQueueWindow(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+
+    expect(result.windowStartUtc).toBe("2026-03-07 00:00:00");
+    expect(result.hasIncompleteRows).toBe(false);
+    expect(result.rowCount).toBe(1);
+  });
+
+  it("should handle T-separator window_start_utc format", async () => {
+    insertQueueRow("q1", tuneId(1), "2026-03-07T00:00:00", "2026-03-07 10:00:00");
+    insertQueueRow("q2", tuneId(2), "2026-03-07T00:00:00", null);
+
+    const result = await getLatestActiveQueueWindow(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+
+    expect(result.windowStartUtc).toContain("2026-03-07");
+    expect(result.hasIncompleteRows).toBe(true);
+    expect(result.rowCount).toBe(2);
   });
 });

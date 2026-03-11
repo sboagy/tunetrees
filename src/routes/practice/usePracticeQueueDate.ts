@@ -103,7 +103,10 @@ function parseStoredDate(value: string | null | undefined): Date | null {
       Number(dateOnlyMatch[1]),
       Number(dateOnlyMatch[2]) - 1,
       Number(dateOnlyMatch[3]),
-      12, 0, 0, 0
+      12,
+      0,
+      0,
+      0
     );
     return Number.isNaN(localNoon.getTime()) ? null : localNoon;
   }
@@ -117,14 +120,19 @@ function parseStoredDate(value: string | null | undefined): Date | null {
       Number(dateTimeNoZoneMatch[1]),
       Number(dateTimeNoZoneMatch[2]) - 1,
       Number(dateTimeNoZoneMatch[3]),
-      12, 0, 0, 0
+      12,
+      0,
+      0,
+      0
     );
     return Number.isNaN(localNoon.getTime()) ? null : localNoon;
   }
 
   // Case 3: explicit zone (e.g. toISOString() output) or other format —
   // let the Date constructor handle it.
-  const normalized = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T");
+  const normalized = trimmed.includes("T")
+    ? trimmed
+    : trimmed.replace(" ", "T");
   const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

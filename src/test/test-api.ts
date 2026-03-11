@@ -620,37 +620,51 @@ async function updateScheduledDates(
 async function getPracticeQueue(repertoireId: string, windowStartUtc?: string) {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
+  const normalizedWindowStartUtc = windowStartUtc
+    ? windowStartUtc.replace(" ", "T").substring(0, 19)
+    : undefined;
 
   let query: any;
   if (windowStartUtc) {
     query = sql`
-      SELECT id, tune_ref, bucket, order_index, window_start_utc, 
-             window_end_utc, completed_at, snapshot_coalesced_ts
+      SELECT id, tune_ref, bucket, order_index,
+             REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') AS window_start_utc,
+             REPLACE(SUBSTR(window_end_utc, 1, 19), 'T', ' ') AS window_end_utc,
+             completed_at,
+             snapshot_coalesced_ts
       FROM daily_practice_queue
       WHERE user_ref = ${userRef}
         AND repertoire_ref = ${repertoireId}
-        AND window_start_utc = ${windowStartUtc}
+        AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${normalizedWindowStartUtc}
         AND active = 1
       ORDER BY bucket ASC, order_index ASC
     `;
   } else {
-    // When no explicit windowStartUtc is provided, select the latest
-    // queue window using the UUIDv7 id ordering (monotonic by time).
+    // When no explicit windowStartUtc is provided, select the chronologically
+    // latest queue window. UUIDv7 insertion order is not a valid proxy because
+    // an older window can be inserted later during sync/regression scenarios.
     query = sql`
-      SELECT id, tune_ref, bucket, order_index, window_start_utc,
-             window_end_utc, completed_at, snapshot_coalesced_ts
+          SELECT id, tune_ref, bucket, order_index,
+            REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') AS window_start_utc,
+            REPLACE(SUBSTR(window_end_utc, 1, 19), 'T', ' ') AS window_end_utc,
+            completed_at,
+            snapshot_coalesced_ts
       FROM daily_practice_queue
       WHERE user_ref = ${userRef}
         AND repertoire_ref = ${repertoireId}
         AND active = 1
-        AND window_start_utc = (
-          SELECT window_start_utc
-          FROM daily_practice_queue
-          WHERE user_ref = ${userRef}
-            AND repertoire_ref = ${repertoireId}
-            AND active = 1
-          ORDER BY id DESC
-          LIMIT 1
+        AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = (
+          SELECT latest_window.normalized_window_start_utc
+          FROM (
+            SELECT REPLACE(SUBSTR(window_start_utc, 1, 19), ' ', 'T') AS normalized_window_start_utc
+            FROM daily_practice_queue
+            WHERE user_ref = ${userRef}
+              AND repertoire_ref = ${repertoireId}
+              AND active = 1
+            GROUP BY REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ')
+            ORDER BY REPLACE(SUBSTR(window_start_utc, 1, 19), 'T', ' ') DESC
+            LIMIT 1
+          ) latest_window
         )
       ORDER BY bucket ASC, order_index ASC
     `;

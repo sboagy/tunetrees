@@ -1164,6 +1164,20 @@ export async function setupForPracticeTestsParallel(
       log.debug(
         `[${user.name}] Queue ready: ${lastCount} tunes in practice grid`
       );
+
+      // Some tests later simulate a fresh device by wiping local SQLite and
+      // re-syncing from Supabase. When this helper explicitly seeded a due queue,
+      // flush that queue upstream so the fresh-device step sees the same latest
+      // queue window instead of silently losing it with the local wipe.
+      if (scheduleDaysAgo !== undefined) {
+        await page.evaluate(async () => {
+          const forceSyncUp = (window as any).__forceSyncUpForTest;
+          if (typeof forceSyncUp !== "function") {
+            throw new Error("__forceSyncUpForTest not available");
+          }
+          await forceSyncUp();
+        });
+      }
     }
   }
 

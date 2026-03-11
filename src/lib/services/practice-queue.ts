@@ -227,6 +227,10 @@ export interface LatestActiveQueueWindow {
 /**
  * Get the latest active queue window for a user/repertoire and whether it is complete.
  *
+ * Always returns the chronologically latest queue window — never falls back to an
+ * older window just because it has incomplete rows. This prevents the UI from
+ * jumping to a stale queue when the current queue becomes fully completed.
+ *
  * This is used to keep queue behavior stable across reloads/devices without relying
  * on localStorage as the source of truth.
  */
@@ -235,39 +239,16 @@ export async function getLatestActiveQueueWindow(
   userRef: string,
   repertoireRef: string
 ): Promise<LatestActiveQueueWindow> {
-  const incompleteRows = await db.all<{
-    windowStartUtc: string;
-    rowCount: number;
-  }>(sql`
-    SELECT
-      substr(replace(window_start_utc, 'T', ' '), 1, 19) as windowStartUtc,
-      COUNT(*) as rowCount
-    FROM daily_practice_queue
-    WHERE user_ref = ${userRef}
-      AND repertoire_ref = ${repertoireRef}
-      AND active = 1
-      AND completed_at IS NULL
-    GROUP BY substr(replace(window_start_utc, 'T', ' '), 1, 19)
-    ORDER BY windowStartUtc DESC
-    LIMIT 1
-  `);
-
-  const latestIncomplete = incompleteRows[0];
-  if (latestIncomplete) {
-    return {
-      windowStartUtc: String(latestIncomplete.windowStartUtc),
-      hasIncompleteRows: true,
-      rowCount: Number(latestIncomplete.rowCount ?? 0),
-    };
-  }
-
+  // Step 1: Find the chronologically latest active queue window (any completion state).
   const rows = await db.all<{
     windowStartUtc: string;
-    rowCount: number;
+    totalCount: number;
+    incompleteCount: number;
   }>(sql`
     SELECT
       substr(replace(window_start_utc, 'T', ' '), 1, 19) as windowStartUtc,
-      COUNT(*) as rowCount
+      COUNT(*) as totalCount,
+      SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) as incompleteCount
     FROM daily_practice_queue
     WHERE user_ref = ${userRef}
       AND repertoire_ref = ${repertoireRef}
@@ -288,8 +269,8 @@ export async function getLatestActiveQueueWindow(
 
   return {
     windowStartUtc: String(latest.windowStartUtc),
-    hasIncompleteRows: false,
-    rowCount: Number(latest.rowCount ?? 0),
+    hasIncompleteRows: Number(latest.incompleteCount) > 0,
+    rowCount: Number(latest.totalCount ?? 0),
   };
 }
 
