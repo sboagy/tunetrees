@@ -1,10 +1,12 @@
 {
   "outputs": {
     "sqliteSchemaFile": "drizzle/schema-sqlite.generated.ts",
+    "sqliteSchemaWrapperFile": "drizzle/schema-sqlite.ts",
     "tableMetaFile": "shared/generated/sync/table-meta.generated.ts",
     "appTableMetaFile": "shared/table-meta.ts",
     "workerPgSchemaFile": "worker/src/generated/schema-postgres.generated.ts",
-    "workerConfigFile": "worker/src/generated/worker-config.generated.ts"
+    "workerConfigFile": "worker/src/generated/worker-config.generated.ts",
+    "workerEntrypointFile": "worker/src/index.ts"
   },
   "tableMeta": {
     "excludeTables": ["sync_change_log"],
