@@ -967,15 +967,8 @@ describe("addSpecificTunesToExistingQueue - Add To Review without regenerating q
     // Should return empty (no queue to add to)
     expect(added).toHaveLength(0);
 
-    // Verify no queue was created
-    const queue = await generateOrGetPracticeQueue(
-      db,
-      TEST_USER_UUID,
-      TEST_REPERTOIRE_UUID
-    );
-    // Only tune 1 might be generated (as a new/unscheduled Q3 tune)
-    // But the key assertion: addSpecificTunesToExistingQueue did NOT create a queue
-    // It just returned empty
+    // Verify the key assertion: addSpecificTunesToExistingQueue did NOT create a queue,
+    // it just returned empty.
     expect(added).toEqual([]);
   });
 
