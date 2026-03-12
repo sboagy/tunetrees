@@ -15,7 +15,7 @@ import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
-import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
+import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -73,7 +73,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     incrementRepertoireListChanged,
     forceSyncUp,
     user,
-    userIdInt,
   } = useAuth();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
@@ -121,22 +120,21 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
       props.table.resetRowSelection();
 
-      console.log("🔄 [AddToReview] Regenerating practice queue...");
-      const currentUserIdInt = userIdInt();
-      if (currentUserIdInt && props.repertoireId) {
+      // Add the newly scheduled tunes to the existing queue (if one exists for today)
+      // without regenerating the whole queue.
+      const currentUserId = user()?.id;
+      if (currentUserId && props.repertoireId && result.tuneIds.length > 0) {
         try {
-          await generateOrGetPracticeQueue(
-            db,
-            currentUserIdInt,
+          const db2 = getDb();
+          await addSpecificTunesToExistingQueue(
+            db2,
+            currentUserId,
             props.repertoireId,
-            new Date(),
-            null,
-            "per_day",
-            true
+            result.tuneIds
           );
-          console.log("✅ Practice queue regenerated");
+          console.log("✅ Tunes appended to existing practice queue");
         } catch (err) {
-          console.error("Error regenerating practice queue:", err);
+          console.error("Error appending tunes to practice queue:", err);
         }
       }
 

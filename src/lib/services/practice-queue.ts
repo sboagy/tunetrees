@@ -913,6 +913,150 @@ export async function generateOrGetPracticeQueue(
 }
 
 /**
+ * Add specific tunes to existing practice queue (Add To Review)
+ *
+ * Appends the given tune IDs directly to the active queue for today.
+ * Used by the "Add To Review" flow in the Repertoire tab to add selected
+ * tunes to the current practice session without regenerating the whole queue.
+ *
+ * Key behavior:
+ * - If a queue exists for today, the tunes are inserted as new queue entries.
+ * - If no queue exists for today, returns empty (tunes will appear in the next
+ *   generated queue when the user next opens the Practice tab).
+ * - Tunes already present in the queue are skipped.
+ *
+ * @param db - SQLite database instance
+ * @param userRef - Supabase Auth UUID
+ * @param repertoireRef - Repertoire ID
+ * @param tuneIds - Array of tune IDs to add to the existing queue
+ * @param reviewSitdownDate - Anchor timestamp (defaults to now UTC)
+ * @param localTzOffsetMinutes - Client timezone offset (optional)
+ * @returns Array of newly inserted queue rows (empty if no queue or no new tunes)
+ *
+ * @example
+ * ```typescript
+ * const added = await addSpecificTunesToExistingQueue(db, userId, repertoireId, [tuneId1, tuneId2]);
+ * // Adds the two specified tunes to today's queue if one exists
+ * ```
+ */
+export async function addSpecificTunesToExistingQueue(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  tuneIds: string[],
+  reviewSitdownDate: Date = new Date(),
+  localTzOffsetMinutes: number | null = null
+): Promise<DailyPracticeQueueRow[]> {
+  if (tuneIds.length === 0) {
+    console.warn("[AddSpecificTunes] No tune IDs provided, returning empty");
+    return [];
+  }
+
+  // Get user's scheduling preferences from database
+  const prefs = await getUserSchedulingPrefs(db, userRef);
+
+  // Compute scheduling windows
+  const windows = computeSchedulingWindows(
+    reviewSitdownDate,
+    prefs.acceptableDelinquencyWindow,
+    localTzOffsetMinutes
+  );
+
+  const windowStartKey = windows.startTs;
+
+  // Get existing active queue for today
+  const existing = await fetchExistingActiveQueue(
+    db,
+    userRef,
+    repertoireRef,
+    windowStartKey
+  );
+
+  if (existing.length === 0) {
+    console.log(
+      "[AddSpecificTunes] No active queue found for today; " +
+        "scheduled tunes will appear in next generated queue"
+    );
+    return [];
+  }
+
+  // Filter out tunes already in queue
+  const existingTuneIds = new Set(existing.map((r) => r.tuneRef));
+  const newTuneIds = tuneIds.filter((id) => !existingTuneIds.has(id));
+
+  if (newTuneIds.length === 0) {
+    console.log("[AddSpecificTunes] All specified tunes already in queue");
+    return [];
+  }
+
+  console.log(
+    `[AddSpecificTunes] Adding ${newTuneIds.length} specific tunes to existing queue`
+  );
+
+  // Find max order_index from existing queue to append after
+  const maxOrderIndex = Math.max(...existing.map((r) => r.orderIndex), -1);
+
+  // Insert the new tunes directly into the queue
+  const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+  const addedIds: string[] = [];
+
+  for (let i = 0; i < newTuneIds.length; i++) {
+    const tuneRef = newTuneIds[i];
+    await db
+      .insert(dailyPracticeQueue)
+      .values({
+        id: generateId(),
+        userRef,
+        repertoireRef,
+        mode: "per_day",
+        queueDate: windows.startTs.substring(0, 10),
+        windowStartUtc: windows.startTs,
+        windowEndUtc: windows.endTs,
+        tuneRef,
+        bucket: 1, // Bucket 1: Due Today (just scheduled for immediate review)
+        orderIndex: maxOrderIndex + 1 + i,
+        snapshotCoalescedTs: now,
+        scheduledSnapshot: now,
+        latestDueSnapshot: null,
+        acceptableDelinquencyWindowSnapshot: prefs.acceptableDelinquencyWindow,
+        tzOffsetMinutesSnapshot: localTzOffsetMinutes,
+        generatedAt: now,
+        completedAt: null,
+        exposuresRequired: null,
+        exposuresCompleted: 0,
+        outcome: null,
+        active: 1,
+        syncVersion: 1,
+        lastModifiedAt: now,
+        deviceId: null,
+      })
+      .run();
+    addedIds.push(tuneRef);
+  }
+
+  // Fetch back the inserted rows
+  const variants = buildWindowStartUtcVariants(windowStartKey);
+  const added = await db
+    .select()
+    .from(dailyPracticeQueue)
+    .where(
+      and(
+        eq(dailyPracticeQueue.userRef, userRef),
+        eq(dailyPracticeQueue.repertoireRef, repertoireRef),
+        inArray(dailyPracticeQueue.windowStartUtc, variants),
+        eq(dailyPracticeQueue.active, 1),
+        inArray(dailyPracticeQueue.tuneRef, addedIds)
+      )
+    )
+    .all();
+
+  console.log(
+    `[AddSpecificTunes] Successfully added ${added.length} tunes to existing queue`
+  );
+  return added as DailyPracticeQueueRow[];
+}
+
+/**
  * Add tunes to existing practice queue (refill from backlog)
  *
  * Appends additional older/lapsed tunes to the active queue for today.

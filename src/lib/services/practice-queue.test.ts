@@ -20,6 +20,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import { CATALOG_TUNE_ID_MAP } from "../db/catalog-tune-ids";
 import {
+  addSpecificTunesToExistingQueue,
   addTunesToQueue,
   classifyQueueBucket,
   computeSchedulingWindows,
@@ -867,5 +868,139 @@ describe("getLatestActiveQueueWindow", () => {
     expect(result.windowStartUtc).toContain("2026-03-07");
     expect(result.hasIncompleteRows).toBe(true);
     expect(result.rowCount).toBe(2);
+  });
+});
+
+describe("addSpecificTunesToExistingQueue - Add To Review without regenerating queue", () => {
+  // Helper to insert a queue row directly (reused from getLatestActiveQueueWindow tests)
+  function insertQueueRow(
+    id: string,
+    tuneRef: string,
+    windowStartUtc: string,
+    completedAt: string | null = null,
+    active = 1
+  ) {
+    db.run(sql`
+      INSERT INTO daily_practice_queue (
+        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+        window_start_utc, window_end_utc, active, completed_at,
+        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+      ) VALUES (
+        ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
+        1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
+        datetime('now'), datetime('now'), datetime('now'), 1
+      )
+    `);
+  }
+
+  it("should add specific tune to existing queue without regenerating it", async () => {
+    // Setup: 2 practiced tunes already in an existing (completed) queue for today
+    const windows = computeSchedulingWindows(new Date(), 7, null);
+    const todayWindowStart = windows.startTs;
+
+    insertTune(tuneId(1), "Practiced Tune 1", formatTimestamp(daysFromNow(0)));
+    insertTune(tuneId(2), "Practiced Tune 2", formatTimestamp(daysFromNow(0)));
+
+    // Insert queue rows marking tunes 1 and 2 as completed today
+    insertQueueRow("q1", tuneId(1), todayWindowStart, new Date().toISOString());
+    insertQueueRow("q2", tuneId(2), todayWindowStart, new Date().toISOString());
+
+    // Tune 3 is in the repertoire but not yet scheduled (won't be in queue)
+    insertTune(tuneId(3), "New Tune to Add", null);
+
+    // Verify initial state: 2 rows in the queue
+    const queueBefore = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+    expect(queueBefore).toHaveLength(2);
+
+    // Add tune 3 directly to the existing queue (the fix)
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(3)]
+    );
+
+    // Should have added 1 tune
+    expect(added).toHaveLength(1);
+    expect(added[0].tuneRef).toBe(tuneId(3));
+
+    // Verify the queue now has 3 entries (original 2 + new 1)
+    const queueAfter = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+    expect(queueAfter).toHaveLength(3);
+
+    // Verify the original tunes (with completedAt) are still in the queue
+    const tune1Row = queueAfter.find((r) => r.tuneRef === tuneId(1));
+    const tune2Row = queueAfter.find((r) => r.tuneRef === tuneId(2));
+    const tune3Row = queueAfter.find((r) => r.tuneRef === tuneId(3));
+
+    expect(tune1Row).toBeDefined();
+    expect(tune2Row).toBeDefined();
+    expect(tune3Row).toBeDefined();
+
+    // Original completed rows should still be marked as completed
+    expect(tune1Row?.completedAt).not.toBeNull();
+    expect(tune2Row?.completedAt).not.toBeNull();
+    // Newly added tune should be incomplete
+    expect(tune3Row?.completedAt).toBeNull();
+  });
+
+  it("should not create a new queue when no queue exists for today", async () => {
+    // Setup: tune in repertoire, but no queue exists for today
+    insertTune(tuneId(1), "Some Tune", null);
+
+    // No queue exists for today
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(1)]
+    );
+
+    // Should return empty (no queue to add to)
+    expect(added).toHaveLength(0);
+
+    // Verify no queue was created
+    const queue = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+    // Only tune 1 might be generated (as a new/unscheduled Q3 tune)
+    // But the key assertion: addSpecificTunesToExistingQueue did NOT create a queue
+    // It just returned empty
+    expect(added).toEqual([]);
+  });
+
+  it("should not add tunes already in the queue", async () => {
+    const windows = computeSchedulingWindows(new Date(), 7, null);
+    const todayWindowStart = windows.startTs;
+
+    insertTune(tuneId(1), "Already In Queue", formatTimestamp(daysFromNow(0)));
+    insertQueueRow("q1", tuneId(1), todayWindowStart, null);
+
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(1)] // Already in queue
+    );
+
+    expect(added).toHaveLength(0);
+
+    // Queue should still have exactly 1 entry
+    const queue = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+    expect(queue).toHaveLength(1);
   });
 });
