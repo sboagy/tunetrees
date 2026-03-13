@@ -1,10 +1,49 @@
 {
   "outputs": {
     "sqliteSchemaFile": "drizzle/schema-sqlite.generated.ts",
+    "sqliteSchemaWrapperFile": "drizzle/schema-sqlite.ts",
+    "sqliteClientFile": "src/lib/db/client-sqlite.ts",
     "tableMetaFile": "shared/generated/sync/table-meta.generated.ts",
     "appTableMetaFile": "shared/table-meta.ts",
+    "syncRuntimeConfigFile": "src/lib/sync/runtime-config.ts",
     "workerPgSchemaFile": "worker/src/generated/schema-postgres.generated.ts",
-    "workerConfigFile": "worker/src/generated/worker-config.generated.ts"
+    "workerConfigFile": "worker/src/generated/worker-config.generated.ts",
+    "workerEntrypointFile": "worker/src/index.ts"
+  },
+  "browserSqlite": {
+    "hooksModule": "src/lib/db/oosync-browser-sqlite-hooks.ts",
+    "indexedDbName": "tunetrees-storage",
+    "indexedDbStore": "databases",
+    "dbKeyPrefix": "tunetrees-db",
+    "dbVersionKeyPrefix": "tunetrees-db-version",
+    "outboxBackupKeyPrefix": "tunetrees-outbox-backup",
+    "lastSyncTimestampKeyPrefix": "TT_LAST_SYNC_TIMESTAMP",
+    "schemaVersion": "2.0.5-add-goal-table",
+    "databaseVersion": 12,
+    "migrationDirectory": "drizzle/migrations/sqlite",
+    "migrationFiles": [
+      "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
+      "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
+      "/drizzle/migrations/sqlite/0002_nappy_roland_deschain.sql",
+      "/drizzle/migrations/sqlite/0003_friendly_cerebro.sql",
+      "/drizzle/migrations/sqlite/0005_add_display_order.sql",
+      "/drizzle/migrations/sqlite/0006_add_auto_schedule_new.sql",
+      "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
+      "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
+      "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
+      "/drizzle/migrations/sqlite/0009_add_plugins.sql",
+      "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
+      "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
+      "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
+      "/drizzle/migrations/sqlite/0013_add_goal_table.sql"
+    ],
+    "forceResetQueryParams": [
+      { "key": "reset", "value": "true" },
+      { "key": "migrate", "value": "uuid" }
+    ],
+    "testApiWindowProperty": "__ttTestApi",
+    "clearInProgressWindowProperty": "__ttE2eIsClearing",
+    "persistWindowHookProperty": "__persistDbForTest"
   },
   "tableMeta": {
     "excludeTables": ["sync_change_log"],

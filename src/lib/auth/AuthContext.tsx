@@ -19,6 +19,7 @@ import {
   type ParentComponent,
   useContext,
 } from "solid-js";
+import { toast } from "solid-sonner";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
@@ -737,6 +738,7 @@ export const AuthProvider: ParentComponent = (props) => {
       realtimeEnabled:
         !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
       syncIntervalMs: isAnonymousUser ? 30000 : 5000, // Anonymous: less frequent sync
+      notifyError: (message, options) => toast.error(message, options),
       pullOnly: isAnonymousUser,
       requestOverridesProvider,
       onSyncComplete: async (result) => {
