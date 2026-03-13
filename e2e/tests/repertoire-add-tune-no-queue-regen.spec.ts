@@ -25,6 +25,7 @@ import {
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
+import { waitForSyncComplete } from "../helpers/local-db-lifecycle";
 import {
   seedUserRepertoire,
   setupForPracticeTestsParallel,
@@ -105,14 +106,13 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     // It will be visible in the repertoire grid but NOT in the practice queue.
     await seedUserRepertoire(testUser, [EXTRA_TUNE]);
 
-    // Pull EXTRA_TUNE into local SQLite without wiping the existing queue.
-    await page.evaluate(async () => {
-      const syncDown = (window as any).__forceSyncDownForTest;
-      if (typeof syncDown === "function") {
-        await syncDown();
-      }
-    });
-    await page.waitForLoadState("networkidle", { timeout: 15_000 });
+    // Reload the page to trigger a fresh startup sync that will pull EXTRA_TUNE
+    // from Supabase into local SQLite.  A simple reload preserves local SQLite
+    // (IndexedDB is not wiped), so the existing practice queue is intact.
+    // This is more reliable than __forceSyncDownForTest, which silently no-ops
+    // if the sync service hasn't finished initialising yet.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForSyncComplete(page);
 
     // Re-inject after page navigation (setupForPracticeTestsParallel may navigate).
     await setInjectedTestUserId(page, testUser.userId);
