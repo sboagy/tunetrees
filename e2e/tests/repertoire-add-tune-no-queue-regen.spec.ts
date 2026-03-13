@@ -25,7 +25,10 @@ import {
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
-import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import {
+  seedUserRepertoire,
+  setupForPracticeTestsParallel,
+} from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -88,15 +91,28 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     // Inject test user ID before and after navigation so __ttTestApi resolves the correct user.
     await setInjectedTestUserId(page, testUser.userId);
 
-    // Seed: 3 tunes in repertoire — 2 scheduled due yesterday, 1 unscheduled.
-    // After setup, the practice queue will contain only QUEUE_TUNES (EXTRA_TUNE has no
-    // scheduled date and is not yet due, so the queue generator skips it).
+    // Phase 1: Seed only the 2 QUEUE_TUNES as scheduled for yesterday.
+    // setupForPracticeTestsParallel clears the repertoire before seeding, so this is
+    // the only call that can set scheduled dates; EXTRA_TUNE is added separately below.
     await setupForPracticeTestsParallel(page, testUser, {
-      repertoireTunes: [...QUEUE_TUNES, EXTRA_TUNE],
-      scheduleDaysAgo: 1, // QUEUE_TUNES due yesterday
+      repertoireTunes: QUEUE_TUNES,
+      scheduleDaysAgo: 1, // QUEUE_TUNES due yesterday → will appear in practice queue
       scheduleBaseDate: currentDate,
       startTab: "practice",
     });
+
+    // Phase 2: Add EXTRA_TUNE to the repertoire as unscheduled (scheduled: null).
+    // It will be visible in the repertoire grid but NOT in the practice queue.
+    await seedUserRepertoire(testUser, [EXTRA_TUNE]);
+
+    // Pull EXTRA_TUNE into local SQLite without wiping the existing queue.
+    await page.evaluate(async () => {
+      const syncDown = (window as any).__forceSyncDownForTest;
+      if (typeof syncDown === "function") {
+        await syncDown();
+      }
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
     // Re-inject after page navigation (setupForPracticeTestsParallel may navigate).
     await setInjectedTestUserId(page, testUser.userId);
@@ -161,28 +177,22 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 15_000 });
 
     // STEP 4: Select EXTRA_TUNE from the repertoire.
-    // The repertoire grid shows all 3 tunes; we select only the last one (EXTRA_TUNE)
-    // which is seeded last and has no scheduled date, so it's not in the current queue.
+    // The repertoire grid shows all 3 tunes; select EXTRA_TUNE by its specific
+    // aria-label (using the tune UUID) rather than relying on row order.
     const repertoireRows = ttPage.getRows("repertoire");
     await expect(repertoireRows).toHaveCount(
       QUEUE_TUNES.length + 1, // All 3 tunes should appear in repertoire
       { timeout: 15_000 }
     );
 
-    const rowCheckboxes = page.locator(
-      '[data-testid="tunes-grid-repertoire"] input[type="checkbox"][aria-label^="Select row"]'
+    // Target EXTRA_TUNE's checkbox directly by its aria-label (tune UUID).
+    const extraTuneCheckbox = page.locator(
+      `[data-testid="tunes-grid-repertoire"] input[type="checkbox"][aria-label="Select row ${EXTRA_TUNE}"]`
     );
-    // Verify checkboxes are rendered before interacting.
-    await expect(rowCheckboxes.last()).toBeVisible({ timeout: 10_000 });
-    expect(
-      await rowCheckboxes.count(),
-      "Should have 3 checkboxes for 3 tunes"
-    ).toBeGreaterThan(0);
-
-    // Click the last row's checkbox (EXTRA_TUNE is seeded last).
-    await rowCheckboxes.last().check();
+    await expect(extraTuneCheckbox).toBeVisible({ timeout: 10_000 });
+    await extraTuneCheckbox.check();
     // Wait for the selection to register in the row model.
-    await expect(rowCheckboxes.last()).toBeChecked({ timeout: 5_000 });
+    await expect(extraTuneCheckbox).toBeChecked({ timeout: 5_000 });
 
     // Set up dialog handler before clicking "Add To Review".
     let dialogMessage = "";
