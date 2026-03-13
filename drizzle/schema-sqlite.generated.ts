@@ -14,7 +14,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import { sqliteSyncColumns } from "./sync-columns";
+import { sqliteSyncColumns } from "oosync/shared/sync-columns";
 
 export const dailyPracticeQueue = sqliteTable(
   "daily_practice_queue",

@@ -10,7 +10,7 @@ import {
   SYNCABLE_TABLES as SYNCABLE_TABLES_GENERATED,
   TABLE_REGISTRY_CORE,
   type TableMetaCore,
-} from "@shared-generated/sync";
+} from "./generated/sync/table-meta.generated";
 
 export type ChangeCategory = string | null;
 export type SyncableTableName = GeneratedSyncableTableName;
