@@ -18,11 +18,9 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { computeSchedulingWindows } from "../../utils/scheduling-windows";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
-  dailyPracticeQueue,
   practiceRecord,
   prefsSchedulingOptions,
   prefsSpacedRepetition,
@@ -590,44 +588,6 @@ export async function addTunesToPracticeQueue(
     } catch (error) {
       console.error(`Error adding tune ${tuneId} to practice queue:`, error);
       skipped++;
-    }
-  }
-
-  // Force regenerate the practice queue to pick up newly scheduled tunes
-  // CRITICAL: The practice grid uses forceRegen=false, so we must clear the existing queue
-  // to ensure new tunes appear immediately in the practice tab when incrementSyncVersion() is called
-  if (added > 0) {
-    try {
-      // Get userRef from repertoire
-      const repertoireData = await db
-        .select({ userRef: repertoire.userRef })
-        .from(repertoire)
-        .where(eq(repertoire.repertoireId, repertoireId))
-        .limit(1);
-
-      if (repertoireData && repertoireData.length > 0) {
-        const userRef = repertoireData[0].userRef;
-        const windows = computeSchedulingWindows(new Date(), 7, null);
-        const queueDate = windows.startTs.split("T")[0]; // YYYY-MM-DD
-
-        // Delete today's existing queue to force regeneration
-        await db
-          .delete(dailyPracticeQueue)
-          .where(
-            and(
-              eq(dailyPracticeQueue.userRef, userRef),
-              eq(dailyPracticeQueue.repertoireRef, repertoireId),
-              eq(dailyPracticeQueue.queueDate, queueDate)
-            )
-          );
-
-        console.log(
-          `[addTunesToPracticeQueue] Cleared existing queue for ${queueDate} to force regeneration of ${added} new tunes`
-        );
-      }
-    } catch (error) {
-      console.error("[addTunesToPracticeQueue] Failed to clear queue:", error);
-      // Don't fail the entire operation if queue clearing fails
     }
   }
 

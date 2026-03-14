@@ -2087,6 +2087,26 @@ export const AuthProvider: ParentComponent = (props) => {
     setLoading(false);
   };
 
+  const waitForSyncService = async (timeoutMs = 15_000) => {
+    const startedAt = Date.now();
+    while (!syncServiceInstance) {
+      if (Date.now() - startedAt > timeoutMs) {
+        throw new Error("Timed out waiting for sync service initialization");
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+
+  const waitForSyncIdle = async (timeoutMs = 15_000) => {
+    const startedAt = Date.now();
+    while (syncServiceInstance?.syncing) {
+      if (Date.now() - startedAt > timeoutMs) {
+        throw new Error("Timed out waiting for in-progress sync to finish");
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  };
+
   /**
    * Force sync down from Supabase (manual sync)
    */
@@ -2100,9 +2120,27 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       diagLog("🔄 [ForceSyncDown] Starting sync down from Supabase...");
       log.info("Forcing sync down from Supabase...");
-      const result = opts?.full
-        ? await syncServiceInstance.forceFullSyncDown()
-        : await syncServiceInstance.syncDown();
+      let result: Awaited<ReturnType<SyncService["syncDown"]>>;
+      try {
+        result = opts?.full
+          ? await syncServiceInstance.forceFullSyncDown()
+          : await syncServiceInstance.syncDown();
+      } catch (error) {
+        if (
+          error instanceof SyncInProgressError ||
+          (error instanceof Error && error.name === "SyncInProgressError")
+        ) {
+          console.warn(
+            "⚠️ [ForceSyncDown] Sync already in progress - waiting and retrying..."
+          );
+          await waitForSyncIdle();
+          result = opts?.full
+            ? await syncServiceInstance.forceFullSyncDown()
+            : await syncServiceInstance.syncDown();
+        } else {
+          throw error;
+        }
+      }
 
       diagLog(
         `✅ [ForceSyncDown] ${opts?.full ? "Full" : "Incremental"} sync down completed:`,
@@ -2231,16 +2269,6 @@ export const AuthProvider: ParentComponent = (props) => {
       log.warn("Sync service not available");
       return;
     }
-
-    const waitForSyncIdle = async (timeoutMs = 15_000) => {
-      const startedAt = Date.now();
-      while (syncServiceInstance?.syncing) {
-        if (Date.now() - startedAt > timeoutMs) {
-          throw new Error("Timed out waiting for in-progress sync to finish");
-        }
-        await new Promise((r) => setTimeout(r, 200));
-      }
-    };
 
     try {
       diagLog("🔄 [ForceSyncUp] Starting sync up to Supabase...");
@@ -2390,6 +2418,7 @@ export const AuthProvider: ParentComponent = (props) => {
     if (!w.__forceSyncUpForTest) {
       w.__forceSyncUpForTest = async () => {
         try {
+          await waitForSyncService();
           await forceSyncUp();
         } catch (e) {
           console.warn("__forceSyncUpForTest failed", e);
@@ -2399,7 +2428,8 @@ export const AuthProvider: ParentComponent = (props) => {
     if (!w.__forceSyncDownForTest) {
       w.__forceSyncDownForTest = async () => {
         try {
-          await forceSyncDown();
+          await waitForSyncService();
+          await forceSyncDown({ full: true });
         } catch (e) {
           console.warn("__forceSyncDownForTest failed", e);
         }
