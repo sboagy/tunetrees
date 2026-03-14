@@ -31,6 +31,19 @@ The UI should feel local-first and immediate. Sync is a background transport and
 
 ## High-Level Architecture
 
+TuneTrees operates as one node within a larger multi-repo workspace. It relies on a shared core library (`rhizome`) and a generated sync runtime (`oosync`).
+
+**🔴 AI AGENT DIRECTIVE: REQUIRED READING 🔴**
+Before suggesting architectural changes, writing database migrations, or altering sync rules, you MUST read the macro-architecture rules defined in our Shared PWA Architecture document.
+
+**How to fetch this context:**
+1. **Local Workspace:** Try to read the local file at `../rhizome/design/shared_pwa_architecture.md`.
+2. **Cloud/Fallback:** If the local path is unavailable or you are in an isolated environment, fetch the document directly from: https://github.com/sboagy/rhizome/blob/main/design/shared_pwa_architecture.md
+
+Do not proceed with cross-repo or database-level changes without reviewing that file for strict namespacing, sibling-app isolation invariants, and the current transition status.
+
+*(Local Flow Diagram)*
+
 ```text
            Supabase (Postgres + Auth + Realtime)
                                |
