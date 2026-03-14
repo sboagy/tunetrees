@@ -25,7 +25,6 @@ import {
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
-import { waitForSyncComplete } from "../helpers/local-db-lifecycle";
 import {
   seedUserRepertoire,
   setupForPracticeTestsParallel,
@@ -55,6 +54,19 @@ async function waitForTestApi(page: Page) {
   await page.waitForFunction(() => !!(window as any).__ttTestApi, {
     timeout: 20000,
   });
+}
+
+async function getRepertoireCount(
+  page: Page,
+  repertoireId: string
+): Promise<number> {
+  return await page.evaluate(async (rid) => {
+    const api = (window as any).__ttTestApi;
+    if (!api || typeof api.getRepertoireCount !== "function") {
+      throw new Error("__ttTestApi.getRepertoireCount is not available");
+    }
+    return await api.getRepertoireCount(rid);
+  }, repertoireId);
 }
 
 /**
@@ -106,16 +118,23 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     // It will be visible in the repertoire grid but NOT in the practice queue.
     await seedUserRepertoire(testUser, [EXTRA_TUNE]);
 
-    // Reload the page to trigger a fresh startup sync that will pull EXTRA_TUNE
-    // from Supabase into local SQLite.  A simple reload preserves local SQLite
-    // (IndexedDB is not wiped), so the existing practice queue is intact.
-    // This is more reliable than __forceSyncDownForTest, which silently no-ops
-    // if the sync service hasn't finished initialising yet.
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await waitForSyncComplete(page);
+    await waitForTestApi(page);
+    await page.evaluate(async () => {
+      const syncDown = (window as any).__forceSyncDownForTest;
+      if (typeof syncDown !== "function") {
+        throw new Error("__forceSyncDownForTest is not available");
+      }
+      await syncDown();
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
-    // Re-inject after page navigation (setupForPracticeTestsParallel may navigate).
-    await setInjectedTestUserId(page, testUser.userId);
+    await expect
+      .poll(
+        () => getRepertoireCount(page, testUser.repertoireId),
+        { timeout: 20_000, intervals: [300, 500, 1000] }
+      )
+      .toBe(QUEUE_TUNES.length + 1);
+
     await waitForTestApi(page);
   });
 
