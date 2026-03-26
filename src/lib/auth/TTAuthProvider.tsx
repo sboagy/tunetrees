@@ -1187,20 +1187,19 @@ const TTInner: ParentComponent = (props) => {
       return;
     }
     try {
-      let _result: Awaited<ReturnType<SyncService["syncDown"]>>;
       try {
-        _result = opts?.full
-          ? await syncServiceInstance.forceFullSyncDown()
-          : await syncServiceInstance.syncDown();
+        await (opts?.full
+          ? syncServiceInstance.forceFullSyncDown()
+          : syncServiceInstance.syncDown());
       } catch (error) {
         if (
           error instanceof SyncInProgressError ||
           (error instanceof Error && error.name === "SyncInProgressError")
         ) {
           await waitForSyncIdle();
-          _result = opts?.full
-            ? await syncServiceInstance.forceFullSyncDown()
-            : await syncServiceInstance.syncDown();
+          await (opts?.full
+            ? syncServiceInstance.forceFullSyncDown()
+            : syncServiceInstance.syncDown());
         } else {
           throw error;
         }
@@ -1222,16 +1221,15 @@ const TTInner: ParentComponent = (props) => {
       return;
     }
     try {
-      let _result: Awaited<ReturnType<SyncService["syncUp"]>>;
       try {
-        _result = await syncServiceInstance.syncUp(opts);
+        await syncServiceInstance.syncUp(opts);
       } catch (error) {
         if (
           error instanceof SyncInProgressError ||
           (error instanceof Error && error.name === "SyncInProgressError")
         ) {
           await waitForSyncIdle();
-          _result = await syncServiceInstance.syncUp(opts);
+          await syncServiceInstance.syncUp(opts);
         } else {
           throw error;
         }

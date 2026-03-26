@@ -585,9 +585,7 @@ jobs:
         run: npm ci
 
       - name: Install 1Password CLI
-        uses: 1password/install-op-action@v1
-
-      - name: Build Application
+        uses: 1password/install-op-action@v2
         # `op run` resolves op:// references in .env.prod.template and injects
         # them as environment variables for the build subprocess.
         run: op run --env-file=".env.prod.template" -- npm run build
@@ -634,7 +632,7 @@ jobs:
         run: cd worker && npm ci
 
       - name: Install 1Password CLI
-        uses: 1password/install-op-action@v1
+        uses: 1password/install-op-action@v2
 
       - name: Deploy Worker
         # `op run` resolves CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
