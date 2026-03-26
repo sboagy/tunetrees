@@ -3,10 +3,15 @@
  * Automatically assigns test users to Playwright workers
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { test as base } from "@playwright/test";
 import log from "loglevel";
+import {
+  CURRENT_AUTH_STATE_DB_VERSION,
+  CURRENT_AUTH_STATE_SNAPSHOT_VERSION,
+  readStoredAuthStateMetadata,
+} from "./auth-state";
 import {
   clearTunetreesClientStorage,
   gotoE2eOrigin,
@@ -33,57 +38,51 @@ function isExpectedPlaywrightTeardownError(error: unknown): boolean {
   );
 }
 
-const AUTH_EXPIRY_MINUTES = 10080; // 7 days in minutes (matches jwt_expiry = 604800 seconds)
+/** Minimum remaining validity before we consider the snapshot stale. */
+const AUTH_EXPIRY_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 
 /**
- * Check if auth file exists and is fresh (< AUTH_EXPIRY_MINUTES old)
+ * Check if a saved auth state file is still valid. Uses the metadata written
+ * by `auth.setup.ts` (JWT expiry, snapshot version, DB schema version) instead
+ * of file mtime.
  */
-function isAuthFresh(authFile: string, userEmail: string): boolean {
-  if (!existsSync(authFile)) {
-    console.log(`⚠️  Auth file missing: ${authFile}`);
+function isAuthFresh(authFile: string): boolean {
+  const metadata = readStoredAuthStateMetadata(authFile);
+  if (!metadata?.hasIndexedDbSnapshot) {
+    console.log(
+      `⚠️  Auth file missing or has no IndexedDB snapshot: ${authFile}`
+    );
     return false;
   }
-
-  try {
-    const authData = JSON.parse(readFileSync(authFile, "utf-8"));
-
-    // Check if this auth file is for the correct user
-    const origins = authData.origins || [];
-    const hasUserData = origins.some((origin: any) => {
-      const localStorage = origin.localStorage || [];
-      return localStorage.some((item: any) => item.value?.includes(userEmail));
-    });
-
-    if (!hasUserData) {
-      console.log(`⚠️  Auth file is not for ${userEmail}: ${authFile}`);
-      return false;
-    }
-
-    // Skip age check in CI - files are freshly generated
-    if (process.env.CI) {
-      return true;
-    }
-
-    const fileStats = statSync(authFile);
-    const fileAgeMinutes = (Date.now() - fileStats.mtimeMs) / 1000 / 60;
-
-    if (fileAgeMinutes >= AUTH_EXPIRY_MINUTES) {
-      console.log(
-        `⚠️  Auth file is stale (${Math.round(fileAgeMinutes)} min old): ${authFile}`
-      );
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.log(`⚠️  Invalid auth file: ${authFile}`, error);
+  if (metadata.expiresAtMs == null) {
+    console.log(`⚠️  Auth file has no expiry: ${authFile}`);
     return false;
   }
-}
-
-export interface TestUserFixture {
-  testUser: TestUser;
-  testUserKey: string;
+  if (metadata.snapshotVersion !== CURRENT_AUTH_STATE_SNAPSHOT_VERSION) {
+    console.log(
+      `⚠️  Auth snapshot version mismatch (got ${metadata.snapshotVersion}, expected ${CURRENT_AUTH_STATE_SNAPSHOT_VERSION}): ${authFile}`
+    );
+    return false;
+  }
+  if (
+    CURRENT_AUTH_STATE_DB_VERSION != null &&
+    metadata.dbVersion !== CURRENT_AUTH_STATE_DB_VERSION
+  ) {
+    console.log(
+      `⚠️  Auth DB version mismatch (got ${metadata.dbVersion}, expected ${CURRENT_AUTH_STATE_DB_VERSION}): ${authFile}`
+    );
+    return false;
+  }
+  if (metadata.expiresAtMs - Date.now() <= AUTH_EXPIRY_SAFETY_WINDOW_MS) {
+    const remaining = Math.round(
+      (metadata.expiresAtMs - Date.now()) / 1000 / 60
+    );
+    console.log(
+      `⚠️  Auth file token expiring soon (${remaining} min left): ${authFile}`
+    );
+    return false;
+  }
+  return true;
 }
 
 type ITuneTreesFixtures = TestUserFixture & {
@@ -154,7 +153,7 @@ export const test = base.extend<ITuneTreesFixtures>({
     const authFile = `e2e/.auth/${testUserKey}.json`;
 
     // Check if auth file is fresh, warn if stale
-    if (!isAuthFresh(authFile, testUser.email)) {
+    if (!isAuthFresh(authFile)) {
       console.log(
         `❌ STALE AUTH: ${authFile} - Run 'npm run db:local:reset' to regenerate auth files`
       );
