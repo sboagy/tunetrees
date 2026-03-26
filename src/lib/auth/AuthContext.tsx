@@ -43,6 +43,7 @@ import {
   type SyncService,
   startSyncWorker,
 } from "../sync";
+import { TTAuthContext, TTAuthProvider } from "./TTAuthProvider";
 
 /**
  * Authentication state interface
@@ -218,7 +219,8 @@ function isUserAnonymous(user: User | null): boolean {
   return hasNoEmail && (hasNoIdentities || hasOnlyAnonymousIdentity);
 }
 
-export const AuthProvider: ParentComponent = (props) => {
+// Legacy implementation kept for reference only; export below delegates to TTAuthProvider.
+const _LegacyAuthProvider: ParentComponent = (props) => {
   const [user, setUser] = createSignal<User | null>(null);
   const [userIdInt, setUserIdInt] = createSignal<string | null>(null);
   const [session, setSession] = createSignal<Session | null>(null);
@@ -2495,6 +2497,12 @@ export const AuthProvider: ParentComponent = (props) => {
 };
 
 /**
+ * AuthProvider is now backed by TTAuthProvider from TTAuthProvider.tsx.
+ * All consumers keep importing from this file unchanged.
+ */
+export const AuthProvider = TTAuthProvider;
+
+/**
  * Hook to access auth context
  *
  * @throws Error if used outside AuthProvider
@@ -2521,9 +2529,10 @@ export const AuthProvider: ParentComponent = (props) => {
  * ```
  */
 export function useAuth(): AuthState {
-  const context = useContext(AuthContext);
+  // Reads from TTAuthContext (provided by TTAuthProvider) rather than the old local AuthContext.
+  const context = useContext(TTAuthContext);
   if (!context) {
     throw new Error("useAuth must be used within AuthProvider");
   }
-  return context;
+  return context as AuthState;
 }

@@ -7,74 +7,30 @@
  * @module supabase/client
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseClient } from "@rhizome/core";
 
-/**
- * Supabase project URL
- * Get from: https://app.supabase.com/project/_/settings/api
- */
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-/**
- * Supabase anonymous key (safe for client-side use)
- * Get from: https://app.supabase.com/project/_/settings/api
- */
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
+  | string
+  | undefined;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
     "Missing Supabase environment variables. " +
-      "Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.local"
+      "Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.local.template"
   );
 }
 
 /**
- * Supabase client instance
+ * Supabase client instance for TuneTrees.
  *
- * Features:
- * - Authentication (email/password, OAuth providers)
- * - Real-time subscriptions
- * - Database queries (with RLS policies)
- * - Storage access
- *
- * @example
- * ```typescript
- * import { supabase } from '@/lib/supabase/client';
- *
- * // Sign in
- * const { data, error } = await supabase.auth.signInWithPassword({
- *   email: 'user@example.com',
- *   password: 'password123'
- * });
- *
- * // Query database (respects RLS policies)
- * const { data: repertoires } = await supabase
- *   .from('repertoire')
- *   .select('*')
- *   .eq('user_ref', userId);
- * ```
+ * Created via @rhizome/core's createSupabaseClient to keep the auth
+ * storage key and options consistent across shared components.
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    // Auto-refresh tokens
-    autoRefreshToken: true,
-
-    // Persist session in localStorage
-    persistSession: true,
-
-    // Detect session from URL (for OAuth callbacks)
-    detectSessionInUrl: true,
-
-    // Storage key for session
-    storageKey: "tunetrees-auth",
-  },
-
-  // Global fetch options
-  global: {
-    headers: {
-      "X-Client-Info": "tunetrees-pwa",
-    },
-  },
+export const supabase = createSupabaseClient({
+  url: supabaseUrl,
+  anonKey: supabaseAnonKey,
+  storageKey: "tunetrees-auth",
 });
 
 /**
