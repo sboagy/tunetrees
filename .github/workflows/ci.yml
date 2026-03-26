@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # yamllint disable rule:line-length
 #
-# Secrets required in the `vite_pwa_env` environment:
+# Secrets required in the `tunetrees_ci_env` environment:
 #   OP_SERVICE_ACCOUNT_TOKEN  — 1Password Service Account token (for op run)
-#   SUPABASE_SERVICE_ROLE_KEY — local (well-known test) service-role key for auth setup
-#   ALICE_TEST_PASSWORD       — kept as fallback / used by op-run template too
-#   TEST_USER_PASSWORD        — (same value)
+#
+# All other secrets (including test user passwords, Supabase keys, Cloudflare creds)
+# are resolved at runtime via `op run` or `op read` using .env.prod.template.
 #
 # All production secrets (CLOUDFLARE_*, VITE_SUPABASE_URL, etc.) are resolved
 # at deploy time via `op run --env-file=".env.prod.template"` so they do NOT
@@ -68,7 +68,7 @@ jobs:
         shard: [1, 2, 3, 4]
 
     timeout-minutes: 60
-    environment: vite_pwa_env
+    environment: tunetrees_ci_env
     env:
       # These override anything from op run for the LOCAL Supabase instance.
       # Values are populated after `supabase start` via $GITHUB_ENV.
@@ -77,9 +77,6 @@ jobs:
       VITE_SUPABASE_URL: ""
       VITE_SUPABASE_ANON_KEY: ""
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      # Test user password — keep as GH secret so auth setup works w/o op cli
-      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
       # Local Supabase service role key (well-known default, not a real secret)
       SUPABASE_SERVICE_ROLE_KEY: super-secret-jwt-token-with-at-least-32-characters-long
 
@@ -119,6 +116,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Resolve test secrets from 1Password
+        # Resolves the shared test-user password via 1Password so it is never
+        # stored as a GitHub secret. Both env vars point to the same value.
+        run: |
+          echo "ALICE_TEST_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+          echo "TEST_USER_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
       # --- Supabase Setup (from Rhizome — the shared multi-tenant instance) ---
       - name: Cache Supabase CLI
         id: cache-supabase
@@ -157,11 +166,6 @@ jobs:
         run: |
           cd rhizome
           supabase start
-          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
-          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
-          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
-          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
-          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
 
       - name: Wait for Supabase API (Health Check)
         run: |
@@ -290,7 +294,7 @@ jobs:
     name: Run PWA Offline Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: vite_pwa_env
+    environment: tunetrees_ci_env
     needs: [test-unit]
     env:
       SUPABASE_URL: ""
@@ -298,8 +302,6 @@ jobs:
       VITE_SUPABASE_URL: ""
       VITE_SUPABASE_ANON_KEY: ""
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
       SUPABASE_SERVICE_ROLE_KEY: super-secret-jwt-token-with-at-least-32-characters-long
 
     steps:
@@ -334,6 +336,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Resolve test secrets from 1Password
+        # Resolves the shared test-user password via 1Password so it is never
+        # stored as a GitHub secret. Both env vars point to the same value.
+        run: |
+          echo "ALICE_TEST_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+          echo "TEST_USER_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       # --- Supabase Setup (shared multi-tenant from Rhizome) ---
       - name: Cache Supabase CLI
@@ -569,7 +583,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-unit, test, test-pwa-offline]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
-    environment: vite_pwa_env
+    environment: tunetrees_ci_env
 
     steps:
       - name: Checkout TuneTrees
@@ -585,7 +599,9 @@ jobs:
         run: npm ci
 
       - name: Install 1Password CLI
-        uses: 1password/install-op-action@v2
+        uses: 1password/install-cli-action@v2
+
+      - name: Build with 1Password secrets
         # `op run` resolves op:// references in .env.prod.template and injects
         # them as environment variables for the build subprocess.
         run: op run --env-file=".env.prod.template" -- npm run build
@@ -613,7 +629,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-unit, test, test-pwa-offline]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
-    environment: vite_pwa_env
+    environment: tunetrees_ci_env
 
     steps:
       - name: Checkout TuneTrees
@@ -632,7 +648,7 @@ jobs:
         run: cd worker && npm ci
 
       - name: Install 1Password CLI
-        uses: 1password/install-op-action@v2
+        uses: 1password/install-cli-action@v2
 
       - name: Deploy Worker
         # `op run` resolves CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
