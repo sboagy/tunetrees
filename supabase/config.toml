@@ -2,6 +2,17 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
+#
+# ⚠️  MULTI-TENANT DB SAFETY WARNING ⚠️
+#
+# TuneTrees shares a Supabase instance with other apps (cubefsrs, etc.) through
+# schema isolation. The `public` schema is SHARED. Never run `supabase db reset`
+# against the local or remote shared Supabase instance — it would wipe ALL apps'
+# data and migrations. Use the rhizome-owned seeding scripts instead:
+#   rhizome/scripts/db-push-local.sh tunetrees/
+#   rhizome/scripts/seed-shared-auth-users-local.sh
+#
+# See ARCHITECTURE.md and rhizome/design/shared_pwa_architecture.md for details.
 project_id = "tunetrees"
 
 [api]
