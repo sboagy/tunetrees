@@ -172,7 +172,7 @@ test.describe("Anonymous User Edge Cases", () => {
     await ttPage.repertoireTab.click();
 
     // Expect either the repertoire grid (if repertoire persists) or the "no repertoire" message
-    const noRepertoireMessage = page.getByText("No repertoire selected");
+    const noRepertoireMessage = page.getByText("No current repertoire");
     const repertoireGridVisible = await ttPage.repertoireGrid
       .isVisible({ timeout: 2000 })
       .catch(() => false);
