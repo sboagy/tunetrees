@@ -64,7 +64,21 @@ jobs:
 
       # 4. Build production bundle
       - name: Build Application
-        run: npm run build
+        run: |
+          for attempt in 1 2 3; do
+            echo "Building application (attempt ${attempt}/3)"
+            if npm run build; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "Build failed after ${attempt} attempts"
+              exit 1
+            fi
+
+            echo "Transient build failure; retrying in 15s"
+            sleep 15
+          done
         env:
           # Use placeholder values for build (not accessing real Supabase)
           VITE_SUPABASE_URL: https://placeholder.supabase.co
