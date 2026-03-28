@@ -132,37 +132,51 @@ async function waitForCatalogSnapshotReady(
   page: import("@playwright/test").Page,
   timeoutMs: number
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  let lastCount = 0;
-
-  while (Date.now() < deadline) {
-    lastCount = await page.evaluate(async () => {
-      const api = (
-        window as unknown as {
-          __ttTestApi?: {
-            getCatalogTuneCountsForUser: () => Promise<{
-              total: number;
-              filtered: number;
-            }>;
-          };
-        }
-      ).__ttTestApi;
-      if (!api) return 0;
-      const counts = await api.getCatalogTuneCountsForUser();
-      return counts.total;
-    });
-
-    if (lastCount > 0) {
-      return;
-    }
-
-    await page.waitForTimeout(100);
-  }
-
-  throw new Error(
-    `[auth.setup] Timed out waiting for tune catalog in local SQLite (last count: ${lastCount}). ` +
-      "Ensure the dev server is running and the sync worker can reach Supabase."
+  console.log(
+    `    [catalog] waiting for catalog snapshot (timeout=${timeoutMs}ms)`
   );
+  // Log every 5s so we can see it's alive while Playwright is polling.
+  const heartbeat = setInterval(() => {
+    console.log(`    [catalog] still waiting for catalog snapshot...`);
+  }, 5_000);
+  try {
+    // Each individual evaluation of the predicate resolves within 2 seconds
+    // via Promise.race with a browser-side timer, so that CDP never blocks
+    // indefinitely on a stalled async call. The outer timeout fires if we
+    // still haven't seen a truthy return after timeoutMs total.
+    await page.waitForFunction(
+      () => {
+        const api = (
+          window as unknown as {
+            __ttTestApi?: {
+              getCatalogTuneCountsForUser: () => Promise<{
+                total: number;
+                filtered: number;
+              }>;
+            };
+          }
+        ).__ttTestApi;
+        if (!api) return false;
+        // Use Promise.race so each evaluation resolves in ≤2 s even if the
+        // inner async call stalls. Playwright CDP awaits the returned Promise;
+        // without this race, a hung getCatalogTuneCountsForUser() would prevent
+        // the outer timeout from ever firing.
+        return Promise.race([
+          api
+            .getCatalogTuneCountsForUser()
+            .then((counts) => counts.total > 0)
+            .catch(() => false),
+          new Promise<false>((resolve) =>
+            setTimeout(() => resolve(false), 2_000)
+          ),
+        ]);
+      },
+      { timeout: timeoutMs, polling: 500 }
+    );
+    console.log(`    [catalog] catalog snapshot ready!`);
+  } finally {
+    clearInterval(heartbeat);
+  }
 }
 
 /**
@@ -278,7 +292,9 @@ async function resetTunetreesUserData(): Promise<void> {
  * IndexedDB) to e2e/.auth/<key>.json.
  */
 setup("authenticate all test users", async ({ browser }) => {
-  setup.setTimeout(120_000);
+  // 8 users × ~30s each (login + __ttTestApi wait + catalog sync) = ~240s worst
+  // case on a cold start. 300s gives comfortable headroom without masking hangs.
+  setup.setTimeout(300_000);
 
   ensureAuthDir();
 
@@ -312,36 +328,72 @@ setup("authenticate all test users", async ({ browser }) => {
 
     console.log(`⏳ [${testUser.name}] Logging in as ${testUser.email}…`);
 
-    // Each user gets an isolated browser context to avoid session bleed
+    // Each user gets an isolated browser context to avoid session bleed.
+    // BASE_URL already has a trailing slash (e.g. "http://localhost:5173/"),
+    // so we must NOT append another slash here or goto('/login') would produce "//login".
+    const baseUrl = String(BASE_URL).replace(/\/$/, "");
     const context = await browser.newContext({
-      baseURL: `${BASE_URL}/`,
+      baseURL: `${baseUrl}/`,
     });
     const page = await context.newPage();
 
+    // Forward browser console messages so we can see what the app is doing
+    // while waiting for auth/DB init without opening the browser.
+    page.on("console", (msg) => {
+      const type = msg.type();
+      const text = msg.text();
+      // Skip noisy Vite HMR heartbeat pings
+      if (text.includes("[vite]") && text.includes("connected")) return;
+      console.log(`    [browser:${type}] ${text}`);
+    });
+    page.on("pageerror", (error) => {
+      console.error(`    [browser:error] ${error.message}`);
+    });
+
     try {
-      // Navigate to login page
-      await page.goto(`${BASE_URL}/login`);
+      // Step 1 — Navigate to login page (relative path; context baseURL is already set)
+      console.log(
+        `  [${testUser.name}] step 1: navigating to ${baseUrl}/login`
+      );
+      await page.goto("/login");
+      console.log(
+        `  [${testUser.name}] step 1: done (current url: ${page.url()})`
+      );
 
-      // Fill and submit credentials
-      await page.locator("#login-email").fill(testUser.email);
-      await page.locator("#login-password").fill(TEST_PASSWORD);
+      // Step 2 — Fill and submit credentials
+      console.log(`  [${testUser.name}] step 2a: filling email`);
+      await page.getByLabel("Email").fill(testUser.email);
+      console.log(`  [${testUser.name}] step 2b: filling password`);
+      await page.locator("input#password").fill(TEST_PASSWORD);
+      console.log(`  [${testUser.name}] step 2c: clicking Sign In`);
       await page.getByRole("button", { name: "Sign In" }).click();
+      console.log(`  [${testUser.name}] step 2: sign-in clicked`);
 
-      // Wait for redirect away from /login
+      // Step 3 — Wait for redirect away from /login
+      console.log(
+        `  [${testUser.name}] step 3: waiting for redirect away from /login`
+      );
       await page.waitForURL((url) => !url.pathname.includes("/login"), {
         timeout: 15_000,
       });
+      console.log(`  [${testUser.name}] step 3: redirected to ${page.url()}`);
 
-      // Wait for __ttTestApi to attach — signals auth + DB init complete
+      // Step 4 — Wait for __ttTestApi to attach — signals auth + DB init complete
+      console.log(
+        `  [${testUser.name}] step 4: waiting for __ttTestApi to attach`
+      );
       await page.waitForFunction(
         () =>
           (window as unknown as { __ttTestApi?: unknown }).__ttTestApi !==
           undefined,
         { timeout: 30_000 }
       );
+      console.log(`  [${testUser.name}] step 4: __ttTestApi attached`);
 
-      // Wait for the tune catalog to be populated in local SQLite
+      // Step 5 — Wait for the tune catalog to be populated in local SQLite
+      console.log(`  [${testUser.name}] step 5: waiting for catalog snapshot`);
       await waitForCatalogSnapshotReady(page, 30_000);
+      console.log(`  [${testUser.name}] step 5: catalog ready`);
 
       // Clear sync timestamps so tests start with a clean incremental baseline
       await page.evaluate(() => {

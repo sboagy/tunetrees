@@ -220,6 +220,7 @@ function isUserAnonymous(user: User | null): boolean {
 }
 
 // Legacy implementation kept for reference only; export below delegates to TTAuthProvider.
+// @ts-expect-error TS6133: intentionally unused — kept as reference while migration is in progress
 const _LegacyAuthProvider: ParentComponent = (props) => {
   const [user, setUser] = createSignal<User | null>(null);
   const [userIdInt, setUserIdInt] = createSignal<string | null>(null);

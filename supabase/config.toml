@@ -13,7 +13,9 @@
 #   rhizome/scripts/seed-shared-auth-users-local.sh
 #
 # See ARCHITECTURE.md and rhizome/design/shared_pwa_architecture.md for details.
-project_id = "tunetrees"
+# Must match rhizome's project_id so that `supabase functions serve` (and other
+# local CLI commands) connect to the shared instance started from the rhizome dir.
+project_id = "rhizome"
 
 [api]
 enabled = true

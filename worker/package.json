@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
-    "dev:local": "WRANGLER_SEND_METRICS=false DO_NOT_TRACK=1 wrangler dev --local",
-    "start": "wrangler dev"
+    "deploy": "FORCE_COLOR=1 op run --env-file=\"../.env.prod.template\" -- wrangler deploy",
+    "dev": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs",
+    "dev:local": "WRANGLER_SEND_METRICS=false DO_NOT_TRACK=1 FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs --local",
+    "start": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240529.0",
