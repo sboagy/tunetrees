@@ -355,6 +355,27 @@ async function assertHasLocalRepertoires(
 // Export getTestUserClient so tests can perform direct Supabase cleanup
 export { getTestUserClient };
 
+async function ensureUserRepertoireExists(user: TestUser, supabase: any) {
+  const { error } = await supabase.from("repertoire").upsert(
+    {
+      repertoire_id: user.repertoireId,
+      user_ref: user.userId,
+      name: `${user.name} Test Repertoire`,
+      deleted: false,
+      sync_version: 1,
+      last_modified_at: new Date().toISOString(),
+      device_id: "test-seed",
+    },
+    { onConflict: "repertoire_id" }
+  );
+
+  if (error) {
+    throw new Error(
+      `Failed to ensure repertoire ${user.repertoireId} for ${user.name}: ${error.message}`
+    );
+  }
+}
+
 /**
  * Parallel-safe version of setupDeterministicTest
  * Sets up a deterministic test state for a specific user
@@ -598,14 +619,15 @@ export async function seedUserRepertoire(
     await verifyTablesEmpty(user, ["repertoire_tune"], supabase);
   }
 
+  await ensureUserRepertoireExists(user, supabase);
+
   const maxAttempts = 5;
   for (const tuneId of tuneIds) {
     let attempt = 0;
     while (true) {
       attempt++;
-      const { error } = await supabase
-        .from("repertoire_tune")
-        .upsert({
+      const { error } = await supabase.from("repertoire_tune").upsert(
+        {
           repertoire_ref: user.repertoireId,
           tune_ref: tuneId,
           current: null,
@@ -616,15 +638,23 @@ export async function seedUserRepertoire(
           sync_version: 1,
           last_modified_at: new Date().toISOString(),
           device_id: "test-seed",
-        })
-        .eq("repertoire_ref", user.repertoireId)
-        .eq("tune_ref", tuneId);
+        },
+        { onConflict: "repertoire_ref,tune_ref" }
+      );
 
       if (!error) break;
 
       if (attempt >= maxAttempts) {
+        const { count: repertoireCount, error: repertoireError } = await supabase
+          .from("repertoire")
+          .select("*", { count: "exact", head: true })
+          .eq("repertoire_id", user.repertoireId)
+          .eq("user_ref", user.userId);
+        const repertoireSummary = repertoireError
+          ? `repertoire check failed: ${repertoireError.message}`
+          : `repertoire rows visible=${repertoireCount ?? 0}`;
         throw new Error(
-          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}`
+          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}. ${repertoireSummary}`
         );
       }
 
