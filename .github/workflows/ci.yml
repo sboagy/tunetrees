@@ -82,6 +82,7 @@ jobs:
     timeout-minutes: 60
     environment: tunetrees_ci_env
     env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
       # These override anything from op run for the LOCAL Supabase instance.
       # Values are populated after `supabase start` via $GITHUB_ENV.
       SUPABASE_URL: ""
@@ -316,6 +317,7 @@ jobs:
     environment: tunetrees_ci_env
     needs: [test-unit]
     env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
       VITE_SUPABASE_URL: ""
