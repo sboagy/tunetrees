@@ -24,7 +24,7 @@
  * Only run this when you want to completely replace Supabase data with SQLite data.
  *
  * Usage:
- *   npm run migrate:production -- --user-uuid=<your-supabase-uuid>
+ *   tsx scripts/migrate-production-to-supabase.ts --user-uuid=<your-supabase-uuid>
  *
  * The user-uuid should be YOUR Supabase Auth UUID (from logging into the app).
  * User ID 1 in SQLite will map to this UUID.
@@ -156,7 +156,7 @@ const TARGET_USER_UUID = userUuidArg?.split("=")[1] || DEFAULT_USER_UUID;
 if (!TARGET_USER_UUID) {
   console.error("❌ Missing target user UUID!");
   console.error(
-    "Usage: npm run migrate:production -- --user-uuid=<your-uuid> [--remote]"
+    "Usage: tsx scripts/migrate-production-to-supabase.ts --user-uuid=<your-uuid> [--remote]"
   );
   console.error("\nGet your UUID from the home page after logging in.");
   console.error("Add --remote flag to migrate to production instead of local.");
@@ -290,7 +290,9 @@ async function checkAndInstallSchema() {
       } catch (error: any) {
         console.error("❌ Failed to install schema:", error.message);
         console.error("\nPlease run manually:");
-        console.error("  npm run db:install-schema");
+        console.error(
+          "  psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -f sql_scripts/create-uuid-schema.sql"
+        );
         process.exit(1);
       }
     } else {
@@ -441,14 +443,12 @@ async function migrateUsers() {
             id, name, email, sr_alg_type, phone, phone_verified,
             acceptable_delinquency_window, avatar_url, deleted, sync_version, last_modified_at, device_id
           ) VALUES (
-            ${userProfileId}, ${user.name}, ${
-          user.email
-        },
+            ${userProfileId}, ${user.name}, ${user.email},
             ${user.sr_alg_type || null}, ${user.phone || null},
             ${sqliteTimestampToPostgres(user.phone_verified)},
             ${user.acceptable_delinquency_window || 21}, ${
-          user.avatar_url || null
-        }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
+              user.avatar_url || null
+            }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
           )
           ON CONFLICT (id) DO UPDATE SET
             name = EXCLUDED.name,

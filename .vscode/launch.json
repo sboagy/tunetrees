@@ -112,25 +112,6 @@
             }
         },
         {
-            "type": "node",
-            "request": "launch",
-            "name": "Run npm migrate:production",
-            "cwd": "${workspaceFolder}",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": [
-                "run",
-                "migrate:production"
-            ],
-            "console": "integratedTerminal",
-            "env": {
-                "BROWSER": "none"
-            },
-            "presentation": {
-                "reveal": "always",
-                "panel": "shared"
-            }
-        },
-        {
             "name": "Attach Chromium Page 9222",
             "type": "chrome",
             "request": "attach",
