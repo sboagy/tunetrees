@@ -265,6 +265,7 @@ jobs:
           pkill -f "vite" || true
           sleep 1
         env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
@@ -462,6 +463,7 @@ jobs:
           pkill -f "vite" || true
           sleep 1
         env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
