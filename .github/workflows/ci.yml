@@ -15,7 +15,7 @@ name: CI - Tests
 
 on:
   push:
-    branches: [main, tt_rz_refactor]
+    branches: [main]
   pull_request:
     branches: [main]
 
