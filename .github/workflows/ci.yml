@@ -178,6 +178,11 @@ jobs:
         run: |
           cd rhizome
           supabase start
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
 
       - name: Wait for Supabase API (Health Check)
         run: |
@@ -198,7 +203,7 @@ jobs:
         # Creates the shared test user accounts without touching app-specific tables.
         run: |
           cd rhizome
-          ./scripts/seed-shared-auth-users-local.sh
+          bash ./scripts/seed-shared-auth-users-local.sh
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
@@ -419,7 +424,7 @@ jobs:
       - name: Seed shared auth users (Rhizome)
         run: |
           cd rhizome
-          ./scripts/seed-shared-auth-users-local.sh
+          bash ./scripts/seed-shared-auth-users-local.sh
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
