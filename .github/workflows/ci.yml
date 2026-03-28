@@ -260,7 +260,7 @@ jobs:
             fi
             sleep 1
           done
-          npm run db:local:gen-test-auth
+          npx playwright test e2e/setup/auth.setup.ts --project=setup --reporter=list
           kill $DEV_PID || true
           pkill -f "vite" || true
           sleep 1
@@ -458,7 +458,7 @@ jobs:
             fi
             sleep 1
           done
-          npm run db:local:gen-test-auth
+          npx playwright test e2e/setup/auth.setup.ts --project=setup --reporter=list
           kill $DEV_PID || true
           pkill -f "vite" || true
           sleep 1
