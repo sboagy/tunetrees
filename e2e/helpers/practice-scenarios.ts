@@ -355,6 +355,28 @@ async function assertHasLocalRepertoires(
 // Export getTestUserClient so tests can perform direct Supabase cleanup
 export { getTestUserClient };
 
+async function ensureUserProfileExists(user: TestUser, supabase: any) {
+  const { error } = await supabase.from("user_profile").upsert(
+    {
+      id: user.userId,
+      name: user.name,
+      email: user.email,
+      acceptable_delinquency_window: 21,
+      deleted: false,
+      sync_version: 1,
+      last_modified_at: new Date().toISOString(),
+      device_id: "test-seed",
+    },
+    { onConflict: "id" }
+  );
+
+  if (error) {
+    throw new Error(
+      `Failed to ensure user_profile ${user.userId} for ${user.name}: ${error.message}`
+    );
+  }
+}
+
 async function ensureUserRepertoireExists(user: TestUser, supabase: any) {
   const { error } = await supabase.from("repertoire").upsert(
     {
@@ -619,6 +641,7 @@ export async function seedUserRepertoire(
     await verifyTablesEmpty(user, ["repertoire_tune"], supabase);
   }
 
+  await ensureUserProfileExists(user, supabase);
   await ensureUserRepertoireExists(user, supabase);
 
   const maxAttempts = 5;
