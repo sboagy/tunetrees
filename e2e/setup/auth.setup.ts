@@ -22,12 +22,13 @@
  * truncates only the user-scoped TuneTrees `public` schema rows.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test as setup } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { config } from "dotenv";
+import { config, parse } from "dotenv";
 import {
   AUTH_STATE_DB_VERSION_STORAGE_KEY,
   AUTH_STATE_SNAPSHOT_VERSION_STORAGE_KEY,
@@ -43,6 +44,8 @@ import { BASE_URL } from "../test-config";
 config({ path: ".env.local" });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(__dirname, "../..");
+const ENV_TEMPLATE_PATH = resolve(REPO_ROOT, ".env.local.template");
 
 /** Auth state files live in e2e/.auth/ (gitignored) */
 const AUTH_DIR = resolve(__dirname, "../.auth");
@@ -95,6 +98,99 @@ function ensureAuthDir(): void {
   if (!existsSync(AUTH_DIR)) {
     mkdirSync(AUTH_DIR, { recursive: true });
   }
+}
+
+function hasEnvValue(key: string): boolean {
+  const value = process.env[key];
+  return value != null && value.trim().length > 0;
+}
+
+function resolveTemplateEnv(
+  templateEnv: Record<string, string>
+): Record<string, string> {
+  const missingEntries = Object.entries(templateEnv).filter(
+    ([key, value]) => !hasEnvValue(key) && value.trim().length > 0
+  );
+
+  if (missingEntries.length === 0) {
+    return {};
+  }
+
+  const injectTemplate = missingEntries
+    .map(([key, value]) => {
+      const templateValue = value.startsWith("op://")
+        ? `{{ ${value} }}`
+        : value;
+      return `${key}=${JSON.stringify(templateValue)}`;
+    })
+    .join("\n");
+
+  let injectedEnvFile: string;
+  try {
+    injectedEnvFile = execFileSync(
+      "sh",
+      ["-lc", 'printf %s "$OP_INJECT_TEMPLATE" | op inject'],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          OP_INJECT_TEMPLATE: injectTemplate,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[auth.setup] Failed to resolve env template via 1Password CLI: ${message}`
+    );
+  }
+
+  return parse(injectedEnvFile);
+}
+
+/**
+ * When this file is run directly instead of via the standard npm scripts,
+ * populate missing env vars through 1Password CLI so setup remains portable.
+ */
+function injectOpEnvIfNeeded(): void {
+  if (hasEnvValue("VITE_SUPABASE_ANON_KEY")) {
+    return;
+  }
+
+  if (!existsSync(ENV_TEMPLATE_PATH)) {
+    throw new Error(
+      `[auth.setup] Missing env template at ${ENV_TEMPLATE_PATH}.`
+    );
+  }
+
+  const injectStartMs = Date.now();
+  try {
+    const templateEnv = parse(readFileSync(ENV_TEMPLATE_PATH, "utf8"));
+    const resolvedEnv = resolveTemplateEnv(templateEnv);
+    for (const [key, value] of Object.entries(resolvedEnv)) {
+      if (!hasEnvValue(key) && value.trim().length > 0) {
+        process.env[key] = value;
+      }
+    }
+  } finally {
+    console.log(
+      `ℹ️  Environment bootstrap resolution took ${Date.now() - injectStartMs}ms`
+    );
+  }
+
+  if (!hasEnvValue("VITE_SUPABASE_ANON_KEY")) {
+    throw new Error(
+      "[auth.setup] Automatic env bootstrap completed, but " +
+        "VITE_SUPABASE_ANON_KEY is still missing."
+    );
+  }
+
+  console.log(
+    "ℹ️  Injected environment variables via 1Password CLI because " +
+      "VITE_SUPABASE_ANON_KEY was missing"
+  );
 }
 
 /**
@@ -295,6 +391,8 @@ setup("authenticate all test users", async ({ browser }) => {
   // 8 users × ~30s each (login + __ttTestApi wait + catalog sync) = ~240s worst
   // case on a cold start. 300s gives comfortable headroom without masking hangs.
   setup.setTimeout(300_000);
+
+  injectOpEnvIfNeeded();
 
   ensureAuthDir();
 

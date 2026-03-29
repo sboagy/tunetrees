@@ -7,6 +7,7 @@
 
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
+import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-instrument-ids.js";
 
 log.setLevel("info");
 
@@ -355,47 +356,201 @@ async function assertHasLocalRepertoires(
 // Export getTestUserClient so tests can perform direct Supabase cleanup
 export { getTestUserClient };
 
-async function ensureUserProfileExists(user: TestUser, supabase: any) {
-  const { error } = await supabase.from("user_profile").upsert(
-    {
-      id: user.userId,
-      name: user.name,
-      email: user.email,
-      acceptable_delinquency_window: 21,
-      deleted: false,
-      sync_version: 1,
-      last_modified_at: new Date().toISOString(),
-      device_id: "test-seed",
-    },
-    { onConflict: "id" }
-  );
+function isTransientSetupErrorMessage(message: string | undefined): boolean {
+  if (!message) return false;
 
-  if (error) {
-    throw new Error(
-      `Failed to ensure user_profile ${user.userId} for ${user.name}: ${error.message}`
-    );
-  }
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("invalid response was received from the upstream server") ||
+    normalized.includes("upstream server") ||
+    normalized.includes("fetch failed") ||
+    normalized.includes("network") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("connection")
+  );
 }
 
-async function ensureUserRepertoireExists(user: TestUser, supabase: any) {
-  const { error } = await supabase.from("repertoire").upsert(
-    {
-      repertoire_id: user.repertoireId,
-      user_ref: user.userId,
-      name: `${user.name} Test Repertoire`,
-      deleted: false,
-      sync_version: 1,
-      last_modified_at: new Date().toISOString(),
-      device_id: "test-seed",
-    },
-    { onConflict: "repertoire_id" }
-  );
+async function retryTransientSetupOperation<T>(
+  label: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const maxAttempts = 3;
 
-  if (error) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isTransient = isTransientSetupErrorMessage(message);
+
+      if (!isTransient || attempt === maxAttempts) {
+        throw error;
+      }
+
+      const backoffMs = Math.min(500 * 2 ** (attempt - 1), 2000);
+      const jitterMs = Math.floor(Math.random() * 150);
+      const delayMs = backoffMs + jitterMs;
+
+      console.warn(
+        `Retrying ${label} after transient setup error (attempt ${attempt}/${maxAttempts}): ${message}`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw new Error(`Unreachable retry state for ${label}`);
+}
+
+async function purgeExtraUserRepertoires(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  const { data: extraRows, error: queryError } = await client
+    .from("repertoire")
+    .select("repertoire_id")
+    .eq("user_ref", user.userId)
+    .neq("repertoire_id", user.repertoireId);
+
+  if (queryError) {
     throw new Error(
-      `Failed to ensure repertoire ${user.repertoireId} for ${user.name}: ${error.message}`
+      `Failed to list extra repertoires for ${user.name}: ${queryError.message}`
     );
   }
+
+  const extraRepertoireIds = (extraRows ?? [])
+    .map((row: { repertoire_id?: string | null }) => row.repertoire_id)
+    .filter(
+      (value: string | null | undefined): value is string =>
+        typeof value === "string"
+    );
+
+  if (extraRepertoireIds.length === 0) {
+    return;
+  }
+
+  for (const repertoireId of extraRepertoireIds) {
+    const { error: practiceRecordError } = await client.rpc(
+      "e2e_clear_practice_record",
+      {
+        target_repertoire: repertoireId,
+      }
+    );
+
+    if (practiceRecordError) {
+      throw new Error(
+        `Failed to clear practice_record for extra repertoire ${repertoireId} (${user.name}): ${practiceRecordError.message}`
+      );
+    }
+  }
+
+  const extraRepertoireDeletes: Array<{
+    table: string;
+    column: string;
+    extraFilter?: (query: any) => any;
+  }> = [
+    { table: "daily_practice_queue", column: "repertoire_ref" },
+    { table: "note", column: "repertoire_ref" },
+    { table: "repertoire_tune", column: "repertoire_ref" },
+    {
+      table: "tab_group_main_state",
+      column: "repertoire_id",
+      extraFilter: (query) => query.eq("user_id", user.userId),
+    },
+    {
+      table: "table_state",
+      column: "repertoire_id",
+      extraFilter: (query) => query.eq("user_id", user.userId),
+    },
+  ];
+
+  for (const { table, column, extraFilter } of extraRepertoireDeletes) {
+    let deleteQuery = client
+      .from(table)
+      .delete()
+      .in(column, extraRepertoireIds);
+    if (extraFilter) {
+      deleteQuery = extraFilter(deleteQuery);
+    }
+    const { error } = await deleteQuery;
+
+    if (error) {
+      throw new Error(
+        `Failed to clear ${table} for extra repertoires (${user.name}): ${error.message}`
+      );
+    }
+  }
+
+  const { error: repertoireDeleteError } = await client
+    .from("repertoire")
+    .delete()
+    .eq("user_ref", user.userId)
+    .in("repertoire_id", extraRepertoireIds);
+
+  if (repertoireDeleteError) {
+    throw new Error(
+      `Failed to delete extra repertoires for ${user.name}: ${repertoireDeleteError.message}`
+    );
+  }
+
+  log.debug(
+    `✅ [${user.name}] Purged ${extraRepertoireIds.length} extra repertoire(s)`
+  );
+}
+
+async function normalizeUserRepertoireRow(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await retryTransientSetupOperation(
+    `repertoire normalization for ${user.name}`,
+    async () => {
+      // Shared setup expects a single seeded repertoire row per fixed test user.
+      // Local exploratory runs can leave additional user-owned repertoires behind.
+      await purgeExtraUserRepertoires(user, client);
+
+      const { data: existingRows, error: queryError } = await client
+        .from("repertoire")
+        .select("sync_version")
+        .eq("repertoire_id", user.repertoireId)
+        .eq("user_ref", user.userId)
+        .limit(1);
+
+      if (queryError) {
+        throw new Error(
+          `Failed to read repertoire ${user.repertoireId} for ${user.name}: ${queryError.message}`
+        );
+      }
+
+      const existingSyncVersion = Number(existingRows?.[0]?.sync_version ?? 0);
+      const nextSyncVersion =
+        Number.isFinite(existingSyncVersion) && existingSyncVersion > 0
+          ? existingSyncVersion + 1
+          : 1;
+
+      const { error } = await client.from("repertoire").upsert(
+        {
+          repertoire_id: user.repertoireId,
+          user_ref: user.userId,
+          name: null,
+          instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID,
+          genre_default: "ITRAD",
+          sr_alg_type: null,
+          deleted: false,
+          sync_version: nextSyncVersion,
+          last_modified_at: new Date().toISOString(),
+          device_id: "test-seed",
+        },
+        { onConflict: "repertoire_id" }
+      );
+
+      if (error) {
+        throw new Error(
+          `Failed to normalize repertoire ${user.repertoireId} for ${user.name}: ${error.message}`
+        );
+      }
+    }
+  );
 }
 
 /**
@@ -576,6 +731,7 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);
+  await normalizeUserRepertoireRow(user);
 
   // Step 2: Seed user's repertoire if specified
   if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
@@ -641,16 +797,14 @@ export async function seedUserRepertoire(
     await verifyTablesEmpty(user, ["repertoire_tune"], supabase);
   }
 
-  await ensureUserProfileExists(user, supabase);
-  await ensureUserRepertoireExists(user, supabase);
-
   const maxAttempts = 5;
   for (const tuneId of tuneIds) {
     let attempt = 0;
     while (true) {
       attempt++;
-      const { error } = await supabase.from("repertoire_tune").upsert(
-        {
+      const { error } = await supabase
+        .from("repertoire_tune")
+        .upsert({
           repertoire_ref: user.repertoireId,
           tune_ref: tuneId,
           current: null,
@@ -661,23 +815,15 @@ export async function seedUserRepertoire(
           sync_version: 1,
           last_modified_at: new Date().toISOString(),
           device_id: "test-seed",
-        },
-        { onConflict: "repertoire_ref,tune_ref" }
-      );
+        })
+        .eq("repertoire_ref", user.repertoireId)
+        .eq("tune_ref", tuneId);
 
       if (!error) break;
 
       if (attempt >= maxAttempts) {
-        const { count: repertoireCount, error: repertoireError } = await supabase
-          .from("repertoire")
-          .select("*", { count: "exact", head: true })
-          .eq("repertoire_id", user.repertoireId)
-          .eq("user_ref", user.userId);
-        const repertoireSummary = repertoireError
-          ? `repertoire check failed: ${repertoireError.message}`
-          : `repertoire rows visible=${repertoireCount ?? 0}`;
         throw new Error(
-          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}. ${repertoireSummary}`
+          `Failed to seed tune ${tuneId} after ${attempt} attempts: ${error.message}`
         );
       }
 
@@ -1082,6 +1228,7 @@ export async function setupForPracticeTestsParallel(
       "repertoire_tune",
       "user_genre_selection",
     ]);
+    await normalizeUserRepertoireRow(user);
 
     if (repertoireTunes.length > 0) {
       await seedUserRepertoire(user, repertoireTunes, true);
@@ -1293,6 +1440,7 @@ export async function setupForRepertoireTestsParallel(
     "repertoire_tune",
     "user_genre_selection",
   ]);
+  await normalizeUserRepertoireRow(user);
 
   await seedUserRepertoire(user, repertoireTunes);
 
@@ -1452,6 +1600,7 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);
+  await normalizeUserRepertoireRow(user);
 
   // 2b. Optionally schedule tunes if not emptying repertoire and requested
   if (!emptyRepertoire && scheduleTunes) {

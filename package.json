@@ -10,7 +10,7 @@
     "dev:worker": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- sh -c 'cd worker && npm run dev'",
     "dev:all": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- concurrently \"npm run dev\" \"npm run dev:worker\"",
     "ai:serve:local": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- supabase functions serve ai-chat --no-verify-jwt",
-    "build": "npm run build:production",
+    "build": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- npm run build:production",
     "build:production": "tsc -b && FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- vite build",
     "build:preview-local": "tsc -b && FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx scripts/build-preview-local.ts",
     "preview": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vite preview",

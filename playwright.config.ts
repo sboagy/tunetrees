@@ -15,7 +15,6 @@ dotenv.config({ path: resolve(__dirname, ".env.local") });
 const DEV_PORT = 5173; // Your standard development port
 const PREVIEW_PORT = 4173; // The port for the production build
 const WORKER_PORT = 8787;
-const SKIP_WEBSERVER = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "true";
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -229,9 +228,7 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: SKIP_WEBSERVER
-    ? undefined
-    : [
+  webServer: [
     // 1. Main Dev Server
     {
       command: "npm run dev",
@@ -267,5 +264,5 @@ export default defineConfig({
     //   reuseExistingServer: !process.env.CI,
     //   timeout: 180 * 1000, // Increased timeout for build step
     // },
-    ],
+  ],
 });

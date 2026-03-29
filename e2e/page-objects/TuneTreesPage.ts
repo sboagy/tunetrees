@@ -1576,6 +1576,23 @@ export class TuneTreesPage {
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 
+    const pause = async (ms: number) => {
+      if (!this.page.isClosed()) {
+        await this.page.waitForTimeout(ms);
+      }
+    };
+
+    const clickFilterButton = async (locator: Locator): Promise<void> => {
+      await locator.scrollIntoViewIfNeeded().catch(() => {});
+
+      try {
+        await locator.click({ timeout: 1500 });
+        return;
+      } catch {
+        await locator.click({ timeout: 1500, force: true }).catch(() => {});
+      }
+    };
+
     let filtersPanelReady = false;
     for (let attempt = 0; attempt < 4; attempt++) {
       const genreFilterVisible = await this.genreFilter
@@ -1592,10 +1609,10 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!panelExpanded) {
-        await this.filtersButton.click({ timeout: 10000 });
+        await clickFilterButton(this.filtersButton);
       }
 
-      await this.page.waitForTimeout(250);
+      await pause(250);
 
       const panelReadyNow = await this.genreFilter
         .isVisible({ timeout: 1000 })
@@ -1612,7 +1629,7 @@ export class TuneTreesPage {
 
       if (stillExpanded) {
         await this.page.keyboard.press("Escape").catch(() => {});
-        await this.page.waitForTimeout(150);
+        await pause(150);
       }
     }
 
@@ -1643,8 +1660,8 @@ export class TuneTreesPage {
           .catch(() => false);
 
         if (!genreFilterVisible) {
-          await this.filtersButton.click({ timeout: 10000 }).catch(() => {});
-          await this.page.waitForTimeout(200);
+          await clickFilterButton(this.filtersButton);
+          await pause(200);
         }
 
         const [isExpanded, isPanelVisible] = await Promise.all([
@@ -1659,8 +1676,8 @@ export class TuneTreesPage {
           return true;
         }
 
-        await this.genreFilter.click({ timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(200);
+        await clickFilterButton(this.genreFilter);
+        await pause(200);
       }
 
       return false;
@@ -1677,7 +1694,7 @@ export class TuneTreesPage {
     for (let attempt = 0; attempt < 5; attempt++) {
       const isOpen = await ensureGenreDropdownOpen();
       if (!isOpen) {
-        await this.page.waitForTimeout(250);
+        await pause(250);
         continue;
       }
 
@@ -1689,7 +1706,7 @@ export class TuneTreesPage {
         .isVisible({ timeout: 1500 })
         .catch(() => false);
       if (!isCandidateVisible) {
-        await this.page.waitForTimeout(250);
+        await pause(250);
         continue;
       }
 
@@ -1702,7 +1719,7 @@ export class TuneTreesPage {
         genreOptionChecked = true;
         break;
       } catch {
-        await this.page.waitForTimeout(200);
+        await pause(200);
       }
     }
 

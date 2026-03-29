@@ -18,26 +18,21 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # <-- This is your manual trigger
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Opt into Node.js 24 for JavaScript-based actions before the runner default
-# changes in June 2026. This also suppresses deprecation warnings from
-# 1password/install-cli-action@v2, which still runs on the older action runtime.
+# Opt into Node.js 24 for all JavaScript actions (required before June 2026 forced migration).
+# This silences Node.js 20 deprecation warnings, including 1password/install-cli-action@v2
+# which has no Node 24-native release yet.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
-# ---------------------------------------------------------------------------
-# REUSABLE: checkout the three repos that make up the local dev environment
-# ---------------------------------------------------------------------------
-# NOTE: A GitHub composite action or workflow would be cleaner here, but
-# inline steps per job are simpler for now and avoid a separate actions/ dir.
-
 jobs:
   # --------------------------------------------------------------------------
-  # JOB 0: UNIT TESTS (VITEST) — no Supabase needed
+  # JOB 0: UNIT TESTS (VITEST)
   # --------------------------------------------------------------------------
   test-unit:
     name: Run Unit Tests
@@ -49,25 +44,25 @@ jobs:
 
     steps:
       - name: Checkout TuneTrees
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v2
-
       - name: Run unit tests
         run: npm run test
 
   # --------------------------------------------------------------------------
-  # JOB 1: STANDARD SHARDED TESTS (Dev Server)
+  # JOB 1: PLAYWRIGHT E2E TESTS (Sharded)
   # --------------------------------------------------------------------------
   test:
     name: Run Playwright Tests
@@ -95,19 +90,21 @@ jobs:
 
     steps:
       - name: Checkout TuneTrees
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout Rhizome (shared Supabase config + DB scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: sboagy/rhizome
+          ref: main
           path: rhizome
           # For private repos, add: token: ${{ secrets.GH_PAT }}
 
       - name: Checkout oosync (sync library for worker)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: sboagy/oosync
+          ref: main
           path: oosync
           # For private repos, add: token: ${{ secrets.GH_PAT }}
 
@@ -121,9 +118,9 @@ jobs:
           docker system prune -a -f || true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
@@ -172,12 +169,27 @@ jobs:
         if: steps.cache-docker-images.outputs.cache-hit == 'true'
         run: docker load -i ~/supabase-docker-images.tar
 
+      - name: Stop any stale Supabase containers
+        working-directory: rhizome
+        run: |
+          supabase stop --no-backup 2>/dev/null || true
+          docker network prune -f 2>/dev/null || true
+
+      - name: Disable Supabase Edge Runtime For CI
+        working-directory: rhizome
+        run: |
+          if grep -q '^\[edge_runtime\]' supabase/config.toml; then
+            perl -0pi -e 's/\[edge_runtime\]\s*\nenabled = true/[edge_runtime]\nenabled = false/' supabase/config.toml
+          else
+            printf '\n[edge_runtime]\nenabled = false\n' >> supabase/config.toml
+          fi
+
       - name: Start Supabase from Rhizome
         # Starting from the rhizome directory uses rhizome's supabase/config.toml,
         # which defines the shared multi-tenant project. NEVER run `supabase db reset`
         # here — that would wipe ALL app schemas (TuneTrees + CubeFSRS).
+        working-directory: rhizome
         run: |
-          cd rhizome
           supabase start
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
@@ -202,8 +214,8 @@ jobs:
 
       - name: Seed shared auth users (Rhizome)
         # Creates the shared test user accounts without touching app-specific tables.
+        working-directory: rhizome
         run: |
-          cd rhizome
           bash ./scripts/seed-shared-auth-users-local.sh
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
@@ -211,8 +223,8 @@ jobs:
       - name: Apply TuneTrees migrations + seeds (Rhizome db-push)
         # Applies TuneTrees-specific migrations and seeds via the rhizome orchestration
         # script, which is safe to run against the shared multi-tenant instance.
+        working-directory: rhizome
         run: |
-          cd rhizome
           ./scripts/db-push-local.sh ${{ github.workspace }}
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
@@ -246,42 +258,24 @@ jobs:
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
-      - name: Generate Auth States
+      - name: Create Playwright output directories
         run: |
-          npm run dev &
-          DEV_PID=$!
-          echo "⏳ Waiting for dev server on http://localhost:5173/..."
-          ATTEMPTS=0
-          until curl -fsS "http://localhost:5173/" > /dev/null; do
-            ATTEMPTS=$((ATTEMPTS+1))
-            if [ "$ATTEMPTS" -ge 60 ]; then
-              echo "❌ Dev server did not become ready in time"
-              kill $DEV_PID || true
-              exit 1
-            fi
-            sleep 1
-          done
-          npx playwright test e2e/setup/auth.setup.ts --project=setup --reporter=list
-          kill $DEV_PID || true
-          pkill -f "vite" || true
-          sleep 1
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          PLAYWRIGHT_SKIP_WEBSERVER: "true"
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          mkdir -p playwright-logs blob-report test-results
 
-      - name: Run Playwright Single Test (Shard ${{ matrix.shard }}/4)
+      - name: Run Playwright Tests (Shard ${{ matrix.shard }}/4)
         run: |
           set -o pipefail
-          mkdir -p playwright-logs
-          echo "🎬 Running sharded test suite"
-          # NOTE: Excluding PWA project from main shards
-          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome" 2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
+          echo "🎬 Running sharded test suite (shard ${{ matrix.shard }}/4)"
+          npm run test:e2e -- \
+            --shard=${{ matrix.shard }}/4 \
+            --project=chromium-auth \
+            --project=chromium \
+            --project="Mobile Chrome" \
+            2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
 
       - name: Upload Playwright log (Shard ${{ matrix.shard }}/4)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-log-${{ matrix.shard }}
           path: playwright-logs/playwright-shard-${{ matrix.shard }}.log
@@ -289,7 +283,7 @@ jobs:
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: blob-report-${{ matrix.shard }}
           path: blob-report/
@@ -297,7 +291,7 @@ jobs:
 
       - name: Upload Test Artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-${{ matrix.shard }}
           path: test-results/
@@ -327,18 +321,20 @@ jobs:
 
     steps:
       - name: Checkout TuneTrees
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout Rhizome (shared Supabase config + DB scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: sboagy/rhizome
+          ref: main
           path: rhizome
 
       - name: Checkout oosync (sync library for worker)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: sboagy/oosync
+          ref: main
           path: oosync
 
       - name: AGGRESSIVE DISK CLEANUP
@@ -350,9 +346,9 @@ jobs:
           docker system prune -a -f || true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
@@ -401,9 +397,24 @@ jobs:
         if: steps.cache-docker-images.outputs.cache-hit == 'true'
         run: docker load -i ~/supabase-docker-images.tar
 
-      - name: Start Supabase from Rhizome
+      - name: Stop any stale Supabase containers
+        working-directory: rhizome
         run: |
-          cd rhizome
+          supabase stop --no-backup 2>/dev/null || true
+          docker network prune -f 2>/dev/null || true
+
+      - name: Disable Supabase Edge Runtime For CI
+        working-directory: rhizome
+        run: |
+          if grep -q '^\[edge_runtime\]' supabase/config.toml; then
+            perl -0pi -e 's/\[edge_runtime\]\s*\nenabled = true/[edge_runtime]\nenabled = false/' supabase/config.toml
+          else
+            printf '\n[edge_runtime]\nenabled = false\n' >> supabase/config.toml
+          fi
+
+      - name: Start Supabase from Rhizome
+        working-directory: rhizome
+        run: |
           supabase start
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
@@ -426,15 +437,15 @@ jobs:
           docker images --format "{{.Repository}}:{{.Tag}}" | grep supabase | xargs docker save -o ~/supabase-docker-images.tar
 
       - name: Seed shared auth users (Rhizome)
+        working-directory: rhizome
         run: |
-          cd rhizome
           bash ./scripts/seed-shared-auth-users-local.sh
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
       - name: Apply TuneTrees migrations + seeds (Rhizome db-push)
+        working-directory: rhizome
         run: |
-          cd rhizome
           ./scripts/db-push-local.sh ${{ github.workspace }}
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
@@ -443,33 +454,14 @@ jobs:
         run: npm run schema:sqlite:check
 
       # --- Playwright PWA Specifics ---
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Generate Auth States
-        run: |
-          npm run dev &
-          DEV_PID=$!
-          echo "⏳ Waiting for dev server on http://localhost:5173/..."
-          ATTEMPTS=0
-          until curl -fsS "http://localhost:5173/" > /dev/null; do
-            ATTEMPTS=$((ATTEMPTS+1))
-            if [ "$ATTEMPTS" -ge 60 ]; then
-              echo "❌ Dev server did not become ready in time"
-              kill $DEV_PID || true
-              exit 1
-            fi
-            sleep 1
-          done
-          npx playwright test e2e/setup/auth.setup.ts --project=setup --reporter=list
-          kill $DEV_PID || true
-          pkill -f "vite" || true
-          sleep 1
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          PLAYWRIGHT_SKIP_WEBSERVER: "true"
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+      - name: Cache Playwright Browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Setup Cloudflare Worker
         run: |
@@ -479,34 +471,50 @@ jobs:
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
+      - name: Install Playwright Browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright System Dependencies
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
       - name: Build PWA
         run: npm run build:preview-local
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
+      - name: Create Playwright output directories
+        run: mkdir -p playwright-logs blob-report test-results
+
       - name: Run PWA Offline Tests
         run: |
           set -o pipefail
-          mkdir -p playwright-logs
-          {
-            echo "🚀 Starting Preview Server on port 4173..."
-            npm run preview:local &
-            PREVIEW_PID=$!
-            sleep 10
+          echo "🚀 Starting Preview Server on port 4173..."
+          npm run preview:local &
+          PREVIEW_PID=$!
 
-            # 1. Run Setup (Uses Preview Server via preview-setup project)
-            echo "🔐 Running Authentication Setup for Preview..."
-            npx playwright test e2e/setup/auth.setup.ts --project=preview-setup
+          cleanup() {
+            kill "$PREVIEW_PID" 2>/dev/null || true
+            pkill -f "vite preview" 2>/dev/null || true
+          }
+          trap cleanup EXIT
 
-            # 2. Run Offline Tests (Uses Preview Server)
-            echo "🎭 Running PWA Offline Tests..."
-            npx playwright test --project=chromium-pwa-offline
+          ATTEMPTS=0
+          until curl -fsS "http://localhost:4173/" > /dev/null; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 60 ]; then
+              echo "❌ Preview server did not become ready in time"
+              exit 1
+            fi
+            sleep 1
+          done
 
-            echo "🛑 Stopping Preview Server..."
-            kill $PREVIEW_PID || true
-            pkill -f "vite" || true
-          } 2>&1 | tee "playwright-logs/playwright-pwa.log"
+          echo "🎭 Running PWA Offline Tests..."
+          npm run test:e2e -- \
+            --project=chromium-pwa-offline \
+            2>&1 | tee "playwright-logs/playwright-pwa.log"
         shell: bash
         env:
           VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
@@ -514,7 +522,7 @@ jobs:
 
       - name: Upload Playwright log (PWA)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-log-pwa
           path: playwright-logs/
@@ -522,7 +530,7 @@ jobs:
 
       - name: Upload PWA blob report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: blob-report-pwa
           path: blob-report/
@@ -530,7 +538,7 @@ jobs:
 
       - name: Upload Test Artifacts (PWA)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-pwa
           path: test-results/
@@ -550,26 +558,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout TuneTrees
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
       - name: Download blob reports from all shards
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
 
+      - name: Detect blob reports
+        id: blob-reports
+        run: |
+          if [ -d all-blob-reports ] && find all-blob-reports -type f -name '*.zip' | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No Playwright blob reports were downloaded; skipping HTML merge."
+          fi
+
       - name: Download Playwright logs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           pattern: playwright-log-*
           path: all-playwright-logs
@@ -577,31 +595,24 @@ jobs:
 
       - name: Assemble combined Playwright log
         run: |
-          set -o pipefail
-          mkdir -p all-playwright-logs
-          find all-playwright-logs -type f -print | sort | xargs -r cat > playwright-run.log
-          if [ ! -f playwright-run.log ]; then
-            : > playwright-run.log
-          fi
+          mkdir -p playwright-logs
+          cat all-playwright-logs/*.log > playwright-logs/playwright-combined.log 2>/dev/null || echo "(no log files)" > playwright-logs/playwright-combined.log
 
       - name: Upload combined Playwright log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: playwright-run-log
-          path: playwright-run.log
-          retention-days: 30
+          name: playwright-log-combined
+          path: playwright-logs/
+          retention-days: 7
 
       - name: Merge into HTML Report
-        run: |
-          if find all-blob-reports -type f -print -quit 2>/dev/null | grep -q .; then
-            npx playwright merge-reports --reporter html ./all-blob-reports
-          else
-            echo "No Playwright blob reports found; skipping HTML merge because upstream jobs did not upload artifacts."
-          fi
+        if: steps.blob-reports.outputs.found == 'true'
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
 
       - name: Upload merged HTML report
-        uses: actions/upload-artifact@v4
+        if: steps.blob-reports.outputs.found == 'true'
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report/
@@ -616,15 +627,17 @@ jobs:
     needs: [test-unit, test, test-pwa-offline]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
     environment: tunetrees_ci_env
+    env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
       - name: Checkout TuneTrees
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
@@ -633,13 +646,8 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@v2
 
-      - name: Build with 1Password secrets
-        # `op run` resolves op:// references in .env.prod.template and injects
-        # them as environment variables for the build subprocess.
-        run: op run --env-file=".env.prod.template" -- npm run build
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          VITE_SYNC_DIAGNOSTICS: "true"
+      - name: Build Application
+        run: npm run build
 
       - name: Deploy to Cloudflare Pages
         # Use `op run` instead of wrangler-action so secrets come from
@@ -665,12 +673,12 @@ jobs:
 
     steps:
       - name: Checkout TuneTrees
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
