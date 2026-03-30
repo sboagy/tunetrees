@@ -41,7 +41,7 @@ import { BASE_URL } from "../test-config";
 
 // Load .env.local as a convenience for local dev. No-op in CI where secrets
 // are injected via `op run` or GitHub Actions environment variables.
-config({ path: ".env.local" });
+config({ path: ".env.local", quiet: true });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../..");
