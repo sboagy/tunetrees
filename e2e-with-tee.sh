@@ -70,11 +70,31 @@ pg() {
     psql -d "${DB_URL}" --no-psqlrc -v ON_ERROR_STOP=1 "$@"
 }
 
+apply_tunetrees_public_baseline_seed() {
+    {
+        printf 'SET session_replication_role = replica;\n'
+        awk '
+            /^INSERT INTO "public"\./ {
+                in_public_insert = 1
+                print
+                next
+            }
+            in_public_insert {
+                print
+                if ($0 ~ /;[[:space:]]*$/) {
+                    in_public_insert = 0
+                }
+            }
+        ' "${TUNETREES_BASELINE_SEED}"
+        printf '\nRESET session_replication_role;\n'
+    } | pg -q
+}
+
 refresh_auth_state() {
     echo "==> Refreshing Playwright auth state"
     rm -rf "${AUTH_DIR}"
     FORCE_COLOR=1 op run --env-file="${ENV_FILE}" -- \
-        playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup
+    npx playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup
 }
 
 run_full_supabase_reset() {
@@ -92,7 +112,7 @@ run_full_supabase_reset() {
     )
 
     echo "==> Applying TuneTrees baseline public seed"
-    pg -f "${TUNETREES_BASELINE_SEED}" -q
+    apply_tunetrees_public_baseline_seed
 
     refresh_auth_state
 }
@@ -118,7 +138,9 @@ BEGIN
     END IF;
 END $$;
 
-TRUNCATE TABLE auth.users RESTART IDENTITY CASCADE;
+-- auth-owned tables can cascade into sequences this role does not own.
+-- We only need to clear auth rows here, not renumber internal auth sequences.
+TRUNCATE TABLE auth.users CASCADE;
 SQL
 
     echo "==> Reseeding shared auth users"
@@ -128,7 +150,7 @@ SQL
     )
 
     echo "==> Reseeding TuneTrees public baseline"
-    pg -f "${TUNETREES_BASELINE_SEED}" -q
+    apply_tunetrees_public_baseline_seed
 
     refresh_auth_state
 }
