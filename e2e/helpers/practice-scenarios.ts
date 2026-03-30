@@ -582,7 +582,9 @@ async function normalizeUserRepertoireRow(user: TestUser, supabase?: any) {
           user_ref: user.userId,
           name: null,
           instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID,
-          genre_default: "ITRAD",
+          // Keep deterministic setup independent from shared genre seed rows.
+          // The effective repertoire genre still resolves from the instrument.
+          genre_default: null,
           sr_alg_type: null,
           deleted: false,
           sync_version: nextSyncVersion,
