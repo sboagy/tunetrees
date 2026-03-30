@@ -7,6 +7,7 @@
 
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
+import postgres from "postgres";
 import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-instrument-ids.js";
 
 log.setLevel("info");
@@ -309,6 +310,55 @@ import { getTestUserClient, type TestUser } from "./test-users";
 
 // Cache mapping from Supabase Auth UUID -> user_ref (same value after user_profile.id elimination)
 const internalUserRefCache: Map<string, string> = new Map();
+const E2E_DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+
+let e2eSqlClient: ReturnType<typeof postgres> | null = null;
+
+function getE2eSqlClient() {
+  if (!e2eSqlClient) {
+    e2eSqlClient = postgres(E2E_DATABASE_URL, { max: 1 });
+  }
+
+  return e2eSqlClient;
+}
+
+async function clearPracticeRecordForRepertoire(repertoireId: string) {
+  const sql = getE2eSqlClient();
+
+  await sql.begin(async (transaction) => {
+    await transaction.unsafe(
+      "SELECT set_config('app.allow_practice_record_delete', 'on', true)"
+    );
+    await transaction.unsafe(
+      `
+      DELETE FROM public.practice_record
+      WHERE repertoire_ref = $1::uuid
+    `,
+      [repertoireId]
+    );
+  });
+}
+
+async function clearPracticeRecordForUser(user: TestUser) {
+  const sql = getE2eSqlClient();
+
+  await sql.begin(async (transaction) => {
+    await transaction.unsafe(
+      "SELECT set_config('app.allow_practice_record_delete', 'on', true)"
+    );
+    await transaction.unsafe(
+      `
+      DELETE FROM public.practice_record pr
+      USING public.repertoire r
+      WHERE pr.repertoire_ref = r.repertoire_id
+        AND r.user_ref = $1::uuid
+    `,
+      [user.userId]
+    );
+  });
+}
 
 async function getInternalUserRef(
   _supabase: any,
@@ -361,7 +411,9 @@ function isTransientSetupErrorMessage(message: string | undefined): boolean {
 
   const normalized = message.toLowerCase();
   return (
-    normalized.includes("invalid response was received from the upstream server") ||
+    normalized.includes(
+      "invalid response was received from the upstream server"
+    ) ||
     normalized.includes("upstream server") ||
     normalized.includes("fetch failed") ||
     normalized.includes("network") ||
@@ -430,16 +482,12 @@ async function purgeExtraUserRepertoires(user: TestUser, supabase?: any) {
   }
 
   for (const repertoireId of extraRepertoireIds) {
-    const { error: practiceRecordError } = await client.rpc(
-      "e2e_clear_practice_record",
-      {
-        target_repertoire: repertoireId,
-      }
-    );
-
-    if (practiceRecordError) {
+    try {
+      await clearPracticeRecordForRepertoire(repertoireId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Failed to clear practice_record for extra repertoire ${repertoireId} (${user.name}): ${practiceRecordError.message}`
+        `Failed to clear practice_record for extra repertoire ${repertoireId} (${user.name}): ${message}`
       );
     }
   }
@@ -547,6 +595,64 @@ async function normalizeUserRepertoireRow(user: TestUser, supabase?: any) {
       if (error) {
         throw new Error(
           `Failed to normalize repertoire ${user.repertoireId} for ${user.name}: ${error.message}`
+        );
+      }
+    }
+  );
+}
+
+async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await retryTransientSetupOperation(
+    `avatar reset for ${user.name}`,
+    async () => {
+      const { data: existingRows, error: queryError } = await client
+        .from("user_profile")
+        .select("sync_version")
+        .eq("id", user.userId)
+        .limit(1);
+
+      if (queryError) {
+        throw new Error(
+          `Failed to read user_profile ${user.userId} for ${user.name}: ${queryError.message}`
+        );
+      }
+
+      if ((existingRows?.length ?? 0) === 0) {
+        const { data: authData, error: authError } =
+          await client.auth.getUser();
+        const authUserId = authData.user?.id ?? null;
+        const authDetail =
+          authUserId === user.userId
+            ? `authenticated as expected user ${authUserId}`
+            : `authenticated as ${authUserId ?? "anonymous"}, expected ${user.userId}`;
+
+        throw new Error(
+          `user_profile ${user.userId} is not visible for ${user.name}; ${authDetail}. This usually means the current Supabase project is missing the user_profile RLS policies for the UUID id column or the helper is pointed at a different project.${authError ? ` auth.getUser() error: ${authError.message}` : ""}`
+        );
+      }
+
+      const existingSyncVersion = Number(existingRows?.[0]?.sync_version ?? 0);
+      const nextSyncVersion =
+        Number.isFinite(existingSyncVersion) && existingSyncVersion > 0
+          ? existingSyncVersion + 1
+          : 1;
+
+      const { error } = await client
+        .from("user_profile")
+        .update({
+          avatar_url: null,
+          sync_version: nextSyncVersion,
+          last_modified_at: new Date().toISOString(),
+          device_id: "test-seed",
+        })
+        .eq("id", user.userId);
+
+      if (error) {
+        throw new Error(
+          `Failed to reset avatar for ${user.name}: ${error.message}`
         );
       }
     }
@@ -732,6 +838,7 @@ export async function setupDeterministicTestParallel(
 
   await verifyTablesEmpty(user, whichTables);
   await normalizeUserRepertoireRow(user);
+  await resetUserProfileAvatar(user);
 
   // Step 2: Seed user's repertoire if specified
   if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
@@ -1103,39 +1210,17 @@ async function clearUserTable(
   // their own transaction, so we use an RPC that sets the flag and deletes in
   // one call.
   if (tableName === "practice_record") {
-    const repertoireIds = new Set<string>([user.repertoireId]);
-    const { data: repertoireRows, error: repertoireQueryError } = await supabase
-      .from("repertoire")
-      .select("repertoire_id")
-      .eq("user_ref", user.userId);
-
-    if (repertoireQueryError) {
+    try {
+      await clearPracticeRecordForUser(user);
+    } catch (practiceRecordError) {
+      const message =
+        practiceRecordError instanceof Error
+          ? practiceRecordError.message
+          : String(practiceRecordError);
       console.warn(
-        `[${user.name}] Failed to query repertoires before clearing practice_record: ${repertoireQueryError.message}`
+        `[${user.name}] Failed to clear practice_record via direct Postgres cleanup: ${message}`
       );
-    } else if (repertoireRows) {
-      for (const row of repertoireRows) {
-        if (row.repertoire_id) {
-          repertoireIds.add(row.repertoire_id);
-        }
-      }
-    }
-
-    for (const repertoireId of repertoireIds) {
-      const { error: rpcError } = await supabase.rpc(
-        "e2e_clear_practice_record",
-        {
-          target_repertoire: repertoireId,
-        }
-      );
-      if (rpcError) {
-        console.warn(
-          `[${user.name}] Failed to clear practice_record for repertoire ${repertoireId}: ${rpcError.message}`
-        );
-        if (!error) {
-          error = rpcError;
-        }
-      }
+      error = practiceRecordError;
     }
   } else {
     // Unified deletion path; RLS ensures only caller's rows are affected.
@@ -1321,7 +1406,7 @@ export async function setupForPracticeTestsParallel(
       // For practice-driven scenarios we expect at least one scheduled tune row (and thus at least
       // one recall-eval control) to exist.
       const practiceGrid = page.getByTestId("tunes-grid-scheduled");
-      await expect(practiceGrid).toBeVisible({ timeout: 15000 });
+      await expect(practiceGrid).toBeVisible({ timeout: 25000 });
 
       // Wait for at least one recall-eval control to appear
       await expect

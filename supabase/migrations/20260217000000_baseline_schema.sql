@@ -39,12 +39,12 @@ CREATE OR REPLACE FUNCTION "public"."e2e_clear_practice_record"("target_repertoi
     SET "search_path" TO 'public', 'auth'
     AS $$
 BEGIN
-	IF NOT EXISTS (
+    IF NOT EXISTS (
 		SELECT 1
 		FROM public.repertoire r
 		WHERE r.repertoire_id = target_repertoire
 			AND r.user_ref = auth.uid()
-	) THEN
+    ) THEN
 		RAISE EXCEPTION 'not authorized to clear practice_record for this repertoire';
 	END IF;
 
@@ -64,12 +64,12 @@ CREATE OR REPLACE FUNCTION "public"."e2e_delete_practice_record_by_tunes"("targe
     SET "search_path" TO 'public', 'auth'
     AS $$
 BEGIN
-	IF NOT EXISTS (
+    IF NOT EXISTS (
 		SELECT 1
 		FROM public.repertoire r
 		WHERE r.repertoire_id = target_repertoire
 			AND r.user_ref = auth.uid()
-	) THEN
+    ) THEN
 		RAISE EXCEPTION 'Not authorized to clear practice_record for this repertoire';
 	END IF;
 

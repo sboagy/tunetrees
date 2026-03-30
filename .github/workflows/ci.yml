@@ -229,6 +229,15 @@ jobs:
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
+      - name: Remove local Supabase bindings from .env.local.template
+        # Later npm scripts use `op run --env-file=.env.local.template`. Strip the
+        # local Supabase-derived keys so `op run` cannot override the runtime values
+        # already exported into $GITHUB_ENV after `supabase start`.
+        run: |
+          tmp_env_file="$(mktemp)"
+          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
+          mv "$tmp_env_file" .env.local.template
+
       - name: Check SQLite schema via Postgres introspection
         run: npm run schema:sqlite:check
 
@@ -449,6 +458,15 @@ jobs:
           ./scripts/db-push-local.sh ${{ github.workspace }}
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Remove local Supabase bindings from .env.local.template
+        # Later npm scripts use `op run --env-file=.env.local.template`. Strip the
+        # local Supabase-derived keys so `op run` cannot override the runtime values
+        # already exported into $GITHUB_ENV after `supabase start`.
+        run: |
+          tmp_env_file="$(mktemp)"
+          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
+          mv "$tmp_env_file" .env.local.template
 
       - name: Check SQLite schema via Postgres introspection
         run: npm run schema:sqlite:check
