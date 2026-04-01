@@ -19,6 +19,23 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
+async function waitForTestApi(page: import("@playwright/test").Page) {
+  await expect
+    .poll(
+      async () => {
+        return await page.evaluate(() => {
+          return typeof (window as any).__ttTestApi === "object";
+        });
+      },
+      {
+        timeout: 15000,
+        intervals: [100, 250, 500, 1000],
+        message: "__ttTestApi did not become available",
+      }
+    )
+    .toBe(true);
+}
+
 /**
  * Helper to open Settings → Catalog & Sync page
  */
@@ -101,6 +118,7 @@ async function getAnnotationCounts(
   page: import("@playwright/test").Page,
   options?: { tuneId?: string }
 ) {
+  await waitForTestApi(page);
   return await page.evaluate(async (opts) => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -114,6 +132,7 @@ async function getAnnotationCounts(
 async function getOrphanedAnnotationCounts(
   page: import("@playwright/test").Page
 ) {
+  await waitForTestApi(page);
   return await page.evaluate(async () => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -132,6 +151,7 @@ async function seedAnnotations(
     referenceCount?: number;
   }
 ) {
+  await waitForTestApi(page);
   return await page.evaluate(async (seedInput) => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -176,6 +196,8 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
       (window as any).__ttTestUserId = userId;
       (window as any).__ttTestApi?.setTestUserId?.(userId);
     }, testUser.userId);
+
+    await waitForTestApi(page);
   });
 
   test("A: Onboarding filters annotations server-side for selected genres", async ({

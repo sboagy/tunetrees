@@ -13,22 +13,57 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 let ttPage: TuneTreesPage;
 
 async function openCatalogSync(page: import("@playwright/test").Page) {
-  await ttPage.userMenuButton.click();
-  await page.waitForTimeout(500);
-  await ttPage.userSettingsButton.click();
-  await page.waitForTimeout(1500);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const settingsVisible = await ttPage.userSettingsButton
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (settingsVisible) break;
 
-  // Only run the mobile menu toggle on Mobile Chrome
-  const ua = await page.evaluate(() => navigator.userAgent);
-  const isMobileChrome = /Android.*Chrome\/\d+/i.test(ua);
-  if (isMobileChrome) {
-    await page.waitForTimeout(800);
-    await ttPage.settingsMenuToggle.click();
+    await ttPage.userMenuButton.click();
+    await page.waitForTimeout(300);
   }
 
-  await page.waitForTimeout(500);
-  await ttPage.userSettingsCatalogSyncButton.click();
-  await page.waitForTimeout(500);
+  await expect(ttPage.userSettingsButton).toBeVisible({ timeout: 5000 });
+  await ttPage.userSettingsButton.click();
+
+  const settingsModal = page.getByTestId("settings-modal");
+  await expect(settingsModal).toBeVisible({ timeout: 15000 });
+
+  const sidebar = settingsModal.getByTestId("settings-sidebar");
+  const menuToggle = settingsModal.getByTestId("settings-menu-toggle");
+  const catalogSyncTab = settingsModal.getByTestId("settings-tab-catalog-sync");
+
+  const hasMobileToggle = await menuToggle
+    .isVisible({ timeout: 500 })
+    .catch(() => false);
+  if (hasMobileToggle) {
+    const tabBox = await catalogSyncTab.boundingBox().catch(() => null);
+    const tabLikelyOffCanvas =
+      !tabBox || tabBox.width < 20 || tabBox.x + tabBox.width < 0;
+
+    if (tabLikelyOffCanvas) {
+      await menuToggle.click();
+      await expect
+        .poll(
+          async () =>
+            (await sidebar.boundingBox().catch(() => null))?.width ?? 0,
+          { timeout: 5000, intervals: [100, 250, 500] }
+        )
+        .toBeGreaterThan(150);
+    }
+  }
+
+  await expect(catalogSyncTab).toBeVisible({ timeout: 10000 });
+  await catalogSyncTab.scrollIntoViewIfNeeded().catch(() => undefined);
+  try {
+    await catalogSyncTab.click({ timeout: 4000 });
+  } catch {
+    await catalogSyncTab.dispatchEvent("click");
+  }
+
+  await expect(page.getByTestId("settings-genre-save")).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 test.describe("USERSETTINGS-002: Catalog & Sync", () => {
