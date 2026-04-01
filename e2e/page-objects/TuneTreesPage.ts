@@ -2165,124 +2165,116 @@ export class TuneTreesPage {
       await this.page.waitForTimeout(delay);
     };
 
+    const isMenuOpen = async () => {
+      const [expanded, visible] = await Promise.all([
+        evalTrigger.getAttribute("aria-expanded").catch(() => null),
+        menu.isVisible().catch(() => false),
+      ]);
+
+      return expanded === "true" || visible;
+    };
+
+    const closeMenu = async () => {
+      if (!(await isMenuOpen())) {
+        return;
+      }
+
+      await evalTrigger.focus().catch(() => undefined);
+      await evalTrigger.press("Escape").catch(async () => {
+        await this.page.keyboard.press("Escape").catch(() => undefined);
+      });
+
+      await expect
+        .poll(() => isMenuOpen(), {
+          timeout: 2000,
+          intervals: [100, 250, 500],
+        })
+        .toBe(false)
+        .catch(() => undefined);
+    };
+
+    const openMenu = async () => {
+      if (await isMenuOpen()) {
+        return;
+      }
+
+      await whichRow.scrollIntoViewIfNeeded().catch(() => undefined);
+      await evalTrigger.scrollIntoViewIfNeeded().catch(() => undefined);
+      await evalTrigger.focus().catch(() => undefined);
+
+      try {
+        await evalTrigger.click({ timeout: 4000 });
+      } catch {
+        await evalTrigger.press("Enter");
+      }
+
+      await expect
+        .poll(() => isMenuOpen(), {
+          timeout: 4000,
+          intervals: [100, 250, 500, 1000],
+        })
+        .toBe(true);
+    };
+
     for (let attempt = 0; attempt < 3; attempt++) {
       if (await triggerAlreadySelected()) {
         return;
       }
 
-      // ACT: Select rating
-      await evalTrigger.scrollIntoViewIfNeeded().catch(() => undefined);
-      await evalTrigger.focus().catch(() => undefined);
+      // The grid cell keeps local open state to survive re-renders. Double-click,
+      // force-click, and global keyboard fallbacks can easily toggle it twice and
+      // leave Playwright fighting the component instead of selecting an option.
+      await closeMenu();
 
-      let triggerClicked = false;
-      for (const force of [false, true]) {
-        try {
-          await evalTrigger
-            .click({ trial: true, timeout: 3000, force })
-            .catch(() => undefined);
-          await evalTrigger.click({ delay: 50, timeout: 3000, force });
-          triggerClicked = true;
-          break;
-        } catch (error) {
-          if (this.page.isClosed()) {
-            throw error;
-          }
-          if (force) {
-            try {
-              await this.page.keyboard.press("Escape");
-            } catch {}
-          }
+      try {
+        await openMenu();
+      } catch (error) {
+        if (this.page.isClosed()) {
+          throw error;
         }
-      }
-
-      let menuOpened = false;
-      if (triggerClicked) {
-        try {
-          await expect(menu).toBeVisible({ timeout: 3000 });
-          menuOpened = true;
-        } catch {
-          for (const key of ["ArrowDown", "Enter", " "]) {
-            try {
-              await this.page.keyboard.press(key);
-              await expect(menu).toBeVisible({ timeout: 1500 });
-              menuOpened = true;
-              break;
-            } catch {}
-          }
-        }
-      } else {
-        for (const key of ["ArrowDown", "Enter", " "]) {
-          try {
-            await this.page.keyboard.press(key);
-            await expect(menu).toBeVisible({ timeout: 1500 });
-            menuOpened = true;
-            break;
-          } catch {}
-        }
-      }
-
-      if (!menuOpened) {
-        // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
-        // Avoid hanging until the full test timeout; back out and retry.
-        try {
-          await this.page.keyboard.press("Escape");
-        } catch {}
-
         await waitBetweenAttempts();
         continue;
       }
 
       const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
       try {
+        await expect(menu).toBeVisible({ timeout: 4000 });
         await expect(whichOption).toBeVisible({ timeout: 4000 });
         await expect(whichOption).toBeEnabled({ timeout: 4000 });
 
-        let optionClicked = false;
-        for (const force of [false, true]) {
-          try {
-            await whichOption.scrollIntoViewIfNeeded().catch(() => undefined);
-            await whichOption.click({ trial: true, timeout: 3000, force });
-            await whichOption.click({ timeout: 3000, force });
-            optionClicked = true;
-            break;
-          } catch {
-            if (force) {
-              throw new Error(
-                `Failed to click recall evaluation option ${evalValue} for tune ${tuneId}`
-              );
-            }
-          }
-        }
-
-        if (!optionClicked) {
-          throw new Error(
-            `Failed to click recall evaluation option ${evalValue} for tune ${tuneId}`
-          );
-        }
+        await whichOption.scrollIntoViewIfNeeded().catch(() => undefined);
+        await whichOption.click({ timeout: 3000 });
       } catch {
-        // Menu items can detach during quick re-renders; back out and retry.
-        try {
-          await this.page.keyboard.press("Escape");
-        } catch {}
+        await closeMenu();
         await waitBetweenAttempts();
         continue;
       }
-      await expect(menu)
-        .toBeHidden({ timeout: 3000 })
-        .catch(() => undefined);
 
       try {
         await expect
-          .poll(async () => (await evalTrigger.textContent()) ?? "", {
-            timeout: 5000,
-            intervals: [100, 250, 500, 1000],
-          })
-          .toMatch(new RegExp(expectedLabel, "i"));
-      } catch {
-        try {
-          await this.page.keyboard.press("Escape");
-        } catch {}
+          .poll(
+            async () => {
+              const [triggerText, open] = await Promise.all([
+                evalTrigger.textContent().catch(() => null),
+                isMenuOpen(),
+              ]);
 
+              return {
+                triggerText: triggerText ?? "",
+                open,
+              };
+            },
+            {
+              timeout: 5000,
+              intervals: [100, 250, 500, 1000],
+            }
+          )
+          .toMatchObject({
+            triggerText: expect.stringMatching(new RegExp(expectedLabel, "i")),
+            open: false,
+          });
+      } catch {
+        await closeMenu();
         await waitBetweenAttempts();
         continue;
       }

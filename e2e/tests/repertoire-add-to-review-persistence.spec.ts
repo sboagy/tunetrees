@@ -17,6 +17,10 @@ import {
 } from "../../src/lib/db/catalog-tune-ids";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import {
+  runTestHook,
+  waitForPracticeViewSettled,
+} from "../helpers/practice-view";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -42,8 +46,6 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     });
   });
 
-  // SKIP: UI BUG - Tunes added to review don't appear in practice queue
-  // Dialog confirms "Added 3 tunes" but they don't show in practice grid
   test("CRITICAL: Add To Review must actually add the selected tunes to practice queue", async ({
     page,
   }) => {
@@ -54,8 +56,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
       return;
     }
     // Navigate to Repertoire tab
-    await page.getByTestId("tab-repertoire").click();
-    await page.waitForTimeout(2000);
+    await ttPage.navigateToTab("repertoire");
 
     // Wait for table to load - use data-index to get actual rows
     await page.waitForSelector("tbody tr[data-index]", {
@@ -107,16 +108,10 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     console.log(`📨 Dialog says added: ${addedCount} tunes`);
     expect(addedCount).toBe(3);
 
-    // CRITICAL: Wait for sync to complete
-    console.log("⏳ Waiting for sync to complete...");
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Navigate to Practice tab
-    await page.getByTestId("tab-practice").click();
-    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
-      state: "visible",
-      timeout: 10000,
-    });
+    await ttPage.navigateToTab("practice");
 
     // Select "Today" from queue date picker to trigger queue display
     const queueButton = page.getByRole("button", {
@@ -125,8 +120,12 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     if (await queueButton.isVisible()) {
       await queueButton.click();
       await page.getByRole("button", { name: /^Today$/ }).click();
-      await page.waitForTimeout(2000);
     }
+
+    await waitForPracticeViewSettled(page, ttPage, {
+      expectRows: true,
+      timeoutMs: 20000,
+    });
 
     // CRITICAL: Verify those EXACT 3 tunes appear in the practice queue
     console.log("🔍 Verifying the selected tunes appear in practice queue...");
@@ -158,22 +157,18 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     console.log(`📅 Found ${todayCount} tunes scheduled for "Today"`);
     expect(todayCount).toBe(3);
 
+    await runTestHook(page, "__persistDbForTest");
+
     // RELOAD THE PAGE
     console.log("🔄 Reloading page...");
     await page.reload();
-    await page.waitForSelector('[data-testid="tab-practice"]', {
-      state: "visible",
-      timeout: 15000,
-    });
-    await page.waitForTimeout(2000);
 
     // Navigate back to Practice tab
-    await page.getByTestId("tab-practice").click();
-    await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
-      state: "visible",
-      timeout: 10000,
+    await ttPage.navigateToTab("practice");
+    await waitForPracticeViewSettled(page, ttPage, {
+      expectRows: true,
+      timeoutMs: 20000,
     });
-    await page.waitForTimeout(1000);
 
     // CRITICAL: Verify those EXACT 3 tunes STILL appear after reload
     console.log("🔍 Verifying tunes persist after reload...");

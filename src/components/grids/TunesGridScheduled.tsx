@@ -95,12 +95,6 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     return mappedData;
   });
 
-  // Track open state for RecallEvalComboBox per tune to preserve dropdowns across refreshes
-  const [openMenus, setOpenMenus] = createSignal<Record<string, boolean>>({});
-  const getRecallEvalOpen = (tuneId: string) => !!openMenus()[tuneId];
-  const setRecallEvalOpen = (tuneId: string, isOpen: boolean) =>
-    setOpenMenus((prev) => ({ ...prev, [tuneId]: isOpen }));
-
   // Notify parent when tunes change (for flashcard view)
   createEffect(() => {
     if (props.onTunesChange) {
@@ -192,8 +186,6 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           cellCallbacks={{
             onRecallEvalChange: handleRecallEvalChange,
             onGoalChange: props.onGoalChange,
-            getRecallEvalOpen,
-            setRecallEvalOpen,
             goals: () => goalsData() ?? [],
           }}
           onTableReady={(tbl) => {

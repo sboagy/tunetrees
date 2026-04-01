@@ -16,8 +16,8 @@ log.setLevel("info");
 /**
  * Clock tolerance for time comparisons
  *
- * CI environments can exhibit multi-second scheduling delays.
- * Mobile browsers show higher variance (observed up to ~300-500ms).
+ * CI environments can exhibit multi-second scheduling delays around reload and
+ * setup, so verification keeps a buffer even though the perceived time is fixed.
  */
 export const CLOCK_TOLERANCE_MS = 18000; // Base tolerance for CI
 
@@ -100,7 +100,11 @@ export function expectDateClose(
 }
 
 /**
- * Set a stable, frozen date/time in the browser context
+ * Set a stable, fixed date/time in the browser context.
+ *
+ * Use `setFixedTime` rather than `install({ time })`: `install` starts a mocked
+ * clock that continues to advance, while these scheduling tests need `Date.now()`
+ * to remain pinned until the helper is called again.
  *
  * @param context - Playwright BrowserContext
  * @param date - Date object or ISO string to freeze time at
@@ -117,11 +121,9 @@ export async function setStableDate(
 ): Promise<void> {
   const timestamp = typeof date === "string" ? new Date(date) : date;
 
-  log.debug(`⏰ Setting stable date: ${timestamp.toISOString()}`);
+  log.debug(`⏰ Setting fixed date: ${timestamp.toISOString()}`);
 
-  await context.clock.install({
-    time: timestamp,
-  });
+  await context.clock.setFixedTime(timestamp);
 }
 
 /**
@@ -160,9 +162,7 @@ export async function advanceDays(
     `⏰ Advancing ${days} days to: ${newDate.toISOString()} (from ${baseDate?.toISOString() || "current"})`
   );
 
-  await context.clock.install({
-    time: newDate,
-  });
+  await context.clock.setFixedTime(newDate);
 
   return newDate;
 }
@@ -187,9 +187,7 @@ export async function advanceHours(
     `⏰ Advancing ${hours} hours to: ${newDate.toISOString()} (from ${baseDate.toISOString()})`
   );
 
-  await context.clock.install({
-    time: newDate,
-  });
+  await context.clock.setFixedTime(newDate);
 
   return newDate;
 }
@@ -213,10 +211,10 @@ export async function getCurrentDate(page: Page): Promise<Date> {
 }
 
 /**
- * Verify that the browser clock is actually frozen at expected time
+ * Verify that the browser clock is actually fixed at expected time
  *
  * @param page - Playwright Page
- * @param expectedDate - Expected frozen date
+ * @param expectedDate - Expected fixed date
  * @param toleranceMs - Tolerance in milliseconds (default: CLOCK_TOLERANCE_MS)
  * @param projectName - Optional project name for mobile detection
  *
@@ -309,7 +307,7 @@ export async function simulateMultiDayScenario(
   for (let day = 0; day < dayCount; day++) {
     log.debug(`📅 Day ${day + 1}/${dayCount}: ${currentDate.toISOString()}`);
 
-    await context.clock.install({ time: currentDate });
+    await context.clock.setFixedTime(currentDate);
     await onEachDay(currentDate, day);
 
     // Advance to next day (same time tomorrow)

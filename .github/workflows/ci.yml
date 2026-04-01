@@ -298,11 +298,8 @@ jobs:
         run: |
           set -o pipefail
           echo "🎬 Running sharded test suite (shard ${{ matrix.shard }}/4)"
-          npm run test:e2e -- \
+          npm run test:e2e:both:ci -- \
             --shard=${{ matrix.shard }}/4 \
-            --project=chromium-auth \
-            --project=chromium \
-            --project="Mobile Chrome" \
             2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
 
       - name: Upload Playwright log (Shard ${{ matrix.shard }}/4)
@@ -582,8 +579,7 @@ jobs:
           done
 
           echo "🎭 Running PWA Offline Tests..."
-          npm run test:e2e -- \
-            --project=chromium-pwa-offline \
+          npm run test:e2e:offline:ci -- \
             2>&1 | tee "playwright-logs/playwright-pwa.log"
         shell: bash
 
