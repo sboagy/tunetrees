@@ -63,9 +63,8 @@ test.describe("REFS-002: References Drag Reorder", () => {
     await ttPage.referenceSubmitButton.click();
     await page.waitForTimeout(500);
 
-    await expect(
-      page.getByRole("heading", { name: "2 references" })
-    ).toBeVisible({
+    // The public baseline already includes one tune-level reference.
+    await expect(ttPage.referencesCount).toHaveText(/^2 references$/i, {
       timeout: 15000,
     });
 
@@ -78,9 +77,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
     await ttPage.referenceTitleInput.fill("Second Reference");
     await ttPage.referenceSubmitButton.click();
     await page.waitForTimeout(500);
-    await expect(
-      page.getByRole("heading", { name: "3 references" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^3 references$/i, {
       timeout: 15000,
     });
   });

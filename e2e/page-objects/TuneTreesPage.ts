@@ -797,11 +797,32 @@ export class TuneTreesPage {
     const options = select.locator("option");
 
     await expect
-      .poll(async () => options.count(), {
-        timeout: 5000,
-        intervals: [100, 250, 500],
-      })
-      .toBeGreaterThan(0);
+      .poll(
+        async () => {
+          const count = await options.count();
+
+          for (let i = 0; i < count; i++) {
+            const option = options.nth(i);
+            const value = (await option.getAttribute("value"))?.trim();
+            const label = (await option.textContent())?.trim();
+
+            if (value && value.toLowerCase() === desiredNormalized) {
+              return true;
+            }
+
+            if (label?.toLowerCase().includes(desiredNormalized)) {
+              return true;
+            }
+          }
+
+          return false;
+        },
+        {
+          timeout: 10000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
 
     const count = await options.count();
     for (let i = 0; i < count; i++) {
@@ -2129,24 +2150,85 @@ export class TuneTreesPage {
     const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
     const evalTrigger = this.page.getByTestId(`recall-eval-${tuneId}`);
     await expect(evalTrigger).toBeVisible({ timeout: 5000 });
+    await expect(evalTrigger).toBeEnabled({ timeout: 5000 });
+
+    const expectedLabel =
+      evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
+    const triggerAlreadySelected = async () => {
+      const text = (await evalTrigger.textContent().catch(() => null)) ?? "";
+      return new RegExp(expectedLabel, "i").test(text);
+    };
+
+    const waitBetweenAttempts = async () => {
+      if (!doTimeouts || this.page.isClosed()) return;
+      const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
+      await this.page.waitForTimeout(delay);
+    };
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      // ACT: Select rating
-      await evalTrigger.click({ delay: 50 });
+      if (await triggerAlreadySelected()) {
+        return;
+      }
 
-      try {
-        await expect(menu).toBeVisible({ timeout: 3000 });
-      } catch {
+      // ACT: Select rating
+      await evalTrigger.scrollIntoViewIfNeeded().catch(() => undefined);
+      await evalTrigger.focus().catch(() => undefined);
+
+      let triggerClicked = false;
+      for (const force of [false, true]) {
+        try {
+          await evalTrigger
+            .click({ trial: true, timeout: 3000, force })
+            .catch(() => undefined);
+          await evalTrigger.click({ delay: 50, timeout: 3000, force });
+          triggerClicked = true;
+          break;
+        } catch (error) {
+          if (this.page.isClosed()) {
+            throw error;
+          }
+          if (force) {
+            try {
+              await this.page.keyboard.press("Escape");
+            } catch {}
+          }
+        }
+      }
+
+      let menuOpened = false;
+      if (triggerClicked) {
+        try {
+          await expect(menu).toBeVisible({ timeout: 3000 });
+          menuOpened = true;
+        } catch {
+          for (const key of ["ArrowDown", "Enter", " "]) {
+            try {
+              await this.page.keyboard.press(key);
+              await expect(menu).toBeVisible({ timeout: 1500 });
+              menuOpened = true;
+              break;
+            } catch {}
+          }
+        }
+      } else {
+        for (const key of ["ArrowDown", "Enter", " "]) {
+          try {
+            await this.page.keyboard.press(key);
+            await expect(menu).toBeVisible({ timeout: 1500 });
+            menuOpened = true;
+            break;
+          } catch {}
+        }
+      }
+
+      if (!menuOpened) {
         // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
         // Avoid hanging until the full test timeout; back out and retry.
         try {
           await this.page.keyboard.press("Escape");
         } catch {}
 
-        if (doTimeouts) {
-          const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-          await this.page.waitForTimeout(delay);
-        }
+        await waitBetweenAttempts();
         continue;
       }
 
@@ -2154,33 +2236,58 @@ export class TuneTreesPage {
       try {
         await expect(whichOption).toBeVisible({ timeout: 4000 });
         await expect(whichOption).toBeEnabled({ timeout: 4000 });
-        await whichOption.click({ trial: true, timeout: 3000 });
-        await whichOption.click({ timeout: 3000 });
+
+        let optionClicked = false;
+        for (const force of [false, true]) {
+          try {
+            await whichOption.scrollIntoViewIfNeeded().catch(() => undefined);
+            await whichOption.click({ trial: true, timeout: 3000, force });
+            await whichOption.click({ timeout: 3000, force });
+            optionClicked = true;
+            break;
+          } catch {
+            if (force) {
+              throw new Error(
+                `Failed to click recall evaluation option ${evalValue} for tune ${tuneId}`
+              );
+            }
+          }
+        }
+
+        if (!optionClicked) {
+          throw new Error(
+            `Failed to click recall evaluation option ${evalValue} for tune ${tuneId}`
+          );
+        }
       } catch {
         // Menu items can detach during quick re-renders; back out and retry.
         try {
           await this.page.keyboard.press("Escape");
         } catch {}
-        if (doTimeouts) {
-          const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-          await this.page.waitForTimeout(delay);
-        }
+        await waitBetweenAttempts();
         continue;
       }
       await expect(menu)
         .toBeHidden({ timeout: 3000 })
         .catch(() => undefined);
 
-      const expectedLabel =
-        evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
-      await expect
-        .poll(async () => (await evalTrigger.textContent()) ?? "", {
-          timeout: 5000,
-          intervals: [100, 250, 500, 1000],
-        })
-        .toMatch(new RegExp(expectedLabel, "i"));
+      try {
+        await expect
+          .poll(async () => (await evalTrigger.textContent()) ?? "", {
+            timeout: 5000,
+            intervals: [100, 250, 500, 1000],
+          })
+          .toMatch(new RegExp(expectedLabel, "i"));
+      } catch {
+        try {
+          await this.page.keyboard.press("Escape");
+        } catch {}
 
-      if (doTimeouts) {
+        await waitBetweenAttempts();
+        continue;
+      }
+
+      if (doTimeouts && !this.page.isClosed()) {
         const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
         await this.page.waitForTimeout(delay);
       }

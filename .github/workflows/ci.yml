@@ -235,7 +235,7 @@ jobs:
         # already exported into $GITHUB_ENV after `supabase start`.
         run: |
           tmp_env_file="$(mktemp)"
-          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
+          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
           mv "$tmp_env_file" .env.local.template
 
       - name: Check SQLite schema via Postgres introspection
@@ -263,7 +263,8 @@ jobs:
         run: |
           cd worker
           npm ci
-          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          echo "SUPABASE_URL=$SUPABASE_URL" > .dev.vars
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
@@ -465,7 +466,7 @@ jobs:
         # already exported into $GITHUB_ENV after `supabase start`.
         run: |
           tmp_env_file="$(mktemp)"
-          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
+          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
           mv "$tmp_env_file" .env.local.template
 
       - name: Check SQLite schema via Postgres introspection
@@ -485,7 +486,8 @@ jobs:
         run: |
           cd worker
           npm ci
-          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          echo "SUPABASE_URL=$SUPABASE_URL" > .dev.vars
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
@@ -498,16 +500,22 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Build PWA
-        run: npm run build:preview-local
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+        run: |
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY not set after Supabase start}"
+          export VITE_SUPABASE_URL="$SUPABASE_URL"
+          export VITE_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          npm run build:preview-local
 
       - name: Create Playwright output directories
         run: mkdir -p playwright-logs blob-report test-results
 
       - name: Run PWA Offline Tests
         run: |
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY not set after Supabase start}"
+          export VITE_SUPABASE_URL="$SUPABASE_URL"
+          export VITE_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
           set -o pipefail
           echo "🚀 Starting Preview Server on port 4173..."
           npm run preview:local &
@@ -534,9 +542,6 @@ jobs:
             --project=chromium-pwa-offline \
             2>&1 | tee "playwright-logs/playwright-pwa.log"
         shell: bash
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       - name: Upload Playwright log (PWA)
         if: always()

@@ -74,6 +74,8 @@ enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 # sql_paths = ["./seed.sql", "./seeds/rsTop500.sql", "./seeds/null_irishtune_reference_user_ref.sql"]
+# This baseline is public-schema-only. Shared auth fixtures are seeded from
+# rhizome before TuneTrees migrations/seeds run.
 sql_paths = ["./seeds/baseline_local_20260217.sql"]
 
 [db.network_restrictions]

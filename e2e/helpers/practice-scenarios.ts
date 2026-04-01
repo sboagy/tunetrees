@@ -372,6 +372,53 @@ async function getInternalUserRef(
   return user.userId;
 }
 
+async function ensureUserProfileRow(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await retryTransientSetupOperation(
+    `user_profile normalization for ${user.name}`,
+    async () => {
+      const { data: existingRows, error: queryError } = await client
+        .from("user_profile")
+        .select("id")
+        .eq("id", user.userId)
+        .limit(1);
+
+      if (queryError) {
+        throw new Error(
+          `Failed to read user_profile ${user.userId} for ${user.name}: ${queryError.message}`
+        );
+      }
+
+      if ((existingRows?.length ?? 0) > 0) {
+        return;
+      }
+
+      const seededName = user.name.endsWith(" Test")
+        ? user.name
+        : `${user.name} Test`;
+
+      const { error: insertError } = await client.from("user_profile").insert({
+        id: user.userId,
+        name: seededName,
+        email: user.email,
+        sr_alg_type: null,
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: new Date().toISOString(),
+        device_id: "test-seed",
+      });
+
+      if (insertError) {
+        throw new Error(
+          `Failed to create user_profile ${user.userId} for ${user.name}: ${insertError.message}`
+        );
+      }
+    }
+  );
+}
+
 async function assertHasLocalRepertoires(
   page: Page,
   minCount = 1
@@ -550,6 +597,8 @@ async function normalizeUserRepertoireRow(user: TestUser, supabase?: any) {
   const userKey = user.email.split(".")[0];
   const client = supabase ?? (await getTestUserClient(userKey)).supabase;
 
+  await ensureUserProfileRow(user, client);
+
   await retryTransientSetupOperation(
     `repertoire normalization for ${user.name}`,
     async () => {
@@ -606,6 +655,8 @@ async function normalizeUserRepertoireRow(user: TestUser, supabase?: any) {
 async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
   const userKey = user.email.split(".")[0];
   const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await ensureUserProfileRow(user, client);
 
   await retryTransientSetupOperation(
     `avatar reset for ${user.name}`,
@@ -1408,48 +1459,88 @@ export async function setupForPracticeTestsParallel(
       // For practice-driven scenarios we expect at least one scheduled tune row (and thus at least
       // one recall-eval control) to exist.
       const practiceGrid = page.getByTestId("tunes-grid-scheduled");
-      await expect(practiceGrid).toBeVisible({ timeout: 25000 });
+      const waitForPracticeQueueReady = async (timeoutMs: number) => {
+        await expect(practiceGrid).toBeVisible({ timeout: timeoutMs });
 
-      // Wait for at least one recall-eval control to appear
-      await expect
-        .poll(
-          async () => {
-            return await practiceGrid
-              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-              .count();
-          },
-          { timeout: 15000, intervals: [200, 500, 1000] }
-        )
-        .toBeGreaterThan(0);
+        // Wait for at least one recall-eval control to appear
+        await expect
+          .poll(
+            async () => {
+              return await practiceGrid
+                .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+                .count();
+            },
+            { timeout: timeoutMs, intervals: [200, 500, 1000] }
+          )
+          .toBeGreaterThan(0);
 
-      // CRITICAL: Additional wait for queue generation resource to complete.
-      // The grid renders when practice_list_staged has data, but the daily_practice_queue
-      // table is populated asynchronously via a SolidJS createResource (ensureDailyQueue).
-      // In slow CI environments, the queue resource may still be initializing when the grid appears.
-      // Without this wait, flashcard tests proceed with an empty queue and fail with "element(s) not found".
-      // Wait for count to stabilize (same value twice in a row = queue ready)
-      let lastCount = 0;
-      let stableCount = 0;
-      await expect
-        .poll(
-          async () => {
-            const currentCount = await practiceGrid
-              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-              .count();
-            if (currentCount === lastCount && currentCount > 0) {
-              stableCount++;
-            } else {
-              stableCount = 0;
-            }
-            lastCount = currentCount;
-            return stableCount >= 2; // Same count twice = stable
-          },
-          { timeout: 25000, intervals: [500, 1000, 2000] }
-        )
-        .toBeTruthy();
+        // CRITICAL: Additional wait for queue generation resource to complete.
+        // The grid renders when practice_list_staged has data, but the daily_practice_queue
+        // table is populated asynchronously via a SolidJS createResource (ensureDailyQueue).
+        // In slow CI environments, the queue resource may still be initializing when the grid appears.
+        // Without this wait, flashcard tests proceed with an empty queue and fail with "element(s) not found".
+        // Wait for count to stabilize (same value twice in a row = queue ready)
+        let lastCount = 0;
+        let stableCount = 0;
+        await expect
+          .poll(
+            async () => {
+              const currentCount = await practiceGrid
+                .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+                .count();
+              if (currentCount === lastCount && currentCount > 0) {
+                stableCount++;
+              } else {
+                stableCount = 0;
+              }
+              lastCount = currentCount;
+              return stableCount >= 2; // Same count twice = stable
+            },
+            { timeout: timeoutMs, intervals: [500, 1000, 2000] }
+          )
+          .toBeTruthy();
+
+        return lastCount;
+      };
+
+      let readyCount: number;
+      try {
+        readyCount = await waitForPracticeQueueReady(25000);
+      } catch {
+        const [loadingVisible, emptyVisible] = await Promise.all([
+          page
+            .getByText("Loading practice queue...")
+            .isVisible()
+            .catch(() => false),
+          page
+            .getByText("All Caught Up!")
+            .isVisible()
+            .catch(() => false),
+        ]);
+
+        console.warn(
+          `[${user.name}] Practice grid did not become ready during setup; forcing sync down and retrying.`,
+          { loadingVisible, emptyVisible }
+        );
+
+        await page.evaluate(async () => {
+          const forceSyncDown = (window as any).__forceSyncDownForTest;
+          if (typeof forceSyncDown === "function") {
+            await forceSyncDown();
+          }
+        });
+        await page
+          .waitForLoadState("networkidle", { timeout: 15000 })
+          .catch(() => undefined);
+        await expect(page.getByTestId("practice-columns-button")).toBeVisible({
+          timeout: 15000,
+        });
+
+        readyCount = await waitForPracticeQueueReady(30000);
+      }
 
       log.debug(
-        `[${user.name}] Queue ready: ${lastCount} tunes in practice grid`
+        `[${user.name}] Queue ready: ${readyCount} tunes in practice grid`
       );
 
       // Some tests later simulate a fresh device by wiping local SQLite and
