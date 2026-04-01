@@ -1150,8 +1150,12 @@ const TTInner: ParentComponent = (props) => {
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_KEY);
     localStorage.removeItem(LEGACY_ANONYMOUS_USER_ID_KEY);
 
-    // rhizome's signOut calls supabase.auth.signOut() and cleans up
-    await rhizome.signOut();
+    if (isAnon) {
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) throw error;
+    } else {
+      await rhizome.signOut();
+    }
 
     setLocalDb(null);
     setUserIdInt(null);

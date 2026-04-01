@@ -90,7 +90,18 @@ const TUNETREES_REPERTOIRE_CHILD_TABLES = [
 /** Minimum remaining validity before we consider the snapshot stale. */
 const AUTH_EXPIRY_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 
-const TEST_PASSWORD = "TestPassword123!";
+function getRequiredTestPassword(): string {
+  const value =
+    process.env.TEST_USER_PASSWORD ?? process.env.ALICE_TEST_PASSWORD;
+
+  if (value && value.trim().length > 0) {
+    return value;
+  }
+
+  throw new Error(
+    "[auth.setup] Missing TEST_USER_PASSWORD or ALICE_TEST_PASSWORD environment variable."
+  );
+}
 
 // -- helpers ------------------------------------------------------------------
 
@@ -462,7 +473,7 @@ setup("authenticate all test users", async ({ browser }) => {
       console.log(`  [${testUser.name}] step 2a: filling email`);
       await page.getByLabel("Email").fill(testUser.email);
       console.log(`  [${testUser.name}] step 2b: filling password`);
-      await page.locator("input#password").fill(TEST_PASSWORD);
+      await page.locator("input#password").fill(getRequiredTestPassword());
       console.log(`  [${testUser.name}] step 2c: clicking Sign In`);
       await page.getByRole("button", { name: "Sign In" }).click();
       console.log(`  [${testUser.name}] step 2: sign-in clicked`);

@@ -7,7 +7,7 @@
   "scripts": {
     "postinstall": "node scripts/patch-supabase-sourcemaps.js",
     "dev": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vite",
-    "dev:worker": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- sh -c 'cd worker && npm run dev'",
+    "dev:worker": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- npm --prefix worker run dev",
     "dev:all": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- concurrently \"npm run dev\" \"npm run dev:worker\"",
     "ai:serve:local": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- supabase functions serve ai-chat --no-verify-jwt",
     "build": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- npm run build:production",
