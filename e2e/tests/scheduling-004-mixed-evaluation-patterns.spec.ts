@@ -357,7 +357,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       if (!rating) continue;
 
       await ttPage.setRowEvaluation(row, rating);
-      await page.waitForTimeout(500); // Stagger evaluations to avoid overwhelming the system
+      await page.waitForTimeout(1000); // Stagger evaluations to avoid overwhelming the system
     }
 
     await submitAndWaitForPracticeSettled(page, ttPage);

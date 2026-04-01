@@ -92,11 +92,29 @@ jobs:
       - name: Checkout TuneTrees
         uses: actions/checkout@v5
 
+      - name: Resolve shared repo refs
+        id: shared_refs
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          resolve_ref() {
+            local repo="$1"
+            local candidate="$2"
+            if git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$candidate" >/dev/null 2>&1; then
+              printf '%s\n' "$candidate"
+            else
+              printf 'main\n'
+            fi
+          }
+
+          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Rhizome (shared Supabase config + DB scripts)
         uses: actions/checkout@v5
         with:
           repository: sboagy/rhizome
-          ref: main
+          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
           path: rhizome
           # For private repos, add: token: ${{ secrets.GH_PAT }}
 
@@ -104,7 +122,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: sboagy/oosync
-          ref: main
+          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
           path: oosync
           # For private repos, add: token: ${{ secrets.GH_PAT }}
 
@@ -125,6 +143,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Overlay checked-out Rhizome and oosync packages
+        run: |
+          npm install --no-save --no-package-lock ./rhizome ./oosync
 
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@v2
@@ -225,7 +247,7 @@ jobs:
         # script, which is safe to run against the shared multi-tenant instance.
         working-directory: rhizome
         run: |
-          ./scripts/db-push-local.sh ${{ github.workspace }}
+          ./scripts/db-push-local.sh --public-cleared ${{ github.workspace }}
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
@@ -333,18 +355,36 @@ jobs:
       - name: Checkout TuneTrees
         uses: actions/checkout@v5
 
+      - name: Resolve shared repo refs
+        id: shared_refs
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          resolve_ref() {
+            local repo="$1"
+            local candidate="$2"
+            if git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$candidate" >/dev/null 2>&1; then
+              printf '%s\n' "$candidate"
+            else
+              printf 'main\n'
+            fi
+          }
+
+          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
       - name: Checkout Rhizome (shared Supabase config + DB scripts)
         uses: actions/checkout@v5
         with:
           repository: sboagy/rhizome
-          ref: main
+          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
           path: rhizome
 
       - name: Checkout oosync (sync library for worker)
         uses: actions/checkout@v5
         with:
           repository: sboagy/oosync
-          ref: main
+          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
           path: oosync
 
       - name: AGGRESSIVE DISK CLEANUP
@@ -363,6 +403,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Overlay checked-out Rhizome and oosync packages
+        run: |
+          npm install --no-save --no-package-lock ./rhizome ./oosync
 
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@v2
@@ -456,7 +500,7 @@ jobs:
       - name: Apply TuneTrees migrations + seeds (Rhizome db-push)
         working-directory: rhizome
         run: |
-          ./scripts/db-push-local.sh ${{ github.workspace }}
+          ./scripts/db-push-local.sh --public-cleared ${{ github.workspace }}
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 

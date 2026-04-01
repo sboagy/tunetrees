@@ -267,7 +267,7 @@ reapply_tunetrees_schema_and_seed() {
     echo "==> Reapplying TuneTrees migrations + seeds"
     (
         cd "${rhizome_repo}"
-        ./scripts/db-push-local.sh "${REPO_ROOT}"
+        ./scripts/db-push-local.sh --public-cleared "${REPO_ROOT}"
     )
 }
 
@@ -356,7 +356,7 @@ case "$RESET_MODE" in
 esac
 
 SECONDS=0
-npm run test:e2e:chromium:both:html -- "$@" 2>&1 | tee "$LOG_FILE"
+npm run test:e2e:chromium:all:html -- "$@" 2>&1 | tee "$LOG_FILE"
 # npm run test:e2e:chromium:html -- "$@" 2>&1 | tee "$LOG_FILE"
 MINUTES=$(echo "scale=2; $SECONDS / 60" | bc)
 echo "Test completed in ${MINUTES}m" | tee -a "$LOG_FILE"
