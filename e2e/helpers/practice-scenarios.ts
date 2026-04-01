@@ -5,6 +5,8 @@
  * Uses direct Supabase calls to manipulate database state before tests run.
  */
 
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
 import postgres from "postgres";
@@ -313,8 +315,37 @@ const internalUserRefCache: Map<string, string> = new Map();
 const E2E_DATABASE_URL =
   process.env.DATABASE_URL ||
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+// CI can occasionally reach repertoire seeding with canonical tune fixtures
+// missing from Postgres. Keep the repair source in the checked-in seed SQL so
+// setup can restore only the exact prerequisite rows it needs.
+const CANONICAL_TUNE_SEED_FILES = [
+  path.resolve(process.cwd(), "supabase/seeds/test_private_tunes.sql"),
+  path.resolve(process.cwd(), "supabase/seeds/baseline_local_20260217.sql"),
+] as const;
+const CANONICAL_TUNE_INSERT_SQL = `
+INSERT INTO public.tune (
+  id,
+  id_foreign,
+  primary_origin,
+  title,
+  type,
+  structure,
+  mode,
+  incipit,
+  genre,
+  private_for,
+  deleted,
+  sync_version,
+  last_modified_at,
+  device_id,
+  composer,
+  artist,
+  release_year
+) VALUES
+`;
 
 let e2eSqlClient: ReturnType<typeof postgres> | null = null;
+let canonicalTuneSeedRowsPromise: Promise<Map<string, string>> | null = null;
 
 function getE2eSqlClient() {
   if (!e2eSqlClient) {
@@ -322,6 +353,130 @@ function getE2eSqlClient() {
   }
 
   return e2eSqlClient;
+}
+
+function collectCanonicalTuneRows(seedSql: string): Map<string, string> {
+  const rowsById = new Map<string, string>();
+  let inTuneInsert = false;
+
+  for (const rawLine of seedSql.split(/\r?\n/)) {
+    const line = rawLine.trim();
+
+    if (!inTuneInsert) {
+      if (line.startsWith('INSERT INTO "public"."tune"')) {
+        inTuneInsert = true;
+      }
+      continue;
+    }
+
+    if (!line || line === "VALUES" || line === ") VALUES") {
+      continue;
+    }
+
+    const rowMatch = line.match(/^\('([^']+)'/);
+    if (!rowMatch) {
+      continue;
+    }
+
+    rowsById.set(rowMatch[1], line.replace(/[;,]\s*$/, ""));
+
+    if (line.endsWith(";")) {
+      inTuneInsert = false;
+    }
+  }
+
+  return rowsById;
+}
+
+async function getCanonicalTuneSeedRows(): Promise<Map<string, string>> {
+  if (!canonicalTuneSeedRowsPromise) {
+    canonicalTuneSeedRowsPromise = (async () => {
+      const rowsById = new Map<string, string>();
+
+      // Parse the tune INSERT blocks once and cache id -> VALUES row so the
+      // setup fix stays aligned with the repository's canonical fixture data.
+      for (const seedFile of CANONICAL_TUNE_SEED_FILES) {
+        const seedSql = await readFile(seedFile, "utf8");
+        const seedRows = collectCanonicalTuneRows(seedSql);
+
+        for (const [id, row] of seedRows.entries()) {
+          if (!rowsById.has(id)) {
+            rowsById.set(id, row);
+          }
+        }
+      }
+
+      return rowsById;
+    })();
+  }
+
+  return canonicalTuneSeedRowsPromise;
+}
+
+async function ensureCanonicalTuneRows(user: TestUser, tuneIds: string[]) {
+  if (tuneIds.length === 0) {
+    return;
+  }
+
+  const sql = getE2eSqlClient();
+  // Check the real Postgres state directly. If a referenced tune row is
+  // missing here, the next repertoire_tune upsert will fail on its FK.
+  const existingRows = await sql.unsafe<{ id: string }[]>(
+    `
+      SELECT id::text AS id
+      FROM public.tune
+      WHERE id = ANY($1::uuid[])
+    `,
+    [tuneIds]
+  );
+
+  const existingIds = new Set(existingRows.map((row) => row.id));
+  const missingIds = tuneIds.filter((tuneId) => !existingIds.has(tuneId));
+
+  if (missingIds.length === 0) {
+    return;
+  }
+
+  const canonicalRows = await getCanonicalTuneSeedRows();
+  const rowsToRestore = missingIds.map((tuneId) => canonicalRows.get(tuneId));
+  const unresolvedIds = missingIds.filter((_, index) => !rowsToRestore[index]);
+
+  if (unresolvedIds.length > 0) {
+    throw new Error(
+      `Missing canonical tune fixtures for ${unresolvedIds.join(", ")}`
+    );
+  }
+
+  console.warn(
+    `[${user.name}] Restoring ${missingIds.length} missing tune row(s) before repertoire seed: ${missingIds.join(", ")}`
+  );
+
+  // Reinsert only the missing canonical rows and leave the rest of the test
+  // database untouched. This is intentionally narrow: fix the FK precondition,
+  // not the entire environment.
+  await sql.unsafe(
+    `${CANONICAL_TUNE_INSERT_SQL}${rowsToRestore.join(",\n")}\nON CONFLICT (id) DO NOTHING;`
+  );
+
+  const restoredRows = await sql.unsafe<{ id: string }[]>(
+    `
+      SELECT id::text AS id
+      FROM public.tune
+      WHERE id = ANY($1::uuid[])
+    `,
+    [missingIds]
+  );
+
+  const restoredIds = new Set(restoredRows.map((row) => row.id));
+  const stillMissingIds = missingIds.filter(
+    (tuneId) => !restoredIds.has(tuneId)
+  );
+
+  if (stillMissingIds.length > 0) {
+    throw new Error(
+      `Failed to restore canonical tune rows for ${stillMissingIds.join(", ")}`
+    );
+  }
 }
 
 async function clearPracticeRecordForRepertoire(repertoireId: string) {
@@ -951,6 +1106,10 @@ export async function seedUserRepertoire(
 ) {
   const userKey = user.email.split(".")[0]; // alice.test@... → alice
   const { supabase } = await getTestUserClient(userKey);
+
+  // Repair missing tune fixtures before inserting repertoire rows so setup
+  // remains deterministic even if Postgres started without the expected data.
+  await ensureCanonicalTuneRows(user, tuneIds);
 
   // Verify repertoire_tune is empty before seeding (consistent helper)
   if (preCheck) {
