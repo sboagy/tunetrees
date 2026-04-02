@@ -19,7 +19,7 @@ localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres
 SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # Empty placeholder for production; wrangler dev reads the real value from
 # worker/.dev.vars (gitignored). In production, use `wrangler secret put`.
-SUPABASE_JWT_SECRET = ""
+# SUPABASE_JWT_SECRET = ""
 # Optional: bypass Hyperdrive and use DATABASE_URL directly for troubleshooting.
 # Requires `wrangler secret put DATABASE_URL` in the target environment.
 # BYPASS_HYPERDRIVE = "true"
