@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "FORCE_COLOR=1 op run --env-file=\"../.env.prod.template\" -- wrangler deploy",
+    "deploy": "FORCE_COLOR=1 op run --env-file=\"../.env.prod.template\" -- sh -c 'printf \"%s\" \"$SUPABASE_JWT_SECRET\" | npx wrangler secret put SUPABASE_JWT_SECRET && npx wrangler deploy'",
     "dev": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs",
     "dev:local": "WRANGLER_SEND_METRICS=false DO_NOT_TRACK=1 FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs --local",
     "start": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs"
