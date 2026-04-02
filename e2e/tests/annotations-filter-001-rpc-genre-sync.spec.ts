@@ -13,6 +13,7 @@
  */
 
 import { expect } from "@playwright/test";
+import { waitForSyncComplete } from "../helpers/local-db-lifecycle";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -20,20 +21,13 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 let ttPage: TuneTreesPage;
 
 async function waitForTestApi(page: import("@playwright/test").Page) {
-  await expect
-    .poll(
-      async () => {
-        return await page.evaluate(() => {
-          return typeof (window as any).__ttTestApi === "object";
-        });
-      },
-      {
-        timeout: 15000,
-        intervals: [100, 250, 500, 1000],
-        message: "__ttTestApi did not become available",
-      }
-    )
-    .toBe(true);
+  await page.waitForFunction(
+    () => typeof (window as any).__ttTestApi === "object",
+    undefined,
+    {
+      timeout: 15000,
+    }
+  );
 }
 
 /**
@@ -100,15 +94,6 @@ async function openCatalogSync(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("settings-genre-save")).toBeVisible({
     timeout: 15000,
   });
-}
-
-/**
- * Helper to wait for sync completion and verify sync state
- */
-async function waitForSyncComplete(page: import("@playwright/test").Page) {
-  await page.waitForLoadState("networkidle", { timeout: 30000 });
-  // Additional wait for local DB to process synced data
-  await page.waitForTimeout(2000);
 }
 
 /**
@@ -203,11 +188,10 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("A: Onboarding filters annotations server-side for selected genres", async ({
     page,
   }) => {
+    test.setTimeout(45000);
+
     // Navigate to catalog to ensure app is loaded
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-
-    // Wait for initial sync to complete
-    await waitForSyncComplete(page);
 
     // Get annotation counts after initial sync with genre selection
     const counts = await getAnnotationCounts(page);
@@ -230,7 +214,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   }) => {
     test.setTimeout(45000); // Genre sync + polling takes time
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-    await waitForSyncComplete(page);
 
     // Record initial counts
     const beforeCounts = await getAnnotationCounts(page);
@@ -286,7 +269,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     test.setTimeout(60000); // Genre sync + polling takes time
 
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-    await waitForSyncComplete(page);
 
     // Use a known genre that's not in default repertoire setup
     // Note: Using "Blues" (mixed case) due to data quality issue in genre table
@@ -393,8 +375,9 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("D: Private tunes sync annotations regardless of genre filter", async ({
     page,
   }) => {
+    test.setTimeout(45000);
+
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-    await waitForSyncComplete(page);
 
     // Get current user ID using test API
     const userId = await page.evaluate(async () => {
