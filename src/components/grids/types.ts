@@ -155,7 +155,4 @@ export interface ICellEditorCallbacks {
   onNotePublicChange?: (tuneId: string, newValue: string) => void;
   /** Reactive accessor for the list of available goals (for the GoalBadge dropdown). */
   goals?: () => IGoalOption[];
-  // Optional control for keeping dropdowns open across refreshes
-  getRecallEvalOpen?: (tuneId: string) => boolean;
-  setRecallEvalOpen?: (tuneId: string, isOpen: boolean) => void;
 }

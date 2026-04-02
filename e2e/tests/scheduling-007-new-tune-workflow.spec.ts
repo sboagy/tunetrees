@@ -273,7 +273,8 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
       // Enable flashcard mode
       await ttPage.enableFlashcardMode();
-      await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
+      // Note: enableFlashcardMode() already internally waits for flashcardView to be visible
+      // (with a 15s timeout) and then waits an additional 800ms. The redundant check is removed.
 
       // Select "Good" evaluation (should transition to Learning state=1)
       await page.waitForTimeout(600);

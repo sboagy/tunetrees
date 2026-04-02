@@ -10,7 +10,7 @@ import dotenv from "dotenv";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-dotenv.config({ path: resolve(__dirname, ".env.local") });
+dotenv.config({ path: resolve(__dirname, ".env.local"), quiet: true });
 
 const DEV_PORT = 5173; // Your standard development port
 const PREVIEW_PORT = 4173; // The port for the production build

@@ -112,7 +112,14 @@ export async function getTestUserClient(userKey: string) {
     return cachedClient;
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let supabase: SupabaseClient;
+  try {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (error) {
+    console.error("Error creating Supabase client:", error);
+    throw error;
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: TEST_PASSWORD,

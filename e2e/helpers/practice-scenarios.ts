@@ -7,6 +7,8 @@
 
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
+import postgres from "postgres";
+import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-instrument-ids.js";
 
 log.setLevel("info");
 
@@ -308,6 +310,55 @@ import { getTestUserClient, type TestUser } from "./test-users";
 
 // Cache mapping from Supabase Auth UUID -> user_ref (same value after user_profile.id elimination)
 const internalUserRefCache: Map<string, string> = new Map();
+const E2E_DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+
+let e2eSqlClient: ReturnType<typeof postgres> | null = null;
+
+function getE2eSqlClient() {
+  if (!e2eSqlClient) {
+    e2eSqlClient = postgres(E2E_DATABASE_URL, { max: 1 });
+  }
+
+  return e2eSqlClient;
+}
+
+async function clearPracticeRecordForRepertoire(repertoireId: string) {
+  const sql = getE2eSqlClient();
+
+  await sql.begin(async (transaction) => {
+    await transaction.unsafe(
+      "SELECT set_config('app.allow_practice_record_delete', 'on', true)"
+    );
+    await transaction.unsafe(
+      `
+      DELETE FROM public.practice_record
+      WHERE repertoire_ref = $1::uuid
+    `,
+      [repertoireId]
+    );
+  });
+}
+
+async function clearPracticeRecordForUser(user: TestUser) {
+  const sql = getE2eSqlClient();
+
+  await sql.begin(async (transaction) => {
+    await transaction.unsafe(
+      "SELECT set_config('app.allow_practice_record_delete', 'on', true)"
+    );
+    await transaction.unsafe(
+      `
+      DELETE FROM public.practice_record pr
+      USING public.repertoire r
+      WHERE pr.repertoire_ref = r.repertoire_id
+        AND r.user_ref = $1::uuid
+    `,
+      [user.userId]
+    );
+  });
+}
 
 async function getInternalUserRef(
   _supabase: any,
@@ -319,6 +370,53 @@ async function getInternalUserRef(
     internalUserRefCache.set(user.userId, user.userId);
   }
   return user.userId;
+}
+
+async function ensureUserProfileRow(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await retryTransientSetupOperation(
+    `user_profile normalization for ${user.name}`,
+    async () => {
+      const { data: existingRows, error: queryError } = await client
+        .from("user_profile")
+        .select("id")
+        .eq("id", user.userId)
+        .limit(1);
+
+      if (queryError) {
+        throw new Error(
+          `Failed to read user_profile ${user.userId} for ${user.name}: ${queryError.message}`
+        );
+      }
+
+      if ((existingRows?.length ?? 0) > 0) {
+        return;
+      }
+
+      const seededName = user.name.endsWith(" Test")
+        ? user.name
+        : `${user.name} Test`;
+
+      const { error: insertError } = await client.from("user_profile").insert({
+        id: user.userId,
+        name: seededName,
+        email: user.email,
+        sr_alg_type: null,
+        deleted: false,
+        sync_version: 1,
+        last_modified_at: new Date().toISOString(),
+        device_id: "test-seed",
+      });
+
+      if (insertError) {
+        throw new Error(
+          `Failed to create user_profile ${user.userId} for ${user.name}: ${insertError.message}`
+        );
+      }
+    }
+  );
 }
 
 async function assertHasLocalRepertoires(
@@ -354,6 +452,265 @@ async function assertHasLocalRepertoires(
 
 // Export getTestUserClient so tests can perform direct Supabase cleanup
 export { getTestUserClient };
+
+function isTransientSetupErrorMessage(message: string | undefined): boolean {
+  if (!message) return false;
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes(
+      "invalid response was received from the upstream server"
+    ) ||
+    normalized.includes("upstream server") ||
+    normalized.includes("fetch failed") ||
+    normalized.includes("network") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("connection")
+  );
+}
+
+async function retryTransientSetupOperation<T>(
+  label: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isTransient = isTransientSetupErrorMessage(message);
+
+      if (!isTransient || attempt === maxAttempts) {
+        throw error;
+      }
+
+      const backoffMs = Math.min(500 * 2 ** (attempt - 1), 2000);
+      const jitterMs = Math.floor(Math.random() * 150);
+      const delayMs = backoffMs + jitterMs;
+
+      console.warn(
+        `Retrying ${label} after transient setup error (attempt ${attempt}/${maxAttempts}): ${message}`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw new Error(`Unreachable retry state for ${label}`);
+}
+
+async function purgeExtraUserRepertoires(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  const { data: extraRows, error: queryError } = await client
+    .from("repertoire")
+    .select("repertoire_id")
+    .eq("user_ref", user.userId)
+    .neq("repertoire_id", user.repertoireId);
+
+  if (queryError) {
+    throw new Error(
+      `Failed to list extra repertoires for ${user.name}: ${queryError.message}`
+    );
+  }
+
+  const extraRepertoireIds = (extraRows ?? [])
+    .map((row: { repertoire_id?: string | null }) => row.repertoire_id)
+    .filter(
+      (value: string | null | undefined): value is string =>
+        typeof value === "string"
+    );
+
+  if (extraRepertoireIds.length === 0) {
+    return;
+  }
+
+  for (const repertoireId of extraRepertoireIds) {
+    try {
+      await clearPracticeRecordForRepertoire(repertoireId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to clear practice_record for extra repertoire ${repertoireId} (${user.name}): ${message}`
+      );
+    }
+  }
+
+  const extraRepertoireDeletes: Array<{
+    table: string;
+    column: string;
+    extraFilter?: (query: any) => any;
+  }> = [
+    { table: "daily_practice_queue", column: "repertoire_ref" },
+    { table: "note", column: "repertoire_ref" },
+    { table: "repertoire_tune", column: "repertoire_ref" },
+    {
+      table: "tab_group_main_state",
+      column: "repertoire_id",
+      extraFilter: (query) => query.eq("user_id", user.userId),
+    },
+    {
+      table: "table_state",
+      column: "repertoire_id",
+      extraFilter: (query) => query.eq("user_id", user.userId),
+    },
+  ];
+
+  for (const { table, column, extraFilter } of extraRepertoireDeletes) {
+    let deleteQuery = client
+      .from(table)
+      .delete()
+      .in(column, extraRepertoireIds);
+    if (extraFilter) {
+      deleteQuery = extraFilter(deleteQuery);
+    }
+    const { error } = await deleteQuery;
+
+    if (error) {
+      throw new Error(
+        `Failed to clear ${table} for extra repertoires (${user.name}): ${error.message}`
+      );
+    }
+  }
+
+  const { error: repertoireDeleteError } = await client
+    .from("repertoire")
+    .delete()
+    .eq("user_ref", user.userId)
+    .in("repertoire_id", extraRepertoireIds);
+
+  if (repertoireDeleteError) {
+    throw new Error(
+      `Failed to delete extra repertoires for ${user.name}: ${repertoireDeleteError.message}`
+    );
+  }
+
+  log.debug(
+    `✅ [${user.name}] Purged ${extraRepertoireIds.length} extra repertoire(s)`
+  );
+}
+
+async function normalizeUserRepertoireRow(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await ensureUserProfileRow(user, client);
+
+  await retryTransientSetupOperation(
+    `repertoire normalization for ${user.name}`,
+    async () => {
+      // Shared setup expects a single seeded repertoire row per fixed test user.
+      // Local exploratory runs can leave additional user-owned repertoires behind.
+      await purgeExtraUserRepertoires(user, client);
+
+      const { data: existingRows, error: queryError } = await client
+        .from("repertoire")
+        .select("sync_version")
+        .eq("repertoire_id", user.repertoireId)
+        .eq("user_ref", user.userId)
+        .limit(1);
+
+      if (queryError) {
+        throw new Error(
+          `Failed to read repertoire ${user.repertoireId} for ${user.name}: ${queryError.message}`
+        );
+      }
+
+      const existingSyncVersion = Number(existingRows?.[0]?.sync_version ?? 0);
+      const nextSyncVersion =
+        Number.isFinite(existingSyncVersion) && existingSyncVersion > 0
+          ? existingSyncVersion + 1
+          : 1;
+
+      const { error } = await client.from("repertoire").upsert(
+        {
+          repertoire_id: user.repertoireId,
+          user_ref: user.userId,
+          name: null,
+          instrument_ref: CATALOG_INSTRUMENT_IRISH_FLUTE_ID,
+          // Keep deterministic setup independent from shared genre seed rows.
+          // The effective repertoire genre still resolves from the instrument.
+          genre_default: null,
+          sr_alg_type: null,
+          deleted: false,
+          sync_version: nextSyncVersion,
+          last_modified_at: new Date().toISOString(),
+          device_id: "test-seed",
+        },
+        { onConflict: "repertoire_id" }
+      );
+
+      if (error) {
+        throw new Error(
+          `Failed to normalize repertoire ${user.repertoireId} for ${user.name}: ${error.message}`
+        );
+      }
+    }
+  );
+}
+
+async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
+  const userKey = user.email.split(".")[0];
+  const client = supabase ?? (await getTestUserClient(userKey)).supabase;
+
+  await ensureUserProfileRow(user, client);
+
+  await retryTransientSetupOperation(
+    `avatar reset for ${user.name}`,
+    async () => {
+      const { data: existingRows, error: queryError } = await client
+        .from("user_profile")
+        .select("sync_version")
+        .eq("id", user.userId)
+        .limit(1);
+
+      if (queryError) {
+        throw new Error(
+          `Failed to read user_profile ${user.userId} for ${user.name}: ${queryError.message}`
+        );
+      }
+
+      if ((existingRows?.length ?? 0) === 0) {
+        const { data: authData, error: authError } =
+          await client.auth.getUser();
+        const authUserId = authData.user?.id ?? null;
+        const authDetail =
+          authUserId === user.userId
+            ? `authenticated as expected user ${authUserId}`
+            : `authenticated as ${authUserId ?? "anonymous"}, expected ${user.userId}`;
+
+        throw new Error(
+          `user_profile ${user.userId} is not visible for ${user.name}; ${authDetail}. This usually means the current Supabase project is missing the user_profile RLS policies for the UUID id column or the helper is pointed at a different project.${authError ? ` auth.getUser() error: ${authError.message}` : ""}`
+        );
+      }
+
+      const existingSyncVersion = Number(existingRows?.[0]?.sync_version ?? 0);
+      const nextSyncVersion =
+        Number.isFinite(existingSyncVersion) && existingSyncVersion > 0
+          ? existingSyncVersion + 1
+          : 1;
+
+      const { error } = await client
+        .from("user_profile")
+        .update({
+          avatar_url: null,
+          sync_version: nextSyncVersion,
+          last_modified_at: new Date().toISOString(),
+          device_id: "test-seed",
+        })
+        .eq("id", user.userId);
+
+      if (error) {
+        throw new Error(
+          `Failed to reset avatar for ${user.name}: ${error.message}`
+        );
+      }
+    }
+  );
+}
 
 /**
  * Parallel-safe version of setupDeterministicTest
@@ -533,6 +890,8 @@ export async function setupDeterministicTestParallel(
   await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);
+  await normalizeUserRepertoireRow(user);
+  await resetUserProfileAvatar(user);
 
   // Step 2: Seed user's repertoire if specified
   if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
@@ -904,39 +1263,17 @@ async function clearUserTable(
   // their own transaction, so we use an RPC that sets the flag and deletes in
   // one call.
   if (tableName === "practice_record") {
-    const repertoireIds = new Set<string>([user.repertoireId]);
-    const { data: repertoireRows, error: repertoireQueryError } = await supabase
-      .from("repertoire")
-      .select("repertoire_id")
-      .eq("user_ref", user.userId);
-
-    if (repertoireQueryError) {
+    try {
+      await clearPracticeRecordForUser(user);
+    } catch (practiceRecordError) {
+      const message =
+        practiceRecordError instanceof Error
+          ? practiceRecordError.message
+          : String(practiceRecordError);
       console.warn(
-        `[${user.name}] Failed to query repertoires before clearing practice_record: ${repertoireQueryError.message}`
+        `[${user.name}] Failed to clear practice_record via direct Postgres cleanup: ${message}`
       );
-    } else if (repertoireRows) {
-      for (const row of repertoireRows) {
-        if (row.repertoire_id) {
-          repertoireIds.add(row.repertoire_id);
-        }
-      }
-    }
-
-    for (const repertoireId of repertoireIds) {
-      const { error: rpcError } = await supabase.rpc(
-        "e2e_clear_practice_record",
-        {
-          target_repertoire: repertoireId,
-        }
-      );
-      if (rpcError) {
-        console.warn(
-          `[${user.name}] Failed to clear practice_record for repertoire ${repertoireId}: ${rpcError.message}`
-        );
-        if (!error) {
-          error = rpcError;
-        }
-      }
+      error = practiceRecordError;
     }
   } else {
     // Unified deletion path; RLS ensures only caller's rows are affected.
@@ -1029,6 +1366,7 @@ export async function setupForPracticeTestsParallel(
       "repertoire_tune",
       "user_genre_selection",
     ]);
+    await normalizeUserRepertoireRow(user);
 
     if (repertoireTunes.length > 0) {
       await seedUserRepertoire(user, repertoireTunes, true);
@@ -1121,48 +1459,88 @@ export async function setupForPracticeTestsParallel(
       // For practice-driven scenarios we expect at least one scheduled tune row (and thus at least
       // one recall-eval control) to exist.
       const practiceGrid = page.getByTestId("tunes-grid-scheduled");
-      await expect(practiceGrid).toBeVisible({ timeout: 15000 });
+      const waitForPracticeQueueReady = async (timeoutMs: number) => {
+        await expect(practiceGrid).toBeVisible({ timeout: timeoutMs });
 
-      // Wait for at least one recall-eval control to appear
-      await expect
-        .poll(
-          async () => {
-            return await practiceGrid
-              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-              .count();
-          },
-          { timeout: 15000, intervals: [200, 500, 1000] }
-        )
-        .toBeGreaterThan(0);
+        // Wait for at least one recall-eval control to appear
+        await expect
+          .poll(
+            async () => {
+              return await practiceGrid
+                .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+                .count();
+            },
+            { timeout: timeoutMs, intervals: [200, 500, 1000] }
+          )
+          .toBeGreaterThan(0);
 
-      // CRITICAL: Additional wait for queue generation resource to complete.
-      // The grid renders when practice_list_staged has data, but the daily_practice_queue
-      // table is populated asynchronously via a SolidJS createResource (ensureDailyQueue).
-      // In slow CI environments, the queue resource may still be initializing when the grid appears.
-      // Without this wait, flashcard tests proceed with an empty queue and fail with "element(s) not found".
-      // Wait for count to stabilize (same value twice in a row = queue ready)
-      let lastCount = 0;
-      let stableCount = 0;
-      await expect
-        .poll(
-          async () => {
-            const currentCount = await practiceGrid
-              .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
-              .count();
-            if (currentCount === lastCount && currentCount > 0) {
-              stableCount++;
-            } else {
-              stableCount = 0;
-            }
-            lastCount = currentCount;
-            return stableCount >= 2; // Same count twice = stable
-          },
-          { timeout: 25000, intervals: [500, 1000, 2000] }
-        )
-        .toBeTruthy();
+        // CRITICAL: Additional wait for queue generation resource to complete.
+        // The grid renders when practice_list_staged has data, but the daily_practice_queue
+        // table is populated asynchronously via a SolidJS createResource (ensureDailyQueue).
+        // In slow CI environments, the queue resource may still be initializing when the grid appears.
+        // Without this wait, flashcard tests proceed with an empty queue and fail with "element(s) not found".
+        // Wait for count to stabilize (same value twice in a row = queue ready)
+        let lastCount = 0;
+        let stableCount = 0;
+        await expect
+          .poll(
+            async () => {
+              const currentCount = await practiceGrid
+                .getByTestId(/^recall-eval-[0-9a-f-]+$/i)
+                .count();
+              if (currentCount === lastCount && currentCount > 0) {
+                stableCount++;
+              } else {
+                stableCount = 0;
+              }
+              lastCount = currentCount;
+              return stableCount >= 2; // Same count twice = stable
+            },
+            { timeout: timeoutMs, intervals: [500, 1000, 2000] }
+          )
+          .toBeTruthy();
+
+        return lastCount;
+      };
+
+      let readyCount: number;
+      try {
+        readyCount = await waitForPracticeQueueReady(25000);
+      } catch {
+        const [loadingVisible, emptyVisible] = await Promise.all([
+          page
+            .getByText("Loading practice queue...")
+            .isVisible()
+            .catch(() => false),
+          page
+            .getByText("All Caught Up!")
+            .isVisible()
+            .catch(() => false),
+        ]);
+
+        console.warn(
+          `[${user.name}] Practice grid did not become ready during setup; forcing sync down and retrying.`,
+          { loadingVisible, emptyVisible }
+        );
+
+        await page.evaluate(async () => {
+          const forceSyncDown = (window as any).__forceSyncDownForTest;
+          if (typeof forceSyncDown === "function") {
+            await forceSyncDown();
+          }
+        });
+        await page
+          .waitForLoadState("networkidle", { timeout: 15000 })
+          .catch(() => undefined);
+        await expect(page.getByTestId("practice-columns-button")).toBeVisible({
+          timeout: 15000,
+        });
+
+        readyCount = await waitForPracticeQueueReady(30000);
+      }
 
       log.debug(
-        `[${user.name}] Queue ready: ${lastCount} tunes in practice grid`
+        `[${user.name}] Queue ready: ${readyCount} tunes in practice grid`
       );
 
       // Some tests later simulate a fresh device by wiping local SQLite and
@@ -1240,6 +1618,7 @@ export async function setupForRepertoireTestsParallel(
     "repertoire_tune",
     "user_genre_selection",
   ]);
+  await normalizeUserRepertoireRow(user);
 
   await seedUserRepertoire(user, repertoireTunes);
 
@@ -1399,6 +1778,7 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);
+  await normalizeUserRepertoireRow(user);
 
   // 2b. Optionally schedule tunes if not emptying repertoire and requested
   if (!emptyRepertoire && scheduleTunes) {

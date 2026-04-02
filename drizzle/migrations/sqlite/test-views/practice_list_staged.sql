@@ -5,7 +5,7 @@
 --
 -- Full production view includes 40+ fields with COALESCE operations,
 -- tune_override joins, transient data, tags, notes, references, etc.
--- See: scripts/create-views-direct.ts for production implementation.
+-- See: scripts/create-db-views.ts and sql_scripts/view_*.sql for production implementation.
 --
 -- Fields included (used by practice-queue.ts):
 --   - id, title (tune identification)

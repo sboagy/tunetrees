@@ -24,7 +24,10 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
-  test.setTimeout(60000);
+  // Increased from 60000 to match other complex scheduling tests (scheduling-001, -005 at 120000).
+  // QuickJS WASM init on first use adds ~5-10s overhead; combined with all test steps,
+  // the 60s budget was too tight under CI load.
+  test.setTimeout(120000);
 
   let currentDate: Date;
   let ttPage: TuneTreesPage;

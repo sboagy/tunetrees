@@ -27,32 +27,23 @@ interface RecallEvalComboBoxProps {
   tuneId: string;
   value: string;
   onChange: (value: string) => void;
-  // Controlled open state (optional). When provided, the dropdown will keep
-  // its open/close state across parent re-renders (e.g., grid refresh).
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
 }
 
 export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   props
 ) => {
-  // NOTE: In the virtualized grid, the TanStack cell renderer does not
-  // necessarily re-run when the external open-state map updates.
-  // If we rely on a fully controlled `open={props.open}`, the Combobox may never
-  // visibly open (aria-expanded stays false) because the prop doesn't update
-  // synchronously.
-  //
-  // We therefore keep an internal open signal that updates immediately on
-  // `onOpenChange`, while still syncing to/from `props.open` when provided.
-  const [localOpen, setLocalOpen] = createSignal(props.open ?? false);
+  // Keep open state local to the control. Trying to preserve it from parents
+  // across virtualized grid refreshes created competing sources of truth and
+  // made the dropdown flaky in both manual use and E2E.
+  const [localOpen, setLocalOpen] = createSignal(false);
 
   createEffect(() => {
-    // If the virtualized grid reuses this cell for a different tune, ensure we
-    // don't carry over any prior open state.
+    // If the virtualized grid reuses this cell for a different tune, or the
+    // evaluation value changes after selection, always collapse the menu.
     void props.tuneId;
+    void props.value;
 
-    if (props.open !== undefined) setLocalOpen(props.open);
-    else setLocalOpen(false);
+    setLocalOpen(false);
   });
 
   const options = [
@@ -114,12 +105,12 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
           // Kobalte Combobox may emit the current value during open/close
           // transitions; avoid staging/clearing unless it truly changed.
           if (next === props.value) return;
+          setLocalOpen(false);
           props.onChange(next);
         }}
         open={localOpen()}
         onOpenChange={(isOpen) => {
           setLocalOpen(isOpen);
-          props.onOpenChange?.(isOpen);
 
           if (isOpen) {
             queueMicrotask(() => {

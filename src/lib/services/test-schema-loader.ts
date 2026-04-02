@@ -121,7 +121,7 @@ export function applyMigrations(db: BetterSQLite3Database): void {
  * (id, title, scheduled, latest_due, deleted, repertoire_deleted, user_ref, repertoire_id).
  *
  * Production view has 40+ fields with tune_override joins, transient data, tags, notes, etc.
- * See: scripts/create-views-direct.ts for full production implementation.
+ * See: scripts/create-db-views.ts and sql_scripts/view_*.sql for full production implementation.
  *
  * This approach prevents schema drift while keeping tests lightweight and focused.
  */

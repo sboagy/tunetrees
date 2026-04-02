@@ -68,10 +68,10 @@ npm run db:push
 
 ```bash
 # Dry run (validation only)
-npm run migrate:production -- --dry-run
+tsx scripts/migrate-production-to-supabase.ts --dry-run
 
 # Full migration
-npm run migrate:production
+tsx scripts/migrate-production-to-supabase.ts
 
 # Verify migration
 npm run migrate:verify
@@ -159,7 +159,7 @@ npm run db:push
 # 3. Fix migration script issue
 
 # 4. Re-run migration
-npm run migrate:production
+tsx scripts/migrate-production-to-supabase.ts
 ```
 
 ---
@@ -173,7 +173,7 @@ npm run migrate:production
 export DATABASE_URL="path/to/tunetrees_test_clean.sqlite3"
 
 # Run migration
-npm run migrate:production -- --test
+tsx scripts/migrate-production-to-supabase.ts --test
 
 # Verify
 npm run migrate:verify

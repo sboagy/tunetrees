@@ -8,7 +8,9 @@
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#1e3a8a" />
     <meta name="description" content="Spaced repetition practice system for musicians. Learn tunes faster with intelligent scheduling." />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- vite-plugin-pwa automatically injects <link rel="manifest" href="/manifest.webmanifest"> into the 
+     built dist/index.html as part of its build pipeline.  If it is included here manually, it will give an 
+     error in development mode. -->
     <link rel="apple-touch-icon" href="/icon-192x192.png" />
     
     <!-- Preconnect to Supabase for faster API calls -->

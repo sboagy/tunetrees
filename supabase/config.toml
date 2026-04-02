@@ -2,7 +2,20 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "tunetrees"
+#
+# ⚠️  MULTI-TENANT DB SAFETY WARNING ⚠️
+#
+# TuneTrees shares a Supabase instance with other apps (cubefsrs, etc.) through
+# schema isolation. The `public` schema is SHARED. Never run `supabase db reset`
+# against the local or remote shared Supabase instance — it would wipe ALL apps'
+# data and migrations. Use the rhizome-owned seeding scripts instead:
+#   rhizome/scripts/db-push-local.sh tunetrees/
+#   rhizome/scripts/seed-shared-auth-users-local.sh
+#
+# See ARCHITECTURE.md and rhizome/design/shared_pwa_architecture.md for details.
+# Must match rhizome's project_id so that `supabase functions serve` (and other
+# local CLI commands) connect to the shared instance started from the rhizome dir.
+project_id = "rhizome"
 
 [api]
 enabled = true
@@ -61,6 +74,8 @@ enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 # sql_paths = ["./seed.sql", "./seeds/rsTop500.sql", "./seeds/null_irishtune_reference_user_ref.sql"]
+# This baseline is public-schema-only. Shared auth fixtures are seeded from
+# rhizome before TuneTrees migrations/seeds run.
 sql_paths = ["./seeds/baseline_local_20260217.sql"]
 
 [db.network_restrictions]

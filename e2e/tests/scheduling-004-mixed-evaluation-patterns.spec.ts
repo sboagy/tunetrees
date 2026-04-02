@@ -12,6 +12,11 @@ import {
   verifyClockFrozen,
 } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import {
+  runTestHook,
+  submitAndWaitForPracticeSettled,
+  waitForPracticeViewSettled,
+} from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
@@ -85,8 +90,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       },
       testInfo: TestInfo
     ): Promise<void> => {
-      // Extend timeout for all tests running this hook by 3x.
-      test.setTimeout(testInfo.timeout * 3);
+      // This multi-day scheduling suite does repeated sync/reload cycles and
+      // can run close to the default 90s ceiling under full-suite CI load.
+      test.setTimeout(Math.max(testInfo.timeout * 3, 180_000));
       ttPage = new TuneTreesPage(page);
 
       // Set stable starting date
@@ -171,12 +177,10 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     }
 
     // Submit all evaluations
-    await ttPage.submitEvaluations();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await page.waitForTimeout(2000);
+    await submitAndWaitForPracticeSettled(page, ttPage);
 
     // Force sync
-    await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+    await runTestHook(page, "__forceSyncUpForTest");
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // === VERIFY: Interval ordering ===
@@ -353,13 +357,12 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       if (!rating) continue;
 
       await ttPage.setRowEvaluation(row, rating);
+      await page.waitForTimeout(1000); // Stagger evaluations to avoid overwhelming the system
     }
 
-    await ttPage.submitEvaluations();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await page.waitForTimeout(2000);
+    await submitAndWaitForPracticeSettled(page, ttPage);
 
-    await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+    await runTestHook(page, "__forceSyncUpForTest");
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     console.log("  Day 1 evaluations submitted");
@@ -368,26 +371,24 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     console.log("\n=== Advancing to Day 2 ===");
 
     // Persist and reload with new date
-    await page.evaluate(() => (window as any).__persistDbForTest?.());
+    await runTestHook(page, "__persistDbForTest");
 
     const day2 = await advanceDays(context, 1, currentDate);
     console.log(`  Day 2 date: ${day2.toISOString().split("T")[0]}`);
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(1500);
-    await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+    await runTestHook(page, "__forceSyncDownForTest");
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await verifyClockFrozen(page, day2, undefined, test.info().project.name);
 
     // Navigate to practice tab
     await ttPage.practiceTab.click();
-    await page.waitForTimeout(2000);
 
     // Check queue composition
-    const day2RowCount = await ttPage.practiceGrid
-      .locator("tbody tr[data-index]")
-      .count();
+    const day2RowCount = await waitForPracticeViewSettled(page, ttPage, {
+      timeoutMs: 20000,
+    });
     console.log(`  Day 2 queue size: ${day2RowCount} tunes`);
 
     // On Day 2, we expect:
@@ -481,11 +482,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       await ttPage.setRowEvaluation(row, rating);
     }
 
-    await ttPage.submitEvaluations();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await page.waitForTimeout(2000);
+    await submitAndWaitForPracticeSettled(page, ttPage);
 
-    await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+    await runTestHook(page, "__forceSyncUpForTest");
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     console.log("  Day 1: All 10 tunes evaluated");
@@ -494,14 +493,13 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     let testDate = currentDate;
 
     for (let day = 2; day <= 5; day++) {
-      await page.evaluate(() => (window as any).__persistDbForTest?.());
+      await runTestHook(page, "__persistDbForTest");
 
       testDate = await advanceDays(context, 1, testDate);
       console.log(`\n  Day ${day}: ${testDate.toISOString().split("T")[0]}`);
 
       await page.reload({ waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(1500);
-      await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+      await runTestHook(page, "__forceSyncDownForTest");
       await page.waitForLoadState("networkidle", { timeout: 15000 });
 
       await verifyClockFrozen(
@@ -537,11 +535,10 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
       // Practice any tunes that are due on this day
       await ttPage.practiceTab.click();
-      await page.waitForTimeout(2000);
 
-      const rowCount = await ttPage.practiceGrid
-        .locator("tbody tr[data-index]")
-        .count();
+      const rowCount = await waitForPracticeViewSettled(page, ttPage, {
+        timeoutMs: 20000,
+      });
       console.log(`    Queue size: ${rowCount} tune(s)`);
 
       if (rowCount > 0) {
@@ -562,11 +559,9 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
         await ttPage.setRowEvaluation(row, "good");
 
-        await ttPage.submitEvaluations();
-        await page.waitForLoadState("networkidle", { timeout: 15000 });
-        await page.waitForTimeout(1000);
+        await submitAndWaitForPracticeSettled(page, ttPage);
 
-        await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+        await runTestHook(page, "__forceSyncUpForTest");
         await page.waitForLoadState("networkidle", { timeout: 10000 });
 
         console.log(`    Practiced 1 tune with "Good"`);

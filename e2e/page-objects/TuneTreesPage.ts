@@ -797,11 +797,32 @@ export class TuneTreesPage {
     const options = select.locator("option");
 
     await expect
-      .poll(async () => options.count(), {
-        timeout: 5000,
-        intervals: [100, 250, 500],
-      })
-      .toBeGreaterThan(0);
+      .poll(
+        async () => {
+          const count = await options.count();
+
+          for (let i = 0; i < count; i++) {
+            const option = options.nth(i);
+            const value = (await option.getAttribute("value"))?.trim();
+            const label = (await option.textContent())?.trim();
+
+            if (value && value.toLowerCase() === desiredNormalized) {
+              return true;
+            }
+
+            if (label?.toLowerCase().includes(desiredNormalized)) {
+              return true;
+            }
+          }
+
+          return false;
+        },
+        {
+          timeout: 10000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
 
     const count = await options.count();
     for (let i = 0; i < count; i++) {
@@ -1576,6 +1597,23 @@ export class TuneTreesPage {
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 
+    const pause = async (ms: number) => {
+      if (!this.page.isClosed()) {
+        await this.page.waitForTimeout(ms);
+      }
+    };
+
+    const clickFilterButton = async (locator: Locator): Promise<void> => {
+      await locator.scrollIntoViewIfNeeded().catch(() => {});
+
+      try {
+        await locator.click({ timeout: 1500 });
+        return;
+      } catch {
+        await locator.click({ timeout: 1500, force: true }).catch(() => {});
+      }
+    };
+
     let filtersPanelReady = false;
     for (let attempt = 0; attempt < 4; attempt++) {
       const genreFilterVisible = await this.genreFilter
@@ -1592,10 +1630,10 @@ export class TuneTreesPage {
         .catch(() => false);
 
       if (!panelExpanded) {
-        await this.filtersButton.click({ timeout: 10000 });
+        await clickFilterButton(this.filtersButton);
       }
 
-      await this.page.waitForTimeout(250);
+      await pause(250);
 
       const panelReadyNow = await this.genreFilter
         .isVisible({ timeout: 1000 })
@@ -1612,7 +1650,7 @@ export class TuneTreesPage {
 
       if (stillExpanded) {
         await this.page.keyboard.press("Escape").catch(() => {});
-        await this.page.waitForTimeout(150);
+        await pause(150);
       }
     }
 
@@ -1643,8 +1681,8 @@ export class TuneTreesPage {
           .catch(() => false);
 
         if (!genreFilterVisible) {
-          await this.filtersButton.click({ timeout: 10000 }).catch(() => {});
-          await this.page.waitForTimeout(200);
+          await clickFilterButton(this.filtersButton);
+          await pause(200);
         }
 
         const [isExpanded, isPanelVisible] = await Promise.all([
@@ -1659,8 +1697,8 @@ export class TuneTreesPage {
           return true;
         }
 
-        await this.genreFilter.click({ timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(200);
+        await clickFilterButton(this.genreFilter);
+        await pause(200);
       }
 
       return false;
@@ -1677,7 +1715,7 @@ export class TuneTreesPage {
     for (let attempt = 0; attempt < 5; attempt++) {
       const isOpen = await ensureGenreDropdownOpen();
       if (!isOpen) {
-        await this.page.waitForTimeout(250);
+        await pause(250);
         continue;
       }
 
@@ -1689,7 +1727,7 @@ export class TuneTreesPage {
         .isVisible({ timeout: 1500 })
         .catch(() => false);
       if (!isCandidateVisible) {
-        await this.page.waitForTimeout(250);
+        await pause(250);
         continue;
       }
 
@@ -1702,7 +1740,7 @@ export class TuneTreesPage {
         genreOptionChecked = true;
         break;
       } catch {
-        await this.page.waitForTimeout(200);
+        await pause(200);
       }
     }
 
@@ -2112,58 +2150,136 @@ export class TuneTreesPage {
     const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
     const evalTrigger = this.page.getByTestId(`recall-eval-${tuneId}`);
     await expect(evalTrigger).toBeVisible({ timeout: 5000 });
+    await expect(evalTrigger).toBeEnabled({ timeout: 5000 });
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      // ACT: Select rating
-      await evalTrigger.click({ delay: 50 });
+    const expectedLabel =
+      evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
+    const triggerAlreadySelected = async () => {
+      const text = (await evalTrigger.textContent().catch(() => null)) ?? "";
+      return new RegExp(expectedLabel, "i").test(text);
+    };
+
+    const waitBetweenAttempts = async () => {
+      if (!doTimeouts || this.page.isClosed()) return;
+      const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
+      await this.page.waitForTimeout(delay);
+    };
+
+    const isMenuOpen = async () => {
+      const [expanded, visible] = await Promise.all([
+        evalTrigger.getAttribute("aria-expanded").catch(() => null),
+        menu.isVisible().catch(() => false),
+      ]);
+
+      return expanded === "true" || visible;
+    };
+
+    const closeMenu = async () => {
+      if (!(await isMenuOpen())) {
+        return;
+      }
+
+      await evalTrigger.focus().catch(() => undefined);
+      await evalTrigger.press("Escape").catch(async () => {
+        await this.page.keyboard.press("Escape").catch(() => undefined);
+      });
+
+      await expect
+        .poll(() => isMenuOpen(), {
+          timeout: 2000,
+          intervals: [100, 250, 500],
+        })
+        .toBe(false)
+        .catch(() => undefined);
+    };
+
+    const openMenu = async () => {
+      if (await isMenuOpen()) {
+        return;
+      }
+
+      await whichRow.scrollIntoViewIfNeeded().catch(() => undefined);
+      await evalTrigger.scrollIntoViewIfNeeded().catch(() => undefined);
+      await evalTrigger.focus().catch(() => undefined);
 
       try {
-        await expect(menu).toBeVisible({ timeout: 3000 });
+        await evalTrigger.click({ timeout: 4000 });
       } catch {
-        // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
-        // Avoid hanging until the full test timeout; back out and retry.
-        try {
-          await this.page.keyboard.press("Escape");
-        } catch {}
+        await evalTrigger.press("Enter");
+      }
 
-        if (doTimeouts) {
-          const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-          await this.page.waitForTimeout(delay);
+      await expect
+        .poll(() => isMenuOpen(), {
+          timeout: 4000,
+          intervals: [100, 250, 500, 1000],
+        })
+        .toBe(true);
+    };
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await triggerAlreadySelected()) {
+        return;
+      }
+
+      // The grid cell keeps local open state to survive re-renders. Double-click,
+      // force-click, and global keyboard fallbacks can easily toggle it twice and
+      // leave Playwright fighting the component instead of selecting an option.
+      await closeMenu();
+
+      try {
+        await openMenu();
+      } catch (error) {
+        if (this.page.isClosed()) {
+          throw error;
         }
+        await waitBetweenAttempts();
         continue;
       }
 
       const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
       try {
+        await expect(menu).toBeVisible({ timeout: 4000 });
         await expect(whichOption).toBeVisible({ timeout: 4000 });
         await expect(whichOption).toBeEnabled({ timeout: 4000 });
-        await whichOption.click({ trial: true, timeout: 3000 });
+
+        await whichOption.scrollIntoViewIfNeeded().catch(() => undefined);
         await whichOption.click({ timeout: 3000 });
       } catch {
-        // Menu items can detach during quick re-renders; back out and retry.
-        try {
-          await this.page.keyboard.press("Escape");
-        } catch {}
-        if (doTimeouts) {
-          const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-          await this.page.waitForTimeout(delay);
-        }
+        await closeMenu();
+        await waitBetweenAttempts();
         continue;
       }
-      await expect(menu)
-        .toBeHidden({ timeout: 3000 })
-        .catch(() => undefined);
 
-      const expectedLabel =
-        evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
-      await expect
-        .poll(async () => (await evalTrigger.textContent()) ?? "", {
-          timeout: 5000,
-          intervals: [100, 250, 500, 1000],
-        })
-        .toMatch(new RegExp(expectedLabel, "i"));
+      try {
+        await expect
+          .poll(
+            async () => {
+              const [triggerText, open] = await Promise.all([
+                evalTrigger.textContent().catch(() => null),
+                isMenuOpen(),
+              ]);
 
-      if (doTimeouts) {
+              return {
+                triggerText: triggerText ?? "",
+                open,
+              };
+            },
+            {
+              timeout: 5000,
+              intervals: [100, 250, 500, 1000],
+            }
+          )
+          .toMatchObject({
+            triggerText: expect.stringMatching(new RegExp(expectedLabel, "i")),
+            open: false,
+          });
+      } catch {
+        await closeMenu();
+        await waitBetweenAttempts();
+        continue;
+      }
+
+      if (doTimeouts && !this.page.isClosed()) {
         const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
         await this.page.waitForTimeout(delay);
       }

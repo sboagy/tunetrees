@@ -218,25 +218,24 @@ test.describe("USERSETTINGS-001: Spaced Repetition Form", () => {
     });
   });
 
-  test.fixme(
-    "should show FSRS fields when FSRS algorithm selected",
-    async ({ page }) => {
-      await page.waitForTimeout(1000);
+  test.fixme("should show FSRS fields when FSRS algorithm selected", async ({
+    page,
+  }) => {
+    await page.waitForTimeout(1000);
 
-      const algorithmSelect = page.getByLabel("Algorithm Type");
+    const algorithmSelect = page.getByLabel("Algorithm Type");
 
-      // Select FSRS
-      await algorithmSelect.click();
-      await page.waitForTimeout(500);
-      await page.getByRole("option", { name: "FSRS" }).click();
-      await page.waitForTimeout(500);
+    // Select FSRS
+    await algorithmSelect.click();
+    await page.waitForTimeout(500);
+    await page.getByRole("option", { name: "FSRS" }).click();
+    await page.waitForTimeout(500);
 
-      // FSRS Initial Weights field should be visible
-      await expect(page.getByLabel("FSRS Initial Weights")).toBeVisible({
-        timeout: 3000,
-      });
-    }
-  );
+    // FSRS Initial Weights field should be visible
+    await expect(page.getByLabel("FSRS Initial Weights")).toBeVisible({
+      timeout: 3000,
+    });
+  });
 
   // test("should validate maximum interval positive number", async ({ page }) => {
   //   await page.waitForTimeout(1000);
@@ -405,8 +404,10 @@ test.describe("USERSETTINGS-001: Navigation", () => {
     });
 
     // Navigate to User Settings > Scheduling Options
+    // Wait for the dropdown item to be visible before clicking it — avoids the
+    // flaky fixed 500ms delay on slow Mobile Chrome emulation.
     await ttPage.userMenuButton.click();
-    await page.waitForTimeout(500);
+    await expect(ttPage.userSettingsButton).toBeVisible({ timeout: 5000 });
     await ttPage.userSettingsButton.click();
     await page.waitForTimeout(500);
     const ua = await page.evaluate(() => navigator.userAgent);

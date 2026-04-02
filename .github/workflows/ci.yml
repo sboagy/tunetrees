@@ -1,18 +1,34 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-# Environment secrets (vite_pwa_env): ALICE_TEST_PASSWORD, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
 # yamllint disable rule:line-length
+#
+# Secrets required in the `tunetrees_ci_env` environment:
+#   OP_SERVICE_ACCOUNT_TOKEN  — 1Password Service Account token (for op run)
+#
+# All other secrets (including test user passwords, Supabase keys, Cloudflare creds)
+# are resolved at runtime via `op run` or `op read` using .env.prod.template.
+#
+# All production secrets (CLOUDFLARE_*, VITE_SUPABASE_URL, etc.) are resolved
+# at deploy time via `op run --env-file=".env.prod.template"` so they do NOT
+# need to be stored individually as GitHub secrets.
 
 name: CI - Tests
 
 on:
   push:
-    branches: [main, fix-practice-queue-sync-3]
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # <-- This is your manual trigger
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+# Opt into Node.js 24 for all JavaScript actions (required before June 2026 forced migration).
+# This silences Node.js 20 deprecation warnings, including 1password/install-cli-action@v2
+# which has no Node 24-native release yet.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # --------------------------------------------------------------------------
@@ -22,16 +38,25 @@ jobs:
     name: Run Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: tunetrees_ci_env
+    env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -40,12 +65,11 @@ jobs:
         run: npm run test
 
   # --------------------------------------------------------------------------
-  # JOB 1: STANDARD SHARDED TESTS (Dev Server)
+  # JOB 1: PLAYWRIGHT E2E TESTS (Sharded)
   # --------------------------------------------------------------------------
   test:
     name: Run Playwright Tests
     runs-on: ubuntu-latest
-    needs: [test-unit]
 
     strategy:
       fail-fast: false
@@ -53,17 +77,56 @@ jobs:
         shard: [1, 2, 3, 4]
 
     timeout-minutes: 60
-    environment: vite_pwa_env
+    environment: tunetrees_ci_env
     env:
-      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+      # These override anything from op run for the LOCAL Supabase instance.
+      # Values are populated after `supabase start` via $GITHUB_ENV.
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
+      VITE_SUPABASE_URL: ""
+      VITE_SUPABASE_ANON_KEY: ""
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # Local Supabase service role key (well-known default, not a real secret)
+      SUPABASE_SERVICE_ROLE_KEY: super-secret-jwt-token-with-at-least-32-characters-long
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
+
+      - name: Resolve shared repo refs
+        id: shared_refs
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          resolve_ref() {
+            local repo="$1"
+            local candidate="$2"
+            if git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$candidate" >/dev/null 2>&1; then
+              printf '%s\n' "$candidate"
+            else
+              printf 'main\n'
+            fi
+          }
+
+          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Rhizome (shared Supabase config + DB scripts)
+        uses: actions/checkout@v5
+        with:
+          repository: sboagy/rhizome
+          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
+          path: rhizome
+          # For private repos, add: token: ${{ secrets.GH_PAT }}
+
+      - name: Checkout oosync (sync library for worker)
+        uses: actions/checkout@v5
+        with:
+          repository: sboagy/oosync
+          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
+          path: oosync
+          # For private repos, add: token: ${{ secrets.GH_PAT }}
 
       - name: AGGRESSIVE DISK CLEANUP
         if: runner.os == 'Linux'
@@ -75,18 +138,37 @@ jobs:
           docker system prune -a -f || true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      # --- Supabase Setup ---
+      - name: Overlay checked-out Rhizome and oosync packages
+        run: |
+          npm install --no-save --no-package-lock ./rhizome ./oosync
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Resolve test secrets from 1Password
+        # Resolves the shared test-user password via 1Password so it is never
+        # stored as a GitHub secret. Both env vars point to the same value.
+        run: |
+          echo "ALICE_TEST_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+          echo "TEST_USER_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      # --- Supabase Setup (from Rhizome — the shared multi-tenant instance) ---
       - name: Cache Supabase CLI
         id: cache-supabase
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: /usr/local/bin/supabase
           key: ${{ runner.os }}-supabase-cli-v1.200.0
@@ -103,7 +185,7 @@ jobs:
 
       - name: Cache Supabase Docker Images
         id: cache-docker-images
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/supabase-docker-images.tar
           key: ${{ runner.os }}-supabase-docker-v1.200.0
@@ -114,14 +196,33 @@ jobs:
         if: steps.cache-docker-images.outputs.cache-hit == 'true'
         run: docker load -i ~/supabase-docker-images.tar
 
-      - name: Start Supabase Local Stack
-        id: supabase
+      - name: Stop any stale Supabase containers
+        working-directory: rhizome
+        run: |
+          supabase stop --no-backup 2>/dev/null || true
+          docker network prune -f 2>/dev/null || true
+
+      - name: Disable Supabase Edge Runtime For CI
+        working-directory: rhizome
+        run: |
+          if grep -q '^\[edge_runtime\]' supabase/config.toml; then
+            perl -0pi -e 's/\[edge_runtime\]\s*\nenabled = true/[edge_runtime]\nenabled = false/' supabase/config.toml
+          else
+            printf '\n[edge_runtime]\nenabled = false\n' >> supabase/config.toml
+          fi
+
+      - name: Start Supabase from Rhizome
+        # Starting from the rhizome directory uses rhizome's supabase/config.toml,
+        # which defines the shared multi-tenant project. NEVER run `supabase db reset`
+        # here — that would wipe ALL app schemas (TuneTrees + CubeFSRS).
+        working-directory: rhizome
         run: |
           supabase start
-          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
-          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
-          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
-          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
 
       - name: Wait for Supabase API (Health Check)
         run: |
@@ -138,24 +239,40 @@ jobs:
         run: |
           docker images --format "{{.Repository}}:{{.Tag}}" | grep supabase | xargs docker save -o ~/supabase-docker-images.tar
 
-      - name: Reset and Seed Database
+      - name: Seed shared auth users (Rhizome)
+        # Creates the shared test user accounts without touching app-specific tables.
+        working-directory: rhizome
         run: |
-          set -o pipefail
-          if ! supabase db reset --debug; then
-            sleep 5
-            supabase db reset --debug
-          fi
+          bash ./scripts/seed-shared-auth-users-local.sh
         env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Apply TuneTrees migrations + seeds (Rhizome db-push)
+        # Applies TuneTrees-specific migrations and seeds via the rhizome orchestration
+        # script, which is safe to run against the shared multi-tenant instance.
+        working-directory: rhizome
+        run: |
+          ./scripts/db-push-local.sh --public-cleared ${{ github.workspace }}
+        env:
+          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Remove local Supabase bindings from .env.local.template
+        # Later npm scripts use `op run --env-file=.env.local.template`. Strip the
+        # local Supabase-derived keys so `op run` cannot override the runtime values
+        # already exported into $GITHUB_ENV after `supabase start`.
+        run: |
+          tmp_env_file="$(mktemp)"
+          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
+          mv "$tmp_env_file" .env.local.template
 
       - name: Check SQLite schema via Postgres introspection
+        if: matrix.shard == 1
         run: npm run schema:sqlite:check
 
       # --- Playwright Setup ---
       - name: Cache Playwright Browsers
         id: cache-playwright
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
@@ -174,44 +291,26 @@ jobs:
         run: |
           cd worker
           npm ci
-          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          echo "SUPABASE_URL=$SUPABASE_URL" > .dev.vars
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
-      - name: Generate Auth States
+      - name: Create Playwright output directories
         run: |
-          npm run dev &
-          DEV_PID=$!
-          echo "⏳ Waiting for dev server on http://localhost:5173/..."
-          ATTEMPTS=0
-          until curl -fsS "http://localhost:5173/" > /dev/null; do
-            ATTEMPTS=$((ATTEMPTS+1))
-            if [ "$ATTEMPTS" -ge 60 ]; then
-              echo "❌ Dev server did not become ready in time"
-              kill $DEV_PID || true
-              exit 1
-            fi
-            sleep 1
-          done
-          npm run db:local:gen-test-auth
-          kill $DEV_PID || true
-          pkill -f "vite" || true
-          sleep 1
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          mkdir -p playwright-logs blob-report test-results
 
-      - name: Run Playwright Single Test (Shard ${{ matrix.shard }}/4)
+      - name: Run Playwright Tests (Shard ${{ matrix.shard }}/4)
         run: |
           set -o pipefail
-          mkdir -p playwright-logs
-          echo "🎬 Running sharded test suite"
-          # NOTE: Excluding PWA project from main shards
-          npx playwright test --shard=${{ matrix.shard }}/4 --project=chromium-auth --project=chromium --project="Mobile Chrome" 2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
+          echo "🎬 Running sharded test suite (shard ${{ matrix.shard }}/4)"
+          npm run test:e2e:both:ci -- \
+            --shard=${{ matrix.shard }}/4 \
+            2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
 
       - name: Upload Playwright log (Shard ${{ matrix.shard }}/4)
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-log-${{ matrix.shard }}
           path: playwright-logs/playwright-shard-${{ matrix.shard }}.log
@@ -219,7 +318,7 @@ jobs:
 
       - name: Upload blob report to GitHub Actions Artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: blob-report-${{ matrix.shard }}
           path: blob-report/
@@ -227,7 +326,7 @@ jobs:
 
       - name: Upload Test Artifacts
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-${{ matrix.shard }}
           path: test-results/
@@ -235,7 +334,7 @@ jobs:
 
       - name: Stop Supabase
         if: always()
-        run: supabase stop --no-backup
+        run: cd rhizome && supabase stop --no-backup
 
   # --------------------------------------------------------------------------
   # JOB 2: PWA OFFLINE TEST (Production Build + Preview)
@@ -244,18 +343,51 @@ jobs:
     name: Run PWA Offline Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: vite_pwa_env
-    needs: [test-unit] # Run after unit tests pass, not in parallel
+    environment: tunetrees_ci_env
     env:
-      ALICE_TEST_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
-      TEST_USER_PASSWORD: ${{ secrets.ALICE_TEST_PASSWORD }}
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
+      VITE_SUPABASE_URL: ""
+      VITE_SUPABASE_ANON_KEY: ""
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      SUPABASE_SERVICE_ROLE_KEY: super-secret-jwt-token-with-at-least-32-characters-long
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
+
+      - name: Resolve shared repo refs
+        id: shared_refs
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          resolve_ref() {
+            local repo="$1"
+            local candidate="$2"
+            if git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$candidate" >/dev/null 2>&1; then
+              printf '%s\n' "$candidate"
+            else
+              printf 'main\n'
+            fi
+          }
+
+          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Rhizome (shared Supabase config + DB scripts)
+        uses: actions/checkout@v5
+        with:
+          repository: sboagy/rhizome
+          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
+          path: rhizome
+
+      - name: Checkout oosync (sync library for worker)
+        uses: actions/checkout@v5
+        with:
+          repository: sboagy/oosync
+          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
+          path: oosync
 
       - name: AGGRESSIVE DISK CLEANUP
         if: runner.os == 'Linux'
@@ -266,18 +398,37 @@ jobs:
           docker system prune -a -f || true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      # --- Self-Contained Supabase Setup (Required for parallelism) ---
+      - name: Overlay checked-out Rhizome and oosync packages
+        run: |
+          npm install --no-save --no-package-lock ./rhizome ./oosync
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Resolve test secrets from 1Password
+        # Resolves the shared test-user password via 1Password so it is never
+        # stored as a GitHub secret. Both env vars point to the same value.
+        run: |
+          echo "ALICE_TEST_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+          echo "TEST_USER_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      # --- Supabase Setup (shared multi-tenant from Rhizome) ---
       - name: Cache Supabase CLI
         id: cache-supabase
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: /usr/local/bin/supabase
           key: ${{ runner.os }}-supabase-cli-v1.200.0
@@ -294,7 +445,7 @@ jobs:
 
       - name: Cache Supabase Docker Images
         id: cache-docker-images
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/supabase-docker-images.tar
           key: ${{ runner.os }}-supabase-docker-v1.200.0
@@ -305,13 +456,30 @@ jobs:
         if: steps.cache-docker-images.outputs.cache-hit == 'true'
         run: docker load -i ~/supabase-docker-images.tar
 
-      - name: Start Supabase Local Stack
+      - name: Stop any stale Supabase containers
+        working-directory: rhizome
+        run: |
+          supabase stop --no-backup 2>/dev/null || true
+          docker network prune -f 2>/dev/null || true
+
+      - name: Disable Supabase Edge Runtime For CI
+        working-directory: rhizome
+        run: |
+          if grep -q '^\[edge_runtime\]' supabase/config.toml; then
+            perl -0pi -e 's/\[edge_runtime\]\s*\nenabled = true/[edge_runtime]\nenabled = false/' supabase/config.toml
+          else
+            printf '\n[edge_runtime]\nenabled = false\n' >> supabase/config.toml
+          fi
+
+      - name: Start Supabase from Rhizome
+        working-directory: rhizome
         run: |
           supabase start
-          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
-          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> $GITHUB_ENV
+          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
           echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
 
       - name: Wait for Supabase API
         run: |
@@ -322,92 +490,107 @@ jobs:
             sleep 2
           done
 
-      - name: Reset and Seed Database
+      - name: Save Docker Images to Cache
+        if: steps.cache-docker-images.outputs.cache-hit != 'true'
         run: |
-          set -o pipefail
-          if ! supabase db reset --debug; then
-            sleep 5
-            supabase db reset --debug
-          fi
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+          docker images --format "{{.Repository}}:{{.Tag}}" | grep supabase | xargs docker save -o ~/supabase-docker-images.tar
 
-      - name: Check SQLite schema via Postgres introspection
-        run: npm run schema:sqlite:check
+      - name: Seed shared auth users (Rhizome)
+        working-directory: rhizome
+        run: |
+          bash ./scripts/seed-shared-auth-users-local.sh
+        env:
+          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Apply TuneTrees migrations + seeds (Rhizome db-push)
+        working-directory: rhizome
+        run: |
+          ./scripts/db-push-local.sh --public-cleared ${{ github.workspace }}
+        env:
+          DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Remove local Supabase bindings from .env.local.template
+        # Later npm scripts use `op run --env-file=.env.local.template`. Strip the
+        # local Supabase-derived keys so `op run` cannot override the runtime values
+        # already exported into $GITHUB_ENV after `supabase start`.
+        run: |
+          tmp_env_file="$(mktemp)"
+          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
+          mv "$tmp_env_file" .env.local.template
 
       # --- Playwright PWA Specifics ---
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Generate Auth States
-        run: |
-          npm run dev &
-          DEV_PID=$!
-          echo "⏳ Waiting for dev server on http://localhost:5173/..."
-          ATTEMPTS=0
-          until curl -fsS "http://localhost:5173/" > /dev/null; do
-            ATTEMPTS=$((ATTEMPTS+1))
-            if [ "$ATTEMPTS" -ge 60 ]; then
-              echo "❌ Dev server did not become ready in time"
-              kill $DEV_PID || true
-              exit 1
-            fi
-            sleep 1
-          done
-          npm run db:local:gen-test-auth
-          kill $DEV_PID || true
-          pkill -f "vite" || true
-          sleep 1
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+      - name: Cache Playwright Browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
       - name: Setup Cloudflare Worker
         run: |
           cd worker
           npm ci
-          echo "SUPABASE_URL=${{ env.SUPABASE_URL }}" > .dev.vars
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          echo "SUPABASE_URL=$SUPABASE_URL" > .dev.vars
           echo "SUPABASE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long" >> .dev.vars
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
-      # IMPORTANT: Build the PWA for production
+      - name: Install Playwright Browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright System Dependencies
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
       - name: Build PWA
-        run: npm run build:preview-local
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
+        run: |
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY not set after Supabase start}"
+          export VITE_SUPABASE_URL="$SUPABASE_URL"
+          export VITE_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          npm run build:preview-local
+
+      - name: Create Playwright output directories
+        run: mkdir -p playwright-logs blob-report test-results
 
       - name: Run PWA Offline Tests
         run: |
+          : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
+          : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY not set after Supabase start}"
+          export VITE_SUPABASE_URL="$SUPABASE_URL"
+          export VITE_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
           set -o pipefail
-          mkdir -p playwright-logs
-          {
-            echo "🚀 Starting Preview Server on port 4173..."
-            npm run preview:local &
-            PREVIEW_PID=$!
-            sleep 10
+          echo "🚀 Starting Preview Server on port 4173..."
+          npm run preview:local &
+          PREVIEW_PID=$!
 
-            # 1. Run Setup (Uses Preview Server via preview-setup project)
-            echo "🔐 Running Authentication Setup for Preview..."
-            npx playwright test e2e/setup/auth.setup.ts --project=preview-setup
+          cleanup() {
+            kill "$PREVIEW_PID" 2>/dev/null || true
+            pkill -f "vite preview" 2>/dev/null || true
+          }
+          trap cleanup EXIT
 
-            # 2. Run Offline Tests (Uses Preview Server)
-            echo "🎭 Running PWA Offline Tests..."
-            npx playwright test --project=chromium-pwa-offline
+          ATTEMPTS=0
+          until curl -fsS "http://localhost:4173/" > /dev/null; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 60 ]; then
+              echo "❌ Preview server did not become ready in time"
+              exit 1
+            fi
+            sleep 1
+          done
 
-            echo "🛑 Stopping Preview Server..."
-            kill $PREVIEW_PID || true
-            pkill -f "vite" || true
-          } 2>&1 | tee "playwright-logs/playwright-pwa.log"
+          echo "🎭 Running PWA Offline Tests..."
+          npm run test:e2e:offline:ci -- \
+            2>&1 | tee "playwright-logs/playwright-pwa.log"
         shell: bash
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       - name: Upload Playwright log (PWA)
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-log-pwa
           path: playwright-logs/
@@ -415,7 +598,7 @@ jobs:
 
       - name: Upload PWA blob report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: blob-report-pwa
           path: blob-report/
@@ -423,7 +606,7 @@ jobs:
 
       - name: Upload Test Artifacts (PWA)
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-pwa
           path: test-results/
@@ -431,7 +614,7 @@ jobs:
 
       - name: Stop Supabase
         if: always()
-        run: supabase stop --no-backup
+        run: cd rhizome && supabase stop --no-backup
 
   # --------------------------------------------------------------------------
   # JOB 3: MERGE REPORTS
@@ -439,30 +622,43 @@ jobs:
   merge-reports:
     name: Merge Playwright Reports
     if: always()
-    needs: [test, test-pwa-offline] # Waits for BOTH jobs
+    needs: [test, test-pwa-offline]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Download blob reports from all shards
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v6
         with:
           pattern: blob-report-*
           path: all-blob-reports
           merge-multiple: true
 
+      - name: Detect blob reports
+        id: blob-reports
+        run: |
+          if [ -d all-blob-reports ] && find all-blob-reports -type f -name '*.zip' | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No Playwright blob reports were downloaded; skipping HTML merge."
+          fi
+
       - name: Download Playwright logs
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v6
         with:
           pattern: playwright-log-*
           path: all-playwright-logs
@@ -470,65 +666,73 @@ jobs:
 
       - name: Assemble combined Playwright log
         run: |
-          set -o pipefail
-          find all-playwright-logs -type f -print | sort | xargs cat > playwright-run.log
+          mkdir -p playwright-logs
+          cat all-playwright-logs/*.log > playwright-logs/playwright-combined.log 2>/dev/null || echo "(no log files)" > playwright-logs/playwright-combined.log
 
       - name: Upload combined Playwright log
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
-          name: playwright-run-log
-          path: playwright-run.log
-          retention-days: 30
+          name: playwright-log-combined
+          path: playwright-logs/
+          retention-days: 7
 
       - name: Merge into HTML Report
+        if: steps.blob-reports.outputs.found == 'true'
         run: npx playwright merge-reports --reporter html ./all-blob-reports
 
       - name: Upload merged HTML report
-        uses: actions/upload-artifact@v7
+        if: steps.blob-reports.outputs.found == 'true'
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
 
   # --------------------------------------------------------------------------
-  # JOB 4: DEPLOY
+  # JOB 4: DEPLOY (Pages + Worker)
   # --------------------------------------------------------------------------
   deploy:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
-    needs: [test-unit, test, test-pwa-offline] # Deploy only if ALL tests pass
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix-practice-queue-sync-3')
-    environment: vite_pwa_env
+    needs: [test-unit, test, test-pwa-offline]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
+    environment: tunetrees_ci_env
+    env:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
       - name: Build Application
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
-          VITE_SYNC_DIAGNOSTICS: true
 
       - name: Deploy to Cloudflare Pages
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=tunetrees-pwa --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        # Use `op run` instead of wrangler-action so secrets come from
+        # 1Password and never need to be stored as individual GitHub secrets.
+        run: |
+          op run --env-file=".env.prod.template" -- \
+            npx wrangler pages deploy dist \
+              --project-name=tunetrees-pwa \
+              --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Output deployment URL
         if: success()
@@ -538,25 +742,38 @@ jobs:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
     needs: [test-unit, test, test-pwa-offline]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix-practice-queue-sync-3')
-    environment: vite_pwa_env
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
+    environment: tunetrees_ci_env
+
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
-      - run: npm ci
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Install Worker Dependencies
         run: cd worker && npm ci
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: "worker"
-          command: deploy
-          secrets: |
-            SUPABASE_JWT_SECRET
+        # `op run` resolves CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
+        # SUPABASE_JWT_SECRET, etc. from .env.prod.template without storing
+        # them as separate GitHub secrets.
+        run: |
+          op run --env-file=".env.prod.template" -- \
+            npx wrangler deploy
+        working-directory: worker
         env:
-          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}

@@ -13,11 +13,22 @@
  */
 
 import { expect } from "@playwright/test";
+import { waitForSyncComplete } from "../helpers/local-db-lifecycle";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
+
+async function waitForTestApi(page: import("@playwright/test").Page) {
+  await page.waitForFunction(
+    () => typeof (window as any).__ttTestApi === "object",
+    undefined,
+    {
+      timeout: 15000,
+    }
+  );
+}
 
 /**
  * Helper to open Settings → Catalog & Sync page
@@ -86,21 +97,13 @@ async function openCatalogSync(page: import("@playwright/test").Page) {
 }
 
 /**
- * Helper to wait for sync completion and verify sync state
- */
-async function waitForSyncComplete(page: import("@playwright/test").Page) {
-  await page.waitForLoadState("networkidle", { timeout: 30000 });
-  // Additional wait for local DB to process synced data
-  await page.waitForTimeout(2000);
-}
-
-/**
  * Helper to get annotation counts using test API
  */
 async function getAnnotationCounts(
   page: import("@playwright/test").Page,
   options?: { tuneId?: string }
 ) {
+  await waitForTestApi(page);
   return await page.evaluate(async (opts) => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -114,6 +117,7 @@ async function getAnnotationCounts(
 async function getOrphanedAnnotationCounts(
   page: import("@playwright/test").Page
 ) {
+  await waitForTestApi(page);
   return await page.evaluate(async () => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -132,6 +136,7 @@ async function seedAnnotations(
     referenceCount?: number;
   }
 ) {
+  await waitForTestApi(page);
   return await page.evaluate(async (seedInput) => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -176,16 +181,17 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
       (window as any).__ttTestUserId = userId;
       (window as any).__ttTestApi?.setTestUserId?.(userId);
     }, testUser.userId);
+
+    await waitForTestApi(page);
   });
 
   test("A: Onboarding filters annotations server-side for selected genres", async ({
     page,
   }) => {
+    test.setTimeout(45000);
+
     // Navigate to catalog to ensure app is loaded
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-
-    // Wait for initial sync to complete
-    await waitForSyncComplete(page);
 
     // Get annotation counts after initial sync with genre selection
     const counts = await getAnnotationCounts(page);
@@ -208,7 +214,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   }) => {
     test.setTimeout(45000); // Genre sync + polling takes time
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-    await waitForSyncComplete(page);
 
     // Record initial counts
     const beforeCounts = await getAnnotationCounts(page);
@@ -264,7 +269,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     test.setTimeout(60000); // Genre sync + polling takes time
 
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-    await waitForSyncComplete(page);
 
     // Use a known genre that's not in default repertoire setup
     // Note: Using "Blues" (mixed case) due to data quality issue in genre table
@@ -371,8 +375,9 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("D: Private tunes sync annotations regardless of genre filter", async ({
     page,
   }) => {
+    test.setTimeout(45000);
+
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
-    await waitForSyncComplete(page);
 
     // Get current user ID using test API
     const userId = await page.evaluate(async () => {

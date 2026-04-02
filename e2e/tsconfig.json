@@ -18,5 +18,11 @@
     "../src/**/*.ts",
     "../shared/**/*.ts",
     "../node_modules/oosync/src/**/*.ts"
+  ],
+  "exclude": [
+    // oosync ships a minimal ambient stub for @supabase/supabase-js (only
+    // the Realtime types it needs). Including it here would shadow the real
+    // package types and break imports like `createClient` in auth.setup.ts.
+    "../node_modules/oosync/src/types/external-modules.d.ts"
   ]
 }

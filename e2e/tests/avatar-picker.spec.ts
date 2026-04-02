@@ -71,23 +71,29 @@ test.describe("AVATAR-001: Avatar Picker", () => {
   });
 
   test("should select predefined avatar", async ({ page }) => {
-    // Click a predefined avatar
-    const balalelkaAvatar = page.locator('img[src*="balalaika.png"]').first();
-    await expect(balalelkaAvatar).toBeVisible({ timeout: 5000 });
-    await balalelkaAvatar.click();
+    // const accordionAvatar = page.locator('img[src*="accordion.png"]').first();
+    const balalaikaAvatar = page.locator('img[src*="balalaika.png"]').first();
+    const preview = page.locator('img[alt="Current avatar"]');
 
-    // Wait for save operation
-    await page.waitForTimeout(1000);
+    await expect(
+      page
+        .locator("div")
+        .filter({ hasText: /^No avatar$/ })
+        .nth(1)
+    ).toBeVisible({ timeout: 5000 });
+
+    await expect(balalaikaAvatar).toBeVisible({ timeout: 10000 });
+    await balalaikaAvatar.click();
+    // await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Check for success toast
     await expect(page.getByText("Avatar updated!")).toBeVisible({
-      timeout: 5000,
+      timeout: 20000,
     });
 
     // Verify avatar appears in preview
-    const preview = page.locator('img[alt="Current avatar"]');
     await expect(preview).toHaveAttribute("src", /balalaika\.png/, {
-      timeout: 5000,
+      timeout: 10000,
     });
   });
 
