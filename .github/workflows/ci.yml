@@ -768,12 +768,9 @@ jobs:
         uses: 1password/install-cli-action@v2
 
       - name: Deploy Worker
-        # `op run` resolves CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
-        # SUPABASE_JWT_SECRET, etc. from .env.prod.template without storing
-        # them as separate GitHub secrets.
-        run: |
-          op run --env-file="../.env.prod.template" -- \
-            npx wrangler deploy
+        # The worker JWT secret must exist as a Cloudflare Worker secret binding.
+        # Loading it into the deploy shell via `op run` is not enough by itself.
+        run: npm run deploy
         working-directory: worker
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
