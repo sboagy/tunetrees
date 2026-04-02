@@ -772,7 +772,7 @@ jobs:
         # SUPABASE_JWT_SECRET, etc. from .env.prod.template without storing
         # them as separate GitHub secrets.
         run: |
-          op run --env-file=".env.prod.template" -- \
+          op run --env-file="../.env.prod.template" -- \
             npx wrangler deploy
         working-directory: worker
         env:
