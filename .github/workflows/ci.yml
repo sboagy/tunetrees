@@ -768,12 +768,13 @@ jobs:
         uses: 1password/install-cli-action@v2
 
       - name: Deploy Worker
-        # `op run` resolves CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
-        # SUPABASE_JWT_SECRET, etc. from .env.prod.template without storing
-        # them as separate GitHub secrets.
-        run: |
-          op run --env-file=".env.prod.template" -- \
-            npx wrangler deploy
-        working-directory: worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: "worker"
+          command: deploy
+          secrets: |
+            SUPABASE_JWT_SECRET
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
