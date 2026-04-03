@@ -125,7 +125,7 @@
     "postgres": "^3.4.8",
     "prettier": "^3.8.1",
     "shadcn-solid": "^0.7.7",
-    "supabase": "^2.76.11",
+    "supabase": "^2.84.7",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
@@ -133,6 +133,6 @@
     "vite-plugin-solid": "^2.11.10",
     "vite-plugin-static-copy": "^3.2.0",
     "workbox-window": "^7.4.0",
-    "wrangler": "^4.67.0"
+    "wrangler": "^4.80.0"
   }
 }
