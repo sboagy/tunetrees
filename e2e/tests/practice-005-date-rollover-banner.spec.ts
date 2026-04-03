@@ -436,7 +436,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     expect(refreshedStorage.manualFlag).toBe("false");
   });
 
-  test("should auto-refresh completed queue without showing banner", async ({
+  test("should show banner for completed queue and refresh when Refresh Now is clicked", async ({
     page,
     context,
     testUser,
@@ -450,6 +450,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     const firstRow = rows.first();
     const secondRow = rows.nth(1);
 
+    // Complete all tunes in the queue
     await ttPage.setRowEvaluation(firstRow, "good");
     await ttPage.setRowEvaluation(secondRow, "good");
     await ttPage.submitEvaluationsButton.click();
@@ -467,8 +468,24 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       )
       .toBe(true);
 
+    // Advance the date — the banner should appear even though the queue is complete.
+    // The user must deliberately click "Refresh Now" to get a new queue.
     currentDate = await advanceDays(context, 1, currentDate);
     await page.waitForTimeout(ROLLOVER_WAIT_MS);
+    await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
+
+    // Queue should still be the old one while the banner is visible
+    const queueWhileBannerVisible = await getQueueSnapshot(
+      page,
+      testUser.repertoireId
+    );
+    expect(queueWhileBannerVisible.windowStartUtc).toBe(
+      initialQueue.windowStartUtc
+    );
+
+    // Click "Refresh Now" to manually advance to the new queue
+    await ttPage.dateRolloverRefreshButton.click();
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
 
     await expect

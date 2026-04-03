@@ -4,10 +4,13 @@
  */
 
 import type { Component } from "solid-js";
+import { Show } from "solid-js";
 
 export interface DateRolloverBannerProps {
   /** The new wall-clock date the user can advance to. */
   newDate: Date;
+  /** When true, the current queue is fully completed (all tunes practiced). */
+  isQueueCompleted?: boolean;
   /** Callback when user clicks refresh button */
   onRefresh?: () => void | Promise<void>;
 }
@@ -47,11 +50,27 @@ export const DateRolloverBanner: Component<DateRolloverBannerProps> = (
             />
           </svg>
           <div>
-            <p class="font-semibold">Practice date has changed</p>
-            <p class="text-sm">
-              The practice date is now {props.newDate.toLocaleDateString()}.
-              Refresh to see today's queue.
-            </p>
+            <Show
+              when={props.isQueueCompleted}
+              fallback={
+                <>
+                  <p class="font-semibold">Practice date has changed</p>
+                  <p class="text-sm">
+                    The practice date is now{" "}
+                    {props.newDate.toLocaleDateString()}. Refresh to see
+                    today's queue.
+                  </p>
+                </>
+              }
+            >
+              <p class="font-semibold">
+                🎉 Practice session complete! New day awaits.
+              </p>
+              <p class="text-sm">
+                The practice date is now {props.newDate.toLocaleDateString()}.
+                Refresh to start a new queue when you're ready.
+              </p>
+            </Show>
           </div>
         </div>
         <button
