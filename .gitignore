@@ -83,7 +83,6 @@ iti_import_output
 
 # Local/personal config files
 .gitconfig
-.npmrc
 
 # Database files (local development)
 *.sqlite3
