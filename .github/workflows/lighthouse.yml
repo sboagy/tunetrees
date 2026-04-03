@@ -16,8 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 # Opt into Node.js 24 for JavaScript-based actions before the runner default
-# changes in June 2026. This also suppresses deprecation warnings from
-# 1password/install-cli-action@v2, which still runs on the older action runtime.
+# changes in June 2026.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -35,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       # 3. Install dependencies
