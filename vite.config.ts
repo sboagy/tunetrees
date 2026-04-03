@@ -29,6 +29,41 @@ export default defineConfig(() => {
     }
   };
 
+  const manualChunkGroups = {
+    "vendor-solid": ["solid-js", "@solidjs/router"],
+    "vendor-ui": [
+      "@kobalte/core",
+      "solid-sonner",
+      "class-variance-authority",
+      "clsx",
+      "tailwind-merge",
+    ],
+    "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
+    "vendor-supabase": ["@supabase/supabase-js"],
+    "vendor-drizzle": ["drizzle-orm"],
+    "vendor-sql": ["sql.js"],
+  } as const;
+
+  const resolveManualChunk = (moduleId: string) => {
+    if (!moduleId.includes("node_modules")) {
+      return undefined;
+    }
+
+    for (const [chunkName, packages] of Object.entries(manualChunkGroups)) {
+      if (
+        packages.some(
+          (packageName) =>
+            moduleId.includes(`/node_modules/${packageName}/`) ||
+            moduleId.includes(`\\node_modules\\${packageName}\\`)
+        )
+      ) {
+        return chunkName;
+      }
+    }
+
+    return undefined;
+  };
+
   return {
     // Development server configuration
     server: {
@@ -228,24 +263,7 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           // Manual chunk splitting for better caching
-          manualChunks: {
-            // Vendor chunks
-            "vendor-solid": ["solid-js", "@solidjs/router"],
-            "vendor-ui": [
-              "@kobalte/core",
-              "solid-sonner",
-              "class-variance-authority",
-              "clsx",
-              "tailwind-merge",
-            ],
-            "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
-            "vendor-supabase": ["@supabase/supabase-js"],
-            // Large libraries that should be separate
-            "vendor-drizzle": ["drizzle-orm"],
-            "vendor-sql": ["sql.js"],
-            // Heavy features loaded on-demand
-            // Note: abcjs and jodit should be lazy-loaded in components
-          },
+          manualChunks: resolveManualChunk,
         },
       },
     },
