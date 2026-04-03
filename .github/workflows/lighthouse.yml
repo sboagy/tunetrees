@@ -16,8 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 # Opt into Node.js 24 for JavaScript-based actions before the runner default
-# changes in June 2026. This also suppresses deprecation warnings from
-# 1password/install-cli-action@v2, which still runs on the older action runtime.
+# changes in June 2026.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -25,60 +24,26 @@ jobs:
   lighthouse:
     name: Lighthouse Audit
     runs-on: ubuntu-latest
-    environment: tunetrees_ci_env
-    env:
-      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
       # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v2
-
       # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "25"
+          node-version: "24"
           cache: "npm"
 
       # 3. Install dependencies
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare Lighthouse build env
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('.env.prod.template')
-          old = 'VITE_WORKER_URL="op://rhizome/shared-local/Vite/VITE_WORKER_URL_TUNETREES_PRODUCTION"'
-          new = 'VITE_WORKER_URL="https://example.invalid/tunetrees-worker"'
-          text = path.read_text()
-          if old not in text:
-              raise SystemExit('Expected VITE_WORKER_URL production reference was not found in .env.prod.template')
-          path.write_text(text.replace(old, new, 1))
-          PY
-
       # 4. Build production bundle
       - name: Build Application
-        run: |
-          for attempt in 1 2 3; do
-            echo "Building application (attempt ${attempt}/3)"
-            if npm run build; then
-              exit 0
-            fi
-
-            if [ "$attempt" -eq 3 ]; then
-              echo "Build failed after ${attempt} attempts"
-              exit 1
-            fi
-
-            echo "Transient build failure; retrying in 15s"
-            sleep 15
-          done
+        run: npx tsc -b && npx vite build
         env:
           # Use placeholder values for build (not accessing real Supabase)
           VITE_SUPABASE_URL: https://placeholder.supabase.co
