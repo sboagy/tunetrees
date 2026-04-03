@@ -5,6 +5,7 @@
  */
 
 export { RecallEvalComboBox } from "./RecallEvalComboBox";
+export { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 export * from "./TuneColumns";
 export { TunesGridCatalog } from "./TunesGridCatalog";
 export { TunesGridRepertoire } from "./TunesGridRepertoire";

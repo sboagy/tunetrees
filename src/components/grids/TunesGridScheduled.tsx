@@ -186,6 +186,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           cellCallbacks={{
             onRecallEvalChange: handleRecallEvalChange,
             onGoalChange: props.onGoalChange,
+            onScheduledChange: props.onScheduledChange,
             goals: () => goalsData() ?? [],
           }}
           onTableReady={(tbl) => {

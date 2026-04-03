@@ -78,6 +78,7 @@ export interface IGridBaseProps {
   onTuneSelect?: (tune: ITuneOverview) => void;
   onRecallEvalChange?: (tuneId: string, newValue: string) => void;
   onGoalChange?: (tuneId: string, newValue: string | null) => void;
+  onScheduledChange?: (tuneId: string, newValue: string | null) => void;
   onSelectionChange?: (selectedCount: number) => void;
   // Practice toolbar callbacks
   onEvaluationsCountChange?: (count: number) => void;
@@ -153,6 +154,8 @@ export interface ICellEditorCallbacks {
   onGoalChange?: (tuneId: string, newValue: string | null) => void;
   onNotePrivateChange?: (tuneId: string, newValue: string) => void;
   onNotePublicChange?: (tuneId: string, newValue: string) => void;
+  /** Called when the user sets or clears a schedule override from the grid cell. */
+  onScheduledChange?: (tuneId: string, newValue: string | null) => void;
   /** Reactive accessor for the list of available goals (for the GoalBadge dropdown). */
   goals?: () => IGoalOption[];
 }

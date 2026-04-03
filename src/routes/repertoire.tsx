@@ -36,6 +36,7 @@ import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEdit
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
+import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import * as schema from "../lib/db/schema";
 import { repertoireTune } from "../lib/db/schema";
 import { log } from "../lib/logger";
@@ -376,6 +377,26 @@ const RepertoirePage: Component = () => {
     }
   };
 
+  // Handle schedule override change from the in-grid date-time picker.
+  const handleScheduledChange = async (
+    tuneId: string,
+    newValue: string | null
+  ) => {
+    const db = localDb();
+    const repertoireId = currentRepertoireId();
+    if (!db || !repertoireId) return;
+
+    try {
+      suppressNextViewRefresh("repertoire");
+      await updateRepertoireTuneFields(db, repertoireId, tuneId, {
+        scheduled: newValue,
+      });
+      incrementRepertoireListChanged();
+    } catch (err) {
+      console.error("[RepertoirePage] Failed to update schedule override:", err);
+    }
+  };
+
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
     null
   );
@@ -445,6 +466,7 @@ const RepertoirePage: Component = () => {
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
                 onGoalChange={handleGoalChange}
+                onScheduledChange={handleScheduledChange}
                 onSelectionChange={setSelectedRowsCount}
                 onTableReady={setTableInstance}
               />

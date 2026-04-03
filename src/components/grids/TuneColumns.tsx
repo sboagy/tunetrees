@@ -9,6 +9,7 @@ import type { ColumnDef, Table } from "@tanstack/solid-table";
 import { type Component, createEffect, Show } from "solid-js";
 import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 /**
@@ -617,13 +618,21 @@ export function getRepertoireColumns(
         <SortableHeader column={column} title="Sched Override" />
       ),
       cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
-
+        const row = info.row.original;
+        const tuneId = String(
+          row.tune_id ?? row.tune?.id ?? row.tuneRef ?? row.id ?? ""
+        );
+        const value = (info.getValue() as string) || "";
         return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(value)}
-          </span>
+          <ScheduledOverridePicker
+            tuneId={tuneId}
+            value={value}
+            onChange={
+              callbacks?.onScheduledChange
+                ? (newValue) => callbacks.onScheduledChange!(tuneId, newValue)
+                : undefined
+            }
+          />
         );
       },
       size: 200,
