@@ -88,7 +88,6 @@ export const ScheduledOverridePicker: Component<
   // Auto-close and re-sync when the virtual list reuses this cell for a
   // different row (tuneId changes) or the underlying data refreshes.
   createEffect(() => {
-    const _tuneId = props.tuneId;
     const _value = props.value;
     setOpen(false);
     untrack(() => setLocalValue(toDatetimeLocal(_value)));
@@ -109,10 +108,7 @@ export const ScheduledOverridePicker: Component<
 
   // ── Read-only fallback ────────────────────────────────────────────────────
   const ReadOnly = () => (
-    <Show
-      when={props.value}
-      fallback={<span class="text-gray-400">—</span>}
-    >
+    <Show when={props.value} fallback={<span class="text-gray-400">—</span>}>
       <span class="text-sm text-gray-600 dark:text-gray-400">
         {formatDisplay(props.value)}
       </span>
