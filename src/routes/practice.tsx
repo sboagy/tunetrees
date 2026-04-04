@@ -31,8 +31,8 @@ import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEdit
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
-import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
+import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
 import { ensureDailyQueue } from "../lib/services/practice-queue";
 import { getPracticeDate } from "../lib/utils/practice-date";
