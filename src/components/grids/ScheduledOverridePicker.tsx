@@ -2,44 +2,150 @@
  * ScheduledOverridePicker
  *
  * In-grid cell editor for the "Sched Override" (scheduled) column.
- * Displays the current override date/time or a "—" placeholder when empty.
- * When `onChange` is provided the cell becomes a clickable trigger that opens
- * a Kobalte Popover with a native `datetime-local` input, a Clear button, and
- * an Apply button — matching the datetime picker already in TuneEditor.
- *
- * Handles TanStack Virtual's cell-reuse pattern by auto-closing the popover
- * and syncing local state whenever `tuneId` or `value` changes.
+ * Uses a single popover surface with an inline calendar, local time controls,
+ * and Apply/Clear/Cancel actions so the browser does not open a second native
+ * date picker panel.
  */
 import { Popover as PopoverPrimitive } from "@kobalte/core/popover";
-import { Calendar } from "lucide-solid";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-solid";
 import {
   type Component,
   createEffect,
+  createMemo,
   createSignal,
+  For,
   Show,
   untrack,
 } from "solid-js";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const DEFAULT_HOUR = "12";
+const DEFAULT_MINUTE = "00";
+const DEFAULT_PERIOD = "PM" as const;
 
-/**
- * Convert an ISO timestamp to the `YYYY-MM-DDTHH:mm` format expected by
- * `<input type="datetime-local">`.  Returns "" for null / invalid values.
- */
-function toDatetimeLocal(isoStr: string | null | undefined): string {
-  if (!isoStr) return "";
+type Meridiem = "AM" | "PM";
+
+function padNumber(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function formatDateKey(date: Date): string {
+  return `${date.getFullYear()}-${padNumber(date.getMonth() + 1)}-${padNumber(date.getDate())}`;
+}
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date: Date, delta: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+}
+
+function addDays(date: Date, delta: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + delta);
+}
+
+function startOfWeek(date: Date): Date {
+  return addDays(date, -date.getDay());
+}
+
+function buildCalendarDays(month: Date): Date[] {
+  const firstDay = startOfMonth(month);
+  const gridStart = startOfWeek(firstDay);
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+}
+
+function formatMonthYear(date: Date): string {
+  return date.toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function getDefaultLocalParts() {
+  return {
+    date: "",
+    hour: DEFAULT_HOUR,
+    minute: DEFAULT_MINUTE,
+    period: DEFAULT_PERIOD,
+  };
+}
+
+function toLocalParts(isoStr: string | null | undefined) {
+  if (!isoStr) return getDefaultLocalParts();
+
   try {
     const date = new Date(isoStr);
-    if (Number.isNaN(date.getTime())) return "";
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    const h = String(date.getHours()).padStart(2, "0");
-    const min = String(date.getMinutes()).padStart(2, "0");
-    return `${y}-${m}-${d}T${h}:${min}`;
+    if (Number.isNaN(date.getTime())) return getDefaultLocalParts();
+
+    const hours24 = date.getHours();
+    const hour12 = hours24 % 12 || 12;
+
+    return {
+      date: formatDateKey(date),
+      hour: padNumber(hour12),
+      minute: padNumber(date.getMinutes()),
+      period: hours24 >= 12 ? ("PM" as const) : ("AM" as const),
+    };
   } catch {
-    return "";
+    return getDefaultLocalParts();
   }
+}
+
+function clampDigits(value: string, maxLength: number): string {
+  return value.replace(/\D/g, "").slice(0, maxLength);
+}
+
+function normalizeHour(value: string): string {
+  if (!value) return DEFAULT_HOUR;
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return DEFAULT_HOUR;
+  return padNumber(Math.min(12, Math.max(1, parsed)));
+}
+
+function normalizeMinute(value: string): string {
+  if (!value) return DEFAULT_MINUTE;
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return DEFAULT_MINUTE;
+  return padNumber(Math.min(59, Math.max(0, parsed)));
+}
+
+function isValidTime(hour: string, minute: string): boolean {
+  if (hour.length === 0 || minute.length === 0) return false;
+
+  const parsedHour = Number.parseInt(hour, 10);
+  const parsedMinute = Number.parseInt(minute, 10);
+
+  return (
+    !Number.isNaN(parsedHour) &&
+    !Number.isNaN(parsedMinute) &&
+    parsedHour >= 1 &&
+    parsedHour <= 12 &&
+    parsedMinute >= 0 &&
+    parsedMinute <= 59
+  );
+}
+
+function toIsoTimestamp(
+  dateValue: string,
+  hourValue: string,
+  minuteValue: string,
+  period: Meridiem
+): string | null {
+  if (!dateValue || !isValidTime(hourValue, minuteValue)) return null;
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  const hour12 = Number.parseInt(hourValue, 10);
+  const minute = Number.parseInt(minuteValue, 10);
+  let hour24 = hour12 % 12;
+  if (period === "PM") hour24 += 12;
+
+  const date = new Date(year, month - 1, day, hour24, minute, 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString();
 }
 
 /** Format an ISO timestamp as a human-readable short date+time string. */
@@ -81,27 +187,74 @@ export const ScheduledOverridePicker: Component<
   ScheduledOverridePickerProps
 > = (props) => {
   const [open, setOpen] = createSignal(false);
-  const [localValue, setLocalValue] = createSignal(
-    toDatetimeLocal(props.value)
+  const [draftDate, setDraftDate] = createSignal("");
+  const [draftHour, setDraftHour] = createSignal(DEFAULT_HOUR);
+  const [draftMinute, setDraftMinute] = createSignal(DEFAULT_MINUTE);
+  const [draftPeriod, setDraftPeriod] = createSignal<Meridiem>(DEFAULT_PERIOD);
+  const [visibleMonth, setVisibleMonth] = createSignal(
+    startOfMonth(new Date())
   );
+
+  const syncFromProps = () => {
+    const parts = toLocalParts(props.value);
+    setDraftDate(parts.date);
+    setDraftHour(parts.hour);
+    setDraftMinute(parts.minute);
+    setDraftPeriod(parts.period);
+    setVisibleMonth(
+      startOfMonth(parts.date ? new Date(`${parts.date}T12:00:00`) : new Date())
+    );
+  };
 
   // Auto-close and re-sync when the virtual list reuses this cell for a
   // different row (tuneId changes) or the underlying data refreshes.
   createEffect(() => {
     const _value = props.value;
     setOpen(false);
-    untrack(() => setLocalValue(toDatetimeLocal(_value)));
+    untrack(() => {
+      void _value;
+      syncFromProps();
+    });
   });
 
+  const calendarDays = createMemo(() => buildCalendarDays(visibleMonth()));
+  const todayKey = createMemo(() => formatDateKey(new Date()));
+  const draftIso = createMemo(() =>
+    toIsoTimestamp(
+      draftDate(),
+      normalizeHour(draftHour()),
+      normalizeMinute(draftMinute()),
+      draftPeriod()
+    )
+  );
+  const canApply = createMemo(() => Boolean(draftIso()));
+  const draftSummary = createMemo(() => {
+    const iso = draftIso();
+    return iso ? formatDisplay(iso) : "Select date and time";
+  });
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen || open()) {
+      syncFromProps();
+    }
+    setOpen(nextOpen);
+  };
+
+  const handleDaySelect = (date: Date) => {
+    setDraftDate(formatDateKey(date));
+    setVisibleMonth(startOfMonth(date));
+  };
+
   const handleApply = () => {
-    const v = localValue();
-    const isoValue = v ? new Date(v).toISOString() : null;
+    const isoValue = draftIso();
+    if (!isoValue) return;
+
     props.onChange?.(isoValue);
     setOpen(false);
   };
 
   const handleClear = () => {
-    setLocalValue("");
+    syncFromProps();
     props.onChange?.(null);
     setOpen(false);
   };
@@ -118,47 +271,197 @@ export const ScheduledOverridePicker: Component<
   // ── Editable (popover) ─────────────────────────────────────────────────────
   return (
     <Show when={props.onChange} fallback={<ReadOnly />}>
-      <PopoverPrimitive open={open()} onOpenChange={setOpen}>
+      <PopoverPrimitive open={open()} onOpenChange={handleOpenChange}>
         <PopoverPrimitive.Trigger
           data-testid={`scheduled-override-trigger-${props.tuneId}`}
-          class="flex items-center gap-1 text-sm cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+          aria-label={
+            props.value ? "Edit schedule override" : "Set schedule override"
+          }
+          class="flex min-h-6 items-center gap-1.5 rounded px-1 text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <Show
             when={props.value}
             fallback={
-              <span class="text-gray-400 group-hover:text-gray-500 dark:group-hover:text-gray-300 flex items-center gap-1">
-                <span>—</span>
-                <Calendar class="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-              </span>
+              <>
+                <Calendar class="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                <span class="sr-only">Set schedule override</span>
+              </>
             }
           >
-            <span class="text-gray-600 dark:text-gray-400 group-hover:text-gray-800 dark:group-hover:text-gray-200">
+            <span class="truncate text-gray-600 dark:text-gray-400">
               {formatDisplay(props.value)}
             </span>
-            <Calendar class="w-3.5 h-3.5 text-gray-400 opacity-50 group-hover:opacity-80 transition-opacity flex-shrink-0" />
+            <Calendar class="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
           </Show>
         </PopoverPrimitive.Trigger>
 
         <PopoverPrimitive.Portal>
           <PopoverPrimitive.Content
             data-testid={`scheduled-override-popover-${props.tuneId}`}
-            class="z-50 w-72 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-lg outline-none"
+            class="z-50 w-[22rem] rounded-md border border-gray-200 bg-white p-4 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900"
           >
-            <div class="space-y-3">
-              <p class="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Schedule Override
-              </p>
-              <input
-                type="datetime-local"
-                value={localValue()}
-                onInput={(e) => setLocalValue(e.currentTarget.value)}
-                data-testid={`scheduled-override-input-${props.tuneId}`}
-                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                Force this tune into your queue on this date. Cleared after
-                practice.
-              </p>
+            <div class="space-y-4">
+              <div class="space-y-1">
+                <p class="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Schedule Override
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  Force this tune into your queue on this date. Cleared after
+                  practice.
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-800/80">
+                <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {draftSummary()}
+                </span>
+                <Calendar class="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+              </div>
+
+              <div class="space-y-3 rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                <div class="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleMonth(addMonths(visibleMonth(), -1))
+                    }
+                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    aria-label="Previous month"
+                  >
+                    <ChevronLeft class="h-4 w-4" />
+                  </button>
+
+                  <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {formatMonthYear(visibleMonth())}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleMonth(addMonths(visibleMonth(), 1))
+                    }
+                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-200 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    aria-label="Next month"
+                  >
+                    <ChevronRight class="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <For each={WEEKDAY_LABELS}>
+                    {(label) => <div>{label}</div>}
+                  </For>
+                </div>
+
+                <div class="grid grid-cols-7 gap-1">
+                  <For each={calendarDays()}>
+                    {(day) => {
+                      const dayKey = formatDateKey(day);
+                      const inCurrentMonth =
+                        day.getMonth() === visibleMonth().getMonth() &&
+                        day.getFullYear() === visibleMonth().getFullYear();
+                      const isSelected = dayKey === draftDate();
+                      const isToday = dayKey === todayKey();
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => handleDaySelect(day)}
+                          data-testid={
+                            isSelected
+                              ? `scheduled-override-selected-day-${props.tuneId}`
+                              : undefined
+                          }
+                          class="inline-flex h-9 items-center justify-center rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          classList={{
+                            "bg-blue-600 text-white": isSelected,
+                            "border border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300":
+                              !isSelected && isToday,
+                            "text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800":
+                              !isSelected && inCurrentMonth && !isToday,
+                            "text-gray-400 hover:bg-gray-100 dark:text-gray-600 dark:hover:bg-gray-800":
+                              !isSelected && !inCurrentMonth && !isToday,
+                          }}
+                        >
+                          {day.getDate()}
+                        </button>
+                      );
+                    }}
+                  </For>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDaySelect(new Date())}
+                  class="text-xs font-medium text-blue-600 hover:underline focus:outline-none dark:text-blue-400"
+                >
+                  Today
+                </button>
+              </div>
+
+              <div class="space-y-2">
+                <div class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Time
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    value={draftHour()}
+                    onInput={(e) =>
+                      setDraftHour(clampDigits(e.currentTarget.value, 2))
+                    }
+                    onBlur={() => setDraftHour(normalizeHour(draftHour()))}
+                    data-testid={`scheduled-override-hour-${props.tuneId}`}
+                    class="w-14 rounded-md border border-gray-300 px-3 py-2 text-center text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    aria-label="Hour"
+                  />
+                  <span class="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                    :
+                  </span>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    value={draftMinute()}
+                    onInput={(e) =>
+                      setDraftMinute(clampDigits(e.currentTarget.value, 2))
+                    }
+                    onBlur={() =>
+                      setDraftMinute(normalizeMinute(draftMinute()))
+                    }
+                    data-testid={`scheduled-override-minute-${props.tuneId}`}
+                    class="w-14 rounded-md border border-gray-300 px-3 py-2 text-center text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                    aria-label="Minute"
+                  />
+                  <div class="ml-1 inline-flex rounded-md border border-gray-300 dark:border-gray-600">
+                    <button
+                      type="button"
+                      onClick={() => setDraftPeriod("AM")}
+                      class="px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      classList={{
+                        "bg-blue-600 text-white": draftPeriod() === "AM",
+                        "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800":
+                          draftPeriod() !== "AM",
+                      }}
+                    >
+                      AM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDraftPeriod("PM")}
+                      class="px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      classList={{
+                        "bg-blue-600 text-white": draftPeriod() === "PM",
+                        "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800":
+                          draftPeriod() !== "PM",
+                      }}
+                    >
+                      PM
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div class="flex items-center justify-between gap-2 pt-1">
                 <button
                   type="button"
@@ -170,7 +473,7 @@ export const ScheduledOverridePicker: Component<
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setOpen(false)}
+                    onClick={() => handleOpenChange(false)}
                     class="px-3 py-1 text-xs text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400"
                   >
                     Cancel
@@ -178,8 +481,12 @@ export const ScheduledOverridePicker: Component<
                   <button
                     type="button"
                     onClick={handleApply}
+                    disabled={!canApply()}
                     data-testid={`scheduled-override-apply-${props.tuneId}`}
-                    class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="px-3 py-1 text-xs rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+                    classList={{
+                      "bg-blue-600 text-white hover:bg-blue-700": canApply(),
+                    }}
                   >
                     Apply
                   </button>
