@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test as setup } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { config, parse } from "dotenv";
+import postgres from "postgres";
 import {
   AUTH_STATE_DB_VERSION_STORAGE_KEY,
   AUTH_STATE_SNAPSHOT_VERSION_STORAGE_KEY,
@@ -46,6 +47,9 @@ config({ path: ".env.local", quiet: true });
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "../..");
 const ENV_TEMPLATE_PATH = resolve(REPO_ROOT, ".env.local.template");
+const E2E_DATABASE_URL =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 
 /** Auth state files live in e2e/.auth/ (gitignored) */
 const AUTH_DIR = resolve(__dirname, "../.auth");
@@ -114,6 +118,91 @@ function ensureAuthDir(): void {
 function hasEnvValue(key: string): boolean {
   const value = process.env[key];
   return value != null && value.trim().length > 0;
+}
+
+function isLocalSupabaseUrl(url: string | undefined): boolean {
+  if (!url) {
+    return false;
+  }
+
+  return /https?:\/\/(127\.0\.0\.1|localhost):54321\/?$/i.test(url);
+}
+
+function getLocalSupabaseServiceRoleKey(): string {
+  try {
+    const statusJson = execFileSync("supabase", ["status", "--output", "json"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+    const status = JSON.parse(statusJson) as { SERVICE_ROLE_KEY?: string };
+    const serviceRoleKey = status.SERVICE_ROLE_KEY?.trim();
+
+    if (!serviceRoleKey) {
+      throw new Error("SERVICE_ROLE_KEY missing from `supabase status --output json`");
+    }
+
+    return serviceRoleKey;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[auth.setup] Failed to get local Supabase service role key from \`supabase status\`: ${message}`
+    );
+  }
+}
+
+function resolveResetServiceRoleKey(): string {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (isLocalSupabaseUrl(supabaseUrl) && !process.env.CI) {
+    const localServiceRoleKey = getLocalSupabaseServiceRoleKey();
+
+    if (envKey !== localServiceRoleKey) {
+      process.env.SUPABASE_SERVICE_ROLE_KEY = localServiceRoleKey;
+      console.log(
+        "ℹ️  Using SUPABASE_SERVICE_ROLE_KEY from local `supabase status` for RESET_DB"
+      );
+    }
+
+    return localServiceRoleKey;
+  }
+
+  if (envKey) {
+    return envKey;
+  }
+
+  throw new Error(
+    "[auth.setup] RESET_DB=true requires SUPABASE_SERVICE_ROLE_KEY to be set."
+  );
+}
+
+async function clearPracticeRecordsForRepertoires(
+  repertoireIds: string[]
+): Promise<void> {
+  if (repertoireIds.length === 0) {
+    return;
+  }
+
+  const sql = postgres(E2E_DATABASE_URL, { max: 1 });
+
+  try {
+    await sql.begin(async (transaction) => {
+      await transaction.unsafe(
+        "SELECT set_config('app.allow_practice_record_delete', 'on', true)"
+      );
+      await transaction.unsafe(
+        `
+        DELETE FROM public.practice_record
+        WHERE repertoire_ref = ANY($1::uuid[])
+      `,
+        [repertoireIds]
+      );
+    });
+  } finally {
+    await sql.end({ timeout: 5 }).catch(() => undefined);
+  }
 }
 
 function resolveTemplateEnv(
@@ -293,12 +382,11 @@ async function waitForCatalogSnapshotReady(
  */
 async function resetTunetreesUserData(): Promise<void> {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = resolveResetServiceRoleKey();
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl) {
     throw new Error(
-      "[auth.setup] RESET_DB=true requires VITE_SUPABASE_URL and " +
-        "SUPABASE_SERVICE_ROLE_KEY to be set."
+      "[auth.setup] RESET_DB=true requires VITE_SUPABASE_URL to be set."
     );
   }
 
@@ -328,6 +416,15 @@ async function resetTunetreesUserData(): Promise<void> {
   // Step 2: delete repertoire child tables by repertoire_ref
   if (repertoireIds.length > 0) {
     for (const table of TUNETREES_REPERTOIRE_CHILD_TABLES) {
+      if (table === "practice_record") {
+        await clearPracticeRecordsForRepertoires(repertoireIds);
+
+        console.log(
+          `  ✅ Cleared public.practice_record for ${repertoireIds.length} repertoires`
+        );
+        continue;
+      }
+
       const { error } = await adminClient
         .from(table)
         .delete()
