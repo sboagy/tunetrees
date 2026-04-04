@@ -3,14 +3,24 @@
 -- User IDs: 9002-9009, Playlist IDs: 9002-9009
 
 -- Insert test users into auth.users (Supabase Auth)
--- Note: Run this in Supabase SQL Editor or via migration
+-- Note: Before running, set app.test_user_password for the current session.
+-- Example:
+--   select set_config('app.test_user_password', '<password>', false);
+
+DO $$
+BEGIN
+  IF COALESCE(current_setting('app.test_user_password', true), '') = '' THEN
+    RAISE EXCEPTION 'Set app.test_user_password before running seed_test_users.sql';
+  END IF;
+END;
+$$;
 
 -- Bob Test User (9002)
 INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
 VALUES (
   '00000000-0000-4000-8000-000000009002',
   'bob.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -22,7 +32,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009003',
   'carol.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -34,7 +44,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009004',
   'dave.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -46,7 +56,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009005',
   'eve.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -58,7 +68,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009006',
   'frank.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -70,7 +80,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009007',
   'grace.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -82,7 +92,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009008',
   'henry.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),
@@ -94,7 +104,7 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 VALUES (
   '00000000-0000-4000-8000-000000009009',
   'iris.test@tunetrees.test',
-  crypt('TestPassword123!', gen_salt('bf')),
+  crypt(current_setting('app.test_user_password'), gen_salt('bf')),
   NOW(),
   NOW(),
   NOW(),

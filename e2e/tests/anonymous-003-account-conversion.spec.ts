@@ -13,6 +13,7 @@
  */
 
 import { test as base, expect } from "@playwright/test";
+import { createGeneratedTestPassword } from "../helpers/test-password";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // Override the base test to NOT use stored auth state (we need fresh sessions)
@@ -138,9 +139,10 @@ test.describe("Anonymous User Account Conversion", () => {
 
     // Fill conversion form
     const testEmail = generateTestEmail();
+    const testPassword = createGeneratedTestPassword();
     await ttPage.convertAnonymousAccount(
       testEmail,
-      "TestPassword123!",
+      testPassword,
       "Test Converted User"
     );
 
@@ -171,7 +173,7 @@ test.describe("Anonymous User Account Conversion", () => {
     await ttPage.clickCreateAccountOnBanner();
 
     const testEmail = generateTestEmail();
-    const testPassword = "TestPassword123!";
+    const testPassword = createGeneratedTestPassword();
     await ttPage.convertAnonymousAccount(
       testEmail,
       testPassword,

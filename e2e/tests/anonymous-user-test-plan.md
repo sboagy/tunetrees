@@ -230,7 +230,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 5. Fill in conversion form:
    - Name: "Test Converted User"
    - Email: "converted@test.com"
-   - Password: "TestPassword123!"
+   - Password: generated per test run
 6. Click "Create Account"
 
 **Expected Results:**

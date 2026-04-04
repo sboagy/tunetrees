@@ -2,7 +2,7 @@
  * Generate bcrypt hash for test passwords
  *
  * Usage:
- *   tsx scripts/generate-bcrypt-hash.ts "TestPassword123!"
+ *   tsx scripts/generate-bcrypt-hash.ts "<password>"
  *
  * This generates bcrypt hashes that you can copy into seed-test-users.sql
  *
@@ -12,8 +12,12 @@
 
 import bcrypt from "bcryptjs";
 
-const password = process.argv[2] || "TestPassword123!";
+const password = process.argv[2];
 const saltRounds = 10;
+
+if (!password) {
+  throw new Error("Usage: tsx scripts/generate-bcrypt-hash.ts \"<password>\"");
+}
 
 async function generateHash() {
   console.log("🔐 Generating bcrypt hash...\n");

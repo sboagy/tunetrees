@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { getRequiredSharedTestPassword } from "../helpers/test-password";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -56,7 +57,7 @@ test.describe("Scroll Position Persistence", () => {
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: user.email,
-      password: process.env.TEST_USER_PASSWORD || "TestPassword123!",
+      password: getRequiredSharedTestPassword(),
     });
 
     if (authError) throw new Error(`Auth failed: ${authError.message}`);
@@ -96,7 +97,7 @@ test.describe("Scroll Position Persistence", () => {
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: user.email,
-      password: process.env.TEST_USER_PASSWORD || "TestPassword123!",
+      password: getRequiredSharedTestPassword(),
     });
 
     if (authError) throw new Error(`Auth failed: ${authError.message}`);

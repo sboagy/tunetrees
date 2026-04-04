@@ -6,6 +6,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "@playwright/test";
+import { getRequiredTestPassword } from "./lib/test-password.js";
 
 const TEST_USERS = [
   { email: "alice.test@tunetrees.test", name: "alice" },
@@ -19,7 +20,7 @@ const TEST_USERS = [
   { email: "iris.test@tunetrees.test", name: "iris" },
 ];
 
-const PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
+const PASSWORD = getRequiredTestPassword();
 const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
 
 async function generateAuthStates() {

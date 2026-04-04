@@ -4,10 +4,10 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getRequiredSharedTestPassword } from "./test-password";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "http://127.0.0.1:54321";
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
-const TEST_PASSWORD = "TestPassword123!";
 
 import {
   TEST_REPERTOIRE_ALICE_ID,
@@ -122,7 +122,7 @@ export async function getTestUserClient(userKey: string) {
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: user.email,
-    password: TEST_PASSWORD,
+    password: getRequiredSharedTestPassword(),
   });
 
   if (error) {

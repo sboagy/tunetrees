@@ -5,6 +5,7 @@
 
 import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
+import { getRequiredTestPassword } from "./lib/test-password.js";
 import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../src/lib/db/catalog-instrument-ids.js";
 
 /**
@@ -28,7 +29,7 @@ function getSupabaseServiceRoleKey(): string {
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
 const SUPABASE_SERVICE_ROLE_KEY = getSupabaseServiceRoleKey();
 
-const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
+const TEST_PASSWORD = getRequiredTestPassword();
 
 // Test users with UUIDs matching tests/fixtures/test-data.ts
 const TEST_USERS = [

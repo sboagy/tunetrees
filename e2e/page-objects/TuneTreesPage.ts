@@ -4,6 +4,7 @@ import {
   clearTunetreesClientStorage,
   gotoE2eOrigin,
 } from "../helpers/local-db-lifecycle";
+import { getRequiredSharedTestPassword } from "../helpers/test-password";
 import { BASE_URL } from "../test-config";
 
 declare global {
@@ -886,7 +887,7 @@ export class TuneTreesPage {
    * login form is detected and credentials are entered.
    *
    * @param email - User's email address
-   * @param password - User's password (default: ALICE_TEST_PASSWORD from env)
+  * @param password - User's password (default: shared test password from env)
    * @param maxAttempts - Maximum retry attempts (default: 10)
    * @throws Error if unable to log in after max attempts
    */
@@ -909,10 +910,7 @@ export class TuneTreesPage {
       if (loginVisible) {
         console.log(`Seem to be logged out, logging back in as ${email}`);
         if (password === "") {
-          const password = process.env.ALICE_TEST_PASSWORD;
-          if (!password) {
-            throw Error("ALICE_TEST_PASSWORD must be set in the environment");
-          }
+          password = getRequiredSharedTestPassword();
         }
         await this.emailInput.fill(email);
         await this.page.locator('input[type="password"]').fill(password);

@@ -14,6 +14,7 @@
  */
 
 import { test as base, expect } from "@playwright/test";
+import { createGeneratedTestPassword } from "../helpers/test-password";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // Override the base test to NOT use stored auth state (we need fresh sessions)
@@ -100,9 +101,10 @@ test.describe("Data Preservation During Conversion", () => {
       await expect(ttPage.conversionHeader).toBeVisible({ timeout: 10000 });
 
       const testEmail = generateTestEmail();
+      const testPassword = createGeneratedTestPassword();
       await ttPage.convertAnonymousAccount(
         testEmail,
-        "TestPassword123!",
+        testPassword,
         "Data Preservation Test User"
       );
 
@@ -171,7 +173,7 @@ test.describe("Data Preservation During Conversion", () => {
       await ttPage.clickCreateAccountOnBanner();
 
       const testEmail = generateTestEmail();
-      const testPassword = "TestPassword123!";
+      const testPassword = createGeneratedTestPassword();
       await ttPage.convertAnonymousAccount(
         testEmail,
         testPassword,
@@ -251,9 +253,10 @@ test.describe("Data Preservation During Conversion", () => {
 
       // Step 3: Convert account
       await ttPage.clickCreateAccountOnBanner();
+      const testPassword = createGeneratedTestPassword();
       await ttPage.convertAnonymousAccount(
         generateTestEmail(),
-        "TestPassword123!",
+        testPassword,
         "Multi Tune Test"
       );
 

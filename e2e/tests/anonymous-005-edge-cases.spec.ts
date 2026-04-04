@@ -12,6 +12,7 @@
  */
 
 import { test as base, expect } from "@playwright/test";
+import { createGeneratedTestPassword } from "../helpers/test-password";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 import { BASE_URL } from "../test-config";
 
@@ -75,9 +76,10 @@ test.describe("Anonymous User Edge Cases", () => {
 
     // Fill in sign-up form
     const uniqueEmail = `regular-signup-${Date.now()}@tunetrees.test`;
+    const uniquePassword = createGeneratedTestPassword();
     await ttPage.nameInput.fill("Regular Test User");
     await ttPage.emailInput.fill(uniqueEmail);
-    await ttPage.passwordInput.fill("TestPassword123!");
+    await ttPage.passwordInput.fill(uniquePassword);
 
     // Submit
     await ttPage.signUpButton.click();

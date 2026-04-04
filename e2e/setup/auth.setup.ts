@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test as setup } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { config, parse } from "dotenv";
+import postgres from "postgres";
 import {
   AUTH_STATE_DB_VERSION_STORAGE_KEY,
   AUTH_STATE_SNAPSHOT_VERSION_STORAGE_KEY,
@@ -170,6 +171,13 @@ function injectOpEnvIfNeeded(): void {
     return;
   }
 
+  if (injectLocalSupabaseEnvIfNeeded()) {
+    console.log(
+      "ℹ️  Bootstrapped local Supabase environment via supabase status because VITE_SUPABASE_ANON_KEY was missing"
+    );
+    return;
+  }
+
   if (!existsSync(ENV_TEMPLATE_PATH)) {
     throw new Error(
       `[auth.setup] Missing env template at ${ENV_TEMPLATE_PATH}.`
@@ -202,6 +210,185 @@ function injectOpEnvIfNeeded(): void {
     "ℹ️  Injected environment variables via 1Password CLI because " +
       "VITE_SUPABASE_ANON_KEY was missing"
   );
+}
+
+function isLocalSupabaseUrl(supabaseUrl: string): boolean {
+  try {
+    const parsedUrl = new URL(supabaseUrl);
+    return ["127.0.0.1", "localhost", "::1"].includes(parsedUrl.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function extractJsonObject(rawOutput: string): string {
+  const firstBraceIndex = rawOutput.indexOf("{");
+  const lastBraceIndex = rawOutput.lastIndexOf("}");
+
+  if (firstBraceIndex === -1 || lastBraceIndex === -1) {
+    throw new Error("Supabase CLI did not return a JSON payload.");
+  }
+
+  return rawOutput.slice(firstBraceIndex, lastBraceIndex + 1);
+}
+
+type LocalSupabaseStatus = {
+  API_URL?: string;
+  ANON_KEY?: string;
+  DB_URL?: string;
+  PUBLISHABLE_KEY?: string;
+  SERVICE_ROLE_KEY?: string;
+};
+
+let localSupabaseStatusCache: LocalSupabaseStatus | null = null;
+
+function readLocalSupabaseStatus(): LocalSupabaseStatus {
+  if (localSupabaseStatusCache) {
+    return localSupabaseStatusCache;
+  }
+
+  let rawStatusOutput: string;
+  try {
+    rawStatusOutput = execFileSync("supabase", ["status", "--output", "json"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[auth.setup] Failed to read local Supabase status: ${message}`
+    );
+  }
+
+  try {
+    localSupabaseStatusCache = JSON.parse(
+      extractJsonObject(rawStatusOutput)
+    ) as LocalSupabaseStatus;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[auth.setup] Failed to parse local Supabase status JSON: ${message}`
+    );
+  }
+
+  return localSupabaseStatusCache;
+}
+
+function injectLocalSupabaseEnvIfNeeded(): boolean {
+  let status: LocalSupabaseStatus;
+  try {
+    status = readLocalSupabaseStatus();
+  } catch {
+    return false;
+  }
+
+  const apiUrl = status.API_URL?.trim();
+  const publishableKey =
+    status.PUBLISHABLE_KEY?.trim() || status.ANON_KEY?.trim();
+
+  if (apiUrl && !hasEnvValue("VITE_SUPABASE_URL")) {
+    process.env.VITE_SUPABASE_URL = apiUrl;
+  }
+
+  if (apiUrl && !hasEnvValue("SUPABASE_URL")) {
+    process.env.SUPABASE_URL = apiUrl;
+  }
+
+  if (publishableKey && !hasEnvValue("VITE_SUPABASE_ANON_KEY")) {
+    process.env.VITE_SUPABASE_ANON_KEY = publishableKey;
+  }
+
+  if (publishableKey && !hasEnvValue("SUPABASE_ANON_KEY")) {
+    process.env.SUPABASE_ANON_KEY = publishableKey;
+  }
+
+  if (
+    status.SERVICE_ROLE_KEY?.trim() &&
+    !hasEnvValue("SUPABASE_SERVICE_ROLE_KEY")
+  ) {
+    process.env.SUPABASE_SERVICE_ROLE_KEY = status.SERVICE_ROLE_KEY.trim();
+  }
+
+  if (status.DB_URL?.trim() && !hasEnvValue("DATABASE_URL")) {
+    process.env.DATABASE_URL = status.DB_URL.trim();
+  }
+
+  return hasEnvValue("VITE_SUPABASE_ANON_KEY");
+}
+
+function resolveServiceRoleKey(supabaseUrl: string): string {
+  const injectedServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!isLocalSupabaseUrl(supabaseUrl)) {
+    if (injectedServiceRoleKey?.trim()) {
+      return injectedServiceRoleKey;
+    }
+
+    throw new Error(
+      "[auth.setup] Non-local Supabase reset requires SUPABASE_SERVICE_ROLE_KEY to be set."
+    );
+  }
+
+  const status = readLocalSupabaseStatus();
+
+  const liveServiceRoleKey = status.SERVICE_ROLE_KEY?.trim();
+  if (!liveServiceRoleKey) {
+    throw new Error(
+      "[auth.setup] Local Supabase status did not include SERVICE_ROLE_KEY."
+    );
+  }
+
+  return liveServiceRoleKey;
+}
+
+function resolveLocalDatabaseUrl(supabaseUrl: string): string | null {
+  if (!isLocalSupabaseUrl(supabaseUrl)) {
+    return null;
+  }
+
+  const liveDatabaseUrl =
+    readLocalSupabaseStatus().DB_URL?.trim() ??
+    process.env.DATABASE_URL?.trim();
+
+  if (!liveDatabaseUrl) {
+    throw new Error(
+      "[auth.setup] Local Supabase reset requires DB_URL from supabase status or DATABASE_URL in the environment."
+    );
+  }
+
+  return liveDatabaseUrl;
+}
+
+async function clearPracticeRecordViaDirectPostgres(
+  databaseUrl: string,
+  repertoireIds: string[]
+): Promise<void> {
+  const sql = postgres(databaseUrl, {
+    max: 1,
+    onnotice: () => {},
+  });
+
+  try {
+    await sql.begin(async (transaction) => {
+      await transaction.unsafe(
+        "SELECT set_config('app.allow_practice_record_delete', 'on', true)"
+      );
+
+      for (const repertoireId of repertoireIds) {
+        await transaction.unsafe(
+          `
+          DELETE FROM public.practice_record
+          WHERE repertoire_ref = $1::uuid
+        `,
+          [repertoireId]
+        );
+      }
+    });
+  } finally {
+    await sql.end();
+  }
 }
 
 /**
@@ -293,14 +480,15 @@ async function waitForCatalogSnapshotReady(
  */
 async function resetTunetreesUserData(): Promise<void> {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!supabaseUrl) {
     throw new Error(
-      "[auth.setup] RESET_DB=true requires VITE_SUPABASE_URL and " +
-        "SUPABASE_SERVICE_ROLE_KEY to be set."
+      "[auth.setup] RESET_DB=true requires VITE_SUPABASE_URL to be set."
     );
   }
+
+  const serviceRoleKey = resolveServiceRoleKey(supabaseUrl);
+  const localDatabaseUrl = resolveLocalDatabaseUrl(supabaseUrl);
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -328,6 +516,18 @@ async function resetTunetreesUserData(): Promise<void> {
   // Step 2: delete repertoire child tables by repertoire_ref
   if (repertoireIds.length > 0) {
     for (const table of TUNETREES_REPERTOIRE_CHILD_TABLES) {
+      if (table === "practice_record" && localDatabaseUrl) {
+        await clearPracticeRecordViaDirectPostgres(
+          localDatabaseUrl,
+          repertoireIds
+        );
+
+        console.log(
+          `  ✅ Cleared public.${table} for ${repertoireIds.length} repertoires via direct Postgres cleanup`
+        );
+        continue;
+      }
+
       const { error } = await adminClient
         .from(table)
         .delete()

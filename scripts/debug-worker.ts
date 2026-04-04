@@ -1,6 +1,7 @@
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import { getRequiredTestPassword } from "./lib/test-password.js";
 
 // Load env vars
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
@@ -24,7 +25,7 @@ async function testWorker() {
     error,
   } = await supabase.auth.signInWithPassword({
     email: "alice.test@tunetrees.test",
-    password: process.env.ALICE_TEST_PASSWORD || "TestPassword123!",
+    password: getRequiredTestPassword(),
   });
 
   if (error || !session) {
