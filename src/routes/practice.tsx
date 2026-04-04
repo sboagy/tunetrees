@@ -259,13 +259,7 @@ const PracticePage: Component = () => {
     }
   };
 
-  const handlePracticeDateRefresh = async (
-    mode: "manual" | "auto" = "manual"
-  ) => {
-    if (mode === "auto" && (queueReady() !== true || queueReady.loading)) {
-      return;
-    }
-
+  const handlePracticeDateRefresh = async () => {
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
@@ -295,7 +289,7 @@ const PracticePage: Component = () => {
     }
 
     console.log(
-      `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()} (${mode})`
+      `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
     );
     incrementPracticeListStagedChanged();
   };
@@ -303,9 +297,7 @@ const PracticePage: Component = () => {
   const { rolloverStatus } = useRolloverStateMachine({
     queueDate,
     isManual,
-    isQueueCompleted,
     queueReady,
-    onAutoAdvance: () => handlePracticeDateRefresh("auto"),
     onClearManual: clearManualAndSetToday,
   });
 
@@ -319,7 +311,8 @@ const PracticePage: Component = () => {
       <Show when={rolloverStatus().showBanner}>
         <DateRolloverBanner
           newDate={rolloverStatus().wallClockDate}
-          onRefresh={() => handlePracticeDateRefresh("manual")}
+          isQueueCompleted={isQueueCompleted()}
+          onRefresh={handlePracticeDateRefresh}
         />
       </Show>
 

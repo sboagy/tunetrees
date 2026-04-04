@@ -384,9 +384,11 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
     // Navigate to practice tab
     await ttPage.practiceTab.click();
+    await ttPage.refreshDateRolloverIfVisible();
 
     // Check queue composition
     const day2RowCount = await waitForPracticeViewSettled(page, ttPage, {
+      expectRows: true,
       timeoutMs: 20000,
     });
     console.log(`  Day 2 queue size: ${day2RowCount} tunes`);

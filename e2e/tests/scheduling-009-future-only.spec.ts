@@ -99,6 +99,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
       await expect(ttPage.practiceColumnsButton).toBeVisible({
         timeout: 30000,
       });
+      await ttPage.refreshDateRolloverIfVisible();
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 30000 });
       await expect(page.getByText("Loading practice queue...")).not.toBeVisible(
         { timeout: 30000 }
