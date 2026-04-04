@@ -978,6 +978,31 @@ export class TuneTreesPage {
   }
 
   /**
+   * Refresh the practice queue when the date rollover banner is visible.
+   * Returns true when a refresh was triggered.
+   *
+   * If we want the cleanest long-term shape, this helper should be split
+   * into a pure predicate plus an explicit refresh action, so tests have
+   * to decide which behavior they expect instead of letting the page object
+   * decide for them. For now, this is a single method for simplicity's sake
+   * is "good enough".
+   */
+  async refreshDateRolloverIfVisible(timeoutMs = 20000): Promise<boolean> {
+    const isVisible = await this.dateRolloverBanner
+      .isVisible()
+      .catch(() => false);
+
+    if (!isVisible) {
+      return false;
+    }
+
+    await this.dateRolloverRefreshButton.click();
+    await expect(this.dateRolloverBanner).toBeHidden({ timeout: timeoutMs });
+
+    return true;
+  }
+
+  /**
    * Click "Create Account" on the anonymous banner
    */
   async clickCreateAccountOnBanner() {

@@ -10,6 +10,10 @@ import {
   verifyClockFrozen,
 } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import {
+  runTestHook,
+  waitForPracticeViewSettled,
+} from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -87,6 +91,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
   }) => {
     // Ensure practice view is ready (single overdue tune seeded)
     await ttPage.navigateToTab("practice");
+    await ttPage.refreshDateRolloverIfVisible();
     await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
@@ -144,7 +149,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
       // Advance clock to next due date (simulate waiting until tune due)
       if (day < RATING_SEQUENCE.length - 1) {
         // Persist DB before reload
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await runTestHook(page, "__persistDbForTest");
 
         // Clear localStorage to avoid stale UI state (flashcard mode, queue date)
         await page.evaluate(() => {
@@ -174,11 +179,15 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
         await ttPage.ensureLoggedIn(testUser.email, testUser.userId);
 
         // Force sync down to refresh data
-        await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+        await runTestHook(page, "__forceSyncDownForTest");
         await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-        // Wait a bit for queue to be created
-        await page.waitForTimeout(500);
+        await ttPage.navigateToTab("practice");
+        await ttPage.refreshDateRolloverIfVisible();
+        await waitForPracticeViewSettled(page, ttPage, {
+          expectRows: true,
+          timeoutMs: 20000,
+        });
 
         // DEBUG: Log practice record and queue state after time advance
         const debugInfo = await page.evaluate(
@@ -228,7 +237,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
           },
           { tuneId: TEST_TUNE_BANISH_ID, repertoireId: testUser.repertoireId }
         );
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await runTestHook(page, "__persistDbForTest");
 
         console.log(
           `[DAY ${day + 1}] DEBUG after time advance:`,

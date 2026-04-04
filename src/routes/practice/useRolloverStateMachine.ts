@@ -11,7 +11,6 @@ import { getPracticeDate } from "../../lib/utils/practice-date";
 interface RolloverStatus {
   ready: boolean;
   showBanner: boolean;
-  shouldAutoAdvance: boolean;
   shouldClearManual: boolean;
   dateChanged: boolean;
   wallClockDate: Date;
@@ -20,9 +19,7 @@ interface RolloverStatus {
 export interface RolloverStateMachineProps {
   queueDate: Accessor<Date>;
   isManual: Accessor<boolean>;
-  isQueueCompleted: Accessor<boolean>;
   queueReady: Resource<true>;
-  onAutoAdvance: () => Promise<void> | void;
   onClearManual: () => void;
 }
 
@@ -72,7 +69,6 @@ export function useRolloverStateMachine(
   const rolloverStatus = createMemo<RolloverStatus>(() => {
     const ready = props.queueReady() === true && !props.queueReady.loading;
     const manual = props.isManual();
-    const completed = props.isQueueCompleted();
     const queueDay = props.queueDate();
     const today = wallClockDate();
     const dateChanged = !isSameDay(queueDay, today);
@@ -81,7 +77,6 @@ export function useRolloverStateMachine(
       return {
         ready: false,
         showBanner: false,
-        shouldAutoAdvance: false,
         shouldClearManual: false,
         dateChanged: false,
         wallClockDate: today,
@@ -90,21 +85,15 @@ export function useRolloverStateMachine(
 
     return {
       ready,
-      showBanner: !manual && dateChanged && !completed,
-      shouldAutoAdvance: !manual && dateChanged && completed,
+      // Show the banner whenever the date has changed, including when the queue
+      // is already complete. Completing all tunes should NOT auto-create a new
+      // queue — the user must deliberately click "Refresh Now" to advance.
+      showBanner: !manual && dateChanged,
       shouldClearManual: manual && isSameDay(queueDay, today),
       dateChanged,
       wallClockDate: today,
     };
   });
-
-  createEffect<boolean>((didAutoAdvance) => {
-    const shouldAutoAdvance = rolloverStatus().shouldAutoAdvance;
-    if (shouldAutoAdvance && !didAutoAdvance) {
-      void props.onAutoAdvance();
-    }
-    return shouldAutoAdvance;
-  }, false);
 
   createEffect<boolean>((didClearManual) => {
     const shouldClearManual = rolloverStatus().shouldClearManual;
