@@ -316,6 +316,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
         await page.waitForLoadState("networkidle", { timeout: 15000 });
         await diagAuth(page, `day-${day}-after-syncdown`);
+        await ttPage.refreshDateRolloverIfVisible();
 
         // Re-enter flashcard mode for next evaluation
         await ttPage.disableFlashcardMode();

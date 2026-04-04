@@ -784,12 +784,13 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       )
       .toBe(true);
 
-    // Advance date — should auto-advance, NOT jump to the stale old queue
+    // Advance date. The banner should remain visible until the user refreshes,
+    // but the refresh must NOT jump back to the stale queue date.
     currentDate = await advanceDays(context, 1, currentDate);
     await page.waitForTimeout(ROLLOVER_WAIT_MS);
 
-    // Banner should be hidden (auto-advance because queue was complete)
-    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
+    await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
+    await ttPage.refreshDateRolloverIfVisible();
 
     // The queue window should have advanced to today, NOT to the stale date
     await expect
