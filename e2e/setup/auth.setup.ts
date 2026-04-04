@@ -130,17 +130,23 @@ function isLocalSupabaseUrl(url: string | undefined): boolean {
 
 function getLocalSupabaseServiceRoleKey(): string {
   try {
-    const statusJson = execFileSync("supabase", ["status", "--output", "json"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
-    });
+    const statusJson = execFileSync(
+      "supabase",
+      ["status", "--output", "json"],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: process.env,
+      }
+    );
     const status = JSON.parse(statusJson) as { SERVICE_ROLE_KEY?: string };
     const serviceRoleKey = status.SERVICE_ROLE_KEY?.trim();
 
     if (!serviceRoleKey) {
-      throw new Error("SERVICE_ROLE_KEY missing from `supabase status --output json`");
+      throw new Error(
+        "SERVICE_ROLE_KEY missing from `supabase status --output json`"
+      );
     }
 
     return serviceRoleKey;
