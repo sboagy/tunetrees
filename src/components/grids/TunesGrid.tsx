@@ -26,6 +26,7 @@ import {
   Show,
 } from "solid-js";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
+import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   CELL_CLASSES,
@@ -36,6 +37,7 @@ import {
   TABLE_CLASSES,
   TBODY_CLASSES,
 } from "./shared-grid-styles";
+import { type IStackedListRow, TuneStackedList } from "./TuneStackedList";
 import { getColumns as getDefaultColumns } from "./TuneColumns";
 import {
   loadTableState,
@@ -76,6 +78,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const isMobile = createIsMobile();
   const [openPopover, setOpenPopover] = createSignal<string | null>(null);
   let popoverRef: HTMLDivElement | undefined;
   useClickOutside(
@@ -743,17 +746,31 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   return (
     <div class="h-full flex flex-col">
-      {/* Table container with virtualization */}
-      <div
-        ref={(el) => {
-          containerRef = el;
-        }}
-        data-testid={`tunes-grid-container-${props.tablePurpose}`}
-        class={`${CONTAINER_CLASSES} ${
-          props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
-        }`}
-        style={{ "touch-action": "pan-x pan-y" }}
-      >
+      {/* Mobile: stacked list view */}
+      <Show when={isMobile()}>
+        <TuneStackedList
+          data={props.data as unknown as IStackedListRow[]}
+          tablePurpose={props.tablePurpose}
+          currentRowId={props.currentRowId}
+          onRowClick={(row) => props.onRowClick?.(row as T)}
+          onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
+          cellCallbacks={props.cellCallbacks}
+        />
+      </Show>
+
+      {/* Desktop: full TanStack table with virtualization */}
+      <Show when={!isMobile()}>
+        {/* Table container with virtualization */}
+        <div
+          ref={(el) => {
+            containerRef = el;
+          }}
+          data-testid={`tunes-grid-container-${props.tablePurpose}`}
+          class={`${CONTAINER_CLASSES} ${
+            props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
+          }`}
+          style={{ "touch-action": "pan-x pan-y" }}
+        >
         <table
           data-testid={`tunes-grid-${props.tablePurpose}`}
           class={TABLE_CLASSES}
@@ -1032,6 +1049,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
           </tbody>
         </table>
       </div>
+      </Show>
     </div>
   );
 }) as Component<ITunesGridProps<any>>;
