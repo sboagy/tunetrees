@@ -367,6 +367,51 @@ export async function getPracticeStatistics(
   };
 }
 
+function normalizeComparableTimestamp(
+  value: string | null | undefined
+): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.replace(" ", "T").substring(0, 19);
+}
+
+export function shouldClearConsumedScheduledOverride(input: {
+  queueScheduledSnapshot: string | null | undefined;
+  currentScheduled: string | null | undefined;
+  queueGeneratedAt: string | null | undefined;
+  repertoireTuneLastModifiedAt: string | null | undefined;
+}): boolean {
+  const queueScheduledSnapshot = normalizeComparableTimestamp(
+    input.queueScheduledSnapshot
+  );
+  if (!queueScheduledSnapshot) {
+    return false;
+  }
+
+  const currentScheduled = normalizeComparableTimestamp(input.currentScheduled);
+  if (currentScheduled !== queueScheduledSnapshot) {
+    return false;
+  }
+
+  const queueGeneratedAt = normalizeComparableTimestamp(input.queueGeneratedAt);
+  const repertoireTuneLastModifiedAt = normalizeComparableTimestamp(
+    input.repertoireTuneLastModifiedAt
+  );
+
+  if (!queueGeneratedAt || !repertoireTuneLastModifiedAt) {
+    return true;
+  }
+
+  return repertoireTuneLastModifiedAt <= queueGeneratedAt;
+}
+
 /**
  * Commit staged evaluations to practice records
  *
@@ -521,20 +566,25 @@ export async function commitStagedEvaluations(
 
     // 2. Get tune_ids that are in the active practice queue window
     console.log("Querying daily_practice_queue...");
-    const queueTuneIds = await db.all<{ tune_ref: string }>(sql`
-      SELECT DISTINCT tune_ref
+    const queueRows = await db.all<{
+      tune_ref: string;
+      scheduled_snapshot: string | null;
+      generated_at: string | null;
+    }>(sql`
+      SELECT tune_ref, scheduled_snapshot, generated_at
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
         AND repertoire_ref = ${repertoireId}
 				AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
     `);
 
-    console.log("Queue tune IDs found:", queueTuneIds.length);
-    if (queueTuneIds.length > 0) {
-      console.log("First queue tune:", queueTuneIds[0]);
+    console.log("Queue tune IDs found:", queueRows.length);
+    if (queueRows.length > 0) {
+      console.log("First queue tune:", queueRows[0]);
     }
 
-    const queueTuneIdSet = new Set(queueTuneIds.map((row) => row.tune_ref));
+    const queueByTuneId = new Map(queueRows.map((row) => [row.tune_ref, row]));
+    const queueTuneIdSet = new Set(queueRows.map((row) => row.tune_ref));
 
     // 3. Filter staged evaluations to only include tunes in current queue
     const evaluationsToCommit = stagedEvaluations.filter((eval_) =>
@@ -665,14 +715,32 @@ export async function commitStagedEvaluations(
 
       // Sync is handled automatically by SQL triggers populating sync_outbox
 
-      // Update repertoire_tune.current (next review date)
-      // Clear any one-off manual override in repertoire_tune.scheduled now that an
-      // evaluation is being committed. The UI expectation (see TuneColumns.tsx) is
-      // that scheduled overrides are transient and removed upon submission.
+      const queueRow = queueByTuneId.get(staged.tune_id);
+      const repertoireTuneRow = await db.get<{
+        scheduled: string | null;
+        last_modified_at: string | null;
+      }>(sql`
+        SELECT scheduled, last_modified_at
+        FROM repertoire_tune
+        WHERE repertoire_ref = ${repertoireId}
+          AND tune_ref = ${staged.tune_id}
+        LIMIT 1
+      `);
+
+      const currentScheduled = repertoireTuneRow?.scheduled ?? null;
+      const shouldClearScheduled = shouldClearConsumedScheduledOverride({
+        queueScheduledSnapshot: queueRow?.scheduled_snapshot,
+        currentScheduled,
+        queueGeneratedAt: queueRow?.generated_at,
+        repertoireTuneLastModifiedAt: repertoireTuneRow?.last_modified_at,
+      });
+
+      // Update repertoire_tune.current (FSRS next review date) while preserving
+      // a newly created or edited manual override for the upcoming next review.
       await db.run(sql`
         UPDATE repertoire_tune
         SET current = ${staged.due},
-            scheduled = NULL,
+            scheduled = ${shouldClearScheduled ? null : currentScheduled},
             last_modified_at = ${now}
         WHERE repertoire_ref = ${repertoireId}
           AND tune_ref = ${staged.tune_id}

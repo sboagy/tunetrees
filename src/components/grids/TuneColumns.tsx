@@ -9,6 +9,7 @@ import type { ColumnDef, Table } from "@tanstack/solid-table";
 import { type Component, createEffect, Show } from "solid-js";
 import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 /**
@@ -57,6 +58,48 @@ const formatJustDate = (dateStr: string): string => {
     day: "numeric",
   });
 };
+
+function getRelativeScheduledDisplay(value: string): {
+  label: string;
+  colorClass: string;
+  title: string;
+} {
+  const date = new Date(value);
+  const now = new Date();
+
+  const dateOnly = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+  const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round(
+    (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  let colorClass = "text-gray-600 dark:text-gray-400";
+  if (diffDays < 0) colorClass = "text-red-600 dark:text-red-400";
+  else if (diffDays === 0) colorClass = "text-orange-600 dark:text-orange-400";
+  else if (diffDays <= 7) colorClass = "text-yellow-600 dark:text-yellow-400";
+  else colorClass = "text-green-600 dark:text-green-400";
+
+  const label =
+    diffDays === 0
+      ? "Today"
+      : diffDays === -1
+        ? "Yesterday"
+        : diffDays < 0
+          ? `${Math.abs(diffDays)}d overdue`
+          : diffDays === 1
+            ? "Tomorrow"
+            : `In ${diffDays}d`;
+
+  return {
+    label,
+    colorClass,
+    title: formatDate(value),
+  };
+}
 
 /**
  * Sortable column header component
@@ -532,103 +575,81 @@ export function getRepertoireColumns(
 
     {
       id: "scheduled",
-      // accessorFn: (row) => row.scheduled,
       accessorFn: (row) => row.scheduled || row.latest_due || "",
       header: ({ column }) => (
         <SortableHeader column={column} title="Scheduled" />
       ),
       cell: (info) => {
-        // Scheduling override semantics:
-        // - `repertoire_tune.scheduled` is a transient, manual override of the FSRS-derived next due date.
-        // - While an evaluation is STAGED (present in `table_transient_data` / practice_list_staged view),
-        //   we intentionally IGNORE any existing override and display the newly computed `latest_due`.
-        // - Upon COMMIT (see `commitStagedEvaluations` in `practice-recording.ts`), the override column
-        //   is cleared (`scheduled = NULL`) so future renders rely exclusively on FSRS scheduling unless
-        //   a new manual override is set.
-        // - The `completed_at` timestamp originates from `daily_practice_queue.completed_at`,
-        //   and indicates the evaluation for that queue window has been submitted. After completion we
-        //   respect any subsequently set manual override (since staging is no longer active).
-        const completedAt = info.cell.row.original.completed_at;
-        const value =
-          info.row.getValue("recall_eval") && !completedAt
-            ? (info.row.getValue("latest_due") as string | null)
-            : (info.getValue() as string | null);
-
-        if (!value) return <span class="text-gray-400">—</span>;
-
-        const date = new Date(value);
-        const now = new Date();
-
-        // Compare dates only (ignore time) to avoid timezone/time-of-day issues
-        const dateOnly = new Date(
-          date.getFullYear(),
-          date.getMonth(),
-          date.getDate()
-        );
-        const nowOnly = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        );
-        const diffDays = Math.round(
-          (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
+        // Scheduling semantics:
+        // - `latest_due` is the computed FSRS next review date.
+        // - `scheduled` is an optional manual override for the next review.
+        // - During staging, show the override when present; otherwise show the
+        //   staged FSRS preview so the visible date matches the effective queueing date.
+        const row = info.cell.row.original as {
+          completed_at?: string | null;
+          scheduled?: string | null;
+          tune_id?: string | number | null;
+          tune?: { id?: string | number | null } | null;
+          tuneRef?: string | number | null;
+          id?: string | number | null;
+        };
+        const completedAt = row.completed_at;
+        const stagedLatestDue = info.row.getValue("latest_due") as
+          | string
+          | null;
+        const scheduledOverride = row.scheduled ?? null;
+        const hasPendingEvaluation =
+          Boolean(info.row.getValue("recall_eval")) && !completedAt;
+        const effectiveScheduled = hasPendingEvaluation
+          ? (scheduledOverride ?? stagedLatestDue)
+          : (info.getValue() as string | null);
+        const tuneId = String(
+          row.tune_id ?? row.tune?.id ?? row.tuneRef ?? row.id ?? ""
         );
 
-        let color = "text-gray-600 dark:text-gray-400";
-        if (diffDays < 0) color = "text-red-600 dark:text-red-400";
-        else if (diffDays === 0) color = "text-orange-600 dark:text-orange-400";
-        else if (diffDays <= 7) color = "text-yellow-600 dark:text-yellow-400";
-        else color = "text-green-600 dark:text-green-400";
+        if (!effectiveScheduled) {
+          return callbacks?.onScheduledChange ? (
+            <ScheduledOverridePicker
+              tuneId={tuneId}
+              value={scheduledOverride ?? ""}
+              onChange={(newValue) =>
+                callbacks.onScheduledChange!(tuneId, newValue)
+              }
+            />
+          ) : (
+            <span class="text-gray-400">—</span>
+          );
+        }
 
-        const label =
-          diffDays === 0
-            ? "Today"
-            : diffDays === -1
-              ? "Yesterday"
-              : diffDays < 0
-                ? `${Math.abs(diffDays)}d overdue`
-                : diffDays === 1
-                  ? "Tomorrow"
-                  : `In ${diffDays}d`;
+        const display = getRelativeScheduledDisplay(effectiveScheduled);
+
+        if (!callbacks?.onScheduledChange) {
+          return (
+            <span
+              class={`text-sm font-medium ${display.colorClass}`}
+              title={display.title}
+            >
+              {display.label}
+            </span>
+          );
+        }
 
         return (
-          <span
-            class={`text-sm font-medium ${color}`}
-            title={date.toLocaleDateString()}
-          >
-            {label}
-          </span>
+          <ScheduledOverridePicker
+            tuneId={tuneId}
+            value={scheduledOverride ?? ""}
+            triggerLabel={display.label}
+            triggerTitle={display.title}
+            triggerTextClass={`text-sm font-medium ${display.colorClass}`}
+            onChange={(newValue) =>
+              callbacks.onScheduledChange!(tuneId, newValue)
+            }
+          />
         );
       },
-      size: 120,
+      size: 170,
       minSize: 100,
-      maxSize: 150,
-    },
-
-    {
-      id: "scheduled_raw",
-      // accessorKey: "scheduled",
-      accessorFn: (row) => row.scheduled || "",
-      meta: {
-        description:
-          "Manual scheduling override for this tune (raw timestamp).",
-      },
-      header: ({ column }) => (
-        <SortableHeader column={column} title="Sched Override" />
-      ),
-      cell: (info) => {
-        const value = info.getValue() as string | null;
-        if (!value) return <span class="text-gray-400">—</span>;
-
-        return (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {formatDate(value)}
-          </span>
-        );
-      },
-      size: 200,
-      minSize: 180,
-      maxSize: 250,
+      maxSize: 220,
     },
 
     {

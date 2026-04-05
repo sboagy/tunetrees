@@ -31,6 +31,7 @@ import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEdit
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
+import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
 import { ensureDailyQueue } from "../lib/services/practice-queue";
@@ -217,6 +218,29 @@ const PracticePage: Component = () => {
       syncPracticeScope,
     });
 
+  // Handle schedule override change from the in-grid date-time picker.
+  const handleScheduledChange = async (
+    tuneId: string,
+    newValue: string | null
+  ) => {
+    const db = localDb();
+    const repertoireId = currentRepertoireId();
+    if (!db || !repertoireId) return;
+
+    try {
+      suppressNextViewRefresh("practice");
+      await updateRepertoireTuneFields(db, repertoireId, tuneId, {
+        scheduled: newValue,
+      });
+      incrementPracticeListStagedChanged();
+    } catch (err) {
+      console.error("[PracticePage] Failed to update schedule override:", err);
+      toast.error(
+        `Failed to update schedule override: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  };
+
   const handleQueueDateChange = async (date: Date, isPreview: boolean) => {
     console.log(
       `Queue date changed to: ${date.toISOString()}, preview: ${isPreview}`
@@ -331,6 +355,7 @@ const PracticePage: Component = () => {
               tablePurpose="scheduled"
               onRecallEvalChange={handleRecallEvalChange}
               onGoalChange={handleGoalChange}
+              onScheduledChange={handleScheduledChange}
               onTuneSelect={handleTuneSelect}
               evaluations={evaluations()}
               onTableInstanceChange={setTableInstance}

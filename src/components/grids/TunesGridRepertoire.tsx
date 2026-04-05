@@ -212,6 +212,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             cellCallbacks={{
               onRecallEvalChange: props.onRecallEvalChange,
               onGoalChange: props.onGoalChange,
+              onScheduledChange: props.onScheduledChange,
               goals: () => goalsData() ?? [],
             }}
             onSelectionChange={(count) => {
