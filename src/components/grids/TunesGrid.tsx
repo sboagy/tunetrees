@@ -37,7 +37,7 @@ import {
   TABLE_CLASSES,
   TBODY_CLASSES,
 } from "./shared-grid-styles";
-import { TuneStackedList } from "./TuneStackedList";
+import { type IStackedListRow, TuneStackedList } from "./TuneStackedList";
 import { getColumns as getDefaultColumns } from "./TuneColumns";
 import {
   loadTableState,
@@ -749,11 +749,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
       {/* Mobile: stacked list view */}
       <Show when={isMobile()}>
         <TuneStackedList
-          data={props.data as any[]}
+          data={props.data as unknown as IStackedListRow[]}
           tablePurpose={props.tablePurpose}
           currentRowId={props.currentRowId}
-          onRowClick={(row) => props.onRowClick?.(row)}
-          onRowDoubleClick={(row) => props.onRowDoubleClick?.(row)}
+          onRowClick={(row) => props.onRowClick?.(row as T)}
+          onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
           cellCallbacks={props.cellCallbacks}
         />
       </Show>

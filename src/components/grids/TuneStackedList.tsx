@@ -139,14 +139,49 @@ const StateBadge = (props: { value: number | null | undefined }) => {
   );
 };
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Minimum data shape expected by TuneStackedList.
+ * The component accesses these fields from tune rows across all three grid
+ * purposes (scheduled / repertoire / catalog).  Fields beyond `id` are
+ * optional because not all purposes populate every column.
+ */
+export interface IStackedListRow {
+  id: string | number;
+  /** Aliased tune id used in scheduled rows (from daily_practice_queue join) */
+  tune_id?: string | number;
+  title?: string | null;
+  type?: string | null;
+  mode?: string | null;
+  structure?: string | null;
+  favorite_url?: string | null;
+  favoriteUrl?: string | null;
+  primary_origin?: string | null;
+  primaryOrigin?: string | null;
+  id_foreign?: string | null;
+  idForeign?: string | null;
+  // Scheduled-specific
+  bucket?: string | null;
+  recall_eval?: string | null;
+  latest_practiced?: string | null;
+  latest_stability?: number | null;
+  // Repertoire-specific
+  latest_state?: number | null;
+  goal?: string | null;
+  latest_goal?: string | null;
+  scheduled?: string | null;
+  latest_due?: string | null;
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface ITuneStackedListProps {
-  data: any[];
+  data: IStackedListRow[];
   tablePurpose: TablePurpose;
   currentRowId?: string | number;
-  onRowClick?: (row: any) => void;
-  onRowDoubleClick?: (row: any) => void;
+  onRowClick?: (row: IStackedListRow) => void;
+  onRowDoubleClick?: (row: IStackedListRow) => void;
   cellCallbacks?: ICellEditorCallbacks;
 }
 
