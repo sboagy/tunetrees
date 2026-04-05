@@ -190,8 +190,9 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
   // Get display name for column - reads from column meta first, then falls back to nameMap
   const getColumnDisplayName = (column: Column<any>): string => {
     // Prefer headerLabel stored in the column definition's meta
-    const meta = column.columnDef.meta as { headerLabel?: string } | undefined;
-    if (meta?.headerLabel) return meta.headerLabel;
+    const meta = column.columnDef.meta as Record<string, unknown> | undefined;
+    const metaLabel = meta?.headerLabel;
+    if (typeof metaLabel === "string" && metaLabel) return metaLabel;
 
     // Fall back to nameMap for any columns without meta.headerLabel
     const columnId = column.id;
@@ -225,8 +226,6 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       note_public: "Public Note",
       has_override: "Override",
       has_staged: "Staged",
-      bucket: "Bucket",
-      evaluation: "Evaluation",
     };
     return (
       nameMap[columnId] ||
