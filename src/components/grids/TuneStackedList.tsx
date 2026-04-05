@@ -1,0 +1,329 @@
+/**
+ * TuneStackedList
+ *
+ * Mobile-optimised stacked list view for tune data.
+ * Rendered instead of the full TanStack table on viewports narrower than the
+ * Tailwind `md` breakpoint (< 768 px).
+ *
+ * Each item shows a prioritised subset of fields stacked vertically (title,
+ * type/mode badges, and purpose-specific secondary info) with a minimum 44 px
+ * touch target, dark-mode support, and current-row highlight.
+ *
+ * This is intentionally NOT a card grid – items are full-width single-column
+ * list rows that maintain the "list" mental model of the desktop table while
+ * fitting narrow viewports without horizontal scrolling.
+ */
+
+import { For, Show } from "solid-js";
+import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import type { ICellEditorCallbacks, TablePurpose } from "./types";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatJustDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+}
+
+function getRelativeLabel(value: string | null | undefined): {
+  label: string;
+  colorClass: string;
+} {
+  if (!value) return { label: "—", colorClass: "text-gray-400" };
+  const date = new Date(value);
+  const now = new Date();
+  const dateOnly = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+  const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round(
+    (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  let colorClass = "text-gray-600 dark:text-gray-400";
+  if (diffDays < 0) colorClass = "text-red-600 dark:text-red-400";
+  else if (diffDays === 0) colorClass = "text-orange-600 dark:text-orange-400";
+  else if (diffDays <= 7) colorClass = "text-yellow-600 dark:text-yellow-400";
+  else colorClass = "text-green-600 dark:text-green-400";
+
+  const label =
+    diffDays === 0
+      ? "Today"
+      : diffDays === -1
+        ? "Yesterday"
+        : diffDays < 0
+          ? `${Math.abs(diffDays)}d overdue`
+          : diffDays === 1
+            ? "Tomorrow"
+            : `In ${diffDays}d`;
+
+  return { label, colorClass };
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+const TypeBadge = (props: { value: string | null | undefined }) => (
+  <Show when={props.value}>
+    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+      {props.value}
+    </span>
+  </Show>
+);
+
+const ModeBadge = (props: { value: string | null | undefined }) => (
+  <Show when={props.value}>
+    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+      {props.value}
+    </span>
+  </Show>
+);
+
+const BucketBadge = (props: { value: string | null | undefined }) => {
+  const colors: Record<string, string> = {
+    "Due Today":
+      "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200",
+    Lapsed:
+      "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200",
+    New: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200",
+    "Old Lapsed":
+      "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200",
+  };
+  const label = props.value ?? "Due Today";
+  const colorClass =
+    colors[label] ??
+    "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400";
+  return (
+    <span
+      class={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${colorClass}`}
+    >
+      {label}
+    </span>
+  );
+};
+
+const StateBadge = (props: { value: number | null | undefined }) => {
+  const statuses: Record<number, { label: string; class: string }> = {
+    0: {
+      label: "New",
+      class:
+        "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs px-1.5 py-0.5 rounded",
+    },
+    1: {
+      label: "Learning",
+      class:
+        "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs px-1.5 py-0.5 rounded",
+    },
+    2: {
+      label: "Review",
+      class:
+        "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs px-1.5 py-0.5 rounded",
+    },
+    3: {
+      label: "Relearning",
+      class:
+        "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 text-xs px-1.5 py-0.5 rounded",
+    },
+  };
+  const status =
+    props.value != null ? (statuses[props.value] ?? statuses[0]) : null;
+  return (
+    <Show when={status}>
+      <span class={status!.class}>{status!.label}</span>
+    </Show>
+  );
+};
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+export interface ITuneStackedListProps {
+  data: any[];
+  tablePurpose: TablePurpose;
+  currentRowId?: string | number;
+  onRowClick?: (row: any) => void;
+  onRowDoubleClick?: (row: any) => void;
+  cellCallbacks?: ICellEditorCallbacks;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export const TuneStackedList = (props: ITuneStackedListProps) => {
+  return (
+    <div
+      class="flex-1 overflow-y-auto"
+      data-testid={`tunes-stacked-list-${props.tablePurpose}`}
+    >
+      <ul
+        class="divide-y divide-gray-200 dark:divide-gray-700"
+        aria-label="Tunes list"
+      >
+        <For each={props.data}>
+          {(item) => {
+            const itemId = item.tune_id ?? item.id;
+            const isSelected = () =>
+              props.currentRowId != null &&
+              String(props.currentRowId) === String(itemId);
+
+            const title = item.title ?? "(Untitled)";
+            const favoriteUrl =
+              item.favorite_url ?? item.favoriteUrl ?? null;
+            const primaryOrigin =
+              item.primary_origin ?? item.primaryOrigin ?? null;
+            const idForeign = item.id_foreign ?? item.idForeign ?? null;
+            const href =
+              favoriteUrl ??
+              (primaryOrigin === "irishtune.info" && idForeign
+                ? `https://www.irishtune.info/tune/${idForeign}/`
+                : null);
+
+            return (
+              <li
+                class={`px-4 py-3 min-h-[44px] cursor-pointer transition-colors ${
+                  isSelected()
+                    ? "bg-blue-50 dark:bg-blue-900/25 border-l-2 border-blue-400 dark:border-blue-500"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                }`}
+                onClick={() => props.onRowClick?.(item)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    props.onRowClick?.(item);
+                  }
+                }}
+                onDblClick={() => props.onRowDoubleClick?.(item)}
+                data-testid={`stacked-item-${itemId}`}
+                data-selected={isSelected() ? "true" : undefined}
+              >
+                {/* Row 1: Title + primary badge */}
+                <div class="flex items-start justify-between gap-2 min-h-[24px]">
+                  <div class="font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0">
+                    <Show when={href} fallback={<span>{title}</span>}>
+                      <a
+                        href={href!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-blue-600 dark:text-blue-400 hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {title}
+                      </a>
+                    </Show>
+                  </div>
+                  {/* Purpose-specific right badge */}
+                  <Show when={props.tablePurpose === "scheduled"}>
+                    <BucketBadge value={item.bucket} />
+                  </Show>
+                  <Show when={props.tablePurpose === "repertoire"}>
+                    <StateBadge value={item.latest_state} />
+                  </Show>
+                </div>
+
+                {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
+                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                  <TypeBadge value={item.type} />
+                  <ModeBadge value={item.mode} />
+
+                  {/* Scheduled: Recall Eval dropdown */}
+                  <Show when={props.tablePurpose === "scheduled"}>
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */}
+                    <div
+                      class="ml-auto w-40 flex-shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <RecallEvalComboBox
+                        tuneId={String(itemId)}
+                        value={item.recall_eval ?? ""}
+                        onChange={(val) => {
+                          props.cellCallbacks?.onRecallEvalChange?.(
+                            String(itemId),
+                            val
+                          );
+                        }}
+                      />
+                    </div>
+                  </Show>
+                </div>
+
+                {/* Row 3: Purpose-specific secondary info */}
+                <Show when={props.tablePurpose === "scheduled"}>
+                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <Show when={item.latest_practiced}>
+                      <span>Practiced: {formatJustDate(item.latest_practiced)}</span>
+                    </Show>
+                    <Show when={item.latest_stability != null}>
+                      <span>
+                        Stability: {(item.latest_stability as number).toFixed(1)}
+                      </span>
+                    </Show>
+                  </div>
+                </Show>
+
+                <Show when={props.tablePurpose === "repertoire"}>
+                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <Show when={item.goal ?? item.latest_goal}>
+                      <span>
+                        Goal:{" "}
+                        <span class="text-gray-700 dark:text-gray-300">
+                          {item.goal ?? item.latest_goal}
+                        </span>
+                      </span>
+                    </Show>
+                    <Show when={item.latest_practiced}>
+                      <span>
+                        Practiced:{" "}
+                        <span class="text-gray-700 dark:text-gray-300">
+                          {formatJustDate(item.latest_practiced)}
+                        </span>
+                      </span>
+                    </Show>
+                    <Show
+                      when={
+                        (item.scheduled ?? item.latest_due) != null
+                      }
+                    >
+                      {(() => {
+                        const rel = getRelativeLabel(
+                          item.scheduled ?? item.latest_due
+                        );
+                        return (
+                          <span>
+                            Due:{" "}
+                            <span class={rel.colorClass}>{rel.label}</span>
+                          </span>
+                        );
+                      })()}
+                    </Show>
+                  </div>
+                </Show>
+
+                <Show when={props.tablePurpose === "catalog"}>
+                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
+                    <Show when={item.structure}>
+                      <span>
+                        Structure:{" "}
+                        <span class="font-mono text-gray-700 dark:text-gray-300">
+                          {item.structure}
+                        </span>
+                      </span>
+                    </Show>
+                    <Show when={item.id}>
+                      <span class="font-mono text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
+                        {String(item.id)}
+                      </span>
+                    </Show>
+                  </div>
+                </Show>
+              </li>
+            );
+          }}
+        </For>
+      </ul>
+    </div>
+  );
+};
