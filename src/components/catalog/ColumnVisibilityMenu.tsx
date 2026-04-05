@@ -8,7 +8,7 @@
  * @module components/catalog/ColumnVisibilityMenu
  */
 
-import type { Table } from "@tanstack/solid-table";
+import type { Column, Table } from "@tanstack/solid-table";
 import {
   ArrowLeftToLine,
   ArrowRightToLine,
@@ -187,8 +187,14 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     });
   };
 
-  // Get display name for column
-  const getColumnDisplayName = (columnId: string): string => {
+  // Get display name for column - reads from column meta first, then falls back to nameMap
+  const getColumnDisplayName = (column: Column<any>): string => {
+    // Prefer headerLabel stored in the column definition's meta
+    const meta = column.columnDef.meta as { headerLabel?: string } | undefined;
+    if (meta?.headerLabel) return meta.headerLabel;
+
+    // Fall back to nameMap for any columns without meta.headerLabel
+    const columnId = column.id;
     const nameMap: Record<string, string> = {
       id: "ID",
       title: "Title",
@@ -196,7 +202,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       mode: "Mode",
       structure: "Structure",
       incipit: "Incipit",
-      private_for: "Status",
+      private_for: "Ownership",
       genre: "Genre",
       composer: "Composer",
       artist: "Artist",
@@ -212,14 +218,15 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       latest_stability: "Stability",
       latest_interval: "Interval",
       latest_due: "Due",
+      latest_state: "State",
       tags: "Tags",
       purpose: "Purpose",
       note_private: "Private Note",
       note_public: "Public Note",
       has_override: "Override",
       has_staged: "Staged",
-      notes: "Notes",
-      favorite_url: "Favorite URL",
+      bucket: "Bucket",
+      evaluation: "Evaluation",
     };
     return (
       nameMap[columnId] ||
@@ -313,7 +320,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                       class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer pointer-events-none flex-shrink-0"
                     />
                     <span class="text-gray-700 dark:text-gray-300 flex-1 truncate">
-                      {getColumnDisplayName(column.id)}
+                      {getColumnDisplayName(column)}
                     </span>
                     <Show when={!column.getIsVisible()}>
                       <span class="text-xs text-gray-400 dark:text-gray-500 flex-shrink-0">
