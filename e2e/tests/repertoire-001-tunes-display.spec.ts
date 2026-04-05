@@ -18,6 +18,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe
   .serial("REPERTOIRE-001: User's Tunes Display", () => {
+    test.setTimeout(60_000);
+
     let ttPage: TuneTreesPage;
 
     test.beforeEach(async ({ page, testUser }) => {

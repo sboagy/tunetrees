@@ -173,6 +173,14 @@ interface ScheduledOverridePickerProps {
   tuneId: string;
   /** Current ISO timestamp value (or empty string / null when unset). */
   value: string;
+  /** Optional trigger label shown instead of the raw override timestamp. */
+  triggerLabel?: string;
+  /** Optional title attribute applied to the trigger. */
+  triggerTitle?: string;
+  /** Optional text color classes for the trigger label. */
+  triggerTextClass?: string;
+  /** Optional emphasis classes applied when an override is set. */
+  triggerActiveClass?: string;
   /**
    * Called when the user applies or clears the override.
    * Pass `null` to clear the override.
@@ -228,6 +236,12 @@ export const ScheduledOverridePicker: Component<
     )
   );
   const canApply = createMemo(() => Boolean(draftIso()));
+  const hasOverride = createMemo(() => Boolean(props.value));
+  const triggerIconClass = createMemo(() =>
+    hasOverride()
+      ? "text-purple-600 dark:text-purple-400"
+      : "text-gray-400 dark:text-gray-500"
+  );
   const draftSummary = createMemo(() => {
     const iso = draftIso();
     return iso ? formatDisplay(iso) : "Select date and time";
@@ -263,7 +277,7 @@ export const ScheduledOverridePicker: Component<
   const ReadOnly = () => (
     <Show when={props.value} fallback={<span class="text-gray-400">—</span>}>
       <span class="text-sm text-gray-600 dark:text-gray-400">
-        {formatDisplay(props.value)}
+        {props.triggerLabel ?? formatDisplay(props.value)}
       </span>
     </Show>
   );
@@ -271,34 +285,55 @@ export const ScheduledOverridePicker: Component<
   // ── Editable (popover) ─────────────────────────────────────────────────────
   return (
     <Show when={props.onChange} fallback={<ReadOnly />}>
-      <PopoverPrimitive open={open()} onOpenChange={handleOpenChange}>
+      <PopoverPrimitive
+        open={open()}
+        onOpenChange={handleOpenChange}
+        placement="bottom-end"
+        gutter={6}
+        shift={12}
+        flip="top-end top-start bottom-start"
+        fitViewport={true}
+        overflowPadding={12}
+      >
         <PopoverPrimitive.Trigger
           data-testid={`scheduled-override-trigger-${props.tuneId}`}
           aria-label={
-            props.value ? "Edit schedule override" : "Set schedule override"
+            props.triggerLabel
+              ? undefined
+              : props.value
+                ? "Edit schedule override"
+                : "Set schedule override"
           }
-          class="flex min-h-6 items-center gap-1.5 rounded px-1 text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          title={props.triggerTitle}
+          class="flex min-h-6 w-full min-w-0 items-center justify-between gap-2 rounded px-1 text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           <Show
-            when={props.value}
+            when={props.triggerLabel ?? props.value}
             fallback={
               <>
-                <Calendar class="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                <span class="min-w-0 flex-1 text-left text-gray-400">
+                  &nbsp;
+                </span>
+                <Calendar
+                  class={`h-4 w-4 flex-shrink-0 ${triggerIconClass()}`}
+                />
                 <span class="sr-only">Set schedule override</span>
               </>
             }
           >
-            <span class="truncate text-gray-600 dark:text-gray-400">
-              {formatDisplay(props.value)}
+            <span
+              class={`min-w-0 flex-1 truncate text-left ${props.triggerTextClass ?? "text-gray-600 dark:text-gray-400"} ${hasOverride() ? (props.triggerActiveClass ?? "font-semibold underline decoration-dotted underline-offset-2") : ""}`}
+            >
+              {props.triggerLabel ?? formatDisplay(props.value)}
             </span>
-            <Calendar class="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+            <Calendar class={`h-4 w-4 flex-shrink-0 ${triggerIconClass()}`} />
           </Show>
         </PopoverPrimitive.Trigger>
 
         <PopoverPrimitive.Portal>
           <PopoverPrimitive.Content
             data-testid={`scheduled-override-popover-${props.tuneId}`}
-            class="z-50 w-[22rem] rounded-md border border-gray-200 bg-white p-4 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900"
+            class="z-50 w-[min(22rem,calc(100vw-1.5rem))] max-h-[min(42rem,calc(100vh-1.5rem))] overflow-y-auto rounded-md border border-gray-200 bg-white p-4 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900"
           >
             <div class="space-y-4">
               <div class="space-y-1">
@@ -306,8 +341,7 @@ export const ScheduledOverridePicker: Component<
                   Schedule Override
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  Force this tune into your queue on this date. Cleared after
-                  practice.
+                  Set a manual override for this tune's next review date.
                 </p>
               </div>
 

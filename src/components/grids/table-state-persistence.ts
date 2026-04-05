@@ -95,7 +95,6 @@ export function getDefaultTableState(
         genre: false,
         private_for: false, // Status column
         scheduled: true,
-        scheduled_raw: true,
         latest_practiced: true,
         latest_goal: true,
         latest_technique: true,
