@@ -179,6 +179,7 @@ export function getCatalogColumns(
     // ID (prevent wrap for UUIDs; truncate with ellipsis)
     {
       accessorKey: "id",
+      meta: { headerLabel: "ID" },
       header: ({ column }) => <SortableHeader column={column} title="ID" />,
       cell: (info) => {
         const value = info.getValue() as string | number | null;
@@ -202,6 +203,7 @@ export function getCatalogColumns(
     // Title (with link)
     {
       accessorKey: "title",
+      meta: { headerLabel: "Title" },
       header: ({ column }) => <SortableHeader column={column} title="Title" />,
       cell: (info) => {
         const tune = info.row.original;
@@ -247,6 +249,7 @@ export function getCatalogColumns(
     // Type
     {
       accessorKey: "type",
+      meta: { headerLabel: "Type" },
       header: ({ column }) => <SortableHeader column={column} title="Type" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
@@ -266,6 +269,7 @@ export function getCatalogColumns(
     // Mode
     {
       accessorKey: "mode",
+      meta: { headerLabel: "Mode" },
       header: ({ column }) => <SortableHeader column={column} title="Mode" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
@@ -285,6 +289,7 @@ export function getCatalogColumns(
     // Structure
     {
       accessorKey: "structure",
+      meta: { headerLabel: "Structure" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Structure" />
       ),
@@ -306,6 +311,7 @@ export function getCatalogColumns(
     // Incipit
     {
       accessorKey: "incipit",
+      meta: { headerLabel: "Incipit" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Incipit" />
       ),
@@ -329,6 +335,7 @@ export function getCatalogColumns(
 
     {
       accessorKey: "genre",
+      meta: { headerLabel: "Genre" },
       header: ({ column }) => <SortableHeader column={column} title="Genre" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
@@ -351,6 +358,7 @@ export function getCatalogColumns(
     // Composer (for Classical/Choral)
     {
       accessorKey: "composer",
+      meta: { headerLabel: "Composer" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Composer" />
       ),
@@ -375,6 +383,7 @@ export function getCatalogColumns(
     // Artist (for Pop/Rock/Jazz)
     {
       accessorKey: "artist",
+      meta: { headerLabel: "Artist" },
       header: ({ column }) => <SortableHeader column={column} title="Artist" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
@@ -397,6 +406,7 @@ export function getCatalogColumns(
     // Release Year
     {
       id: "release_year",
+      meta: { headerLabel: "Year" },
       accessorFn: (row) =>
         (row as any).release_year ?? (row as any).releaseYear ?? null,
       header: ({ column }) => <SortableHeader column={column} title="Year" />,
@@ -419,6 +429,7 @@ export function getCatalogColumns(
     // Foreign ID (Spotify/YouTube)
     {
       id: "id_foreign",
+      meta: { headerLabel: "External ID" },
       accessorFn: (row) =>
         (row as any).id_foreign ?? (row as any).idForeign ?? null,
       header: ({ column }) => (
@@ -445,6 +456,7 @@ export function getCatalogColumns(
     // Status (Public/Private)
     {
       id: "private_for",
+      meta: { headerLabel: "Ownership" },
       accessorFn: (row) =>
         (row as any).private_for ?? (row as any).privateFor ?? null,
       header: ({ column }) => (
@@ -485,6 +497,7 @@ export function getRepertoireColumns(
     // Learned status
     {
       accessorKey: "latest_state",
+      meta: { headerLabel: "State" },
       header: ({ column }) => <SortableHeader column={column} title="State" />,
       cell: (info) => {
         const valueNum = info.getValue() as number | null;
@@ -527,6 +540,7 @@ export function getRepertoireColumns(
 
     {
       accessorKey: "learned",
+      meta: { headerLabel: "Learned" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Learned" />
       ),
@@ -548,6 +562,7 @@ export function getRepertoireColumns(
     // Goal
     {
       accessorKey: "goal",
+      meta: { headerLabel: "Goal" },
       header: ({ column }) => <SortableHeader column={column} title="Goal" />,
       cell: (info) => {
         const row = info.row.original;
@@ -575,6 +590,7 @@ export function getRepertoireColumns(
 
     {
       id: "scheduled",
+      meta: { headerLabel: "Scheduled" },
       accessorFn: (row) => row.scheduled || row.latest_due || "",
       header: ({ column }) => (
         <SortableHeader column={column} title="Scheduled" />
@@ -654,6 +670,7 @@ export function getRepertoireColumns(
 
     {
       id: "latest_due",
+      meta: { headerLabel: "Due" },
       accessorFn: (row) => row.latest_due,
       header: ({ column }) => <SortableHeader column={column} title="Due" />,
       cell: (info) => {
@@ -674,6 +691,7 @@ export function getRepertoireColumns(
     // Latest Practiced
     {
       accessorKey: "latest_practiced",
+      meta: { headerLabel: "Last Practiced" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Last Practiced" />
       ),
@@ -695,6 +713,7 @@ export function getRepertoireColumns(
     // Recall Eval (transient field - editable)
     {
       accessorKey: "recall_eval",
+      meta: { headerLabel: "Recall Eval" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Recall Eval" />
       ),
@@ -730,6 +749,7 @@ export function getRepertoireColumns(
     // Latest Quality
     {
       accessorKey: "latest_quality",
+      meta: { headerLabel: "Quality" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Quality" />
       ),
@@ -749,6 +769,7 @@ export function getRepertoireColumns(
     // Latest Easiness
     {
       accessorKey: "latest_easiness",
+      meta: { headerLabel: "Easiness" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Easiness" />
       ),
@@ -770,6 +791,7 @@ export function getRepertoireColumns(
     // Latest Stability
     {
       accessorKey: "latest_stability",
+      meta: { headerLabel: "Stability" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Stability" />
       ),
@@ -791,6 +813,7 @@ export function getRepertoireColumns(
     // Latest Interval
     {
       accessorKey: "latest_interval",
+      meta: { headerLabel: "Interval" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Interval" />
       ),
@@ -829,6 +852,7 @@ export function getRepertoireColumns(
     // Tags
     {
       accessorKey: "tags",
+      meta: { headerLabel: "Tags" },
       header: ({ column }) => <SortableHeader column={column} title="Tags" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
@@ -851,6 +875,7 @@ export function getRepertoireColumns(
     // Purpose (transient)
     {
       accessorKey: "purpose",
+      meta: { headerLabel: "Purpose" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Purpose" />
       ),
@@ -875,6 +900,7 @@ export function getRepertoireColumns(
     // Note Private (transient)
     {
       accessorKey: "note_private",
+      meta: { headerLabel: "Private Note" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Private Note" />
       ),
@@ -899,6 +925,7 @@ export function getRepertoireColumns(
     // Note Public (transient)
     {
       accessorKey: "note_public",
+      meta: { headerLabel: "Public Note" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Public Note" />
       ),
@@ -923,6 +950,7 @@ export function getRepertoireColumns(
     // Has Override
     {
       accessorKey: "has_override",
+      meta: { headerLabel: "Override" },
       header: ({ column }) => (
         <SortableHeader column={column} title="Override" />
       ),
@@ -944,6 +972,7 @@ export function getRepertoireColumns(
     // Has Staged
     {
       accessorKey: "has_staged",
+      meta: { headerLabel: "Staged" },
       header: ({ column }) => <SortableHeader column={column} title="Staged" />,
       cell: (info) => {
         const value = info.getValue() as number | null;
@@ -986,6 +1015,7 @@ export function getScheduledColumns(
       id: "bucket",
       accessorFn: (row) => row.bucket || "Due Today",
       meta: {
+        headerLabel: "Bucket",
         description:
           "Practice queue bucket computed by the scheduler (Due Today, Lapsed, New, Old Lapsed).",
       },
@@ -1022,6 +1052,7 @@ export function getScheduledColumns(
       id: "evaluation",
       accessorFn: (row) => row.recall_eval || "",
       meta: {
+        headerLabel: "Evaluation",
         description:
           "Your recall rating for this practice (Again/Hard/Good/Easy).",
       },
