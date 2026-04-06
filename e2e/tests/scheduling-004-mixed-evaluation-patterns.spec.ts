@@ -120,6 +120,12 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     page,
     testUser,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses table-specific row selectors (tbody tr[data-index]) not available in mobile stacked list."
+      );
+    }
     console.log("\n=== SCHEDULING-004: Mixed Evaluation Patterns ===");
     console.log(`  Test date: ${currentDate.toISOString().split("T")[0]}`);
 

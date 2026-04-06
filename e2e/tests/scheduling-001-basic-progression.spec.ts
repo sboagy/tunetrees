@@ -89,6 +89,12 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
     context,
     testUser,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses table-specific row selectors (tbody tr[data-index]) not available in mobile stacked list."
+      );
+    }
     // Ensure practice view is ready (single overdue tune seeded)
     await ttPage.navigateToTab("practice");
     await ttPage.refreshDateRolloverIfVisible();
