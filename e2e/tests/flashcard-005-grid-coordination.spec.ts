@@ -238,6 +238,12 @@ test.describe
     test("06. Current tune synchronization grid ↔ flashcard", async ({
       page,
     }) => {
+      if (test.info().project.name === "Mobile Chrome") {
+        test.skip(
+          true,
+          "Test uses getByRole('cell') row interaction not available in mobile stacked list."
+        );
+      }
       const app = new TuneTreesPage(page);
       // Ensure grid is rendered with at least two rows
       const grid = app.practiceGrid;

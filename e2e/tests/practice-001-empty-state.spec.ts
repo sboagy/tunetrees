@@ -6,6 +6,7 @@ import {
 } from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // import type { TestUser } from "../helpers/test-users";
 
@@ -57,8 +58,9 @@ test.describe
       const grid = page.getByTestId("tunes-grid-scheduled");
       await expect(grid).toBeVisible({ timeout: 40000 });
 
-      // Count only data rows (exclude virtualization spacers)
-      const dataRows = grid.locator("tbody tr[data-index]");
+      // Count data rows - works for both table mode and mobile stacked list
+      const ttPage = new TuneTreesPage(page);
+      const dataRows = ttPage.getRows("scheduled");
       const rowCount = await dataRows.count();
       console.log(`📊 Practice grid has ${rowCount} data rows`);
       expect(rowCount).toBeGreaterThan(0); // Should have at least some unscheduled tunes
