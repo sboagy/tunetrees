@@ -134,7 +134,6 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
 
     await expect(firstNoteEditButton).toBeVisible({ timeout: 5000 });
     await firstNoteEditButton.click();
-    await page.waitForTimeout(500); // Wait for editor to appear
 
     const noteEditor = ttPage.getNoteEditor(noteId);
     await expect(noteEditor).toBeVisible({ timeout: 5000 });
@@ -144,10 +143,9 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
 
     // Update the note content
     const joditEditor2 = noteEditor.locator(".jodit-wysiwyg");
+    await expect(joditEditor2).toBeVisible({ timeout: 5000 });
     await joditEditor2.click();
-    await page.waitForTimeout(500);
     await joditEditor2.fill("This has been edited");
-    await page.waitForTimeout(300);
 
     const noteSaveButton = page.getByTestId(`note-save-button-${noteId}`);
 
