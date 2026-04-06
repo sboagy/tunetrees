@@ -23,7 +23,6 @@ import { TunesGridScheduled } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import {
-  DateRolloverBanner,
   FlashcardView,
   PracticeControlBanner,
 } from "../components/practice";
@@ -34,7 +33,7 @@ import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
-import { ensureDailyQueue } from "../lib/services/practice-queue";
+import { generateOrGetPracticeQueue } from "../lib/services/practice-queue";
 import { getPracticeDate } from "../lib/utils/practice-date";
 import { useFlashcardPersistence } from "./practice/useFlashcardPersistence";
 import { usePracticeEvaluations } from "./practice/usePracticeEvaluations";
@@ -174,7 +173,6 @@ const PracticePage: Component = () => {
   const {
     practiceRows,
     filteredPracticeList,
-    isQueueCompleted,
     practiceListLoading,
     practiceListError,
   } = usePracticeListData({
@@ -280,10 +278,18 @@ const PracticePage: Component = () => {
     clearManualAndSetToday();
 
     try {
-      await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
+      await generateOrGetPracticeQueue(
+        db,
+        userIdValue,
+        repertoireId,
+        practiceDate,
+        null,
+        "per_day",
+        true
+      );
     } catch (error) {
       console.warn(
-        "[PracticePage] Failed to ensure queue during refresh:",
+        "[PracticePage] Failed to regenerate queue during refresh:",
         error
       );
     }
@@ -308,14 +314,6 @@ const PracticePage: Component = () => {
 
   return (
     <div class="h-full flex flex-col">
-      <Show when={rolloverStatus().showBanner}>
-        <DateRolloverBanner
-          newDate={rolloverStatus().wallClockDate}
-          isQueueCompleted={isQueueCompleted()}
-          onRefresh={handlePracticeDateRefresh}
-        />
-      </Show>
-
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}
         isStaging={isStaging()}
@@ -331,6 +329,9 @@ const PracticePage: Component = () => {
         table={tableInstance()}
         flashcardFieldVisibility={flashcardFieldVisibility()}
         onFlashcardFieldVisibilityChange={setFlashcardFieldVisibility}
+        rolloverPending={rolloverStatus().showBanner}
+        rolloverDate={rolloverStatus().wallClockDate}
+        onPracticeDateRefresh={handlePracticeDateRefresh}
       />
 
       <div class={GRID_CONTENT_CONTAINER}>
