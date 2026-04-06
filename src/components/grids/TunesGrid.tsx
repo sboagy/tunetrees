@@ -25,7 +25,13 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
+import {
+  getScreenSize,
+  loadTableStateFromDb,
+  saveTableStateToDb,
+} from "@/lib/db/queries/table-state";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   CELL_CLASSES,
@@ -76,6 +82,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const { localDb } = useAuth();
   const [openPopover, setOpenPopover] = createSignal<string | null>(null);
   let popoverRef: HTMLDivElement | undefined;
   useClickOutside(
@@ -410,6 +417,39 @@ export const TunesGrid = (<T extends { id: string | number }>(
     });
   });
 
+  // If localStorage had no persisted state, attempt an async load from the
+  // local SQLite DB (which syncs remotely).  This recovers column preferences
+  // after a localStorage reset or on a new device.
+  if (!loadedState) {
+    onMount(async () => {
+      const db = localDb();
+      const key = stateKey();
+      if (!db) return;
+      const dbState = await loadTableStateFromDb(
+        db,
+        key.userId,
+        key.tablePurpose,
+        key.repertoireId,
+        getScreenSize()
+      );
+      if (!dbState) return;
+
+      const merged = sanitizeInitialTableState(
+        mergeWithDefaults(dbState, props.tablePurpose as any),
+        allowedColumnIds
+      );
+      if (merged.columnVisibility) setColumnVisibility(merged.columnVisibility);
+      if (merged.columnOrder?.length) setColumnOrder(merged.columnOrder);
+      if (merged.columnSizing && Object.keys(merged.columnSizing).length)
+        setColumnSizing(merged.columnSizing);
+      if (merged.sorting?.length) setSorting(merged.sorting);
+      if (merged.columnPinning) setColumnPinning(merged.columnPinning);
+      console.log(
+        `[TunesGrid ${props.tablePurpose}] Restored state from DB (localStorage was empty)`
+      );
+    });
+  }
+
   const reorderColumns = (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
     const current = columnOrder();
@@ -475,6 +515,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
     })
   );
 
+  // Debounce handle for DB writes (avoids excessive writes during rapid state changes)
+  let dbSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
   // Persist table state (excluding scrollTop here)
   createEffect(() => {
     const state = {
@@ -487,7 +530,35 @@ export const TunesGrid = (<T extends { id: string | number }>(
       // Do not persist scrollTop here; handled by scroll persistence logic below
       scrollTop: loadedState?.scrollTop || 0,
     };
+
+    // Immediate write to localStorage for fast synchronous reads on reload
     saveTableState(stateKey(), state);
+
+    // Debounced write to local SQLite DB (synced remotely), so column preferences
+    // survive a localStorage reset and roam across devices.
+    const key = stateKey();
+    const db = localDb();
+    if (db) {
+      if (dbSaveTimer !== null) clearTimeout(dbSaveTimer);
+      dbSaveTimer = setTimeout(() => {
+        dbSaveTimer = null;
+        void saveTableStateToDb(
+          db,
+          key.userId,
+          key.tablePurpose,
+          key.repertoireId,
+          getScreenSize(),
+          state
+        );
+      }, 500);
+    }
+  });
+
+  onCleanup(() => {
+    if (dbSaveTimer !== null) {
+      clearTimeout(dbSaveTimer);
+      dbSaveTimer = null;
+    }
   });
 
   // Simple scroll restoration and persistence
