@@ -89,11 +89,11 @@ export function getDefaultTableState(
         // Show only the essentials for the daily practice queue
         bucket: true,
         evaluation: true,
+        goal: true,
         scheduled: true,
         latest_practiced: true,
         // Hide everything else
         id: false,
-        goal: false,
         type: false,
         mode: false,
         structure: false,
@@ -124,14 +124,15 @@ export function getDefaultTableState(
 
     case "repertoire":
       baseState.columnVisibility = {
-        // Show only genre and the two most useful date columns
+        // Keep selection + core workflow columns visible by default
+        select: true,
+        type: true,
+        goal: true,
         genre: true,
         latest_practiced: true,
         latest_due: true,
         // Hide everything else
-        select: false,
         id: false,
-        type: false,
         mode: false,
         structure: false,
         incipit: false,
@@ -161,12 +162,12 @@ export function getDefaultTableState(
 
     case "catalog":
       baseState.columnVisibility = {
-        // Show only composer alongside title
+        // Keep selection available for add-to-repertoire workflows
+        select: true,
+        type: true,
         composer: true,
         // Hide everything else
-        select: false,
         id: false,
-        type: false,
         mode: false,
         structure: false,
         incipit: false,
