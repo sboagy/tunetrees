@@ -75,13 +75,16 @@ interface TabBarProps {
  * ```
  */
 export const TabBar: Component<TabBarProps> = (props) => {
-  // Detect mobile viewport to switch between Select dropdown and tab buttons.
-  // Use the same 768px (md) breakpoint as the rest of the app (e.g. sidebar auto-collapse).
-  const [isMobile, setIsMobile] = createSignal(false);
+  // Initialize isMobile synchronously so the correct layout is rendered on first paint
+  // (no flash from desktop→mobile). Use the same 768px (md) breakpoint as the rest of
+  // the app (e.g. sidebar auto-collapse in MainLayout.tsx).
+  const [isMobile, setIsMobile] = createSignal(
+    typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 767px)").matches
+  );
 
   onMount(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     // Return cleanup function (matches the onMount cleanup pattern used in MainLayout.tsx)
@@ -100,6 +103,21 @@ export const TabBar: Component<TabBarProps> = (props) => {
     <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       {/* Mobile: Kobalte Select dropdown — avoids icon-only "mystery meat" navigation */}
       <Show when={isMobile()}>
+        {/*
+         * Hidden sentinel spans: always in DOM on mobile so Playwright's toBeVisible()
+         * and toHaveAttribute("aria-current") checks work for tests that verify active tab.
+         * 1px × 1px absolute position so they're invisible to users but detectable by tests.
+         */}
+        <For each={TABS}>
+          {(tab) => (
+            <span
+              data-testid={`tab-${tab.id}`}
+              aria-current={activeTabId() === tab.id ? "page" : undefined}
+              aria-hidden="true"
+              style="position:absolute;width:1px;height:1px;overflow:hidden;pointer-events:none"
+            />
+          )}
+        </For>
         <div class="px-4 py-2">
           <Select
             value={activeTabId()}

@@ -1175,7 +1175,7 @@ export class TuneTreesPage {
           analysis: "Analysis",
         };
         const option = this.page.getByRole("option", {
-          name: tabLabels[tabId],
+          name: new RegExp(tabLabels[tabId], "i"),
         });
         await expect(option).toBeVisible({ timeout: 5_000 });
         await option.click({ timeout: 5_000 });
