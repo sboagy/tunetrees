@@ -664,6 +664,52 @@ describe("generateOrGetPracticeQueue - Frozen Queue Behavior", () => {
 
     expect(queue2).toHaveLength(2); // Now includes new tune
   });
+
+  it("should persist the regenerated queue for subsequent reloads", async () => {
+    insertTune(tuneId(1), "Completed Tune", formatTimestamp(daysFromNow(0)));
+
+    const originalQueue = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+    expect(originalQueue).toHaveLength(1);
+
+    db.run(sql`
+      UPDATE daily_practice_queue
+      SET completed_at = datetime('now')
+      WHERE id = ${originalQueue[0].id}
+    `);
+
+    insertTune(tuneId(2), "Fresh Tune", formatTimestamp(daysFromNow(0)));
+
+    const regeneratedQueue = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      new Date(),
+      null,
+      "per_day",
+      true
+    );
+
+    expect(regeneratedQueue).toHaveLength(2);
+    expect(regeneratedQueue.some((row) => row.id === originalQueue[0].id)).toBe(
+      false
+    );
+    expect(regeneratedQueue.every((row) => row.completedAt === null)).toBe(true);
+
+    const reloadedQueue = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+
+    expect(reloadedQueue).toHaveLength(2);
+    expect(reloadedQueue.map((row) => row.id)).toEqual(
+      regeneratedQueue.map((row) => row.id)
+    );
+  });
 });
 
 describe("addTunesToQueue - Refill Functionality", () => {
