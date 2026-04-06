@@ -143,7 +143,6 @@ export function getDefaultTableState(
         private_for: false,
         latest_state: false,
         learned: false,
-        goal: false,
         scheduled: false,
         recall_eval: false,
         latest_quality: false,
