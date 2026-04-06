@@ -1520,10 +1520,10 @@ export class TuneTreesPage {
    */
   async expectTuneVisible(tuneName: string, grid: Locator, timeout = 5000) {
     // Desktop table: tune name lives in a <td> cell.
-    // Mobile stacked list: tune name lives inside an <li> item (no "cell" role).
+    // Mobile stacked list: tune name lives inside an <li> stacked item.
     const tuneItem = grid
       .getByRole("cell", { name: tuneName })
-      .or(grid.locator("li").filter({ hasText: tuneName }))
+      .or(grid.locator("li[data-testid^='stacked-item-']").filter({ hasText: tuneName }))
       .first();
     await expect(tuneItem).toBeVisible({ timeout });
   }
