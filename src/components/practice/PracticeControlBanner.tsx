@@ -70,6 +70,15 @@ export interface PracticeControlBannerProps {
   onQueueDateChange?: (date: Date, isPreview: boolean) => void;
   /** Handler for queue reset */
   onQueueReset?: () => void;
+  /**
+   * When true, the practice date has rolled over and the queue needs a refresh.
+   * The refresh button is always visible but only enabled when this is true.
+   */
+  rolloverPending?: boolean;
+  /** The new wall-clock date that is now current (shown in tooltip when rollover is pending) */
+  rolloverDate?: Date;
+  /** Handler called when the user clicks the refresh-queue button */
+  onPracticeDateRefresh?: () => void | Promise<void>;
 }
 
 export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
@@ -131,6 +140,12 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const handleQueueReset = () => {
     if (props.onQueueReset) {
       props.onQueueReset();
+    }
+  };
+
+  const handlePracticeDateRefresh = async () => {
+    if (props.onPracticeDateRefresh) {
+      await props.onPracticeDateRefresh();
     }
   };
 
@@ -246,6 +261,72 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           >
             <Plus size={14} />
             <span class="hidden md:inline">Add More</span>
+          </button>
+
+          {/* Date-rollover indicator — only rendered (and therefore visible to
+              Playwright) when the practice date has rolled past the current queue.
+              Kept as a lightweight inline element so it doesn't shift the layout. */}
+          <Show when={props.rolloverPending}>
+            <output
+              data-testid="date-rollover-banner"
+              class="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
+              title={`Practice date is now ${props.rolloverDate?.toLocaleDateString() ?? "today"}`}
+              aria-live="polite"
+            >
+              <svg
+                class={TOOLBAR_ICON_SIZE}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span class="hidden sm:inline">New day</span>
+            </output>
+          </Show>
+
+          {/* Refresh Queue button — always visible, enabled only when rollover is
+              pending. Uses amber styling when active so it draws the eye without
+              being as intrusive as the old full-width banner. */}
+          <button
+            type="button"
+            data-testid="date-rollover-refresh-button"
+            onClick={handlePracticeDateRefresh}
+            disabled={!props.rolloverPending}
+            title={
+              props.rolloverPending
+                ? `Practice date has changed to ${props.rolloverDate?.toLocaleDateString() ?? "today"}. Click to refresh the queue.`
+                : "Queue is up to date"
+            }
+            class={`${TOOLBAR_BUTTON_BASE}`}
+            classList={{
+              "text-amber-600 dark:text-amber-400 border-amber-400/70 dark:border-amber-600/70 hover:bg-amber-50 dark:hover:bg-amber-900/20":
+                !!props.rolloverPending,
+              "text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed":
+                !props.rolloverPending,
+            }}
+          >
+            <svg
+              class={TOOLBAR_ICON_SIZE}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span class="hidden md:inline">Refresh</span>
           </button>
 
           {/* Queue control button */}
