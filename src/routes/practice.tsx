@@ -23,7 +23,6 @@ import { TunesGridScheduled } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
 import {
-  DateRolloverBanner,
   FlashcardView,
   PracticeControlBanner,
 } from "../components/practice";
@@ -174,7 +173,6 @@ const PracticePage: Component = () => {
   const {
     practiceRows,
     filteredPracticeList,
-    isQueueCompleted,
     practiceListLoading,
     practiceListError,
   } = usePracticeListData({
@@ -316,14 +314,6 @@ const PracticePage: Component = () => {
 
   return (
     <div class="h-full flex flex-col">
-      <Show when={rolloverStatus().showBanner}>
-        <DateRolloverBanner
-          newDate={rolloverStatus().wallClockDate}
-          isQueueCompleted={isQueueCompleted()}
-          onRefresh={handlePracticeDateRefresh}
-        />
-      </Show>
-
       <PracticeControlBanner
         evaluationsCount={evaluationsCount()}
         isStaging={isStaging()}
@@ -339,6 +329,9 @@ const PracticePage: Component = () => {
         table={tableInstance()}
         flashcardFieldVisibility={flashcardFieldVisibility()}
         onFlashcardFieldVisibilityChange={setFlashcardFieldVisibility}
+        rolloverPending={rolloverStatus().showBanner}
+        rolloverDate={rolloverStatus().wallClockDate}
+        onPracticeDateRefresh={handlePracticeDateRefresh}
       />
 
       <div class={GRID_CONTENT_CONTAINER}>
