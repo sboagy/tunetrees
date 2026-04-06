@@ -256,7 +256,7 @@ test.describe
       // The logic was changed, such that clicking on a row no longer selects it as the
       // current tune.  Accordingly, we also click on it here to make it the current
       // tune row.
-      await rows.nth(1).getByRole("cell").first().click();
+      await rows.nth(1).click();
 
       // Open flashcard mode and verify it starts on second item
       await app.enableFlashcardMode();
@@ -297,7 +297,7 @@ test.describe
       // The logic was changed, such that clicking on a row no longer selects it as the
       // current tune.  Accordingly, we also click on it here to make it the current
       // tune row.
-      await rows.nth(1).getByRole("cell").first().click();
+      await rows.nth(1).click();
 
       // Open flashcard mode
       await app.enableFlashcardMode();
