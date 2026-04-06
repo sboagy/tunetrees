@@ -130,6 +130,12 @@ test.describe("Repertoire: Add To Review", () => {
   });
 
   test("should handle tunes already scheduled", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses row checkbox selection which is only available in the desktop table view."
+      );
+    }
     // Navigate to Repertoire tab
     await page.getByTestId("tab-repertoire").click();
     await page.waitForTimeout(500);
@@ -163,6 +169,12 @@ test.describe("Repertoire: Add To Review", () => {
   test("should verify console logs for database operation", async ({
     page,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses row checkbox selection which is only available in the desktop table view."
+      );
+    }
     // Set up console message listener
     const consoleLogs: string[] = [];
     page.on("console", (msg) => {

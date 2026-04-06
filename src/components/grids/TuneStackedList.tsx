@@ -191,7 +191,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
   return (
     <div
       class="flex-1 overflow-y-auto"
-      data-testid={`tunes-stacked-list-${props.tablePurpose}`}
+      data-testid={`tunes-grid-${props.tablePurpose}`}
     >
       <ul
         class="divide-y divide-gray-200 dark:divide-gray-700"

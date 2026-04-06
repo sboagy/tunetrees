@@ -1498,8 +1498,11 @@ export class TuneTreesPage {
   }
 
   getRows(gridId: string): Locator {
+    // Support both table mode (desktop) and stacked list mode (mobile).
+    // On desktop the TanStack virtual table renders "tbody tr[data-index]".
+    // On mobile the TuneStackedList renders "li[data-testid^='stacked-item-']".
     return this.page.locator(
-      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index]`
+      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index], [data-testid="tunes-grid-${gridId}"] li[data-testid^="stacked-item-"]`
     );
   }
 
@@ -1946,14 +1949,16 @@ export class TuneTreesPage {
     // Wait for grid to be visible first
     await expect(grid).toBeVisible({ timeout: 40000 });
 
-    // Check for table cells
-    const cells = grid.locator("td");
+    // Support both table mode (desktop) and stacked list mode (mobile):
+    // - Table: <td> cells inside <tbody>
+    // - Stacked list: <li data-testid="stacked-item-*"> elements
+    const items = grid.locator("td, li[data-testid^='stacked-item-']");
 
-    // Wait for at least one cell to appear (30s timeout)
-    await expect(cells.first()).toBeVisible({ timeout: 30000 });
+    // Wait for at least one item to appear (30s timeout)
+    await expect(items.first()).toBeVisible({ timeout: 30000 });
 
-    const cellCount = await cells.count();
-    expect(cellCount).toBeGreaterThan(0);
+    const itemCount = await items.count();
+    expect(itemCount).toBeGreaterThan(0);
   }
 
   /**
