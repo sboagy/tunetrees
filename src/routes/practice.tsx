@@ -34,7 +34,7 @@ import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
-import { ensureDailyQueue } from "../lib/services/practice-queue";
+import { generateOrGetPracticeQueue } from "../lib/services/practice-queue";
 import { getPracticeDate } from "../lib/utils/practice-date";
 import { useFlashcardPersistence } from "./practice/useFlashcardPersistence";
 import { usePracticeEvaluations } from "./practice/usePracticeEvaluations";
@@ -280,10 +280,18 @@ const PracticePage: Component = () => {
     clearManualAndSetToday();
 
     try {
-      await ensureDailyQueue(db, userIdValue, repertoireId, practiceDate);
+      await generateOrGetPracticeQueue(
+        db,
+        userIdValue,
+        repertoireId,
+        practiceDate,
+        null,
+        "per_day",
+        true
+      );
     } catch (error) {
       console.warn(
-        "[PracticePage] Failed to ensure queue during refresh:",
+        "[PracticePage] Failed to regenerate queue during refresh:",
         error
       );
     }
