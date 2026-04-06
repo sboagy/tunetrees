@@ -123,7 +123,7 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
     const firstNote = ttPage.getAllNoteItems().first();
     const firstNoteTestId = await firstNote.getAttribute("data-testid");
     expect(firstNoteTestId).toBeTruthy();
-    const noteId = firstNoteTestId!.replace("note-item-", "");
+    const noteId = (firstNoteTestId ?? "").replace("note-item-", "");
     const firstNoteContent = ttPage.getNoteContent(noteId);
 
     await expect(firstNoteContent).toContainText("This will be edited", {
