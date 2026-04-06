@@ -417,38 +417,39 @@ export const TunesGrid = (<T extends { id: string | number }>(
     });
   });
 
-  // If localStorage had no persisted state, attempt an async load from the
-  // local SQLite DB (which syncs remotely).  This recovers column preferences
-  // after a localStorage reset or on a new device.
-  if (!loadedState) {
-    onMount(async () => {
-      const db = localDb();
-      const key = stateKey();
-      if (!db) return;
-      const dbState = await loadTableStateFromDb(
-        db,
-        key.userId,
-        key.tablePurpose,
-        key.repertoireId,
-        getScreenSize()
-      );
-      if (!dbState) return;
+  // On mount, attempt an async load from the local SQLite DB (which syncs remotely).
+  // This recovers column preferences after a localStorage reset or on a new device.
+  // Only applies the DB state when localStorage had no persisted state (to avoid
+  // overwriting user changes that exist only in localStorage).
+  onMount(async () => {
+    // Skip if localStorage already had a persisted state for this key.
+    if (loadedState) return;
+    const db = localDb();
+    const key = stateKey();
+    if (!db) return;
+    const dbState = await loadTableStateFromDb(
+      db,
+      key.userId,
+      key.tablePurpose,
+      key.repertoireId,
+      getScreenSize()
+    );
+    if (!dbState) return;
 
-      const merged = sanitizeInitialTableState(
-        mergeWithDefaults(dbState, props.tablePurpose as any),
-        allowedColumnIds
-      );
-      if (merged.columnVisibility) setColumnVisibility(merged.columnVisibility);
-      if (merged.columnOrder?.length) setColumnOrder(merged.columnOrder);
-      if (merged.columnSizing && Object.keys(merged.columnSizing).length)
-        setColumnSizing(merged.columnSizing);
-      if (merged.sorting?.length) setSorting(merged.sorting);
-      if (merged.columnPinning) setColumnPinning(merged.columnPinning);
-      console.log(
-        `[TunesGrid ${props.tablePurpose}] Restored state from DB (localStorage was empty)`
-      );
-    });
-  }
+    const merged = sanitizeInitialTableState(
+      mergeWithDefaults(dbState, props.tablePurpose as any),
+      allowedColumnIds
+    );
+    if (merged.columnVisibility) setColumnVisibility(merged.columnVisibility);
+    if (merged.columnOrder?.length) setColumnOrder(merged.columnOrder);
+    if (merged.columnSizing && Object.keys(merged.columnSizing).length)
+      setColumnSizing(merged.columnSizing);
+    if (merged.sorting?.length) setSorting(merged.sorting);
+    if (merged.columnPinning) setColumnPinning(merged.columnPinning);
+    console.log(
+      `[TunesGrid ${props.tablePurpose}] Restored state from DB (localStorage was empty)`
+    );
+  });
 
   const reorderColumns = (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
