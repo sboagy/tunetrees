@@ -55,7 +55,6 @@ test.describe
           true,
           "All tests in this suite use row checkboxes which are not available in the mobile stacked list."
         );
-        return;
       }
       // Setup: Seed several tunes in repertoire for selection testing
       // Using known valid tune IDs: testUserPrivateTune1 (Banish Misfortune), TEST_TUNE_MORRISON_ID (Morrison's Jig)

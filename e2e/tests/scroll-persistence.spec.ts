@@ -35,7 +35,6 @@ test.describe("Scroll Position Persistence", () => {
         true,
         "All tests in this suite use tunes-grid-container-* which only exists in the desktop table, not the mobile stacked list."
       );
-      return;
     }
     const currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);

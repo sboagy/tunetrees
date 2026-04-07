@@ -49,7 +49,6 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
         true,
         "All tests in this suite use row checkboxes to add tunes to repertoire/review, which are not available in the mobile stacked list."
       );
-      return;
     }
     // Extend timeout for all tests running this hook by 3x.
     test.setTimeout(testInfo.timeout * 3);

@@ -49,7 +49,6 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
         true,
         "All tests in this suite use tbody tr row selectors and dblclick, which are not available in the mobile stacked list."
       );
-      return;
     }
     ttPage = new TuneTreesPage(page);
 
