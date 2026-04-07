@@ -6,6 +6,7 @@ import {
 } from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // import type { TestUser } from "../helpers/test-users";
 
@@ -57,8 +58,9 @@ test.describe
       const grid = page.getByTestId("tunes-grid-scheduled");
       await expect(grid).toBeVisible({ timeout: 40000 });
 
-      // Count only data rows (exclude virtualization spacers)
-      const dataRows = grid.locator("tbody tr[data-index]");
+      // Count data rows - works for both table mode and mobile stacked list
+      const ttPage = new TuneTreesPage(page);
+      const dataRows = ttPage.getRows("scheduled");
       const rowCount = await dataRows.count();
       console.log(`📊 Practice grid has ${rowCount} data rows`);
       expect(rowCount).toBeGreaterThan(0); // Should have at least some unscheduled tunes
@@ -69,6 +71,7 @@ test.describe
     }) => {
       // Unscheduled tunes should be labeled as "New" (Q3 bucket)
       const grid = page.getByTestId("tunes-grid-scheduled");
+      const ttPage = new TuneTreesPage(page);
       const newBucketLabel = grid.getByText("New").first();
       try {
         await expect(newBucketLabel).toBeVisible({ timeout: 7000 });
@@ -77,7 +80,7 @@ test.describe
         expect(newCount).toBeGreaterThan(1);
       } catch {
         // If "New" label is not rendered (layout variations), ensure grid has content and proceed
-        const rows = grid.locator("tbody tr");
+        const rows = ttPage.getRows("scheduled");
         const count = await rows.count();
         expect(count).toBeGreaterThan(0);
       }
@@ -89,7 +92,8 @@ test.describe
       await expect(grid).toBeVisible({ timeout: 10000 });
 
       // Should have at least one data row with content
-      const dataRows = grid.locator("tbody tr[data-index]");
+      const ttPage = new TuneTreesPage(page);
+      const dataRows = ttPage.getRows("scheduled");
       await expect(dataRows.first()).toBeVisible();
 
       const firstRowText = await dataRows.first().textContent();
@@ -132,8 +136,8 @@ test.describe
       // Check for evaluation-related UI elements (dropdowns, buttons, etc.)
       // Note: This is a basic check - specific UI may vary
       // const firstRow = grid.locator("tbody tr").first();
-      const tune2TitleCell = page.getByRole("cell", { name: "Morrison's Jig" });
-      await expect(tune2TitleCell).toBeVisible();
+      const ttPage = new TuneTreesPage(page);
+      await ttPage.expectTuneVisible("Morrison's Jig", grid);
     });
 
     test("should allow completing practice session", async ({ page }) => {

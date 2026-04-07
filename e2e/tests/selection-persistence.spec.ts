@@ -50,6 +50,12 @@ test.describe
     test.slow();
 
     test.beforeEach(async ({ page, testUser }) => {
+      if (test.info().project.name === "Mobile Chrome") {
+        test.skip(
+          true,
+          "All tests in this suite use row checkboxes which are not available in the mobile stacked list."
+        );
+      }
       // Setup: Seed several tunes in repertoire for selection testing
       // Using known valid tune IDs: testUserPrivateTune1 (Banish Misfortune), TEST_TUNE_MORRISON_ID (Morrison's Jig)
       // Start on catalog tab since most tests begin there
