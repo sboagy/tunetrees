@@ -146,6 +146,12 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
     await expect(joditEditor2).toBeVisible({ timeout: 5000 });
     await joditEditor2.click();
     await joditEditor2.fill("This has been edited");
+    await expect
+      .poll(async () => {
+        const editorTextarea = noteEditor.locator("textarea");
+        return (await editorTextarea.inputValue().catch(() => "")).trim();
+      })
+      .toContain("This has been edited");
 
     const noteSaveButton = page.getByTestId(`note-save-button-${noteId}`);
 
