@@ -21,6 +21,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { persistDb } from "../db/client-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
@@ -43,6 +44,11 @@ const HARD_QUEUE_ROW_CAP = 5000;
 
 // Type alias to support both sql.js (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
+
+async function persistQueueMutations(): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+  await persistDb();
+}
 
 function buildWindowStartUtcVariants(windowStart: string): string[] {
   const trimmed = windowStart.trim();
@@ -573,6 +579,7 @@ export async function generateOrGetPracticeQueue(
     repertoireRef,
     windowStartKey
   );
+  let queueMutated = false;
 
   if (existing.length > 0 && !forceRegen) {
     console.log(
@@ -595,6 +602,7 @@ export async function generateOrGetPracticeQueue(
         )
       )
       .run();
+    queueMutated = true;
   }
 
   // Query practice_list_staged using four-bucket logic with capacity limits
@@ -904,6 +912,9 @@ export async function generateOrGetPracticeQueue(
     repertoireRef,
     windows
   );
+  if (queueMutated || built.length > 0) {
+    await persistQueueMutations();
+  }
 
   console.log(
     `[PracticeQueue] Generated queue: ${persisted.length} rows persisted`
