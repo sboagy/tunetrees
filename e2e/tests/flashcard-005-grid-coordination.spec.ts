@@ -5,6 +5,7 @@ import {
 } from "../../tests/fixtures/test-data";
 import { setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { skipIfMobileChrome } from "../helpers/mobile-project";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -284,12 +285,11 @@ test.describe
     });
 
     test("07. Multiple evaluations sync correctly", async ({ page }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test depends on current-row-to-flashcard sync via row interaction, which is not available in the mobile stacked list."
-        );
-      }
+      skipIfMobileChrome(
+        test.info().project.name,
+        test.skip,
+        "Test depends on current-row-to-flashcard sync via row interaction, which is not available in the mobile stacked list."
+      );
       // Evaluate first tune in grid
       const app = new TuneTreesPage(page);
       // Ensure grid is rendered with at least two rows

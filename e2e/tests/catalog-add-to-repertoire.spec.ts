@@ -27,6 +27,7 @@ import {
   CATALOG_TUNE_70_ID,
   getPrivateTuneIds,
 } from "../../tests/fixtures/test-data";
+import { skipIfMobileChrome } from "../helpers/mobile-project";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
@@ -94,12 +95,11 @@ test.describe
     test("should add selected tunes to repertoire @side-effects", async ({
       page,
     }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-        );
-      }
+      skipIfMobileChrome(
+        test.info().project.name,
+        test.skip,
+        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
+      );
       // Capture browser console messages (quiet by default)
       page.on("console", (msg) => {
         if (msg.type() === "error") {
@@ -203,12 +203,11 @@ test.describe
     test("should handle tunes already in repertoire @side-effects", async ({
       page,
     }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-        );
-      }
+      skipIfMobileChrome(
+        test.info().project.name,
+        test.skip,
+        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
+      );
       // const ttPage = new TuneTreesPage(page);
       // First add user's private tune to repertoire
       await ttPage.navigateToTab("catalog");
@@ -264,12 +263,11 @@ test.describe
     test("should handle batch add with mix of new and existing tunes", async ({
       page,
     }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-        );
-      }
+      skipIfMobileChrome(
+        test.info().project.name,
+        test.skip,
+        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
+      );
       // First add tune 66
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
@@ -313,12 +311,11 @@ test.describe
     test("CRITICAL: should persist added tunes after page reload @side-effects", async ({
       page,
     }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-        );
-      }
+      skipIfMobileChrome(
+        test.info().project.name,
+        test.skip,
+        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
+      );
       // Navigate to Catalog tab
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
