@@ -26,12 +26,12 @@ import {
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import {
   getScreenSize,
   loadTableStateFromDb,
   saveTableStateToDb,
 } from "@/lib/db/queries/table-state";
+import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
@@ -84,7 +84,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
-const { localDb } = useAuth();
+  const { localDb } = useAuth();
   const isMobile = createIsMobile();
   const [openPopover, setOpenPopover] = createSignal<string | null>(null);
   let popoverRef: HTMLDivElement | undefined;

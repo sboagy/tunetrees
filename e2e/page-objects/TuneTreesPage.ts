@@ -1439,7 +1439,7 @@ export class TuneTreesPage {
     if (grid === this.practiceGrid) {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
-// Table mode: find a table row containing the tune ID text, or by select-row checkbox.
+    // Table mode: find a table row containing the tune ID text, or by select-row checkbox.
     // Stacked list mode: find the li by its data-testid="stacked-item-{tuneId}".
     return grid.locator(
       `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li[data-testid="stacked-item-${tuneId}"]`
@@ -1523,7 +1523,11 @@ export class TuneTreesPage {
     // Mobile stacked list: tune name lives inside an <li> stacked item.
     const tuneItem = grid
       .getByRole("cell", { name: tuneName })
-      .or(grid.locator("li[data-testid^='stacked-item-']").filter({ hasText: tuneName }))
+      .or(
+        grid
+          .locator("li[data-testid^='stacked-item-']")
+          .filter({ hasText: tuneName })
+      )
       .first();
     await expect(tuneItem).toBeVisible({ timeout });
   }

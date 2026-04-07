@@ -128,7 +128,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   });
 
   test("should display tune columns correctly", async () => {
-if (test.info().project.name === "Mobile Chrome") {
+    if (test.info().project.name === "Mobile Chrome") {
       test.skip(
         true,
         "Test checks column header test IDs (ch-*) that only exist in the desktop table view."
