@@ -323,6 +323,12 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     context,
     testUser,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses tbody tr[data-index] row selectors which are not available in the mobile stacked list."
+      );
+    }
     console.log("\n=== Day 2: Queue Composition After Mixed Ratings ===");
 
     // First, practice all tunes on Day 1
@@ -448,6 +454,12 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     context,
     testUser,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses tbody tr[data-index] row selectors which are not available in the mobile stacked list."
+      );
+    }
     console.log("\n=== Multi-Day Progression (Days 1-5) ===");
 
     // === DAY 1: Initial evaluations ===

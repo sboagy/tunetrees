@@ -192,6 +192,12 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
   });
 
   test("should apply plugin schedule overrides", async ({ page, testUser }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses tbody tr[data-index='0'] row selector which is not available in the mobile stacked list."
+      );
+    }
     const timeline: string[] = [];
     const stamp = (event: string, details?: Record<string, unknown>) => {
       const line = `[${new Date().toISOString()}] ${event}${details ? ` ${JSON.stringify(details)}` : ""}`;

@@ -5,6 +5,7 @@ import {
 } from "../../tests/fixtures/test-data";
 import { setStableDate } from "../helpers/clock-control";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { skipIfMobileChrome } from "../helpers/mobile-project";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -256,7 +257,7 @@ test.describe
       // The logic was changed, such that clicking on a row no longer selects it as the
       // current tune.  Accordingly, we also click on it here to make it the current
       // tune row.
-      await rows.nth(1).getByRole("cell").first().click();
+      await rows.nth(1).click();
 
       // Open flashcard mode and verify it starts on second item
       await app.enableFlashcardMode();
@@ -284,6 +285,11 @@ test.describe
     });
 
     test("07. Multiple evaluations sync correctly", async ({ page }) => {
+      skipIfMobileChrome(
+        test.info().project.name,
+        test.skip,
+        "Test depends on current-row-to-flashcard sync via row interaction, which is not available in the mobile stacked list."
+      );
       // Evaluate first tune in grid
       const app = new TuneTreesPage(page);
       // Ensure grid is rendered with at least two rows
@@ -297,7 +303,7 @@ test.describe
       // The logic was changed, such that clicking on a row no longer selects it as the
       // current tune.  Accordingly, we also click on it here to make it the current
       // tune row.
-      await rows.nth(1).getByRole("cell").first().click();
+      await rows.nth(1).click();
 
       // Open flashcard mode
       await app.enableFlashcardMode();

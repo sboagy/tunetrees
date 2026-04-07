@@ -64,6 +64,12 @@ test.describe("Repertoire: Add To Review", () => {
   });
 
   test("should add selected tunes to practice queue", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses row checkbox selection which is only available in the desktop table view."
+      );
+    }
     // Navigate to Repertoire tab
     await page.getByTestId("tab-repertoire").click();
     await page.waitForTimeout(500);
@@ -98,6 +104,12 @@ test.describe("Repertoire: Add To Review", () => {
   });
 
   test("should handle multiple tunes selection", async ({ page }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses row checkbox selection which is only available in the desktop table view."
+      );
+    }
     // Navigate to Repertoire tab
     await page.getByTestId("tab-repertoire").click();
     await page.waitForTimeout(500);

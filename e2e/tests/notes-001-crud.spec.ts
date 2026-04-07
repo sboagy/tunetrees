@@ -113,75 +113,56 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
   });
 
   test("should edit an existing note with text content", async ({ page }) => {
-    // Click Add button to create a new note
-    await ttPage.notesAddButton.click();
-
-    // Wait for Jodit editor to appear
-    await expect(ttPage.notesNewEditor).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Type in Jodit editor
-    const joditEditor = page.locator(".jodit-wysiwyg");
-    await joditEditor.click();
-    await joditEditor.fill("This will be edited");
-
-    // Verify Save button is now enabled
-    await expect(ttPage.notesSaveButton).toBeEnabled();
-
-    // Save the note
-    await ttPage.notesSaveButton.click();
+    await ttPage.addNote("This will be edited");
 
     // Verify note appears in list
     await expect(page.getByRole("heading", { name: "1 note" })).toBeVisible({
       timeout: 15000,
     });
 
-    // Verify note content is displayed
-    await expect(page.getByText("This will be edited")).toBeVisible({
+    const firstNote = ttPage.getAllNoteItems().first();
+    const firstNoteTestId = await firstNote.getAttribute("data-testid");
+    expect(firstNoteTestId).toMatch(/^note-item-/);
+    const noteId = (firstNoteTestId ?? "").replace("note-item-", "");
+    const firstNoteContent = ttPage.getNoteContent(noteId);
+
+    await expect(firstNoteContent).toContainText("This will be edited", {
       timeout: 5000,
     });
 
-    const firstNoteEditButton = ttPage.notesList
-      .locator('[data-testid^="note-edit-button-"]')
-      .first();
+    const firstNoteEditButton = ttPage.getNoteEditButton(noteId);
 
     await expect(firstNoteEditButton).toBeVisible({ timeout: 5000 });
     await firstNoteEditButton.click();
 
-    page.waitForTimeout(500); // Wait for editor to appear
-
-    const noteEditor = page.locator('[data-testid^="note-editor-"]').first();
+    const noteEditor = ttPage.getNoteEditor(noteId);
+    await expect(noteEditor).toBeVisible({ timeout: 5000 });
 
     const editorText2 = await noteEditor.textContent();
     expect(editorText2).toContain("This will be edited");
 
     // Update the note content
-    await noteEditor.click();
-    // Will a longer wait here to cause the hanging issue to happen before we even click?;
-    page.waitForTimeout(500);
-
-    await page.mouse.click(5, 5);
-
-    const joditEditor2 = page.locator(".jodit-wysiwyg");
+    const joditEditor2 = noteEditor.locator(".jodit-wysiwyg");
+    await expect(joditEditor2).toBeVisible({ timeout: 5000 });
     await joditEditor2.click();
-
-    await page.waitForTimeout(500);
     await joditEditor2.fill("This has been edited");
-    await page.waitForTimeout(300);
+    await expect
+      .poll(async () => {
+        const editorTextarea = noteEditor.locator("textarea");
+        return (await editorTextarea.inputValue().catch(() => "")).trim();
+      })
+      .toContain("This has been edited");
 
-    const noteSaveButton = page
-      .locator('[data-testid^="note-save-button-"]')
-      .first();
+    const noteSaveButton = page.getByTestId(`note-save-button-${noteId}`);
 
     await expect(noteSaveButton).toBeVisible({ timeout: 5000 });
     await expect(noteSaveButton).toBeEnabled({ timeout: 5000 });
 
     await noteSaveButton.click();
-    await page.waitForTimeout(300);
+    await expect(noteEditor).not.toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByText("This has been edited")).toBeVisible({
-      timeout: 5000,
+    await expect(firstNoteContent).toContainText("This has been edited", {
+      timeout: 10000,
     });
 
     console.log("Note edited successfully");
