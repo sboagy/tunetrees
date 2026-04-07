@@ -30,6 +30,13 @@ test.describe("Scroll Position Persistence", () => {
   let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page, testUser, context }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "All tests in this suite use tunes-grid-container-* which only exists in the desktop table, not the mobile stacked list."
+      );
+      return;
+    }
     const currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
