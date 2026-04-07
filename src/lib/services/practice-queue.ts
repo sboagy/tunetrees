@@ -21,6 +21,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { persistDb } from "../db/client-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
@@ -904,6 +905,14 @@ export async function generateOrGetPracticeQueue(
     repertoireRef,
     windows
   );
+  if (forceRegen || built.length > 0) {
+    // Queue rows are visible immediately from the in-memory sql.js DB. Flush now so
+    // Refresh Now replacements, empty forced regenerations, and first-time queue
+    // creation all survive a hard browser reload.
+    if (typeof indexedDB !== "undefined") {
+      await persistDb();
+    }
+  }
 
   console.log(
     `[PracticeQueue] Generated queue: ${persisted.length} rows persisted`

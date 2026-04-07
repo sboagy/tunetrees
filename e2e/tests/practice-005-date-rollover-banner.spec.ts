@@ -496,11 +496,22 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
       )
       .not.toBe(initialQueue.windowStartUtc);
 
+    const refreshedQueue = await getQueueSnapshot(page, testUser.repertoireId);
     const refreshedStorage = await getQueueStorage(page);
     expect(refreshedStorage.queueDate?.slice(0, 10)).toBe(
       currentDate.toISOString().slice(0, 10)
     );
     expect(refreshedStorage.manualFlag).toBe("false");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForTestApi(page);
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+    await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
+
+    const reloadedQueue = await getQueueSnapshot(page, testUser.repertoireId);
+    expect(reloadedQueue.windowStartUtc).toBe(refreshedQueue.windowStartUtc);
+    expect(reloadedQueue.tuneOrder).toEqual(refreshedQueue.tuneOrder);
+    expect(reloadedQueue.windowStartUtc).not.toBe(initialQueue.windowStartUtc);
   });
 
   test("should keep incomplete queue stable after local reset and reload", async ({
