@@ -77,6 +77,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   test("should show Private badge on User's private tunes only", async () => {
     // Search for User's private tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
+    await ttPage.ensureGridColumnVisible("catalog", "Ownership");
 
     // Get user's private tune IDs
     const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
@@ -121,8 +122,8 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   });
 
   test("should display tune columns correctly", async () => {
-    // Use Page Object to verify key columns are visible
-    await ttPage.expectColumnsVisible(["Title", "Type", "Mode"]);
+    // Verify the slimmer catalog defaults that remain visible without opening the column menu
+    await ttPage.expectColumnsVisible(["Title", "Type", "Composer"]);
   });
 
   test("should allow filtering by tune type", async () => {

@@ -77,6 +77,7 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     }
 
     await ttPage.searchForTune("Kesh Jig", ttPage.repertoireGrid);
+    await ttPage.ensureGridColumnVisible("repertoire", "Scheduled");
 
     const trigger = page.getByTestId(
       `scheduled-override-trigger-${CATALOG_TUNE_KESH_ID}`

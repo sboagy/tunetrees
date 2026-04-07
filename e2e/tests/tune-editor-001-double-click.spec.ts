@@ -184,7 +184,9 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await ttPage.navigateToTab("repertoire");
 
     // Find a tune row in repertoire
-    const tuneCell = page.getByRole("cell", { name: "JigD" }).first();
+    const tuneCell = page
+      .getByRole("cell", { name: "Banish Misfortune" })
+      .first();
     const tuneRow = tuneCell.locator("xpath=ancestor::tr[1]");
 
     await expect(tuneRow).toBeVisible({ timeout: 5000 });
@@ -208,7 +210,9 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);
 
-    const tuneRow = page.getByRole("cell", { name: "Public" }).first();
+    const tuneRow = page
+      .getByRole("cell", { name: "A Fig for a Kiss" })
+      .first();
 
     await tuneRow.dblclick();
 

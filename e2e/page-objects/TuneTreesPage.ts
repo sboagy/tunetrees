@@ -1435,7 +1435,9 @@ export class TuneTreesPage {
     if (grid === this.practiceGrid) {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
-    return grid.locator(`tr:has-text("${tuneId}")`);
+    return grid.locator(
+      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"])`
+    );
   }
 
   async setGridRowChecked(tuneId: string, grid: Locator, checked = true) {
@@ -1590,6 +1592,78 @@ export class TuneTreesPage {
       const header = this.page.getByTestId(`ch-${id.toLowerCase()}`);
       await expect(header).toBeVisible({ timeout: 5000 });
     }
+  }
+
+  private getColumnsButtonForTab(
+    tab: "catalog" | "repertoire" | "practice"
+  ): Locator {
+    return tab === "catalog"
+      ? this.catalogColumnsButton
+      : tab === "repertoire"
+        ? this.repertoireColumnsButton
+        : this.practiceColumnsButton;
+  }
+
+  private getColumnVisibilityMenu(): Locator {
+    return this.page
+      .locator("div.fixed.w-64")
+      .filter({ hasText: "Show Columns" })
+      .last();
+  }
+
+  async setGridColumnVisibility(
+    tab: "catalog" | "repertoire" | "practice",
+    columnLabel: string,
+    visible: boolean
+  ) {
+    const columnsButton = this.getColumnsButtonForTab(tab);
+    const menu = this.getColumnVisibilityMenu();
+    const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    await expect(columnsButton).toBeVisible({ timeout: 5000 });
+    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
+
+    const menuVisible = await menu
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await columnsButton.click();
+      await expect(menu).toBeVisible({ timeout: 5000 });
+    }
+
+    const label = menu
+      .locator("button span")
+      .filter({ hasText: new RegExp(`^\\s*${escapedLabel}\\s*$`, "i") })
+      .first();
+    const option = label.locator("xpath=ancestor::button[1]");
+    const checkbox = option.locator('input[type="checkbox"]').first();
+
+    await expect(label).toBeVisible({ timeout: 5000 });
+    await option.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(checkbox).toBeVisible({ timeout: 5000 });
+
+    const isChecked = await checkbox.isChecked().catch(() => false);
+    if (isChecked !== visible) {
+      await option.click();
+      if (visible) {
+        await expect(checkbox).toBeChecked({ timeout: 5000 });
+      } else {
+        await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+      }
+    }
+
+    await this.page.keyboard.press("Escape").catch(() => undefined);
+    await expect(menu)
+      .toBeHidden({ timeout: 5000 })
+      .catch(() => undefined);
+  }
+
+  async ensureGridColumnVisible(
+    tab: "catalog" | "repertoire" | "practice",
+    columnLabel: string
+  ) {
+    await this.setGridColumnVisibility(tab, columnLabel, true);
   }
 
   /**

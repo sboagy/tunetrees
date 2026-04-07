@@ -145,7 +145,10 @@ test.describe
       await ttPage.displaySubmittedSwitch.click();
       await page.waitForTimeout(500);
 
-      await page.getByRole("cell", { name: "JigD" }).first().click();
+      await page
+        .getByRole("cell", { name: "Banish Misfortune" })
+        .first()
+        .click();
       // await page.getByRole("cell", { name: "recall" }).first().click();
 
       // Open flashcard (will show first tune, which may be submitted)
