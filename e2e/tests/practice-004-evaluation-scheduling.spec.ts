@@ -63,6 +63,12 @@ test.describe
     });
 
     test("should schedule 'Again' rating for tomorrow (not today)", async () => {
+      if (test.info().project.name === "Mobile Chrome") {
+        test.skip(
+          true,
+          "Test uses getColumnIndexByHeaderText and getByRole('cell') selectors not available in mobile stacked list."
+        );
+      }
       // ARRANGE: Get first tune evaluation dropdown
       const rows = ttPage.getRows("scheduled");
       const firstRow = rows.first();
@@ -149,7 +155,7 @@ test.describe
       await expect(firstDropdown).toContainText(/Good/i, { timeout: 5000 });
 
       // Count initial rows
-      const initialRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+      const initialRows = ttPage.getRows("scheduled");
       const initialCount = await initialRows.count();
       expect(initialCount).toBe(2);
       console.log(`Initial tune count: ${initialCount}`);
@@ -164,7 +170,7 @@ test.describe
       });
 
       // Verify tune disappeared from grid
-      const afterRows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+      const afterRows = ttPage.getRows("scheduled");
 
       const expectedCount = initialCount - 1;
       const maxAttempts = 16;

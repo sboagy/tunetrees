@@ -26,6 +26,7 @@ import {
   Show,
 } from "solid-js";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
+import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {
   CELL_CLASSES,
@@ -37,6 +38,7 @@ import {
   TBODY_CLASSES,
 } from "./shared-grid-styles";
 import { getColumns as getDefaultColumns } from "./TuneColumns";
+import { type IStackedListRow, TuneStackedList } from "./TuneStackedList";
 import {
   loadTableState,
   mergeWithDefaults,
@@ -76,6 +78,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const isMobile = createIsMobile();
   const [openPopover, setOpenPopover] = createSignal<string | null>(null);
   let popoverRef: HTMLDivElement | undefined;
   useClickOutside(
@@ -743,295 +746,310 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   return (
     <div class="h-full flex flex-col">
-      {/* Table container with virtualization */}
-      <div
-        ref={(el) => {
-          containerRef = el;
-        }}
-        data-testid={`tunes-grid-container-${props.tablePurpose}`}
-        class={`${CONTAINER_CLASSES} ${
-          props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
-        }`}
-        style={{ "touch-action": "pan-x pan-y" }}
-      >
-        <table
-          data-testid={`tunes-grid-${props.tablePurpose}`}
-          class={TABLE_CLASSES}
-          style={{ width: `${table.getTotalSize()}px` }}
-        >
-          {/* Sticky header */}
-          <thead class={HEADER_CLASSES}>
-            <For each={table.getHeaderGroups()}>
-              {(headerGroup) => (
-                <tr>
-                  <For each={headerGroup.headers}>
-                    {(header) => {
-                      const headerLabelText =
-                        typeof header.column.columnDef.header === "string"
-                          ? header.column.columnDef.header
-                          : header.column.id;
-                      const columnMeta = header.column.columnDef.meta as
-                        | { description?: string }
-                        | undefined;
-                      const columnDescription =
-                        props.columnDescriptions?.[header.column.id] ??
-                        columnMeta?.description;
-                      const canSort = () => header.column.getCanSort();
-                      const sortState = () => header.column.getIsSorted();
-                      const sortLabel = () =>
-                        sortState() === "asc"
-                          ? "Sorted ascending - click to sort descending"
-                          : sortState() === "desc"
-                            ? "Sorted descending - click to clear sort"
-                            : "Not sorted - click to sort ascending";
-                      const headerContent = flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      );
+      {/* Mobile: stacked list view */}
+      <Show when={isMobile()}>
+        <TuneStackedList
+          data={props.data as unknown as IStackedListRow[]}
+          tablePurpose={props.tablePurpose}
+          currentRowId={props.currentRowId}
+          onRowClick={(row) => props.onRowClick?.(row as T)}
+          onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
+          cellCallbacks={props.cellCallbacks}
+        />
+      </Show>
 
-                      return (
-                        <th
-                          data-column-id={header.column.id}
-                          data-testid={`ch-${header.column.id}`}
-                          class={getHeaderCellClasses(
-                            `${draggedColumnId() === header.column.id ? "opacity-50" : ""} ${
-                              isDragging() &&
-                              hoverColumnId() === header.column.id &&
-                              draggedColumnId() !== header.column.id
-                                ? "bg-blue-50 dark:bg-blue-900/20"
-                                : ""
-                            }${header.column.getIsPinned() ? " bg-gray-100 dark:bg-gray-800" : ""}${getPinnedBorderClass(header.column)}`
-                          )}
-                          style={getPinnedHeaderStyle(
-                            header.column,
-                            header.getSize()
-                          )}
-                          onDragOver={(e) =>
-                            handleDragOver(
-                              e as unknown as DragEvent,
-                              header.column.id
-                            )
-                          }
-                          onDrop={(e) =>
-                            handleDrop(
-                              e as unknown as DragEvent,
-                              header.column.id
-                            )
-                          }
-                        >
-                          <div class="flex items-center gap-1">
-                            <div class="flex items-center gap-1 min-w-0 flex-1">
-                              <Show
-                                when={!!columnDescription}
-                                fallback={
-                                  <Show
-                                    when={canSort()}
-                                    fallback={
-                                      <span class="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
-                                        {headerContent}
-                                      </span>
+      {/* Desktop: full TanStack table with virtualization */}
+      <Show when={!isMobile()}>
+        {/* Table container with virtualization */}
+        <div
+          ref={(el) => {
+            containerRef = el;
+          }}
+          data-testid={`tunes-grid-container-${props.tablePurpose}`}
+          class={`${CONTAINER_CLASSES} ${
+            props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
+          }`}
+          style={{ "touch-action": "pan-x pan-y" }}
+        >
+          <table
+            data-testid={`tunes-grid-${props.tablePurpose}`}
+            class={TABLE_CLASSES}
+            style={{ width: `${table.getTotalSize()}px` }}
+          >
+            {/* Sticky header */}
+            <thead class={HEADER_CLASSES}>
+              <For each={table.getHeaderGroups()}>
+                {(headerGroup) => (
+                  <tr>
+                    <For each={headerGroup.headers}>
+                      {(header) => {
+                        const headerLabelText =
+                          typeof header.column.columnDef.header === "string"
+                            ? header.column.columnDef.header
+                            : header.column.id;
+                        const columnMeta = header.column.columnDef.meta as
+                          | { description?: string }
+                          | undefined;
+                        const columnDescription =
+                          props.columnDescriptions?.[header.column.id] ??
+                          columnMeta?.description;
+                        const canSort = () => header.column.getCanSort();
+                        const sortState = () => header.column.getIsSorted();
+                        const sortLabel = () =>
+                          sortState() === "asc"
+                            ? "Sorted ascending - click to sort descending"
+                            : sortState() === "desc"
+                              ? "Sorted descending - click to clear sort"
+                              : "Not sorted - click to sort ascending";
+                        const headerContent = flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        );
+
+                        return (
+                          <th
+                            data-column-id={header.column.id}
+                            data-testid={`ch-${header.column.id}`}
+                            class={getHeaderCellClasses(
+                              `${draggedColumnId() === header.column.id ? "opacity-50" : ""} ${
+                                isDragging() &&
+                                hoverColumnId() === header.column.id &&
+                                draggedColumnId() !== header.column.id
+                                  ? "bg-blue-50 dark:bg-blue-900/20"
+                                  : ""
+                              }${header.column.getIsPinned() ? " bg-gray-100 dark:bg-gray-800" : ""}${getPinnedBorderClass(header.column)}`
+                            )}
+                            style={getPinnedHeaderStyle(
+                              header.column,
+                              header.getSize()
+                            )}
+                            onDragOver={(e) =>
+                              handleDragOver(
+                                e as unknown as DragEvent,
+                                header.column.id
+                              )
+                            }
+                            onDrop={(e) =>
+                              handleDrop(
+                                e as unknown as DragEvent,
+                                header.column.id
+                              )
+                            }
+                          >
+                            <div class="flex items-center gap-1">
+                              <div class="flex items-center gap-1 min-w-0 flex-1">
+                                <Show
+                                  when={!!columnDescription}
+                                  fallback={
+                                    <Show
+                                      when={canSort()}
+                                      fallback={
+                                        <span class="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
+                                          {headerContent}
+                                        </span>
+                                      }
+                                    >
+                                      <button
+                                        type="button"
+                                        class="flex items-center gap-1 min-w-0 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400"
+                                        aria-label={sortLabel()}
+                                        title={sortLabel()}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          header.column.toggleSorting();
+                                        }}
+                                      >
+                                        <span class="min-w-0 flex-1 overflow-hidden">
+                                          {headerContent}
+                                        </span>
+                                      </button>
+                                    </Show>
+                                  }
+                                >
+                                  <Popover
+                                    open={openPopover() === header.column.id}
+                                    onOpenChange={(isOpen) =>
+                                      setOpenPopover(
+                                        isOpen ? header.column.id : null
+                                      )
                                     }
                                   >
-                                    <button
+                                    <PopoverTrigger
+                                      as="button"
                                       type="button"
                                       class="flex items-center gap-1 min-w-0 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400"
-                                      aria-label={sortLabel()}
-                                      title={sortLabel()}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        header.column.toggleSorting();
-                                      }}
+                                      aria-label={`About ${headerLabelText}`}
                                     >
                                       <span class="min-w-0 flex-1 overflow-hidden">
                                         {headerContent}
                                       </span>
-                                    </button>
-                                  </Show>
+                                      <span class="sr-only">
+                                        {`About ${headerLabelText}`}
+                                      </span>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      ref={(el: HTMLDivElement) => {
+                                        popoverRef = el;
+                                      }}
+                                      onClick={(event: MouseEvent) =>
+                                        event.stopPropagation()
+                                      }
+                                      data-testid={`column-info-${header.column.id}`}
+                                    >
+                                      {columnDescription}
+                                    </PopoverContent>
+                                  </Popover>
+                                </Show>
+                              </div>
+                              <Show when={canSort()}>
+                                <button
+                                  type="button"
+                                  class="flex-shrink-0 inline-flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
+                                  aria-label={sortLabel()}
+                                  title={sortLabel()}
+                                  data-testid={`column-sort-${header.column.id}`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    header.column.toggleSorting();
+                                  }}
+                                >
+                                  <span aria-hidden="true">
+                                    {sortState() === "asc"
+                                      ? "↑"
+                                      : sortState() === "desc"
+                                        ? "↓"
+                                        : "↕"}
+                                  </span>
+                                  <span class="sr-only">{sortLabel()}</span>
+                                </button>
+                              </Show>
+                              <Show
+                                when={
+                                  !!props.enableColumnReorder &&
+                                  header.column.id !== "select" &&
+                                  header.column.id !== "actions"
                                 }
                               >
-                                <Popover
-                                  open={openPopover() === header.column.id}
-                                  onOpenChange={(isOpen) =>
-                                    setOpenPopover(
-                                      isOpen ? header.column.id : null
+                                <button
+                                  type="button"
+                                  draggable={true}
+                                  onDragStart={(e) =>
+                                    handleDragStart(
+                                      e as unknown as DragEvent,
+                                      header.column.id
                                     )
                                   }
+                                  onDragEnd={handleDragEnd}
+                                  onClick={(event) => event.stopPropagation()}
+                                  class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
+                                  aria-label={`Drag to reorder ${headerLabelText} column`}
                                 >
-                                  <PopoverTrigger
-                                    as="button"
-                                    type="button"
-                                    class="flex items-center gap-1 min-w-0 flex-1 text-left hover:text-blue-600 dark:hover:text-blue-400"
-                                    aria-label={`About ${headerLabelText}`}
-                                  >
-                                    <span class="min-w-0 flex-1 overflow-hidden">
-                                      {headerContent}
-                                    </span>
-                                    <span class="sr-only">
-                                      {`About ${headerLabelText}`}
-                                    </span>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    ref={(el: HTMLDivElement) => {
-                                      popoverRef = el;
-                                    }}
-                                    onClick={(event: MouseEvent) =>
-                                      event.stopPropagation()
-                                    }
-                                    data-testid={`column-info-${header.column.id}`}
-                                  >
-                                    {columnDescription}
-                                  </PopoverContent>
-                                </Popover>
+                                  <GripVertical
+                                    size={14}
+                                    class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                  />
+                                </button>
+                              </Show>
+                              <Show when={header.column.getCanResize()}>
+                                <button
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    setIsResizing(true);
+                                    header.getResizeHandler()(e);
+                                  }}
+                                  onTouchStart={(e) => {
+                                    e.stopPropagation();
+                                    setIsResizing(true);
+                                    header.getResizeHandler()(e);
+                                  }}
+                                  onClick={(event) => event.stopPropagation()}
+                                  class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
+                                  aria-label={`Resize ${header.id} column`}
+                                >
+                                  <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
+                                </button>
                               </Show>
                             </div>
-                            <Show when={canSort()}>
-                              <button
-                                type="button"
-                                class="flex-shrink-0 inline-flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
-                                aria-label={sortLabel()}
-                                title={sortLabel()}
-                                data-testid={`column-sort-${header.column.id}`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  header.column.toggleSorting();
-                                }}
-                              >
-                                <span aria-hidden="true">
-                                  {sortState() === "asc"
-                                    ? "↑"
-                                    : sortState() === "desc"
-                                      ? "↓"
-                                      : "↕"}
-                                </span>
-                                <span class="sr-only">{sortLabel()}</span>
-                              </button>
-                            </Show>
-                            <Show
-                              when={
-                                !!props.enableColumnReorder &&
-                                header.column.id !== "select" &&
-                                header.column.id !== "actions"
-                              }
-                            >
-                              <button
-                                type="button"
-                                draggable={true}
-                                onDragStart={(e) =>
-                                  handleDragStart(
-                                    e as unknown as DragEvent,
-                                    header.column.id
-                                  )
-                                }
-                                onDragEnd={handleDragEnd}
-                                onClick={(event) => event.stopPropagation()}
-                                class="cursor-grab active:cursor-grabbing flex-shrink-0 p-0.5 border-0 bg-transparent"
-                                aria-label={`Drag to reorder ${headerLabelText} column`}
-                              >
-                                <GripVertical
-                                  size={14}
-                                  class="text-gray-400 dark:text-gray-500 opacity-50 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                                />
-                              </button>
-                            </Show>
-                            <Show when={header.column.getCanResize()}>
-                              <button
-                                type="button"
-                                onMouseDown={(e) => {
-                                  e.stopPropagation();
-                                  setIsResizing(true);
-                                  header.getResizeHandler()(e);
-                                }}
-                                onTouchStart={(e) => {
-                                  e.stopPropagation();
-                                  setIsResizing(true);
-                                  header.getResizeHandler()(e);
-                                }}
-                                onClick={(event) => event.stopPropagation()}
-                                class="resize-handle absolute top-0 right-0 w-4 h-full cursor-col-resize select-none touch-none group/resize bg-transparent border-0 p-0 z-10"
-                                aria-label={`Resize ${header.id} column`}
-                              >
-                                <div class="absolute top-0 right-0 w-1 h-full bg-gray-300 dark:bg-gray-600 group-hover/resize:bg-blue-500 dark:group-hover/resize:bg-blue-400 group-hover/resize:w-1.5 transition-all pointer-events-none" />
-                              </button>
-                            </Show>
-                          </div>
-                        </th>
-                      );
-                    }}
-                  </For>
-                </tr>
-              )}
-            </For>
-          </thead>
-
-          {/* Virtualized body */}
-          <tbody class={TBODY_CLASSES}>
-            {/* Spacer for virtual scrolling offset */}
-            <Show when={rowVirtualizer().getVirtualItems().length > 0}>
-              <tr
-                style={{
-                  height: `${rowVirtualizer().getVirtualItems()[0]?.start || 0}px`,
-                }}
-              />
-            </Show>
-
-            {/* Render only visible rows */}
-            <For each={rowVirtualizer().getVirtualItems()}>
-              {(virtualRow) => {
-                const row = table.getRowModel().rows[virtualRow.index];
-                if (!row) return null;
-
-                return (
-                  <tr
-                    class={
-                      props.currentRowId === (row.original as any).id
-                        ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
-                        : ROW_CLASSES
-                    }
-                    onClick={() => props.onRowClick?.(row.original)}
-                    onDblClick={() => props.onRowDoubleClick?.(row.original)}
-                    data-index={virtualRow.index}
-                  >
-                    <For each={row.getVisibleCells()}>
-                      {(cell) => (
-                        <td
-                          class={`${CELL_CLASSES}${cell.column.getIsPinned() ? " bg-white dark:bg-gray-900" : ""}${getPinnedBorderClass(cell.column)}`}
-                          style={getPinnedCellStyle(
-                            cell.column,
-                            cell.column.getSize()
-                          )}
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </td>
-                      )}
+                          </th>
+                        );
+                      }}
                     </For>
                   </tr>
-                );
-              }}
-            </For>
+                )}
+              </For>
+            </thead>
 
-            {/* Spacer after visible items */}
-            <Show
-              when={
-                rowVirtualizer().getVirtualItems().length > 0 &&
-                rowVirtualizer().getVirtualItems().length <
-                  table.getRowModel().rows.length
-              }
-            >
-              <tr
-                style={{
-                  height: `${
-                    rowVirtualizer().getTotalSize() -
-                    (rowVirtualizer().getVirtualItems().at(-1)?.end || 0)
-                  }px`,
+            {/* Virtualized body */}
+            <tbody class={TBODY_CLASSES}>
+              {/* Spacer for virtual scrolling offset */}
+              <Show when={rowVirtualizer().getVirtualItems().length > 0}>
+                <tr
+                  style={{
+                    height: `${rowVirtualizer().getVirtualItems()[0]?.start || 0}px`,
+                  }}
+                />
+              </Show>
+
+              {/* Render only visible rows */}
+              <For each={rowVirtualizer().getVirtualItems()}>
+                {(virtualRow) => {
+                  const row = table.getRowModel().rows[virtualRow.index];
+                  if (!row) return null;
+
+                  return (
+                    <tr
+                      class={
+                        props.currentRowId === (row.original as any).id
+                          ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
+                          : ROW_CLASSES
+                      }
+                      onClick={() => props.onRowClick?.(row.original)}
+                      onDblClick={() => props.onRowDoubleClick?.(row.original)}
+                      data-index={virtualRow.index}
+                    >
+                      <For each={row.getVisibleCells()}>
+                        {(cell) => (
+                          <td
+                            class={`${CELL_CLASSES}${cell.column.getIsPinned() ? " bg-white dark:bg-gray-900" : ""}${getPinnedBorderClass(cell.column)}`}
+                            style={getPinnedCellStyle(
+                              cell.column,
+                              cell.column.getSize()
+                            )}
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </td>
+                        )}
+                      </For>
+                    </tr>
+                  );
                 }}
-              />
-            </Show>
-          </tbody>
-        </table>
-      </div>
+              </For>
+
+              {/* Spacer after visible items */}
+              <Show
+                when={
+                  rowVirtualizer().getVirtualItems().length > 0 &&
+                  rowVirtualizer().getVirtualItems().length <
+                    table.getRowModel().rows.length
+                }
+              >
+                <tr
+                  style={{
+                    height: `${
+                      rowVirtualizer().getTotalSize() -
+                      (rowVirtualizer().getVirtualItems().at(-1)?.end || 0)
+                    }px`,
+                  }}
+                />
+              </Show>
+            </tbody>
+          </table>
+        </div>
+      </Show>
     </div>
   );
 }) as Component<ITunesGridProps<any>>;

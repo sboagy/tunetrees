@@ -77,6 +77,12 @@ test.describe
     });
 
     test("should display tune structure AABBCC", async ({ page }) => {
+      if (test.info().project.name === "Mobile Chrome") {
+        test.skip(
+          true,
+          "The mobile stacked list for the repertoire tab does not display the structure field."
+        );
+      }
       // Look for structure information
       const structureCells = page.getByText("AABBCC");
       await expect(structureCells.first()).toBeVisible({ timeout: 5000 });

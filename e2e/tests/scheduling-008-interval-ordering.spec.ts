@@ -87,6 +87,12 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
     page,
     testUser,
   }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Test uses row checkboxes to add tunes to repertoire/review, which are not available in the mobile stacked list."
+      );
+    }
     // Helper to create, configure, and add a tune to review
     async function createAndAddToReview(meta: RatedTuneMeta, tuneType: string) {
       await ttPage.catalogTab.click();

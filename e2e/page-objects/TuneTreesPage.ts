@@ -1357,7 +1357,9 @@ export class TuneTreesPage {
       const noTunesFoundLocator = this.page.getByText("No tunes found");
 
       const matchingRow = grid
-        .locator("tbody tr", { hasText: tuneTitle })
+        .locator("tbody tr, li[data-testid^='stacked-item-']", {
+          hasText: tuneTitle,
+        })
         .first();
       let hasMatchingRow = false;
       for (let attempt = 0; attempt < 6; attempt++) {
@@ -1389,7 +1391,9 @@ export class TuneTreesPage {
     // Wait for the search results to settle: either empty state appears or
     // at least one row is present.
     const noTunesFound = this.page.getByText("No tunes found");
-    const dataRows = grid.locator("tbody tr[data-index], tbody tr");
+    const dataRows = grid.locator(
+      "tbody tr[data-index], tbody tr, li[data-testid^='stacked-item-']"
+    );
 
     await expect
       .poll(
@@ -1435,7 +1439,11 @@ export class TuneTreesPage {
     if (grid === this.practiceGrid) {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
-    return grid.locator(`tr:has-text("${tuneId}")`);
+    // Table mode: find a table row containing the tune ID text.
+    // Stacked list mode: find the li by its data-testid="stacked-item-{tuneId}".
+    return grid.locator(
+      `tr:has-text("${tuneId}"), li[data-testid="stacked-item-${tuneId}"]`
+    );
   }
 
   async setGridRowChecked(tuneId: string, grid: Locator, checked = true) {
@@ -1498,8 +1506,11 @@ export class TuneTreesPage {
   }
 
   getRows(gridId: string): Locator {
+    // Support both table mode (desktop) and stacked list mode (mobile).
+    // On desktop the TanStack virtual table renders "tbody tr[data-index]".
+    // On mobile the TuneStackedList renders "li[data-testid^='stacked-item-']".
     return this.page.locator(
-      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index]`
+      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index], [data-testid="tunes-grid-${gridId}"] li[data-testid^="stacked-item-"]`
     );
   }
 
@@ -1508,8 +1519,13 @@ export class TuneTreesPage {
    * Handles virtualized grids by searching within the grid context
    */
   async expectTuneVisible(tuneName: string, grid: Locator, timeout = 5000) {
-    const tuneLink = await grid.getByRole("cell", { name: tuneName }).first();
-    await expect(tuneLink).toBeVisible({ timeout });
+    // Desktop table: tune name lives in a <td> cell.
+    // Mobile stacked list: tune name lives inside an <li> stacked item.
+    const tuneItem = grid
+      .getByRole("cell", { name: tuneName })
+      .or(grid.locator("li[data-testid^='stacked-item-']").filter({ hasText: tuneName }))
+      .first();
+    await expect(tuneItem).toBeVisible({ timeout });
   }
 
   /**
@@ -1946,14 +1962,16 @@ export class TuneTreesPage {
     // Wait for grid to be visible first
     await expect(grid).toBeVisible({ timeout: 40000 });
 
-    // Check for table cells
-    const cells = grid.locator("td");
+    // Support both table mode (desktop) and stacked list mode (mobile):
+    // - Table: <td> cells inside <tbody>
+    // - Stacked list: <li data-testid="stacked-item-*"> elements
+    const items = grid.locator("td, li[data-testid^='stacked-item-']");
 
-    // Wait for at least one cell to appear (30s timeout)
-    await expect(cells.first()).toBeVisible({ timeout: 30000 });
+    // Wait for at least one item to appear (30s timeout)
+    await expect(items.first()).toBeVisible({ timeout: 30000 });
 
-    const cellCount = await cells.count();
-    expect(cellCount).toBeGreaterThan(0);
+    const itemCount = await items.count();
+    expect(itemCount).toBeGreaterThan(0);
   }
 
   /**

@@ -44,6 +44,12 @@ let ttPage: TuneTreesPage;
 
 test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
   test.beforeEach(async ({ page, testUser }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "All tests in this suite use tbody tr row selectors and dblclick, which are not available in the mobile stacked list."
+      );
+    }
     ttPage = new TuneTreesPage(page);
 
     // Setup: Start on catalog tab with some tunes

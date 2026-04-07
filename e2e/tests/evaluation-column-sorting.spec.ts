@@ -19,6 +19,12 @@ import { test } from "../helpers/test-fixture";
 
 test.describe("Evaluation Column Sorting Disabled", () => {
   test.beforeEach(async ({ page, testUser, context }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Tests check column header test IDs (ch-*) that only exist in the desktop table view."
+      );
+    }
     const currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 

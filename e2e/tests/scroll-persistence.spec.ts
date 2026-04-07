@@ -28,8 +28,19 @@ test.describe("Scroll Position Persistence", () => {
   let addedTuneIds: string[] = [];
   let currentTestUser: TestUser;
   let ttPage: TuneTreesPage;
+  let shouldCleanup = false;
 
-  test.beforeEach(async ({ page, testUser, context }) => {
+  test.beforeEach(async ({ page, testUser, context }, testInfo) => {
+    shouldCleanup = false;
+    addedTuneIds = [];
+
+    if (testInfo.project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "All tests in this suite use tunes-grid-container-* which only exists in the desktop table, not the mobile stacked list."
+      );
+      return;
+    }
     const currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
@@ -46,6 +57,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     ttPage = new TuneTreesPage(page);
+    shouldCleanup = true;
   });
 
   /**
@@ -115,6 +127,10 @@ test.describe("Scroll Position Persistence", () => {
   }
 
   test.afterEach(async () => {
+    if (!shouldCleanup) {
+      return;
+    }
+
     // Clean up: remove test tunes
     await removeScrollTestTunes(addedTuneIds, currentTestUser);
     await ttPage.page.waitForTimeout(1000);

@@ -24,6 +24,12 @@ test.describe("Checkbox Header Indeterminate State", () => {
   let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page, testUser }) => {
+    if (test.info().project.name === "Mobile Chrome") {
+      test.skip(
+        true,
+        "Tests use row-selection checkboxes that only exist in the desktop table view."
+      );
+    }
     // Setup: Seed several tunes in repertoire for selection testing
     const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
     await setupForRepertoireTestsParallel(page, testUser, {
