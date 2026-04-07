@@ -15,6 +15,14 @@ function isTransientExecutionContextError(error: unknown): boolean {
   );
 }
 
+function isHookAvailabilityRace(
+  error: unknown,
+  hookName: TestHookName
+): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(`${hookName} is not available`);
+}
+
 /**
  * Wait for a browser test hook to exist after reload/navigation, then invoke it.
  *
@@ -59,9 +67,36 @@ export async function runTestHook(
       }, hookName);
       return;
     } catch (error) {
-      if (!isTransientExecutionContextError(error) || attempt === 4) {
+      if (
+        (!isTransientExecutionContextError(error) &&
+          !isHookAvailabilityRace(error, hookName)) ||
+        attempt === 4
+      ) {
         throw error;
       }
+
+      await expect
+        .poll(
+          async () => {
+            try {
+              return await page.evaluate((name) => {
+                return typeof (window as any)[name] === "function";
+              }, hookName);
+            } catch (retryError) {
+              if (isTransientExecutionContextError(retryError)) {
+                return false;
+              }
+              throw retryError;
+            }
+          },
+          {
+            timeout: 5000,
+            intervals: [100, 250, 500],
+            message: `${hookName} did not become available for retry`,
+          }
+        )
+        .toBe(true);
+
       await page.waitForTimeout(250 * (attempt + 1));
     }
   }
