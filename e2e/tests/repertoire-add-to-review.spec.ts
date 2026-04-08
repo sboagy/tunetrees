@@ -25,12 +25,13 @@ import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
-// import { TuneTreesPage } from "../helpers/page-objects";
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+// import { TuneTreesPage } from "../helpers/page-objects";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Repertoire: Add To Review", () => {
-  // let ttPage: TuneTreesPage;
+  let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page, testUser }) => {
     await setupForRepertoireTestsParallel(page, testUser, {
@@ -38,12 +39,12 @@ test.describe("Repertoire: Add To Review", () => {
       scheduleTunes: false,
     });
 
-    // ttPage = new TuneTreesPage(page);
+    ttPage = new TuneTreesPage(page);
   });
 
   test("should show alert when no tunes selected", async ({ page }) => {
     // Navigate to Repertoire tab
-    await page.getByTestId("tab-repertoire").click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Set up dialog handler
@@ -71,7 +72,7 @@ test.describe("Repertoire: Add To Review", () => {
       );
     }
     // Navigate to Repertoire tab
-    await page.getByTestId("tab-repertoire").click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Select first tune in repertoire (should exist from test setup)
@@ -111,7 +112,7 @@ test.describe("Repertoire: Add To Review", () => {
       );
     }
     // Navigate to Repertoire tab
-    await page.getByTestId("tab-repertoire").click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Select first two tunes (skip "select all" checkbox at index 0)
@@ -149,7 +150,7 @@ test.describe("Repertoire: Add To Review", () => {
       );
     }
     // Navigate to Repertoire tab
-    await page.getByTestId("tab-repertoire").click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Select the first tune
@@ -196,7 +197,7 @@ test.describe("Repertoire: Add To Review", () => {
     });
 
     // Navigate to Repertoire tab
-    await page.getByTestId("tab-repertoire").click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Select first tune

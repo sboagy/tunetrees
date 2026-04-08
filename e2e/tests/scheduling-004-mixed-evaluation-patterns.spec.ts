@@ -395,7 +395,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     await verifyClockFrozen(page, day2, undefined, test.info().project.name);
 
     // Navigate to practice tab
-    await ttPage.practiceTab.click();
+    await ttPage.navigateToTab("practice");
     await ttPage.refreshDateRolloverIfVisible();
 
     // Check queue composition
@@ -554,7 +554,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
       }
 
       // Practice any tunes that are due on this day
-      await ttPage.practiceTab.click();
+      await ttPage.navigateToTab("practice");
 
       const rowCount = await waitForPracticeViewSettled(page, ttPage, {
         timeoutMs: 20000,

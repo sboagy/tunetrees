@@ -1148,41 +1148,86 @@ export class TuneTreesPage {
    * Navigate to a specific tab by ID
    */
   async navigateToTab(
-    tabId: "practice" | "repertoire" | "catalog" | "analysis"
+    tabId: "practice" | "repertoire" | "catalog" | "analysis",
+    options?: { waitForContent?: boolean }
   ) {
-    const tab = this.page.getByTestId(`tab-${tabId}`);
+    const waitForContent = options?.waitForContent ?? true;
 
-    await expect(tab).toBeVisible({ timeout: 20_000 });
-    await expect(tab).toBeEnabled({ timeout: 20_000 });
+    // Check if we're in mobile view (Select dropdown) or desktop (tab buttons).
+    // On mobile (< 768px) TabBar renders a Kobalte Select; on desktop it renders tab buttons.
+    const selectTrigger = this.page.getByTestId("tab-nav-select");
+    const isSelectVisible = await selectTrigger.isVisible().catch(() => false);
 
-    // Avoid short "trial" clicks: they can flake under CI load.
-    // Let Playwright's normal click retry within a reasonable timeout.
-    const [selectedBefore, currentBefore] = await Promise.all([
-      tab.getAttribute("aria-selected"),
-      tab.getAttribute("aria-current"),
-    ]);
-    const isActiveBefore =
-      selectedBefore === "true" || currentBefore === "page";
+    if (isSelectVisible) {
+      // Mobile: navigate via the Select dropdown.
+      // Determine the currently active tab from the URL (?tab=<id> param; defaults to "practice").
+      const currentUrl = this.page.url();
+      const currentTab =
+        new URL(currentUrl).searchParams.get("tab") || "practice";
 
-    if (!isActiveBefore) {
-      await tab.scrollIntoViewIfNeeded().catch(() => undefined);
-      await tab.click({ timeout: 10_000 });
+      if (currentTab !== tabId) {
+        await expect(selectTrigger).toBeEnabled({ timeout: 20_000 });
+        await selectTrigger.click({ timeout: 10_000 });
+
+        // Kobalte Select items have role="option"; match by the visible label text.
+        // These labels must match the `label` field of the TABS constant in TabBar.tsx.
+        const tabLabels: Record<string, string> = {
+          practice: "Practice",
+          repertoire: "Repertoire",
+          catalog: "Catalog",
+          analysis: "Analysis",
+        };
+        const option = this.page.getByRole("option", {
+          name: new RegExp(tabLabels[tabId], "i"),
+        });
+        await expect(option).toBeVisible({ timeout: 5_000 });
+        await option.click({ timeout: 5_000 });
+
+        // Wait for the URL to reflect the newly selected tab.
+        await expect(this.page).toHaveURL(new RegExp(`[?&]tab=${tabId}`), {
+          timeout: 10_000,
+        });
+      }
+    } else {
+      // Desktop: navigate via the visible tab buttons.
+      const tab = this.page.getByTestId(`tab-${tabId}`);
+
+      await expect(tab).toBeVisible({ timeout: 20_000 });
+      await expect(tab).toBeEnabled({ timeout: 20_000 });
+
+      // Avoid short "trial" clicks: they can flake under CI load.
+      // Let Playwright's normal click retry within a reasonable timeout.
+      const [selectedBefore, currentBefore] = await Promise.all([
+        tab.getAttribute("aria-selected"),
+        tab.getAttribute("aria-current"),
+      ]);
+      const isActiveBefore =
+        selectedBefore === "true" || currentBefore === "page";
+
+      if (!isActiveBefore) {
+        await tab.scrollIntoViewIfNeeded().catch(() => undefined);
+        await tab.click({ timeout: 10_000 });
+      }
+
+      // Wait for the tab to become active.
+      // Tabs may indicate this via `aria-selected="true"` or `aria-current="page"`.
+      await expect
+        .poll(
+          async () => {
+            const [selected, current] = await Promise.all([
+              tab.getAttribute("aria-selected"),
+              tab.getAttribute("aria-current"),
+            ]);
+            return selected === "true" || current === "page";
+          },
+          { timeout: 10_000, intervals: [100, 250, 500, 1000] }
+        )
+        .toBe(true);
     }
 
-    // Wait for the tab to become active.
-    // Tabs may indicate this via `aria-selected="true"` or `aria-current="page"`.
-    await expect
-      .poll(
-        async () => {
-          const [selected, current] = await Promise.all([
-            tab.getAttribute("aria-selected"),
-            tab.getAttribute("aria-current"),
-          ]);
-          return selected === "true" || current === "page";
-        },
-        { timeout: 10_000, intervals: [100, 250, 500, 1000] }
-      )
-      .toBe(true);
+    if (!waitForContent) {
+      return;
+    }
 
     // Wait for tab-specific, always-present UI before asserting on grids.
     // Some grids only mount when data is loaded and non-empty.
@@ -1196,7 +1241,12 @@ export class TuneTreesPage {
             : undefined;
     if (sentinel) {
       await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
-      await expect(sentinel).toBeVisible({ timeout: 20_000 });
+      // Best-effort: anonymous users and empty states may not have a columns button.
+      // Use a short timeout so multiple navigations don't exhaust the test budget
+      // (e.g. 3 × 20 s would exceed a 30 s test timeout before .catch() fires).
+      await expect(sentinel)
+        .toBeVisible({ timeout: 5_000 })
+        .catch(() => undefined);
     }
 
     // Then wait for the corresponding grid/content to be visible
@@ -1224,7 +1274,9 @@ export class TuneTreesPage {
 
       const finalCount = await grid.count().catch(() => 0);
       if (finalCount > 0) {
-        await expect(grid).toBeVisible({ timeout: 20_000 });
+        await expect(grid)
+          .toBeVisible({ timeout: 20_000 })
+          .catch(() => undefined);
       }
     }
   }

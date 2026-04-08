@@ -49,7 +49,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     });
 
     // Navigate to repertoire tab to ensure we have repertoire context
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await expect(ttPage.repertoireTab).toBeVisible({ timeout: 10000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
   });

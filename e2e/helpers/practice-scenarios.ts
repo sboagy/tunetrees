@@ -13,6 +13,73 @@ import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-inst
 log.setLevel("info");
 
 // ============================================================================
+// TAB NAVIGATION HELPER (MOBILE + DESKTOP COMPATIBLE)
+// ============================================================================
+
+/**
+ * Navigate to a specific main tab on both mobile (Kobalte Select dropdown)
+ * and desktop (tab buttons) layouts.
+ *
+ * On mobile (< 768px) the TabBar renders a Kobalte Select instead of tab
+ * buttons. This helper detects which layout is active and uses the correct
+ * interaction so tests work across all viewport sizes.
+ */
+export async function navigateToTabForTest(
+  page: Page,
+  tabId: "practice" | "repertoire" | "catalog" | "analysis"
+): Promise<void> {
+  const tabLabels: Record<string, string> = {
+    practice: "Practice",
+    repertoire: "Repertoire",
+    catalog: "Catalog",
+    analysis: "Analysis",
+  };
+
+  // Check for mobile Select trigger (visible only when viewport < 768px)
+  const selectTrigger = page.getByTestId("tab-nav-select");
+  const isSelectVisible = await selectTrigger.isVisible().catch(() => false);
+
+  if (isSelectVisible) {
+    // Mobile: navigate via the Select dropdown
+    const currentUrl = page.url();
+    const currentTab =
+      new URL(currentUrl).searchParams.get("tab") || "practice";
+    if (currentTab === tabId) return; // Already on target tab
+
+    await expect(selectTrigger).toBeEnabled({ timeout: 20_000 });
+    await selectTrigger.click({ timeout: 10_000 });
+
+    // Kobalte Select items have role="option"; match by visible label text.
+    // These labels must match the `label` field in the TABS constant in TabBar.tsx.
+    const option = page.getByRole("option", {
+      name: new RegExp(tabLabels[tabId], "i"),
+    });
+    await expect(option).toBeVisible({ timeout: 5_000 });
+    await option.click({ timeout: 5_000 });
+
+    // Wait for the URL to reflect the newly selected tab
+    await expect(page).toHaveURL(new RegExp(`[?&]tab=${tabId}`), {
+      timeout: 10_000,
+    });
+  } else {
+    // Desktop: navigate via the visible tab buttons
+    const tabBtn = page.getByTestId(`tab-${tabId}`);
+    await tabBtn.waitFor({ state: "visible", timeout: 20_000 });
+
+    const ariaCurrent = await tabBtn.getAttribute("aria-current");
+    if (ariaCurrent === "page") return; // Already active
+
+    await tabBtn.click();
+    await expect
+      .poll(async () => await tabBtn.getAttribute("aria-current"), {
+        timeout: 10_000,
+        intervals: [100, 250, 500, 1000],
+      })
+      .toBe("page");
+  }
+}
+
+// ============================================================================
 // LEGACY ALICE-SPECIFIC FUNCTIONS (DEPRECATED)
 // All new tests should use the parallel-safe functions below
 // ============================================================================
@@ -1417,35 +1484,7 @@ export async function setupForPracticeTestsParallel(
   await resetLocalDbAndResync(page);
 
   // 6. Navigate to starting tab (skip if already active)
-  const tabSelector = `[data-testid="tab-${startTab}"]`;
-  const tabLocator = page.getByTestId(`tab-${startTab}`);
-
-  const isActive = await tabLocator.evaluate(
-    (el) =>
-      el.getAttribute("aria-current") === "page" ||
-      el.getAttribute("aria-selected") === "true" ||
-      el.classList.contains("active")
-  );
-
-  if (!isActive) {
-    await page.waitForSelector(tabSelector, { timeout: 10000 });
-    await tabLocator.click();
-    await expect
-      .poll(
-        async () => {
-          const ariaCurrent = await tabLocator.getAttribute("aria-current");
-          const ariaSelected = await tabLocator.getAttribute("aria-selected");
-          const classActive = await tabLocator.evaluate((el) =>
-            el.classList.contains("active")
-          );
-          return (
-            ariaCurrent === "page" || ariaSelected === "true" || classActive
-          );
-        },
-        { timeout: 10000, intervals: [100, 250, 500] }
-      )
-      .toBe(true);
-  }
+  await navigateToTabForTest(page, startTab);
 
   // 7. Ensure Practice tab is rendered before tests start interacting.
   // NOTE: When there are no tunes due (or repertoire is empty), the app shows an empty-state
@@ -1702,10 +1741,7 @@ export async function setupForRepertoireTestsParallel(
   await assertHasLocalRepertoires(page, 1);
 
   // 7. Navigate to repertoire tab
-  await page.waitForSelector('[data-testid="tab-repertoire"]', {
-    timeout: 20000,
-  });
-  await page.getByTestId("tab-repertoire").click();
+  await navigateToTabForTest(page, "repertoire");
   await page.waitForTimeout(1000);
 
   log.debug(
@@ -1841,10 +1877,7 @@ export async function setupForCatalogTestsParallel(
   log.debug(`✅ [${user.name}] Repertoire title matched: ${expectedTitle}`);
 
   // 6. Navigate to starting tab
-  await page.waitForSelector(`[data-testid="tab-${startTab}"]`, {
-    timeout: 10000,
-  });
-  await page.getByTestId(`tab-${startTab}`).click();
+  await navigateToTabForTest(page, startTab);
   await page.waitForTimeout(500);
 
   const catalogAddToRepertoireButton = page.getByTestId(

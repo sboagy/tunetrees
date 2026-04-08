@@ -91,11 +91,11 @@ test.describe
       await expect(page.locator("text=3 tunes selected")).toBeVisible();
 
       // Switch to Practice tab
-      await page.click('button:has-text("Practice")');
+      await ttPage.navigateToTab("practice");
       await page.waitForTimeout(500);
 
       // Switch back to Catalog tab
-      await page.click('button:has-text("Catalog")');
+      await ttPage.navigateToTab("catalog");
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 5000,
       });
@@ -139,11 +139,10 @@ test.describe
       await expect(page.locator("text=2 tunes selected")).toBeVisible();
 
       // Switch to Catalog tab
-      await page.click('button:has-text("Catalog")');
-      await page.waitForTimeout(500);
+      await ttPage.navigateToTab("catalog");
 
       // Switch back to Repertoire tab
-      await page.click('button:has-text("Repertoire")');
+      await ttPage.navigateToTab("repertoire");
       await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
         timeout: 5000,
       });
@@ -182,9 +181,8 @@ test.describe
       await expect(page.locator("text=2 tunes selected")).not.toBeVisible();
 
       // Switch tabs and return
-      await page.click('button:has-text("Practice")');
-      await page.waitForTimeout(500);
-      await page.click('button:has-text("Catalog")');
+      await ttPage.navigateToTab("practice");
+      await ttPage.navigateToTab("catalog");
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 5000,
       });
@@ -218,7 +216,7 @@ test.describe
       await page.waitForTimeout(2000); // Wait for sync after reload
 
       // Navigate back to Catalog tab
-      await page.click('button:has-text("Catalog")');
+      await ttPage.navigateToTab("catalog");
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 5000,
       });
@@ -335,7 +333,7 @@ test.describe
       await page.waitForTimeout(2000); // Wait for sync after reload
 
       // Navigate back to Repertoire tab
-      await page.click('button:has-text("Repertoire")');
+      await ttPage.navigateToTab("repertoire");
       await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
         timeout: 5000,
       });

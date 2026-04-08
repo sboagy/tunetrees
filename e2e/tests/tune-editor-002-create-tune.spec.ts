@@ -28,7 +28,7 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
     });
 
     // Navigate to catalog tab
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
   });
