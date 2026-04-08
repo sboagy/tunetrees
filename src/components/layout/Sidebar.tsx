@@ -90,7 +90,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const location = useLocation();
 
   // Tune Info section collapsed state – defaults to collapsed when the sidebar
-  // is docked at the bottom (horizontal layout) to conserve vertical space.
+  // is docked at the bottom position to conserve vertical space.
   const [tuneInfoCollapsed, setTuneInfoCollapsed] = createSignal(
     props.dockPosition === "bottom"
   );
@@ -294,12 +294,12 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       {/* Sidebar Content (conditionally rendered) */}
       <div
-        class={`flex-1 overflow-auto p-2 ${
+        class={`flex-1 overflow-auto p-2 space-y-2 ${
           props.dockPosition === "right"
-            ? "space-y-2 pl-8 md:pl-3"
-            : isHorizontal()
-              ? "space-y-2"
-              : "space-y-2 pr-8 md:pr-3"
+            ? "pl-8 md:pl-3"
+            : !isHorizontal()
+              ? "pr-8 md:pr-3"
+              : ""
         } ${props.collapsed ? "hidden" : ""}`}
       >
         {/* Current Tune Info Header – collapsible when sidebar is at the bottom */}
