@@ -27,6 +27,9 @@ vi.mock("../../../src/lib/sync", () => ({
   queueSync: vi.fn(() => Promise.resolve()),
 }));
 
+// A deterministic UUID-format string used as the test user's Supabase auth ID.
+// The format mirrors what Supabase Auth assigns so FK constraints on
+// user_profile.id pass without needing to call real auth APIs.
 const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 let db: BetterSQLite3Database;

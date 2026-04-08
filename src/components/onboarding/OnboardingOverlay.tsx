@@ -64,6 +64,13 @@ export const OnboardingOverlay: Component = () => {
   const [isLoadingGenres, setIsLoadingGenres] = createSignal(false);
   const [isSavingGenres, setIsSavingGenres] = createSignal(false);
   const [isCreatingStarter, setIsCreatingStarter] = createSignal(false);
+  /** User-visible error shown when starter creation fails in Step 1 */
+  const [starterError, setStarterError] = createSignal<string | null>(null);
+  /**
+   * Shown in Step 2 when tune auto-population failed (non-fatal —
+   * user can still add tunes manually from the catalog).
+   */
+  const [populationWarning, setPopulationWarning] = createSignal<string | null>(null);
 
   const handleRepertoireCreated = () => {
     setRepertoireCreated(true);
@@ -91,6 +98,7 @@ export const OnboardingOverlay: Component = () => {
     const template = getStarterTemplateById(templateId);
     if (!template) return;
 
+    setStarterError(null);
     setIsCreatingStarter(true);
     try {
       const newRepertoire = await createStarterRepertoire(db, userId, template);
@@ -110,6 +118,9 @@ export const OnboardingOverlay: Component = () => {
       console.error(
         `Failed to create starter repertoire from template "${templateId}":`,
         error
+      );
+      setStarterError(
+        "Could not create the starter repertoire. Please try again or create a custom one."
       );
     } finally {
       setIsCreatingStarter(false);
@@ -245,11 +256,22 @@ export const OnboardingOverlay: Component = () => {
             console.log(
               `✅ Added ${result.added} tunes to starter repertoire (${result.skipped} already present)`
             );
+            if (result.added === 0 && result.skipped === 0) {
+              // Catalog may not have synced tunes yet; user can add from catalog manually
+              setPopulationWarning(
+                `No matching tunes were found in the catalog for "${template.name}". ` +
+                  "You can add tunes manually from the Catalog tab."
+              );
+            }
           } catch (popErr) {
             // Non-fatal: user can add tunes manually from catalog
             console.warn(
               "Failed to auto-populate starter repertoire tunes:",
               popErr
+            );
+            setPopulationWarning(
+              `Could not auto-populate tunes for "${template.name}". ` +
+                "You can add tunes manually from the Catalog tab."
             );
           }
         }
@@ -382,6 +404,16 @@ export const OnboardingOverlay: Component = () => {
                       Create Custom
                     </button>
                   </div>
+
+                  {/* Starter creation error */}
+                  <Show when={starterError()}>
+                    <p
+                      class="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md px-3 py-2"
+                      role="alert"
+                    >
+                      {starterError()}
+                    </p>
+                  </Show>
                 </div>
               </div>
             </div>
@@ -441,6 +473,15 @@ export const OnboardingOverlay: Component = () => {
                       {isSavingGenres() ? "Saving..." : "Continue"}
                     </button>
                   </div>
+
+                  {/* Tune population warning (shown after save if auto-populate failed) */}
+                  <Show when={populationWarning()}>
+                    <output
+                      class="block text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md px-3 py-2"
+                    >
+                      {populationWarning()}
+                    </output>
+                  </Show>
                 </div>
               </div>
             </div>
