@@ -495,11 +495,6 @@ export async function getCatalogTuneIdsByFilter(
   filterType: "genre" | "origin",
   filterValue: string
 ): Promise<string[]> {
-  const baseConditions = [
-    eq(schema.tune.deleted, 0),
-    isNull(schema.tune.privateFor), // catalog (public) tunes only
-  ];
-
   const filterCondition =
     filterType === "genre"
       ? eq(schema.tune.genre, filterValue)
@@ -508,7 +503,13 @@ export async function getCatalogTuneIdsByFilter(
   const rows = await db
     .select({ id: schema.tune.id })
     .from(schema.tune)
-    .where(and(...baseConditions, filterCondition) as any)
+    .where(
+      and(
+        eq(schema.tune.deleted, 0),
+        isNull(schema.tune.privateFor), // catalog (public) tunes only
+        filterCondition
+      )
+    )
     .all();
 
   return rows.map((r) => r.id);

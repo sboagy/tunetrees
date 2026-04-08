@@ -320,7 +320,7 @@ export const OnboardingOverlay: Component = () => {
                       {(template) => (
                         <button
                           type="button"
-                          onClick={() => void handleStarterChosen(template.id)}
+                          onClick={() => handleStarterChosen(template.id)}
                           disabled={isCreatingStarter()}
                           data-testid={`onboarding-starter-${template.id}`}
                           class="w-full text-left border border-blue-200 dark:border-blue-700 rounded-lg p-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
