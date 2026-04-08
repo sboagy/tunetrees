@@ -167,7 +167,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       // ===== STEP 1: Create New Tune in Catalog =====
       console.log("\n=== Step 1: Create New Tune in Catalog ===");
 
-      await ttPage.catalogTab.click();
+      await ttPage.navigateToTab("catalog");
       await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
       await page.waitForLoadState("networkidle", { timeout: 15000 });
 
@@ -232,7 +232,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       console.log("\n=== Step 3: Add to Review ===");
 
       // Navigate to Repertoire tab
-      await ttPage.repertoireTab.click();
+      await ttPage.navigateToTab("repertoire");
       await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(1000);
 
@@ -257,7 +257,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       console.log("\n=== Step 4: Verify in Practice Queue ===");
 
       // Navigate to Practice tab
-      await ttPage.practiceTab.click();
+      await ttPage.navigateToTab("practice");
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(1000);
 
@@ -364,7 +364,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     console.log("\n=== NEW → Review (Easy) Test ===");
 
     // Create tune (same steps as above, condensed)
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
 
     await ttPage.catalogAddTuneButton.click();
@@ -393,7 +393,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Add to review
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
     await ttPage.searchForTune(easyTestTitle, ttPage.repertoireGrid);
     const repCheckbox = ttPage.repertoireGrid
@@ -404,7 +404,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Practice with "Easy"
-    await ttPage.practiceTab.click();
+    await ttPage.navigateToTab("practice");
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
     await ttPage.enableFlashcardMode();
     await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
@@ -492,7 +492,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     console.log("\n=== NEW → Learning (Again) Test ===");
 
     // Create tune (condensed)
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await ttPage.catalogAddTuneButton.click();
     const newButton = page.getByRole("button", { name: /^new$/i });
     await newButton.click();
@@ -514,7 +514,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await ttPage.catalogAddToRepertoireButton.click();
     await page.waitForTimeout(2000);
 
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await ttPage.searchForTune(againTestTitle, ttPage.repertoireGrid);
     await ttPage.repertoireGrid
       .locator('input[type="checkbox"]')
@@ -524,7 +524,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await page.waitForTimeout(2000);
 
     // Practice with "Again"
-    await ttPage.practiceTab.click();
+    await ttPage.navigateToTab("practice");
     await ttPage.enableFlashcardMode();
     await ttPage.selectFlashcardEvaluation("again");
     await page.waitForTimeout(500);

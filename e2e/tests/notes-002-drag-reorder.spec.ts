@@ -30,7 +30,7 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
     });
 
     // Navigate to Catalog tab to find and select a tune
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
 
     // Search for and select Banish Misfortune tune

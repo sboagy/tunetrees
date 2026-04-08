@@ -89,7 +89,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
   }) => {
     // Helper to create, configure, and add a tune to review
     async function createAndAddToReview(meta: RatedTuneMeta, tuneType: string) {
-      await ttPage.catalogTab.click();
+      await ttPage.navigateToTab("catalog");
       await ttPage.catalogAddTuneButton.click();
       const newButton = page.getByRole("button", { name: /^new$/i });
       await newButton.click();
@@ -111,7 +111,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       await ttPage.catalogAddToRepertoireButton.click();
       await page.waitForTimeout(1000);
       // Add to review
-      await ttPage.repertoireTab.click();
+      await ttPage.navigateToTab("repertoire");
       await ttPage.searchForTune(meta.title, ttPage.repertoireGrid);
       const repCheckbox = ttPage.repertoireGrid
         .locator('input[type="checkbox"]')
@@ -222,7 +222,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
           }
           await page.waitForTimeout(500);
         } catch (_e) {}
-        await ttPage.practiceTab.click();
+        await ttPage.navigateToTab("practice");
         const rows = await ttPage.getRows("scheduled");
 
         // await ttPage.searchForTune(meta.title, ttPage.practiceGrid);

@@ -155,7 +155,7 @@ test.describe
       console.log(`  Current date: ${currentDate.toISOString().split("T")[0]}`);
 
       // Navigate to practice tab
-      await ttPage.practiceTab.click();
+      await ttPage.navigateToTab("practice");
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
       // Query practice queue to examine bucket distribution
@@ -272,7 +272,7 @@ test.describe
       console.log("\n=== Queue Ordering Test ===");
 
       // Navigate to practice tab
-      await ttPage.practiceTab.click();
+      await ttPage.navigateToTab("practice");
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
       // The first few rows should be Q1 tunes (Due Today)
@@ -331,7 +331,7 @@ test.describe
       );
       console.log("\n=== Practice Effect on Buckets Test ===");
 
-      await ttPage.practiceTab.click();
+      await ttPage.navigateToTab("practice");
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
       // Get initial distribution

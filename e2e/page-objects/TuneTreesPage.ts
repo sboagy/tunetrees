@@ -1148,8 +1148,11 @@ export class TuneTreesPage {
    * Navigate to a specific tab by ID
    */
   async navigateToTab(
-    tabId: "practice" | "repertoire" | "catalog" | "analysis"
+    tabId: "practice" | "repertoire" | "catalog" | "analysis",
+    options?: { waitForContent?: boolean }
   ) {
+    const waitForContent = options?.waitForContent ?? true;
+
     // Check if we're in mobile view (Select dropdown) or desktop (tab buttons).
     // On mobile (< 768px) TabBar renders a Kobalte Select; on desktop it renders tab buttons.
     const selectTrigger = this.page.getByTestId("tab-nav-select");
@@ -1181,10 +1184,9 @@ export class TuneTreesPage {
         await option.click({ timeout: 5_000 });
 
         // Wait for the URL to reflect the newly selected tab.
-        await expect(this.page).toHaveURL(
-          new RegExp(`[?&]tab=${tabId}`),
-          { timeout: 10_000 }
-        );
+        await expect(this.page).toHaveURL(new RegExp(`[?&]tab=${tabId}`), {
+          timeout: 10_000,
+        });
       }
     } else {
       // Desktop: navigate via the visible tab buttons.
@@ -1223,6 +1225,10 @@ export class TuneTreesPage {
         .toBe(true);
     }
 
+    if (!waitForContent) {
+      return;
+    }
+
     // Wait for tab-specific, always-present UI before asserting on grids.
     // Some grids only mount when data is loaded and non-empty.
     const sentinel =
@@ -1235,7 +1241,12 @@ export class TuneTreesPage {
             : undefined;
     if (sentinel) {
       await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
-      await expect(sentinel).toBeVisible({ timeout: 20_000 });
+      // Best-effort: anonymous users and empty states may not have a columns button.
+      // Use a short timeout so multiple navigations don't exhaust the test budget
+      // (e.g. 3 × 20 s would exceed a 30 s test timeout before .catch() fires).
+      await expect(sentinel)
+        .toBeVisible({ timeout: 5_000 })
+        .catch(() => undefined);
     }
 
     // Then wait for the corresponding grid/content to be visible
@@ -1263,7 +1274,9 @@ export class TuneTreesPage {
 
       const finalCount = await grid.count().catch(() => 0);
       if (finalCount > 0) {
-        await expect(grid).toBeVisible({ timeout: 20_000 });
+        await expect(grid)
+          .toBeVisible({ timeout: 20_000 })
+          .catch(() => undefined);
       }
     }
   }

@@ -132,7 +132,7 @@ test.describe("Scroll Position Persistence", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -192,12 +192,12 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(3000);
 
     // Switch to Practice tab
-    await page.click('button:has-text("Practice")');
+    await ttPage.navigateToTab("practice");
     await waitToSettle(page);
     await page.waitForTimeout(3000);
 
     // Switch back to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -220,7 +220,7 @@ test.describe("Scroll Position Persistence", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    await page.click('button:has-text("Repertoire")');
+    await ttPage.navigateToTab("repertoire");
     await waitToSettle(page);
 
     // Scroll down (reduced amount for smaller grids)
@@ -237,12 +237,12 @@ test.describe("Scroll Position Persistence", () => {
     expect(scrollTopBefore).toBeLessThan(500);
 
     // Switch tabs and return
-    await page.click('button:has-text("Catalog")');
+    await ttPage.navigateToTab("catalog");
 
     await waitToSettle(page);
     await page.waitForTimeout(2000);
 
-    await page.click('button:has-text("Repertoire")');
+    await ttPage.navigateToTab("repertoire");
     
     await waitToSettle(page);
 
@@ -264,7 +264,7 @@ test.describe("Scroll Position Persistence", () => {
     page,
   }) => {
     // Navigate to Practice tab
-    await page.click('button:has-text("Practice")');
+    await ttPage.navigateToTab("practice");
     await waitToSettle(page);
 
     // Scroll down (practice grid has less content) - use mouse wheel for real scroll event
@@ -309,9 +309,9 @@ test.describe("Scroll Position Persistence", () => {
     expect(scrollTopBefore).toBeLessThan(200);
 
     // Switch tabs and return
-    await page.click('button:has-text("Catalog")');
+    await ttPage.navigateToTab("catalog");
     await page.waitForTimeout(500);
-    await page.click('button:has-text("Practice")');
+    await ttPage.navigateToTab("practice");
     await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
@@ -353,7 +353,7 @@ test.describe("Scroll Position Persistence", () => {
     });
 
     // Navigate to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -440,7 +440,7 @@ test.describe("Scroll Position Persistence", () => {
     );
 
     // Navigate back to Catalog tab
-    await page.click('button:has-text("Catalog")');
+    await ttPage.navigateToTab("catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -614,7 +614,7 @@ test.describe("Scroll Position Persistence", () => {
     page,
   }) => {
     // Navigate to Practice tab
-    await page.click('button:has-text("Practice")');
+    await ttPage.navigateToTab("practice");
     await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
@@ -632,7 +632,7 @@ test.describe("Scroll Position Persistence", () => {
     await page.waitForTimeout(2000);
 
     // Navigate back to Practice tab
-    await page.click('button:has-text("Practice")');
+    await ttPage.navigateToTab("practice");
     await page.waitForSelector('[data-testid="tunes-grid-scheduled"]', {
       timeout: 5000,
     });
