@@ -19,7 +19,14 @@
  */
 
 import { useLocation, useNavigate } from "@solidjs/router";
-import { ChevronLeft, ChevronRight, GripVertical, Pencil } from "lucide-solid";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  GripVertical,
+  Pencil,
+} from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -81,6 +88,18 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const { currentTuneId } = useCurrentTune();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Tune Info section collapsed state – defaults to collapsed when the sidebar
+  // is docked at the bottom (horizontal layout) to conserve vertical space.
+  const [tuneInfoCollapsed, setTuneInfoCollapsed] = createSignal(
+    props.dockPosition === "bottom"
+  );
+
+  // Reset the Tune Info section collapse state whenever the dock position changes
+  // so the default is always applied on each new position.
+  createEffect(() => {
+    setTuneInfoCollapsed(props.dockPosition === "bottom");
+  });
 
   // Local width state for smooth dragging without triggering parent updates
   const [localWidth, setLocalWidth] = createSignal(props.width);
@@ -250,10 +269,10 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
   return (
     <aside
-      class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex ${
+      class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex flex-col ${
         isHorizontal()
-          ? "flex-row border-t border-gray-200/20 dark:border-gray-700/20"
-          : "flex-col border-r border-gray-200/20 dark:border-gray-700/20"
+          ? "border-t border-gray-200/20 dark:border-gray-700/20"
+          : "border-r border-gray-200/20 dark:border-gray-700/20"
       } ${isResizing() ? "" : "transition-all duration-300"} z-10`}
       style={{
         [isHorizontal() ? "height" : "width"]: props.collapsed
@@ -268,9 +287,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     >
       {/* Drag Handle Header - Always visible */}
       <header
-        class={`flex items-center justify-center p-1 border-b border-gray-200/20 dark:border-gray-700/20 ${
-          isHorizontal() ? "border-r border-b-0" : ""
-        } flex-shrink-0 relative z-20`}
+        class="flex items-center justify-center p-1 border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20"
       >
         {/* The drag handle has been moved next to the collapse button */}
       </header>
@@ -278,15 +295,40 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Sidebar Content (conditionally rendered) */}
       <div
         class={`flex-1 overflow-auto p-2 ${
-          isHorizontal()
-            ? "flex flex-row space-x-2"
-            : props.dockPosition === "right"
-              ? "space-y-2 pl-8 md:pl-3"
+          props.dockPosition === "right"
+            ? "space-y-2 pl-8 md:pl-3"
+            : isHorizontal()
+              ? "space-y-2"
               : "space-y-2 pr-8 md:pr-3"
         } ${props.collapsed ? "hidden" : ""}`}
       >
-        {/* Current Tune Info Header */}
-        <TuneInfoHeader />
+        {/* Current Tune Info Header – collapsible when sidebar is at the bottom */}
+        <Show
+          when={isHorizontal()}
+          fallback={<TuneInfoHeader />}
+        >
+          <div class="border-b border-gray-200/30 dark:border-gray-700/30 pb-1">
+            <button
+              type="button"
+              onClick={() => setTuneInfoCollapsed(!tuneInfoCollapsed())}
+              class="w-full flex items-center justify-between px-2 py-1 text-left hover:bg-gray-100/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
+              aria-expanded={!tuneInfoCollapsed()}
+              title={tuneInfoCollapsed() ? "Show tune info" : "Hide tune info"}
+            >
+              <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Tune Info
+              </span>
+              {tuneInfoCollapsed() ? (
+                <ChevronDown class="w-3.5 h-3.5 text-gray-400" />
+              ) : (
+                <ChevronUp class="w-3.5 h-3.5 text-gray-400" />
+              )}
+            </button>
+            <Show when={!tuneInfoCollapsed()}>
+              <TuneInfoHeader />
+            </Show>
+          </div>
+        </Show>
 
         {/* References Section */}
         <section

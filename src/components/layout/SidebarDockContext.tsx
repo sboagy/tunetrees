@@ -3,6 +3,8 @@
  *
  * Manages the sidebar's dock position (left, right, or bottom).
  * Persists state to localStorage for immediate UI updates.
+ * Mobile and desktop positions are stored separately so that
+ * a user's desktop preference does not override their mobile preference.
  * TODO: Sync to database via tab_group_main_state.sidebarDockPosition
  *
  * @module components/layout/SidebarDockContext
@@ -15,8 +17,16 @@ import {
   type ParentComponent,
   useContext,
 } from "solid-js";
+import { createIsMobile } from "@/lib/hooks/useIsMobile";
 
 export type DockPosition = "left" | "right" | "bottom";
+
+/** localStorage key for the sidebar dock position on mobile viewports */
+const MOBILE_KEY = "sidebar-dock-position-mobile";
+/** localStorage key for the sidebar dock position on desktop viewports */
+const DESKTOP_KEY = "sidebar-dock-position-desktop";
+/** Legacy single key – migrated to DESKTOP_KEY on first load */
+const LEGACY_KEY = "sidebar-dock-position";
 
 interface SidebarDockContextValue {
   position: () => DockPosition;
@@ -37,7 +47,13 @@ export const useSidebarDock = () => {
  * Sidebar Dock Position Provider
  *
  * Wraps the app to provide sidebar dock position state.
- * Loads from localStorage on mount, saves on every change.
+ * Mobile and desktop positions are stored under separate localStorage keys so
+ * that changing the sidebar position on a phone does not affect the desktop
+ * layout and vice versa.
+ *
+ * Defaults:
+ *  - mobile  → "bottom"
+ *  - desktop → "left"
  *
  * @example
  * ```tsx
@@ -49,20 +65,58 @@ export const useSidebarDock = () => {
  * ```
  */
 export const SidebarDockProvider: ParentComponent = (props) => {
-  const [position, setPositionInternal] = createSignal<DockPosition>("left");
+  // Reactive viewport detection (updates on window resize via matchMedia)
+  const isMobile = createIsMobile();
 
-  // Load from localStorage on mount
+  // Separate position signals for mobile and desktop with appropriate defaults
+  const [mobilePosition, setMobilePositionInternal] =
+    createSignal<DockPosition>("bottom");
+  const [desktopPosition, setDesktopPositionInternal] =
+    createSignal<DockPosition>("left");
+
+  // Load persisted positions from localStorage on mount
   onMount(() => {
-    const saved = localStorage.getItem("sidebar-dock-position");
-    if (saved === "left" || saved === "right" || saved === "bottom") {
-      setPositionInternal(saved);
+    const savedMobile = localStorage.getItem(MOBILE_KEY);
+    if (
+      savedMobile === "left" ||
+      savedMobile === "right" ||
+      savedMobile === "bottom"
+    ) {
+      setMobilePositionInternal(savedMobile);
+    }
+    // else keep default "bottom" for mobile
+
+    const savedDesktop = localStorage.getItem(DESKTOP_KEY);
+    if (
+      savedDesktop === "left" ||
+      savedDesktop === "right" ||
+      savedDesktop === "bottom"
+    ) {
+      setDesktopPositionInternal(savedDesktop);
+    } else {
+      // Migrate from legacy single key (if the user had a saved preference)
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if (legacy === "left" || legacy === "right" || legacy === "bottom") {
+        setDesktopPositionInternal(legacy);
+        localStorage.setItem(DESKTOP_KEY, legacy);
+      }
+      // else keep default "left" for desktop
     }
   });
 
-  // Wrapper to save to localStorage on every change
+  // Derived position: returns the correct signal based on current viewport
+  const position = (): DockPosition =>
+    isMobile() ? mobilePosition() : desktopPosition();
+
+  // Wrapper that saves to the appropriate key depending on current viewport
   const setPosition = (newPosition: DockPosition) => {
-    setPositionInternal(newPosition);
-    localStorage.setItem("sidebar-dock-position", newPosition);
+    if (isMobile()) {
+      setMobilePositionInternal(newPosition);
+      localStorage.setItem(MOBILE_KEY, newPosition);
+    } else {
+      setDesktopPositionInternal(newPosition);
+      localStorage.setItem(DESKTOP_KEY, newPosition);
+    }
     // TODO: Save to database via tab_group_main_state
   };
 
