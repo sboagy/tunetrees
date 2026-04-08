@@ -66,7 +66,7 @@ export class TuneTreesPage {
 
   // Search & Filters
   readonly searchBox: Locator;
-  readonly searchBoxPanel: Locator; // Search box inside filter panel (mobile)
+  readonly searchBoxPanel: Locator; // Toolbar search box (always visible; was formerly mobile-only)
   readonly filtersButton: Locator;
   readonly typeFilter: Locator;
   readonly modeFilter: Locator;
@@ -1284,10 +1284,10 @@ export class TuneTreesPage {
   /**
    * Search for a tune and wait for results
    * Returns the grid for further assertions
-   * Handles responsive layout: search box in toolbar (desktop) or filter panel (mobile)
+   * The search box is now always visible in the toolbar (desktop and mobile).
    */
   async searchForTune(tuneTitle: string, grid: Locator): Promise<void> {
-    // Check if toolbar search box is visible (desktop view)
+    // Check if toolbar search box is visible (should always be true now)
     const isToolbarSearchVisible = await (async () => {
       const blockStartMs = Date.now();
       try {
@@ -2023,16 +2023,16 @@ export class TuneTreesPage {
 
   /**
    * Clear search box
-   * Handles responsive layout: search box in toolbar (desktop) or filter panel (mobile)
+   * The search box is now always visible in the toolbar (desktop and mobile).
    */
   async clearSearch() {
-    // Check if toolbar search box is visible (desktop view)
+    // Check if toolbar search box is visible (should always be true now)
     const isToolbarSearchVisible = await this.searchBox
       .isVisible({ timeout: 1000 })
       .catch(() => false);
 
     if (isToolbarSearchVisible) {
-      // Desktop: use toolbar search box
+      // Toolbar search box: use it directly
       await this.searchBox.clear();
     } else {
       // Mobile: open filter panel if needed and use search box inside

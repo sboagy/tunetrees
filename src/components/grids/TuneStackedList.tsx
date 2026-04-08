@@ -155,6 +155,8 @@ export interface IStackedListRow {
   type?: string | null;
   mode?: string | null;
   structure?: string | null;
+  composer?: string | null;
+  genre?: string | null;
   favorite_url?: string | null;
   favoriteUrl?: string | null;
   primary_origin?: string | null;
@@ -166,12 +168,12 @@ export interface IStackedListRow {
   recall_eval?: string | null;
   latest_practiced?: string | null;
   latest_stability?: number | null;
+  latest_due?: string | null;
   // Repertoire-specific
   latest_state?: number | null;
   goal?: string | null;
   latest_goal?: string | null;
   scheduled?: string | null;
-  latest_due?: string | null;
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -183,11 +185,30 @@ export interface ITuneStackedListProps {
   onRowClick?: (row: IStackedListRow) => void;
   onRowDoubleClick?: (row: IStackedListRow) => void;
   cellCallbacks?: ICellEditorCallbacks;
+  /**
+   * Column visibility state from the TanStack table instance.
+   * Controls which fields are rendered in each stacked list item.
+   * A column is visible when its value is `true` or not present in the map.
+   * Mirrors the same visibility object used by the desktop table.
+   */
+  columnVisibility?: Record<string, boolean>;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const TuneStackedList = (props: ITuneStackedListProps) => {
+  /**
+   * Returns true when the given column should be rendered.
+   * A column is considered visible unless it is explicitly set to `false` in
+   * the `columnVisibility` map.  When the map is absent or empty every field
+   * defaults to visible (backward-compatible behaviour).
+   */
+  const isColVisible = (columnId: string): boolean => {
+    const vis = props.columnVisibility;
+    if (!vis || Object.keys(vis).length === 0) return true;
+    return vis[columnId] !== false;
+  };
+
   return (
     <div
       class="flex-1 overflow-y-auto"
@@ -234,7 +255,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 data-testid={`stacked-item-${itemId}`}
                 data-selected={isSelected() ? "true" : undefined}
               >
-                {/* Row 1: Title + primary badge */}
+                {/* Row 1: Title + primary badge (always shown) */}
                 <div class="flex items-start justify-between gap-2 min-h-[24px]">
                   <div class="font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0">
                     <Show when={href} fallback={<span>{title}</span>}>
@@ -249,22 +270,41 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                       </a>
                     </Show>
                   </div>
-                  {/* Purpose-specific right badge */}
-                  <Show when={props.tablePurpose === "scheduled"}>
+                  {/* Purpose-specific right badge, controlled by column visibility */}
+                  <Show
+                    when={
+                      props.tablePurpose === "scheduled" &&
+                      isColVisible("bucket")
+                    }
+                  >
                     <BucketBadge value={item.bucket} />
                   </Show>
-                  <Show when={props.tablePurpose === "repertoire"}>
+                  <Show
+                    when={
+                      props.tablePurpose === "repertoire" &&
+                      isColVisible("latest_state")
+                    }
+                  >
                     <StateBadge value={item.latest_state} />
                   </Show>
                 </div>
 
                 {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
                 <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                  <TypeBadge value={item.type} />
-                  <ModeBadge value={item.mode} />
+                  <Show when={isColVisible("type")}>
+                    <TypeBadge value={item.type} />
+                  </Show>
+                  <Show when={isColVisible("mode")}>
+                    <ModeBadge value={item.mode} />
+                  </Show>
 
-                  {/* Scheduled: Recall Eval dropdown */}
-                  <Show when={props.tablePurpose === "scheduled"}>
+                  {/* Scheduled: Recall Eval dropdown (controlled by "evaluation" column) */}
+                  <Show
+                    when={
+                      props.tablePurpose === "scheduled" &&
+                      isColVisible("evaluation")
+                    }
+                  >
                     {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */}
                     {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */}
                     <div
@@ -288,10 +328,36 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 {/* Row 3: Purpose-specific secondary info */}
                 <Show when={props.tablePurpose === "scheduled"}>
                   <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <Show when={item.latest_practiced}>
+                    <Show when={isColVisible("goal") && (item.goal ?? item.latest_goal)}>
+                      <span>
+                        Goal:{" "}
+                        <span class="text-gray-700 dark:text-gray-300">
+                          {item.goal ?? item.latest_goal}
+                        </span>
+                      </span>
+                    </Show>
+                    <Show
+                      when={
+                        isColVisible("scheduled") &&
+                        (item.scheduled ?? item.latest_due) != null
+                      }
+                    >
+                      {(() => {
+                        const rel = getRelativeLabel(
+                          item.scheduled ?? item.latest_due
+                        );
+                        return (
+                          <span>
+                            Due:{" "}
+                            <span class={rel.colorClass}>{rel.label}</span>
+                          </span>
+                        );
+                      })()}
+                    </Show>
+                    <Show when={isColVisible("latest_practiced") && item.latest_practiced}>
                       <span>Practiced: {formatJustDate(item.latest_practiced)}</span>
                     </Show>
-                    <Show when={item.latest_stability != null}>
+                    <Show when={isColVisible("latest_stability") && item.latest_stability != null}>
                       <span>
                         Stability: {(item.latest_stability as number).toFixed(1)}
                       </span>
@@ -301,7 +367,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
 
                 <Show when={props.tablePurpose === "repertoire"}>
                   <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <Show when={item.goal ?? item.latest_goal}>
+                    <Show when={isColVisible("goal") && (item.goal ?? item.latest_goal)}>
                       <span>
                         Goal:{" "}
                         <span class="text-gray-700 dark:text-gray-300">
@@ -309,7 +375,15 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         </span>
                       </span>
                     </Show>
-                    <Show when={item.latest_practiced}>
+                    <Show when={isColVisible("genre") && item.genre}>
+                      <span>
+                        Genre:{" "}
+                        <span class="text-gray-700 dark:text-gray-300">
+                          {item.genre}
+                        </span>
+                      </span>
+                    </Show>
+                    <Show when={isColVisible("latest_practiced") && item.latest_practiced}>
                       <span>
                         Practiced:{" "}
                         <span class="text-gray-700 dark:text-gray-300">
@@ -319,6 +393,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                     </Show>
                     <Show
                       when={
+                        (isColVisible("scheduled") || isColVisible("latest_due")) &&
                         (item.scheduled ?? item.latest_due) != null
                       }
                     >
@@ -339,7 +414,14 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
 
                 <Show when={props.tablePurpose === "catalog"}>
                   <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <Show when={item.structure}>
+                    <Show when={isColVisible("composer") && item.composer}>
+                      <span>
+                        <span class="text-gray-700 dark:text-gray-300">
+                          {item.composer}
+                        </span>
+                      </span>
+                    </Show>
+                    <Show when={isColVisible("structure") && item.structure}>
                       <span>
                         Structure:{" "}
                         <span class="font-mono text-gray-700 dark:text-gray-300">
@@ -347,7 +429,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         </span>
                       </span>
                     </Show>
-                    <Show when={item.id}>
+                    <Show when={isColVisible("id") && item.id}>
                       <span class="font-mono text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
                         {String(item.id)}
                       </span>
