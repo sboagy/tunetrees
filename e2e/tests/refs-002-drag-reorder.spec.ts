@@ -46,7 +46,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
 
     // Wait for sidebar to show tune details
     await expect(
-      page.getByRole("heading", { name: "Banish Misfortune" })
+      page.getByRole("heading", { name: /Banish Misfortune/i })
     ).toBeVisible({
       timeout: 10000,
     });

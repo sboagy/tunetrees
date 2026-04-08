@@ -278,7 +278,11 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Sidebar Content (conditionally rendered) */}
       <div
         class={`flex-1 overflow-auto p-2 ${
-          isHorizontal() ? "flex flex-row space-x-2" : "space-y-2"
+          isHorizontal()
+            ? "flex flex-row space-x-2"
+            : props.dockPosition === "right"
+              ? "space-y-2 pl-8 md:pl-3"
+              : "space-y-2 pr-8 md:pr-3"
         } ${props.collapsed ? "hidden" : ""}`}
       >
         {/* Current Tune Info Header */}

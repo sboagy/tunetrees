@@ -67,7 +67,9 @@ test.describe
     });
 
     test("should display tune modes", async ({ page }) => {
-      // Look for mode badges
+      await ttPage.ensureGridColumnVisible("repertoire", "Mode");
+
+      // Look for mode badges after revealing the hidden column
       await expect(page.getByText(/D Mixolydian/i).first()).toBeVisible({
         timeout: 5000,
       });
@@ -83,7 +85,9 @@ test.describe
           "The mobile stacked list for the repertoire tab does not display the structure field."
         );
       }
-      // Look for structure information
+      await ttPage.ensureGridColumnVisible("repertoire", "Structure");
+
+      // Look for structure information after revealing the hidden column
       const structureCells = page.getByText("AABBCC");
       await expect(structureCells.first()).toBeVisible({ timeout: 5000 });
     });

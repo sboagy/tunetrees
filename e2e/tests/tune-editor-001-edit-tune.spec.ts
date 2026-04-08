@@ -1,4 +1,5 @@
 import { expect } from "@playwright/test";
+import { getPrivateTuneIds } from "../../tests/fixtures/test-data";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -36,20 +37,28 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
 
   test("should open tune editor and cancel without saving changes", async ({
     page,
+    testUser,
   }) => {
     // ARRANGE: Find a tune in the catalog
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await page.waitForTimeout(500); // Wait for filter to apply
 
-    // Click on the first tune row to open details
-    const firstRow = ttPage.getRows("catalog").first();
-    await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    // Select the user's private Banish row directly instead of depending on
+    // duplicate-title ordering in the catalog results.
+    const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
+    const selectedTuneRow = ttPage.getTuneRowById(
+      privateTune1Id,
+      ttPage.catalogGrid
+    );
+    await expect(selectedTuneRow).toBeVisible({ timeout: 5000 });
+    await selectedTuneRow.click();
+    await ttPage.ensureSidebarExpanded({ timeoutMs: 10000 });
     await page.waitForTimeout(500);
 
     // Look for Edit button in sidebar
     const editButton = ttPage.sidebarEditTuneButton;
     await expect(editButton).toBeVisible({ timeout: 5000 });
+    await expect(editButton).toBeEnabled({ timeout: 5000 });
 
     // ACT: Open editor
     await editButton.click();

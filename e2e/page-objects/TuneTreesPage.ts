@@ -1491,10 +1491,10 @@ export class TuneTreesPage {
     if (grid === this.practiceGrid) {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
-    // Table mode: find a table row containing the tune ID text.
+    // Table mode: find a table row containing the tune ID text, or by select-row checkbox.
     // Stacked list mode: find the li by its data-testid="stacked-item-{tuneId}".
     return grid.locator(
-      `tr:has-text("${tuneId}"), li[data-testid="stacked-item-${tuneId}"]`
+      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li[data-testid="stacked-item-${tuneId}"]`
     );
   }
 
@@ -1575,7 +1575,11 @@ export class TuneTreesPage {
     // Mobile stacked list: tune name lives inside an <li> stacked item.
     const tuneItem = grid
       .getByRole("cell", { name: tuneName })
-      .or(grid.locator("li[data-testid^='stacked-item-']").filter({ hasText: tuneName }))
+      .or(
+        grid
+          .locator("li[data-testid^='stacked-item-']")
+          .filter({ hasText: tuneName })
+      )
       .first();
     await expect(tuneItem).toBeVisible({ timeout });
   }
@@ -1658,6 +1662,78 @@ export class TuneTreesPage {
       const header = this.page.getByTestId(`ch-${id.toLowerCase()}`);
       await expect(header).toBeVisible({ timeout: 5000 });
     }
+  }
+
+  private getColumnsButtonForTab(
+    tab: "catalog" | "repertoire" | "practice"
+  ): Locator {
+    return tab === "catalog"
+      ? this.catalogColumnsButton
+      : tab === "repertoire"
+        ? this.repertoireColumnsButton
+        : this.practiceColumnsButton;
+  }
+
+  private getColumnVisibilityMenu(): Locator {
+    return this.page
+      .locator("div.fixed.w-64")
+      .filter({ hasText: "Show Columns" })
+      .last();
+  }
+
+  async setGridColumnVisibility(
+    tab: "catalog" | "repertoire" | "practice",
+    columnLabel: string,
+    visible: boolean
+  ) {
+    const columnsButton = this.getColumnsButtonForTab(tab);
+    const menu = this.getColumnVisibilityMenu();
+    const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    await expect(columnsButton).toBeVisible({ timeout: 5000 });
+    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
+
+    const menuVisible = await menu
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await columnsButton.click();
+      await expect(menu).toBeVisible({ timeout: 5000 });
+    }
+
+    const label = menu
+      .locator("button span")
+      .filter({ hasText: new RegExp(`^\\s*${escapedLabel}\\s*$`, "i") })
+      .first();
+    const option = label.locator("xpath=ancestor::button[1]");
+    const checkbox = option.locator('input[type="checkbox"]').first();
+
+    await expect(label).toBeVisible({ timeout: 5000 });
+    await option.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(checkbox).toBeVisible({ timeout: 5000 });
+
+    const isChecked = await checkbox.isChecked().catch(() => false);
+    if (isChecked !== visible) {
+      await option.click();
+      if (visible) {
+        await expect(checkbox).toBeChecked({ timeout: 5000 });
+      } else {
+        await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+      }
+    }
+
+    await this.page.keyboard.press("Escape").catch(() => undefined);
+    await expect(menu)
+      .toBeHidden({ timeout: 5000 })
+      .catch(() => undefined);
+  }
+
+  async ensureGridColumnVisible(
+    tab: "catalog" | "repertoire" | "practice",
+    columnLabel: string
+  ) {
+    await this.setGridColumnVisibility(tab, columnLabel, true);
   }
 
   /**

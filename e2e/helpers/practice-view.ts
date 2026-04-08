@@ -6,6 +6,23 @@ export type TestHookName =
   | "__forceSyncUpForTest"
   | "__persistDbForTest";
 
+function isTransientExecutionContextError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("Execution context was destroyed") ||
+    message.includes("Cannot find context with specified id") ||
+    message.includes("Target closed")
+  );
+}
+
+function isHookAvailabilityRace(
+  error: unknown,
+  hookName: TestHookName
+): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(`${hookName} is not available`);
+}
+
 /**
  * Wait for a browser test hook to exist after reload/navigation, then invoke it.
  *
@@ -20,9 +37,16 @@ export async function runTestHook(
   await expect
     .poll(
       async () => {
-        return await page.evaluate((name) => {
-          return typeof (window as any)[name] === "function";
-        }, hookName);
+        try {
+          return await page.evaluate((name) => {
+            return typeof (window as any)[name] === "function";
+          }, hookName);
+        } catch (error) {
+          if (isTransientExecutionContextError(error)) {
+            return false;
+          }
+          throw error;
+        }
       },
       {
         timeout: 10000,
@@ -32,13 +56,50 @@ export async function runTestHook(
     )
     .toBe(true);
 
-  await page.evaluate(async (name) => {
-    const hook = (window as any)[name];
-    if (typeof hook !== "function") {
-      throw new Error(`${name} is not available`);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await page.evaluate(async (name) => {
+        const hook = (window as any)[name];
+        if (typeof hook !== "function") {
+          throw new Error(`${name} is not available`);
+        }
+        await hook();
+      }, hookName);
+      return;
+    } catch (error) {
+      if (
+        (!isTransientExecutionContextError(error) &&
+          !isHookAvailabilityRace(error, hookName)) ||
+        attempt === 4
+      ) {
+        throw error;
+      }
+
+      await expect
+        .poll(
+          async () => {
+            try {
+              return await page.evaluate((name) => {
+                return typeof (window as any)[name] === "function";
+              }, hookName);
+            } catch (retryError) {
+              if (isTransientExecutionContextError(retryError)) {
+                return false;
+              }
+              throw retryError;
+            }
+          },
+          {
+            timeout: 5000,
+            intervals: [100, 250, 500],
+            message: `${hookName} did not become available for retry`,
+          }
+        )
+        .toBe(true);
+
+      await page.waitForTimeout(250 * (attempt + 1));
     }
-    await hook();
-  }, hookName);
+  }
 }
 
 /**
