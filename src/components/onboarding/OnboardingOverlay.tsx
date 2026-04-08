@@ -107,7 +107,10 @@ export const OnboardingOverlay: Component = () => {
       setRepertoireCreated(true);
       nextStep();
     } catch (error) {
-      console.error("Failed to create starter repertoire:", error);
+      console.error(
+        `Failed to create starter repertoire from template "${templateId}":`,
+        error
+      );
     } finally {
       setIsCreatingStarter(false);
     }
