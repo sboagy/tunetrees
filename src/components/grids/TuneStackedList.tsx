@@ -168,11 +168,13 @@ export interface IStackedListRow {
   recall_eval?: string | null;
   latest_practiced?: string | null;
   latest_stability?: number | null;
+  // latest_due is used in both scheduled (FSRS next-review date) and repertoire (due date display)
   latest_due?: string | null;
   // Repertoire-specific
   latest_state?: number | null;
   goal?: string | null;
   latest_goal?: string | null;
+  // scheduled is used in both scheduled and repertoire (manual override date)
   scheduled?: string | null;
 }
 
@@ -393,6 +395,9 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                     </Show>
                     <Show
                       when={
+                        // Show if either the "Scheduled" override column or the
+                        // "Due" (latest_due) FSRS column is visible, since both
+                        // map to this single merged "Due:" display in the stacked list.
                         (isColVisible("scheduled") || isColVisible("latest_due")) &&
                         (item.scheduled ?? item.latest_due) != null
                       }
