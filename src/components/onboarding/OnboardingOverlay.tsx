@@ -13,12 +13,21 @@ import {
   type Component,
   createEffect,
   createSignal,
+  For,
   Match,
   Show,
   Switch,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
+import {
+  STARTER_TEMPLATES,
+  getStarterTemplateById,
+} from "../../lib/db/starter-repertoire-templates";
+import {
+  createStarterRepertoire,
+  populateStarterRepertoireFromCatalog,
+} from "../../lib/services/repertoire-service";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
 import { RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
 
@@ -28,8 +37,16 @@ import { RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
  * Shows instructional overlays based on the current onboarding step.
  */
 export const OnboardingOverlay: Component = () => {
-  const { needsOnboarding, onboardingStep, nextStep, skipOnboarding } =
-    useOnboarding();
+  const {
+    needsOnboarding,
+    onboardingStep,
+    nextStep,
+    skipOnboarding,
+    setPendingStarter,
+    clearPendingStarter,
+    pendingStarterRepertoireId,
+    pendingStarterTemplateId,
+  } = useOnboarding();
   const {
     incrementRepertoireListChanged,
     localDb,
@@ -46,6 +63,7 @@ export const OnboardingOverlay: Component = () => {
   const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
   const [isLoadingGenres, setIsLoadingGenres] = createSignal(false);
   const [isSavingGenres, setIsSavingGenres] = createSignal(false);
+  const [isCreatingStarter, setIsCreatingStarter] = createSignal(false);
 
   const handleRepertoireCreated = () => {
     setRepertoireCreated(true);
@@ -58,6 +76,41 @@ export const OnboardingOverlay: Component = () => {
 
   const handleSkip = () => {
     skipOnboarding();
+  };
+
+  /**
+   * Handle the user choosing a starter/demo repertoire template.
+   * Creates the repertoire immediately and defers tune population to
+   * after the catalog sync in the next step.
+   */
+  const handleStarterChosen = async (templateId: string) => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) return;
+
+    const template = getStarterTemplateById(templateId);
+    if (!template) return;
+
+    setIsCreatingStarter(true);
+    try {
+      const newRepertoire = await createStarterRepertoire(db, userId, template);
+
+      // Store the pending starter so Step 2 can populate it after sync
+      setPendingStarter(newRepertoire.repertoireId, template.id);
+
+      // Pre-select the starter's genres for Step 2
+      setSelectedGenreIds(template.preselectedGenreIds);
+
+      // Refresh the repertoire dropdown in TopNav
+      incrementRepertoireListChanged();
+
+      setRepertoireCreated(true);
+      nextStep();
+    } catch (error) {
+      console.error("Failed to create starter repertoire:", error);
+    } finally {
+      setIsCreatingStarter(false);
+    }
   };
 
   // Load genres when component mounts or step changes to choose-genres
@@ -168,6 +221,38 @@ export const OnboardingOverlay: Component = () => {
           );
         });
       }
+
+      // If the user picked a starter repertoire in Step 1, populate it now
+      // that the catalog has synced and tunes are available locally.
+      const starterRepertoireId = pendingStarterRepertoireId();
+      const starterTemplateId = pendingStarterTemplateId();
+      if (starterRepertoireId && starterTemplateId) {
+        const template = getStarterTemplateById(starterTemplateId);
+        if (template) {
+          console.log(
+            `🎵 Populating starter repertoire "${starterRepertoireId}" from template "${starterTemplateId}"`
+          );
+          try {
+            const result = await populateStarterRepertoireFromCatalog(
+              db,
+              userId,
+              starterRepertoireId,
+              template
+            );
+            console.log(
+              `✅ Added ${result.added} tunes to starter repertoire (${result.skipped} already present)`
+            );
+          } catch (popErr) {
+            // Non-fatal: user can add tunes manually from catalog
+            console.warn(
+              "Failed to auto-populate starter repertoire tunes:",
+              popErr
+            );
+          }
+        }
+        clearPendingStarter();
+      }
+
       nextStep();
       navigate("/?tab=catalog");
     } catch (error) {
@@ -196,10 +281,10 @@ export const OnboardingOverlay: Component = () => {
       {/* Onboarding Overlays */}
       <Show when={needsOnboarding()}>
         <Switch>
-          {/* Step 1: Create Repertoire */}
+          {/* Step 1: Choose starter or create custom repertoire */}
           <Match when={onboardingStep() === "create-repertoire"}>
             <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
                 <div class="flex items-start justify-between mb-4">
                   <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
@@ -221,25 +306,63 @@ export const OnboardingOverlay: Component = () => {
 
                 <div class="space-y-4">
                   <p class="text-gray-600 dark:text-gray-300">
-                    Let's get you started! First, create a repertoire to
-                    organize tunes.
+                    Get started with a pre-populated demo repertoire, or create
+                    your own from scratch.
                   </p>
 
-                  <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
-                    <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                      What's a repertoire?
+                  {/* Starter repertoire cards */}
+                  <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      Demo Repertoires
                     </h3>
-                    <p class="text-sm text-blue-800 dark:text-blue-200">
-                      Repertoires group tunes by instrument, genre, or goal. You
-                      can manage multiple repertoires or maintain a single one.
-                    </p>
+
+                    <For each={STARTER_TEMPLATES}>
+                      {(template) => (
+                        <button
+                          type="button"
+                          onClick={() => void handleStarterChosen(template.id)}
+                          disabled={isCreatingStarter()}
+                          data-testid={`onboarding-starter-${template.id}`}
+                          class="w-full text-left border border-blue-200 dark:border-blue-700 rounded-lg p-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <div class="flex items-start gap-3">
+                            <span class="text-2xl leading-none mt-0.5" aria-hidden="true">
+                              {template.emoji}
+                            </span>
+                            <div class="flex-1 min-w-0">
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-semibold text-gray-900 dark:text-white text-sm">
+                                  {template.name}
+                                </span>
+                                <span class="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                  ~{template.estimatedTuneCount} tunes
+                                </span>
+                              </div>
+                              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                {template.description}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      )}
+                    </For>
                   </div>
 
+                  {/* Divider */}
+                  <div class="flex items-center gap-3">
+                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                    <span class="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                      or
+                    </span>
+                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                  </div>
+
+                  {/* Custom repertoire + skip */}
                   <div class="flex gap-3">
                     <button
                       type="button"
                       onClick={handleSkip}
-                      class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors"
+                      class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors text-sm"
                     >
                       Skip Tour
                     </button>
@@ -249,10 +372,11 @@ export const OnboardingOverlay: Component = () => {
                         setRepertoireCreated(false);
                         setShowRepertoireDialog(true);
                       }}
-                      class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+                      disabled={isCreatingStarter()}
+                      class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                       data-testid="onboarding-create-repertoire"
                     >
-                      Create Repertoire
+                      Create Custom
                     </button>
                   </div>
                 </div>

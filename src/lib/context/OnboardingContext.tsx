@@ -45,6 +45,25 @@ interface OnboardingState {
 
   /** Check if user should see onboarding (no repertoires) */
   shouldShowOnboarding: (hasRepertoires: boolean) => boolean;
+
+  /**
+   * ID of a starter repertoire that is waiting to be populated with tunes
+   * after the catalog sync completes (set in Step 1, consumed in Step 2).
+   * null when no starter is pending.
+   */
+  pendingStarterRepertoireId: Accessor<string | null>;
+
+  /**
+   * Template ID of the pending starter so the overlay knows which genres to
+   * pre-select and which filter to use during population.
+   */
+  pendingStarterTemplateId: Accessor<string | null>;
+
+  /** Store the starter repertoire ID and template ID for deferred population */
+  setPendingStarter: (repertoireId: string, templateId: string) => void;
+
+  /** Clear the pending starter once it has been populated */
+  clearPendingStarter: () => void;
 }
 
 /**
@@ -92,6 +111,24 @@ export const OnboardingProvider: ParentComponent = (props) => {
     typeof localStorage !== "undefined" &&
       localStorage.getItem(SKIPPED_KEY) === "true"
   );
+
+  // Track a starter repertoire that needs tune population after catalog sync.
+  const [pendingStarterRepertoireId, setPendingStarterRepertoireId] =
+    createSignal<string | null>(null);
+  const [pendingStarterTemplateId, setPendingStarterTemplateId] =
+    createSignal<string | null>(null);
+
+  /** Store the starter repertoire ID and template ID for deferred population */
+  const setPendingStarter = (repertoireId: string, templateId: string) => {
+    setPendingStarterRepertoireId(repertoireId);
+    setPendingStarterTemplateId(templateId);
+  };
+
+  /** Clear the pending starter once population is complete */
+  const clearPendingStarter = () => {
+    setPendingStarterRepertoireId(null);
+    setPendingStarterTemplateId(null);
+  };
 
   /**
    * Check if user should see onboarding based on whether they have repertoires
@@ -175,6 +212,10 @@ export const OnboardingProvider: ParentComponent = (props) => {
     completeOnboarding,
     skipOnboarding,
     shouldShowOnboarding,
+    pendingStarterRepertoireId,
+    pendingStarterTemplateId,
+    setPendingStarter,
+    clearPendingStarter,
   };
 
   return (

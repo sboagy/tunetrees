@@ -471,3 +471,45 @@ export async function searchTunes(
     .orderBy(asc(schema.tune.title))
     .all();
 }
+
+/**
+ * Get catalog tune IDs filtered by genre or primary origin.
+ *
+ * Used to populate starter/demo repertoires after catalog sync.
+ * Returns only non-deleted, public (non-private) catalog tunes.
+ *
+ * @param db - Database instance
+ * @param filterType - "genre" to filter by genre column, "origin" by primary_origin
+ * @param filterValue - The genre ID or primary_origin value to match
+ * @returns Array of tune ID strings
+ *
+ * @example
+ * // All ITRAD tunes
+ * const ids = await getCatalogTuneIdsByFilter(db, "genre", "ITRAD");
+ *
+ * // All Rolling Stone Top 500 songs
+ * const ids = await getCatalogTuneIdsByFilter(db, "origin", "rolling_stone_top_500_v1");
+ */
+export async function getCatalogTuneIdsByFilter(
+  db: SqliteDatabase,
+  filterType: "genre" | "origin",
+  filterValue: string
+): Promise<string[]> {
+  const baseConditions = [
+    eq(schema.tune.deleted, 0),
+    isNull(schema.tune.privateFor), // catalog (public) tunes only
+  ];
+
+  const filterCondition =
+    filterType === "genre"
+      ? eq(schema.tune.genre, filterValue)
+      : eq(schema.tune.primaryOrigin, filterValue);
+
+  const rows = await db
+    .select({ id: schema.tune.id })
+    .from(schema.tune)
+    .where(and(...baseConditions, filterCondition) as any)
+    .all();
+
+  return rows.map((r) => r.id);
+}
