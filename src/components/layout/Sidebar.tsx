@@ -32,6 +32,7 @@ import {
   createEffect,
   createSignal,
   onCleanup,
+  onMount,
   Show,
 } from "solid-js";
 import { NotesPanel } from "@/components/notes/NotesPanel";
@@ -40,6 +41,7 @@ import { TuneInfoHeader } from "@/components/sidebar";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import type { DockPosition } from "./SidebarDockContext";
 import { SidebarDragHandle } from "./SidebarDragHandle";
+import { useSidebarResize } from "./SidebarResizeContext";
 
 /**
  * Sidebar Component Props
@@ -89,16 +91,31 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Tune Info section collapsed state – defaults to collapsed when the sidebar
-  // is docked at the bottom position to conserve vertical space.
+  // Tune Info section collapsed state – persisted to localStorage so it
+  // survives navigation and dialog open/cancel cycles.
+  // If no saved preference exists, default to collapsed when bottom-docked
+  // (to conserve vertical space) and expanded otherwise.
+  const TUNE_INFO_COLLAPSED_KEY = "sidebar-tune-info-collapsed";
   const [tuneInfoCollapsed, setTuneInfoCollapsed] = createSignal(
     props.dockPosition === "bottom"
   );
 
-  // Reset the Tune Info section collapse state whenever the dock position changes
-  // so the default is always applied on each new position.
+  onMount(() => {
+    const saved = localStorage.getItem(TUNE_INFO_COLLAPSED_KEY);
+    if (saved !== null) {
+      setTuneInfoCollapsed(saved === "true");
+    }
+    // else keep the dock-position-based default set in createSignal
+  });
+
+  // When the dock position changes, only apply the position-based default if the
+  // user has no saved preference (i.e., they haven't explicitly toggled it yet).
   createEffect(() => {
-    setTuneInfoCollapsed(props.dockPosition === "bottom");
+    const pos = props.dockPosition;
+    const hasSaved = localStorage.getItem(TUNE_INFO_COLLAPSED_KEY) !== null;
+    if (!hasSaved) {
+      setTuneInfoCollapsed(pos === "bottom");
+    }
   });
 
   // Local width state for smooth dragging without triggering parent updates
@@ -259,6 +276,23 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
   const isHorizontal = () => props.dockPosition === "bottom";
 
+  // Register resize handlers into the shared context so that sibling
+  // components (e.g. the "N tunes due" sticky footer) can act as the resize
+  // target when the sidebar is bottom-docked.
+  const { registerHandlers } = useSidebarResize();
+  createEffect(() => {
+    if (isHorizontal() && !props.collapsed) {
+      registerHandlers({
+        onMouseDown: handleMouseDown,
+        onTouchStart: handleTouchStart,
+      });
+    } else {
+      registerHandlers(null);
+    }
+  });
+  // Clean up when sidebar unmounts
+  onCleanup(() => registerHandlers(null));
+
   const handleEdit = () => {
     const tuneId = currentTuneId();
     if (tuneId) {
@@ -286,9 +320,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       }}
     >
       {/* Drag Handle Header - Always visible */}
-      <header
-        class="flex items-center justify-center p-1 border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20"
-      >
+      <header class="flex items-center justify-center p-1 border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20">
         {/* The drag handle has been moved next to the collapse button */}
       </header>
 
@@ -303,14 +335,15 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         } ${props.collapsed ? "hidden" : ""}`}
       >
         {/* Current Tune Info Header – collapsible when sidebar is at the bottom */}
-        <Show
-          when={isHorizontal()}
-          fallback={<TuneInfoHeader />}
-        >
+        <Show when={isHorizontal()} fallback={<TuneInfoHeader />}>
           <div class="border-b border-gray-200/30 dark:border-gray-700/30 pb-1">
             <button
               type="button"
-              onClick={() => setTuneInfoCollapsed(!tuneInfoCollapsed())}
+              onClick={() => {
+                const next = !tuneInfoCollapsed();
+                setTuneInfoCollapsed(next);
+                localStorage.setItem(TUNE_INFO_COLLAPSED_KEY, String(next));
+              }}
               class="w-full flex items-center justify-between px-2 py-1 text-left hover:bg-gray-100/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
               aria-expanded={!tuneInfoCollapsed()}
               title={tuneInfoCollapsed() ? "Show tune info" : "Hide tune info"}
@@ -347,16 +380,16 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         </section>
       </div>
 
-      {/* Resize Handle with GripVertical indicator (only when expanded) */}
-      <div class={`${props.collapsed ? "hidden" : ""}`}>
+      {/* Resize Handle with GripVertical indicator (only when expanded and NOT bottom-docked).
+          When bottom-docked, the sticky footer in TunesGridScheduled acts as the resize
+          handle via SidebarResizeContext, so this button is hidden to avoid confusion. */}
+      <div class={`${props.collapsed || isHorizontal() ? "hidden" : ""}`}>
         <button
           type="button"
           class={`absolute z-20 select-none ${
-            isHorizontal()
-              ? "top-0 left-12 right-0 h-4 md:h-1 cursor-row-resize hover:bg-blue-500 md:hover:h-1.5"
-              : props.dockPosition === "right"
-                ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
-                : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+            props.dockPosition === "right"
+              ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+              : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
           } transition-all group border-0 bg-transparent p-0 touch-none`}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
@@ -366,18 +399,12 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           {/* GripVertical icon - centered, always slightly visible on mobile, hover on desktop */}
           <div
             class={`absolute opacity-60 md:opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none ${
-              isHorizontal()
-                ? "left-1/2 -translate-x-1/2 -top-2"
-                : props.dockPosition === "right"
-                  ? "top-1/2 -translate-y-1/2 -left-2"
-                  : "top-1/2 -translate-y-1/2 -right-2"
+              props.dockPosition === "right"
+                ? "top-1/2 -translate-y-1/2 -left-2"
+                : "top-1/2 -translate-y-1/2 -right-2"
             }`}
           >
-            <GripVertical
-              class={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
-                isHorizontal() ? "rotate-90" : ""
-              }`}
-            />
+            <GripVertical class="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
           </div>
         </button>
       </div>

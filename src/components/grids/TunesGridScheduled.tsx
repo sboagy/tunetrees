@@ -21,6 +21,7 @@ import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
+import { useSidebarResize } from "../layout/SidebarResizeContext";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
@@ -30,6 +31,10 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const { localDb } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+
+  // When the sidebar is bottom-docked, use the sticky footer as the resize
+  // handle so it is easy to find and tap on mobile.
+  const { handlers: resizeHandlers } = useSidebarResize();
 
   // Goals: load once per user, used by GoalBadge dropdown in the grid.
   const [goalsData] = createResource(
@@ -196,14 +201,44 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         />
       </Show>
 
-      {/* Sticky Footer with Stats */}
-      <div class="sticky bottom-0 z-10 bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 px-4 py-2">
-        <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-          <span>
-            {tunes().length} tune{tunes().length !== 1 ? "s" : ""} due
-          </span>
-        </div>
-      </div>
+      {/* Sticky Footer with Stats.
+          When the sidebar is bottom-docked, resizeHandlers() is non-null and
+          the entire footer bar doubles as the resize drag handle. A centered
+          pill indicator provides a visual affordance. We conditionally render
+          a <button> (interactive) vs <div> (static) to satisfy a11y rules. */}
+      <Show
+        when={resizeHandlers()}
+        fallback={
+          <div class="sticky bottom-0 z-10 bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 px-4 py-2">
+            <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+              <span>
+                {tunes().length} tune{tunes().length !== 1 ? "s" : ""} due
+              </span>
+            </div>
+          </div>
+        }
+      >
+        {(handlers) => (
+          <button
+            type="button"
+            class="sticky bottom-0 z-10 w-full text-left bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 px-4 pt-1 pb-2 select-none cursor-row-resize touch-none"
+            onMouseDown={(e) => handlers().onMouseDown(e)}
+            onTouchStart={(e) => handlers().onTouchStart(e)}
+            title="Drag to resize sidebar"
+            aria-label="Drag to resize sidebar"
+          >
+            {/* Drag-indicator pill centered at the top of the bar */}
+            <div class="flex justify-center mb-1 pointer-events-none">
+              <div class="w-8 h-1 rounded-full bg-gray-400 dark:bg-gray-500 opacity-70" />
+            </div>
+            <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+              <span>
+                {tunes().length} tune{tunes().length !== 1 ? "s" : ""} due
+              </span>
+            </div>
+          </button>
+        )}
+      </Show>
     </div>
   );
 };

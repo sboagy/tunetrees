@@ -13,12 +13,13 @@
  */
 
 import type { ParentComponent } from "solid-js";
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { AnonymousBanner } from "../auth/AnonymousBanner";
 import { DropZoneOverlays } from "./DropZoneOverlays";
 import { Sidebar } from "./Sidebar";
 import { useSidebarDock } from "./SidebarDockContext";
+import { SidebarResizeProvider } from "./SidebarResizeContext";
 import { TabBar, type TabId } from "./TabBar";
 import { TopNav } from "./TopNav";
 
@@ -56,9 +57,23 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     setIsDragging(false);
   };
 
+  // Separate localStorage keys for mobile/desktop sidebar collapsed state.
+  // Defaults to open (false) on both viewports. Mobile-specific key ensures the
+  // bottom-dock default stays open without inheriting a desktop "collapsed" pref.
+  const COLLAPSED_MOBILE_KEY = "sidebar-collapsed-mobile";
+  const COLLAPSED_DESKTOP_KEY = "sidebar-collapsed-desktop";
+
+  const collapsedKey = () =>
+    window.innerWidth < 768 ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY;
+
   // Load sidebar state from localStorage on mount
   onMount(() => {
-    const savedCollapsed = localStorage.getItem("sidebar-collapsed");
+    // Load the correct key based on initial viewport
+    const isMobileNow = window.innerWidth < 768;
+    const savedCollapsed = localStorage.getItem(
+      isMobileNow ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY
+    );
+    // Default for mobile is open (false); only apply saved value if explicitly set
     if (savedCollapsed === "true") {
       setSidebarCollapsed(true);
     }
@@ -71,27 +86,36 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
       }
     }
 
-    // Auto-collapse on mobile
-    const checkMobile = () => {
-      const isMobile = window.innerWidth < 768; // md breakpoint
-      if (isMobile && !sidebarCollapsed()) {
-        setSidebarCollapsed(true);
+    // On viewport type change (desktop↔mobile), save current state under the
+    // outgoing key and restore the saved state for the incoming viewport type.
+    let wasMobile = isMobileNow;
+    const handleViewportChange = () => {
+      const nowMobile = window.innerWidth < 768;
+      if (nowMobile !== wasMobile) {
+        // Save current collapsed state under the outgoing viewport key
+        localStorage.setItem(
+          wasMobile ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY,
+          String(sidebarCollapsed())
+        );
+        // Restore the saved state for the new viewport (default to open)
+        const saved = localStorage.getItem(
+          nowMobile ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY
+        );
+        setSidebarCollapsed(saved === "true");
+        wasMobile = nowMobile;
       }
     };
 
-    // Check on mount
-    checkMobile();
-
-    // Check on resize
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener("resize", handleViewportChange);
+    // Properly register cleanup (onMount ignores return values in SolidJS)
+    onCleanup(() => window.removeEventListener("resize", handleViewportChange));
   });
 
   const handleSidebarToggle = () => {
     const newState = !sidebarCollapsed();
     setSidebarCollapsed(newState);
-    // Save state to localStorage
-    localStorage.setItem("sidebar-collapsed", String(newState));
+    // Save under the correct viewport key
+    localStorage.setItem(collapsedKey(), String(newState));
     // TODO: Save to tab_group_main_state table
   };
 
@@ -103,61 +127,63 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   };
 
   return (
-    <div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Top Navigation Bar */}
-      <TopNav />
+    <SidebarResizeProvider>
+      <div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+        {/* Top Navigation Bar */}
+        <TopNav />
 
-      {/* Anonymous User Banner */}
-      <Show when={isAnonymous()}>
-        <AnonymousBanner
-          onConvert={() => {
-            // Use window.location instead of navigate() due to SolidJS router issues
-            // when called from within nested component callbacks
-            window.location.href = "/login?convert=true";
-          }}
-        />
-      </Show>
+        {/* Anonymous User Banner */}
+        <Show when={isAnonymous()}>
+          <AnonymousBanner
+            onConvert={() => {
+              // Use window.location instead of navigate() due to SolidJS router issues
+              // when called from within nested component callbacks
+              window.location.href = "/login?convert=true";
+            }}
+          />
+        </Show>
 
-      <div
-        class={`flex flex-1 overflow-hidden relative ${
-          dockPosition() === "bottom"
-            ? "flex-col-reverse"
-            : dockPosition() === "right"
-              ? "flex-row-reverse"
-              : "flex-row"
-        }`}
-      >
-        {/* Drop Zone Overlays (shown during drag) */}
-        <DropZoneOverlays isDragging={isDragging()} />
+        <div
+          class={`flex flex-1 overflow-hidden relative ${
+            dockPosition() === "bottom"
+              ? "flex-col-reverse"
+              : dockPosition() === "right"
+                ? "flex-row-reverse"
+                : "flex-row"
+          }`}
+        >
+          {/* Drop Zone Overlays (shown during drag) */}
+          <DropZoneOverlays isDragging={isDragging()} />
 
-        {/* Sidebar */}
-        <Sidebar
-          collapsed={sidebarCollapsed()}
-          onToggle={handleSidebarToggle}
-          width={sidebarWidth()}
-          onWidthChange={() => {}} // No-op during drag
-          onWidthChangeEnd={handleSidebarWidthChangeEnd}
-          minWidth={240}
-          maxWidth={600}
-          dockPosition={dockPosition()}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        />
+          {/* Sidebar */}
+          <Sidebar
+            collapsed={sidebarCollapsed()}
+            onToggle={handleSidebarToggle}
+            width={sidebarWidth()}
+            onWidthChange={() => {}} // No-op during drag
+            onWidthChangeEnd={handleSidebarWidthChangeEnd}
+            minWidth={240}
+            maxWidth={600}
+            dockPosition={dockPosition()}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          />
 
-        {/* Main Content Area */}
-        <div class="flex-1 flex flex-col overflow-hidden">
-          {/* Tab Navigation - only show if activeTab is provided (Home page) */}
-          <Show when={props.activeTab && props.onTabChange}>
-            <TabBar
-              activeTab={props.activeTab}
-              onTabChange={props.onTabChange!}
-            />
-          </Show>
+          {/* Main Content Area */}
+          <div class="flex-1 flex flex-col overflow-hidden">
+            {/* Tab Navigation - only show if activeTab is provided (Home page) */}
+            <Show when={props.activeTab && props.onTabChange}>
+              <TabBar
+                activeTab={props.activeTab}
+                onTabChange={props.onTabChange!}
+              />
+            </Show>
 
-          {/* Tab Content - Remove overflow-auto to let child components handle scrolling */}
-          <div class="flex-1 overflow-hidden">{props.children}</div>
+            {/* Tab Content - Remove overflow-auto to let child components handle scrolling */}
+            <div class="flex-1 overflow-hidden">{props.children}</div>
+          </div>
         </div>
       </div>
-    </div>
+    </SidebarResizeProvider>
   );
 };

@@ -94,9 +94,12 @@ export const SidebarDockProvider: ParentComponent = (props) => {
     ) {
       setDesktopPositionInternal(savedDesktop);
     } else {
-      // Migrate from legacy single key (if the user had a saved preference)
+      // Migrate from legacy single key (if the user had a saved preference).
+      // Only migrate "left"/"right" – "bottom" is now mobile-only, so if
+      // the legacy key held "bottom" (e.g. from earlier dev/test sessions)
+      // do not promote it to the desktop key; keep the "left" default instead.
       const legacy = localStorage.getItem(LEGACY_KEY);
-      if (legacy === "left" || legacy === "right" || legacy === "bottom") {
+      if (legacy === "left" || legacy === "right") {
         setDesktopPositionInternal(legacy);
         localStorage.setItem(DESKTOP_KEY, legacy);
       }
