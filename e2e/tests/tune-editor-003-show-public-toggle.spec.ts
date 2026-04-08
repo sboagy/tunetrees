@@ -26,7 +26,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
     });
     await ttPage.page.waitForTimeout(500);
 
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     // Avoid networkidle (websockets + service worker keep network open); rely on UI ready state
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });

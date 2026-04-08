@@ -169,7 +169,7 @@ test.describe("Anonymous User Edge Cases", () => {
 
     // Check that we're back on the home page
     // Note: Without a repertoire, repertoire tab shows "No repertoire selected"
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire", { waitForContent: false });
 
     // Expect either the repertoire grid (if repertoire persists) or the "no repertoire" message
     const noRepertoireMessage = page.getByText("No current repertoire");

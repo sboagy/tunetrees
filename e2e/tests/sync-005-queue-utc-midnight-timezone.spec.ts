@@ -6,6 +6,7 @@ import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
 import { resetLocalDbAndResync } from "../helpers/local-db-lifecycle";
 import {
   getTestUserClient,
+  navigateToTabForTest,
   setupForPracticeTestsParallel,
 } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
@@ -155,8 +156,7 @@ test.describe("SYNC-005: UTC-midnight window_start_utc regression (timezone bug)
     await resetLocalDbAndResync(page);
 
     // Navigate to practice tab (setup used "repertoire" to avoid premature queue creation)
-    const practiceTab = page.getByTestId("tab-practice");
-    await practiceTab.click();
+    await navigateToTabForTest(page, "practice");
 
     // Wait for practice UI to settle after queueReady resolves
     await expect(page.getByTestId("practice-columns-button")).toBeVisible({

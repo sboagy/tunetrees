@@ -160,7 +160,7 @@ test.describe("Anonymous User Data Functionality", () => {
     await expect(firstTuneCheckbox).not.toBeChecked({ timeout: 15000 });
 
     // Navigate to Repertoire to verify
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
 
     const repertoireRows = ttPage.repertoireGrid.locator(

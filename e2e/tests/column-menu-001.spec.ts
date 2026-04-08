@@ -21,7 +21,7 @@ test.describe("Column Visibility Menu", () => {
 
   test("should keep menu open when clicking checkbox", async ({ page }) => {
     // Navigate to Repertoire tab
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(1000);
 
     // Click the Columns button to open menu
@@ -84,7 +84,7 @@ test.describe("Column Visibility Menu", () => {
 
   test("should close menu when clicking outside", async ({ page }) => {
     // Navigate to Repertoire tab
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(1000);
 
     // Click the Columns button to open menu

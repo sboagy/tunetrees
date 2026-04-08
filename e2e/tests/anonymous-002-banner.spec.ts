@@ -45,15 +45,15 @@ test.describe("Anonymous User Banner", () => {
 
   test("2.2 Banner shows on all main tabs", async () => {
     // Check Practice tab
-    await ttPage.practiceTab.click();
+    await ttPage.navigateToTab("practice", { waitForContent: false });
     await expect(ttPage.anonymousBanner).toBeVisible({ timeout: 5000 });
 
     // Check Repertoire tab
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire", { waitForContent: false });
     await expect(ttPage.anonymousBanner).toBeVisible({ timeout: 5000 });
 
     // Check Catalog tab
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog", { waitForContent: false });
     await expect(ttPage.anonymousBanner).toBeVisible({ timeout: 5000 });
   });
 
@@ -86,13 +86,13 @@ test.describe("Anonymous User Banner", () => {
     await expect(ttPage.anonymousBanner).not.toBeVisible({ timeout: 5000 });
 
     // Navigate to different tabs
-    await ttPage.repertoireTab.click();
+    await ttPage.navigateToTab("repertoire", { waitForContent: false });
     await expect(ttPage.anonymousBanner).not.toBeVisible({ timeout: 2000 });
 
-    await ttPage.catalogTab.click();
+    await ttPage.navigateToTab("catalog", { waitForContent: false });
     await expect(ttPage.anonymousBanner).not.toBeVisible({ timeout: 2000 });
 
-    await ttPage.practiceTab.click();
+    await ttPage.navigateToTab("practice", { waitForContent: false });
     await expect(ttPage.anonymousBanner).not.toBeVisible({ timeout: 2000 });
   });
 
