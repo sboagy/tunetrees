@@ -16,7 +16,7 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
-import type { SqliteDatabase } from "../client-sqlite";
+import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import { note, practiceRecord, repertoireTune } from "../schema";
 
 /**
@@ -49,6 +49,10 @@ export async function updateRepertoireTuneLearned(
     );
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
+
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  // Auto-persist runs every 30s, but user might refresh before that fires
+  await persistDb();
 }
 
 /**
@@ -96,6 +100,10 @@ export async function updateRepertoireTuneFields(
     );
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
+
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  // Auto-persist runs every 30s, but user might refresh before that fires
+  await persistDb();
 }
 
 /**
@@ -195,6 +203,10 @@ export async function upsertPracticeRecord(
   }
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
+
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  // Auto-persist runs every 30s, but user might refresh before that fires
+  await persistDb();
 }
 
 /**
@@ -254,6 +266,10 @@ export async function getOrCreatePrivateNote(
     })
     .returning();
 
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  // Auto-persist runs every 30s, but user might refresh before that fires
+  await persistDb();
+
   return newNote[0].id;
 }
 
@@ -280,6 +296,10 @@ export async function updateNoteText(
     .where(eq(note.id, noteId));
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
+
+  // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+  // Auto-persist runs every 30s, but user might refresh before that fires
+  await persistDb();
 }
 
 /**
