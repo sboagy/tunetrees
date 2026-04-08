@@ -58,11 +58,10 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     // Look for Edit button in sidebar
     const editButton = ttPage.sidebarEditTuneButton;
     await expect(editButton).toBeVisible({ timeout: 5000 });
+    await expect(editButton).toBeEnabled({ timeout: 5000 });
 
     // ACT: Open editor
-    // On Mobile Chrome the sidebar resize handle (w-4, z-20) overlaps the
-    // edit button, so use force to dispatch the click directly.
-    await editButton.click({ force: true });
+    await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Verify we're on the edit page or modal is open
@@ -123,7 +122,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
     await expect(editButton).toBeVisible({ timeout: 5000 });
-    await editButton.click({ force: true });
+    await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ACT: Modify title
@@ -183,7 +182,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     // const editButton = ttPage.sidebarEditTuneButton;
     const editButton = page.getByRole("button", { name: "Edit tune" });
     await expect(editButton).toBeVisible({ timeout: 5000 });
-    await editButton.click({ force: true });
+    await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ACT: Modify multiple fields
@@ -250,7 +249,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
     await expect(editButton).toBeVisible({ timeout: 5000 });
-    await editButton.click({ force: true });
+    await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ACT: Modify title (this should create an override)
