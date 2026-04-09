@@ -43,6 +43,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
 
     // On mobile, expand the sidebar (collapsed by default)
     await ttPage.ensureSidebarExpanded();
+    await ttPage.ensureTuneInfoExpanded();
 
     // Wait for sidebar to show tune details
     await expect(
@@ -123,10 +124,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
 
     await expect(firstDragHandle).toBeVisible({ timeout: 5000 });
     await expect(secondRefItem).toBeVisible({ timeout: 5000 });
-    await firstDragHandle.scrollIntoViewIfNeeded();
-    await secondRefItem.scrollIntoViewIfNeeded();
-
-    await firstDragHandle.dragTo(secondRefItem, { force: true });
+    await ttPage.dispatchHtml5DragAndDrop(firstDragHandle, secondRefItem);
 
     // Verify order changed - second reference should now be first
     await expect

@@ -205,8 +205,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
               String(props.currentRowId) === String(itemId);
 
             const title = item.title ?? "(Untitled)";
-            const favoriteUrl =
-              item.favorite_url ?? item.favoriteUrl ?? null;
+            const favoriteUrl = item.favorite_url ?? item.favoriteUrl ?? null;
             const primaryOrigin =
               item.primary_origin ?? item.primaryOrigin ?? null;
             const idForeign = item.id_foreign ?? item.idForeign ?? null;
@@ -274,6 +273,15 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                       <RecallEvalComboBox
                         tuneId={String(itemId)}
                         value={item.recall_eval ?? ""}
+                        open={props.cellCallbacks?.getRecallEvalOpen?.(
+                          String(itemId)
+                        )}
+                        onOpenChange={(isOpen) =>
+                          props.cellCallbacks?.setRecallEvalOpen?.(
+                            String(itemId),
+                            isOpen
+                          )
+                        }
                         onChange={(val) => {
                           props.cellCallbacks?.onRecallEvalChange?.(
                             String(itemId),
@@ -289,11 +297,14 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 <Show when={props.tablePurpose === "scheduled"}>
                   <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
                     <Show when={item.latest_practiced}>
-                      <span>Practiced: {formatJustDate(item.latest_practiced)}</span>
+                      <span>
+                        Practiced: {formatJustDate(item.latest_practiced)}
+                      </span>
                     </Show>
                     <Show when={item.latest_stability != null}>
                       <span>
-                        Stability: {(item.latest_stability as number).toFixed(1)}
+                        Stability:{" "}
+                        {(item.latest_stability as number).toFixed(1)}
                       </span>
                     </Show>
                   </div>
@@ -317,19 +328,14 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         </span>
                       </span>
                     </Show>
-                    <Show
-                      when={
-                        (item.scheduled ?? item.latest_due) != null
-                      }
-                    >
+                    <Show when={(item.scheduled ?? item.latest_due) != null}>
                       {(() => {
                         const rel = getRelativeLabel(
                           item.scheduled ?? item.latest_due
                         );
                         return (
                           <span>
-                            Due:{" "}
-                            <span class={rel.colorClass}>{rel.label}</span>
+                            Due: <span class={rel.colorClass}>{rel.label}</span>
                           </span>
                         );
                       })()}

@@ -47,6 +47,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
 
     // On mobile, expand the sidebar (collapsed by default)
     await ttPage.ensureSidebarExpanded();
+    await ttPage.ensureTuneInfoExpanded();
 
     // Wait for sidebar to show tune details
     await expect(

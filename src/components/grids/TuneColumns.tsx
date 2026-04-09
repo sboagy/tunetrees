@@ -1143,6 +1143,10 @@ export function getScheduledColumns(
           <RecallEvalComboBox
             tuneId={tuneId}
             value={currentEval}
+            open={callbacks?.getRecallEvalOpen?.(tuneId)}
+            onOpenChange={(isOpen) =>
+              callbacks?.setRecallEvalOpen?.(tuneId, isOpen)
+            }
             onChange={(value) => {
               if (callbacks?.onRecallEvalChange) {
                 callbacks.onRecallEvalChange(tuneId, value);

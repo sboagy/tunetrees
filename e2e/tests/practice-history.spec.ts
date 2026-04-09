@@ -69,15 +69,6 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
     await ttPage.searchForTune("Banish Misfortune", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
-    // On mobile: expand sidebar BEFORE clicking tune
-    const expandSidebarButton = page.getByRole("button", {
-      name: /expand sidebar/i,
-    });
-    if (await expandSidebarButton.isVisible({ timeout: 1000 })) {
-      await expandSidebarButton.click();
-      await page.waitForTimeout(300);
-    }
-
     // Now click the tune
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
@@ -85,6 +76,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
 
     // Wait for sidebar to populate with tune details
     await page.waitForTimeout(1500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Navigate to practice history
     const practiceHistoryLink = page.getByTestId(
@@ -123,15 +115,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
-
-    // Expand sidebar on mobile
-    const expandSidebarButton = page.getByRole("button", {
-      name: /expand sidebar/i,
-    });
-    if (await expandSidebarButton.isVisible({ timeout: 1000 })) {
-      await expandSidebarButton.click();
-      await page.waitForTimeout(300);
-    }
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Navigate to practice history
     const practiceHistoryLink = page.getByTestId(
@@ -337,8 +321,7 @@ test.describe("PRACTICE-HISTORY: Editing Records", () => {
     await firstRow.click();
     await page.waitForTimeout(500);
 
-    // Expand sidebar on mobile
-    await ttPage.ensureSidebarExpanded({ timeoutMs: 10_000 });
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     const practiceHistoryLink = page.getByTestId(
       "sidebar-practice-history-link"
@@ -464,21 +447,13 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
     await ttPage.searchForTune("Banish", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
 
-    // On mobile: expand sidebar BEFORE clicking tune
-    const expandSidebarButton = page.getByRole("button", {
-      name: /expand sidebar/i,
-    });
-    if (await expandSidebarButton.isVisible({ timeout: 1000 })) {
-      await expandSidebarButton.click();
-      await page.waitForTimeout(300);
-    }
-
     // Now click the tune
     const firstRow = ttPage.getRows("repertoire").first();
     await firstRow.click();
 
     // Wait for sidebar to populate with tune details
     await page.waitForTimeout(1500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     const practiceHistoryLink = page.getByTestId(
       "sidebar-practice-history-link"
@@ -625,7 +600,7 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
     await firstRow.click();
     await page.waitForTimeout(500);
 
-    await ttPage.ensureSidebarExpanded({ timeoutMs: 10_000 });
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     const practiceHistoryLink = page.getByTestId(
       "sidebar-practice-history-link"

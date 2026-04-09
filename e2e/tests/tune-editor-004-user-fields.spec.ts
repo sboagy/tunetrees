@@ -69,6 +69,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
@@ -97,6 +98,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     // ASSERT: Reopen editor and verify learned date was saved
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
@@ -122,6 +124,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
@@ -148,6 +151,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     // ASSERT: Reopen and verify
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
@@ -173,6 +177,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
@@ -200,6 +205,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     // ASSERT: Reopen and verify
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
@@ -225,6 +231,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
@@ -257,6 +264,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
@@ -301,6 +309,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // ACT: Click practice history link in sidebar
     const practiceHistoryLink = page.getByTestId(
@@ -338,6 +347,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;

@@ -54,6 +54,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await selectedTuneRow.click();
     await ttPage.ensureSidebarExpanded({ timeoutMs: 10000 });
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Look for Edit button in sidebar
     const editButton = ttPage.sidebarEditTuneButton;
@@ -118,6 +119,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
@@ -177,10 +179,10 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Open editor
-    // const editButton = ttPage.sidebarEditTuneButton;
-    const editButton = page.getByRole("button", { name: "Edit tune" });
+    const editButton = ttPage.sidebarEditTuneButton;
     await expect(editButton).toBeVisible({ timeout: 5000 });
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -245,6 +247,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await firstRow.click();
     await page.waitForTimeout(500);
+    await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Open editor
     const editButton = ttPage.sidebarEditTuneButton;
