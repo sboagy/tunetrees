@@ -43,6 +43,7 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
 
     // On mobile, expand the sidebar (collapsed by default)
     await ttPage.ensureSidebarExpanded();
+    await ttPage.ensureTuneInfoExpanded();
 
     // Wait for sidebar to show tune details
     await expect(
@@ -113,7 +114,7 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
     const firstDragHandle = page.getByTestId(`note-drag-handle-${firstNoteId}`);
     const secondNoteItem = page.getByTestId(`note-item-${secondNoteId}`);
 
-    await firstDragHandle.dragTo(secondNoteItem);
+    await ttPage.dispatchHtml5DragAndDrop(firstDragHandle, secondNoteItem);
 
     // Verify order changed - second note should now be first
     // try for a few times

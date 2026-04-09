@@ -100,6 +100,12 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     return mappedData;
   });
 
+  // Preserve recall-eval menu open state across reactive grid refreshes.
+  const [openMenus, setOpenMenus] = createSignal<Record<string, boolean>>({});
+  const getRecallEvalOpen = (tuneId: string) => !!openMenus()[tuneId];
+  const setRecallEvalOpen = (tuneId: string, isOpen: boolean) =>
+    setOpenMenus((prev) => ({ ...prev, [tuneId]: isOpen }));
+
   // Notify parent when tunes change (for flashcard view)
   createEffect(() => {
     if (props.onTunesChange) {
@@ -190,6 +196,8 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           onColumnVisibilityChange={setColumnVisibility}
           cellCallbacks={{
             onRecallEvalChange: handleRecallEvalChange,
+            getRecallEvalOpen,
+            setRecallEvalOpen,
             onGoalChange: props.onGoalChange,
             onScheduledChange: props.onScheduledChange,
             goals: () => goalsData() ?? [],
@@ -221,16 +229,12 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
         {(handlers) => (
           <button
             type="button"
-            class="sticky bottom-0 z-10 w-full text-left bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 px-4 pt-1 pb-2 select-none cursor-row-resize touch-none"
+            class="sticky bottom-0 z-10 w-full text-left bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 px-4 py-2 select-none cursor-row-resize touch-none"
             onMouseDown={(e) => handlers().onMouseDown(e)}
             onTouchStart={(e) => handlers().onTouchStart(e)}
             title="Drag to resize sidebar"
             aria-label="Drag to resize sidebar"
           >
-            {/* Drag-indicator pill centered at the top of the bar */}
-            <div class="flex justify-center mb-1 pointer-events-none">
-              <div class="w-8 h-1 rounded-full bg-gray-400 dark:bg-gray-500 opacity-70" />
-            </div>
             <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
               <span>
                 {tunes().length} tune{tunes().length !== 1 ? "s" : ""} due

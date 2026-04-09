@@ -319,9 +319,52 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           : "auto",
       }}
     >
-      {/* Drag Handle Header - Always visible */}
-      <header class="flex items-center justify-center p-1 border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20">
-        {/* The drag handle has been moved next to the collapse button */}
+      {/* Keep a visible resize affordance on the bottom-docked sidebar even when
+          the scheduled-grid footer is absent (for example in flashcard mode).
+          The footer can still act as an additional resize target when present. */}
+      <Show when={isHorizontal() && !props.collapsed}>
+        <button
+          type="button"
+          class="flex-shrink-0 flex justify-center items-center py-0.5 cursor-row-resize select-none touch-none border-b border-gray-200/20 dark:border-gray-700/20 hover:bg-gray-200/20 dark:hover:bg-gray-700/20 transition-colors"
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+          title="Drag to resize sidebar"
+          aria-label="Resize sidebar"
+          data-testid="sidebar-resize-handle-bottom"
+        >
+          <div class="w-8 h-1 rounded-full bg-gray-400 dark:bg-gray-500 opacity-70 pointer-events-none" />
+        </button>
+      </Show>
+
+      {/* Drag/collapse header.
+          For the bottom-docked expanded sidebar, keep these controls in a
+          dedicated header row so they do not overlap the Tune Info toggle. */}
+      <header
+        class={`border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20 ${
+          isHorizontal() && !props.collapsed
+            ? "flex items-center justify-between px-2 py-1"
+            : "flex items-center justify-center p-1"
+        }`}
+      >
+        <Show when={isHorizontal() && !props.collapsed}>
+          <div class="flex items-center">
+            <SidebarDragHandle
+              onDragStart={props.onDragStart}
+              onDragEnd={props.onDragEnd}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={props.onToggle}
+            class="p-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-200/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            aria-expanded={true}
+            data-testid="sidebar-collapse-toggle"
+          >
+            <ChevronRight class="w-3.5 h-3.5 rotate-90" />
+          </button>
+        </Show>
       </header>
 
       {/* Sidebar Content (conditionally rendered) */}
@@ -344,9 +387,10 @@ export const Sidebar: Component<SidebarProps> = (props) => {
                 setTuneInfoCollapsed(next);
                 localStorage.setItem(TUNE_INFO_COLLAPSED_KEY, String(next));
               }}
-              class="w-full flex items-center justify-between px-2 py-1 text-left hover:bg-gray-100/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500"
+              class="w-full flex items-center justify-between px-2 py-1 text-left hover:bg-gray-100/30 dark:hover:bg-gray-700/30 rounded transition-colors focus:outline-none"
               aria-expanded={!tuneInfoCollapsed()}
               title={tuneInfoCollapsed() ? "Show tune info" : "Hide tune info"}
+              data-testid="sidebar-tune-info-toggle"
             >
               <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 Tune Info
@@ -358,7 +402,9 @@ export const Sidebar: Component<SidebarProps> = (props) => {
               )}
             </button>
             <Show when={!tuneInfoCollapsed()}>
-              <TuneInfoHeader />
+              <div class="mt-0.5">
+                <TuneInfoHeader />
+              </div>
             </Show>
           </div>
         </Show>
@@ -436,11 +482,13 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Collapse Toggle Button and Drag Handle - positioned based on dock position */}
       <div
         class={`absolute flex items-center justify-center z-30 select-none ${
-          isHorizontal()
-            ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
-            : props.dockPosition === "right"
-              ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
-              : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
+          isHorizontal() && !props.collapsed
+            ? "hidden"
+            : isHorizontal()
+              ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
+              : props.dockPosition === "right"
+                ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
+                : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
         }`}
       >
         <button

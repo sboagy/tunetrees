@@ -125,6 +125,7 @@ export class TuneTreesPage {
   readonly settingsMenuToggle: Locator;
   readonly addTuneDialog: Locator;
   readonly sidebarEditTuneButton: Locator;
+  readonly sidebarTuneInfoToggle: Locator;
   readonly sidebarExpandButton: Locator;
   readonly sidebarCollapseButton: Locator;
 
@@ -354,6 +355,7 @@ export class TuneTreesPage {
     this.sidebarEditTuneButton = page
       .getByTestId(/^sidebar-edit-tune-button(?:-collapsed)?$/)
       .last();
+    this.sidebarTuneInfoToggle = page.getByTestId("sidebar-tune-info-toggle");
 
     // Sidebar expand/collapse buttons (for mobile responsive layout)
     this.sidebarExpandButton = page.getByRole("button", {
@@ -846,6 +848,28 @@ export class TuneTreesPage {
   }
 
   /**
+   * Dispatch an HTML5 drag sequence directly. This is more reliable than
+   * Locator.dragTo() for mobile emulation when the app listens to
+   * dragstart/dragover/drop on draggable elements.
+   */
+  async dispatchHtml5DragAndDrop(source: Locator, target: Locator) {
+    await expect(source).toBeVisible({ timeout: 10000 });
+    await expect(target).toBeVisible({ timeout: 10000 });
+    await source.scrollIntoViewIfNeeded();
+    await target.scrollIntoViewIfNeeded();
+
+    const dataTransfer = await this.page.evaluateHandle(
+      () => new DataTransfer()
+    );
+
+    await source.dispatchEvent("dragstart", { dataTransfer });
+    await target.dispatchEvent("dragenter", { dataTransfer });
+    await target.dispatchEvent("dragover", { dataTransfer });
+    await target.dispatchEvent("drop", { dataTransfer });
+    await source.dispatchEvent("dragend", { dataTransfer });
+  }
+
+  /**
    * Sign up with email/password
    */
   async signUp(email: string, password: string, name: string) {
@@ -1047,6 +1071,8 @@ export class TuneTreesPage {
    * Avoids Playwright's networkidle which can hang due to persistent websocket connections.
    */
   async openTuneEditor() {
+    await this.ensureTuneInfoExpanded({ timeoutMs: 10000 });
+    await expect(this.sidebarEditTuneButton).toBeVisible({ timeout: 10000 });
     await this.sidebarEditTuneButton.click();
     await this.page.waitForTimeout(100); // Allow sync to start
     await expect(this.tuneEditorForm).toBeVisible({ timeout: 10000 });
@@ -1097,6 +1123,38 @@ export class TuneTreesPage {
 
       await this.page.waitForTimeout(100);
     }
+  }
+
+  /**
+   * Ensure the mobile-only Tune Info accordion is expanded before interacting
+   * with controls rendered inside TuneInfoHeader. No-op on desktop/side dock.
+   */
+  async ensureTuneInfoExpanded(opts?: { timeoutMs?: number }) {
+    const timeoutMs = opts?.timeoutMs ?? 8000;
+
+    await this.ensureSidebarExpanded({ timeoutMs });
+
+    const tuneInfoButton = this.sidebarTuneInfoToggle;
+
+    const toggleVisible = await tuneInfoButton
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!toggleVisible) return;
+
+    const ariaExpanded = await tuneInfoButton
+      .getAttribute("aria-expanded")
+      .catch(() => null);
+    if (ariaExpanded === "true") return;
+
+    await tuneInfoButton.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(tuneInfoButton).toBeVisible({ timeout: timeoutMs });
+    await expect(tuneInfoButton).toBeEnabled({ timeout: timeoutMs });
+    await tuneInfoButton.click({ timeout: timeoutMs });
+
+    await expect(tuneInfoButton).toHaveAttribute("aria-expanded", "true", {
+      timeout: timeoutMs,
+    });
+    await this.page.waitForTimeout(150);
   }
 
   /**
