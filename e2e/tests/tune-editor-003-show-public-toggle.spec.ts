@@ -28,8 +28,9 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
 
     await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
-    // Avoid networkidle (websockets + service worker keep network open); rely on UI ready state
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    // The catalog shell can mount before the synced catalog rows arrive on Mobile Chrome.
+    // Wait for actual content so searches don't race the empty-state render.
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
   });
 
   async function editTuneFieldAndSave(
@@ -40,6 +41,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
     await ttPage.searchForTune(tuneName, ttPage.catalogGrid);
     await ttPage.page.waitForTimeout(500);
     const firstRow = ttPage.getRows("catalog").first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
     await firstRow.click();
 
     await ttPage.openTuneEditor();
@@ -81,6 +83,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
     await ttPage.searchForTune(tuneTitleModified, ttPage.catalogGrid);
     await page.waitForTimeout(500);
     const firstRow = ttPage.getRows("catalog").first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
     await firstRow.click();
     await ttPage.openTuneEditor();
     const indicator = page.getByTestId("override-indicator-title");
@@ -121,6 +124,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
     await ttPage.searchForTune(tuneTitleModified, ttPage.catalogGrid);
     await page.waitForTimeout(500);
     const firstRow = ttPage.getRows("catalog").first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
     await firstRow.click();
     await ttPage.openTuneEditor();
 

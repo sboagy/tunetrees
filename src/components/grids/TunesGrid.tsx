@@ -828,6 +828,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
           onRowClick={(row) => props.onRowClick?.(row as T)}
           onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
           cellCallbacks={props.cellCallbacks}
+          columnVisibility={columnVisibility()}
         />
       </Show>
 
