@@ -250,9 +250,9 @@ export const ScheduledOverridePicker: Component<
           date.getMonth(),
           date.getDate()
         );
-        const nowOnly = new Date();
-        nowOnly.setHours(0, 0, 0, 0);
-        if (dateOnly < nowOnly) {
+        const todayDateOnly = new Date();
+        todayDateOnly.setHours(0, 0, 0, 0);
+        if (dateOnly < todayDateOnly) {
           // Override date is in the past – use red to signal an overdue/stale override.
           return "text-red-600 dark:text-red-400";
         }
