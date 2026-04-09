@@ -1012,18 +1012,60 @@ export class TuneTreesPage {
    * is "good enough".
    */
   async refreshDateRolloverIfVisible(timeoutMs = 20000): Promise<boolean> {
-    const isVisible = await this.dateRolloverBanner
-      .isVisible()
-      .catch(() => false);
+    const loadingMessage = this.page.getByText("Loading practice queue...");
+    const rowLocator = this.practiceGrid.locator("tbody tr[data-index]");
+    const startedAt = Date.now();
+    let settledWithoutRefreshSince: number | null = null;
 
-    if (!isVisible) {
-      return false;
+    while (Date.now() - startedAt < timeoutMs) {
+      const [
+        loadingVisible,
+        bannerVisible,
+        refreshEnabled,
+        emptyVisible,
+        gridVisible,
+      ] = await Promise.all([
+        loadingMessage.isVisible().catch(() => false),
+        this.dateRolloverBanner.isVisible().catch(() => false),
+        this.dateRolloverRefreshButton.isEnabled().catch(() => false),
+        this.page
+          .getByText("All Caught Up!")
+          .isVisible()
+          .catch(() => false),
+        this.practiceGrid.isVisible().catch(() => false),
+      ]);
+
+      if (bannerVisible || refreshEnabled) {
+        await this.dateRolloverRefreshButton.click();
+        await expect(this.dateRolloverRefreshButton).toBeDisabled({
+          timeout: timeoutMs,
+        });
+        await expect(this.dateRolloverBanner).toBeHidden({
+          timeout: timeoutMs,
+        });
+        return true;
+      }
+
+      const rowCount = gridVisible
+        ? await rowLocator.count().catch(() => 0)
+        : 0;
+      const settledWithoutRefresh =
+        !loadingVisible && (emptyVisible || rowCount > 0);
+
+      if (settledWithoutRefresh) {
+        if (settledWithoutRefreshSince === null) {
+          settledWithoutRefreshSince = Date.now();
+        } else if (Date.now() - settledWithoutRefreshSince >= 1000) {
+          return false;
+        }
+      } else {
+        settledWithoutRefreshSince = null;
+      }
+
+      await this.page.waitForTimeout(200);
     }
 
-    await this.dateRolloverRefreshButton.click();
-    await expect(this.dateRolloverBanner).toBeHidden({ timeout: timeoutMs });
-
-    return true;
+    return false;
   }
 
   /**

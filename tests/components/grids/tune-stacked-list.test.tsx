@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@solidjs/testing-library";
+import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
+import { createSignal, type Setter } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type IStackedListRow,
@@ -183,5 +184,41 @@ describe("TuneStackedList column visibility", () => {
         assertColumnControlsContent("scheduled", scheduledColumns, testCase);
       });
     }
+  });
+
+  it("reacts to column visibility changes without remounting", async () => {
+    let setVisibility!: Setter<Record<string, boolean>>;
+
+    const Host = () => {
+      const [visibility, updateVisibility] = createSignal(
+        buildVisibility(repertoireColumns, true, {})
+      );
+      setVisibility = updateVisibility;
+
+      return (
+        <TuneStackedList
+          data={[baseRow]}
+          tablePurpose="repertoire"
+          columnVisibility={visibility()}
+        />
+      );
+    };
+
+    render(() => <Host />);
+
+    expect(screen.getByText(/Structure:/)).toBeDefined();
+    expect(screen.getByText(/Due:/)).toBeDefined();
+
+    setVisibility(
+      buildVisibility(repertoireColumns, true, {
+        structure: false,
+        latest_due: false,
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Structure:/)).toBeNull();
+      expect(screen.queryByText(/Due:/)).toBeNull();
+    });
   });
 });

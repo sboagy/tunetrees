@@ -312,13 +312,13 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
               (primaryOrigin === "irishtune.info" && idForeign
                 ? `https://www.irishtune.info/tune/${idForeign}/`
                 : null);
-            const titleVisible = isColVisible("title");
-            const idVisible = isColVisible("id") && item.id != null;
-            const showIdInMetadata = titleVisible && idVisible;
+            const titleVisible = () => isColVisible("title");
+            const idVisible = () => isColVisible("id") && item.id != null;
+            const showIdInMetadata = () => titleVisible() && idVisible();
             const goalValue = item.goal ?? item.latest_goal;
             const recallEval = getRecallEvalDisplay(item.recall_eval);
 
-            const tuneMetadata: JSX.Element[] = [
+            const tuneMetadata = (): JSX.Element[] => [
               ...(isColVisible("structure") && item.structure
                 ? [
                     renderLabeledValue(
@@ -351,7 +351,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 : []),
             ];
 
-            const practiceMetadata: JSX.Element[] =
+            const practiceMetadata = (): JSX.Element[] =>
               props.tablePurpose === "catalog"
                 ? []
                 : [
@@ -429,7 +429,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                       : []),
                   ];
 
-            const auxiliaryMetadata: JSX.Element[] = [
+            const auxiliaryMetadata = (): JSX.Element[] => [
               ...(isColVisible("tags") && item.tags
                 ? [renderLabeledValue("Tags", item.tags)]
                 : []),
@@ -472,7 +472,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                     ),
                   ]
                 : []),
-              ...(showIdInMetadata
+              ...(showIdInMetadata()
                 ? [
                     renderLabeledValue(
                       "ID",
@@ -483,10 +483,10 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 : []),
             ];
 
-            const metadataEntries = [
-              ...tuneMetadata,
-              ...practiceMetadata,
-              ...auxiliaryMetadata,
+            const metadataEntries = (): JSX.Element[] => [
+              ...tuneMetadata(),
+              ...practiceMetadata(),
+              ...auxiliaryMetadata(),
             ];
 
             return (
@@ -511,10 +511,10 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 <div class="flex items-start justify-between gap-2 min-h-[24px]">
                   <div class="font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0">
                     <Show
-                      when={titleVisible}
+                      when={titleVisible()}
                       fallback={
                         <Show
-                          when={idVisible}
+                          when={idVisible()}
                           fallback={
                             <span class="text-gray-400 dark:text-gray-500 italic">
                               Title hidden
@@ -613,9 +613,9 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 </div>
 
                 {/* Row 3: Purpose-specific secondary info */}
-                <Show when={metadataEntries.length > 0}>
+                <Show when={metadataEntries().length > 0}>
                   <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <For each={metadataEntries}>{(entry) => entry}</For>
+                    <For each={metadataEntries()}>{(entry) => entry}</For>
                   </div>
                 </Show>
               </li>

@@ -76,9 +76,23 @@ export function usePracticeEvaluations(
   const isStaging = createMemo(() => stagingTuneIds().length > 0);
 
   const evaluationsCount = createMemo(() => {
-    return props.practiceListData().reduce((count, tune) => {
-      return count + (Number(tune.has_staged) === 1 ? 1 : 0);
-    }, 0);
+    const stagedTuneIds = new Set<string>();
+
+    for (const tune of props.practiceListData()) {
+      if (Number(tune.has_staged) === 1) {
+        stagedTuneIds.add(String(tune.id));
+      }
+    }
+
+    for (const [tuneId, evaluation] of Object.entries(evaluations())) {
+      if (evaluation) {
+        stagedTuneIds.add(tuneId);
+      } else {
+        stagedTuneIds.delete(tuneId);
+      }
+    }
+
+    return stagedTuneIds.size;
   });
 
   const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
