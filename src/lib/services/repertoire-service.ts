@@ -7,15 +7,19 @@
  * @module lib/services/repertoire-service
  */
 
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
-import { getCatalogTuneIdsByFilter } from "../db/queries/tunes";
 import {
   addTunesToRepertoire,
   createRepertoire,
   getUserRepertoires,
 } from "../db/queries/repertoires";
+import { getCatalogTuneIdsByFilter } from "../db/queries/tunes";
 import type { StarterRepertoireTemplate } from "../db/starter-repertoire-templates";
 import type { Repertoire } from "../db/types";
+
+// Support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 const SELECTED_REPERTOIRE_KEY_PREFIX = "tunetrees:selectedRepertoire";
 const SELECTED_REPERTOIRE_LEGACY_KEY_PREFIX = "tunetrees:selectedRepertoire";
@@ -170,7 +174,7 @@ export function clearSelectedRepertoireId(userId: string): void {
  * ```
  */
 export async function createStarterRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userId: string,
   template: StarterRepertoireTemplate
 ): Promise<Repertoire> {
@@ -214,7 +218,7 @@ export async function createStarterRepertoire(
  * ```
  */
 export async function populateStarterRepertoireFromCatalog(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userId: string,
   repertoireId: string,
   template: StarterRepertoireTemplate

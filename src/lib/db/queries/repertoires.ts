@@ -18,6 +18,7 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
@@ -35,6 +36,9 @@ import type {
   RepertoireTune,
   RepertoireWithSummary,
 } from "../types";
+
+// Support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 export type {
   NewRepertoire,
@@ -188,7 +192,7 @@ export async function getUserRepertoires(
  * ```
  */
 export async function getRepertoireById(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   repertoireId: string,
   userId: string
 ): Promise<Repertoire | null> {
@@ -234,7 +238,7 @@ export async function getRepertoireById(
  * ```
  */
 export async function createRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userId: string,
   data: Omit<
     NewRepertoire,
@@ -411,7 +415,7 @@ export async function deleteRepertoire(
  * ```
  */
 export async function addTuneToRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   repertoireId: string,
   tuneId: string,
   userId: string
@@ -697,7 +701,7 @@ export async function getRepertoireTunesStaged(
  * ```
  */
 export async function addTunesToRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   repertoireId: string,
   tuneIds: string[],
   userId: string

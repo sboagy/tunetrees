@@ -8,10 +8,14 @@
  */
 
 import { and, asc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
 import type { CreateTuneInput, Tune } from "../types";
+
+// Support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 /**
  * Search and filter options for tunes
@@ -491,7 +495,7 @@ export async function searchTunes(
  * const ids = await getCatalogTuneIdsByFilter(db, "origin", "rolling_stone_top_500_v1");
  */
 export async function getCatalogTuneIdsByFilter(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   filterType: "genre" | "origin",
   filterValue: string
 ): Promise<string[]> {
@@ -501,7 +505,7 @@ export async function getCatalogTuneIdsByFilter(
       : eq(schema.tune.primaryOrigin, filterValue);
 
   const rows = await db
-    .select({ id: schema.tune.id })
+    .select()
     .from(schema.tune)
     .where(
       and(
