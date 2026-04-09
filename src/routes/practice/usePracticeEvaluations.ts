@@ -7,7 +7,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import type { ITuneOverview } from "../../components/grids/types";
-import type { SqliteDatabase } from "../../lib/db/client-sqlite";
+import { persistDb, type SqliteDatabase } from "../../lib/db/client-sqlite";
 import type { GoalRow } from "../../lib/db/queries/user-settings";
 import { repertoireTune } from "../../lib/db/schema";
 import {
@@ -184,6 +184,9 @@ export function usePracticeEvaluations(
             eq(repertoireTune.repertoireRef, repertoireId)
           )
         );
+      // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+      // Auto-persist runs every 30s, but user might refresh before that fires
+      await persistDb();
       await clearStagedEvaluation(db, userIdValue, tuneId, repertoireId);
       props.incrementPracticeListStagedChanged();
     } catch (error) {
