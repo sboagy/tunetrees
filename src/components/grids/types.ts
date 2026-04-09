@@ -151,6 +151,8 @@ export interface IGoalOption {
  */
 export interface ICellEditorCallbacks {
   onRecallEvalChange?: (tuneId: string, newValue: string) => void;
+  getRecallEvalOpen?: (tuneId: string) => boolean;
+  setRecallEvalOpen?: (tuneId: string, open: boolean) => void;
   onGoalChange?: (tuneId: string, newValue: string | null) => void;
   onNotePrivateChange?: (tuneId: string, newValue: string) => void;
   onNotePublicChange?: (tuneId: string, newValue: string) => void;

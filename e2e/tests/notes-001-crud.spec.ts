@@ -45,6 +45,7 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
     await ttPage.ensureSidebarExpanded();
 
     // Wait for sidebar to show tune details
+    await ttPage.ensureTuneInfoExpanded();
     await expect(
       page.getByRole("heading", { name: "Banish Misfortune" })
     ).toBeVisible({

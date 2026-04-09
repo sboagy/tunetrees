@@ -95,6 +95,9 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
     }
     // Helper to create, configure, and add a tune to review
     async function createAndAddToReview(meta: RatedTuneMeta, tuneType: string) {
+      // Clear saved catalog URL params so navigateToTab("catalog") doesn't restore
+      // a stale search query from a previous iteration into the returnPath.
+      await page.evaluate(() => localStorage.removeItem("tt:url:catalog"));
       await ttPage.navigateToTab("catalog");
       await ttPage.catalogAddTuneButton.click();
       const newButton = page.getByRole("button", { name: /^new$/i });
@@ -108,16 +111,57 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       const saveButton = page.getByRole("button", { name: /save/i });
       await saveButton.click();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
-      // Add to repertoire
+      // TuneEditor save navigates back to returnPath (/?tab=catalog).
+      // Wait for the catalog grid to appear (means initial tunes load is done).
+      await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+      // After the catalog loads, reconcileCatalogSelection fires asynchronously
+      // (setTimeout 0 after each sync DOWN) and may trigger additional allTunes +
+      // tunes refetches. Each refetch temporarily hides the toolbar AND the grid.
+      // Wait here for those cycles to complete so the search fills against a stable
+      // catalog state and the filtered row stays visible long enough to check.
+      await page.waitForTimeout(2000);
+      // searchForTune handles toolbar-visibility retries and waits 2s after fill.
       await ttPage.searchForTune(meta.title, ttPage.catalogGrid);
-      const checkbox = ttPage.catalogGrid
+      // Capture debug info from the DOM to diagnose filter state mismatches.
+      const debugInfo = await page.evaluate(() => {
+        const table = document.querySelector(
+          '[data-testid="tunes-grid-catalog"]'
+        );
+        const rows = table?.querySelectorAll("tbody tr")?.length ?? 0;
+        const firstCells = table
+          ? Array.from(table.querySelectorAll("tbody tr td:nth-child(2)"))
+              .slice(0, 3)
+              .map((td: Element) => (td as HTMLElement).innerText?.trim())
+          : [];
+        const searchInput = document.querySelector(
+          '[data-testid="search-box-panel"]'
+        ) as HTMLInputElement | null;
+        const url = window.location.href;
+        return { rows, firstCells, searchValue: searchInput?.value, url };
+      });
+      console.log(
+        `[SCHED-008 DEBUG ${meta.rating}] ${JSON.stringify(debugInfo)}`
+      );
+      // Wait for the filtered row to appear (Playwright retries every 100ms).
+      const tuneRowInCatalog = ttPage.catalogGrid
+        .locator("tbody tr")
+        .filter({ hasText: meta.title });
+      await expect(tuneRowInCatalog).toBeVisible({ timeout: 10000 });
+      // Select the first data-row checkbox (nth(1) = index 1, after select-all header).
+      const firstCheckbox = ttPage.catalogGrid
         .locator('input[type="checkbox"]')
         .nth(1);
-      await checkbox.check();
+      await firstCheckbox.check();
+      await page.waitForTimeout(500);
+      // Verify tune is selected before adding to repertoire.
+      await expect(page.getByText(/1 tune selected/i)).toBeVisible({
+        timeout: 3000,
+      });
       await ttPage.catalogAddToRepertoireButton.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000); // Wait for sync
       // Add to review
       await ttPage.navigateToTab("repertoire");
+      await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
       await ttPage.searchForTune(meta.title, ttPage.repertoireGrid);
       const repCheckbox = ttPage.repertoireGrid
         .locator('input[type="checkbox"]')

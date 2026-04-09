@@ -592,6 +592,15 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                       <RecallEvalComboBox
                         tuneId={String(itemId)}
                         value={item.recall_eval ?? ""}
+                        open={props.cellCallbacks?.getRecallEvalOpen?.(
+                          String(itemId)
+                        )}
+                        onOpenChange={(isOpen) =>
+                          props.cellCallbacks?.setRecallEvalOpen?.(
+                            String(itemId),
+                            isOpen
+                          )
+                        }
                         onChange={(val) => {
                           props.cellCallbacks?.onRecallEvalChange?.(
                             String(itemId),
