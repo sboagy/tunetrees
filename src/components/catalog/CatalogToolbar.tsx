@@ -211,7 +211,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               />
             </svg>
             <span class="hidden md:inline">Add To Repertoire</span>
-            <span class="md:hidden">Add to Rep</span>
+            <span class="md:hidden">Add To Rep</span>
           </button>
 
           {/* Search input - always visible across all screen sizes */}
