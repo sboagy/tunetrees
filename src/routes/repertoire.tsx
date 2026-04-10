@@ -37,6 +37,7 @@ import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
+import { persistDb } from "../lib/db/client-sqlite";
 import * as schema from "../lib/db/schema";
 import { repertoireTune } from "../lib/db/schema";
 import { STARTER_TEMPLATES } from "../lib/db/starter-repertoire-templates";
@@ -375,6 +376,9 @@ const RepertoirePage: Component = () => {
             );
         }
       });
+      // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+      // Auto-persist runs every 30s, but user might refresh before that fires
+      await persistDb();
       incrementRepertoireListChanged();
     } catch (err) {
       console.error("[RepertoirePage] Failed to update goal:", err);

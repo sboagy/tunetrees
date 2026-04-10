@@ -111,9 +111,10 @@ export const TOOLBAR_BUTTON_NEUTRAL_ALT =
  * Search input container
  * - Responsive width
  * - Relative positioning for icon
+ * - Always visible (search is a primary interaction even on mobile)
  */
 export const TOOLBAR_SEARCH_CONTAINER =
-  "relative hidden md:flex items-center flex-1 min-w-[12ch] max-w-xs";
+  "relative flex items-center flex-1 min-w-0 sm:min-w-[12ch] max-w-xs";
 
 /**
  * Search input field

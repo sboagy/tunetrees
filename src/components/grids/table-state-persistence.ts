@@ -81,66 +81,100 @@ export function getDefaultTableState(
     rowSelection: {},
   };
 
-  // Purpose-specific defaults
+  // Purpose-specific defaults — only the most essential columns are shown by default.
+  // Users can reveal additional columns using the column-visibility control.
   switch (purpose) {
     case "scheduled":
       baseState.columnVisibility = {
-        // Show all practice-relevant columns by default
+        // Show only the essentials for the daily practice queue
         bucket: true,
         evaluation: true,
-        goal: false,
-        type: true,
-        mode: true,
+        goal: true,
+        scheduled: true,
+        latest_practiced: true,
+        // Hide everything else
+        id: false,
+        type: false,
+        mode: false,
+        structure: false,
         incipit: false,
         genre: false,
-        private_for: false, // Status column
-        scheduled: true,
-        latest_practiced: true,
-        latest_goal: true,
-        latest_technique: true,
-        latest_quality: true,
-        latest_stability: true,
-        latest_easiness: true,
-        latest_repetitions: true,
-        latest_due: true,
+        composer: false,
+        artist: false,
+        release_year: false,
+        id_foreign: false,
+        private_for: false,
+        latest_state: false,
         learned: false,
-        // Hide less important columns
-        id: false,
-        structure: true,
-      };
-      baseState.sorting = [{ id: "id", desc: true }]; // Default sort by id
-      break;
-
-    case "repertoire":
-      baseState.columnVisibility = {
-        id: false,
-        incipit: true,
-        genre: true,
-        scheduled: true,
-        latest_practiced: true,
+        latest_due: false,
+        recall_eval: false, // "evaluation" column is used in the scheduled grid instead
         latest_quality: false,
         latest_easiness: false,
         latest_stability: false,
         latest_interval: false,
-        latest_due: true,
         tags: false,
         purpose: false,
         note_private: false,
         note_public: false,
         has_override: false,
         has_staged: false,
+      };
+      baseState.sorting = [{ id: "id", desc: true }]; // Default sort by id
+      break;
+
+    case "repertoire":
+      baseState.columnVisibility = {
+        // Keep selection + core workflow columns visible by default
+        select: true,
+        type: true,
+        goal: true,
+        genre: true,
+        latest_practiced: true,
+        latest_due: true,
+        // Hide everything else
+        id: false,
+        mode: false,
+        structure: false,
+        incipit: false,
+        composer: false,
+        artist: false,
+        release_year: false,
+        id_foreign: false,
+        private_for: false,
+        latest_state: false,
         learned: false,
+        scheduled: true,
+        recall_eval: false,
+        latest_quality: false,
+        latest_easiness: false,
+        latest_stability: false,
+        latest_interval: false,
+        tags: false,
+        purpose: false,
+        note_private: false,
+        note_public: false,
+        has_override: false,
+        has_staged: false,
       };
       baseState.sorting = [{ id: "title", desc: false }]; // Sort by title
       break;
 
     case "catalog":
       baseState.columnVisibility = {
-        incipit: false,
+        // Keep selection available for add-to-repertoire workflows
+        select: true,
+        type: true,
         composer: true,
-        artist: true,
-        release_year: true,
+        // Hide everything else
+        id: false,
+        mode: false,
+        structure: false,
+        incipit: false,
+        genre: false,
+        artist: false,
+        release_year: false,
         id_foreign: false,
+        private_for: false,
       };
       baseState.sorting = [{ id: "title", desc: false }]; // Sort by title
       break;

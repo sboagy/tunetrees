@@ -25,6 +25,12 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
+import {
+  getScreenSize,
+  loadTableStateFromDb,
+  saveTableStateToDb,
+} from "@/lib/db/queries/table-state";
 import { useClickOutside } from "@/lib/hooks/useClickOutside";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -78,6 +84,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
 export const TunesGrid = (<T extends { id: string | number }>(
   props: ITunesGridProps<T>
 ) => {
+  const { localDb } = useAuth();
   const isMobile = createIsMobile();
   const [openPopover, setOpenPopover] = createSignal<string | null>(null);
   let popoverRef: HTMLDivElement | undefined;
@@ -413,6 +420,40 @@ export const TunesGrid = (<T extends { id: string | number }>(
     });
   });
 
+  // On mount, attempt an async load from the local SQLite DB (which syncs remotely).
+  // This recovers column preferences after a localStorage reset or on a new device.
+  // Only applies the DB state when localStorage had no persisted state (to avoid
+  // overwriting user changes that exist only in localStorage).
+  onMount(async () => {
+    // Skip if localStorage already had a persisted state for this key.
+    if (loadedState) return;
+    const db = localDb();
+    const key = stateKey();
+    if (!db) return;
+    const dbState = await loadTableStateFromDb(
+      db,
+      key.userId,
+      key.tablePurpose,
+      key.repertoireId,
+      getScreenSize()
+    );
+    if (!dbState) return;
+
+    const merged = sanitizeInitialTableState(
+      mergeWithDefaults(dbState, props.tablePurpose as any),
+      allowedColumnIds
+    );
+    if (merged.columnVisibility) setColumnVisibility(merged.columnVisibility);
+    if (merged.columnOrder?.length) setColumnOrder(merged.columnOrder);
+    if (merged.columnSizing && Object.keys(merged.columnSizing).length)
+      setColumnSizing(merged.columnSizing);
+    if (merged.sorting?.length) setSorting(merged.sorting);
+    if (merged.columnPinning) setColumnPinning(merged.columnPinning);
+    console.log(
+      `[TunesGrid ${props.tablePurpose}] Restored state from DB (localStorage was empty)`
+    );
+  });
+
   const reorderColumns = (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
     const current = columnOrder();
@@ -457,26 +498,30 @@ export const TunesGrid = (<T extends { id: string | number }>(
     setHoverColumnId(null);
   };
 
-  // Container ref for virtualization
+  // Container ref for virtualization. Plain variable – the div is always in the
+  // DOM (never unmounted), so the ref is set once at mount and never changes.
   let containerRef: HTMLDivElement | undefined;
 
-  // Virtualizer for rows
-  const rowVirtualizer = createMemo(() =>
-    createVirtualizer({
-      get count() {
-        return table.getRowModel().rows.length;
-      },
-      getScrollElement: () => containerRef || null,
-      estimateSize: () => 40,
-      overscan: 10,
-      getItemKey: (index) => {
-        const row = table.getRowModel().rows[index];
-        return row ? row.id : index;
-      },
-      useAnimationFrameWithResizeObserver: true,
-      isScrollingResetDelay: 200,
-    })
-  );
+  const currentRows = createMemo(() => table.getRowModel().rows);
+
+  // Single stable virtualizer tied to the always-present container div.
+  const rowVirtualizer = createVirtualizer({
+    get count() {
+      return currentRows().length;
+    },
+    getScrollElement: () => containerRef || null,
+    estimateSize: () => 40,
+    overscan: 10,
+    getItemKey: (index) => {
+      const row = currentRows()[index];
+      return row ? row.id : index;
+    },
+    useAnimationFrameWithResizeObserver: true,
+    isScrollingResetDelay: 200,
+  });
+
+  // Debounce handle for DB writes (avoids excessive writes during rapid state changes)
+  let dbSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Persist table state (excluding scrollTop here)
   createEffect(() => {
@@ -490,7 +535,35 @@ export const TunesGrid = (<T extends { id: string | number }>(
       // Do not persist scrollTop here; handled by scroll persistence logic below
       scrollTop: loadedState?.scrollTop || 0,
     };
+
+    // Immediate write to localStorage for fast synchronous reads on reload
     saveTableState(stateKey(), state);
+
+    // Debounced write to local SQLite DB (synced remotely), so column preferences
+    // survive a localStorage reset and roam across devices.
+    const key = stateKey();
+    const db = localDb();
+    if (db) {
+      if (dbSaveTimer !== null) clearTimeout(dbSaveTimer);
+      dbSaveTimer = setTimeout(() => {
+        dbSaveTimer = null;
+        void saveTableStateToDb(
+          db,
+          key.userId,
+          key.tablePurpose,
+          key.repertoireId,
+          getScreenSize(),
+          state
+        );
+      }, 500);
+    }
+  });
+
+  onCleanup(() => {
+    if (dbSaveTimer !== null) {
+      clearTimeout(dbSaveTimer);
+      dbSaveTimer = null;
+    }
   });
 
   // Simple scroll restoration and persistence
@@ -545,7 +618,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   // Watch for row count changes at component level (proper reactive scope)
   createEffect(() => {
-    const rowCount = table.getRowModel().rows.length;
+    const rowCount = currentRows().length;
     const previous = lastRowCount();
 
     if (rowCount !== previous && previous >= 0) {
@@ -599,7 +672,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
         ? Number.parseInt(localStorage.getItem(key) || "0", 10)
         : 0;
       setTargetScroll(storedScroll);
-      setLastRowCount(table.getRowModel().rows.length);
+      setLastRowCount(currentRows().length);
 
       // Apply initial scroll - let row count effect handle stabilization
       if (storedScroll > 0) {
@@ -746,7 +819,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   return (
     <div class="h-full flex flex-col">
-      {/* Mobile: stacked list view */}
+      {/* Mobile: stacked list view (conditionally rendered) */}
       <Show when={isMobile()}>
         <TuneStackedList
           data={props.data as unknown as IStackedListRow[]}
@@ -755,22 +828,25 @@ export const TunesGrid = (<T extends { id: string | number }>(
           onRowClick={(row) => props.onRowClick?.(row as T)}
           onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
           cellCallbacks={props.cellCallbacks}
+          columnVisibility={columnVisibility()}
         />
       </Show>
 
-      {/* Desktop: full TanStack table with virtualization */}
-      <Show when={!isMobile()}>
-        {/* Table container with virtualization */}
-        <div
-          ref={(el) => {
-            containerRef = el;
-          }}
-          data-testid={`tunes-grid-container-${props.tablePurpose}`}
-          class={`${CONTAINER_CLASSES} ${
-            props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
-          }`}
-          style={{ "touch-action": "pan-x pan-y" }}
-        >
+      {/* Desktop: keep the scroll container mounted so the virtualizer retains
+          its scroll element across mobile↔desktop viewport transitions.
+          The table itself only renders on desktop to avoid duplicate public
+          grid test ids on mobile. */}
+      <div
+        ref={(el) => {
+          containerRef = el;
+        }}
+        data-testid={`tunes-grid-container-${props.tablePurpose}`}
+        class={`${CONTAINER_CLASSES} ${isMobile() ? "hidden" : ""} ${
+          props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
+        }`}
+        style={{ "touch-action": "pan-x pan-y" }}
+      >
+        <Show when={!isMobile()}>
           <table
             data-testid={`tunes-grid-${props.tablePurpose}`}
             class={TABLE_CLASSES}
@@ -983,48 +1059,53 @@ export const TunesGrid = (<T extends { id: string | number }>(
             {/* Virtualized body */}
             <tbody class={TBODY_CLASSES}>
               {/* Spacer for virtual scrolling offset */}
-              <Show when={rowVirtualizer().getVirtualItems().length > 0}>
+              <Show when={rowVirtualizer.getVirtualItems().length > 0}>
                 <tr
                   style={{
-                    height: `${rowVirtualizer().getVirtualItems()[0]?.start || 0}px`,
+                    height: `${rowVirtualizer.getVirtualItems()[0]?.start || 0}px`,
                   }}
                 />
               </Show>
 
               {/* Render only visible rows */}
-              <For each={rowVirtualizer().getVirtualItems()}>
+              <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualRow) => {
-                  const row = table.getRowModel().rows[virtualRow.index];
-                  if (!row) return null;
+                  const row = () => currentRows()[virtualRow.index];
 
                   return (
-                    <tr
-                      class={
-                        props.currentRowId === (row.original as any).id
-                          ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
-                          : ROW_CLASSES
-                      }
-                      onClick={() => props.onRowClick?.(row.original)}
-                      onDblClick={() => props.onRowDoubleClick?.(row.original)}
-                      data-index={virtualRow.index}
-                    >
-                      <For each={row.getVisibleCells()}>
-                        {(cell) => (
-                          <td
-                            class={`${CELL_CLASSES}${cell.column.getIsPinned() ? " bg-white dark:bg-gray-900" : ""}${getPinnedBorderClass(cell.column)}`}
-                            style={getPinnedCellStyle(
-                              cell.column,
-                              cell.column.getSize()
-                            )}
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                          </td>
-                        )}
-                      </For>
-                    </tr>
+                    <Show when={row()}>
+                      {/* Read the current row through an accessor so filtering can swap
+                            row content without requiring a full table remount. */}
+                      <tr
+                        class={
+                          props.currentRowId === (row()!.original as any).id
+                            ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
+                            : ROW_CLASSES
+                        }
+                        onClick={() => props.onRowClick?.(row()!.original)}
+                        onDblClick={() =>
+                          props.onRowDoubleClick?.(row()!.original)
+                        }
+                        data-index={virtualRow.index}
+                      >
+                        <For each={row()!.getVisibleCells()}>
+                          {(cell) => (
+                            <td
+                              class={`${CELL_CLASSES}${cell.column.getIsPinned() ? " bg-white dark:bg-gray-900" : ""}${getPinnedBorderClass(cell.column)}`}
+                              style={getPinnedCellStyle(
+                                cell.column,
+                                cell.column.getSize()
+                              )}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </td>
+                          )}
+                        </For>
+                      </tr>
+                    </Show>
                   );
                 }}
               </For>
@@ -1032,24 +1113,24 @@ export const TunesGrid = (<T extends { id: string | number }>(
               {/* Spacer after visible items */}
               <Show
                 when={
-                  rowVirtualizer().getVirtualItems().length > 0 &&
-                  rowVirtualizer().getVirtualItems().length <
+                  rowVirtualizer.getVirtualItems().length > 0 &&
+                  rowVirtualizer.getVirtualItems().length <
                     table.getRowModel().rows.length
                 }
               >
                 <tr
                   style={{
                     height: `${
-                      rowVirtualizer().getTotalSize() -
-                      (rowVirtualizer().getVirtualItems().at(-1)?.end || 0)
+                      rowVirtualizer.getTotalSize() -
+                      (rowVirtualizer.getVirtualItems().at(-1)?.end || 0)
                     }px`,
                   }}
                 />
               </Show>
             </tbody>
           </table>
-        </div>
-      </Show>
+        </Show>
+      </div>
     </div>
   );
 }) as Component<ITunesGridProps<any>>;

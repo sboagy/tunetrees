@@ -151,7 +151,11 @@ test.describe
       await ttPage.displaySubmittedSwitch.click();
       await page.waitForTimeout(500);
 
-      await page.getByRole("cell", { name: "JigD" }).first().click();
+      const banishRow = ttPage
+        .getTuneRowById(TEST_TUNE_BANISH_ID, ttPage.practiceGrid)
+        .first();
+      await expect(banishRow).toBeVisible({ timeout: 10000 });
+      await banishRow.click();
       // await page.getByRole("cell", { name: "recall" }).first().click();
 
       // Open flashcard (will show first tune, which may be submitted)

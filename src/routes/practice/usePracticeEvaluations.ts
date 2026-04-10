@@ -7,7 +7,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import type { ITuneOverview } from "../../components/grids/types";
-import type { SqliteDatabase } from "../../lib/db/client-sqlite";
+import { persistDb, type SqliteDatabase } from "../../lib/db/client-sqlite";
 import type { GoalRow } from "../../lib/db/queries/user-settings";
 import { repertoireTune } from "../../lib/db/schema";
 import {
@@ -76,9 +76,23 @@ export function usePracticeEvaluations(
   const isStaging = createMemo(() => stagingTuneIds().length > 0);
 
   const evaluationsCount = createMemo(() => {
-    return props.practiceListData().reduce((count, tune) => {
-      return count + (Number(tune.has_staged) === 1 ? 1 : 0);
-    }, 0);
+    const stagedTuneIds = new Set<string>();
+
+    for (const tune of props.practiceListData()) {
+      if (Number(tune.has_staged) === 1) {
+        stagedTuneIds.add(String(tune.id));
+      }
+    }
+
+    for (const [tuneId, evaluation] of Object.entries(evaluations())) {
+      if (evaluation) {
+        stagedTuneIds.add(tuneId);
+      } else {
+        stagedTuneIds.delete(tuneId);
+      }
+    }
+
+    return stagedTuneIds.size;
   });
 
   const handleRecallEvalChange = async (tuneId: string, evaluation: string) => {
@@ -184,6 +198,9 @@ export function usePracticeEvaluations(
             eq(repertoireTune.repertoireRef, repertoireId)
           )
         );
+      // CRITICAL: Persist to IndexedDB immediately to prevent data loss on refresh
+      // Auto-persist runs every 30s, but user might refresh before that fires
+      await persistDb();
       await clearStagedEvaluation(db, userIdValue, tuneId, repertoireId);
       props.incrementPracticeListStagedChanged();
     } catch (error) {

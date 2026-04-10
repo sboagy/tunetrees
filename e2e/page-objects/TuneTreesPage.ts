@@ -66,7 +66,7 @@ export class TuneTreesPage {
 
   // Search & Filters
   readonly searchBox: Locator;
-  readonly searchBoxPanel: Locator; // Search box inside filter panel (mobile)
+  readonly searchBoxPanel: Locator; // Toolbar search box (always visible; was formerly mobile-only)
   readonly filtersButton: Locator;
   readonly typeFilter: Locator;
   readonly modeFilter: Locator;
@@ -125,6 +125,7 @@ export class TuneTreesPage {
   readonly settingsMenuToggle: Locator;
   readonly addTuneDialog: Locator;
   readonly sidebarEditTuneButton: Locator;
+  readonly sidebarTuneInfoToggle: Locator;
   readonly sidebarExpandButton: Locator;
   readonly sidebarCollapseButton: Locator;
 
@@ -355,6 +356,7 @@ export class TuneTreesPage {
     this.sidebarEditTuneButton = page
       .getByTestId(/^sidebar-edit-tune-button(?:-collapsed)?$/)
       .last();
+    this.sidebarTuneInfoToggle = page.getByTestId("sidebar-tune-info-toggle");
 
     // Sidebar expand/collapse buttons (for mobile responsive layout)
     this.sidebarExpandButton = page.getByRole("button", {
@@ -889,6 +891,28 @@ export class TuneTreesPage {
   }
 
   /**
+   * Dispatch an HTML5 drag sequence directly. This is more reliable than
+   * Locator.dragTo() for mobile emulation when the app listens to
+   * dragstart/dragover/drop on draggable elements.
+   */
+  async dispatchHtml5DragAndDrop(source: Locator, target: Locator) {
+    await expect(source).toBeVisible({ timeout: 10000 });
+    await expect(target).toBeVisible({ timeout: 10000 });
+    await source.scrollIntoViewIfNeeded();
+    await target.scrollIntoViewIfNeeded();
+
+    const dataTransfer = await this.page.evaluateHandle(
+      () => new DataTransfer()
+    );
+
+    await source.dispatchEvent("dragstart", { dataTransfer });
+    await target.dispatchEvent("dragenter", { dataTransfer });
+    await target.dispatchEvent("dragover", { dataTransfer });
+    await target.dispatchEvent("drop", { dataTransfer });
+    await source.dispatchEvent("dragend", { dataTransfer });
+  }
+
+  /**
    * Sign up with email/password
    */
   async signUp(email: string, password: string, name: string) {
@@ -1031,18 +1055,60 @@ export class TuneTreesPage {
    * is "good enough".
    */
   async refreshDateRolloverIfVisible(timeoutMs = 20000): Promise<boolean> {
-    const isVisible = await this.dateRolloverBanner
-      .isVisible()
-      .catch(() => false);
+    const loadingMessage = this.page.getByText("Loading practice queue...");
+    const rowLocator = this.practiceGrid.locator("tbody tr[data-index]");
+    const startedAt = Date.now();
+    let settledWithoutRefreshSince: number | null = null;
 
-    if (!isVisible) {
-      return false;
+    while (Date.now() - startedAt < timeoutMs) {
+      const [
+        loadingVisible,
+        bannerVisible,
+        refreshEnabled,
+        emptyVisible,
+        gridVisible,
+      ] = await Promise.all([
+        loadingMessage.isVisible().catch(() => false),
+        this.dateRolloverBanner.isVisible().catch(() => false),
+        this.dateRolloverRefreshButton.isEnabled().catch(() => false),
+        this.page
+          .getByText("All Caught Up!")
+          .isVisible()
+          .catch(() => false),
+        this.practiceGrid.isVisible().catch(() => false),
+      ]);
+
+      if (bannerVisible || refreshEnabled) {
+        await this.dateRolloverRefreshButton.click();
+        await expect(this.dateRolloverRefreshButton).toBeDisabled({
+          timeout: timeoutMs,
+        });
+        await expect(this.dateRolloverBanner).toBeHidden({
+          timeout: timeoutMs,
+        });
+        return true;
+      }
+
+      const rowCount = gridVisible
+        ? await rowLocator.count().catch(() => 0)
+        : 0;
+      const settledWithoutRefresh =
+        !loadingVisible && (emptyVisible || rowCount > 0);
+
+      if (settledWithoutRefresh) {
+        if (settledWithoutRefreshSince === null) {
+          settledWithoutRefreshSince = Date.now();
+        } else if (Date.now() - settledWithoutRefreshSince >= 1000) {
+          return false;
+        }
+      } else {
+        settledWithoutRefreshSince = null;
+      }
+
+      await this.page.waitForTimeout(200);
     }
 
-    await this.dateRolloverRefreshButton.click();
-    await expect(this.dateRolloverBanner).toBeHidden({ timeout: timeoutMs });
-
-    return true;
+    return false;
   }
 
   /**
@@ -1090,6 +1156,8 @@ export class TuneTreesPage {
    * Avoids Playwright's networkidle which can hang due to persistent websocket connections.
    */
   async openTuneEditor() {
+    await this.ensureTuneInfoExpanded({ timeoutMs: 10000 });
+    await expect(this.sidebarEditTuneButton).toBeVisible({ timeout: 10000 });
     await this.sidebarEditTuneButton.click();
     await this.page.waitForTimeout(100); // Allow sync to start
     await expect(this.tuneEditorForm).toBeVisible({ timeout: 10000 });
@@ -1140,6 +1208,38 @@ export class TuneTreesPage {
 
       await this.page.waitForTimeout(100);
     }
+  }
+
+  /**
+   * Ensure the mobile-only Tune Info accordion is expanded before interacting
+   * with controls rendered inside TuneInfoHeader. No-op on desktop/side dock.
+   */
+  async ensureTuneInfoExpanded(opts?: { timeoutMs?: number }) {
+    const timeoutMs = opts?.timeoutMs ?? 8000;
+
+    await this.ensureSidebarExpanded({ timeoutMs });
+
+    const tuneInfoButton = this.sidebarTuneInfoToggle;
+
+    const toggleVisible = await tuneInfoButton
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!toggleVisible) return;
+
+    const ariaExpanded = await tuneInfoButton
+      .getAttribute("aria-expanded")
+      .catch(() => null);
+    if (ariaExpanded === "true") return;
+
+    await tuneInfoButton.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(tuneInfoButton).toBeVisible({ timeout: timeoutMs });
+    await expect(tuneInfoButton).toBeEnabled({ timeout: timeoutMs });
+    await tuneInfoButton.click({ timeout: timeoutMs });
+
+    await expect(tuneInfoButton).toHaveAttribute("aria-expanded", "true", {
+      timeout: timeoutMs,
+    });
+    await this.page.waitForTimeout(150);
   }
 
   /**
@@ -1327,10 +1427,10 @@ export class TuneTreesPage {
   /**
    * Search for a tune and wait for results
    * Returns the grid for further assertions
-   * Handles responsive layout: search box in toolbar (desktop) or filter panel (mobile)
+   * The search box is now always visible in the toolbar (desktop and mobile).
    */
   async searchForTune(tuneTitle: string, grid: Locator): Promise<void> {
-    // Check if toolbar search box is visible (desktop view)
+    // Check if toolbar search box is visible (should always be true now)
     const isToolbarSearchVisible = await (async () => {
       const blockStartMs = Date.now();
       try {
@@ -1534,10 +1634,10 @@ export class TuneTreesPage {
     if (grid === this.practiceGrid) {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
-    // Table mode: find a table row containing the tune ID text.
+    // Table mode: find a table row containing the tune ID text, or by select-row checkbox.
     // Stacked list mode: find the li by its data-testid="stacked-item-{tuneId}".
     return grid.locator(
-      `tr:has-text("${tuneId}"), li[data-testid="stacked-item-${tuneId}"]`
+      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li[data-testid="stacked-item-${tuneId}"]`
     );
   }
 
@@ -1705,6 +1805,78 @@ export class TuneTreesPage {
       const header = this.page.getByTestId(`ch-${id.toLowerCase()}`);
       await expect(header).toBeVisible({ timeout: 5000 });
     }
+  }
+
+  private getColumnsButtonForTab(
+    tab: "catalog" | "repertoire" | "practice"
+  ): Locator {
+    return tab === "catalog"
+      ? this.catalogColumnsButton
+      : tab === "repertoire"
+        ? this.repertoireColumnsButton
+        : this.practiceColumnsButton;
+  }
+
+  private getColumnVisibilityMenu(): Locator {
+    return this.page
+      .locator("div.fixed.w-64")
+      .filter({ hasText: "Show Columns" })
+      .last();
+  }
+
+  async setGridColumnVisibility(
+    tab: "catalog" | "repertoire" | "practice",
+    columnLabel: string,
+    visible: boolean
+  ) {
+    const columnsButton = this.getColumnsButtonForTab(tab);
+    const menu = this.getColumnVisibilityMenu();
+    const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    await expect(columnsButton).toBeVisible({ timeout: 5000 });
+    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
+
+    const menuVisible = await menu
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await columnsButton.click();
+      await expect(menu).toBeVisible({ timeout: 5000 });
+    }
+
+    const label = menu
+      .locator("button span")
+      .filter({ hasText: new RegExp(`^\\s*${escapedLabel}\\s*$`, "i") })
+      .first();
+    const option = label.locator("xpath=ancestor::button[1]");
+    const checkbox = option.locator('input[type="checkbox"]').first();
+
+    await expect(label).toBeVisible({ timeout: 5000 });
+    await option.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(checkbox).toBeVisible({ timeout: 5000 });
+
+    const isChecked = await checkbox.isChecked().catch(() => false);
+    if (isChecked !== visible) {
+      await option.click();
+      if (visible) {
+        await expect(checkbox).toBeChecked({ timeout: 5000 });
+      } else {
+        await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+      }
+    }
+
+    await this.page.keyboard.press("Escape").catch(() => undefined);
+    await expect(menu)
+      .toBeHidden({ timeout: 5000 })
+      .catch(() => undefined);
+  }
+
+  async ensureGridColumnVisible(
+    tab: "catalog" | "repertoire" | "practice",
+    columnLabel: string
+  ) {
+    await this.setGridColumnVisibility(tab, columnLabel, true);
   }
 
   /**
@@ -1994,16 +2166,16 @@ export class TuneTreesPage {
 
   /**
    * Clear search box
-   * Handles responsive layout: search box in toolbar (desktop) or filter panel (mobile)
+   * The search box is now always visible in the toolbar (desktop and mobile).
    */
   async clearSearch() {
-    // Check if toolbar search box is visible (desktop view)
+    // Check if toolbar search box is visible (should always be true now)
     const isToolbarSearchVisible = await this.searchBox
       .isVisible({ timeout: 1000 })
       .catch(() => false);
 
     if (isToolbarSearchVisible) {
-      // Desktop: use toolbar search box
+      // Toolbar search box: use it directly
       await this.searchBox.clear();
     } else {
       // Mobile: open filter panel if needed and use search box inside

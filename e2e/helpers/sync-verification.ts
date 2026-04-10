@@ -12,6 +12,14 @@ import log from "loglevel";
 
 log.setLevel("info");
 
+async function readSyncOutboxCount(page: Page): Promise<number> {
+  return await page.evaluate(async () => {
+    const api = (window as any).__ttTestApi;
+    if (!api) throw new Error("__ttTestApi not available");
+    return await api.getSyncOutboxCount();
+  });
+}
+
 /**
  * Wait for sync to complete
  * Polls the sync outbox until empty (all changes synced)
@@ -26,15 +34,13 @@ export async function waitForSync(
   log.info("⏳ Waiting for sync to complete...");
 
   const startTime = Date.now();
-  const pollInterval = 1000; // Poll every second
+  const pollInterval = 250;
+  const zeroStableForMs = 1000;
   let lastCount = -1;
+  let zeroStableMs = 0;
 
   while (Date.now() - startTime < timeoutMs) {
-    const count = await page.evaluate(async () => {
-      const api = (window as any).__ttTestApi;
-      if (!api) throw new Error("__ttTestApi not available");
-      return await api.getSyncOutboxCount();
-    });
+    const count = await readSyncOutboxCount(page);
 
     if (count !== lastCount) {
       log.info(`🔄 Sync outbox count: ${count}`);
@@ -42,20 +48,21 @@ export async function waitForSync(
     }
 
     if (count === 0) {
-      const elapsed = Date.now() - startTime;
-      log.info(`✅ Sync completed in ${elapsed}ms`);
-      return;
+      zeroStableMs += pollInterval;
+      if (zeroStableMs >= zeroStableForMs) {
+        const elapsed = Date.now() - startTime;
+        log.info(`✅ Sync completed in ${elapsed}ms`);
+        return;
+      }
+    } else {
+      zeroStableMs = 0;
     }
 
     await page.waitForTimeout(pollInterval);
   }
 
   // Timeout - log final state
-  const finalCount = await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
-    if (!api) throw new Error("__ttTestApi not available");
-    return await api.getSyncOutboxCount();
-  });
+  const finalCount = await readSyncOutboxCount(page);
 
   throw new Error(
     `Sync did not complete within ${timeoutMs}ms. ${finalCount} items still pending in outbox. Sync may not be running (check if offline or network issues).`
@@ -70,13 +77,14 @@ export async function waitForSync(
 export async function verifySyncOutboxEmpty(page: Page): Promise<void> {
   log.info("🔍 Verifying sync_outbox is empty...");
 
-  const count = await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
-    if (!api) throw new Error("__ttTestApi not available");
-    return await api.getSyncOutboxCount();
-  });
+  await expect
+    .poll(async () => await readSyncOutboxCount(page), {
+      timeout: 10000,
+      intervals: [200, 250, 500, 1000],
+      message: "sync_outbox did not become empty",
+    })
+    .toBe(0);
 
-  expect(count).toBe(0);
   log.info("✅ sync_outbox is empty");
 }
 
@@ -92,11 +100,7 @@ export async function verifySyncOutboxCount(
 ): Promise<void> {
   log.info(`🔍 Verifying sync_outbox has ${expectedCount} items...`);
 
-  const count = await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
-    if (!api) throw new Error("__ttTestApi not available");
-    return await api.getSyncOutboxCount();
-  });
+  const count = await readSyncOutboxCount(page);
 
   expect(count).toBe(expectedCount);
   log.info(`✅ sync_outbox has ${expectedCount} items`);
@@ -109,13 +113,7 @@ export async function verifySyncOutboxCount(
  * @returns Number of pending sync items
  */
 export async function getSyncOutboxCount(page: Page): Promise<number> {
-  return await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
-    if (!api) {
-      throw new Error("__ttTestApi not available");
-    }
-    return await api.getSyncOutboxCount();
-  });
+  return await readSyncOutboxCount(page);
 }
 
 /**

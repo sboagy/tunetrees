@@ -367,9 +367,18 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     expect(afterCounts.references).toBeLessThan(beforeCounts.references);
 
     // Verify no orphaned annotations remain
-    const orphanedCounts = await getOrphanedAnnotationCounts(page);
-    expect(orphanedCounts.orphanedNotes).toBe(0);
-    expect(orphanedCounts.orphanedReferences).toBe(0);
+    await expect
+      .poll(
+        async () => {
+          const counts = await getOrphanedAnnotationCounts(page);
+          return [counts.orphanedNotes, counts.orphanedReferences];
+        },
+        {
+          timeout: 15000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toEqual([0, 0]);
   });
 
   test("D: Private tunes sync annotations regardless of genre filter", async ({

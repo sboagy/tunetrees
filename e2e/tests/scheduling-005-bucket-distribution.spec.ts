@@ -346,7 +346,7 @@ test.describe
       console.log(`  Initial total: ${initialDistribution.total}`);
 
       // Practice one Q1 tune
-      const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+      const row = ttPage.getRows("scheduled").first();
       await expect(row).toBeVisible({ timeout: 10000 });
 
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");

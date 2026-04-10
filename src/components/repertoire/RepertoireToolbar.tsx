@@ -256,8 +256,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </div>
 
           <FilterPanel
-            searchQuery={props.searchQuery}
-            onSearchChange={props.onSearchChange}
             availableTypes={props.availableTypes}
             selectedTypes={props.selectedTypes}
             onTypesChange={props.onTypesChange}

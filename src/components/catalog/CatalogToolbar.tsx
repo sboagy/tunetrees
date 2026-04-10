@@ -214,7 +214,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             <span class="hidden sm:inline md:hidden">Add To Rep</span>
           </button>
 
-          {/* Search input - visible on larger screens, hidden on mobile (moves to FilterPanel) */}
+          {/* Search input - always visible across all screen sizes */}
           <div class={TOOLBAR_SEARCH_CONTAINER}>
             <svg
               class={TOOLBAR_SEARCH_ICON}
@@ -240,10 +240,8 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             />
           </div>
 
-          {/* FilterPanel - search shows inside on mobile */}
+          {/* FilterPanel - type/mode/genre/repertoire filters */}
           <FilterPanel
-            searchQuery={props.searchQuery}
-            onSearchChange={props.onSearchChange}
             availableTypes={props.availableTypes}
             selectedTypes={props.selectedTypes}
             onTypesChange={props.onTypesChange}

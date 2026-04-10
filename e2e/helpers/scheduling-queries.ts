@@ -5,18 +5,76 @@
  * during E2E tests. Uses the __ttTestApi exposed by the application.
  */
 
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
 
 log.setLevel("info");
 
-async function waitForTestApi(page: Page, timeoutMs = 30000): Promise<void> {
-  await page.waitForFunction(
-    () => {
-      return !!(window as any).__ttTestApi;
-    },
-    { timeout: timeoutMs }
+function isTransientTestApiError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("__ttTestApi not available on window") ||
+    message.includes("Execution context was destroyed") ||
+    message.includes("Target page, context or browser has been closed") ||
+    message.includes("Cannot find context with specified id") ||
+    message.includes("Target closed")
   );
+}
+
+async function waitForTestApi(page: Page, timeoutMs = 30000): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(() => !!(window as any).__ttTestApi);
+        } catch (error) {
+          if (isTransientTestApiError(error)) {
+            return false;
+          }
+          throw error;
+        }
+      },
+      {
+        timeout: timeoutMs,
+        intervals: [100, 250, 500, 1000],
+        message: "__ttTestApi did not become available",
+      }
+    )
+    .toBe(true);
+}
+
+async function withTestApiRetry<Result>(
+  page: Page,
+  action: () => Promise<Result>,
+  options: {
+    label: string;
+    timeoutMs?: number;
+    maxAttempts?: number;
+    retryDelayMs?: number;
+  }
+): Promise<Result> {
+  const timeoutMs = options.timeoutMs ?? 30000;
+  const maxAttempts = options.maxAttempts ?? 3;
+  const retryDelayMs = options.retryDelayMs ?? 300;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await waitForTestApi(page, timeoutMs);
+      return await action();
+    } catch (error) {
+      if (attempt < maxAttempts && isTransientTestApiError(error)) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.warn(
+          `⚠️ ${options.label} retry ${attempt}/${maxAttempts} due to transient test API race: ${message}`
+        );
+        await page.waitForTimeout(retryDelayMs * attempt);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error(`${options.label} failed after ${maxAttempts} attempts`);
 }
 
 /**
@@ -78,14 +136,19 @@ export async function queryPracticeRecords(
 ): Promise<PracticeRecord[]> {
   log.debug(`📊 Querying practice records for ${tuneIds.length} tune(s)`);
 
-  const records = await page.evaluate(async (ids) => {
-    const api = (window as any).__ttTestApi;
-    if (!api) {
-      throw new Error("__ttTestApi not available on window");
-    }
+  const records = await withTestApiRetry(
+    page,
+    () =>
+      page.evaluate(async (ids) => {
+        const api = (window as any).__ttTestApi;
+        if (!api) {
+          throw new Error("__ttTestApi not available on window");
+        }
 
-    return await api.getPracticeRecords(ids);
-  }, tuneIds);
+        return await api.getPracticeRecords(ids);
+      }, tuneIds),
+    { label: "queryPracticeRecords" }
+  );
 
   log.debug(`✅ Found ${records.length} practice record(s)`);
   return records;
@@ -104,14 +167,19 @@ export async function queryTunesByTitles(
 ): Promise<Array<{ id: string; title: string }>> {
   log.debug(`📊 Querying tunes by ${titles.length} title(s)`);
 
-  const tunes = await page.evaluate(async (titlesArg) => {
-    const api = (window as any).__ttTestApi;
-    if (!api) {
-      throw new Error("__ttTestApi not available on window");
-    }
+  const tunes = await withTestApiRetry(
+    page,
+    () =>
+      page.evaluate(async (titlesArg) => {
+        const api = (window as any).__ttTestApi;
+        if (!api) {
+          throw new Error("__ttTestApi not available on window");
+        }
 
-    return await api.getTunesByTitles(titlesArg);
-  }, titles);
+        return await api.getTunesByTitles(titlesArg);
+      }, titles),
+    { label: "queryTunesByTitles" }
+  );
 
   log.debug(`✅ Found ${tunes.length} tune(s) by title`);
   return tunes;
@@ -137,13 +205,10 @@ export async function queryLatestPracticeRecord(
   const pollIntervalMs = options.pollIntervalMs ?? 300;
 
   const fetchOnce = async (): Promise<PracticeRecord | null> => {
-    let record: PracticeRecord | null = null;
-    const maxAttempts = 3;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        await waitForTestApi(page, 30000);
-        record = await page.evaluate(
+    return await withTestApiRetry(
+      page,
+      () =>
+        page.evaluate(
           async (args) => {
             try {
               const api = (window as any).__ttTestApi;
@@ -174,29 +239,9 @@ export async function queryLatestPracticeRecord(
             }
           },
           { tuneId, repertoireId }
-        );
-        break;
-      } catch (err) {
-        const message = (err as Error).message || "unknown error";
-        const isMissingApi = message.includes("__ttTestApi not available");
-        const isContextRace =
-          message.includes("Execution context was destroyed") ||
-          message.includes("Target page, context or browser has been closed");
-
-        if (attempt < maxAttempts && (isMissingApi || isContextRace)) {
-          log.warn(
-            `⚠️ queryLatestPracticeRecord retry ${attempt}/${maxAttempts} due to transient API/context race: ${message}`
-          );
-          await page.waitForTimeout(300);
-          continue;
-        }
-
-        log.error(`❌ queryLatestPracticeRecord evaluate failed: ${message}`);
-        throw err; // Re-throw so tests still fail visibly
-      }
-    }
-
-    return record;
+        ),
+      { label: "queryLatestPracticeRecord" }
+    );
   };
 
   const startedAt = Date.now();
@@ -241,16 +286,21 @@ export async function queryScheduledDates(
     `📊 Querying scheduled dates for repertoire ${repertoireId}${tuneIds ? ` (${tuneIds.length} tunes)` : ""}`
   );
 
-  const result = await page.evaluate(
-    async (args) => {
-      const api = (window as any).__ttTestApi;
-      if (!api) {
-        throw new Error("__ttTestApi not available on window");
-      }
+  const result = await withTestApiRetry(
+    page,
+    () =>
+      page.evaluate(
+        async (args) => {
+          const api = (window as any).__ttTestApi;
+          if (!api) {
+            throw new Error("__ttTestApi not available on window");
+          }
 
-      return await api.getScheduledDates(args.repertoireId, args.tuneIds);
-    },
-    { repertoireId, tuneIds }
+          return await api.getScheduledDates(args.repertoireId, args.tuneIds);
+        },
+        { repertoireId, tuneIds }
+      ),
+    { label: "queryScheduledDates" }
   );
 
   const dateMap = new Map<string, ScheduledDateInfo>(Object.entries(result));
@@ -276,16 +326,24 @@ export async function queryPracticeQueue(
     `📊 Querying practice queue for repertoire ${repertoireId}${windowStartUtc ? ` (window: ${windowStartUtc})` : ""}`
   );
 
-  const queue = await page.evaluate(
-    async (args) => {
-      const api = (window as any).__ttTestApi;
-      if (!api) {
-        throw new Error("__ttTestApi not available on window");
-      }
+  const queue = await withTestApiRetry(
+    page,
+    () =>
+      page.evaluate(
+        async (args) => {
+          const api = (window as any).__ttTestApi;
+          if (!api) {
+            throw new Error("__ttTestApi not available on window");
+          }
 
-      return await api.getPracticeQueue(args.repertoireId, args.windowStartUtc);
-    },
-    { repertoireId, windowStartUtc }
+          return await api.getPracticeQueue(
+            args.repertoireId,
+            args.windowStartUtc
+          );
+        },
+        { repertoireId, windowStartUtc }
+      ),
+    { label: "queryPracticeQueue" }
   );
 
   log.debug(
