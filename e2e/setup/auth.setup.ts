@@ -388,8 +388,8 @@ async function waitForCatalogSnapshotReady(
  *
  * Targets:
  *   - Native Supabase anonymous users (is_anonymous = true).
- *   - Email accounts matching "anon-test-*@tunetrees.test" left behind by
- *     the anonymous account-conversion E2E tests.
+ *   - Any email account whose address ends with "@tunetrees.test" (not just
+ *     "anon-test-*" prefixed ones) left behind by E2E tests.
  *
  * Named TEST_USERS are never touched; their IDs are excluded from the delete
  * set explicitly.

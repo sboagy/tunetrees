@@ -168,7 +168,8 @@ export const OnboardingOverlay: Component = () => {
 
     const db = localDb();
     const userId = user()?.id;
-    // userIdInt is the integer PK used by the local DB for row ownership
+    // userIdInt is the UUID from user_profile.id (matched against authUserId),
+    // used for DB ownership checks. Falls back to the auth user id.
     const userIntId = userIdInt() ?? userId;
     if (!db || !userId) return;
 
