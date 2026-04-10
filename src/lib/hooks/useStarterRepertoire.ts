@@ -35,18 +35,32 @@ export function useStarterRepertoire(): UseStarterRepertoireReturn {
   const [starterError, setStarterError] = createSignal<string | null>(null);
 
   const handleStarterChosen = async (templateId: string): Promise<void> => {
+    // Clear any previous failure so each user action gets fresh feedback.
+    setStarterError(null);
+
     // Prefer the internal integer-mapped UUID; fall back to auth user id
     const userId = userIdInt() ?? user()?.id;
-    if (!userId) return;
+    if (!userId) {
+      console.warn("Starter repertoire selection failed: userId unavailable");
+      setStarterError("Could not start onboarding because no user is loaded.");
+      return;
+    }
 
     const template = getStarterTemplateById(templateId);
-    if (!template) return;
+    if (!template) {
+      console.warn(
+        `Starter repertoire selection failed: unknown template "${templateId}"`
+      );
+      setStarterError(
+        "Could not find that starter repertoire. Please refresh and try again."
+      );
+      return;
+    }
 
     // Do NOT create the repertoire yet — just open the genre-selection dialog.
     // The repertoire will be created only if the user presses "Continue"
     // in the genre dialog. Pressing "Cancel" brings them back to this panel
     // with no side-effects.
-    setStarterError(null);
     beginOnboardingAtGenreStep(userId, templateId);
   };
 

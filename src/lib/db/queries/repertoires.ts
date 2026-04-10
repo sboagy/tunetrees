@@ -17,7 +17,7 @@
  * @module lib/db/queries/repertoires
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
@@ -747,4 +747,86 @@ export async function addTunesToRepertoire(
   }
 
   return { added, skipped, tuneIds: addedTuneIds };
+}
+
+/**
+ * Add many tunes to a repertoire with a single insert/upsert.
+ *
+ * Active rows already present in the repertoire are counted as skipped.
+ * Missing rows are inserted, and soft-deleted rows are undeleted via a bulk
+ * conflict update. This is the preferred path for starter/demo repertoires and
+ * other large imports.
+ */
+export async function addTunesToRepertoireBulk(
+  db: AnyDatabase,
+  repertoireId: string,
+  tuneIds: string[],
+  userId: string
+): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
+  // Verify repertoire ownership
+  const repertoireRecord = await getRepertoireById(db, repertoireId, userId);
+  if (!repertoireRecord) {
+    throw new Error("Repertoire not found or access denied");
+  }
+
+  if (tuneIds.length === 0) {
+    return { added: 0, skipped: 0, tuneIds: [] };
+  }
+
+  const activeExisting = await db
+    .select()
+    .from(repertoireTune)
+    .where(
+      and(
+        eq(repertoireTune.repertoireRef, repertoireId),
+        inArray(repertoireTune.tuneRef, tuneIds),
+        eq(repertoireTune.deleted, 0)
+      )
+    );
+
+  const activeTuneIds = new Set(activeExisting.map((row) => row.tuneRef));
+  const tuneIdsToUpsert = tuneIds.filter(
+    (tuneId) => !activeTuneIds.has(tuneId)
+  );
+
+  if (tuneIdsToUpsert.length === 0) {
+    return {
+      added: 0,
+      skipped: activeTuneIds.size,
+      tuneIds: [],
+    };
+  }
+
+  const now = new Date().toISOString();
+  await db
+    .insert(repertoireTune)
+    .values(
+      tuneIdsToUpsert.map((tuneId) => ({
+        repertoireRef: repertoireId,
+        tuneRef: tuneId,
+        current: null,
+        learned: null,
+        scheduled: now,
+        goal: "recall",
+        deleted: 0,
+        syncVersion: 1,
+        lastModifiedAt: now,
+        deviceId: "local",
+      }))
+    )
+    .onConflictDoUpdate({
+      target: [repertoireTune.repertoireRef, repertoireTune.tuneRef],
+      set: {
+        deleted: 0,
+        syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
+        lastModifiedAt: now,
+        deviceId: "local",
+      },
+    });
+
+  return {
+    added: tuneIdsToUpsert.length,
+    skipped: activeTuneIds.size,
+    tuneIds: tuneIdsToUpsert,
+  };
 }

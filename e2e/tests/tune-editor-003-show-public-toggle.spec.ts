@@ -28,21 +28,26 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
 
     await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
-    // Avoid networkidle (websockets + service worker keep network open); rely on UI ready state
-    await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
   });
+
+  async function openCatalogTuneEditor(tuneName: string): Promise<void> {
+    await ttPage.expectGridHasContent(ttPage.catalogGrid);
+    await ttPage.searchForTune(tuneName, ttPage.catalogGrid);
+
+    const firstRow = ttPage.getRows("catalog").first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
+    await firstRow.click();
+
+    await ttPage.openTuneEditor();
+  }
 
   async function editTuneFieldAndSave(
     tuneName: string,
     fieldTestId: string,
     newValue: string
   ): Promise<void> {
-    await ttPage.searchForTune(tuneName, ttPage.catalogGrid);
-    await ttPage.page.waitForTimeout(500);
-    const firstRow = ttPage.getRows("catalog").first();
-    await firstRow.click();
-
-    await ttPage.openTuneEditor();
+    await openCatalogTuneEditor(tuneName);
 
     const field = ttPage.page.getByTestId(fieldTestId);
     await expect(field).toBeVisible({ timeout: 5000 });
@@ -78,11 +83,8 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
       tuneTitleModified
     );
 
-    await ttPage.searchForTune(tuneTitleModified, ttPage.catalogGrid);
-    await page.waitForTimeout(500);
-    const firstRow = ttPage.getRows("catalog").first();
-    await firstRow.click();
-    await ttPage.openTuneEditor();
+    await openCatalogTuneEditor(tuneTitleModified);
+
     const indicator = page.getByTestId("override-indicator-title");
     await expect(indicator).toBeVisible();
   });
@@ -98,12 +100,9 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
       "tune-editor-input-title",
       tuneTitleModified
     );
-    await page.waitForTimeout(500);
-    // const firstRow = ttPage.getRows(tuneTitleModified).first();
-    // await firstRow.click();
 
-    await ttPage.openTuneEditor();
-    await page.waitForTimeout(500);
+    await openCatalogTuneEditor(tuneTitleModified);
+
     const indicator = page.getByTestId("override-indicator-title");
     await indicator.click();
     const reveal = page.getByTestId("override-reveal-title");
@@ -118,11 +117,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
       "tune-editor-input-title",
       tuneTitleModified
     );
-    await ttPage.searchForTune(tuneTitleModified, ttPage.catalogGrid);
-    await page.waitForTimeout(500);
-    const firstRow = ttPage.getRows("catalog").first();
-    await firstRow.click();
-    await ttPage.openTuneEditor();
+    await openCatalogTuneEditor(tuneTitleModified);
 
     const indicator = page.getByTestId("override-indicator-title");
     await indicator.click();

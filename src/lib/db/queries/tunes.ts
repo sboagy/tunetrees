@@ -499,22 +499,16 @@ export async function getCatalogTuneIdsByFilter(
   filterType: "genre" | "origin",
   filterValue: string
 ): Promise<string[]> {
-  const filterCondition =
-    filterType === "genre"
-      ? eq(schema.tune.genre, filterValue)
-      : eq(schema.tune.primaryOrigin, filterValue);
+  const filterColumn =
+    filterType === "genre" ? sql.raw("genre") : sql.raw("primary_origin");
 
-  const rows = await db
-    .select()
-    .from(schema.tune)
-    .where(
-      and(
-        eq(schema.tune.deleted, 0),
-        isNull(schema.tune.privateFor), // catalog (public) tunes only
-        filterCondition
-      )
-    )
-    .all();
+  const rows = await db.all<{ id: string }>(sql`
+    SELECT id
+    FROM tune
+    WHERE deleted = 0
+      AND private_for IS NULL
+      AND ${filterColumn} = ${filterValue}
+  `);
 
   return rows.map((r) => r.id);
 }

@@ -10,7 +10,7 @@
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import {
-  addTunesToRepertoire,
+  addTunesToRepertoireBulk,
   createRepertoire,
   getUserRepertoires,
 } from "../db/queries/repertoires";
@@ -196,8 +196,9 @@ export async function createStarterRepertoire(
  * Populate a starter repertoire with matching catalog tunes.
  *
  * Queries all non-deleted, public catalog tunes that match the template's
- * filter (genre or primary_origin) and bulk-adds them to the given
- * repertoire. Tunes already in the repertoire are skipped silently.
+ * filter (genre or primary_origin) and adds them to the given repertoire via
+ * a single bulk insert/upsert. Tunes already active in the repertoire are
+ * skipped, while soft-deleted rows are undeleted.
  *
  * This should be called **after** the catalog has synced so that the
  * relevant tunes exist in the local SQLite database.
@@ -238,7 +239,12 @@ export async function populateStarterRepertoireFromCatalog(
     return { added: 0, skipped: 0 };
   }
 
-  const result = await addTunesToRepertoire(db, repertoireId, tuneIds, userId);
+  const result = await addTunesToRepertoireBulk(
+    db,
+    repertoireId,
+    tuneIds,
+    userId
+  );
 
   console.log(
     `✅ Populated starter repertoire "${repertoireId}" with ${result.added} tunes ` +

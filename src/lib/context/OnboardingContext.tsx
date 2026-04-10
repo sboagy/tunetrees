@@ -96,11 +96,7 @@ interface OnboardingState {
 /**
  * Onboarding steps
  */
-export type OnboardingStep =
-  | "create-repertoire"
-  | "choose-genres"
-  | "view-catalog"
-  | "complete";
+export type OnboardingStep = "choose-genres" | "view-catalog" | "complete";
 
 /**
  * Onboarding context (undefined until provider is mounted)
@@ -181,7 +177,10 @@ export const OnboardingProvider: ParentComponent = (props) => {
 
   /**
    * Start onboarding flow.
-   * Will not re-start if the given user has already skipped or completed onboarding.
+   *
+   * Step 1 now lives inline in the empty-state UI, so the modal flow begins at
+   * the genre dialog. This ensures callers never land in a state where
+   * needsOnboarding is true but no overlay is rendered.
    *
    * @param userId - Optional user ID to scope the "skipped" localStorage flag
    *   per user. Pass the current user's ID so that switching from an anonymous
@@ -197,9 +196,10 @@ export const OnboardingProvider: ParentComponent = (props) => {
       return;
     }
     setCurrentOnboardingUserId(userId);
+    setChosenStarterTemplateId(null);
     console.log("🎓 Starting onboarding flow");
     setNeedsOnboarding(true);
-    setOnboardingStep("create-repertoire");
+    setOnboardingStep("choose-genres");
   };
 
   /**
@@ -235,6 +235,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     console.log("🎓 Dismissing genre dialog — no repertoire created");
     setNeedsOnboarding(false);
     setOnboardingStep(null);
+    clearPendingStarter();
     setChosenStarterTemplateId(null);
     // Do NOT write to localStorage — the user is not marked as skipped/completed.
   };
@@ -246,9 +247,7 @@ export const OnboardingProvider: ParentComponent = (props) => {
     const current = onboardingStep();
     console.log("🎓 Onboarding next step from:", current);
 
-    if (current === "create-repertoire") {
-      setOnboardingStep("choose-genres");
-    } else if (current === "choose-genres") {
+    if (current === "choose-genres") {
       setOnboardingStep("view-catalog");
     } else if (current === "view-catalog") {
       setOnboardingStep("complete");
