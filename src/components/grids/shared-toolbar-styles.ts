@@ -28,10 +28,12 @@ export const TOOLBAR_CONTAINER_CLASSES =
 /**
  * Inner wrapper for toolbar content
  * - Responsive padding
- * - Explicit height for consistency across all toolbars
+ * - Min-height instead of fixed height so the toolbar can grow when
+ *   text labels cause buttons to wrap on small screens
+ * - flex-wrap allows mobile buttons to flow onto multiple rows
  */
 export const TOOLBAR_INNER_CLASSES =
-  "px-2 sm:px-3 lg:px-4 h-[46px] flex items-center";
+  "px-2 sm:px-3 lg:px-4 min-h-[46px] flex flex-wrap items-center gap-y-1.5 py-1.5";
 
 /**
  * Flexbox container for toolbar buttons

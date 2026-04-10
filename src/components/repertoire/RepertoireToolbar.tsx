@@ -227,7 +227,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
               />
             </svg>
             <span class="hidden md:inline">Add To Review</span>
-            <span class="hidden sm:inline md:hidden">Review</span>
+            <span class="md:hidden">Review</span>
           </button>
 
           <div class={TOOLBAR_SEARCH_CONTAINER}>
@@ -296,6 +296,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
               />
             </svg>
             <span class="hidden sm:inline">Add Tune</span>
+            <span class="sm:hidden">Add</span>
           </button>
 
           <button
@@ -321,7 +322,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
               />
             </svg>
             <span class="hidden md:inline">Remove From Repertoire</span>
-            <span class="hidden sm:inline md:hidden">Remove</span>
+            <span class="md:hidden">Remove</span>
           </button>
         </div>
 
@@ -338,9 +339,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
           >
             <Columns size={14} />
-            <span class="hidden lg:inline">Columns</span>
+            <span class="hidden sm:inline">Columns</span>
+            <span class="sm:hidden">Cols</span>
             <svg
-              class="w-3.5 h-3.5 hidden lg:inline"
+              class="w-3.5 h-3.5 hidden sm:inline"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
