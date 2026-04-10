@@ -824,6 +824,10 @@ export async function addTunesToRepertoireBulk(
       },
     });
 
+  // Persist to IndexedDB immediately so tunes survive a browser refresh
+  // before the periodic auto-persist has a chance to run.
+  await persistDb();
+
   return {
     added: tuneIdsToUpsert.length,
     skipped: activeTuneIds.size,
