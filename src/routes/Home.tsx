@@ -21,8 +21,6 @@ import { MainLayout } from "../components/layout";
 import type { TabId } from "../components/layout/TabBar";
 import { OnboardingOverlay } from "../components/onboarding";
 import { useAuth } from "../lib/auth/AuthContext";
-import { useOnboarding } from "../lib/context/OnboardingContext";
-import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticePage from "./practice";
@@ -45,21 +43,7 @@ import RepertoirePage from "./repertoire";
 const Home: Component = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const {
-    user,
-    loading,
-    isAnonymous,
-    initialSyncComplete,
-    lastSyncTimestamp,
-    localDb,
-    userIdInt,
-  } = useAuth();
-  const {
-    startOnboarding,
-    shouldShowOnboarding,
-    hasCheckedOnboarding,
-    setHasCheckedOnboarding,
-  } = useOnboarding();
+  const { user, loading, isAnonymous } = useAuth();
   const [activeTab, setActiveTab] = createSignal<TabId>("practice");
 
   // Initialize active tab from URL parameter
@@ -81,50 +65,6 @@ const Home: Component = () => {
   createEffect(() => {
     if (!loading() && !user() && !isAnonymous()) {
       navigate("/login", { replace: true });
-    }
-  });
-
-  // Check if onboarding is needed for users with no repertoires
-  createEffect(() => {
-    // Wait for auth to be loaded and initial sync to complete
-    if (loading() || (!user() && !isAnonymous()) || !initialSyncComplete()) {
-      return;
-    }
-    if (hasCheckedOnboarding()) return;
-
-    // IMPORTANT: After local storage wipe, local DB starts empty and repertoires are only
-    // available after the first syncDown completes. If we check too early, we incorrectly
-    // show the onboarding flow to users who already have repertoires.
-    if (user() && !isAnonymous()) {
-      // Only gate when online; if offline we can't wait for syncDown.
-      if (navigator.onLine && !lastSyncTimestamp()) {
-        return;
-      }
-    }
-
-    // Check if user has any repertoires
-    const db = localDb();
-    // Use userIdInt which is the correct UUID for both regular and anonymous users
-    const userId = userIdInt();
-
-    if (db && userId) {
-      setHasCheckedOnboarding(true);
-      void (async () => {
-        try {
-          const repertoires = await getUserRepertoires(db, userId);
-          const hasRepertoires = repertoires.length > 0;
-
-          if (shouldShowOnboarding(hasRepertoires)) {
-            console.log("🎓 No repertoires found, starting onboarding");
-            // Small delay to let UI settle
-            setTimeout(() => {
-              startOnboarding();
-            }, 500);
-          }
-        } catch (error) {
-          console.error("Failed to check repertoires for onboarding:", error);
-        }
-      })();
     }
   });
 

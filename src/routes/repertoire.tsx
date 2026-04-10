@@ -39,6 +39,8 @@ import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import * as schema from "../lib/db/schema";
 import { repertoireTune } from "../lib/db/schema";
+import { STARTER_TEMPLATES } from "../lib/db/starter-repertoire-templates";
+import { useStarterRepertoire } from "../lib/hooks/useStarterRepertoire";
 import { log } from "../lib/logger";
 
 const arraysEqual = (a: string[], b: string[]) =>
@@ -70,6 +72,8 @@ const RepertoirePage: Component = () => {
     suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
+  const { isCreatingStarter, starterError, handleStarterChosen } =
+    useStarterRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
 
@@ -393,7 +397,10 @@ const RepertoirePage: Component = () => {
       });
       incrementRepertoireListChanged();
     } catch (err) {
-      console.error("[RepertoirePage] Failed to update schedule override:", err);
+      console.error(
+        "[RepertoirePage] Failed to update schedule override:",
+        err
+      );
     }
   };
 
@@ -477,17 +484,13 @@ const RepertoirePage: Component = () => {
         {/* No repertoire selected message */}
         <Show when={!currentRepertoireId()}>
           <RepertoireEmptyState
-            title="No current repertoire"
-            description={
-              `Repertoires group tunes by instrument, genre, or goal. ` +
-              `Create a new repertoire and add tunes from the Catalog ` +
-              `tab, or select an existing repertoire, if available, from the ` +
-              `Repertoire menu in the top banner.`
-            }
-            primaryAction={{
-              label: "Create repertoire",
-              onClick: () => setShowRepertoireDialog(true),
-            }}
+            title="Welcome to TuneTrees! 🎵"
+            description="Get started with a pre-populated starter repertoire, or create your own from scratch."
+            starterTemplates={STARTER_TEMPLATES}
+            onStarterChosen={handleStarterChosen}
+            onCreateCustom={() => setShowRepertoireDialog(true)}
+            isCreatingStarter={isCreatingStarter()}
+            starterError={starterError()}
           />
         </Show>
       </div>
