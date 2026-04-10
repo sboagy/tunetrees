@@ -77,7 +77,7 @@ export class TuneTreesPage {
   // Toolbar Buttons - Generic (may not work on all tabs/viewports)
   readonly addTuneButton: Locator; // Generic by title
   readonly deleteButton: Locator; // Generic by role
-  readonly columnsButton: Locator; // Generic by role (text hidden on mobile)
+  readonly columnsButton: Locator; // Generic by testid union for cross-viewport stability
 
   // Tab-specific Toolbar Buttons (use these for reliable cross-viewport testing)
   readonly catalogAddTuneButton: Locator;
@@ -279,7 +279,11 @@ export class TuneTreesPage {
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
     this.addTuneButton = page.getByRole("button", { name: "Add a new tune" });
     this.deleteButton = page.getByRole("button", { name: /Delete/i });
-    this.columnsButton = page.getByRole("button", { name: /Columns/i }); // Text hidden on mobile
+    this.columnsButton = page
+      .locator(
+        '[data-testid="catalog-columns-button"], [data-testid="repertoire-columns-button"], [data-testid="practice-columns-button"]'
+      )
+      .first();
 
     // Tab-specific Toolbar Buttons - Catalog
     this.catalogAddTuneButton = page.getByTestId("catalog-add-tune-button");

@@ -103,7 +103,7 @@ test.describe
 
     test("should have Columns button enabled", async ({ page }) => {
       // Columns button should be available even with empty grid
-      const columnsButton = page.getByRole("button", { name: /Columns/i });
+      const columnsButton = page.getByTestId("practice-columns-button");
 
       await expect(columnsButton).toBeVisible({ timeout: 5000 });
       await expect(columnsButton).toBeEnabled();
