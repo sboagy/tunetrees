@@ -237,33 +237,11 @@ export const ScheduledOverridePicker: Component<
   );
   const canApply = createMemo(() => Boolean(draftIso()));
   const hasOverride = createMemo(() => Boolean(props.value));
-  const triggerIconClass = createMemo(() => {
-    if (!hasOverride()) return "text-gray-400 dark:text-gray-500";
-
-    // Color the icon based on whether the override date is past, today, or future,
-    // matching the color semantics of getRelativeScheduledDisplay in TuneColumns.tsx.
-    try {
-      const date = new Date(props.value);
-      if (!Number.isNaN(date.getTime())) {
-        const dateOnly = new Date(
-          date.getFullYear(),
-          date.getMonth(),
-          date.getDate()
-        );
-        const todayDateOnly = new Date();
-        todayDateOnly.setHours(0, 0, 0, 0);
-        if (dateOnly < todayDateOnly) {
-          // Override date is in the past – use red to signal an overdue/stale override.
-          return "text-red-600 dark:text-red-400";
-        }
-      }
-    } catch {
-      // Fall through to purple if the date cannot be parsed.
-    }
-
-    // Override is today or in the future – purple indicates an active scheduled override.
-    return "text-purple-600 dark:text-purple-400";
-  });
+  const triggerIconClass = createMemo(() =>
+    hasOverride()
+      ? "text-purple-600 dark:text-purple-400"
+      : "text-gray-400 dark:text-gray-500"
+  );
   const draftSummary = createMemo(() => {
     const iso = draftIso();
     return iso ? formatDisplay(iso) : "Select date and time";
