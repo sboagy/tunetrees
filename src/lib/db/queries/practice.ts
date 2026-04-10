@@ -490,8 +490,14 @@ export async function getPracticeHistory(
  * Add tunes to practice queue ("Add To Review" from Repertoire)
  *
  * For selected repertoire tunes, this function:
- * 1. Sets the scheduled date to now (makes them immediately available for practice)
+ * 1. Bumps lastModifiedAt for sync tracking
  * 2. Creates initial practice records if they don't exist
+ *
+ * NOTE: This function intentionally does NOT set `scheduled = now`. The
+ * `scheduled` field on repertoire_tune is reserved for explicit user-set
+ * schedule overrides (via the ScheduledOverridePicker). Making tunes
+ * immediately available for practice is handled by addSpecificTunesToExistingQueue
+ * which writes directly to daily_practice_queue.
  *
  * This is the client-side equivalent of the legacy Python function:
  * `add_tunes_to_practice_queue` in tunetrees/app/queries.py
@@ -519,11 +525,11 @@ export async function addTunesToPracticeQueue(
 
   for (const tuneId of tuneIds) {
     try {
-      // Update repertoire_tune.scheduled to make tune immediately available
+      // Touch lastModifiedAt for sync tracking (do NOT set scheduled — that
+      // field is reserved for explicit user-set overrides via ScheduledOverridePicker)
       const result = await db
         .update(repertoireTune)
         .set({
-          scheduled: now,
           syncVersion: sql.raw(`sync_version + 1`),
           lastModifiedAt: now,
         })

@@ -237,18 +237,13 @@ export const ScheduledOverridePicker: Component<
   );
   const canApply = createMemo(() => Boolean(draftIso()));
   const hasOverride = createMemo(() => Boolean(props.value));
-  // Show purple only when the override is still in effect (today or a future date).
-  // A past override is treated as consumed/expired and shown as gray, matching the
-  // "no override" state. Only two colors are used — independent of the cell text's
-  // multi-color relative-date display.
-  const triggerIconClass = createMemo(() => {
-    if (!hasOverride()) return "text-gray-400 dark:text-gray-500";
-    const todayDateOnly = new Date().toISOString().substring(0, 10);
-    const overrideDateOnly = props.value.substring(0, 10);
-    return overrideDateOnly >= todayDateOnly
+  // Binary: purple = a schedule override is set (user-specified); gray = no override.
+  // Color is independent of whether the override date is past, today, or future.
+  const triggerIconClass = createMemo(() =>
+    hasOverride()
       ? "text-purple-600 dark:text-purple-400"
-      : "text-gray-400 dark:text-gray-500";
-  });
+      : "text-gray-400 dark:text-gray-500"
+  );
   const draftSummary = createMemo(() => {
     const iso = draftIso();
     return iso ? formatDisplay(iso) : "Select date and time";
