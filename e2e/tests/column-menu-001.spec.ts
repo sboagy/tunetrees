@@ -25,9 +25,7 @@ test.describe("Column Visibility Menu", () => {
     await page.waitForTimeout(1000);
 
     // Click the Columns button to open menu
-    const columnsButton = page
-      .getByRole("button", { name: /columns/i })
-      .first();
+    const columnsButton = ttPage.repertoireColumnsButton;
     await columnsButton.click();
     await page.waitForTimeout(500);
 
