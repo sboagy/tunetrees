@@ -194,6 +194,7 @@ export class TuneTreesPage {
   readonly onboardingGenreSearchInput: Locator;
   readonly onboardingGenreSelectAllButton: Locator;
   readonly onboardingGenreClearAllButton: Locator;
+  readonly onboardingGenreCancelButton: Locator;
   readonly onboardingGenreContinueButton: Locator;
   readonly onboardingGenreCheckboxes: Locator;
 
@@ -467,6 +468,9 @@ export class TuneTreesPage {
     this.onboardingGenreClearAllButton = page.getByTestId(
       "onboarding-genre-clear-all"
     );
+    this.onboardingGenreCancelButton = page.getByTestId(
+      "onboarding-genre-cancel"
+    );
     this.onboardingGenreContinueButton = page.getByTestId(
       "onboarding-genre-continue"
     );
@@ -565,6 +569,22 @@ export class TuneTreesPage {
     await this.page.waitForTimeout(1500);
 
     await this.startOnboardingWithRepertoire(repertoireName);
+    await expect(this.onboardingChooseGenresHeading).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(this.onboardingGenreSearchInput).toBeVisible({
+      timeout: 15000,
+    });
+  }
+
+  getOnboardingStarterCard(templateId: string): Locator {
+    return this.page.getByTestId(`onboarding-starter-${templateId}`);
+  }
+
+  async chooseStarterTemplate(templateId: string) {
+    const card = this.getOnboardingStarterCard(templateId);
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await card.click({ timeout: 5000 });
     await expect(this.onboardingChooseGenresHeading).toBeVisible({
       timeout: 15000,
     });
