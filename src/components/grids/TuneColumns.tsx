@@ -596,34 +596,24 @@ export function getRepertoireColumns(
         <SortableHeader column={column} title="Scheduled" />
       ),
       cell: (info) => {
-        // Scheduling semantics:
-        // - `latest_due` is the computed FSRS next review date.
-        // - `scheduled` is an optional manual override for the next review.
-        // - During staging, show the override when present; otherwise show the
-        //   staged FSRS preview so the visible date matches the effective queueing date.
+        // Display falls back to latest_due when no override exists, but the
+        // picker itself only edits the raw scheduled override.
         const row = info.cell.row.original as {
-          completed_at?: string | null;
           scheduled?: string | null;
           tune_id?: string | number | null;
           tune?: { id?: string | number | null } | null;
           tuneRef?: string | number | null;
           id?: string | number | null;
         };
-        const completedAt = row.completed_at;
-        const stagedLatestDue = info.row.getValue("latest_due") as
-          | string
-          | null;
-        const scheduledOverride = row.scheduled ?? null;
-        const hasPendingEvaluation =
-          Boolean(info.row.getValue("recall_eval")) && !completedAt;
-        const effectiveScheduled = hasPendingEvaluation
-          ? (scheduledOverride ?? stagedLatestDue)
-          : (info.getValue() as string | null);
+        const scheduledOverride = row.scheduled || null;
+        const latestDue =
+          (info.row.getValue("latest_due") as string | null) || null;
+        const displayedScheduled = scheduledOverride ?? latestDue;
         const tuneId = String(
           row.tune_id ?? row.tune?.id ?? row.tuneRef ?? row.id ?? ""
         );
 
-        if (!effectiveScheduled) {
+        if (!displayedScheduled) {
           return callbacks?.onScheduledChange ? (
             <ScheduledOverridePicker
               tuneId={tuneId}
@@ -637,7 +627,7 @@ export function getRepertoireColumns(
           );
         }
 
-        const display = getRelativeScheduledDisplay(effectiveScheduled);
+        const display = getRelativeScheduledDisplay(displayedScheduled);
 
         if (!callbacks?.onScheduledChange) {
           return (
