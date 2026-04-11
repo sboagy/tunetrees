@@ -22,17 +22,16 @@ import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 import { TunesGridScheduled } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../components/grids/types";
-import {
-  FlashcardView,
-  PracticeControlBanner,
-} from "../components/practice";
+import { FlashcardView, PracticeControlBanner } from "../components/practice";
 import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { useOnboarding } from "../lib/context/OnboardingContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
+import { useStarterRepertoire } from "../lib/hooks/useStarterRepertoire";
 import { generateOrGetPracticeQueue } from "../lib/services/practice-queue";
 import { getPracticeDate } from "../lib/utils/practice-date";
 import { useFlashcardPersistence } from "./practice/useFlashcardPersistence";
@@ -63,7 +62,13 @@ const PracticePage: Component = () => {
     suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
+  const { isCreatingStarter, starterError, handleStarterChosen } =
+    useStarterRepertoire();
+  const { beginOnboardingAtGenreStep } = useOnboarding();
   const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
+  // Track whether the dialog was opened from the empty-state onboarding panel
+  // (i.e. the user has no repertoire yet) so we can trigger genre selection after save.
+  const [openedFromOnboarding, setOpenedFromOnboarding] = createSignal(false);
   const [isChatOpen, setIsChatOpen] = createSignal(false);
   const [tableInstance, setTableInstance] = createSignal<any>(null);
   const repertoiresVersion = createMemo(() => `${repertoireListChanged()}`);
@@ -104,7 +109,16 @@ const PracticePage: Component = () => {
     repertoiresLoadedVersion,
     setRepertoiresLoadedVersion,
     onOpenAssistant: () => setIsChatOpen(true),
-    onCreateRepertoire: () => setShowRepertoireDialog(true),
+    onCreateRepertoire: () => {
+      // If no repertoire exists yet, the dialog is being opened from the
+      // onboarding empty-state panel — remember this so we can chain into
+      // genre selection once the repertoire is saved.
+      setOpenedFromOnboarding(!currentRepertoireId());
+      setShowRepertoireDialog(true);
+    },
+    onStarterChosen: handleStarterChosen,
+    isCreatingStarter,
+    starterError,
   });
 
   const getUserId = async (): Promise<string | null> => {
@@ -375,6 +389,13 @@ const PracticePage: Component = () => {
           onSaved={() => {
             incrementRepertoireListChanged();
             setShowRepertoireDialog(false);
+            // If the dialog was opened from the onboarding empty-state panel,
+            // chain directly into the genre-selection step so the catalog sync
+            // and population happen without requiring manual navigation.
+            if (openedFromOnboarding()) {
+              setOpenedFromOnboarding(false);
+              beginOnboardingAtGenreStep(user()?.id);
+            }
           }}
         />
       </Show>
