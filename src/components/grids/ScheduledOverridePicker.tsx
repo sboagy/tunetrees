@@ -244,6 +244,11 @@ export const ScheduledOverridePicker: Component<
       ? "text-purple-600 dark:text-purple-400"
       : "text-gray-400 dark:text-gray-500"
   );
+  const triggerIconWrapperClass = createMemo(() =>
+    hasOverride()
+      ? "border-b-2 border-current pb-0.5"
+      : "border-b-2 border-transparent pb-0.5"
+  );
   const draftSummary = createMemo(() => {
     const iso = draftIso();
     return iso ? formatDisplay(iso) : "Select date and time";
@@ -316,9 +321,12 @@ export const ScheduledOverridePicker: Component<
                 <span class="min-w-0 flex-1 text-left text-gray-400">
                   &nbsp;
                 </span>
-                <Calendar
-                  class={`h-4 w-4 flex-shrink-0 ${triggerIconClass()}`}
-                />
+                <span
+                  data-testid={`scheduled-override-icon-${props.tuneId}`}
+                  class={`inline-flex flex-shrink-0 items-end ${triggerIconClass()} ${triggerIconWrapperClass()}`}
+                >
+                  <Calendar class="h-4 w-4" />
+                </span>
                 <span class="sr-only">Set schedule override</span>
               </>
             }
@@ -328,7 +336,12 @@ export const ScheduledOverridePicker: Component<
             >
               {props.triggerLabel ?? formatDisplay(props.value)}
             </span>
-            <Calendar class={`h-4 w-4 flex-shrink-0 ${triggerIconClass()}`} />
+            <span
+              data-testid={`scheduled-override-icon-${props.tuneId}`}
+              class={`inline-flex flex-shrink-0 items-end ${triggerIconClass()} ${triggerIconWrapperClass()}`}
+            >
+              <Calendar class="h-4 w-4" />
+            </span>
           </Show>
         </PopoverPrimitive.Trigger>
 

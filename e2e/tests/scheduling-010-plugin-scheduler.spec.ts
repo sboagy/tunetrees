@@ -12,6 +12,7 @@ import {
   seedSchedulingPluginLocally,
   setupForPracticeTestsParallel,
 } from "../helpers/practice-scenarios";
+import { submitAndWaitForPracticeSettled } from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -242,20 +243,15 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       ).toBeVisible({ timeout: 10000 });
       stamp("target-row-visible", { tuneTitle: TEST_TUNE_BANISH_TITLE });
 
-      await ttPage.enableFlashcardMode();
-      stamp("flashcard-mode-enabled");
-      await expect(ttPage.flashcardView).toBeVisible({ timeout: 10000 });
-      stamp("flashcard-visible");
-
-      stamp("before-selectFlashcardEvaluation", {
+      stamp("before-setRowEvaluation", {
         eval: "good",
         url: page.url(),
       });
-      await ttPage.selectFlashcardEvaluation("good");
-      stamp("after-selectFlashcardEvaluation");
+      await ttPage.setRowEvaluation(row, "good");
+      stamp("after-setRowEvaluation");
 
       stamp("before-submitEvaluations", { timeoutMs: 60000, url: page.url() });
-      await ttPage.submitEvaluations({ timeoutMs: 60000 });
+      await submitAndWaitForPracticeSettled(page, ttPage, 60000);
       stamp("after-submitEvaluations");
 
       // await page.waitForLoadState("networkidle", { timeout: 15000 });
