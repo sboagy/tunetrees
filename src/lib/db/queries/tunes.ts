@@ -8,10 +8,14 @@
  */
 
 import { and, asc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "../../utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
 import type { CreateTuneInput, Tune } from "../types";
+
+// Support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 /**
  * Search and filter options for tunes
@@ -470,4 +474,41 @@ export async function searchTunes(
     .where(and(...conditions) as any)
     .orderBy(asc(schema.tune.title))
     .all();
+}
+
+/**
+ * Get catalog tune IDs filtered by genre or primary origin.
+ *
+ * Used to populate starter/demo repertoires after catalog sync.
+ * Returns only non-deleted, public (non-private) catalog tunes.
+ *
+ * @param db - Database instance
+ * @param filterType - "genre" to filter by genre column, "origin" by primary_origin
+ * @param filterValue - The genre ID or primary_origin value to match
+ * @returns Array of tune ID strings
+ *
+ * @example
+ * // All ITRAD tunes
+ * const ids = await getCatalogTuneIdsByFilter(db, "genre", "ITRAD");
+ *
+ * // All Rolling Stone Top 500 songs
+ * const ids = await getCatalogTuneIdsByFilter(db, "origin", "rolling_stone_top_500_v1");
+ */
+export async function getCatalogTuneIdsByFilter(
+  db: AnyDatabase,
+  filterType: "genre" | "origin",
+  filterValue: string
+): Promise<string[]> {
+  const filterColumn =
+    filterType === "genre" ? sql.raw("genre") : sql.raw("primary_origin");
+
+  const rows = await db.all<{ id: string }>(sql`
+    SELECT id
+    FROM tune
+    WHERE deleted = 0
+      AND private_for IS NULL
+      AND ${filterColumn} = ${filterValue}
+  `);
+
+  return rows.map((r) => r.id);
 }

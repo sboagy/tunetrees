@@ -168,10 +168,12 @@ test.describe("Anonymous User Edge Cases", () => {
     await ttPage.signInAnonymously();
 
     // Check that we're back on the home page
-    // Note: Without a repertoire, repertoire tab shows "No repertoire selected"
+    // A fresh anonymous session now lands on the starter-repertoire empty state.
+    // Older flows may still show a legacy no-repertoire message.
     await ttPage.navigateToTab("repertoire", { waitForContent: false });
 
-    // Expect either the repertoire grid (if repertoire persists) or the "no repertoire" message
+    // Accept either persisted repertoire data, the legacy empty-state copy, or
+    // the new starter-repertoire chooser.
     const noRepertoireMessage = page.getByText("No current repertoire");
     const repertoireGridVisible = await ttPage.repertoireGrid
       .isVisible({ timeout: 2000 })
@@ -179,13 +181,27 @@ test.describe("Anonymous User Edge Cases", () => {
     const noRepertoireVisible = await noRepertoireMessage
       .isVisible({ timeout: 2000 })
       .catch(() => false);
+    const starterEmptyStateVisible = await ttPage.onboardingWelcomeHeading
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    const starterCreateButtonVisible =
+      await ttPage.onboardingCreateRepertoireButton
+        .isVisible({ timeout: 2000 })
+        .catch(() => false);
 
-    // Either way is valid - data cleared means no repertoire, or data persisted means it's there
-    expect(repertoireGridVisible || noRepertoireVisible).toBe(true);
+    expect(
+      repertoireGridVisible ||
+        noRepertoireVisible ||
+        (starterEmptyStateVisible && starterCreateButtonVisible)
+    ).toBe(true);
 
     // Log the state for debugging
     console.log(
-      `After re-login: repertoireGrid=${repertoireGridVisible}, noRepertoire=${noRepertoireVisible}`
+      "After re-login:" +
+        ` repertoireGrid=${repertoireGridVisible},` +
+        ` noRepertoire=${noRepertoireVisible},` +
+        ` starterEmptyState=${starterEmptyStateVisible},` +
+        ` starterCreateButton=${starterCreateButtonVisible}`
     );
   });
 

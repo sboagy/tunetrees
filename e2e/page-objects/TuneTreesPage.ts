@@ -195,6 +195,7 @@ export class TuneTreesPage {
   readonly onboardingGenreSearchInput: Locator;
   readonly onboardingGenreSelectAllButton: Locator;
   readonly onboardingGenreClearAllButton: Locator;
+  readonly onboardingGenreCancelButton: Locator;
   readonly onboardingGenreContinueButton: Locator;
   readonly onboardingGenreCheckboxes: Locator;
 
@@ -473,6 +474,9 @@ export class TuneTreesPage {
     this.onboardingGenreClearAllButton = page.getByTestId(
       "onboarding-genre-clear-all"
     );
+    this.onboardingGenreCancelButton = page.getByTestId(
+      "onboarding-genre-cancel"
+    );
     this.onboardingGenreContinueButton = page.getByTestId(
       "onboarding-genre-continue"
     );
@@ -579,46 +583,78 @@ export class TuneTreesPage {
     });
   }
 
+  getOnboardingStarterCard(templateId: string): Locator {
+    return this.page.getByTestId(`onboarding-starter-${templateId}`);
+  }
+
+  async chooseStarterTemplate(templateId: string) {
+    const card = this.getOnboardingStarterCard(templateId);
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await card.click({ timeout: 5000 });
+    await expect(this.onboardingChooseGenresHeading).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(this.onboardingGenreSearchInput).toBeVisible({
+      timeout: 15000,
+    });
+  }
+
   /**
    * Dismiss onboarding overlay if it is visible.
    * The app has a bug where onboarding can appear with a 500ms+ delay,
    * so we need to wait long enough and be aggressive about dismissing.
    */
   async dismissOnboardingIfPresent() {
-    const welcomeHeading = this.page.getByRole("heading", {
-      name: /Welcome to TuneTrees/i,
-    });
-    const skipTourButton = this.page
-      .locator('button:has-text("Skip Tour")')
-      .last();
+    // In the new onboarding design, Step 1 is shown inline in the empty-state
+    // panel (not a blocking modal overlay). Only Steps 2 and 3 render as modal
+    // overlays that need active dismissal. This method handles those two cases
+    // quickly and without crashing if the page navigates mid-wait.
 
-    // Wait for the app to potentially show onboarding (600ms delay + buffer)
-    await this.page.waitForTimeout(1000);
+    try {
+      // Brief wait for any async onboarding trigger to fire.
+      await this.page.waitForTimeout(500);
 
-    // Try up to 5 times to ensure onboarding is dismissed
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const isVisible = await welcomeHeading.isVisible().catch(() => false);
-
-      if (isVisible) {
-        try {
-          await skipTourButton.click({ timeout: 2000 });
-          // Wait for it to disappear
-          await welcomeHeading.waitFor({ state: "hidden", timeout: 3000 });
-        } catch {
-          // Click might have failed, wait and retry
-          await this.page.waitForTimeout(500);
-          continue;
+      // Step 2: Genre selection dialog — cancel it if open.
+      const genreHeading = this.page.getByRole("heading", {
+        name: /Choose additional genres to download/i,
+      });
+      if (await genreHeading.isVisible().catch(() => false)) {
+        const cancelButton = this.page.getByTestId("onboarding-genre-cancel");
+        if (await cancelButton.isVisible().catch(() => false)) {
+          await cancelButton.click({ timeout: 2000 }).catch(() => {});
+          await genreHeading
+            .waitFor({ state: "hidden", timeout: 3000 })
+            .catch(() => {});
         }
-      }
-
-      // Wait to see if it re-appears
-      await this.page.waitForTimeout(800);
-
-      const stillVisible = await welcomeHeading.isVisible().catch(() => false);
-      if (!stillVisible) {
-        // It's gone and stayed gone - success!
         return;
       }
+
+      // Step 3: "Add some tunes" / view-catalog overlay — click Got it! or Skip.
+      const step3Heading = this.page.getByRole("heading", {
+        name: /add some tunes/i,
+      });
+      if (await step3Heading.isVisible().catch(() => false)) {
+        const gotItButton = this.page.getByRole("button", {
+          name: /got it!/i,
+        });
+        const skipButton = this.page.getByRole("button", {
+          name: /skip tour/i,
+        });
+        if (await gotItButton.isVisible().catch(() => false)) {
+          await gotItButton.click({ timeout: 2000 }).catch(() => {});
+        } else if (await skipButton.isVisible().catch(() => false)) {
+          await skipButton.click({ timeout: 2000 }).catch(() => {});
+        }
+        await step3Heading
+          .waitFor({ state: "hidden", timeout: 3000 })
+          .catch(() => {});
+        return;
+      }
+
+      // No blocking modal overlay — the empty-state panel is inline and
+      // non-blocking, so nothing needs to be dismissed.
+    } catch {
+      // Ignore any errors from page navigation / browser closure.
     }
   }
 
@@ -686,7 +722,14 @@ export class TuneTreesPage {
     });
 
     if (genresFilter && genresFilter.length > 0) {
-      await this.onboardingGenreClearAllButton.click({ timeout: 3000 });
+      // Only click "Clear all" if it's enabled — the dialog may open with no
+      // genres pre-selected, in which case the button is correctly disabled.
+      const clearEnabled = await this.onboardingGenreClearAllButton
+        .isEnabled()
+        .catch(() => false);
+      if (clearEnabled) {
+        await this.onboardingGenreClearAllButton.click({ timeout: 3000 });
+      }
       for (const genre of genresFilter) {
         await this.setOnboardingGenreChecked(genre, true);
       }

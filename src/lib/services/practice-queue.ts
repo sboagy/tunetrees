@@ -21,8 +21,8 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { persistDb } from "../db/client-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
+import { persistDb } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
 import {

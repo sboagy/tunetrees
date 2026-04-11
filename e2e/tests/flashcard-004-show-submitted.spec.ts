@@ -134,6 +134,12 @@ test.describe
 
     test("04. Toggle updates current card display", async ({ page }) => {
       test.fixme(!!process.env.CI, "Known timing issue in CI");
+      if (test.info().project.name === "Mobile Chrome") {
+        test.skip(
+          true,
+          "Test uses getByRole('cell') which is not available in mobile stacked-list view."
+        );
+      }
 
       // Turn ON Show Submitted to see all tunes
       const showSubmittedToggle =

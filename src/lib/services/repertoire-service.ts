@@ -7,12 +7,19 @@
  * @module lib/services/repertoire-service
  */
 
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import {
+  addTunesToRepertoireBulk,
   createRepertoire,
   getUserRepertoires,
 } from "../db/queries/repertoires";
+import { getCatalogTuneIdsByFilter } from "../db/queries/tunes";
+import type { StarterRepertoireTemplate } from "../db/starter-repertoire-templates";
 import type { Repertoire } from "../db/types";
+
+// Support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 const SELECTED_REPERTOIRE_KEY_PREFIX = "tunetrees:selectedRepertoire";
 const SELECTED_REPERTOIRE_LEGACY_KEY_PREFIX = "tunetrees:selectedRepertoire";
@@ -145,4 +152,104 @@ export function clearSelectedRepertoireId(userId: string): void {
 
   localStorage.removeItem(getSelectedRepertoireKey(userId));
   localStorage.removeItem(getLegacySelectedRepertoireKey(userId));
+}
+
+/**
+ * Create a starter/demo repertoire from a template.
+ *
+ * Creates the repertoire record with the template's name, genre, and
+ * spaced-repetition algorithm. Does NOT populate tunes — call
+ * {@link populateStarterRepertoireFromCatalog} after the catalog has synced
+ * to add the matching tunes.
+ *
+ * @param db - SQLite database instance
+ * @param userId - User's Supabase UUID
+ * @param template - Starter template definition
+ * @returns The newly created repertoire
+ *
+ * @example
+ * ```typescript
+ * import { ITRAD_STARTER_TEMPLATE } from "@/lib/db/starter-repertoire-templates";
+ * const rep = await createStarterRepertoire(db, user.id, ITRAD_STARTER_TEMPLATE);
+ * ```
+ */
+export async function createStarterRepertoire(
+  db: AnyDatabase,
+  userId: string,
+  template: StarterRepertoireTemplate
+): Promise<Repertoire> {
+  const newRepertoire = await createRepertoire(db, userId, {
+    name: template.name,
+    genreDefault: template.genreDefault,
+    instrumentRef: null,
+    srAlgType: template.srAlgType,
+  });
+
+  console.log(
+    `✅ Created starter repertoire "${newRepertoire.repertoireId}" from template "${template.id}" for user ${userId}`
+  );
+
+  return newRepertoire;
+}
+
+/**
+ * Populate a starter repertoire with matching catalog tunes.
+ *
+ * Queries all non-deleted, public catalog tunes that match the template's
+ * filter (genre or primary_origin) and adds them to the given repertoire via
+ * a single bulk insert/upsert. Tunes already active in the repertoire are
+ * skipped, while soft-deleted rows are undeleted.
+ *
+ * This should be called **after** the catalog has synced so that the
+ * relevant tunes exist in the local SQLite database.
+ *
+ * @param db - SQLite database instance
+ * @param userId - User's Supabase UUID (for ownership check)
+ * @param repertoireId - ID of the repertoire to populate
+ * @param template - Starter template that defines the tune filter
+ * @returns Counts of added and skipped tunes
+ *
+ * @example
+ * ```typescript
+ * await triggerCatalogSync();
+ * const result = await populateStarterRepertoireFromCatalog(
+ *   db, user.id, rep.repertoireId, ITRAD_STARTER_TEMPLATE
+ * );
+ * console.log(`Added ${result.added} tunes`);
+ * ```
+ */
+export async function populateStarterRepertoireFromCatalog(
+  db: AnyDatabase,
+  userId: string,
+  repertoireId: string,
+  template: StarterRepertoireTemplate
+): Promise<{ added: number; skipped: number }> {
+  const tuneIds = await getCatalogTuneIdsByFilter(
+    db,
+    template.tuneFilterType,
+    template.tuneFilterValue
+  );
+
+  if (tuneIds.length === 0) {
+    console.warn(
+      `⚠️ No catalog tunes found for starter template "${template.id}" ` +
+        `(filter: ${template.tuneFilterType}="${template.tuneFilterValue}"). ` +
+        "The catalog may not have synced yet."
+    );
+    return { added: 0, skipped: 0 };
+  }
+
+  const result = await addTunesToRepertoireBulk(
+    db,
+    repertoireId,
+    tuneIds,
+    userId
+  );
+
+  console.log(
+    `✅ Populated starter repertoire "${repertoireId}" with ${result.added} tunes ` +
+      `(${result.skipped} skipped) from template "${template.id}"`
+  );
+
+  return { added: result.added, skipped: result.skipped };
 }
