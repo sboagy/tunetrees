@@ -34,6 +34,8 @@
     "fix": "biome check --write src e2e tests worker",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:local:reset": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright clear-cache && RESET_DB=true FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup",
+    "db:local:auth:reset": "bash node_modules/@rhizome/core/scripts/reset-shared-auth-users-local.sh",
+    "db:local:auth:reset:all": "bash node_modules/@rhizome/core/scripts/reset-shared-auth-users-local.sh --all",
     "db:dump-migration": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- npx supabase db dump --local --schema public -f supabase/migrations/20241101000000_initial_schema.sql",
     "db:dump-seed": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- npx supabase db dump --local --data-only --schema public -f supabase/seed.sql",
     "db:remote:backup": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- node scripts/run-rhizome-db-remote-backup.mjs --schema public --schema auth",
