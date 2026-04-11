@@ -382,6 +382,88 @@ async function waitForCatalogSnapshotReady(
 }
 
 /**
+ * Delete all anonymous and ephemeral E2E auth users via the Supabase Admin
+ * Auth API. This cascades into public.user_profile (and any other tables
+ * backed by FK triggers) automatically.
+ *
+ * Targets:
+ *   - Native Supabase anonymous users (is_anonymous = true).
+ *   - Any email account whose address ends with "@tunetrees.test" (not just
+ *     "anon-test-*" prefixed ones) left behind by E2E tests.
+ *
+ * Named TEST_USERS are never touched; their IDs are excluded from the delete
+ * set explicitly.
+ */
+async function deleteAnonAuthUsers(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: ReturnType<typeof createClient<any>>
+): Promise<void> {
+  const namedTestUserIds = new Set(
+    Object.values(TEST_USERS).map((u) => u.userId)
+  );
+
+  // Collect candidate anonymous auth user IDs via the Admin Auth API.
+  // The Supabase JS admin.listUsers() is paginated; we iterate all pages.
+  const anonUserIds: string[] = [];
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      throw new Error(
+        `[auth.setup] Failed to list auth users for anon cleanup (page ${page}): ${error.message}`
+      );
+    }
+
+    const users = data?.users ?? [];
+
+    for (const user of users) {
+      if (namedTestUserIds.has(user.id)) continue;
+
+      const isAnon = user.is_anonymous === true;
+      const isEphemeralEmail = user.email?.endsWith("@tunetrees.test") === true;
+
+      if (isAnon || isEphemeralEmail) {
+        anonUserIds.push(user.id);
+      }
+    }
+
+    // Stop when the page is smaller than perPage (last page).
+    if (users.length < perPage) break;
+    page++;
+  }
+
+  if (anonUserIds.length === 0) {
+    console.log("    ℹ️  No anonymous/ephemeral auth users to delete.");
+    return;
+  }
+
+  console.log(
+    `    🗑️  Deleting ${anonUserIds.length} anonymous/ephemeral auth user(s)…`
+  );
+
+  for (const userId of anonUserIds) {
+    const { error } = await adminClient.auth.admin.deleteUser(userId);
+    if (error) {
+      // Warn rather than throw: a partially cleaned state is better than
+      // aborting the entire reset.
+      console.warn(
+        `    ⚠️  Failed to delete auth user ${userId}: ${error.message}`
+      );
+    }
+  }
+
+  console.log(
+    `  ✅ Deleted ${anonUserIds.length} anonymous/ephemeral auth user(s)`
+  );
+}
+
+/**
  * Clear all user-owned TuneTrees data from Supabase Postgres for every test
  * user. Only called when RESET_DB=true. Never touches catalog tables (tune,
  * genre, etc.) or the sync_change_log system table.
@@ -493,6 +575,32 @@ async function resetTunetreesUserData(): Promise<void> {
   }
 
   console.log(`  ✅ Cleared public.repertoire for ${userIds.length} users`);
+
+  // Step 5b: delete anonymous / ephemeral auth users BEFORE clearing
+  // user_profile, so their cascade (auth.users → user_profile) removes anon
+  // rows first. Named TEST_USERS are excluded; their auth.users rows stay.
+  //
+  // We target:
+  //   1. Native anonymous users (is_anonymous = true in auth.users).
+  //   2. Email accounts matching "*@tunetrees.test" left by account-conversion tests.
+  console.log("  🗑️  Cleaning up anonymous / ephemeral auth users…");
+  await deleteAnonAuthUsers(adminClient);
+
+  // Step 5c: wipe ALL user_profile rows (and cascade to any remaining child
+  // rows from non-TEST_USERS accounts such as real developer profiles in the
+  // local DB). The JS client cannot issue a no-filter bulk DELETE, and even
+  // the `.gt("id", …)` workaround fails if non-test users still have child
+  // rows referencing user_profile (e.g. daily_practice_queue). Using
+  // TRUNCATE … CASCADE via a direct postgres connection sidesteps both
+  // issues: it handles FK ordering automatically and bypasses row-level
+  // triggers (including the practice_record delete-guard trigger).
+  const pgForTruncate = postgres(E2E_DATABASE_URL, { max: 1 });
+  try {
+    await pgForTruncate.unsafe("TRUNCATE public.user_profile CASCADE");
+    console.log("  ✅ Truncated public.user_profile CASCADE (all users)");
+  } finally {
+    await pgForTruncate.end({ timeout: 5 }).catch(() => undefined);
+  }
 }
 
 // -- main setup test ----------------------------------------------------------

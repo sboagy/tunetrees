@@ -1,8 +1,11 @@
 /**
  * Onboarding Overlay Component
  *
- * Displays step-by-step instructions for new users to set up their account.
- * Guides them through creating a repertoire and adding tunes from the catalog.
+ * Displays the modal steps for the new-user onboarding flow after a starter
+ * repertoire has been chosen or a custom repertoire created.
+ *
+ * Step 1 ("create-repertoire") is now embedded inline in the
+ * RepertoireEmptyState panel; this component handles only Steps 2 and 3.
  *
  * @module components/onboarding/OnboardingOverlay
  */
@@ -19,43 +22,100 @@ import {
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
+import { getStarterTemplateById } from "../../lib/db/starter-repertoire-templates";
+import {
+  createStarterRepertoire,
+  populateStarterRepertoireFromCatalog,
+} from "../../lib/services/repertoire-service";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
-import { RepertoireEditorDialog } from "../repertoires/RepertoireEditorDialog";
 
 /**
  * Onboarding Overlay Component
  *
- * Shows instructional overlays based on the current onboarding step.
+ * Shows instructional overlays for Steps 2 ("choose-genres") and 3 ("view-catalog").
+ * Triggered after the user picks or creates a repertoire from the empty-state panel.
  */
 export const OnboardingOverlay: Component = () => {
-  const { needsOnboarding, onboardingStep, nextStep, skipOnboarding } =
-    useOnboarding();
   const {
-    incrementRepertoireListChanged,
+    needsOnboarding,
+    onboardingStep,
+    nextStep,
+    skipOnboarding,
+    dismissGenreDialog,
+    clearPendingStarter,
+    pendingStarterRepertoireId,
+    pendingStarterTemplateId,
+    chosenStarterTemplateId,
+    setChosenStarterTemplateId,
+    setPendingStarter,
+  } = useOnboarding();
+  const {
     localDb,
     forceSyncDown,
     remoteSyncDownCompletionVersion,
     user,
+    userIdInt,
+    incrementRepertoireListChanged,
     catalogSyncPending,
     triggerCatalogSync,
   } = useAuth();
   const navigate = useNavigate();
-  const [showRepertoireDialog, setShowRepertoireDialog] = createSignal(false);
-  const [repertoireCreated, setRepertoireCreated] = createSignal(false);
   const [genres, setGenres] = createSignal<Genre[]>([]);
   const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
   const [isLoadingGenres, setIsLoadingGenres] = createSignal(false);
   const [isSavingGenres, setIsSavingGenres] = createSignal(false);
+  /**
+   * Shown in Step 2 when tune auto-population failed (non-fatal —
+   * user can still add tunes manually from the catalog).
+   */
+  const [populationWarning, setPopulationWarning] = createSignal<string | null>(
+    null
+  );
+  /** Non-fatal error shown in the dialog when repertoire creation fails. */
+  const [creationError, setCreationError] = createSignal<string | null>(null);
 
-  const handleRepertoireCreated = () => {
-    setRepertoireCreated(true);
-    setShowRepertoireDialog(false);
-    // Trigger global repertoire list refresh so TopNav dropdown updates
-    incrementRepertoireListChanged();
-    // Move to next step: choose genres (don't navigate yet)
-    nextStep();
+  /**
+   * Genre IDs that must be selected because the chosen starter template
+   * requires them. Derived reactively so it always matches the current template
+   * even when the user switches between starter cards.
+   */
+  const starterLockedGenreIds = () => {
+    const id = chosenStarterTemplateId();
+    if (!id) return [];
+    return getStarterTemplateById(id)?.preselectedGenreIds ?? [];
   };
 
+  /**
+   * The selection that GenreMultiSelect actually renders: user-chosen ids
+   * merged with the locked (starter-required) ids. This guarantees locked
+   * genres are always shown checked regardless of async load timing.
+   */
+  const effectiveSelectedGenreIds = () =>
+    Array.from(new Set([...selectedGenreIds(), ...starterLockedGenreIds()]));
+
+  /**
+   * Cancel: close the genre dialog without creating anything. The user goes
+   * back to the starter-picker panel so they can try again or choose a
+   * different option. Does NOT mark onboarding as skipped/completed.
+   *
+   * Also resets local genre state so the next dialog open always starts
+   * completely fresh, regardless of which template was previously viewed.
+   */
+  const handleCancel = () => {
+    // Reset local state BEFORE dismissing so the signals are clean if the
+    // component re-enters "choose-genres" for a different template.
+    setSelectedGenreIds([]);
+    setGenres([]);
+    setCreationError(null);
+    setPopulationWarning(null);
+    dismissGenreDialog();
+  };
+
+  /**
+   * Skip / finish the Step 3 "view-catalog" tour: mark onboarding done.
+   * The repertoire already exists at this point so persisting the skip flag
+   * is correct and intentional.
+   */
   const handleSkip = () => {
     skipOnboarding();
   };
@@ -78,38 +138,14 @@ export const OnboardingOverlay: Component = () => {
           const { getGenresWithSelection } = await import(
             "@/lib/db/queries/user-genre-selection"
           );
-          const { getUserRepertoires } = await import(
-            "@/lib/db/queries/repertoires"
-          );
 
           const genreList = await getGenresWithSelection(db, resolvedUserId);
           // Sort by name
           genreList.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
           setGenres(genreList);
-
-          // If user already made a selection, preserve it; otherwise default to existing selection or all
-          if (selectedGenreIds().length === 0) {
-            const preselected = genreList
-              .filter((g) => g.selected)
-              .map((g) => g.id);
-
-            if (preselected.length > 0) {
-              setSelectedGenreIds(preselected);
-            } else if (genreList.length > 0) {
-              const repertoires = await getUserRepertoires(db, resolvedUserId);
-              const latest = repertoires[repertoires.length - 1];
-              const defaultGenreId = latest?.genreDefault ?? null;
-
-              if (
-                defaultGenreId &&
-                genreList.some((g) => g.id === defaultGenreId)
-              ) {
-                setSelectedGenreIds([defaultGenreId]);
-              } else {
-                setSelectedGenreIds(genreList.map((g) => g.id));
-              }
-            }
-          }
+          // selectedGenreIds is deliberately left empty here.
+          // Locked (starter-required) genres are merged in reactively via
+          // effectiveSelectedGenreIds below, so they always appear checked.
         } catch (error) {
           console.error("Failed to load genres:", error);
         } finally {
@@ -122,26 +158,73 @@ export const OnboardingOverlay: Component = () => {
   });
 
   const handleSaveGenres = async () => {
-    if (selectedGenreIds().length === 0) return;
+    // Snapshot the effective selection NOW — before any signal mutations.
+    // effectiveSelectedGenreIds() merges selectedGenreIds with the locked
+    // starter genres derived from chosenStarterTemplateId(). Clearing
+    // chosenStarterTemplateId later in Step A would drop those locked genres
+    // from a reactive re-call, causing an empty genre save and empty sync.
+    const genreIdsToSave = effectiveSelectedGenreIds();
+    if (genreIdsToSave.length === 0) return;
 
     const db = localDb();
     const userId = user()?.id;
+    // userIdInt is the UUID from user_profile.id (matched against authUserId),
+    // used for DB ownership checks. Falls back to the auth user id.
+    const userIntId = userIdInt() ?? userId;
     if (!db || !userId) return;
 
+    setCreationError(null);
     setIsSavingGenres(true);
     try {
+      // ── Step A: Create the starter repertoire if it was only chosen (not yet created) ──
+      // When the user clicks a starter card, we just open this dialog; the
+      // actual DB row is created here so that Cancel truly cancels everything.
+      const templateId = chosenStarterTemplateId();
+      if (templateId && !pendingStarterRepertoireId()) {
+        const template = getStarterTemplateById(templateId);
+        if (!template || !userIntId) {
+          setCreationError(
+            "Could not find starter template. Please try again."
+          );
+          return;
+        }
+        try {
+          const newRepertoire = await createStarterRepertoire(
+            db,
+            userIntId,
+            template
+          );
+          // Store for genre-step population (Step B below)
+          setPendingStarter(newRepertoire.repertoireId, template.id);
+          // Reflect new repertoire in the top-nav dropdown
+          incrementRepertoireListChanged();
+          // Clear the pre-creation placeholder — safe now because we already
+          // snapshotted genreIdsToSave above before this mutation.
+          setChosenStarterTemplateId(null);
+          console.log(
+            `✅ Created starter repertoire "${newRepertoire.repertoireId}"`
+          );
+        } catch (createError) {
+          console.error("Failed to create starter repertoire:", createError);
+          setCreationError(
+            "Could not create the starter repertoire. Please try again or choose Create Custom Repertoire."
+          );
+          return;
+        }
+      }
+
       const { upsertUserGenreSelection, purgeLocalCatalogForGenres } =
         await import("@/lib/db/queries/user-genre-selection");
 
-      // Save genre selection
-      await upsertUserGenreSelection(db, userId, selectedGenreIds());
-      console.log("✅ Genre selection saved");
+      // Save genre selection — uses the snapshot captured before Step A mutations
+      await upsertUserGenreSelection(db, userId, genreIdsToSave);
+      console.log("✅ Genre selection saved:", genreIdsToSave);
 
       // If catalog sync was deferred until onboarding, trigger it now with genre filter
       if (catalogSyncPending()) {
         console.log(
           "🎵 Triggering catalog sync with selected genres:",
-          selectedGenreIds()
+          genreIdsToSave
         );
         await triggerCatalogSync();
       } else {
@@ -150,7 +233,7 @@ export const OnboardingOverlay: Component = () => {
         console.log("🧹 Purging non-selected catalog tunes...");
         const allGenres = genres().map((g) => g.id);
         const deselectedGenres = allGenres.filter(
-          (id) => !selectedGenreIds().includes(id)
+          (id) => !genreIdsToSave.includes(id)
         );
         const purgeResult = await purgeLocalCatalogForGenres(
           db,
@@ -168,6 +251,49 @@ export const OnboardingOverlay: Component = () => {
           );
         });
       }
+
+      // If the user picked a starter repertoire in Step 1, populate it now
+      // that the catalog has synced and tunes are available locally.
+      const starterRepertoireId = pendingStarterRepertoireId();
+      const starterTemplateId = pendingStarterTemplateId();
+      if (starterRepertoireId && starterTemplateId) {
+        const template = getStarterTemplateById(starterTemplateId);
+        if (template) {
+          console.log(
+            `🎵 Populating starter repertoire "${starterRepertoireId}" from template "${starterTemplateId}"`
+          );
+          try {
+            const result = await populateStarterRepertoireFromCatalog(
+              db,
+              userId,
+              starterRepertoireId,
+              template
+            );
+            console.log(
+              `✅ Added ${result.added} tunes to starter repertoire (${result.skipped} already present)`
+            );
+            if (result.added === 0 && result.skipped === 0) {
+              // Catalog may not have synced tunes yet; user can add from catalog manually
+              setPopulationWarning(
+                `No matching tunes were found in the catalog for "${template.name}". ` +
+                  "You can add tunes manually from the Catalog tab."
+              );
+            }
+          } catch (popErr) {
+            // Non-fatal: user can add tunes manually from catalog
+            console.warn(
+              "Failed to auto-populate starter repertoire tunes:",
+              popErr
+            );
+            setPopulationWarning(
+              `Could not auto-populate tunes for "${template.name}". ` +
+                "You can add tunes manually from the Catalog tab."
+            );
+          }
+        }
+        clearPendingStarter();
+      }
+
       nextStep();
       navigate("/?tab=catalog");
     } catch (error) {
@@ -179,87 +305,11 @@ export const OnboardingOverlay: Component = () => {
 
   return (
     <>
-      {/* Repertoire Editor Dialog */}
-      <Show when={showRepertoireDialog()}>
-        <RepertoireEditorDialog
-          isOpen={showRepertoireDialog()}
-          onClose={() => {
-            setShowRepertoireDialog(false);
-            if (!repertoireCreated()) {
-              skipOnboarding(); // If they close without creating, skip onboarding
-            }
-          }}
-          onSaved={handleRepertoireCreated}
-        />
-      </Show>
-
-      {/* Onboarding Overlays */}
+      {/* Onboarding Overlays — Steps 2 and 3 only.
+          Step 1 (starter-repertoire picker) is embedded inline in the
+          RepertoireEmptyState panel rendered by each tab (Practice, Repertoire). */}
       <Show when={needsOnboarding()}>
         <Switch>
-          {/* Step 1: Create Repertoire */}
-          <Match when={onboardingStep() === "create-repertoire"}>
-            <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-                <div class="flex items-start justify-between mb-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                      <Info class="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">
-                      Welcome to TuneTrees! 🎵
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSkip}
-                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                    aria-label="Skip tour"
-                  >
-                    <X class="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div class="space-y-4">
-                  <p class="text-gray-600 dark:text-gray-300">
-                    Let's get you started! First, create a repertoire to
-                    organize tunes.
-                  </p>
-
-                  <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
-                    <h3 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                      What's a repertoire?
-                    </h3>
-                    <p class="text-sm text-blue-800 dark:text-blue-200">
-                      Repertoires group tunes by instrument, genre, or goal. You
-                      can manage multiple repertoires or maintain a single one.
-                    </p>
-                  </div>
-
-                  <div class="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleSkip}
-                      class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors"
-                    >
-                      Skip Tour
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRepertoireCreated(false);
-                        setShowRepertoireDialog(true);
-                      }}
-                      class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
-                      data-testid="onboarding-create-repertoire"
-                    >
-                      Create Repertoire
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Match>
-
           {/* Step 2: Choose Genres */}
           <Match when={onboardingStep() === "choose-genres"}>
             <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -292,21 +342,33 @@ export const OnboardingOverlay: Component = () => {
                   >
                     <GenreMultiSelect
                       genres={genres()}
-                      selectedGenreIds={selectedGenreIds()}
+                      selectedGenreIds={effectiveSelectedGenreIds()}
                       onChange={setSelectedGenreIds}
                       searchable={true}
                       disabled={isSavingGenres()}
                       autoScrollToSelected={true}
                       testIdPrefix="onboarding-genre"
+                      lockedGenreIds={starterLockedGenreIds()}
+                      lockedLabel="Required for starter"
                     />
                   </Show>
 
                   <div class="flex gap-3">
                     <button
                       type="button"
+                      onClick={handleCancel}
+                      disabled={isSavingGenres()}
+                      class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="onboarding-genre-cancel"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
                       onClick={handleSaveGenres}
                       disabled={
-                        isSavingGenres() || selectedGenreIds().length === 0
+                        isSavingGenres() ||
+                        effectiveSelectedGenreIds().length === 0
                       }
                       class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="onboarding-genre-continue"
@@ -314,6 +376,20 @@ export const OnboardingOverlay: Component = () => {
                       {isSavingGenres() ? "Saving..." : "Continue"}
                     </button>
                   </div>
+
+                  {/* Repertoire creation error (non-fatal — shown if creation fails on Continue) */}
+                  <Show when={creationError()}>
+                    <output class="block text-sm text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md px-3 py-2">
+                      {creationError()}
+                    </output>
+                  </Show>
+
+                  {/* Tune population warning (shown after save if auto-populate failed) */}
+                  <Show when={populationWarning()}>
+                    <output class="block text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md px-3 py-2">
+                      {populationWarning()}
+                    </output>
+                  </Show>
                 </div>
               </div>
             </div>

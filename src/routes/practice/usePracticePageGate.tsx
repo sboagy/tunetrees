@@ -7,6 +7,7 @@ import {
 } from "solid-js";
 import { GridStatusMessage } from "../../components/grids/GridStatusMessage";
 import { RepertoireEmptyState } from "../../components/repertoire";
+import { STARTER_TEMPLATES } from "../../lib/db/starter-repertoire-templates";
 import type { RepertoireWithSummary } from "../../lib/db/types";
 
 export interface PracticePageGateProps {
@@ -24,6 +25,12 @@ export interface PracticePageGateProps {
   setRepertoiresLoadedVersion: (value: string | null) => void;
   onOpenAssistant: () => void;
   onCreateRepertoire: () => void;
+  /** Called when the user picks a starter template from the empty-state panel */
+  onStarterChosen?: (templateId: string) => void;
+  /** Whether a starter repertoire is currently being created */
+  isCreatingStarter?: Accessor<boolean>;
+  /** User-visible error from starter creation, if any */
+  starterError?: Accessor<string | null>;
 }
 
 export interface PracticePageGateState {
@@ -139,19 +146,25 @@ export function usePracticePageGate(
       !repertoiresLoading &&
       repertoireCount === 0
     ) {
+      // Show inline starter picker when callbacks are wired in; otherwise fall
+      // back to the simple single "Create repertoire" button.
+      const hasStarterSupport = !!props.onStarterChosen;
       return (
         <RepertoireEmptyState
-          title="No current repertoire"
+          title="Welcome to TuneTrees! 🎵"
           description={
-            `Repertoires group tunes by instrument, genre, or goal. ` +
-            `Create a new repertoire to start practicing, or select ` +
-            `an existing repertoire, if one exists, from the Repertoire ` +
-            `menu in the top banner.`
+            hasStarterSupport
+              ? "Get started with a pre-populated starter repertoire, or create your own from scratch."
+              : `Repertoires group tunes by instrument, genre, or goal. ` +
+                `Create a new repertoire to start practicing, or select ` +
+                `an existing repertoire, if one exists, from the Repertoire ` +
+                `menu in the top banner.`
           }
-          primaryAction={{
-            label: "Create repertoire",
-            onClick: props.onCreateRepertoire,
-          }}
+          starterTemplates={hasStarterSupport ? STARTER_TEMPLATES : undefined}
+          onStarterChosen={props.onStarterChosen}
+          onCreateCustom={props.onCreateRepertoire}
+          isCreatingStarter={props.isCreatingStarter?.()}
+          starterError={props.starterError?.()}
         />
       );
     }
