@@ -28,18 +28,19 @@ export const TOOLBAR_CONTAINER_CLASSES =
 /**
  * Inner wrapper for toolbar content
  * - Responsive padding
- * - Explicit height for consistency across all toolbars
+ * - Minimum height for consistency; grows taller when controls wrap to new rows
+ * - flex-wrap allows controls to wrap onto additional rows on narrow screens
  */
 export const TOOLBAR_INNER_CLASSES =
-  "px-2 sm:px-3 lg:px-4 h-[46px] flex items-center";
+  "px-2 sm:px-3 lg:px-4 min-h-[46px] flex flex-wrap items-center py-1 gap-y-1";
 
 /**
  * Flexbox container for toolbar buttons
  * - Gap between items
- * - Horizontal layout
+ * - Horizontal layout with wrapping so buttons flow onto new rows on narrow screens
  */
 export const TOOLBAR_BUTTON_GROUP_CLASSES =
-  "flex items-center gap-1.5 sm:gap-2";
+  "flex flex-wrap items-center gap-1.5 sm:gap-2";
 
 /**
  * Base button styling (shared across all button types)

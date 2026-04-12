@@ -227,7 +227,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             }}
           >
             <Send size={14} />
-            <span class="hidden sm:inline">Submit</span>
+            <span>Submit</span>
             <Show when={props.evaluationsCount && props.evaluationsCount > 0}>
               <span class={TOOLBAR_BADGE}>{props.evaluationsCount}</span>
             </Show>
@@ -246,7 +246,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               <SwitchControl>
                 <SwitchThumb />
               </SwitchControl>
-              <SwitchLabel class="text-xs font-medium cursor-pointer select-none ml-2 hidden sm:inline">
+              <SwitchLabel class="text-xs font-medium cursor-pointer select-none ml-2">
                 Show Submitted
               </SwitchLabel>
             </Switch>
@@ -260,7 +260,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
           >
             <Plus size={14} />
-            <span class="hidden md:inline">Add More</span>
+            <span>Add More</span>
           </button>
 
           {/* Date-rollover indicator — only rendered (and therefore visible to
@@ -287,7 +287,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span class="hidden sm:inline">New day</span>
+              <span>New day</span>
             </output>
           </Show>
 
@@ -326,7 +326,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <span class="hidden md:inline">Refresh</span>
+            <span>Refresh</span>
           </button>
 
           {/* Queue control button */}
@@ -350,7 +350,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <span class="hidden lg:inline">
+            <span>
               {formatQueueDate(props.queueDate || new Date())}
             </span>
             <svg
@@ -382,7 +382,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               <SwitchControl>
                 <SwitchThumb />
               </SwitchControl>
-              <SwitchLabel class="text-xs font-medium cursor-pointer select-none ml-2 hidden sm:inline">
+              <SwitchLabel class="text-xs font-medium cursor-pointer select-none ml-2">
                 Flashcard Mode
               </SwitchLabel>
             </Switch>
@@ -405,11 +405,11 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
           >
             <Columns size={14} />
-            <span class="hidden sm:inline">
+            <span>
               {props.flashcardMode ? "Fields" : "Columns"}
             </span>
             <svg
-              class="w-3.5 h-3.5 hidden lg:inline"
+              class="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

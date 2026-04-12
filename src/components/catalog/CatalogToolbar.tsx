@@ -210,8 +210,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
               />
             </svg>
-            <span class="hidden md:inline">Add To Repertoire</span>
-            <span class="hidden sm:inline md:hidden">Add To Rep</span>
+            <span>Add To Repertoire</span>
           </button>
 
           {/* Search input - always visible across all screen sizes */}
@@ -282,7 +281,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            <span class="hidden sm:inline">Add Tune</span>
+            <span>Add Tune</span>
           </button>
 
           {/* Delete Tunes button */}
@@ -308,7 +307,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M4 7h16"
               />
             </svg>
-            <span class="hidden sm:inline">Delete</span>
+            <span>Delete</span>
           </button>
         </div>
 
@@ -327,9 +326,9 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
               class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
             >
               <Columns size={14} />
-              <span class="hidden lg:inline">Columns</span>
+              <span>Columns</span>
               <svg
-                class="w-3.5 h-3.5 hidden lg:inline"
+                class="w-3.5 h-3.5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

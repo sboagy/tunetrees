@@ -226,8 +226,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
               />
             </svg>
-            <span class="hidden md:inline">Add To Review</span>
-            <span class="hidden sm:inline md:hidden">Review</span>
+            <span>Add To Review</span>
           </button>
 
           <div class={TOOLBAR_SEARCH_CONTAINER}>
@@ -295,7 +294,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-            <span class="hidden sm:inline">Add Tune</span>
+            <span>Add Tune</span>
           </button>
 
           <button
@@ -320,8 +319,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span class="hidden md:inline">Remove From Repertoire</span>
-            <span class="hidden sm:inline md:hidden">Remove</span>
+            <span>Remove From Repertoire</span>
           </button>
         </div>
 
@@ -338,9 +336,9 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
           >
             <Columns size={14} />
-            <span class="hidden lg:inline">Columns</span>
+            <span>Columns</span>
             <svg
-              class="w-3.5 h-3.5 hidden lg:inline"
+              class="w-3.5 h-3.5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
