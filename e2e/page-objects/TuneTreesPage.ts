@@ -280,7 +280,7 @@ export class TuneTreesPage {
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
     this.addTuneButton = page.getByRole("button", { name: "Add a new tune" });
     this.deleteButton = page.getByRole("button", { name: /Delete/i });
-    this.columnsButton = page.getByRole("button", { name: /Columns/i }); // Label always visible
+    this.columnsButton = page.locator('[data-testid$="-columns-button"]');
 
     // Tab-specific Toolbar Buttons - Catalog
     this.catalogAddTuneButton = page.getByTestId("catalog-add-tune-button");
@@ -1758,9 +1758,16 @@ export class TuneTreesPage {
           : tab === "repertoire"
             ? this.repertoireAddTuneButton
             : this.addTuneButton;
+      if (tab === "catalog" || tab === "repertoire") {
+        await this.ensureToolbarActionVisible(tab, button);
+      }
       await expect(button).toBeVisible({ timeout: 5000 });
     }
     if (options.addToRepertoire) {
+      await this.ensureToolbarActionVisible(
+        "catalog",
+        this.catalogAddToRepertoireButton
+      );
       await expect(this.catalogAddToRepertoireButton).toBeVisible({
         timeout: 5000,
       });
@@ -1771,6 +1778,9 @@ export class TuneTreesPage {
         tab === "catalog" ? this.catalogDeleteButton : this.deleteButton;
 
       if (options.delete) {
+        if (tab === "catalog") {
+          await this.ensureToolbarActionVisible("catalog", deleteBtn);
+        }
         await expect(deleteBtn).toBeVisible();
         await expect(deleteBtn).toBeEnabled();
       } else {
@@ -1817,10 +1827,69 @@ export class TuneTreesPage {
         : this.practiceColumnsButton;
   }
 
+  private async ensureToolbarActionVisible(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ) {
+    const alreadyVisible = await action
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (alreadyVisible) {
+      return;
+    }
+
+    const overflowButton = this.getColumnsButtonForTab(tab);
+    await expect(overflowButton).toBeVisible({ timeout: 5000 });
+    await overflowButton.click();
+    await expect(action).toBeVisible({ timeout: 5000 });
+  }
+
+  async clickCatalogAddToRepertoire() {
+    await this.ensureToolbarActionVisible(
+      "catalog",
+      this.catalogAddToRepertoireButton
+    );
+    await this.catalogAddToRepertoireButton.click({ timeout: 5000 });
+  }
+
+  async clickCatalogAddTune() {
+    await this.ensureToolbarActionVisible("catalog", this.catalogAddTuneButton);
+    await this.catalogAddTuneButton.click({ timeout: 5000 });
+  }
+
+  async clickCatalogDelete() {
+    await this.ensureToolbarActionVisible("catalog", this.catalogDeleteButton);
+    await this.catalogDeleteButton.click({ timeout: 5000 });
+  }
+
+  async clickRepertoireAddToReview() {
+    await this.ensureToolbarActionVisible(
+      "repertoire",
+      this.repertoireAddToReviewButton
+    );
+    await this.repertoireAddToReviewButton.click({ timeout: 5000 });
+  }
+
+  async clickRepertoireAddTune() {
+    await this.ensureToolbarActionVisible(
+      "repertoire",
+      this.repertoireAddTuneButton
+    );
+    await this.repertoireAddTuneButton.click({ timeout: 5000 });
+  }
+
+  async clickRepertoireRemove() {
+    await this.ensureToolbarActionVisible(
+      "repertoire",
+      this.repertoireRemoveButton
+    );
+    await this.repertoireRemoveButton.click({ timeout: 5000 });
+  }
+
   private getColumnVisibilityMenu(): Locator {
     return this.page
       .locator("div.fixed.w-64")
-      .filter({ hasText: "Show Columns" })
+      .filter({ hasText: /Show Columns|Display Options/i })
       .last();
   }
 
@@ -1841,6 +1910,15 @@ export class TuneTreesPage {
       .catch(() => false);
     if (!menuVisible) {
       await columnsButton.click();
+      const displayOptionsButton = this.page
+        .getByRole("button", { name: /^Display Options$/i })
+        .last();
+      const displayOptionsVisible = await displayOptionsButton
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+      if (displayOptionsVisible) {
+        await displayOptionsButton.click();
+      }
       await expect(menu).toBeVisible({ timeout: 5000 });
     }
 

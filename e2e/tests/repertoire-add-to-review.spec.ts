@@ -55,7 +55,7 @@ test.describe("Repertoire: Add To Review", () => {
     });
 
     // Click "Add To Review" without selecting any tunes
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
 
     // Wait for dialog
     await page.waitForTimeout(500);
@@ -90,7 +90,7 @@ test.describe("Repertoire: Add To Review", () => {
     });
 
     // Click "Add To Review"
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
 
     // Wait for dialog
     await page.waitForTimeout(500);
@@ -133,7 +133,7 @@ test.describe("Repertoire: Add To Review", () => {
     });
 
     // Click "Add To Review"
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
 
     // Wait for dialog
     await page.waitForTimeout(500);
@@ -165,14 +165,14 @@ test.describe("Repertoire: Add To Review", () => {
     });
 
     // Add to review first time
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
     await page.waitForTimeout(500);
 
     // Select the same tune again
     await firstCheckbox.check();
 
     // Try to add again
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
     await page.waitForTimeout(500);
 
     // Should allow re-scheduling (updating scheduled timestamp)
@@ -210,7 +210,7 @@ test.describe("Repertoire: Add To Review", () => {
     });
 
     // Click "Add To Review"
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
     await page.waitForTimeout(1000);
 
     // Check console logs for success message

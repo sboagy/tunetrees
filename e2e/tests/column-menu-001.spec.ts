@@ -24,17 +24,21 @@ test.describe("Column Visibility Menu", () => {
     await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(1000);
 
-    // Click the Columns button to open menu
-    const columnsButton = page
-      .getByRole("button", { name: /columns/i })
-      .first();
+    // Click the Display Options trigger to open the column menu.
+    const columnsButton = ttPage.repertoireColumnsButton;
     await columnsButton.click();
+    const displayOptionsButton = page
+      .getByRole("button", { name: /^Display Options$/i })
+      .last();
+    if (await displayOptionsButton.isVisible().catch(() => false)) {
+      await displayOptionsButton.click();
+    }
     await page.waitForTimeout(500);
 
     // Check that menu is visible
     const menu = page
       .locator("div.fixed.w-64")
-      .filter({ hasText: "Show Columns" });
+      .filter({ hasText: /Show Columns|Display Options/i });
     await expect(menu).toBeVisible();
 
     // Log initial state
@@ -90,12 +94,18 @@ test.describe("Column Visibility Menu", () => {
     // Click the Columns button to open menu
     const columnsButton = ttPage.columnsButton;
     await columnsButton.click();
+    const displayOptionsButton = page
+      .getByRole("button", { name: /^Display Options$/i })
+      .last();
+    if (await displayOptionsButton.isVisible().catch(() => false)) {
+      await displayOptionsButton.click();
+    }
     await page.waitForTimeout(500);
 
     // Check that menu is visible
     const menu = page
       .locator("div.fixed.w-64")
-      .filter({ hasText: "Show Columns" });
+      .filter({ hasText: /Show Columns|Display Options/i });
     await expect(menu).toBeVisible();
 
     // Click outside the menu

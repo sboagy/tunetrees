@@ -9,11 +9,7 @@
  */
 
 import type { Column, Table } from "@tanstack/solid-table";
-import {
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  PinOff,
-} from "lucide-solid";
+import { ArrowLeftToLine, ArrowRightToLine, PinOff } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -34,6 +30,8 @@ export interface ColumnVisibilityMenuProps {
   onClose: () => void;
   /** Reference to the trigger button for positioning */
   triggerRef?: HTMLElement;
+  /** Optional menu title */
+  title?: string;
 }
 
 /**
@@ -253,6 +251,8 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     return getToggleableColumns().filter((col) => col.getIsVisible()).length;
   };
 
+  const menuTitle = () => props.title ?? "Show Columns";
+
   return (
     <Show when={props.isOpen}>
       <Portal>
@@ -268,7 +268,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
           <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200/30 dark:border-gray-700/30 px-3 py-2">
             <div class="flex items-center justify-between">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Show Columns
+                {menuTitle()}
               </span>
               <span class="text-xs text-gray-500 dark:text-gray-400">
                 {visibleCount()} / {getToggleableColumns().length}

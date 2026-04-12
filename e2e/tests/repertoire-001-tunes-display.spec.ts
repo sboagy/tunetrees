@@ -93,15 +93,10 @@ test.describe
     });
 
     test("should show toolbar with Add To Review button", async () => {
-      // Toolbar buttons should be visible - use tab-specific locators
-      await expect(ttPage.repertoireAddToReviewButton).toBeVisible({
-        timeout: 5000,
-      });
-      await expect(ttPage.repertoireAddTuneButton).toBeVisible({
-        timeout: 5000,
-      });
-      await expect(ttPage.repertoireColumnsButton).toBeVisible({
-        timeout: 5000,
+      await ttPage.expectToolbarVisible({
+        addTune: true,
+        columns: true,
+        tab: "repertoire",
       });
     });
 
@@ -112,8 +107,7 @@ test.describe
         columns: true,
         tab: "repertoire",
       });
-      // Just verify the "Add To Review" button exists (enabled/disabled depends on selection)
-      await expect(ttPage.repertoireAddToReviewButton).toBeVisible({
+      await expect(ttPage.repertoireColumnsButton).toBeVisible({
         timeout: 5000,
       });
     });

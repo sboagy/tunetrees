@@ -17,6 +17,7 @@ import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { AnonymousBanner } from "../auth/AnonymousBanner";
 import { DropZoneOverlays } from "./DropZoneOverlays";
+import { MobileControlBarProvider } from "./MobileControlBarContext";
 import { Sidebar } from "./Sidebar";
 import { useSidebarDock } from "./SidebarDockContext";
 import { SidebarResizeProvider } from "./SidebarResizeContext";
@@ -128,62 +129,64 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
 
   return (
     <SidebarResizeProvider>
-      <div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
-        {/* Top Navigation Bar */}
-        <TopNav />
+      <MobileControlBarProvider>
+        <div class="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+          {/* Top Navigation Bar */}
+          <TopNav />
 
-        {/* Anonymous User Banner */}
-        <Show when={isAnonymous()}>
-          <AnonymousBanner
-            onConvert={() => {
-              // Use window.location instead of navigate() due to SolidJS router issues
-              // when called from within nested component callbacks
-              window.location.href = "/login?convert=true";
-            }}
-          />
-        </Show>
+          {/* Anonymous User Banner */}
+          <Show when={isAnonymous()}>
+            <AnonymousBanner
+              onConvert={() => {
+                // Use window.location instead of navigate() due to SolidJS router issues
+                // when called from within nested component callbacks
+                window.location.href = "/login?convert=true";
+              }}
+            />
+          </Show>
 
-        <div
-          class={`flex flex-1 overflow-hidden relative ${
-            dockPosition() === "bottom"
-              ? "flex-col-reverse"
-              : dockPosition() === "right"
-                ? "flex-row-reverse"
-                : "flex-row"
-          }`}
-        >
-          {/* Drop Zone Overlays (shown during drag) */}
-          <DropZoneOverlays isDragging={isDragging()} />
+          <div
+            class={`flex flex-1 overflow-hidden relative ${
+              dockPosition() === "bottom"
+                ? "flex-col-reverse"
+                : dockPosition() === "right"
+                  ? "flex-row-reverse"
+                  : "flex-row"
+            }`}
+          >
+            {/* Drop Zone Overlays (shown during drag) */}
+            <DropZoneOverlays isDragging={isDragging()} />
 
-          {/* Sidebar */}
-          <Sidebar
-            collapsed={sidebarCollapsed()}
-            onToggle={handleSidebarToggle}
-            width={sidebarWidth()}
-            onWidthChange={() => {}} // No-op during drag
-            onWidthChangeEnd={handleSidebarWidthChangeEnd}
-            minWidth={240}
-            maxWidth={600}
-            dockPosition={dockPosition()}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          />
+            {/* Sidebar */}
+            <Sidebar
+              collapsed={sidebarCollapsed()}
+              onToggle={handleSidebarToggle}
+              width={sidebarWidth()}
+              onWidthChange={() => {}} // No-op during drag
+              onWidthChangeEnd={handleSidebarWidthChangeEnd}
+              minWidth={240}
+              maxWidth={600}
+              dockPosition={dockPosition()}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            />
 
-          {/* Main Content Area */}
-          <div class="flex-1 flex flex-col overflow-hidden">
-            {/* Tab Navigation - only show if activeTab is provided (Home page) */}
-            <Show when={props.activeTab && props.onTabChange}>
-              <TabBar
-                activeTab={props.activeTab}
-                onTabChange={props.onTabChange!}
-              />
-            </Show>
+            {/* Main Content Area */}
+            <div class="flex-1 flex flex-col overflow-hidden">
+              {/* Tab Navigation - only show if activeTab is provided (Home page) */}
+              <Show when={props.activeTab && props.onTabChange}>
+                <TabBar
+                  activeTab={props.activeTab}
+                  onTabChange={props.onTabChange!}
+                />
+              </Show>
 
-            {/* Tab Content - Remove overflow-auto to let child components handle scrolling */}
-            <div class="flex-1 overflow-hidden">{props.children}</div>
+              {/* Tab Content - Remove overflow-auto to let child components handle scrolling */}
+              <div class="flex-1 overflow-hidden">{props.children}</div>
+            </div>
           </div>
         </div>
-      </div>
+      </MobileControlBarProvider>
     </SidebarResizeProvider>
   );
 };

@@ -7,10 +7,12 @@
  * @module components/repertoire/RepertoireToolbar
  */
 
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
-import { Columns } from "lucide-solid";
+import { Columns, EllipsisVertical, Plus } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
+import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
@@ -35,6 +37,7 @@ import {
 } from "../grids/shared-toolbar-styles";
 import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
+import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -68,6 +71,7 @@ export interface RepertoireToolbarProps {
 }
 
 export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
+  const isMobile = createIsMobile();
   const {
     incrementPracticeListStagedChanged,
     incrementRepertoireListChanged,
@@ -78,7 +82,9 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
   const [isRemoving, setIsRemoving] = createSignal(false);
+  const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
+  let mobileOverflowButtonRef: HTMLButtonElement | undefined;
 
   const handleAddToReview = async () => {
     try {
@@ -200,169 +206,312 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     setShowColumnsDropdown(!showColumnsDropdown());
   };
 
-  return (
-    <div class={TOOLBAR_CONTAINER_CLASSES}>
-      <div class={TOOLBAR_INNER_CLASSES}>
-        <div class={TOOLBAR_BUTTON_GROUP_CLASSES}>
-          <button
-            type="button"
-            onClick={handleAddToReview}
-            title="Add selected tunes to practice review queue"
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
-            data-testid="add-to-review-button"
-            disabled={!props.table}
+  const openDisplayOptions = () => {
+    setShowOverflowMenu(false);
+    setShowColumnsDropdown(true);
+  };
+
+  const displayOptionsTriggerRef = () =>
+    isMobile() ? mobileOverflowButtonRef : columnsButtonRef;
+
+  const mobileMenuItemClasses =
+    "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-left text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-800";
+
+  useRegisterMobileControlBar(() => {
+    if (!isMobile()) return undefined;
+
+    return (
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <div class="relative min-w-0 flex-1">
+          <svg
+            class={TOOLBAR_SEARCH_ICON}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
           >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
-            </svg>
-            <span>Add To Review</span>
-          </button>
-
-          <div class={TOOLBAR_SEARCH_CONTAINER}>
-            <svg
-              class={TOOLBAR_SEARCH_ICON}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search tunes..."
-              value={props.searchQuery}
-              onInput={(e) => props.onSearchChange(e.currentTarget.value)}
-              class={TOOLBAR_SEARCH_INPUT}
-              data-testid="search-box-panel"
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
-          </div>
-
-          <FilterPanel
-            availableTypes={props.availableTypes}
-            selectedTypes={props.selectedTypes}
-            onTypesChange={props.onTypesChange}
-            availableModes={props.availableModes}
-            selectedModes={props.selectedModes}
-            onModesChange={props.onModesChange}
-            availableGenres={props.availableGenres}
-            selectedGenres={props.selectedGenres}
-            onGenresChange={props.onGenresChange}
-            availableRepertoires={[]}
-            selectedRepertoireIds={[]}
-            onRepertoireIdsChange={() => {}}
-            loading={props.loading}
-            hideRepertoireFilter={true}
-            isExpanded={props.filterPanelExpanded}
-            onExpandedChange={props.onFilterPanelExpandedChange}
+          </svg>
+          <input
+            type="text"
+            placeholder="Search tunes..."
+            value={props.searchQuery}
+            onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+            class={`${TOOLBAR_SEARCH_INPUT} h-10 pr-3`}
+            data-testid="search-box-panel"
           />
-
-          <button
-            type="button"
-            onClick={handleAddTune}
-            title="Add a new tune"
-            data-testid="repertoire-add-tune-button"
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
-          >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            <span>Add Tune</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleRemoveFromRepertoire}
-            title="Remove selected tunes from repertoire"
-            data-testid="repertoire-remove-button"
-            disabled={!props.selectedRowsCount || props.selectedRowsCount === 0}
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_WARNING}`}
-          >
-            <svg
-              class={TOOLBAR_ICON_SIZE}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>Remove From Repertoire</span>
-          </button>
         </div>
 
-        <div class={TOOLBAR_SPACER} />
+        <FilterPanel
+          availableTypes={props.availableTypes}
+          selectedTypes={props.selectedTypes}
+          onTypesChange={props.onTypesChange}
+          availableModes={props.availableModes}
+          selectedModes={props.selectedModes}
+          onModesChange={props.onModesChange}
+          availableGenres={props.availableGenres}
+          selectedGenres={props.selectedGenres}
+          onGenresChange={props.onGenresChange}
+          availableRepertoires={[]}
+          selectedRepertoireIds={[]}
+          onRepertoireIdsChange={() => {}}
+          loading={props.loading}
+          hideRepertoireFilter={true}
+          isExpanded={props.filterPanelExpanded}
+          onExpandedChange={props.onFilterPanelExpandedChange}
+        />
 
-        <div class="relative">
-          <button
-            ref={columnsButtonRef!}
+        <DropdownMenu
+          open={showOverflowMenu()}
+          onOpenChange={setShowOverflowMenu}
+        >
+          <DropdownMenu.Trigger
+            ref={mobileOverflowButtonRef}
             type="button"
-            onClick={handleColumnsToggle}
-            title="Show/hide columns"
             data-testid="repertoire-columns-button"
-            aria-expanded={showColumnsDropdown()}
-            class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
+            aria-label="More options"
+            class="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
           >
-            <Columns size={14} />
-            <span>Columns</span>
-            <svg
-              class="w-3.5 h-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
+            <EllipsisVertical class="h-4 w-4" />
+            <span class="sr-only">More options</span>
+          </DropdownMenu.Trigger>
 
-          <Show when={props.table}>
-            <ColumnVisibilityMenu
-              table={props.table!}
-              isOpen={showColumnsDropdown()}
-              onClose={() => setShowColumnsDropdown(false)}
-              triggerRef={columnsButtonRef}
-            />
-          </Show>
-        </div>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="z-50 min-w-[16rem] rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+              <button
+                type="button"
+                data-testid="add-to-review-button"
+                class={mobileMenuItemClasses}
+                disabled={!props.table}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  void handleAddToReview();
+                }}
+              >
+                <span>Add To Review</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="repertoire-add-tune-button"
+                class={mobileMenuItemClasses}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  handleAddTune();
+                }}
+              >
+                <span class="flex items-center gap-2">
+                  <Plus class="h-4 w-4" />
+                  Add Tune
+                </span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="repertoire-remove-button"
+                class={mobileMenuItemClasses}
+                disabled={
+                  !props.selectedRowsCount || props.selectedRowsCount === 0
+                }
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  void handleRemoveFromRepertoire();
+                }}
+              >
+                <span>Remove From Repertoire</span>
+              </button>
+
+              <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+              <button
+                type="button"
+                class={mobileMenuItemClasses}
+                onClick={openDisplayOptions}
+              >
+                <span>Display Options</span>
+              </button>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu>
       </div>
+    );
+  });
+
+  return (
+    <>
+      <Show when={!isMobile()}>
+        <div class={TOOLBAR_CONTAINER_CLASSES}>
+          <div class={TOOLBAR_INNER_CLASSES}>
+            <div class={TOOLBAR_BUTTON_GROUP_CLASSES}>
+              <button
+                type="button"
+                onClick={handleAddToReview}
+                title="Add selected tunes to practice review queue"
+                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
+                data-testid="add-to-review-button"
+                disabled={!props.table}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                  />
+                </svg>
+                <span>Add To Review</span>
+              </button>
+
+              <div class={TOOLBAR_SEARCH_CONTAINER}>
+                <svg
+                  class={TOOLBAR_SEARCH_ICON}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search tunes..."
+                  value={props.searchQuery}
+                  onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+                  class={TOOLBAR_SEARCH_INPUT}
+                  data-testid="search-box-panel"
+                />
+              </div>
+
+              <FilterPanel
+                availableTypes={props.availableTypes}
+                selectedTypes={props.selectedTypes}
+                onTypesChange={props.onTypesChange}
+                availableModes={props.availableModes}
+                selectedModes={props.selectedModes}
+                onModesChange={props.onModesChange}
+                availableGenres={props.availableGenres}
+                selectedGenres={props.selectedGenres}
+                onGenresChange={props.onGenresChange}
+                availableRepertoires={[]}
+                selectedRepertoireIds={[]}
+                onRepertoireIdsChange={() => {}}
+                loading={props.loading}
+                hideRepertoireFilter={true}
+                isExpanded={props.filterPanelExpanded}
+                onExpandedChange={props.onFilterPanelExpandedChange}
+              />
+
+              <button
+                type="button"
+                onClick={handleAddTune}
+                title="Add a new tune"
+                data-testid="repertoire-add-tune-button"
+                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span>Add Tune</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRemoveFromRepertoire}
+                title="Remove selected tunes from repertoire"
+                data-testid="repertoire-remove-button"
+                disabled={
+                  !props.selectedRowsCount || props.selectedRowsCount === 0
+                }
+                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_WARNING}`}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span>Remove From Repertoire</span>
+              </button>
+            </div>
+
+            <div class={TOOLBAR_SPACER} />
+
+            <div class="relative">
+              <button
+                ref={columnsButtonRef!}
+                type="button"
+                onClick={handleColumnsToggle}
+                title="Show/hide columns"
+                data-testid="repertoire-columns-button"
+                aria-expanded={showColumnsDropdown()}
+                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
+              >
+                <Columns size={14} />
+                <span>Columns</span>
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      <Show when={props.table}>
+        <ColumnVisibilityMenu
+          table={props.table!}
+          isOpen={showColumnsDropdown()}
+          onClose={() => setShowColumnsDropdown(false)}
+          triggerRef={displayOptionsTriggerRef()}
+          title={isMobile() ? "Display Options" : "Show Columns"}
+        />
+      </Show>
 
       <AddTuneDialog
         open={showAddTuneDialog()}
@@ -401,6 +550,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 };

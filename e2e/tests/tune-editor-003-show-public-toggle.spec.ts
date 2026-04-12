@@ -129,8 +129,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
 
   test("should not show indicators on new tune creation", async ({ page }) => {
     // New tune flow
-    const addTuneButton = page.getByTestId("catalog-add-tune-button");
-    await addTuneButton.click();
+    await ttPage.clickCatalogAddTune();
     const addTuneDialog = page.locator('[role="dialog"]').first();
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
     // TODO: Adapt custom Select interaction for genre selection.

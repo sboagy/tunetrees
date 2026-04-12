@@ -43,52 +43,31 @@ test.describe
     test.beforeEach(async ({ page, testUser }) => {
       currentTestUser = testUser;
       ttPage = new TuneTreesPage(page);
-      // Fast setup: clear repertoire, start on catalog tab
       await setupForCatalogTestsParallel(page, testUser, {
         emptyRepertoire: true,
         startTab: "catalog",
       });
-      // await page.waitForSelector('[data-testid="tab-repertoire"]', {
-      //   timeout: 10000,
-      // });
-      // await page.getByTestId("tab-repertoire").click();
-      // await page.waitForTimeout(500);
-
-      // const dataRows = page.locator(
-      //   '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-      // );
-      // const dataCount = await dataRows.count();
-      // console.log(`📊 Repertoire has ${dataCount} data rows`);
-      // expect(dataCount).toBe(0);
-
-      // await page.getByTestId(`tab-catalog`).click();
       await page.waitForTimeout(500);
     });
 
     test("should show alert when no tunes selected", async ({ page }) => {
-      // Set up dialog handler before clicking button
       let dialogMessage = "";
       page.on("dialog", async (dialog) => {
         dialogMessage = dialog.message();
         await dialog.accept();
       });
 
-      // Ensure catalog grid and toolbar are ready
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 10000,
       });
-      await page.getByTestId("catalog-add-to-repertoire-button").waitFor({
-        state: "visible",
-        timeout: 10000,
+      await ttPage.expectToolbarVisible({
+        addToRepertoire: true,
+        tab: "catalog",
       });
 
-      // Click "Add To Repertoire" without selecting any tunes
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
-
-      // Wait for dialog to be handled
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(500);
 
-      // Verify alert message
       expect(dialogMessage).toContain("No tunes selected");
     });
 
@@ -100,7 +79,7 @@ test.describe
         test.skip,
         "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
       );
-      // Capture browser console messages (quiet by default)
+
       page.on("console", (msg) => {
         if (msg.type() === "error") {
           console.error(`❌ BROWSER ERROR: ${msg.text()}`);
@@ -118,11 +97,9 @@ test.describe
         console.error(`❌ PAGE ERROR: ${err.message}`)
       );
 
-      // Navigate to Catalog tab
       ttPage.navigateToTab("catalog");
       await page.waitForTimeout(200);
 
-      // Select specific tunes that we know exist
       const tune1Checkbox = page.getByRole("checkbox", {
         name: `Select row ${CATALOG_TUNE_A_FIG_FOR_A_KISS}`,
       });
@@ -133,7 +110,6 @@ test.describe
       await tune1Checkbox.check();
       await tune2Checkbox.check();
 
-      // Debug: Check how many checkboxes are actually checked
       const checkedBoxes = await page
         .locator(
           '[data-testid="tunes-grid-catalog"] input[type="checkbox"]:checked'
@@ -141,31 +117,22 @@ test.describe
         .count();
       console.log(`📌 Number of checked boxes: ${checkedBoxes}`);
 
-      // Set up dialog handler
       let dialogMessage = "";
       page.on("dialog", async (dialog) => {
         dialogMessage = dialog.message();
         await dialog.accept();
       });
 
-      // Click "Add To Repertoire"
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
-
-      // Wait for dialog
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(500);
 
-      // Verify success message (should be 2 new tunes since we started empty)
       console.log(`Dialog: ${dialogMessage}`);
       expect(dialogMessage).toContain("Added 2 tune");
 
-      // Wait for sync
       await page.waitForTimeout(2000);
-
-      // Navigate to Repertoire tab
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(500);
 
-      // Debug: Query Supabase directly to see what's actually there
       const supabaseCount = await page.evaluate(async (repertoireId) => {
         const response = await fetch(
           `http://localhost:54321/rest/v1/repertoire_tune?repertoire_ref=eq.${repertoireId}&select=tune_ref`,
@@ -184,8 +151,6 @@ test.describe
         `🔍 Supabase has ${supabaseCount} tunes for user ${currentTestUser.repertoireId}`
       );
 
-      // Grid uses virtualization with spacer rows for scrolling
-      // Count only data rows (those with data-index attribute)
       const dataRows = page.locator(
         '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
       );
@@ -193,7 +158,6 @@ test.describe
       console.log(`📊 Repertoire has ${dataCount} data rows`);
       expect(dataCount).toBe(2);
 
-      // Verify the tunes are the ones we added
       const row0Text = await dataRows.nth(0).textContent();
       const row1Text = await dataRows.nth(1).textContent();
       expect(row0Text).toContain("A Fig for a Kiss");
@@ -208,13 +172,10 @@ test.describe
         test.skip,
         "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
       );
-      // const ttPage = new TuneTreesPage(page);
-      // First add user's private tune to repertoire
+
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
-      // Ensure grid rendered content
       await ttPage.expectGridHasContent(ttPage.catalogGrid);
-      // Search for the tune to force row virtualization to render
       await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
 
       const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
@@ -231,12 +192,11 @@ test.describe
         await dialog.accept();
       });
 
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(500);
       console.log(`First add: ${dialogMessage}`);
       expect(dialogMessage).toContain("Added 1 tune");
 
-      // Now try to add same tune again
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
       await ttPage.clearSearch();
@@ -249,11 +209,10 @@ test.describe
       await expect(userPrivateTuneB).toBeVisible({ timeout: 5000 });
       await ttPage.setGridRowChecked(privateTune1Id, ttPage.catalogGrid);
 
-      dialogMessage = ""; // Reset
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
+      dialogMessage = "";
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(500);
 
-      // Should show "already in repertoire" or "0 added"
       console.log(`Second add: ${dialogMessage}`);
       expect(dialogMessage).toMatch(
         /already in repertoire|No tunes were added/
@@ -268,10 +227,9 @@ test.describe
         test.skip,
         "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
       );
-      // First add tune 66
+
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
-
       await ttPage.filterByGenre("Irish Traditional Music");
 
       const checkbox = page.getByRole("checkbox", {
@@ -285,10 +243,9 @@ test.describe
         await dialog.accept();
       });
 
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(500);
 
-      // Now add batch: one new (70), one existing (66)
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
 
@@ -299,11 +256,10 @@ test.describe
         .getByRole("checkbox", { name: `Select row ${CATALOG_TUNE_70_ID}` })
         .check();
 
-      dialogMessage = ""; // Reset
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
+      dialogMessage = "";
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(500);
 
-      // Should show "Added 1" (only the new one)
       console.log(`Batch add: ${dialogMessage}`);
       expect(dialogMessage).toContain("Added 1 tune");
     });
@@ -316,7 +272,7 @@ test.describe
         test.skip,
         "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
       );
-      // Navigate to Catalog tab
+
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
 
@@ -329,7 +285,6 @@ test.describe
         expect(countBefore).toBe(0);
       }
 
-      // Select 2 specific tunes
       const tune1Checkbox = page.getByRole("checkbox", {
         name: `Select row ${CATALOG_TUNE_A_FIG_FOR_A_KISS}`,
       });
@@ -340,7 +295,6 @@ test.describe
       await tune1Checkbox.check();
       await tune2Checkbox.check();
 
-      // Debug: Check how many checkboxes are actually checked
       const checkedBoxes = await page
         .locator(
           '[data-testid="tunes-grid-catalog"] input[type="checkbox"]:checked'
@@ -348,22 +302,18 @@ test.describe
         .count();
       console.log(`📌 Number of checked boxes in catalog: ${checkedBoxes}`);
 
-      // Click "Add To Repertoire" and dismiss dialog
       page.on("dialog", async (dialog) => {
         console.log("Dialog message:", dialog.message());
         await dialog.accept();
       });
-      await page.getByTestId("catalog-add-to-repertoire-button").click();
+      await ttPage.clickCatalogAddToRepertoire();
 
-      // Wait for sync to complete
       console.log("⏳ Waiting for sync to complete...");
       await page.waitForTimeout(3000);
 
-      // Navigate to Repertoire to verify tunes were added
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(200);
 
-      // Verify the selected tunes appear (avoid brittle exact counts under parallel suite load)
       const dataRowsBefore = page.locator(
         '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
       );
@@ -378,16 +328,13 @@ test.describe
         timeout: 10000,
       });
 
-      // RELOAD THE PAGE
       console.log("🔄 Reloading page...");
       await page.reload();
-      await page.waitForTimeout(3000); // Wait for sync down
+      await page.waitForTimeout(3000);
 
-      // Navigate back to Repertoire tab
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(200);
 
-      // CRITICAL: Verify tunes STILL appear after reload
       const dataRowsAfter = page.locator(
         '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
       );

@@ -92,14 +92,14 @@ test.describe("Anonymous User Data Functionality", () => {
     await firstTuneCheckbox.click();
 
     // Ensure "Add to Repertoire" is enabled/clickable after selecting a tune
-    await expect(ttPage.catalogAddToRepertoireButton).toBeVisible({
-      timeout: 10000,
+    await ttPage.expectToolbarVisible({
+      addToRepertoire: true,
+      tab: "catalog",
     });
     await expect(ttPage.catalogAddToRepertoireButton).toBeEnabled({
       timeout: 10000,
     });
-    // Click "Add to Repertoire" button
-    await ttPage.catalogAddToRepertoireButton.click();
+    await ttPage.clickCatalogAddToRepertoire();
 
     // Wait for success indication
     // Wait until selection is cleared (checkbox becomes unchecked)
@@ -148,13 +148,14 @@ test.describe("Anonymous User Data Functionality", () => {
       .locator('input[type="checkbox"]');
     await firstTuneCheckbox.click();
 
-    await expect(ttPage.catalogAddToRepertoireButton).toBeVisible({
-      timeout: 10000,
+    await ttPage.expectToolbarVisible({
+      addToRepertoire: true,
+      tab: "catalog",
     });
     await expect(ttPage.catalogAddToRepertoireButton).toBeEnabled({
       timeout: 10000,
     });
-    await ttPage.catalogAddToRepertoireButton.click();
+    await ttPage.clickCatalogAddToRepertoire();
 
     // Wait until selection is cleared (checkbox becomes unchecked)
     await expect(firstTuneCheckbox).not.toBeChecked({ timeout: 15000 });

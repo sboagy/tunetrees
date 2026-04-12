@@ -113,7 +113,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
       console.log("Dialog message:", dialog.message());
       await dialog.accept();
     });
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
 
     // Wait for dialog
     await page.waitForTimeout(500);
