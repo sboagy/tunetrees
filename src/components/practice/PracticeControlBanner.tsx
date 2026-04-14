@@ -115,9 +115,9 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
     }
   };
 
-  const handleDisplaySubmittedToggle = () => {
+  const handleDisplaySubmittedChange = (showSubmitted: boolean) => {
     if (props.onShowSubmittedChange) {
-      props.onShowSubmittedChange(!(props.showSubmitted ?? false));
+      props.onShowSubmittedChange(showSubmitted);
       incrementPracticeListStagedChanged();
     }
   };
@@ -155,9 +155,9 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
     }
   };
 
-  const handleFlashcardToggle = () => {
+  const handleFlashcardModeChange = (enabled: boolean) => {
     if (props.onFlashcardModeChange) {
-      props.onFlashcardModeChange(!(props.flashcardMode ?? false));
+      props.onFlashcardModeChange(enabled);
     }
   };
 
@@ -229,6 +229,31 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           </button>
 
           <Show when={props.rolloverPending}>
+            <output
+              data-testid="date-rollover-banner"
+              class="flex max-w-[8rem] items-center gap-1 rounded-md border border-amber-400/80 bg-amber-50 px-2 py-2 text-xs font-medium text-amber-700 dark:border-amber-600/70 dark:bg-amber-900/20 dark:text-amber-300"
+              title={`Practice date is now ${props.rolloverDate?.toLocaleDateString() ?? "today"}`}
+              aria-live="polite"
+            >
+              <svg
+                class="h-3.5 w-3.5 flex-none"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span class="truncate">New day</span>
+            </output>
+          </Show>
+
+          <Show when={props.rolloverPending}>
             <button
               type="button"
               data-testid="date-rollover-refresh-button"
@@ -275,27 +300,45 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 
               <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
 
-              <button
-                type="button"
+              <Switch
+                checked={props.showSubmitted ?? false}
+                onChange={(checked) => {
+                  handleDisplaySubmittedChange(checked);
+                  setShowOverflowMenu(false);
+                }}
+                data-testid="display-submitted-switch"
                 class={mobileMenuItemClasses}
-                onClick={handleDisplaySubmittedToggle}
               >
-                <span>Show Submitted</span>
+                <SwitchLabel class="flex-1 cursor-pointer select-none text-sm">
+                  Show Submitted
+                </SwitchLabel>
                 <span class={mobileMenuMetaClasses}>
                   {props.showSubmitted ? "On" : "Off"}
                 </span>
-              </button>
+                <SwitchControl class="ml-1">
+                  <SwitchThumb />
+                </SwitchControl>
+              </Switch>
 
-              <button
-                type="button"
+              <Switch
+                checked={props.flashcardMode ?? false}
+                onChange={(checked) => {
+                  handleFlashcardModeChange(checked);
+                  setShowOverflowMenu(false);
+                }}
+                data-testid="flashcard-mode-switch"
                 class={mobileMenuItemClasses}
-                onClick={handleFlashcardToggle}
               >
-                <span>Flashcard Mode</span>
+                <SwitchLabel class="flex-1 cursor-pointer select-none text-sm">
+                  Flashcard Mode
+                </SwitchLabel>
                 <span class={mobileMenuMetaClasses}>
                   {props.flashcardMode ? "On" : "Off"}
                 </span>
-              </button>
+                <SwitchControl class="ml-1">
+                  <SwitchThumb />
+                </SwitchControl>
+              </Switch>
 
               <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
 
@@ -412,7 +455,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               >
                 <Switch
                   checked={props.showSubmitted ?? false}
-                  onChange={handleDisplaySubmittedToggle}
+                  onChange={handleDisplaySubmittedChange}
                   data-testid="display-submitted-switch"
                 >
                   <SwitchControl>
@@ -546,7 +589,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               >
                 <Switch
                   checked={props.flashcardMode ?? false}
-                  onChange={handleFlashcardToggle}
+                  onChange={handleFlashcardModeChange}
                   data-testid="flashcard-mode-switch"
                 >
                   <SwitchControl>

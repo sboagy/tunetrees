@@ -4,8 +4,8 @@ import {
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
 import { setStableDate } from "../helpers/clock-control";
-import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { skipIfMobileChrome } from "../helpers/mobile-project";
+import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -114,14 +114,7 @@ test.describe
     test("03. Grid Submit → flashcard list updates", async ({ page }) => {
       // Turn OFF Show Submitted
       const app = new TuneTreesPage(page);
-      const showSubmittedToggle =
-        app.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await showSubmittedToggle.click();
-        await page.waitForTimeout(500);
-      }
+      await app.setShowSubmitted(false, 500);
 
       // Select and submit in grid
       const grid = app.practiceGrid;
@@ -153,14 +146,7 @@ test.describe
 
       // Turn OFF Show Submitted
       const app = new TuneTreesPage(page);
-      const showSubmittedToggle =
-        app.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await showSubmittedToggle.click();
-        await page.waitForTimeout(500);
-      }
+      await app.setShowSubmitted(false, 500);
 
       // Count initial grid rows
       const grid = app.practiceGrid;
@@ -209,14 +195,7 @@ test.describe
       await page.waitForTimeout(1500);
 
       // Turn OFF Show Submitted
-      const showSubmittedToggle2 =
-        app.displaySubmittedSwitch.getByRole("switch");
-      const isOn2 =
-        (await showSubmittedToggle2.getAttribute("aria-checked")) === "true";
-      if (isOn2) {
-        await showSubmittedToggle2.click();
-        await page.waitForTimeout(500);
-      }
+      await app.setShowSubmitted(false, 500);
 
       // Open flashcard (should only show unsubmitted tunes)
       await app.enableFlashcardMode();
@@ -227,8 +206,7 @@ test.describe
       expect(total).toBeGreaterThanOrEqual(0);
 
       // Toggle Show Submitted ON (while flashcard open)
-      await app.displaySubmittedSwitch.click();
-      await page.waitForTimeout(500);
+      await app.setShowSubmitted(true, 500);
 
       // Verify flashcard list updated (now shows 2 tunes)
       counterText = await counter.textContent();

@@ -1880,24 +1880,36 @@ export async function setupForCatalogTestsParallel(
   await navigateToTabForTest(page, startTab);
   await page.waitForTimeout(500);
 
-  const catalogAddToRepertoireButton = page.getByTestId(
-    "catalog-add-to-repertoire-button"
-  );
-  await catalogAddToRepertoireButton.waitFor({
+  const catalogOverflowButton = page.getByTestId("catalog-columns-button");
+  await catalogOverflowButton.waitFor({
     state: "visible",
     timeout: 10000,
   });
 
-  // Wait for tune count to be visible (any number of tunes)
-  const tuneCountComponent = page
-    .locator("div")
-    .filter({ hasText: /^\d+ tunes?$/ })
-    .first();
+  const catalogGrid = page.getByTestId("tunes-grid-catalog");
+  await catalogGrid.waitFor({ state: "visible", timeout: 10000 });
+
+  const catalogRows = page.locator(
+    '[data-testid="tunes-grid-catalog"] tbody tr[data-index], [data-testid="tunes-grid-catalog"] li[data-testid^="stacked-item-"]'
+  );
 
   await page.waitForTimeout(2000);
 
-  const isVisible = await tuneCountComponent.isVisible();
-  if (!isVisible) {
+  let catalogRowCount = 0;
+  try {
+    await expect
+      .poll(
+        async () => {
+          catalogRowCount = await catalogRows.count().catch(() => 0);
+          return catalogRowCount;
+        },
+        {
+          timeout: 10000,
+          intervals: [200, 500, 1000],
+        }
+      )
+      .toBeGreaterThan(0);
+  } catch {
     const snapshotName = `e2e/tests/artifacts/catalog-missing-${user.email.split(".")[0]}-${Date.now()}.png`;
     try {
       await page.screenshot({ path: snapshotName, fullPage: true });
@@ -1906,7 +1918,7 @@ export async function setupForCatalogTestsParallel(
       console.warn("⚠️ Failed to save snapshot:", String(err));
     }
     throw new Error(
-      `Tune count component not visible; snapshot saved as ${snapshotName}`
+      `Catalog grid did not render any rows; snapshot saved as ${snapshotName}`
     );
   }
 

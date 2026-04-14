@@ -35,9 +35,8 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
 
   test("should create new tune with minimal fields", async ({ page }) => {
     // ARRANGE: Open "Add Tune" dialog
-    const addTuneButton = ttPage.catalogAddTuneButton;
-    await expect(addTuneButton).toBeVisible({ timeout: 10000 });
-    await addTuneButton.click();
+    await ttPage.expectToolbarVisible({ addTune: true, tab: "catalog" });
+    await ttPage.clickCatalogAddTune();
 
     // Wait for dialog to open
     const addTuneDialog = ttPage.addTuneDialog;
@@ -86,9 +85,8 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
 
   test("should create new tune with all fields populated", async ({ page }) => {
     // ARRANGE: Open "Add Tune" dialog
-    const addTuneButton = ttPage.catalogAddTuneButton;
-    await expect(addTuneButton).toBeVisible({ timeout: 10000 });
-    await addTuneButton.click();
+    await ttPage.expectToolbarVisible({ addTune: true, tab: "catalog" });
+    await ttPage.clickCatalogAddTune();
 
     const addTuneDialog = ttPage.addTuneDialog;
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
@@ -155,9 +153,8 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
     page,
   }) => {
     // ARRANGE: Open "Add Tune" dialog and enter title
-    const addTuneButton = ttPage.catalogAddTuneButton;
-    await expect(addTuneButton).toBeVisible({ timeout: 10000 });
-    await addTuneButton.click();
+    await ttPage.expectToolbarVisible({ addTune: true, tab: "catalog" });
+    await ttPage.clickCatalogAddTune();
 
     const addTuneDialog = ttPage.addTuneDialog;
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
@@ -214,9 +211,8 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
 
   test("should cancel new tune creation", async ({ page }) => {
     // ARRANGE: Open tune editor for new tune
-    const addTuneButton = ttPage.catalogAddTuneButton;
-    await expect(addTuneButton).toBeVisible({ timeout: 10000 });
-    await addTuneButton.click();
+    await ttPage.expectToolbarVisible({ addTune: true, tab: "catalog" });
+    await ttPage.clickCatalogAddTune();
 
     const addTuneDialog = ttPage.addTuneDialog;
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
