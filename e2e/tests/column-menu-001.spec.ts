@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import {
   TEST_TUNE_BANISH_ID,
   TEST_TUNE_MORRISON_ID,
@@ -6,6 +6,18 @@ import {
 import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+
+async function openDisplayOptionsMenu(page: Page, trigger: Locator) {
+  const ariaLabel = ((await trigger.getAttribute("aria-label")) ?? "")
+    .trim()
+    .toLowerCase();
+
+  await trigger.click();
+
+  if (ariaLabel === "more options") {
+    await page.getByRole("button", { name: /^Display Options$/i }).click();
+  }
+}
 
 test.describe("Column Visibility Menu", () => {
   let ttPage: TuneTreesPage;
@@ -26,13 +38,7 @@ test.describe("Column Visibility Menu", () => {
 
     // Click the Display Options trigger to open the column menu.
     const columnsButton = ttPage.repertoireColumnsButton;
-    await columnsButton.click();
-    const displayOptionsButton = page
-      .getByRole("button", { name: /^Display Options$/i })
-      .last();
-    if (await displayOptionsButton.isVisible().catch(() => false)) {
-      await displayOptionsButton.click();
-    }
+    await openDisplayOptionsMenu(page, columnsButton);
     await page.waitForTimeout(500);
 
     // Check that menu is visible
@@ -91,15 +97,9 @@ test.describe("Column Visibility Menu", () => {
     await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(1000);
 
-    // Click the Columns button to open menu
-    const columnsButton = ttPage.columnsButton;
-    await columnsButton.click();
-    const displayOptionsButton = page
-      .getByRole("button", { name: /^Display Options$/i })
-      .last();
-    if (await displayOptionsButton.isVisible().catch(() => false)) {
-      await displayOptionsButton.click();
-    }
+    // Click the Display Options trigger to open menu.
+    const columnsButton = ttPage.repertoireColumnsButton;
+    await openDisplayOptionsMenu(page, columnsButton);
     await page.waitForTimeout(500);
 
     // Check that menu is visible

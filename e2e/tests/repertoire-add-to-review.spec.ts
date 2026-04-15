@@ -11,7 +11,7 @@
  * 5. Verify database changes (scheduled timestamp set)
  *
  * Edge Cases:
- * - No tunes selected (button should show alert)
+ * - No tunes selected (button should stay disabled)
  * - Tunes already scheduled (should be skipped with feedback)
  * - Multiple tunes selected (batch operation)
  *
@@ -42,42 +42,39 @@ test.describe("Repertoire: Add To Review", () => {
     ttPage = new TuneTreesPage(page);
   });
 
-  test("should show alert when no tunes selected", async ({ page }) => {
+  test("should keep Add To Review disabled until rows are selected", async ({
+    page,
+  }) => {
+    const isMobileChrome = test.info().project.name === "Mobile Chrome";
+
     // Navigate to Repertoire tab
     await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
-    // Set up dialog handler
-    let dialogMessage = "";
-    page.on("dialog", async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.accept();
-    });
+    if (isMobileChrome) {
+      await ttPage.repertoireColumnsButton.click();
+    }
+    await expect(ttPage.repertoireAddToReviewButton).toBeDisabled();
 
-    // Click "Add To Review" without selecting any tunes
-    await ttPage.clickRepertoireAddToReview();
+    if (isMobileChrome) {
+      await page.keyboard.press("Escape").catch(() => undefined);
+    }
 
-    // Wait for dialog
-    await page.waitForTimeout(500);
+    await ttPage.setGridRowChecked(TEST_TUNE_BANISH_ID, ttPage.repertoireGrid);
 
-    // Verify alert message
-    expect(dialogMessage).toContain("No tunes selected");
+    if (isMobileChrome) {
+      await ttPage.repertoireColumnsButton.click();
+    }
+    await expect(ttPage.repertoireAddToReviewButton).toBeEnabled();
   });
 
   test("should add selected tunes to practice queue", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkbox selection which is only available in the desktop table view."
-      );
-    }
     // Navigate to Repertoire tab
     await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Select first tune in repertoire (should exist from test setup)
-    const firstCheckbox = page.locator('input[type="checkbox"]').nth(1); // Skip "select all"
-    await firstCheckbox.check();
+    await ttPage.setGridRowChecked(TEST_TUNE_BANISH_ID, ttPage.repertoireGrid);
 
     // Verify selection count
     await expect(page.getByText(/1 tune selected/)).toBeVisible();
@@ -105,22 +102,15 @@ test.describe("Repertoire: Add To Review", () => {
   });
 
   test("should handle multiple tunes selection", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkbox selection which is only available in the desktop table view."
-      );
-    }
     // Navigate to Repertoire tab
     await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
-    // Select first two tunes (skip "select all" checkbox at index 0)
-    const firstCheckbox = page.locator('input[type="checkbox"]').nth(1);
-    const secondCheckbox = page.locator('input[type="checkbox"]').nth(2);
-
-    await firstCheckbox.check();
-    await secondCheckbox.check();
+    await ttPage.setGridRowChecked(TEST_TUNE_BANISH_ID, ttPage.repertoireGrid);
+    await ttPage.setGridRowChecked(
+      TEST_TUNE_MORRISON_ID,
+      ttPage.repertoireGrid
+    );
 
     // Verify selection count
     await expect(page.getByText(/2 tunes selected/)).toBeVisible();
@@ -143,19 +133,12 @@ test.describe("Repertoire: Add To Review", () => {
   });
 
   test("should handle tunes already scheduled", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkbox selection which is only available in the desktop table view."
-      );
-    }
     // Navigate to Repertoire tab
     await ttPage.navigateToTab("repertoire");
     await page.waitForTimeout(500);
 
     // Select the first tune
-    const firstCheckbox = page.locator('input[type="checkbox"]').nth(1);
-    await firstCheckbox.check();
+    await ttPage.setGridRowChecked(TEST_TUNE_BANISH_ID, ttPage.repertoireGrid);
 
     // Set up dialog handler
     let dialogMessage = "";
@@ -169,7 +152,7 @@ test.describe("Repertoire: Add To Review", () => {
     await page.waitForTimeout(500);
 
     // Select the same tune again
-    await firstCheckbox.check();
+    await ttPage.setGridRowChecked(TEST_TUNE_BANISH_ID, ttPage.repertoireGrid);
 
     // Try to add again
     await ttPage.clickRepertoireAddToReview();
@@ -182,12 +165,6 @@ test.describe("Repertoire: Add To Review", () => {
   test("should verify console logs for database operation", async ({
     page,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkbox selection which is only available in the desktop table view."
-      );
-    }
     // Set up console message listener
     const consoleLogs: string[] = [];
     page.on("console", (msg) => {
@@ -201,8 +178,7 @@ test.describe("Repertoire: Add To Review", () => {
     await page.waitForTimeout(500);
 
     // Select first tune
-    const firstCheckbox = page.locator('input[type="checkbox"]').nth(1);
-    await firstCheckbox.check();
+    await ttPage.setGridRowChecked(TEST_TUNE_BANISH_ID, ttPage.repertoireGrid);
 
     // Set up dialog handler
     page.on("dialog", async (dialog) => {

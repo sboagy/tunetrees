@@ -1995,6 +1995,23 @@ export class TuneTreesPage {
       .last();
   }
 
+  private async openDisplayOptionsEntryIfNeeded(
+    columnsButton: Locator
+  ): Promise<void> {
+    const ariaLabel = ((await columnsButton.getAttribute("aria-label")) ?? "")
+      .trim()
+      .toLowerCase();
+    const opensOverflowMenu = ariaLabel === "more options";
+
+    if (!opensOverflowMenu) {
+      return;
+    }
+
+    const displayOptionsButton = this.getDisplayOptionsButton();
+    await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
+    await displayOptionsButton.click();
+  }
+
   async setGridColumnVisibility(
     tab: "catalog" | "repertoire" | "practice",
     columnLabel: string,
@@ -2012,13 +2029,7 @@ export class TuneTreesPage {
       .catch(() => false);
     if (!menuVisible) {
       await columnsButton.click();
-      const displayOptionsButton = this.getDisplayOptionsButton();
-      const displayOptionsVisible = await displayOptionsButton
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
-      if (displayOptionsVisible) {
-        await displayOptionsButton.click();
-      }
+      await this.openDisplayOptionsEntryIfNeeded(columnsButton);
       await expect(menu).toBeVisible({ timeout: 5000 });
     }
 
@@ -3217,14 +3228,7 @@ export class TuneTreesPage {
       await expect(this.practiceColumnsButton).toBeVisible({ timeout: 5000 });
       await expect(this.practiceColumnsButton).toBeEnabled({ timeout: 5000 });
       await this.practiceColumnsButton.click();
-
-      const displayOptionsButton = this.getDisplayOptionsButton();
-      const displayOptionsVisible = await displayOptionsButton
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
-      if (displayOptionsVisible) {
-        await displayOptionsButton.click();
-      }
+      await this.openDisplayOptionsEntryIfNeeded(this.practiceColumnsButton);
 
       try {
         await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });

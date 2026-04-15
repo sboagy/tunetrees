@@ -242,6 +242,9 @@ export interface ITuneStackedListProps {
   currentRowId?: string | number;
   onRowClick?: (row: IStackedListRow) => void;
   onRowDoubleClick?: (row: IStackedListRow) => void;
+  enableRowSelection?: boolean;
+  selectedRowIds?: Record<string, boolean>;
+  onRowSelectionChange?: (row: IStackedListRow, checked: boolean) => void;
   cellCallbacks?: ICellEditorCallbacks;
   /**
    * Column visibility state from the TanStack table instance.
@@ -297,9 +300,12 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
         <For each={props.data}>
           {(item) => {
             const itemId = item.tune_id ?? item.id;
+            const rowId = String(item.id);
             const isSelected = () =>
               props.currentRowId != null &&
               String(props.currentRowId) === String(itemId);
+            const isRowChecked = () => props.selectedRowIds?.[rowId] === true;
+            const showsRowSelection = () => props.enableRowSelection === true;
 
             const title = item.title ?? "(Untitled)";
             const favoriteUrl = item.favorite_url ?? item.favoriteUrl ?? null;
@@ -507,117 +513,144 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 data-testid={`stacked-item-${itemId}`}
                 data-selected={isSelected() ? "true" : undefined}
               >
-                {/* Row 1: Title + primary badge (always shown) */}
-                <div class="flex items-start justify-between gap-2 min-h-[24px]">
-                  <div class="font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0">
-                    <Show
-                      when={titleVisible()}
-                      fallback={
-                        <Show
-                          when={idVisible()}
-                          fallback={
-                            <span class="text-gray-400 dark:text-gray-500 italic">
-                              Title hidden
-                            </span>
-                          }
-                        >
-                          <span class="font-mono text-xs text-gray-600 dark:text-gray-400">
-                            {String(item.id)}
-                          </span>
-                        </Show>
-                      }
-                    >
-                      <Show when={href} fallback={<span>{title}</span>}>
-                        <a
-                          href={href!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-blue-600 dark:text-blue-400 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {title}
-                        </a>
-                      </Show>
-                    </Show>
-                  </div>
-                  {/* Purpose-specific right badge, controlled by column visibility */}
-                  <Show
-                    when={
-                      props.tablePurpose === "scheduled" &&
-                      isColVisible("bucket")
-                    }
-                  >
-                    <BucketBadge value={item.bucket} />
-                  </Show>
-                  <Show
-                    when={
-                      props.tablePurpose === "repertoire" &&
-                      isColVisible("latest_state")
-                    }
-                  >
-                    <StateBadge value={item.latest_state} />
-                  </Show>
-                </div>
-
-                {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
-                <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                  <Show when={isColVisible("type")}>
-                    <TypeBadge value={item.type} />
-                  </Show>
-                  <Show when={isColVisible("mode")}>
-                    <ModeBadge value={item.mode} />
-                  </Show>
-                  <Show
-                    when={
-                      props.tablePurpose === "scheduled" &&
-                      isColVisible("latest_state")
-                    }
-                  >
-                    <StateBadge value={item.latest_state} />
-                  </Show>
-
-                  {/* Scheduled: Recall Eval dropdown (controlled by "evaluation" column) */}
-                  <Show
-                    when={
-                      props.tablePurpose === "scheduled" &&
-                      isColVisible("evaluation")
-                    }
-                  >
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */}
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */}
+                <div class="flex items-start gap-2.5">
+                  <Show when={showsRowSelection()}>
+                    {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper isolates checkbox interaction from row tap selection */}
+                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the checkbox itself */}
                     <div
-                      class="ml-auto w-40 flex-shrink-0"
+                      class="flex h-10 w-10 flex-shrink-0 items-start justify-center pt-1"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <RecallEvalComboBox
-                        tuneId={String(itemId)}
-                        value={item.recall_eval ?? ""}
-                        open={props.cellCallbacks?.getRecallEvalOpen?.(
-                          String(itemId)
-                        )}
-                        onOpenChange={(isOpen) =>
-                          props.cellCallbacks?.setRecallEvalOpen?.(
-                            String(itemId),
-                            isOpen
+                      <input
+                        type="checkbox"
+                        checked={isRowChecked()}
+                        onChange={(e) =>
+                          props.onRowSelectionChange?.(
+                            item,
+                            e.currentTarget.checked
                           )
                         }
-                        onChange={(val) => {
-                          props.cellCallbacks?.onRecallEvalChange?.(
-                            String(itemId),
-                            val
-                          );
-                        }}
+                        class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`Select row ${rowId}`}
+                        data-testid={`stacked-row-checkbox-${rowId}`}
                       />
                     </div>
                   </Show>
-                </div>
 
-                {/* Row 3: Purpose-specific secondary info */}
-                <Show when={metadataEntries().length > 0}>
-                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <For each={metadataEntries()}>{(entry) => entry}</For>
+                  <div class="min-w-0 flex-1">
+                    {/* Row 1: Title + primary badge (always shown) */}
+                    <div class="flex items-start justify-between gap-2 min-h-[24px]">
+                      <div class="font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0">
+                        <Show
+                          when={titleVisible()}
+                          fallback={
+                            <Show
+                              when={idVisible()}
+                              fallback={
+                                <span class="text-gray-400 dark:text-gray-500 italic">
+                                  Title hidden
+                                </span>
+                              }
+                            >
+                              <span class="font-mono text-xs text-gray-600 dark:text-gray-400">
+                                {String(item.id)}
+                              </span>
+                            </Show>
+                          }
+                        >
+                          <Show when={href} fallback={<span>{title}</span>}>
+                            <a
+                              href={href!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="text-blue-600 dark:text-blue-400 hover:underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {title}
+                            </a>
+                          </Show>
+                        </Show>
+                      </div>
+                      {/* Purpose-specific right badge, controlled by column visibility */}
+                      <Show
+                        when={
+                          props.tablePurpose === "scheduled" &&
+                          isColVisible("bucket")
+                        }
+                      >
+                        <BucketBadge value={item.bucket} />
+                      </Show>
+                      <Show
+                        when={
+                          props.tablePurpose === "repertoire" &&
+                          isColVisible("latest_state")
+                        }
+                      >
+                        <StateBadge value={item.latest_state} />
+                      </Show>
+                    </div>
+
+                    {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                      <Show when={isColVisible("type")}>
+                        <TypeBadge value={item.type} />
+                      </Show>
+                      <Show when={isColVisible("mode")}>
+                        <ModeBadge value={item.mode} />
+                      </Show>
+                      <Show
+                        when={
+                          props.tablePurpose === "scheduled" &&
+                          isColVisible("latest_state")
+                        }
+                      >
+                        <StateBadge value={item.latest_state} />
+                      </Show>
+
+                      {/* Scheduled: Recall Eval dropdown (controlled by "evaluation" column) */}
+                      <Show
+                        when={
+                          props.tablePurpose === "scheduled" &&
+                          isColVisible("evaluation")
+                        }
+                      >
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */}
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */}
+                        <div
+                          class="ml-auto w-40 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <RecallEvalComboBox
+                            tuneId={String(itemId)}
+                            value={item.recall_eval ?? ""}
+                            open={props.cellCallbacks?.getRecallEvalOpen?.(
+                              String(itemId)
+                            )}
+                            onOpenChange={(isOpen) =>
+                              props.cellCallbacks?.setRecallEvalOpen?.(
+                                String(itemId),
+                                isOpen
+                              )
+                            }
+                            onChange={(val) => {
+                              props.cellCallbacks?.onRecallEvalChange?.(
+                                String(itemId),
+                                val
+                              );
+                            }}
+                          />
+                        </div>
+                      </Show>
+                    </div>
+
+                    {/* Row 3: Purpose-specific secondary info */}
+                    <Show when={metadataEntries().length > 0}>
+                      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-3 gap-y-0.5">
+                        <For each={metadataEntries()}>{(entry) => entry}</For>
+                      </div>
+                    </Show>
                   </div>
-                </Show>
+                </div>
               </li>
             );
           }}

@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@solidjs/testing-library";
 import { createSignal, type Setter } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -219,6 +225,69 @@ describe("TuneStackedList column visibility", () => {
     await waitFor(() => {
       expect(screen.queryByText(/Structure:/)).toBeNull();
       expect(screen.queryByText(/Due:/)).toBeNull();
+    });
+  });
+
+  it("renders row-selection checkboxes only when selection is enabled", () => {
+    const withSelection = render(() => (
+      <TuneStackedList
+        data={[baseRow]}
+        tablePurpose="catalog"
+        enableRowSelection={true}
+        selectedRowIds={{}}
+        onRowSelectionChange={() => {}}
+      />
+    ));
+
+    expect(
+      screen.getByRole("checkbox", { name: "Select row catalog-row-1" })
+    ).toBeDefined();
+
+    withSelection.unmount();
+
+    render(() => <TuneStackedList data={[baseRow]} tablePurpose="catalog" />);
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Select row catalog-row-1" })
+    ).toBeNull();
+  });
+
+  it("toggles row selection without firing the row click handler", async () => {
+    const onRowClick = vi.fn();
+    const onRowSelectionChange = vi.fn();
+
+    const Host = () => {
+      const [selectedRowIds, setSelectedRowIds] = createSignal<
+        Record<string, boolean>
+      >({});
+
+      return (
+        <TuneStackedList
+          data={[baseRow]}
+          tablePurpose="catalog"
+          enableRowSelection={true}
+          selectedRowIds={selectedRowIds()}
+          onRowClick={onRowClick}
+          onRowSelectionChange={(row, checked) => {
+            onRowSelectionChange(row, checked);
+            setSelectedRowIds(checked ? { [String(row.id)]: true } : {});
+          }}
+        />
+      );
+    };
+
+    render(() => <Host />);
+
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Select row catalog-row-1",
+    });
+
+    await fireEvent.click(checkbox);
+
+    expect(onRowSelectionChange).toHaveBeenCalledWith(baseRow, true);
+    expect(onRowClick).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect((checkbox as HTMLInputElement).checked).toBe(true);
     });
   });
 });

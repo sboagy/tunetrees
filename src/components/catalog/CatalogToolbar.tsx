@@ -19,7 +19,7 @@
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
-import { Columns, EllipsisVertical, Plus } from "lucide-solid";
+import { ChevronRight, Columns, EllipsisVertical, Plus } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
@@ -108,6 +108,12 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   let mobileOverflowButtonRef: HTMLButtonElement | undefined;
 
   const activeRepertoireId = () => props.repertoireId;
+  const hasSelectedRows = () =>
+    Boolean(
+      props.table && props.selectedRowsCount && props.selectedRowsCount > 0
+    );
+  const canAddToRepertoire = () =>
+    Boolean(hasSelectedRows() && activeRepertoireId() && auth.user());
 
   const handleAddToRepertoire = async () => {
     try {
@@ -270,6 +276,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 type="button"
                 data-testid="catalog-add-to-repertoire-button"
                 class={mobileMenuItemClasses}
+                disabled={!canAddToRepertoire()}
                 onClick={() => {
                   setShowOverflowMenu(false);
                   void handleAddToRepertoire();
@@ -316,6 +323,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 onClick={openDisplayOptions}
               >
                 <span>Display Options</span>
+                <ChevronRight class="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </button>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -338,6 +346,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 title="Add selected tunes to repertoire"
                 data-testid="catalog-add-to-repertoire-button"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
+                disabled={!canAddToRepertoire()}
               >
                 <svg
                   class={TOOLBAR_ICON_SIZE}
@@ -466,12 +475,12 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                   ref={columnsButtonRef!}
                   type="button"
                   onClick={handleColumnsToggle}
-                  title="Show/hide columns"
+                  title="Display options"
                   data-testid="catalog-columns-button"
                   class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
                 >
                   <Columns size={14} />
-                  <span>Columns</span>
+                  <span>Display Options</span>
                   <svg
                     class="w-3.5 h-3.5"
                     fill="none"
@@ -500,7 +509,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           isOpen={showColumnsDropdown()}
           onClose={() => setShowColumnsDropdown(false)}
           triggerRef={displayOptionsTriggerRef()}
-          title={isMobile() ? "Display Options" : "Show Columns"}
+          title="Display Options"
         />
       </Show>
 

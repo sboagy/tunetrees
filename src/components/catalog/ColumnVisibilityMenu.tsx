@@ -20,6 +20,8 @@ import {
   Show,
 } from "solid-js";
 import { Portal } from "solid-js/web";
+import type { ITableDisplayOptionsMeta } from "../grids/types";
+import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 
 export interface ColumnVisibilityMenuProps {
   /** TanStack Table instance */
@@ -251,7 +253,16 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     return getToggleableColumns().filter((col) => col.getIsVisible()).length;
   };
 
-  const menuTitle = () => props.title ?? "Show Columns";
+  const menuTitle = () => props.title ?? "Display Options";
+  const displayOptionsMeta = () => {
+    return props.table.options.meta as ITableDisplayOptionsMeta | undefined;
+  };
+  const currentViewMode = () => {
+    return displayOptionsMeta()?.getViewMode?.() ?? "grid";
+  };
+  const canToggleViewMode = () => {
+    return typeof displayOptionsMeta()?.setViewMode === "function";
+  };
 
   return (
     <Show when={props.isOpen}>
@@ -292,6 +303,31 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                 Hide All
               </button>
             </div>
+
+            <Show when={canToggleViewMode()}>
+              <div class="mt-2 border-t border-gray-200/30 pt-2 dark:border-gray-700/30">
+                <Switch
+                  checked={currentViewMode() === "list"}
+                  onChange={(checked) => {
+                    displayOptionsMeta()?.setViewMode?.(
+                      checked ? "list" : "grid"
+                    );
+                  }}
+                  data-testid="display-mode-switch"
+                  class="flex w-full items-center gap-3 rounded-md px-1 py-1.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/50"
+                >
+                  <SwitchLabel class="flex-1 cursor-pointer select-none">
+                    List View
+                  </SwitchLabel>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">
+                    {currentViewMode() === "list" ? "List" : "Grid"}
+                  </span>
+                  <SwitchControl class="ml-1">
+                    <SwitchThumb />
+                  </SwitchControl>
+                </Switch>
+              </div>
+            </Show>
           </div>
 
           {/* Column checkboxes */}

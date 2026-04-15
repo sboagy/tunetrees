@@ -12,7 +12,7 @@
  * 6. Verify selected tunes appear in repertoire
  *
  * Edge Cases:
- * - No tunes selected (button should show alert)
+ * - No tunes selected (button should stay disabled)
  * - Tunes already in repertoire (should be skipped with feedback)
  * - Multiple tunes selected (batch operation)
  */
@@ -27,7 +27,6 @@ import {
   CATALOG_TUNE_70_ID,
   getPrivateTuneIds,
 } from "../../tests/fixtures/test-data";
-import { skipIfMobileChrome } from "../helpers/mobile-project";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
@@ -50,12 +49,10 @@ test.describe
       await page.waitForTimeout(500);
     });
 
-    test("should show alert when no tunes selected", async ({ page }) => {
-      let dialogMessage = "";
-      page.on("dialog", async (dialog) => {
-        dialogMessage = dialog.message();
-        await dialog.accept();
-      });
+    test("should keep Add To Repertoire disabled until rows are selected", async ({
+      page,
+    }) => {
+      const isMobileChrome = test.info().project.name === "Mobile Chrome";
 
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 10000,
@@ -65,21 +62,29 @@ test.describe
         tab: "catalog",
       });
 
-      await ttPage.clickCatalogAddToRepertoire();
-      await page.waitForTimeout(500);
+      if (isMobileChrome) {
+        await ttPage.catalogColumnsButton.click();
+      }
+      await expect(ttPage.catalogAddToRepertoireButton).toBeDisabled();
 
-      expect(dialogMessage).toContain("No tunes selected");
+      if (isMobileChrome) {
+        await page.keyboard.press("Escape").catch(() => undefined);
+      }
+
+      await ttPage.setGridRowChecked(
+        CATALOG_TUNE_A_FIG_FOR_A_KISS,
+        ttPage.catalogGrid
+      );
+
+      if (isMobileChrome) {
+        await ttPage.catalogColumnsButton.click();
+      }
+      await expect(ttPage.catalogAddToRepertoireButton).toBeEnabled();
     });
 
     test("should add selected tunes to repertoire @side-effects", async ({
       page,
     }) => {
-      skipIfMobileChrome(
-        test.info().project.name,
-        test.skip,
-        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-      );
-
       page.on("console", (msg) => {
         if (msg.type() === "error") {
           console.error(`❌ BROWSER ERROR: ${msg.text()}`);
@@ -97,7 +102,7 @@ test.describe
         console.error(`❌ PAGE ERROR: ${err.message}`)
       );
 
-      ttPage.navigateToTab("catalog");
+      await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(200);
 
       const tune1Checkbox = page.getByRole("checkbox", {
@@ -151,28 +156,21 @@ test.describe
         `🔍 Supabase has ${supabaseCount} tunes for user ${currentTestUser.repertoireId}`
       );
 
-      const dataRows = page.locator(
-        '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-      );
+      const dataRows = ttPage.getRows("repertoire");
       const dataCount = await dataRows.count();
       console.log(`📊 Repertoire has ${dataCount} data rows`);
       expect(dataCount).toBe(2);
 
-      const row0Text = await dataRows.nth(0).textContent();
-      const row1Text = await dataRows.nth(1).textContent();
-      expect(row0Text).toContain("A Fig for a Kiss");
-      expect(row1Text).toContain("Alasdruim's March");
+      await ttPage.expectTuneVisible("A Fig for a Kiss", ttPage.repertoireGrid);
+      await ttPage.expectTuneVisible(
+        "Alasdruim's March",
+        ttPage.repertoireGrid
+      );
     });
 
     test("should handle tunes already in repertoire @side-effects", async ({
       page,
     }) => {
-      skipIfMobileChrome(
-        test.info().project.name,
-        test.skip,
-        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-      );
-
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
       await ttPage.expectGridHasContent(ttPage.catalogGrid);
@@ -222,12 +220,6 @@ test.describe
     test("should handle batch add with mix of new and existing tunes", async ({
       page,
     }) => {
-      skipIfMobileChrome(
-        test.info().project.name,
-        test.skip,
-        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-      );
-
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
       await ttPage.filterByGenre("Irish Traditional Music");
@@ -267,19 +259,11 @@ test.describe
     test("CRITICAL: should persist added tunes after page reload @side-effects", async ({
       page,
     }) => {
-      skipIfMobileChrome(
-        test.info().project.name,
-        test.skip,
-        "Test relies on desktop row-selection checkboxes that are not rendered in the mobile stacked list."
-      );
-
       await ttPage.navigateToTab("catalog");
       await page.waitForTimeout(500);
 
       {
-        const dataRowsBefore = page.locator(
-          '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-        );
+        const dataRowsBefore = ttPage.getRows("repertoire");
         const countBefore = await dataRowsBefore.count();
         console.log(`✅ ${countBefore} tunes before reload (1)`);
         expect(countBefore).toBe(0);
@@ -314,19 +298,16 @@ test.describe
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(200);
 
-      const dataRowsBefore = page.locator(
-        '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-      );
+      const dataRowsBefore = ttPage.getRows("repertoire");
       const countBefore = await dataRowsBefore.count();
       console.log(`✅ ${countBefore} tunes before reload (2)`);
       expect(countBefore).toBeGreaterThanOrEqual(2);
 
-      await expect(page.getByText("A Fig for a Kiss")).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(page.getByText("Alasdruim's March")).toBeVisible({
-        timeout: 10000,
-      });
+      await ttPage.expectTuneVisible("A Fig for a Kiss", ttPage.repertoireGrid);
+      await ttPage.expectTuneVisible(
+        "Alasdruim's March",
+        ttPage.repertoireGrid
+      );
 
       console.log("🔄 Reloading page...");
       await page.reload();
@@ -335,19 +316,16 @@ test.describe
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(200);
 
-      const dataRowsAfter = page.locator(
-        '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-      );
+      const dataRowsAfter = ttPage.getRows("repertoire");
       const countAfter = await dataRowsAfter.count();
       console.log(`📊 ${countAfter} tunes after reload`);
       expect(countAfter).toBeGreaterThanOrEqual(2);
 
-      await expect(page.getByText("A Fig for a Kiss")).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(page.getByText("Alasdruim's March")).toBeVisible({
-        timeout: 10000,
-      });
+      await ttPage.expectTuneVisible("A Fig for a Kiss", ttPage.repertoireGrid);
+      await ttPage.expectTuneVisible(
+        "Alasdruim's March",
+        ttPage.repertoireGrid
+      );
 
       console.log("✅ PASS: Tunes persist after reload!");
     });

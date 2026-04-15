@@ -18,7 +18,14 @@
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
-import { Columns, EllipsisVertical, Plus, RefreshCw, Send } from "lucide-solid";
+import {
+  ChevronRight,
+  Columns,
+  EllipsisVertical,
+  Plus,
+  RefreshCw,
+  Send,
+} from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -359,9 +366,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 onClick={handleDisplayOptionsOpen}
               >
                 <span>Display Options</span>
-                <span class={mobileMenuMetaClasses}>
-                  {props.flashcardMode ? "Fields" : "Columns"}
-                </span>
+                <ChevronRight class="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </button>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -612,13 +617,15 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 type="button"
                 onClick={handleColumnsToggle}
                 title={
-                  props.flashcardMode ? "Show/hide fields" : "Show/hide columns"
+                  props.flashcardMode ? "Show/hide fields" : "Display options"
                 }
                 data-testid="practice-columns-button"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
               >
                 <Columns size={14} />
-                <span>{props.flashcardMode ? "Fields" : "Columns"}</span>
+                <span>
+                  {props.flashcardMode ? "Fields" : "Display Options"}
+                </span>
                 <svg
                   class="w-3.5 h-3.5"
                   fill="none"
@@ -646,7 +653,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           table={props.table!}
           onClose={() => setShowColumnsDropdown(false)}
           triggerRef={displayOptionsTriggerRef()}
-          title={isMobile() ? "Display Options" : "Show Columns"}
+          title="Display Options"
         />
       </Show>
 
