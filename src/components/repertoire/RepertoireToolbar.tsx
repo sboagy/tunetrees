@@ -334,6 +334,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
               <button
                 type="button"
+                data-testid="display-options-entry-button"
                 class={mobileMenuItemClasses}
                 onClick={openDisplayOptions}
               >

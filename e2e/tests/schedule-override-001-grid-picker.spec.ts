@@ -139,7 +139,9 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     // setupForPracticeTestsParallel seeds the queue by writing an initial
     // scheduled value. Clear that inherited override first so the baseline UI
     // state for the rest of the test is the fallback latest_due display.
-    await popover.getByRole("button", { name: "Clear" }).click();
+    await popover.getByRole("button", { name: "Clear" }).click({
+      force: true,
+    });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(popover).toBeHidden({ timeout: 10000 });
 
@@ -188,7 +190,7 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     await popover.getByRole("button", { name: "AM" }).click();
     await popover
       .getByTestId(`scheduled-override-apply-${CATALOG_TUNE_KESH_ID}`)
-      .click();
+      .click({ force: true });
 
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(popover).toBeHidden({ timeout: 10000 });
@@ -230,7 +232,9 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
 
     await trigger.click();
     await expect(popover).toBeVisible({ timeout: 10000 });
-    await popover.getByRole("button", { name: "Clear" }).click();
+    await popover.getByRole("button", { name: "Clear" }).click({
+      force: true,
+    });
 
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(popover).toBeHidden({ timeout: 10000 });

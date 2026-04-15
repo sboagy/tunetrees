@@ -2124,14 +2124,12 @@ export class TuneTreesPage {
   }
 
   private getDisplayOptionsButton(): Locator {
-    return this.page
-      .getByRole("button")
-      .filter({ hasText: /Display Options/i })
-      .last();
+    return this.page.getByTestId("display-options-entry-button").last();
   }
 
   private async openDisplayOptionsEntryIfNeeded(
-    columnsButton: Locator
+    columnsButton: Locator,
+    targetMenu: Locator = this.getColumnVisibilityMenu()
   ): Promise<void> {
     const ariaLabel = ((await columnsButton.getAttribute("aria-label")) ?? "")
       .trim()
@@ -2142,9 +2140,28 @@ export class TuneTreesPage {
       return;
     }
 
-    const displayOptionsButton = this.getDisplayOptionsButton();
-    await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
-    await displayOptionsButton.click();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) {
+        await columnsButton.click().catch(() => undefined);
+      }
+
+      const displayOptionsButton = this.getDisplayOptionsButton();
+      await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
+
+      // The Kobalte dropdown entry can detach as it closes itself while opening
+      // the nested menu surface. Trigger the handler directly and wait for the
+      // caller-specific target menu to appear.
+      await displayOptionsButton.dispatchEvent("click").catch(() => undefined);
+
+      const menuVisible = await targetMenu
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (menuVisible) {
+        return;
+      }
+    }
+
+    await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 
   async setGridColumnVisibility(
@@ -3360,7 +3377,10 @@ export class TuneTreesPage {
       await expect(this.practiceColumnsButton).toBeVisible({ timeout: 5000 });
       await expect(this.practiceColumnsButton).toBeEnabled({ timeout: 5000 });
       await this.practiceColumnsButton.click();
-      await this.openDisplayOptionsEntryIfNeeded(this.practiceColumnsButton);
+      await this.openDisplayOptionsEntryIfNeeded(
+        this.practiceColumnsButton,
+        this.flashcardFieldsMenu
+      );
 
       try {
         await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });

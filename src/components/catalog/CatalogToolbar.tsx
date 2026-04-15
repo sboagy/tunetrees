@@ -319,6 +319,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
 
               <button
                 type="button"
+                data-testid="display-options-entry-button"
                 class={mobileMenuItemClasses}
                 onClick={openDisplayOptions}
               >

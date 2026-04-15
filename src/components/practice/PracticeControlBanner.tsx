@@ -362,6 +362,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 
               <button
                 type="button"
+                data-testid="display-options-entry-button"
                 class={mobileMenuItemClasses}
                 onClick={handleDisplayOptionsOpen}
               >
