@@ -32,6 +32,15 @@ export interface ColumnVisibilityMenuProps {
   onClose: () => void;
   /** Reference to the trigger button for positioning */
   triggerRef?: HTMLElement;
+  /**
+   * Optional element to exclude from the outside-click close guard.
+   * When not provided, defaults to `triggerRef`.
+   * Pass `null` to disable the guard entirely so that any click outside the
+   * menu — including on the overflow trigger — will close the menu.  This is
+   * useful on mobile where the overflow button opens its own popover and should
+   * not keep the Display Options menu open.
+   */
+  closeGuardRef?: HTMLElement | null;
   /** Optional menu title */
   title?: string;
 }
@@ -145,12 +154,22 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       const handleClickOutside = (e: MouseEvent) => {
         const target = e.target as Node;
 
-        // Check if click is inside menu or trigger button
+        // Check if click is inside menu
         const isInsideMenu = menuRef?.contains(target);
-        const isInsideTrigger = props.triggerRef?.contains(target);
+
+        // Determine which element guards against outside-click dismissal.
+        // Three-state logic for closeGuardRef:
+        //   undefined  → not provided; fall back to triggerRef (backward-compatible default)
+        //   null       → explicitly disabled; any click outside the menu closes it
+        //   HTMLElement → use that element as the guard
+        const guardRef =
+          props.closeGuardRef !== undefined
+            ? props.closeGuardRef
+            : props.triggerRef;
+        const isInsideGuard = guardRef?.contains(target);
 
         // Only close if click is truly outside
-        if (!isInsideMenu && !isInsideTrigger) {
+        if (!isInsideMenu && !isInsideGuard) {
           props.onClose();
         }
       };

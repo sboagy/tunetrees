@@ -654,6 +654,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           table={props.table!}
           onClose={() => setShowColumnsDropdown(false)}
           triggerRef={displayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
           title="Display Options"
         />
       </Show>
@@ -676,6 +677,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           }}
           onClose={() => setShowColumnsDropdown(false)}
           triggerRef={displayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
         />
       </Show>
 

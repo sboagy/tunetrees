@@ -510,6 +510,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
           isOpen={showColumnsDropdown()}
           onClose={() => setShowColumnsDropdown(false)}
           triggerRef={displayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
           title="Display Options"
         />
       </Show>

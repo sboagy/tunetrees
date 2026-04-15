@@ -515,6 +515,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           isOpen={showColumnsDropdown()}
           onClose={() => setShowColumnsDropdown(false)}
           triggerRef={displayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
           title="Display Options"
         />
       </Show>
