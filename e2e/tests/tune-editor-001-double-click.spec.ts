@@ -44,12 +44,6 @@ let ttPage: TuneTreesPage;
 
 test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
   test.beforeEach(async ({ page, testUser }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "All tests in this suite use tbody tr row selectors and dblclick, which are not available in the mobile stacked list."
-      );
-    }
     ttPage = new TuneTreesPage(page);
 
     // Setup: Start on catalog tab with some tunes
@@ -73,8 +67,8 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await page.waitForTimeout(500); // Allow grid to render
 
     // Find a tune row (A Fig for a Kiss)
-    const tuneRow = page
-      .locator('[data-testid="tunes-grid-catalog"] tbody tr')
+    const tuneRow = ttPage
+      .getRows("catalog")
       .filter({ hasText: "A Fig for a Kiss" })
       .first();
 
@@ -111,8 +105,8 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);
 
-    const tuneRow = page
-      .locator('[data-testid="tunes-grid-catalog"] tbody tr')
+    const tuneRow = ttPage
+      .getRows("catalog")
       .filter({ hasText: "A Fig for a Kiss" })
       .first();
 
@@ -150,8 +144,8 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);
 
-    const tuneRow = page
-      .locator('[data-testid="tunes-grid-catalog"] tbody tr')
+    const tuneRow = ttPage
+      .getRows("catalog")
       .filter({ hasText: "A Fig for a Kiss" })
       .first();
 
@@ -190,10 +184,10 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await ttPage.navigateToTab("repertoire");
 
     // Find a tune row in repertoire
-    const tuneCell = page
-      .getByRole("cell", { name: "Banish Misfortune" })
+    const tuneRow = ttPage
+      .getRows("repertoire")
+      .filter({ hasText: "Banish Misfortune" })
       .first();
-    const tuneRow = tuneCell.locator("xpath=ancestor::tr[1]");
 
     await expect(tuneRow).toBeVisible({ timeout: 5000 });
 
@@ -216,8 +210,9 @@ test.describe("TUNE-EDITOR-001: Double-Click to Edit and Full Workflow", () => {
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(500);
 
-    const tuneRow = page
-      .getByRole("cell", { name: "A Fig for a Kiss" })
+    const tuneRow = ttPage
+      .getRows("catalog")
+      .filter({ hasText: "A Fig for a Kiss" })
       .first();
 
     await tuneRow.dblclick();

@@ -44,12 +44,6 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
   let newTuneId: string | undefined;
 
   test.beforeEach(async ({ page, context, testUser }, testInfo) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "All tests in this suite use row checkboxes to add tunes to repertoire/review, which are not available in the mobile stacked list."
-      );
-    }
     // Extend timeout for all tests running this hook by 3x.
     test.setTimeout(testInfo.timeout * 3);
 
@@ -178,7 +172,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       await page.waitForLoadState("networkidle", { timeout: 15000 });
 
       // Open "Add Tune" dialog
-      await ttPage.catalogAddTuneButton.click();
+      await ttPage.clickCatalogAddTune();
       await expect(ttPage.addTuneDialog).toBeVisible({ timeout: 5000 });
 
       // Click "New" to create empty tune
@@ -217,9 +211,13 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       console.log("\n=== Step 2: Add to Repertoire ===");
 
       // Select the new tune (checkbox in first column)
-      const firstCheckbox = ttPage.catalogGrid
+      const catalogRow = ttPage
+        .getRows("catalog")
+        .filter({ hasText: newTuneTitle })
+        .first();
+      const firstCheckbox = catalogRow
         .locator('input[type="checkbox"]')
-        .nth(1);
+        .first();
       await firstCheckbox.check();
       await page.waitForTimeout(500);
 
@@ -229,7 +227,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       });
 
       // Click "Add to Repertoire"
-      await ttPage.catalogAddToRepertoireButton.click();
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(2000); // Wait for sync
 
       console.log("  ✓ Added to repertoire");
@@ -247,14 +245,18 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       await page.waitForTimeout(500);
 
       // Select the tune
-      const repertoireCheckbox = ttPage.repertoireGrid
+      const repertoireRow = ttPage
+        .getRows("repertoire")
+        .filter({ hasText: newTuneTitle })
+        .first();
+      const repertoireCheckbox = repertoireRow
         .locator('input[type="checkbox"]')
-        .nth(1);
+        .first();
       await repertoireCheckbox.check();
       await page.waitForTimeout(500);
 
       // Click "Add To Review"
-      await ttPage.repertoireAddToReviewButton.click();
+      await ttPage.clickRepertoireAddToReview();
       await page.waitForTimeout(2000); // Wait for sync
 
       console.log("  ✓ Added to review (practice queue)");
@@ -373,7 +375,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await ttPage.navigateToTab("catalog");
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 10000 });
 
-    await ttPage.catalogAddTuneButton.click();
+    await ttPage.clickCatalogAddTune();
     await expect(ttPage.addTuneDialog).toBeVisible({ timeout: 5000 });
 
     const newButton = page.getByRole("button", { name: /^new$/i });
@@ -391,22 +393,26 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
     // Add to repertoire
     await ttPage.searchForTune(easyTestTitle, ttPage.catalogGrid);
-    const checkbox = ttPage.catalogGrid
-      .locator('input[type="checkbox"]')
-      .nth(1);
+    const catalogRow = ttPage
+      .getRows("catalog")
+      .filter({ hasText: easyTestTitle })
+      .first();
+    const checkbox = catalogRow.locator('input[type="checkbox"]').first();
     await checkbox.check();
-    await ttPage.catalogAddToRepertoireButton.click();
+    await ttPage.clickCatalogAddToRepertoire();
     await page.waitForTimeout(2000);
 
     // Add to review
     await ttPage.navigateToTab("repertoire");
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
     await ttPage.searchForTune(easyTestTitle, ttPage.repertoireGrid);
-    const repCheckbox = ttPage.repertoireGrid
-      .locator('input[type="checkbox"]')
-      .nth(1);
+    const repertoireRow = ttPage
+      .getRows("repertoire")
+      .filter({ hasText: easyTestTitle })
+      .first();
+    const repCheckbox = repertoireRow.locator('input[type="checkbox"]').first();
     await repCheckbox.check();
-    await ttPage.repertoireAddToReviewButton.click();
+    await ttPage.clickRepertoireAddToReview();
     await page.waitForTimeout(2000);
 
     // Practice with "Easy"
@@ -499,7 +505,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
     // Create tune (condensed)
     await ttPage.navigateToTab("catalog");
-    await ttPage.catalogAddTuneButton.click();
+    await ttPage.clickCatalogAddTune();
     const newButton = page.getByRole("button", { name: /^new$/i });
     await newButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -516,17 +522,22 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
 
     // Add to repertoire → review (condensed)
     await ttPage.searchForTune(againTestTitle, ttPage.catalogGrid);
-    await ttPage.catalogGrid.locator('input[type="checkbox"]').nth(1).check();
-    await ttPage.catalogAddToRepertoireButton.click();
+    const catalogRow = ttPage
+      .getRows("catalog")
+      .filter({ hasText: againTestTitle })
+      .first();
+    await catalogRow.locator('input[type="checkbox"]').first().check();
+    await ttPage.clickCatalogAddToRepertoire();
     await page.waitForTimeout(2000);
 
     await ttPage.navigateToTab("repertoire");
     await ttPage.searchForTune(againTestTitle, ttPage.repertoireGrid);
-    await ttPage.repertoireGrid
-      .locator('input[type="checkbox"]')
-      .nth(1)
-      .check();
-    await ttPage.repertoireAddToReviewButton.click();
+    const repertoireRow = ttPage
+      .getRows("repertoire")
+      .filter({ hasText: againTestTitle })
+      .first();
+    await repertoireRow.locator('input[type="checkbox"]').first().check();
+    await ttPage.clickRepertoireAddToReview();
     await page.waitForTimeout(2000);
 
     // Practice with "Again"

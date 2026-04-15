@@ -142,11 +142,6 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     page,
     testUser,
   }) => {
-    // Skip on mobile — UI layout differs for evaluation controls.
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip();
-    }
-
     // STEP 1: Verify initial queue contains exactly the 2 scheduled tunes.
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20_000 });
 

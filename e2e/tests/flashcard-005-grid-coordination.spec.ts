@@ -4,7 +4,6 @@ import {
   TEST_TUNE_MORRISON_ID,
 } from "../../tests/fixtures/test-data";
 import { setStableDate } from "../helpers/clock-control";
-import { skipIfMobileChrome } from "../helpers/mobile-project";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -217,12 +216,6 @@ test.describe
     test("06. Current tune synchronization grid ↔ flashcard", async ({
       page,
     }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test uses getByRole('cell') row interaction not available in mobile stacked list."
-        );
-      }
       const app = new TuneTreesPage(page);
       // Ensure grid is rendered with at least two rows
       const grid = app.practiceGrid;
@@ -263,11 +256,6 @@ test.describe
     });
 
     test("07. Multiple evaluations sync correctly", async ({ page }) => {
-      skipIfMobileChrome(
-        test.info().project.name,
-        test.skip,
-        "Test depends on current-row-to-flashcard sync via row interaction, which is not available in the mobile stacked list."
-      );
       // Evaluate first tune in grid
       const app = new TuneTreesPage(page);
       // Ensure grid is rendered with at least two rows

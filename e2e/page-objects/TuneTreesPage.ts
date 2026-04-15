@@ -1520,21 +1520,8 @@ export class TuneTreesPage {
 
       // Ensure the filter panel is closed so the grid is interactable.
       // (The panel may already be open from earlier steps.)
-      const panelStillVisible = await this.searchBoxPanel
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
-      if (panelStillVisible) {
-        const filtersVisible = await this.filtersButton
-          .isVisible({ timeout: 1000 })
-          .catch(() => false);
-        if (filtersVisible) {
-          await this.page.waitForTimeout(50); // Trying to help flaky test
-          await this.filtersButton.click();
-        } else {
-          await this.page.keyboard.press("Escape").catch(() => {});
-        }
-        await this.page.waitForTimeout(300);
-      }
+      await this.closeFilterPanelIfOpen();
+
       const noTunesFoundLocator = this.page.getByText("No tunes found");
 
       const matchingRow = grid
@@ -1803,6 +1790,14 @@ export class TuneTreesPage {
     }
   }
 
+  private getGridForTab(tab: "catalog" | "repertoire" | "practice"): Locator {
+    return tab === "catalog"
+      ? this.catalogGrid
+      : tab === "repertoire"
+        ? this.repertoireGrid
+        : this.practiceGrid;
+  }
+
   private getColumnsButtonForTab(
     tab: "catalog" | "repertoire" | "practice"
   ): Locator {
@@ -1811,6 +1806,146 @@ export class TuneTreesPage {
       : tab === "repertoire"
         ? this.repertoireColumnsButton
         : this.practiceColumnsButton;
+  }
+
+  private async isDisplayModeListEnabled(): Promise<boolean> {
+    const displayModeSwitch = this.page.getByTestId("display-mode-switch");
+    await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
+
+    const ariaChecked = await displayModeSwitch.getAttribute("aria-checked");
+    if (ariaChecked === "true") return true;
+    if (ariaChecked === "false") return false;
+
+    const switchInput = displayModeSwitch
+      .locator('input[type="checkbox"]')
+      .first();
+    const hasInput = (await switchInput.count().catch(() => 0)) > 0;
+    if (hasInput) {
+      return await switchInput.isChecked().catch(() => false);
+    }
+
+    return await displayModeSwitch.evaluate((element) => {
+      return (
+        element.hasAttribute("data-checked") ||
+        element.getAttribute("data-state") === "checked"
+      );
+    });
+  }
+
+  private async closeColumnVisibilityMenu(menu: Locator) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const menuVisible = await menu
+        .isVisible({ timeout: 200 })
+        .catch(() => false);
+      if (!menuVisible) break;
+
+      const box = await menu.boundingBox().catch(() => null);
+      if (box) {
+        const outsideX = Math.max(4, Math.floor(box.x) - 12);
+        const outsideY = Math.max(
+          4,
+          Math.floor(box.y + Math.min(box.height / 2, 24))
+        );
+        await this.page.mouse.click(outsideX, outsideY).catch(() => undefined);
+      } else {
+        await this.page.mouse.click(4, 4).catch(() => undefined);
+      }
+
+      await this.page.waitForTimeout(100);
+    }
+
+    await expect(menu).toBeHidden({ timeout: 5000 });
+  }
+
+  private async closeFilterPanelIfOpen() {
+    const filterPanel = this.page.locator('[data-filter-panel="true"]').last();
+    const panelVisible = await filterPanel
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+
+    if (!panelVisible) return;
+
+    const filtersVisible = await this.filtersButton
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+
+    if (filtersVisible) {
+      await this.filtersButton.click().catch(() => undefined);
+      const hiddenAfterToggle = await filterPanel
+        .isHidden({ timeout: 500 })
+        .catch(() => false);
+      if (hiddenAfterToggle) return;
+    }
+
+    const box = await filterPanel.boundingBox().catch(() => null);
+    if (box) {
+      const outsideX = Math.max(4, Math.floor(box.x) - 12);
+      const outsideY = Math.max(
+        4,
+        Math.floor(box.y + Math.min(box.height / 2, 24))
+      );
+      await this.page.mouse.click(outsideX, outsideY).catch(() => undefined);
+    } else {
+      await this.page.mouse.click(4, 4).catch(() => undefined);
+    }
+
+    await expect(filterPanel).toBeHidden({ timeout: 5000 });
+  }
+
+  async setViewMode(
+    tab: "catalog" | "repertoire" | "practice",
+    mode: "grid" | "list"
+  ) {
+    const columnsButton = this.getColumnsButtonForTab(tab);
+    const grid = this.getGridForTab(tab);
+    const menu = this.getColumnVisibilityMenu();
+
+    await expect(grid).toBeVisible({ timeout: 10000 });
+    await expect(columnsButton).toBeVisible({ timeout: 5000 });
+    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
+
+    const menuVisible = await menu
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await columnsButton.click();
+      await this.openDisplayOptionsEntryIfNeeded(columnsButton);
+      await expect(menu).toBeVisible({ timeout: 5000 });
+    }
+
+    const shouldUseList = mode === "list";
+    const displayModeSwitch = this.page.getByTestId("display-mode-switch");
+    const listEnabled = await this.isDisplayModeListEnabled();
+
+    if (listEnabled !== shouldUseList) {
+      await displayModeSwitch.click();
+      await expect
+        .poll(() => this.isDisplayModeListEnabled(), {
+          timeout: 5000,
+          intervals: [100, 250, 500],
+        })
+        .toBe(shouldUseList);
+    }
+
+    await this.closeColumnVisibilityMenu(menu);
+
+    if (mode === "grid") {
+      await expect(grid.locator("thead th").first()).toBeVisible({
+        timeout: 10000,
+      });
+    } else {
+      await expect(
+        grid.locator("li[data-testid^='stacked-item-']").first()
+      ).toBeVisible({ timeout: 10000 });
+    }
+  }
+
+  async ensureGridView(tab: "catalog" | "repertoire" | "practice") {
+    await this.setViewMode(tab, "grid");
+  }
+
+  async ensureListView(tab: "catalog" | "repertoire" | "practice") {
+    await this.setViewMode(tab, "list");
   }
 
   private async revealToolbarAction(
@@ -2055,10 +2190,7 @@ export class TuneTreesPage {
       }
     }
 
-    await this.page.keyboard.press("Escape").catch(() => undefined);
-    await expect(menu)
-      .toBeHidden({ timeout: 5000 })
-      .catch(() => undefined);
+    await this.closeColumnVisibilityMenu(menu);
   }
 
   async ensureGridColumnVisible(

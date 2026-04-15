@@ -55,12 +55,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   });
 
   test("should save and load learned date field", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
     // ARRANGE: Find a tune in repertoire grid
     await ttPage.searchForTune("Banish Misfortune", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
@@ -109,13 +103,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   });
 
   test("should save and load practice goal field", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
-
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
@@ -162,13 +149,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   });
 
   test("should save and load schedule override field", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
-
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Kesh Jig", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
@@ -216,13 +196,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   });
 
   test("should display next review as read-only", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
-
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Dancingmaster", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
@@ -249,13 +222,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   });
 
   test("should navigate to practice history from editor", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
-
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
@@ -294,13 +260,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   });
 
   test("should navigate to practice history from sidebar", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
-
     // ARRANGE: Find a tune (no need to open editor)
     await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
@@ -332,13 +291,6 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
   test("should save multiple user-specific fields together", async ({
     page,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
-
     // ARRANGE: Find a tune
     await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
     await page.waitForTimeout(500);

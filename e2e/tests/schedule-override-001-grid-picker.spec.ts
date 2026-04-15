@@ -90,10 +90,6 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     page,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(true, "Grid picker assertions are currently desktop-only.");
-    }
-
     const practiceRow = ttPage.getRows("scheduled").first();
     await expect(practiceRow).toBeVisible({ timeout: 10000 });
     await ttPage.setRowEvaluation(practiceRow, "good");
@@ -109,6 +105,7 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     expect(practiceRecord?.due).toBeTruthy();
 
     await ttPage.navigateToTab("repertoire");
+    await ttPage.ensureGridView("repertoire");
     await ttPage.expectGridHasContent(ttPage.repertoireGrid);
 
     await ttPage.searchForTune("Kesh Jig", ttPage.repertoireGrid);

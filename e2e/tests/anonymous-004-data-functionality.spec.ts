@@ -55,12 +55,6 @@ test.describe("Anonymous User Data Functionality", () => {
   });
 
   test("4.2 Anonymous user can add tune to repertoire", async ({ page }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkboxes which are only available in the desktop table view."
-      );
-    }
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously WITH a repertoire (needed for repertoire functionality)
     await ttPage.gotoLogin();
@@ -119,12 +113,6 @@ test.describe("Anonymous User Data Functionality", () => {
   test("4.3 Anonymous user data persists after page refresh", async ({
     page,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkboxes and tbody tr selectors not available in mobile stacked list."
-      );
-    }
     test.setTimeout(60_000);
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously WITH a repertoire (needed for repertoire functionality)
@@ -142,8 +130,15 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
     // Select and add first tune
-    const firstTuneCheckbox = ttPage.catalogGrid
-      .locator("tbody tr[data-index]")
+    const catalogRows = ttPage.getRows("catalog");
+    await expect
+      .poll(async () => catalogRows.count(), {
+        timeout: 10000,
+        intervals: [100, 200, 500, 1000],
+      })
+      .toBeGreaterThan(0);
+
+    const firstTuneCheckbox = catalogRows
       .first()
       .locator('input[type="checkbox"]');
     await firstTuneCheckbox.click();
@@ -164,9 +159,7 @@ test.describe("Anonymous User Data Functionality", () => {
     await ttPage.navigateToTab("repertoire");
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
 
-    const repertoireRows = ttPage.repertoireGrid.locator(
-      "tbody tr[data-index]"
-    );
+    const repertoireRows = ttPage.getRows("repertoire");
     await expect
       .poll(async () => repertoireRows.count(), {
         timeout: 15000,
@@ -206,12 +199,6 @@ test.describe("Anonymous User Data Functionality", () => {
   test("4.4 Reference data (genres, types) available for anonymous users", async ({
     page,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test falls back to tbody tr / td cell selectors not available in mobile stacked list."
-      );
-    }
     ttPage = new TuneTreesPage(page);
     // Sign in anonymously (no repertoire needed for reference data viewing)
     await ttPage.gotoLogin();
@@ -224,36 +211,8 @@ test.describe("Anonymous User Data Functionality", () => {
     await expect(ttPage.catalogColumnsButton).toBeVisible({ timeout: 20000 });
     await ttPage.expectGridHasContent(ttPage.catalogGrid);
 
-    // Look for the Type column header with sort functionality
-    // Use a more specific selector to avoid matching drag handle and resize buttons
-    const typeColumnHeader = page
-      .getByTestId("ch-type")
-      .getByRole("button", { name: /Type ↕|Type Sort/ })
-      .first();
-
-    // If the standard column header isn't found, try clicking on the column text
-    if (
-      !(await typeColumnHeader.isVisible({ timeout: 2000 }).catch(() => false))
-    ) {
-      // Fall back to verifying the column exists with tune types displayed in rows
-      const firstRow = ttPage.catalogGrid
-        .locator("tbody tr[data-index]")
-        .first();
-      const typeCell = firstRow.locator("td").nth(2); // Type is typically the 3rd column
-      await expect(typeCell).toBeVisible({ timeout: 10000 });
-      // If we can see data in the type column, reference data is loaded
-      return;
-    }
-
-    // Click to open filter/sort menu if available
-    await typeColumnHeader.click();
-    await page.waitForTimeout(500);
-
-    // Verify tune types are available by checking if dropdown/menu appeared
-    const filterMenu = page.locator('[role="menu"], [role="listbox"]');
-    if (await filterMenu.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Close the menu
-      await page.keyboard.press("Escape");
-    }
+    await ttPage.filterByGenre("Irish Traditional Music");
+    await ttPage.filterByType("JigD");
+    await ttPage.expectTuneVisible("Banish Misfortune", ttPage.catalogGrid);
   });
 });
