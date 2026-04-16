@@ -17,7 +17,9 @@
  * @module lib/db/queries/repertoires
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { getPracticeDate } from "@/lib/utils/practice-date";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
@@ -35,6 +37,9 @@ import type {
   RepertoireTune,
   RepertoireWithSummary,
 } from "../types";
+
+// Support both sql.js (production) and better-sqlite3 (testing)
+type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 export type {
   NewRepertoire,
@@ -188,7 +193,7 @@ export async function getUserRepertoires(
  * ```
  */
 export async function getRepertoireById(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   repertoireId: string,
   userId: string
 ): Promise<Repertoire | null> {
@@ -234,7 +239,7 @@ export async function getRepertoireById(
  * ```
  */
 export async function createRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   userId: string,
   data: Omit<
     NewRepertoire,
@@ -411,7 +416,7 @@ export async function deleteRepertoire(
  * ```
  */
 export async function addTuneToRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   repertoireId: string,
   tuneId: string,
   userId: string
@@ -462,12 +467,15 @@ export async function addTuneToRepertoire(
 
   // Create new association
   const now = new Date().toISOString();
+  const practiceDayTimestamp = getPracticeDate().toISOString();
   const newAssociation: NewRepertoireTune = {
     repertoireRef: repertoireId,
     tuneRef: tuneId,
     current: null,
     learned: null,
-    scheduled: now, // Schedule for immediate practice
+    // Normalize to the current practice day so new tunes land in today's queue
+    // regardless of the user's local time vs. UTC.
+    scheduled: practiceDayTimestamp,
     goal: "recall",
     deleted: 0,
     syncVersion: 1,
@@ -697,7 +705,7 @@ export async function getRepertoireTunesStaged(
  * ```
  */
 export async function addTunesToRepertoire(
-  db: SqliteDatabase,
+  db: AnyDatabase,
   repertoireId: string,
   tuneIds: string[],
   userId: string
@@ -743,4 +751,93 @@ export async function addTunesToRepertoire(
   }
 
   return { added, skipped, tuneIds: addedTuneIds };
+}
+
+/**
+ * Add many tunes to a repertoire with a single insert/upsert.
+ *
+ * Active rows already present in the repertoire are counted as skipped.
+ * Missing rows are inserted, and soft-deleted rows are undeleted via a bulk
+ * conflict update. This is the preferred path for starter/demo repertoires and
+ * other large imports.
+ */
+export async function addTunesToRepertoireBulk(
+  db: AnyDatabase,
+  repertoireId: string,
+  tuneIds: string[],
+  userId: string
+): Promise<{ added: number; skipped: number; tuneIds: string[] }> {
+  // Verify repertoire ownership
+  const repertoireRecord = await getRepertoireById(db, repertoireId, userId);
+  if (!repertoireRecord) {
+    throw new Error("Repertoire not found or access denied");
+  }
+
+  if (tuneIds.length === 0) {
+    return { added: 0, skipped: 0, tuneIds: [] };
+  }
+
+  const activeExisting = await db
+    .select()
+    .from(repertoireTune)
+    .where(
+      and(
+        eq(repertoireTune.repertoireRef, repertoireId),
+        inArray(repertoireTune.tuneRef, tuneIds),
+        eq(repertoireTune.deleted, 0)
+      )
+    );
+
+  const activeTuneIds = new Set(activeExisting.map((row) => row.tuneRef));
+  const tuneIdsToUpsert = tuneIds.filter(
+    (tuneId) => !activeTuneIds.has(tuneId)
+  );
+
+  if (tuneIdsToUpsert.length === 0) {
+    return {
+      added: 0,
+      skipped: activeTuneIds.size,
+      tuneIds: [],
+    };
+  }
+
+  const now = new Date().toISOString();
+  const practiceDayTimestamp = getPracticeDate().toISOString();
+  await db
+    .insert(repertoireTune)
+    .values(
+      tuneIdsToUpsert.map((tuneId) => ({
+        repertoireRef: repertoireId,
+        tuneRef: tuneId,
+        current: null,
+        learned: null,
+        // Normalize to the practice day so bulk starter/catalog additions are
+        // immediately eligible for today's queue across time zones.
+        scheduled: practiceDayTimestamp,
+        goal: "recall",
+        deleted: 0,
+        syncVersion: 1,
+        lastModifiedAt: now,
+        deviceId: "local",
+      }))
+    )
+    .onConflictDoUpdate({
+      target: [repertoireTune.repertoireRef, repertoireTune.tuneRef],
+      set: {
+        deleted: 0,
+        syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
+        lastModifiedAt: now,
+        deviceId: "local",
+      },
+    });
+
+  // Persist to IndexedDB immediately so tunes survive a browser refresh
+  // before the periodic auto-persist has a chance to run.
+  await persistDb();
+
+  return {
+    added: tuneIdsToUpsert.length,
+    skipped: activeTuneIds.size,
+    tuneIds: tuneIdsToUpsert,
+  };
 }

@@ -52,8 +52,10 @@ import {
 } from "./table-state-persistence";
 import type {
   ICellEditorCallbacks,
+  ITableDisplayOptionsMeta,
   ITableStateExtended,
   TablePurpose,
+  TableViewMode,
 } from "./types";
 
 export interface ITunesGridProps<T extends { id: string | number }> {
@@ -125,6 +127,12 @@ export const TunesGrid = (<T extends { id: string | number }>(
     state: ITableStateExtended,
     allowedColumnIds: ReadonlySet<string>
   ): ITableStateExtended => {
+    const sanitizeViewMode = (
+      mode: ITableStateExtended["viewMode"]
+    ): TableViewMode | undefined => {
+      return mode === "grid" || mode === "list" ? mode : undefined;
+    };
+
     // Migrate old/deprecated column IDs to current ones where possible.
     const mapColumnId = (id: string): string => {
       if (
@@ -184,6 +192,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       columnSizing: filterByAllowed(state.columnSizing),
       columnOrder: sanitizeOrder(state.columnOrder),
       sorting: sanitizeSorting(state.sorting),
+      viewMode: sanitizeViewMode(state.viewMode),
       columnPinning: {
         left: (state.columnPinning?.left ?? []).filter((id) =>
           allowedColumnIds.has(mapColumnId(id))
@@ -241,19 +250,37 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [columnPinning, setColumnPinning] = createSignal<ColumnPinningState>(
     initialState.columnPinning || { left: [], right: [] }
   );
-
-  const [lastSelectionKey, setLastSelectionKey] = createSignal<string | null>(
-    null
+  const [viewModeOverride, setViewModeOverride] = createSignal<
+    TableViewMode | undefined
+  >(initialState.viewMode);
+  const defaultViewMode = createMemo<TableViewMode>(() =>
+    isMobile() ? "list" : "grid"
   );
+  const effectiveViewMode = createMemo<TableViewMode>(() => {
+    return viewModeOverride() ?? defaultViewMode();
+  });
 
-  // Restore rowSelection when the storage key changes (user/repertoire/tab changes)
+  const setPersistedViewMode = (mode: TableViewMode) => {
+    setViewModeOverride(mode === defaultViewMode() ? undefined : mode);
+  };
+
+  const [lastPersistedStateKey, setLastPersistedStateKey] = createSignal<
+    string | null
+  >(null);
+
+  // Restore persisted layout and selection state when the storage key changes.
   createEffect(() => {
     const key = stateKey();
     const keySignature = `${key.userId}:${key.tablePurpose}:${key.repertoireId}`;
-    if (keySignature === lastSelectionKey()) return;
-    setLastSelectionKey(keySignature);
+    if (keySignature === lastPersistedStateKey()) return;
+    setLastPersistedStateKey(keySignature);
 
     const loaded = loadTableState(key);
+    setViewModeOverride(
+      loaded?.viewMode === "grid" || loaded?.viewMode === "list"
+        ? loaded.viewMode
+        : undefined
+    );
     if (loaded?.rowSelection) {
       if (Object.keys(loaded.rowSelection).length > 0) {
         console.log(
@@ -352,6 +379,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
     setSorting((prev) => filterSorting(prev, allowed));
   });
 
+  const tableDisplayOptionsMeta: ITableDisplayOptionsMeta = {
+    getViewMode: () => effectiveViewMode(),
+    setViewMode: (mode) => setPersistedViewMode(mode),
+  };
+
   // Create table instance
   const table = createSolidTable<T>({
     get data() {
@@ -365,6 +397,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     enableRowSelection: props.enableRowSelection ?? true,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
+    meta: tableDisplayOptionsMeta,
     state: {
       get sorting() {
         return sorting();
@@ -443,6 +476,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       mergeWithDefaults(dbState, props.tablePurpose as any),
       allowedColumnIds
     );
+    setViewModeOverride(merged.viewMode);
     if (merged.columnVisibility) setColumnVisibility(merged.columnVisibility);
     if (merged.columnOrder?.length) setColumnOrder(merged.columnOrder);
     if (merged.columnSizing && Object.keys(merged.columnSizing).length)
@@ -503,6 +537,25 @@ export const TunesGrid = (<T extends { id: string | number }>(
   let containerRef: HTMLDivElement | undefined;
 
   const currentRows = createMemo(() => table.getRowModel().rows);
+  const stackedListData = createMemo<IStackedListRow[]>(() =>
+    currentRows().map((row) => row.original as unknown as IStackedListRow)
+  );
+
+  const handleStackedRowSelectionChange = (
+    row: IStackedListRow,
+    checked: boolean
+  ) => {
+    const rowId = String(row.id);
+    setRowSelection((prev) => {
+      const currentlySelected = prev[rowId] === true;
+      if (currentlySelected === checked) return prev;
+
+      const next = { ...prev };
+      if (checked) next[rowId] = true;
+      else delete next[rowId];
+      return next;
+    });
+  };
 
   // Single stable virtualizer tied to the always-present container div.
   const rowVirtualizer = createVirtualizer({
@@ -532,6 +585,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       columnOrder: columnOrder(),
       columnVisibility: columnVisibility(),
       columnPinning: columnPinning(),
+      viewMode: viewModeOverride(),
       // Do not persist scrollTop here; handled by scroll persistence logic below
       scrollTop: loadedState?.scrollTop || 0,
     };
@@ -819,34 +873,36 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   return (
     <div class="h-full flex flex-col">
-      {/* Mobile: stacked list view (conditionally rendered) */}
-      <Show when={isMobile()}>
+      {/* List mode: stacked list view, either by mobile default or explicit override. */}
+      <Show when={effectiveViewMode() === "list"}>
         <TuneStackedList
-          data={props.data as unknown as IStackedListRow[]}
+          data={stackedListData()}
           tablePurpose={props.tablePurpose}
           currentRowId={props.currentRowId}
           onRowClick={(row) => props.onRowClick?.(row as T)}
           onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
+          enableRowSelection={props.enableRowSelection ?? true}
+          selectedRowIds={rowSelection()}
+          onRowSelectionChange={handleStackedRowSelectionChange}
           cellCallbacks={props.cellCallbacks}
           columnVisibility={columnVisibility()}
         />
       </Show>
 
-      {/* Desktop: keep the scroll container mounted so the virtualizer retains
-          its scroll element across mobile↔desktop viewport transitions.
-          The table itself only renders on desktop to avoid duplicate public
-          grid test ids on mobile. */}
+      {/* Grid mode: keep the scroll container mounted so the virtualizer retains
+          its scroll element across layout switches. The table itself only renders
+          while grid mode is active to avoid duplicate public grid test ids. */}
       <div
         ref={(el) => {
           containerRef = el;
         }}
         data-testid={`tunes-grid-container-${props.tablePurpose}`}
-        class={`${CONTAINER_CLASSES} ${isMobile() ? "hidden" : ""} ${
+        class={`${CONTAINER_CLASSES} ${effectiveViewMode() === "list" ? "hidden" : ""} ${
           props.tablePurpose === "scheduled" ? "pb-16 scroll-pb-16" : ""
         }`}
         style={{ "touch-action": "pan-x pan-y" }}
       >
-        <Show when={!isMobile()}>
+        <Show when={effectiveViewMode() === "grid"}>
           <table
             data-testid={`tunes-grid-${props.tablePurpose}`}
             class={TABLE_CLASSES}

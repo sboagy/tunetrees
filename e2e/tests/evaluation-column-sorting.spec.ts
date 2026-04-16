@@ -16,15 +16,10 @@ import {
 } from "../../tests/fixtures/test-data";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe("Evaluation Column Sorting Disabled", () => {
   test.beforeEach(async ({ page, testUser, context }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Tests check column header test IDs (ch-*) that only exist in the desktop table view."
-      );
-    }
     const currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
@@ -37,6 +32,9 @@ test.describe("Evaluation Column Sorting Disabled", () => {
       startTab: "practice",
     });
     await page.waitForTimeout(200);
+
+    const ttPage = new TuneTreesPage(page);
+    await ttPage.ensureGridView("practice");
   });
 
   test("Evaluation column header is not clickable for sorting", async ({
@@ -52,7 +50,7 @@ test.describe("Evaluation Column Sorting Disabled", () => {
     const initialClass = await evaluationHeader.getAttribute("class");
 
     // Click the Evaluation column header (should not trigger sorting)
-    await evaluationHeader.click();
+    await evaluationHeader.click({ force: true });
     await page.waitForTimeout(300);
 
     // Verify no sort indicator appears (no asc/desc arrow classes)
@@ -73,7 +71,7 @@ test.describe("Evaluation Column Sorting Disabled", () => {
     const evaluationHeader = page.getByTestId("ch-evaluation");
 
     // Hover over the header
-    await evaluationHeader.hover();
+    await evaluationHeader.hover({ force: true });
     await page.waitForTimeout(200);
 
     // Check if sort arrows/indicators are NOT present
@@ -95,7 +93,7 @@ test.describe("Evaluation Column Sorting Disabled", () => {
     await expect(titleHeader).toBeVisible();
 
     // Click the Title column header (should trigger sorting)
-    await titleHeader.click();
+    await titleHeader.click({ force: true });
     await page.waitForTimeout(500);
 
     // This verifies that sorting works for other columns, proving

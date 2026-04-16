@@ -21,8 +21,8 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { persistDb } from "../db/client-sqlite";
 import type { SqliteDatabase } from "../db/client-sqlite";
+import { persistDb } from "../db/client-sqlite";
 import type { PracticeListStagedRow } from "../db/queries/practice";
 import { dailyPracticeQueue, prefsSchedulingOptions } from "../db/schema";
 import {
@@ -924,14 +924,17 @@ export async function generateOrGetPracticeQueue(
 /**
  * Add specific tunes to existing practice queue (Add To Review)
  *
- * Appends the given tune IDs directly to the active queue for today.
+ * Appends the given tune IDs directly to the currently active queue window.
  * Used by the "Add To Review" flow in the Repertoire tab to add selected
  * tunes to the current practice session without regenerating the whole queue.
  *
  * Key behavior:
  * - If a queue exists for today, the tunes are inserted as new queue entries.
- * - If no queue exists for today, returns empty (tunes will appear in the next
- *   generated queue when the user next opens the Practice tab).
+ * - If today's queue does not exist but an older active queue is still current
+ *   in the UI (for example, before the user clicks the rollover Refresh button),
+ *   the tunes are appended to that latest active queue window instead.
+ * - If no active queue exists at all, returns empty (tunes will appear in the
+ *   next generated queue when the user next opens the Practice tab).
  * - Tunes already present in the queue are skipped.
  *
  * @param db - SQLite database instance
@@ -945,7 +948,7 @@ export async function generateOrGetPracticeQueue(
  * @example
  * ```typescript
  * const added = await addSpecificTunesToExistingQueue(db, userId, repertoireId, [tuneId1, tuneId2]);
- * // Adds the two specified tunes to today's queue if one exists
+ * // Adds the two specified tunes to the current active queue if one exists
  * ```
  */
 export async function addSpecificTunesToExistingQueue(
@@ -971,22 +974,57 @@ export async function addSpecificTunesToExistingQueue(
     localTzOffsetMinutes
   );
 
-  const windowStartKey = windows.startTs;
+  let activeWindowStartKey = windows.startTs;
+  let activeWindowEndKey = windows.endTs;
+  let activeQueueDate = windows.startTs.substring(0, 10);
 
-  // Get existing active queue for today
-  const existing = await fetchExistingActiveQueue(
+  // Prefer today's queue, but if the user is still looking at an aged-out
+  // active queue window, append there instead of dropping the request.
+  let existing = await fetchExistingActiveQueue(
     db,
     userRef,
     repertoireRef,
-    windowStartKey
+    activeWindowStartKey
   );
 
   if (existing.length === 0) {
-    console.log(
-      "[AddSpecificTunes] No active queue found for today; " +
-        "scheduled tunes will appear in next generated queue"
+    const latestQueueWindow = await getLatestActiveQueueWindow(
+      db,
+      userRef,
+      repertoireRef
     );
-    return [];
+
+    if (!latestQueueWindow.windowStartUtc) {
+      console.log(
+        "[AddSpecificTunes] No active queue found; " +
+          "scheduled tunes will appear in next generated queue"
+      );
+      return [];
+    }
+
+    existing = await fetchExistingActiveQueue(
+      db,
+      userRef,
+      repertoireRef,
+      latestQueueWindow.windowStartUtc
+    );
+
+    if (existing.length === 0) {
+      console.log(
+        `[AddSpecificTunes] Latest active queue window ${latestQueueWindow.windowStartUtc} had no active rows; ` +
+          "scheduled tunes will appear in next generated queue"
+      );
+      return [];
+    }
+
+    activeWindowStartKey = latestQueueWindow.windowStartUtc;
+    activeWindowEndKey = existing[0]?.windowEndUtc ?? activeWindowEndKey;
+    activeQueueDate =
+      existing[0]?.queueDate ?? activeWindowStartKey.substring(0, 10);
+
+    console.log(
+      `[AddSpecificTunes] Falling back to latest active queue window ${activeWindowStartKey}`
+    );
   }
 
   // Filter out tunes already in queue
@@ -1018,9 +1056,9 @@ export async function addSpecificTunesToExistingQueue(
         userRef,
         repertoireRef,
         mode: "per_day",
-        queueDate: windows.startTs.substring(0, 10),
-        windowStartUtc: windows.startTs,
-        windowEndUtc: windows.endTs,
+        queueDate: activeQueueDate,
+        windowStartUtc: activeWindowStartKey,
+        windowEndUtc: activeWindowEndKey,
         tuneRef,
         bucket: 1, // Bucket 1: Due Today (just scheduled for immediate review)
         orderIndex: maxOrderIndex + 1 + i,
@@ -1044,7 +1082,7 @@ export async function addSpecificTunesToExistingQueue(
   }
 
   // Fetch back the inserted rows
-  const variants = buildWindowStartUtcVariants(windowStartKey);
+  const variants = buildWindowStartUtcVariants(activeWindowStartKey);
   const added = await db
     .select()
     .from(dailyPracticeQueue)

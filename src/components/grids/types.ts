@@ -13,6 +13,11 @@ import type { ITuneOverview } from "../../lib/db/view-types";
 export type TablePurpose = "scheduled" | "repertoire" | "catalog";
 
 /**
+ * Supported layout modes for tune collections
+ */
+export type TableViewMode = "grid" | "list";
+
+/**
  * Tune overview data structure from practice_list_staged view
  * Combines tune data with practice records and transient staging data
  */
@@ -53,10 +58,19 @@ export interface ITableStateExtended {
   columnOrder?: IColumnOrder;
   columnVisibility?: IColumnVisibility;
   columnPinning?: IColumnPinning;
+  viewMode?: TableViewMode;
   scrollTop?: number;
   sorting?: Array<{ id: string; desc: boolean }>;
   globalFilter?: string;
   rowSelection?: { [key: string]: boolean };
+}
+
+/**
+ * Optional TanStack table meta used by shared display-option controls
+ */
+export interface ITableDisplayOptionsMeta {
+  getViewMode?: () => TableViewMode;
+  setViewMode?: (mode: TableViewMode) => void;
 }
 
 /**

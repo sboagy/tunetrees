@@ -13,7 +13,7 @@
  * @module components/layout/TabBar
  */
 
-import { type Component, For, Show, createSignal, onMount } from "solid-js";
+import { type Component, createSignal, For, onMount, Show } from "solid-js";
 import {
   Select,
   SelectContent,
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMobileControlBar } from "./MobileControlBarContext";
 
 /**
  * Tab identifier
@@ -75,6 +76,8 @@ interface TabBarProps {
  * ```
  */
 export const TabBar: Component<TabBarProps> = (props) => {
+  const { mobileContent } = useMobileControlBar();
+
   // Initialize isMobile synchronously so the correct layout is rendered on first paint
   // (no flash from desktop→mobile). Use the same 768px (md) breakpoint as the rest of
   // the app (e.g. sidebar auto-collapse in MainLayout.tsx).
@@ -99,6 +102,45 @@ export const TabBar: Component<TabBarProps> = (props) => {
     console.log(`Active tab: ${tab.id}`);
   };
 
+  const renderMobileSelect = () => (
+    <Select
+      class="w-auto flex-none"
+      value={activeTabId()}
+      onChange={(value) => value && props.onTabChange?.(value as TabId)}
+      options={TABS.map((t) => t.id)}
+      itemComponent={(itemProps) => {
+        const tab = TABS.find((t) => t.id === itemProps.item.rawValue);
+        if (!tab) return null;
+        return (
+          <SelectItem item={itemProps.item}>
+            <span class="mr-2">{tab.icon}</span>
+            {tab.label}
+          </SelectItem>
+        );
+      }}
+    >
+      <SelectTrigger
+        aria-label="Select section"
+        data-testid="tab-nav-select"
+        class="h-10 w-auto max-w-[10rem] gap-1 rounded-md px-3 text-sm font-medium shadow-none [&>span]:max-w-[7.5rem]"
+      >
+        <SelectValue<TabId>>
+          {(state) => {
+            const tab =
+              TABS.find((t) => t.id === state.selectedOption()) || TABS[0];
+            return (
+              <>
+                <span class="mr-1.5">{tab.icon}</span>
+                {tab.label}
+              </>
+            );
+          }}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent />
+    </Select>
+  );
+
   return (
     <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       {/* Mobile: Kobalte Select dropdown — avoids icon-only "mystery meat" navigation */}
@@ -118,45 +160,14 @@ export const TabBar: Component<TabBarProps> = (props) => {
             />
           )}
         </For>
-        <div class="px-4 py-2">
-          <Select
-            value={activeTabId()}
-            onChange={(value) =>
-              value && props.onTabChange?.(value as TabId)
-            }
-            options={TABS.map((t) => t.id)}
-            itemComponent={(itemProps) => {
-              // Guard: options are sourced from TABS, so this should always find a match.
-              const tab = TABS.find((t) => t.id === itemProps.item.rawValue);
-              if (!tab) return null;
-              return (
-                <SelectItem item={itemProps.item}>
-                  <span class="mr-2">{tab.icon}</span>
-                  {tab.label}
-                </SelectItem>
-              );
-            }}
+        <div class="flex items-center gap-2 px-2 py-2">
+          {renderMobileSelect()}
+          <Show
+            when={mobileContent()}
+            fallback={<div class="h-10 flex-1" aria-hidden="true" />}
           >
-            <SelectTrigger
-              aria-label="Select section"
-              data-testid="tab-nav-select"
-            >
-              <SelectValue<TabId>>
-                {(state) => {
-                  const tab =
-                    TABS.find((t) => t.id === state.selectedOption()) ||
-                    TABS[0];
-                  return (
-                    <>
-                      <span class="mr-2">{tab.icon}</span>
-                      {tab.label}
-                    </>
-                  );
-                }}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent />
-          </Select>
+            {(content) => <div class="min-w-0 flex-1">{content()}</div>}
+          </Show>
         </div>
       </Show>
 

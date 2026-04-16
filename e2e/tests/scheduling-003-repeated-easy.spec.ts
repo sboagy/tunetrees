@@ -108,12 +108,6 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     context,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses table-specific row selectors (tbody tr[data-index]) not available in mobile stacked list."
-      );
-    }
     const intervals: number[] = [];
     const scheduledDates: Date[] = [];
     const difficulties: number[] = [];

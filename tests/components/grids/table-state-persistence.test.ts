@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getDefaultTableState } from "@/components/grids/table-state-persistence";
+import {
+  getDefaultTableState,
+  mergeWithDefaults,
+} from "@/components/grids/table-state-persistence";
 
 describe("getDefaultTableState", () => {
   it("keeps core workflow columns visible in the repertoire grid", () => {
@@ -35,5 +38,23 @@ describe("getDefaultTableState", () => {
       scheduled: true,
       latest_practiced: true,
     });
+  });
+
+  it("defaults to viewport-driven layout mode selection", () => {
+    const state = getDefaultTableState("catalog");
+
+    expect(state.viewMode).toBeUndefined();
+  });
+
+  it("preserves a saved layout override when merging defaults", () => {
+    const state = mergeWithDefaults(
+      {
+        viewMode: "list",
+        columnVisibility: {},
+      },
+      "repertoire"
+    );
+
+    expect(state.viewMode).toBe("list");
   });
 });

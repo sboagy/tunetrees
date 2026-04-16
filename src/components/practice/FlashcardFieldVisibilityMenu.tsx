@@ -26,6 +26,13 @@ export interface FlashcardFieldVisibilityMenuProps {
   onFieldVisibilityChange: (visibility: FlashcardFieldVisibilityByFace) => void;
   onClose: () => void;
   triggerRef?: HTMLButtonElement;
+  /**
+   * Optional element to exclude from the outside-click close guard.
+   * When not provided, defaults to `triggerRef`.
+   * Pass `null` to disable the guard entirely so that any click outside the
+   * menu — including on the overflow trigger — closes the menu.
+   */
+  closeGuardRef?: HTMLElement | null;
 }
 
 export const FlashcardFieldVisibilityMenu: Component<
@@ -67,14 +74,21 @@ export const FlashcardFieldVisibilityMenu: Component<
   };
 
   const handleClickOutside = (e: MouseEvent) => {
-    if (
-      menuRef &&
-      props.triggerRef &&
-      !menuRef.contains(e.target as Node) &&
-      !props.triggerRef.contains(e.target as Node)
-    ) {
-      e.stopPropagation(); // Prevent click from propagating to lower elements
-      props.onClose();
+    if (!menuRef) return; // menu element not yet mounted
+    if (!menuRef.contains(e.target as Node)) {
+      // Determine which element guards against outside-click dismissal.
+      // Three-state logic for closeGuardRef:
+      //   undefined  → not provided; fall back to triggerRef (backward-compatible default)
+      //   null       → explicitly disabled; any click outside the menu closes it
+      //   HTMLElement → use that element as the guard
+      const guardRef =
+        props.closeGuardRef !== undefined
+          ? props.closeGuardRef
+          : props.triggerRef;
+      if (!guardRef?.contains(e.target as Node)) {
+        e.stopPropagation(); // Prevent click from propagating to lower elements
+        props.onClose();
+      }
     }
   };
 

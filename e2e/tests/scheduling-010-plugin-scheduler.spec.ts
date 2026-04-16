@@ -12,6 +12,7 @@ import {
   seedSchedulingPluginLocally,
   setupForPracticeTestsParallel,
 } from "../helpers/practice-scenarios";
+import { submitAndWaitForPracticeSettled } from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -192,12 +193,6 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
   });
 
   test("should apply plugin schedule overrides", async ({ page, testUser }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses tbody tr[data-index='0'] row selector which is not available in the mobile stacked list."
-      );
-    }
     const timeline: string[] = [];
     const stamp = (event: string, details?: Record<string, unknown>) => {
       const line = `[${new Date().toISOString()}] ${event}${details ? ` ${JSON.stringify(details)}` : ""}`;
@@ -236,26 +231,21 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
       stamp("practice-grid-visible");
 
-      const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
-      await expect(
-        row.getByRole("cell", { name: TEST_TUNE_BANISH_TITLE })
-      ).toBeVisible({ timeout: 10000 });
+      const row = ttPage.getRows("scheduled").first();
+      await expect(row).toContainText(TEST_TUNE_BANISH_TITLE, {
+        timeout: 10000,
+      });
       stamp("target-row-visible", { tuneTitle: TEST_TUNE_BANISH_TITLE });
 
-      await ttPage.enableFlashcardMode();
-      stamp("flashcard-mode-enabled");
-      await expect(ttPage.flashcardView).toBeVisible({ timeout: 10000 });
-      stamp("flashcard-visible");
-
-      stamp("before-selectFlashcardEvaluation", {
+      stamp("before-setRowEvaluation", {
         eval: "good",
         url: page.url(),
       });
-      await ttPage.selectFlashcardEvaluation("good");
-      stamp("after-selectFlashcardEvaluation");
+      await ttPage.setRowEvaluation(row, "good");
+      stamp("after-setRowEvaluation");
 
       stamp("before-submitEvaluations", { timeoutMs: 60000, url: page.url() });
-      await ttPage.submitEvaluations({ timeoutMs: 60000 });
+      await submitAndWaitForPracticeSettled(page, ttPage, 60000);
       stamp("after-submitEvaluations");
 
       // await page.waitForLoadState("networkidle", { timeout: 15000 });

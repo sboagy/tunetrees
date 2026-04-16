@@ -17,8 +17,19 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
   test("requires at least one genre selection", async () => {
     await ttPage.signInAnonymouslyToGenreSelection("E2E Genre Repertoire");
 
-    await expect(ttPage.onboardingGenreClearAllButton).toBeVisible({
+    // Genre dialog opens with no genres pre-selected, so Continue is already
+    // disabled and Clear all is disabled. Select all first, then clear to
+    // verify that Continue becomes disabled again.
+    await expect(ttPage.onboardingGenreSelectAllButton).toBeVisible({
       timeout: 15000,
+    });
+    await ttPage.onboardingGenreSelectAllButton.click();
+    await expect(ttPage.onboardingGenreContinueButton).toBeEnabled({
+      timeout: 10000,
+    });
+
+    await expect(ttPage.onboardingGenreClearAllButton).toBeEnabled({
+      timeout: 5000,
     });
     await ttPage.onboardingGenreClearAllButton.click();
 
@@ -35,10 +46,10 @@ test.describe("FEATURE-341: Anonymous genre selection onboarding", () => {
   test("continues to catalog after selecting genres", async ({ page }) => {
     await ttPage.signInAnonymouslyToGenreSelection("E2E Catalog Repertoire");
 
-    await expect(ttPage.onboardingGenreClearAllButton).toBeVisible({
+    // Genre dialog opens with no genres pre-selected — just select Blues directly.
+    await expect(ttPage.onboardingGenreSearchInput).toBeVisible({
       timeout: 15000,
     });
-    await ttPage.onboardingGenreClearAllButton.click();
     await ttPage.page
       .getByRole("checkbox", { name: "Blues - Blues", exact: true })
       .click();

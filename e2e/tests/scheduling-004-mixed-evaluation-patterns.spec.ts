@@ -120,12 +120,6 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     page,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses table-specific row selectors (tbody tr[data-index]) not available in mobile stacked list."
-      );
-    }
     console.log("\n=== SCHEDULING-004: Mixed Evaluation Patterns ===");
     console.log(`  Test date: ${currentDate.toISOString().split("T")[0]}`);
 
@@ -134,7 +128,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
-    const rows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+    const rows = ttPage.getRows("scheduled");
     await expect
       .poll(async () => await rows.count(), {
         timeout: 20000,
@@ -158,7 +152,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // NOTE: Grid order may differ from ALL_TUNES order, so we extract tune ID from each row
     const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
-      const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
+      const row = rows.nth(i);
       await expect(row).toBeVisible({ timeout: 10000 });
 
       // Extract tune ID from the eval dropdown's data-testid (format: recall-eval-{uuid})
@@ -323,18 +317,12 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     context,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses tbody tr[data-index] row selectors which are not available in the mobile stacked list."
-      );
-    }
     console.log("\n=== Day 2: Queue Composition After Mixed Ratings ===");
 
     // First, practice all tunes on Day 1
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
-    const rows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+    const rows = ttPage.getRows("scheduled");
     await expect
       .poll(async () => await rows.count(), {
         timeout: 20000,
@@ -351,7 +339,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // Extract tune ID from each row's eval dropdown testid to apply correct rating
     const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
-      const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
+      const row = rows.nth(i);
       await expect(row).toBeVisible({ timeout: 10000 });
 
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
@@ -454,18 +442,12 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     context,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses tbody tr[data-index] row selectors which are not available in the mobile stacked list."
-      );
-    }
     console.log("\n=== Multi-Day Progression (Days 1-5) ===");
 
     // === DAY 1: Initial evaluations ===
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
 
-    const rows = ttPage.practiceGrid.locator("tbody tr[data-index]");
+    const rows = ttPage.getRows("scheduled");
     await expect
       .poll(async () => await rows.count(), {
         timeout: 20000,
@@ -482,7 +464,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
     // Extract tune ID from each row's eval dropdown testid to apply correct rating
     const rowCount = await rows.count();
     for (let i = 0; i < rowCount; i++) {
-      const row = ttPage.practiceGrid.locator(`tbody tr[data-index='${i}']`);
+      const row = rows.nth(i);
       await expect(row).toBeVisible({ timeout: 10000 });
 
       const evalDropdown = row.locator("[data-testid^='recall-eval-']");
@@ -563,7 +545,7 @@ test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {
 
       if (rowCount > 0) {
         // Practice first tune with "Good"
-        const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+        const row = ttPage.getRows("scheduled").first();
         await expect(row).toBeVisible({ timeout: 5000 });
 
         const evalDropdown = row.locator("[data-testid^='recall-eval-']");

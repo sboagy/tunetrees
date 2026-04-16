@@ -121,6 +121,7 @@ export async function waitForPracticeViewSettled(
   const expectRows = opts.expectRows ?? false;
   const loadingMessage = page.getByText("Loading practice queue...");
   const emptyState = page.getByText("All Caught Up!");
+  const practiceRows = ttPage.getRows("scheduled");
   let latestRowCount = 0;
 
   await expect(ttPage.practiceColumnsButton).toBeVisible({
@@ -141,9 +142,7 @@ export async function waitForPracticeViewSettled(
         }
 
         if (gridVisible) {
-          latestRowCount = await ttPage.practiceGrid
-            .locator("tbody tr[data-index]")
-            .count();
+          latestRowCount = await practiceRows.count();
           return !expectRows || latestRowCount > 0;
         }
 

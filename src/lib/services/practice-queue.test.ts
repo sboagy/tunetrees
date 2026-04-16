@@ -697,7 +697,9 @@ describe("generateOrGetPracticeQueue - Frozen Queue Behavior", () => {
     expect(regeneratedQueue.some((row) => row.id === originalQueue[0].id)).toBe(
       false
     );
-    expect(regeneratedQueue.every((row) => row.completedAt === null)).toBe(true);
+    expect(regeneratedQueue.every((row) => row.completedAt === null)).toBe(
+      true
+    );
 
     const reloadedQueue = await generateOrGetPracticeQueue(
       db,
@@ -834,11 +836,26 @@ describe("getLatestActiveQueueWindow", () => {
   it("should return the chronologically latest window even when fully complete", async () => {
     // Old queue (2/25) with an incomplete row
     insertQueueRow("q1", tuneId(1), "2026-02-25 00:00:00", null);
-    insertQueueRow("q2", tuneId(2), "2026-02-25 00:00:00", "2026-02-25 10:00:00");
+    insertQueueRow(
+      "q2",
+      tuneId(2),
+      "2026-02-25 00:00:00",
+      "2026-02-25 10:00:00"
+    );
 
     // Latest queue (3/7) fully complete
-    insertQueueRow("q3", tuneId(3), "2026-03-07 00:00:00", "2026-03-07 10:00:00");
-    insertQueueRow("q4", tuneId(4), "2026-03-07 00:00:00", "2026-03-07 11:00:00");
+    insertQueueRow(
+      "q3",
+      tuneId(3),
+      "2026-03-07 00:00:00",
+      "2026-03-07 10:00:00"
+    );
+    insertQueueRow(
+      "q4",
+      tuneId(4),
+      "2026-03-07 00:00:00",
+      "2026-03-07 11:00:00"
+    );
 
     const result = await getLatestActiveQueueWindow(
       db,
@@ -854,10 +871,20 @@ describe("getLatestActiveQueueWindow", () => {
 
   it("should return the latest window with incomplete rows flagged correctly", async () => {
     // Old complete queue
-    insertQueueRow("q1", tuneId(1), "2026-02-25 00:00:00", "2026-02-25 10:00:00");
+    insertQueueRow(
+      "q1",
+      tuneId(1),
+      "2026-02-25 00:00:00",
+      "2026-02-25 10:00:00"
+    );
 
     // Latest queue with incomplete rows
-    insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", "2026-03-07 10:00:00");
+    insertQueueRow(
+      "q2",
+      tuneId(2),
+      "2026-03-07 00:00:00",
+      "2026-03-07 10:00:00"
+    );
     insertQueueRow("q3", tuneId(3), "2026-03-07 00:00:00", null);
 
     const result = await getLatestActiveQueueWindow(
@@ -888,7 +915,12 @@ describe("getLatestActiveQueueWindow", () => {
     insertQueueRow("q1", tuneId(1), "2026-03-10 00:00:00", null, 0);
 
     // Active queue for an older date
-    insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", "2026-03-07 10:00:00");
+    insertQueueRow(
+      "q2",
+      tuneId(2),
+      "2026-03-07 00:00:00",
+      "2026-03-07 10:00:00"
+    );
 
     const result = await getLatestActiveQueueWindow(
       db,
@@ -902,7 +934,12 @@ describe("getLatestActiveQueueWindow", () => {
   });
 
   it("should handle T-separator window_start_utc format", async () => {
-    insertQueueRow("q1", tuneId(1), "2026-03-07T00:00:00", "2026-03-07 10:00:00");
+    insertQueueRow(
+      "q1",
+      tuneId(1),
+      "2026-03-07T00:00:00",
+      "2026-03-07 10:00:00"
+    );
     insertQueueRow("q2", tuneId(2), "2026-03-07T00:00:00", null);
 
     const result = await getLatestActiveQueueWindow(
@@ -1016,6 +1053,60 @@ describe("addSpecificTunesToExistingQueue - Add To Review without regenerating q
     // Verify the key assertion: addSpecificTunesToExistingQueue did NOT create a queue,
     // it just returned empty.
     expect(added).toEqual([]);
+  });
+
+  it("should append to the latest active queue when today's queue has rolled over", async () => {
+    const staleDate = daysFromNow(-1);
+    const staleWindows = computeSchedulingWindows(staleDate, 7, null);
+    const staleWindowStart = staleWindows.startTs;
+
+    insertTune(tuneId(1), "Yesterday Queue Tune", formatTimestamp(staleDate));
+    insertTune(tuneId(2), "New Tune For Stale Queue", null);
+
+    insertQueueRow("q1", tuneId(1), staleWindowStart, null);
+
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(2)]
+    );
+
+    expect(added).toHaveLength(1);
+    expect(added[0].tuneRef).toBe(tuneId(2));
+    expect(added[0].windowStartUtc).toContain(
+      staleWindowStart.substring(0, 10)
+    );
+
+    const rows = db.all<{
+      tuneRef: string;
+      windowStartUtc: string;
+    }>(sql`
+      SELECT tune_ref as tuneRef, window_start_utc as windowStartUtc
+      FROM daily_practice_queue
+      WHERE user_ref = ${TEST_USER_UUID}
+        AND repertoire_ref = ${TEST_REPERTOIRE_UUID}
+        AND active = 1
+      ORDER BY order_index ASC
+    `);
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.tuneRef)).toEqual([tuneId(1), tuneId(2)]);
+    expect(
+      rows.every((row) =>
+        row.windowStartUtc.includes(staleWindowStart.substring(0, 10))
+      )
+    ).toBe(true);
+
+    const latestWindow = await getLatestActiveQueueWindow(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID
+    );
+    expect(latestWindow.windowStartUtc).toContain(
+      staleWindowStart.substring(0, 10)
+    );
+    expect(latestWindow.rowCount).toBe(2);
   });
 
   it("should not add tunes already in the queue", async () => {

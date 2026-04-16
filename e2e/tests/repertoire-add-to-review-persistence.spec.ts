@@ -5,7 +5,8 @@
  * 1. Selects specific tunes from repertoire
  * 2. Adds them to practice queue
  * 3. Verifies those EXACT TUNES appear in the practice tab
- * 4. Verifies they have TODAY'S date as scheduled
+ * 4. Verifies they are appended to today's practice queue without writing
+ *    manual schedule overrides
  * 5. Verifies they persist after reload
  */
 
@@ -21,19 +22,37 @@ import {
   runTestHook,
   waitForPracticeViewSettled,
 } from "../helpers/practice-view";
+import {
+  queryPracticeQueue,
+  queryScheduledDates,
+} from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+
+async function setInjectedTestUserId(
+  page: import("@playwright/test").Page,
+  userId: string
+) {
+  await page.addInitScript((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+  await page.evaluate((id) => {
+    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+  }, userId);
+}
 
 test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
   let ttPage: TuneTreesPage;
 
   let currentDate: Date;
+  const expectedTuneTitles = ["Abbey Reel", "Alexander's", "Morrison's Jig"];
 
   test.beforeEach(async ({ page, context, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
+    await setInjectedTestUserId(page, testUser.userId);
 
     // Setup with 3 known tunes in repertoire
     await setupDeterministicTestParallel(page, testUser, {
@@ -48,41 +67,26 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
 
   test("CRITICAL: Add To Review must actually add the selected tunes to practice queue", async ({
     page,
+    testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      console.log(
-        "FIXME: Test needs to be adapted for mobile, skipping for now!"
-      );
-      return;
-    }
     // Navigate to Repertoire tab
     await ttPage.navigateToTab("repertoire");
 
-    // Wait for table to load - use data-index to get actual rows
-    await page.waitForSelector("tbody tr[data-index]", {
-      state: "visible",
-      timeout: 10000,
-    });
-
-    // Get the NAMES of the first 3 tunes we're going to select
-    const rows = page.locator("tbody tr[data-index]");
-    const tune1Name = await rows.nth(0).locator("td").nth(1).textContent(); // Title is 2nd column
-    const tune2Name = await rows.nth(1).locator("td").nth(1).textContent();
-    const tune3Name = await rows.nth(2).locator("td").nth(1).textContent();
-
-    console.log(
-      `📝 Selecting tunes: "${tune1Name}", "${tune2Name}", "${tune3Name}"`
+    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_ABBY_REEL,
+      ttPage.repertoireGrid
     );
-
-    // Select those 3 tunes
-    const checkboxes = page.locator(
-      'input[type="checkbox"][aria-label^="Select row"]'
+    await page.waitForTimeout(200);
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_ALEXANDERS_ID,
+      ttPage.repertoireGrid
     );
-    await checkboxes.nth(0).check();
     await page.waitForTimeout(200);
-    await checkboxes.nth(1).check();
-    await page.waitForTimeout(200);
-    await checkboxes.nth(2).check();
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_MORRISON_ID,
+      ttPage.repertoireGrid
+    );
     await page.waitForTimeout(200);
 
     console.log("✅ Selected 3 tunes from repertoire");
@@ -94,7 +98,7 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
       console.log("Dialog message:", dialog.message());
       await dialog.accept();
     });
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
 
     // Wait for dialog
     await page.waitForTimeout(500);
@@ -138,30 +142,42 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     // const tune1InPractice = practiceTable.locator(`text="${tune1Name}"`);
     // const tune2InPractice = practiceTable.locator(`text="${tune2Name}"`);
     // const tune3InPractice = practiceTable.locator(`text="${tune3Name}"`);
-    const tune1InPractice = page.getByRole("cell", { name: `${tune1Name}` });
-    const tune2InPractice = page.getByRole("cell", { name: `${tune2Name}` });
-    const tune3InPractice = page.getByRole("cell", { name: `${tune3Name}` });
-
-    await expect(tune1InPractice).toBeVisible({ timeout: 8000 });
-    await expect(tune2InPractice).toBeVisible({ timeout: 8000 });
-    await expect(tune3InPractice).toBeVisible({ timeout: 8000 });
+    for (const title of expectedTuneTitles) {
+      await ttPage.expectTuneVisible(title, ttPage.practiceGrid, 8000);
+    }
 
     console.log(`✅ All 3 tunes found in practice queue!`);
-    // Verify they are scheduled for today (not "Never" or some past date)
-    // Check that at least one of them shows today's date or "Today" in scheduled column
-    const todayText = ttPage
-      .getRows("scheduled")
-      .getByRole("cell", { name: "Today", exact: true });
-    const todayCount = await todayText.count();
+    // Add To Review appends the tunes directly to today's queue; it must NOT
+    // write a manual scheduled override. Verify the queue entries exist and the
+    // underlying scheduled column remains null for each selected tune.
+    const expectedTuneIds = [
+      CATALOG_TUNE_ABBY_REEL,
+      CATALOG_TUNE_ALEXANDERS_ID,
+      CATALOG_TUNE_MORRISON_ID,
+    ];
+    const queue = await queryPracticeQueue(page, testUser.repertoireId);
+    const activeQueueTuneIds = queue
+      .filter((item) => item.completed_at === null)
+      .map((item) => item.tune_ref)
+      .sort();
 
-    console.log(`📅 Found ${todayCount} tunes scheduled for "Today"`);
-    expect(todayCount).toBe(3);
+    expect(activeQueueTuneIds).toEqual([...expectedTuneIds].sort());
+
+    const scheduledDates = await queryScheduledDates(
+      page,
+      testUser.repertoireId,
+      expectedTuneIds
+    );
+    for (const tuneId of expectedTuneIds) {
+      expect(scheduledDates.get(tuneId)?.scheduled ?? null).toBeNull();
+    }
 
     await runTestHook(page, "__persistDbForTest");
 
     // RELOAD THE PAGE
     console.log("🔄 Reloading page...");
     await page.reload();
+    await setInjectedTestUserId(page, testUser.userId);
 
     // Navigate back to Practice tab
     await ttPage.navigateToTab("practice");
@@ -173,9 +189,16 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     // CRITICAL: Verify those EXACT 3 tunes STILL appear after reload
     console.log("🔍 Verifying tunes persist after reload...");
 
-    await expect(tune1InPractice).toBeVisible({ timeout: 5000 });
-    await expect(tune2InPractice).toBeVisible({ timeout: 5000 });
-    await expect(tune3InPractice).toBeVisible({ timeout: 5000 });
+    for (const title of expectedTuneTitles) {
+      await ttPage.expectTuneVisible(title, ttPage.practiceGrid, 5000);
+    }
+
+    const reloadedQueue = await queryPracticeQueue(page, testUser.repertoireId);
+    const reloadedActiveTuneIds = reloadedQueue
+      .filter((item) => item.completed_at === null)
+      .map((item) => item.tune_ref)
+      .sort();
+    expect(reloadedActiveTuneIds).toEqual([...expectedTuneIds].sort());
 
     console.log(`✅ PASS: All 3 tunes persist after reload!`);
   });

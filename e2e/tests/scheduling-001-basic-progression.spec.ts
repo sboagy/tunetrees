@@ -89,12 +89,6 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
     context,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses table-specific row selectors (tbody tr[data-index]) not available in mobile stacked list."
-      );
-    }
     // Ensure practice view is ready (single overdue tune seeded)
     await ttPage.navigateToTab("practice");
     await ttPage.refreshDateRolloverIfVisible();
@@ -104,12 +98,12 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
     // Helper to select evaluation from grid & submit
     async function evaluate(rating: "again" | "hard" | "good" | "easy") {
       // Locate first (and only) row; tune should be present when due
-      const row = ttPage.practiceGrid.locator("tbody tr[data-index='0']");
+      const row = ttPage.getRows("scheduled").first();
       await expect(row).toBeVisible({ timeout: 10000 });
       // Confirm row contains the tune title for robustness
-      await expect(
-        row.getByRole("cell", { name: TEST_TUNE_BANISH_TITLE })
-      ).toBeVisible({ timeout: 10000 });
+      await expect(row).toContainText(TEST_TUNE_BANISH_TITLE, {
+        timeout: 10000,
+      });
 
       // Use the page-object helper to avoid menu detachment races during rerenders.
       await ttPage.setRowEvaluation(row, rating);

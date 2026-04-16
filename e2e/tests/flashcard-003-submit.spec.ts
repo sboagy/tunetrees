@@ -123,8 +123,7 @@ test.describe
     test("05. Submit updates grid immediately", async ({ page }) => {
       const app = new TuneTreesPage(page);
       // Ensure Show Submitted is OFF for deterministic row decrease
-      const showSwitch = app.displaySubmittedSwitch.getByRole("switch");
-      await expect(showSwitch).toHaveAttribute("aria-checked", "false");
+      expect(await app.isShowSubmittedEnabled()).toBe(false);
 
       // Count initial grid rows (evaluation triggers as proxy)
       const grid = app.practiceGrid;
@@ -141,13 +140,8 @@ test.describe
       await page.waitForTimeout(1500);
 
       // Ensure Show Submitted is OFF for deterministic row decrease
-      const showSubmittedToggle =
-        app.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await showSubmittedToggle.click();
-        await page.waitForTimeout(300);
+      if (await app.isShowSubmittedEnabled()) {
+        await app.setShowSubmitted(false);
       }
 
       // Exit flashcard via toolbar switch to avoid close-button races
@@ -218,13 +212,7 @@ test.describe
       );
 
       // Verify flashcard count updated (if Show Submitted OFF)
-      const showSubmittedToggle =
-        app.displaySubmittedSwitch.getByRole("switch");
-
-      await expect(showSubmittedToggle).toHaveAttribute(
-        "aria-checked",
-        "false"
-      );
+      expect(await app.isShowSubmittedEnabled()).toBe(false);
 
       // Wait for flashcard count to update (poll until it decreases)
       let attemptCount = 0;

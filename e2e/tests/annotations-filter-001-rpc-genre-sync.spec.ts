@@ -167,6 +167,11 @@ async function seedAnnotations(
 // }
 
 test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
+  // This suite does a full local DB reset + initial sync in beforeEach.
+  // Per-test body timeouts do not protect that setup path, so the suite needs
+  // a larger timeout budget up front for CI.
+  test.setTimeout(120_000);
+
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
@@ -188,8 +193,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("A: Onboarding filters annotations server-side for selected genres", async ({
     page,
   }) => {
-    test.setTimeout(45000);
-
     // Navigate to catalog to ensure app is loaded
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
 
@@ -212,7 +215,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("B: Settings genre addition syncs new genre's annotations", async ({
     page,
   }) => {
-    test.setTimeout(45000); // Genre sync + polling takes time
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
 
     // Record initial counts
@@ -266,8 +268,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("C: Settings genre removal purges orphaned annotations", async ({
     page,
   }) => {
-    test.setTimeout(60000); // Genre sync + polling takes time
-
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
 
     // Use a known genre that's not in default repertoire setup
@@ -384,8 +384,6 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   test("D: Private tunes sync annotations regardless of genre filter", async ({
     page,
   }) => {
-    test.setTimeout(45000);
-
     await expect(ttPage.catalogGrid).toBeVisible({ timeout: 15000 });
 
     // Get current user ID using test API

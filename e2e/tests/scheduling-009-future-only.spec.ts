@@ -94,26 +94,15 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
     const intervals: number[] = [];
 
     const waitForTuneInPracticeQueue = async () => {
-      await waitForSyncComplete(page, 45000);
-
       await expect(ttPage.practiceColumnsButton).toBeVisible({
         timeout: 30000,
       });
-      await ttPage.refreshDateRolloverIfVisible();
-      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 30000 });
-      await expect(page.getByText("Loading practice queue...")).not.toBeVisible(
-        { timeout: 30000 }
-      );
 
-      const tuneRecallEvalControl = page.getByTestId(`recall-eval-${tuneId}`);
-      await expect
-        .poll(async () => await tuneRecallEvalControl.count(), {
-          timeout: 45000,
-          intervals: [200, 500, 1000],
-        })
-        .toBeGreaterThan(0);
-
-      await expect(tuneRecallEvalControl).toBeVisible({ timeout: 15000 });
+      // Setup and explicit post-reload paths already wait for sync completion.
+      // Here we only need to resolve any rollover banner before switching to
+      // flashcards. Queue readiness is already handled by setup and explicit
+      // post-reload sync waits in this spec.
+      await ttPage.refreshDateRolloverIfVisible(10000);
     };
 
     // 2. Evaluation Loop

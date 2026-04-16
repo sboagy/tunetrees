@@ -5,8 +5,12 @@ import {
   STANDARD_TEST_DATE,
   setStableDate,
 } from "../helpers/clock-control";
-import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
-import { queryScheduledDates } from "../helpers/scheduling-queries";
+import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { submitAndWaitForPracticeSettled } from "../helpers/practice-view";
+import {
+  queryLatestPracticeRecord,
+  queryScheduledDates,
+} from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -21,6 +25,18 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 let currentDate: Date;
+
+function formatGridDateTitle(dateStr: string): string {
+  return new Date(dateStr).toLocaleString("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  });
+}
 
 function buildLocalIsoForDate(
   baseDate: Date,
@@ -60,21 +76,37 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     currentDate = new Date(STANDARD_TEST_DATE);
     await setStableDate(context, currentDate);
 
-    await setupForRepertoireTestsParallel(page, testUser, {
+    await setupForPracticeTestsParallel(page, testUser, {
       repertoireTunes: [CATALOG_TUNE_KESH_ID],
-      scheduleTunes: false,
+      scheduleDaysAgo: 1,
+      scheduleBaseDate: currentDate,
+      startTab: "practice",
     });
 
-    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
+    await ttPage.expectGridHasContent(ttPage.practiceGrid);
   });
 
   test("should apply and clear a schedule override from the single-surface grid picker", async ({
     page,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(true, "Grid picker assertions are currently desktop-only.");
-    }
+    const practiceRow = ttPage.getRows("scheduled").first();
+    await expect(practiceRow).toBeVisible({ timeout: 10000 });
+    await ttPage.setRowEvaluation(practiceRow, "good");
+    await submitAndWaitForPracticeSettled(page, ttPage, 20000);
+
+    const practiceRecord = await queryLatestPracticeRecord(
+      page,
+      CATALOG_TUNE_KESH_ID,
+      testUser.repertoireId,
+      { waitForRecordMs: 10000, pollIntervalMs: 250 }
+    );
+    expect(practiceRecord).not.toBeNull();
+    expect(practiceRecord?.due).toBeTruthy();
+
+    await ttPage.navigateToTab("repertoire");
+    await ttPage.ensureGridView("repertoire");
+    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
 
     await ttPage.searchForTune("Kesh Jig", ttPage.repertoireGrid);
     await ttPage.ensureGridColumnVisible("repertoire", "Scheduled");
@@ -84,6 +116,7 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     );
     await expect(trigger).toBeVisible({ timeout: 10000 });
     await trigger.scrollIntoViewIfNeeded();
+
     await trigger.click();
 
     const popover = page.getByTestId(
@@ -103,6 +136,44 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
       popover.getByTestId(`scheduled-override-apply-${CATALOG_TUNE_KESH_ID}`)
     ).toBeVisible({ timeout: 10000 });
 
+    // setupForPracticeTestsParallel seeds the queue by writing an initial
+    // scheduled value. Clear that inherited override first so the baseline UI
+    // state for the rest of the test is the fallback latest_due display.
+    await popover.getByRole("button", { name: "Clear" }).click({
+      force: true,
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await expect(popover).toBeHidden({ timeout: 10000 });
+
+    await expect
+      .poll(
+        () =>
+          getScheduledOverride(
+            page,
+            testUser.repertoireId,
+            CATALOG_TUNE_KESH_ID
+          ),
+        {
+          timeout: 10000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBeNull();
+
+    const fallbackLabel = ((await trigger.textContent()) ?? "").trim();
+    const fallbackTitle = await trigger.getAttribute("title");
+    const triggerIcon = page.getByTestId(
+      `scheduled-override-icon-${CATALOG_TUNE_KESH_ID}`
+    );
+
+    expect(fallbackLabel.length).toBeGreaterThan(0);
+    expect(fallbackTitle).toBe(formatGridDateTitle(practiceRecord!.due));
+    await expect(triggerIcon).toHaveClass(/text-gray-(400|500)/);
+    await expect(triggerIcon).toHaveClass(/border-transparent/);
+
+    await trigger.click();
+    await expect(popover).toBeVisible({ timeout: 10000 });
+
     await popover.getByRole("button", { name: "Today" }).click();
 
     const hourInput = popover.getByTestId(
@@ -119,12 +190,13 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
     await popover.getByRole("button", { name: "AM" }).click();
     await popover
       .getByTestId(`scheduled-override-apply-${CATALOG_TUNE_KESH_ID}`)
-      .click();
+      .click({ force: true });
 
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(popover).toBeHidden({ timeout: 10000 });
 
     const expectedScheduledIso = buildLocalIsoForDate(currentDate, 8, 15, "AM");
+    const expectedScheduledTitle = formatGridDateTitle(expectedScheduledIso);
 
     await expect
       .poll(
@@ -153,10 +225,16 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
       test.info().project.name,
       1000
     );
+    await expect(trigger).toHaveText(/Today/, { timeout: 10000 });
+    await expect(trigger).toHaveAttribute("title", expectedScheduledTitle);
+    await expect(triggerIcon).toHaveClass(/text-purple-400|text-purple-600/);
+    await expect(triggerIcon).toHaveClass(/border-current/);
 
     await trigger.click();
     await expect(popover).toBeVisible({ timeout: 10000 });
-    await popover.getByRole("button", { name: "Clear" }).click();
+    await popover.getByRole("button", { name: "Clear" }).click({
+      force: true,
+    });
 
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(popover).toBeHidden({ timeout: 10000 });
@@ -175,5 +253,12 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
         }
       )
       .toBeNull();
+
+    await expect(trigger).toHaveText(fallbackLabel, { timeout: 10000 });
+    await expect(trigger).toHaveAttribute("title", fallbackTitle ?? "", {
+      timeout: 10000,
+    });
+    await expect(triggerIcon).toHaveClass(/text-gray-(400|500)/);
+    await expect(triggerIcon).toHaveClass(/border-transparent/);
   });
 });
