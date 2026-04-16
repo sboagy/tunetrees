@@ -706,7 +706,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                             }
                             return (
                               <span
-                                class={`ml-auto text-sm ${colorClass} italic font-medium`}
+                                class={`ml-auto text-sm italic font-medium ${colorClass}`}
                               >
                                 {label}
                               </span>
