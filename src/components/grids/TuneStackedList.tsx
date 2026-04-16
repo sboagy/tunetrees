@@ -212,12 +212,14 @@ export interface IStackedListRow {
   // Scheduled-specific
   bucket?: string | null;
   recall_eval?: string | null;
+  completed_at?: string | null; // Timestamp when evaluation was submitted
   learned?: string | null;
   latest_practiced?: string | null;
   latest_quality?: number | null;
   latest_easiness?: number | null;
   latest_stability?: number | null;
   latest_interval?: number | null;
+  latest_technique?: string | null;
   // latest_due is used in both scheduled (FSRS next-review date) and repertoire (due date display)
   latest_due?: string | null;
   // Repertoire-specific
