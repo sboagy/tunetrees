@@ -607,39 +607,112 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         <StateBadge value={item.latest_state} />
                       </Show>
 
-                      {/* Scheduled: Recall Eval dropdown (controlled by "evaluation" column) */}
+                      {/* Scheduled: Recall Eval dropdown or static text (controlled by "evaluation" column) */}
                       <Show
                         when={
                           props.tablePurpose === "scheduled" &&
                           isColVisible("evaluation")
                         }
                       >
-                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */}
-                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */}
-                        <div
-                          class="ml-auto w-40 flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
+                        <Show
+                          when={item.completed_at}
+                          fallback={
+                            /* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */
+                            /* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */
+                            <div
+                              class="ml-auto w-40 flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <RecallEvalComboBox
+                                tuneId={String(itemId)}
+                                value={item.recall_eval ?? ""}
+                                open={props.cellCallbacks?.getRecallEvalOpen?.(
+                                  String(itemId)
+                                )}
+                                onOpenChange={(isOpen) =>
+                                  props.cellCallbacks?.setRecallEvalOpen?.(
+                                    String(itemId),
+                                    isOpen
+                                  )
+                                }
+                                onChange={(val) => {
+                                  props.cellCallbacks?.onRecallEvalChange?.(
+                                    String(itemId),
+                                    val
+                                  );
+                                }}
+                              />
+                            </div>
+                          }
                         >
-                          <RecallEvalComboBox
-                            tuneId={String(itemId)}
-                            value={item.recall_eval ?? ""}
-                            open={props.cellCallbacks?.getRecallEvalOpen?.(
-                              String(itemId)
-                            )}
-                            onOpenChange={(isOpen) =>
-                              props.cellCallbacks?.setRecallEvalOpen?.(
-                                String(itemId),
-                                isOpen
-                              )
-                            }
-                            onChange={(val) => {
-                              props.cellCallbacks?.onRecallEvalChange?.(
-                                String(itemId),
-                                val
+                          {/* Tune already submitted: show static evaluation text */}
+                          {(() => {
+                            let label = "(Not Set)";
+                            let colorClass = "text-gray-600 dark:text-gray-400";
+                            if (
+                              item.latest_quality !== null &&
+                              item.latest_quality !== undefined
+                            ) {
+                              const quality = item.latest_quality;
+                              const technique =
+                                item.latest_technique || "fsrs";
+                              if (technique === "sm2") {
+                                const sm2Labels: Record<number, string> = {
+                                  0: "Complete blackout",
+                                  1: "Incorrect response",
+                                  2: "Incorrect (easy to recall)",
+                                  3: "Correct (serious difficulty)",
+                                  4: "Correct (hesitation)",
+                                  5: "Perfect response",
+                                };
+                                const sm2Colors: Record<number, string> = {
+                                  0: "text-red-600 dark:text-red-400",
+                                  1: "text-red-600 dark:text-red-400",
+                                  2: "text-orange-600 dark:text-orange-400",
+                                  3: "text-yellow-600 dark:text-yellow-400",
+                                  4: "text-green-600 dark:text-green-400",
+                                  5: "text-blue-600 dark:text-blue-400",
+                                };
+                                label =
+                                  sm2Labels[quality] || `Quality ${quality}`;
+                                colorClass =
+                                  sm2Colors[quality] || colorClass;
+                              } else {
+                                const fsrsLabels: Record<number, string> = {
+                                  1: "Again",
+                                  2: "Hard",
+                                  3: "Good",
+                                  4: "Easy",
+                                };
+                                const fsrsColors: Record<number, string> = {
+                                  1: "text-red-600 dark:text-red-400",
+                                  2: "text-orange-600 dark:text-orange-400",
+                                  3: "text-green-600 dark:text-green-400",
+                                  4: "text-blue-600 dark:text-blue-400",
+                                };
+                                label =
+                                  fsrsLabels[quality] || `Quality ${quality}`;
+                                colorClass =
+                                  fsrsColors[quality] || colorClass;
+                              }
+                            } else if (item.recall_eval) {
+                              const evalDisplay = getRecallEvalDisplay(
+                                item.recall_eval
                               );
-                            }}
-                          />
-                        </div>
+                              if (evalDisplay) {
+                                label = evalDisplay.label;
+                                colorClass = evalDisplay.colorClass;
+                              }
+                            }
+                            return (
+                              <span
+                                class={`ml-auto text-sm ${colorClass} italic font-medium`}
+                              >
+                                {label}
+                              </span>
+                            );
+                          })()}
+                        </Show>
                       </Show>
                     </div>
 
