@@ -160,17 +160,12 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
     });
 
     await ttPage.navigateToTab("repertoire");
+    await ttPage.ensureGridView("repertoire");
   });
 
   test("B: should update goal from badge dropdown and open Goals settings", async ({
     page,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses tbody tr[data-index] and cell selectors not available in mobile stacked list."
-      );
-    }
     await ttPage.searchForTune("Cooley's", ttPage.repertoireGrid);
 
     const row = ttPage.repertoireGrid

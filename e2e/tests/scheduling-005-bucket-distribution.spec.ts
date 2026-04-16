@@ -326,10 +326,8 @@ test.describe
       //   357 |       // The initial Q1 had 2 tunes, after practicing 1, it should have 1 left in active view
       //     at /home/runner/work/tunetrees/tunetrees/e2e/tests/scheduling-005-bucket-distribution.spec.ts:354:37
       test.skip(
-        process.env.CI === "true" ||
-          process.env.CI === "1" ||
-          test.info().project.name === "Mobile Chrome",
-        "Skipping test in CI and Mobile Chrome (uses desktop-only tbody tr[data-index] selector)"
+        process.env.CI === "true" || process.env.CI === "1",
+        "Skipping test in CI"
       );
       console.log("\n=== Practice Effect on Buckets Test ===");
 

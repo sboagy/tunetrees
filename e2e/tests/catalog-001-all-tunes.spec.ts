@@ -75,12 +75,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   });
 
   test("should show Private badge on User's private tunes only", async () => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses table column headers and cell selectors not available in mobile stacked list."
-      );
-    }
+    await ttPage.ensureGridView("catalog");
     // Search for User's private tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await ttPage.ensureGridColumnVisible("catalog", "Ownership");
@@ -128,12 +123,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
   });
 
   test("should display tune columns correctly", async () => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test checks column header test IDs (ch-*) that only exist in the desktop table view."
-      );
-    }
+    await ttPage.ensureGridView("catalog");
     // Verify the slimmer catalog defaults that remain visible without opening the column menu
     await ttPage.expectColumnsVisible(["Title", "Type", "Composer"]);
   });

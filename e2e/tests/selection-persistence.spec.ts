@@ -43,6 +43,27 @@ async function openCatalogSync(page: Page, ttPage: TuneTreesPage) {
   await page.waitForTimeout(500);
 }
 
+function getGridRowCheckboxes(page: Page, gridId: "catalog" | "repertoire") {
+  return page.locator(
+    `[data-testid="tunes-grid-${gridId}"] input[type="checkbox"][aria-label^="Select row "]`
+  );
+}
+
+async function waitForGridRowCheckboxes(
+  page: Page,
+  gridId: "catalog" | "repertoire",
+  minimumCount: number
+) {
+  const checkboxes = getGridRowCheckboxes(page, gridId);
+  await expect
+    .poll(() => checkboxes.count(), {
+      timeout: 10000,
+      message: `Expected ${gridId} view to render at least ${minimumCount} row checkboxes`,
+    })
+    .toBeGreaterThanOrEqual(minimumCount);
+  return checkboxes;
+}
+
 test.describe
   .serial("Row Selection Persistence", () => {
     let ttPage: TuneTreesPage;
@@ -50,12 +71,6 @@ test.describe
     test.slow();
 
     test.beforeEach(async ({ page, testUser }) => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "All tests in this suite use row checkboxes which are not available in the mobile stacked list."
-        );
-      }
       // Setup: Seed several tunes in repertoire for selection testing
       // Using known valid tune IDs: testUserPrivateTune1 (Banish Misfortune), TEST_TUNE_MORRISON_ID (Morrison's Jig)
       // Start on catalog tab since most tests begin there
@@ -80,12 +95,10 @@ test.describe
       });
 
       // Select first 3 tunes using checkboxes
-      const checkboxes = page.locator(
-        '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
-      );
-      await checkboxes.nth(1).check(); // Skip header checkbox, select row 1
+      const checkboxes = await waitForGridRowCheckboxes(page, "catalog", 3);
+      await checkboxes.nth(0).check();
+      await checkboxes.nth(1).check();
       await checkboxes.nth(2).check();
-      await checkboxes.nth(3).check();
 
       // Verify selection summary shows "3 tunes selected"
       await expect(page.locator("text=3 tunes selected")).toBeVisible();
@@ -101,10 +114,15 @@ test.describe
       });
 
       // Verify selections are still intact
+      const checkboxesAfterReturn = await waitForGridRowCheckboxes(
+        page,
+        "catalog",
+        3
+      );
       await expect(page.locator("text=3 tunes selected")).toBeVisible();
-      await expect(checkboxes.nth(1)).toBeChecked();
-      await expect(checkboxes.nth(2)).toBeChecked();
-      await expect(checkboxes.nth(3)).toBeChecked();
+      await expect(checkboxesAfterReturn.nth(0)).toBeChecked();
+      await expect(checkboxesAfterReturn.nth(1)).toBeChecked();
+      await expect(checkboxesAfterReturn.nth(2)).toBeChecked();
     });
 
     test("Repertoire: selections persist across tab switches", async ({
@@ -117,23 +135,17 @@ test.describe
       await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
         timeout: 10000,
       });
-      await page.waitForFunction(
-        (sel) => document.querySelectorAll(sel).length >= 3,
-        '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
-      );
 
       // Select first 2 tunes using checkboxes
-      const checkboxes = page.locator(
-        '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
-      );
-      await checkboxes.nth(1).check(); // Skip header checkbox, select row 1
+      const checkboxes = await waitForGridRowCheckboxes(page, "repertoire", 2);
+      await checkboxes.nth(0).check();
       // Take a visual snapshot for debugging / CI artifacts
       await page.screenshot({
         path: `e2e/artifacts/repertoire-selection-mid-${Date.now()}.png`,
         fullPage: false,
       });
       await page.waitForTimeout(250);
-      await checkboxes.nth(2).check();
+      await checkboxes.nth(1).check();
 
       // Verify selection summary shows "2 tunes selected"
       await expect(page.locator("text=2 tunes selected")).toBeVisible();
@@ -147,16 +159,15 @@ test.describe
         timeout: 5000,
       });
 
-      // Ensure checkboxes are still present
-      await page.waitForFunction(
-        (sel) => document.querySelectorAll(sel).length >= 2,
-        '[data-testid="tunes-grid-repertoire"] tbody tr[data-index]'
-      );
-
       // Verify selections are still intact
+      const checkboxesAfterReturn = await waitForGridRowCheckboxes(
+        page,
+        "repertoire",
+        2
+      );
       await expect(page.locator("text=2 tunes selected")).toBeVisible();
-      await expect(checkboxes.nth(1)).toBeChecked();
-      await expect(checkboxes.nth(2)).toBeChecked();
+      await expect(checkboxesAfterReturn.nth(0)).toBeChecked();
+      await expect(checkboxesAfterReturn.nth(1)).toBeChecked();
     });
 
     test("Catalog: clearing selections persists across tab switches", async ({
@@ -169,11 +180,9 @@ test.describe
       });
 
       // Select 2 tunes
-      const checkboxes = page.locator(
-        '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
-      );
+      const checkboxes = await waitForGridRowCheckboxes(page, "catalog", 2);
+      await checkboxes.nth(0).check();
       await checkboxes.nth(1).check();
-      await checkboxes.nth(2).check();
       await expect(page.locator("text=2 tunes selected")).toBeVisible();
 
       // Clear selection using "Clear selection" button
@@ -188,9 +197,14 @@ test.describe
       });
 
       // Verify no selections remain
+      const checkboxesAfterReturn = await waitForGridRowCheckboxes(
+        page,
+        "catalog",
+        2
+      );
       await expect(page.locator("text=tunes selected")).not.toBeVisible();
-      await expect(checkboxes.nth(1)).not.toBeChecked();
-      await expect(checkboxes.nth(2)).not.toBeChecked();
+      await expect(checkboxesAfterReturn.nth(0)).not.toBeChecked();
+      await expect(checkboxesAfterReturn.nth(1)).not.toBeChecked();
     });
 
     test("Catalog: selections and catalog list STAY THE SAME after browser refresh", async ({
@@ -203,12 +217,10 @@ test.describe
       });
 
       // Select 3 tunes
-      const checkboxes = page.locator(
-        '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
-      );
+      const checkboxes = await waitForGridRowCheckboxes(page, "catalog", 3);
+      await checkboxes.nth(0).check();
       await checkboxes.nth(1).check();
       await checkboxes.nth(2).check();
-      await checkboxes.nth(3).check();
       await expect(page.locator("text=3 tunes selected")).toBeVisible();
 
       // Refresh the page (simulates browser refresh)
@@ -223,12 +235,14 @@ test.describe
 
       // Verify selections persisted through refresh (from localStorage)
       await expect(page.locator("text=3 tunes selected")).toBeVisible();
-      const checkboxesAfterReload = page.locator(
-        '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
+      const checkboxesAfterReload = await waitForGridRowCheckboxes(
+        page,
+        "catalog",
+        3
       );
+      await expect(checkboxesAfterReload.nth(0)).toBeChecked();
       await expect(checkboxesAfterReload.nth(1)).toBeChecked();
       await expect(checkboxesAfterReload.nth(2)).toBeChecked();
-      await expect(checkboxesAfterReload.nth(3)).toBeChecked();
     });
 
     test("Catalog: selections persist after browser refresh", async ({
@@ -241,12 +255,10 @@ test.describe
       });
 
       // Select 3 tunes
-      const checkboxes = page.locator(
-        '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
-      );
-      const checkbox1 = checkboxes.nth(1);
-      const checkbox2 = checkboxes.nth(2);
-      const checkbox3 = checkboxes.nth(3);
+      const checkboxes = await waitForGridRowCheckboxes(page, "catalog", 3);
+      const checkbox1 = checkboxes.nth(0);
+      const checkbox2 = checkboxes.nth(1);
+      const checkbox3 = checkboxes.nth(2);
 
       await checkbox1.check();
       await checkbox2.check();
@@ -299,32 +311,24 @@ test.describe
       // Navigate to Repertoire tab
       await ttPage.navigateToTab("repertoire");
 
-      // Ensure checkboxes are rendered: header + 2 rows (>= 3 checkboxes)
-      await page.waitForFunction(
-        (sel) => document.querySelectorAll(sel).length >= 3,
-        '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
-      );
-
       // Select 2 tunes
-      const checkboxes = page.locator(
-        '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
-      );
-      await expect(checkboxes.nth(1)).toBeEnabled({ timeout: 10000 });
-      await checkboxes.nth(1).scrollIntoViewIfNeeded();
-      await checkboxes.nth(1).check({ force: true });
+      const checkboxes = await waitForGridRowCheckboxes(page, "repertoire", 2);
+      await expect(checkboxes.nth(0)).toBeEnabled({ timeout: 10000 });
+      await checkboxes.nth(0).scrollIntoViewIfNeeded();
+      await checkboxes.nth(0).check({ force: true });
       await page.waitForTimeout(250);
-      await expect(checkboxes.nth(1)).toBeChecked();
+      await expect(checkboxes.nth(0)).toBeChecked();
 
       // Take a visual snapshot for debugging / CI artifacts
       await page.screenshot({
         path: `e2e/artifacts/repertoire-selection-before-second-${Date.now()}.png`,
         fullPage: false,
       });
-      await expect(checkboxes.nth(2)).toBeEnabled({ timeout: 10000 });
-      await checkboxes.nth(2).scrollIntoViewIfNeeded();
-      await checkboxes.nth(2).check({ force: true });
+      await expect(checkboxes.nth(1)).toBeEnabled({ timeout: 10000 });
+      await checkboxes.nth(1).scrollIntoViewIfNeeded();
+      await checkboxes.nth(1).check({ force: true });
       await page.waitForTimeout(250);
-      await expect(checkboxes.nth(2)).toBeChecked();
+      await expect(checkboxes.nth(1)).toBeChecked();
 
       await expect(page.locator("text=2 tunes selected")).toBeVisible();
 
@@ -340,11 +344,13 @@ test.describe
 
       // Verify selections persisted through refresh
       await expect(page.locator("text=2 tunes selected")).toBeVisible();
-      const checkboxesAfterReload = page.locator(
-        '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
+      const checkboxesAfterReload = await waitForGridRowCheckboxes(
+        page,
+        "repertoire",
+        2
       );
+      await expect(checkboxesAfterReload.nth(0)).toBeChecked();
       await expect(checkboxesAfterReload.nth(1)).toBeChecked();
-      await expect(checkboxesAfterReload.nth(2)).toBeChecked();
     });
   });
 

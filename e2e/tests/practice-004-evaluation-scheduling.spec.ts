@@ -60,15 +60,10 @@ test.describe
         ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
       ).toBeVisible({ timeout: 10000 });
       await page.waitForTimeout(100); // small buffer
+      await ttPage.ensureGridView("practice");
     });
 
     test("should schedule 'Again' rating for tomorrow (not today)", async () => {
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test uses getColumnIndexByHeaderText and getByRole('cell') selectors not available in mobile stacked list."
-        );
-      }
       // ARRANGE: Get first tune evaluation dropdown
       const rows = ttPage.getRows("scheduled");
       const firstRow = rows.first();

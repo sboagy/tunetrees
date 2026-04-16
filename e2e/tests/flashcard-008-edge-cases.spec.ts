@@ -87,11 +87,7 @@ test.describe
 
       // Turn OFF Show Submitted
       const app = new TuneTreesPage(page);
-      const showSubmittedToggle =
-        app.displaySubmittedSwitch.getByRole("switch");
-      expect(
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true"
-      ).toBe(false);
+      expect(await app.isShowSubmittedEnabled()).toBe(false);
 
       // Submit all tunes via grid (use evaluation triggers as proxy for rows)
       const grid = app.practiceGrid;
@@ -137,13 +133,11 @@ test.describe
       // Accept one of two valid end-states:
       // 1) Switch is disabled when no due tunes (preferred), OR
       // 2) Switch is enabled but opening shows the empty-state overlay.
-      const switchIsDisabled = await app.flashcardModeSwitch
-        .isDisabled()
-        .catch(() => false);
+      const switchIsDisabled = await app.isFlashcardModeDisabled();
       if (switchIsDisabled) {
-        await expect(app.flashcardModeSwitch).toBeDisabled();
+        expect(switchIsDisabled).toBe(true);
       } else {
-        await app.enableFlashcardMode();
+        await app.enableFlashcardModeAllowingEmptyState();
         await expect(page.getByTestId("flashcard-empty-state")).toBeVisible();
         // Close the overlay by toggling flashcard mode off
         await app.disableFlashcardMode();
@@ -249,14 +243,7 @@ test.describe
 
       // Turn OFF Show Submitted
       const app = new TuneTreesPage(page);
-      const showSubmittedToggle =
-        app.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await showSubmittedToggle.click();
-        await page.waitForTimeout(500);
-      }
+      await app.setShowSubmitted(false, 500);
 
       // Open flashcard
       await app.enableFlashcardMode();
@@ -420,13 +407,11 @@ test.describe
       // Open flashcard
       await app.enableFlashcardMode();
 
-      const showSubmittedToggle = app.displaySubmittedSwitch;
       const counter = app.flashcardHeaderCounter;
 
       // Rapid toggle Show Submitted
       for (let i = 0; i < 5; i++) {
-        await showSubmittedToggle.click();
-        await page.waitForTimeout(100);
+        await app.toggleShowSubmitted(100);
       }
       await page.waitForTimeout(300);
 
@@ -442,8 +427,7 @@ test.describe
       await expect(liveEvalInput).not.toBeVisible();
 
       // go back to unsubmitted card
-      await showSubmittedToggle.click();
-      await page.waitForTimeout(100);
+      await app.toggleShowSubmitted(100);
 
       // Verify can still select evaluation, IF we're showing an unsubmitted card
       await app.selectFlashcardEvaluation("good");
@@ -468,7 +452,7 @@ test.describe
 
       // Verify flashcard mode switch should be enabled regardless of if there are practice tunes or not.
       const app = new TuneTreesPage(page);
-      await expect(app.flashcardModeSwitch).toBeEnabled();
+      expect(await app.isFlashcardModeDisabled()).toBe(false);
 
       // Verify empty state message shown (pick the first matching text to avoid strict mode conflict)
       await expect(

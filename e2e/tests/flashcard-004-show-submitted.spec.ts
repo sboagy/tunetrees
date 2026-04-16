@@ -52,19 +52,9 @@ test.describe
       }
     });
 
-    test("01. Show Submitted OFF excludes submitted tunes", async ({
-      page,
-    }) => {
+    test("01. Show Submitted OFF excludes submitted tunes", async () => {
       // Ensure Show Submitted is OFF
-      const showSubmittedToggle =
-        ttPage.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        // Click the container to avoid pointer-intercept issues on the input
-        await ttPage.displaySubmittedSwitch.click();
-        await page.waitForTimeout(500);
-      }
+      await ttPage.setShowSubmitted(false, 500);
 
       // Open flashcard
       await ttPage.enableFlashcardMode(500);
@@ -81,16 +71,9 @@ test.describe
       expect(offTotal).toBeGreaterThanOrEqual(1);
     });
 
-    test("02. Show Submitted ON includes submitted tunes", async ({ page }) => {
+    test("02. Show Submitted ON includes submitted tunes", async () => {
       // Turn ON Show Submitted
-      const showSubmittedToggle =
-        ttPage.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (!isOn) {
-        await ttPage.displaySubmittedSwitch.click();
-        await page.waitForTimeout(500);
-      }
+      await ttPage.setShowSubmitted(true, 500);
 
       // Open flashcard
       await ttPage.enableFlashcardMode(500);
@@ -100,16 +83,9 @@ test.describe
       expect(onTotal).toBeGreaterThanOrEqual(1);
     });
 
-    test("03. Toggle updates flashcard count", async ({ page }) => {
+    test("03. Toggle updates flashcard count", async () => {
       // Open flashcard with Show Submitted OFF
-      const showSubmittedToggle =
-        ttPage.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await ttPage.displaySubmittedSwitch.click();
-        await page.waitForTimeout(500);
-      }
+      await ttPage.setShowSubmitted(false, 500);
 
       await ttPage.enableFlashcardMode(500);
 
@@ -118,38 +94,27 @@ test.describe
       expect(total).toBeGreaterThanOrEqual(1);
 
       // Toggle Show Submitted ON (without closing flashcard)
-      await ttPage.displaySubmittedSwitch.click();
+      await ttPage.toggleShowSubmitted(500);
 
       // Verify count increased or stayed the same
       total = await ttPage.waitForCounterValue();
       expect(total).toBeGreaterThanOrEqual(1);
 
       // Toggle back OFF
-      await ttPage.displaySubmittedSwitch.click();
+      await ttPage.toggleShowSubmitted(500);
 
       // Verify count back to unsubmitted-only value
       total = await ttPage.waitForCounterValue();
       expect(total).toBeGreaterThanOrEqual(1);
     });
 
-    test("04. Toggle updates current card display", async ({ page }) => {
+    test("04. Toggle updates current card display", async () => {
       test.fixme(!!process.env.CI, "Known timing issue in CI");
-      if (test.info().project.name === "Mobile Chrome") {
-        test.skip(
-          true,
-          "Test uses getByRole('cell') which is not available in mobile stacked-list view."
-        );
-      }
 
       // Turn ON Show Submitted to see all tunes
-      const showSubmittedToggle =
-        ttPage.displaySubmittedSwitch.getByRole("switch");
-      expect(await showSubmittedToggle.getAttribute("aria-checked")).toBe(
-        "false"
-      );
+      expect(await ttPage.isShowSubmittedEnabled()).toBe(false);
 
-      await ttPage.displaySubmittedSwitch.click();
-      await page.waitForTimeout(500);
+      await ttPage.setShowSubmitted(true, 500);
 
       const banishRow = ttPage
         .getTuneRowById(TEST_TUNE_BANISH_ID, ttPage.practiceGrid)
@@ -165,8 +130,7 @@ test.describe
       const firstTitle = await ttPage.flashcardTitle.textContent();
 
       // Toggle Show Submitted OFF
-      await ttPage.displaySubmittedSwitch.click();
-      await page.waitForTimeout(1000);
+      await ttPage.setShowSubmitted(false, 1000);
 
       // Verify current card changed (should skip submitted tune)
       const newTitle = await ttPage.flashcardTitle.textContent();
@@ -175,14 +139,7 @@ test.describe
 
     test("05. Submit + toggle interaction", async ({ page }) => {
       // Turn OFF Show Submitted
-      const showSubmittedToggle =
-        ttPage.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await ttPage.displaySubmittedSwitch.click();
-        await page.waitForTimeout(500);
-      }
+      await ttPage.setShowSubmitted(false, 500);
 
       // Open flashcard (unsubmitted tunes)
       await ttPage.enableFlashcardMode(500);
@@ -202,8 +159,7 @@ test.describe
       expect(total).toBeGreaterThanOrEqual(1);
 
       // Toggle Show Submitted ON
-      await ttPage.displaySubmittedSwitch.click();
-      await page.waitForTimeout(500);
+      await ttPage.setShowSubmitted(true, 500);
 
       // Verify count is now >= previous off count
       total = await ttPage.waitForCounterValue();
@@ -214,14 +170,7 @@ test.describe
       page,
     }) => {
       // Set Show Submitted to specific state (OFF)
-      const showSubmittedToggle =
-        ttPage.displaySubmittedSwitch.getByRole("switch");
-      const isOn =
-        (await showSubmittedToggle.getAttribute("aria-checked")) === "true";
-      if (isOn) {
-        await showSubmittedToggle.click();
-        await page.waitForTimeout(500);
-      }
+      await ttPage.setShowSubmitted(false, 500);
 
       // Open flashcard
       await ttPage.enableFlashcardMode(500);
@@ -242,8 +191,7 @@ test.describe
       expect(total).toBeGreaterThanOrEqual(1);
 
       // Now toggle ON
-      await ttPage.displaySubmittedSwitch.click();
-      await page.waitForTimeout(500);
+      await ttPage.setShowSubmitted(true, 500);
 
       // Close and reopen
       await ttPage.disableFlashcardMode();

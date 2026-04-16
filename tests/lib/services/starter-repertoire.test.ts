@@ -12,12 +12,23 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCatalogTuneIdsByFilter } from "../../../src/lib/db/queries/tunes";
-import { ITRAD_STARTER_TEMPLATE, RS500_STARTER_TEMPLATE } from "../../../src/lib/db/starter-repertoire-templates";
+import {
+  ITRAD_STARTER_TEMPLATE,
+  RS500_STARTER_TEMPLATE,
+} from "../../../src/lib/db/starter-repertoire-templates";
+import { generateOrGetPracticeQueue } from "../../../src/lib/services/practice-queue";
 import {
   createStarterRepertoire,
   populateStarterRepertoireFromCatalog,
 } from "../../../src/lib/services/repertoire-service";
-import { applyMigrations } from "../../../src/lib/services/test-schema-loader";
+import {
+  applyMigrations,
+  createPracticeListStagedView,
+} from "../../../src/lib/services/test-schema-loader";
+
+const TEST_PRACTICE_DATE = vi.hoisted(
+  () => new Date("2024-01-15T12:00:00.000Z")
+);
 
 // Suppress sync/persist side effects
 vi.mock("../../../src/lib/db/client-sqlite", () => ({
@@ -25,6 +36,9 @@ vi.mock("../../../src/lib/db/client-sqlite", () => ({
 }));
 vi.mock("../../../src/lib/sync", () => ({
   queueSync: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("../../../src/lib/utils/practice-date", () => ({
+  getPracticeDate: vi.fn(() => TEST_PRACTICE_DATE),
 }));
 
 // A deterministic UUID-format string used as the test user's Supabase auth ID.
@@ -80,6 +94,7 @@ beforeEach(() => {
   sqlite = new Database(":memory:");
   db = drizzle(sqlite) as BetterSQLite3Database;
   applyMigrations(db);
+  createPracticeListStagedView(db);
   seedUser();
 });
 
@@ -174,7 +189,11 @@ describe("createStarterRepertoire", () => {
   it("creates a repertoire from the ITRAD template with correct metadata", async () => {
     // Seed ITRAD genre so the FK on repertoire.genre_default passes
     seedGenre("ITRAD");
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, ITRAD_STARTER_TEMPLATE);
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      ITRAD_STARTER_TEMPLATE
+    );
 
     expect(rep.repertoireId).toBeDefined();
     expect(rep.name).toBe(ITRAD_STARTER_TEMPLATE.name);
@@ -185,7 +204,11 @@ describe("createStarterRepertoire", () => {
   });
 
   it("creates a repertoire from the RS500 template with null genreDefault", async () => {
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, RS500_STARTER_TEMPLATE);
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      RS500_STARTER_TEMPLATE
+    );
 
     expect(rep.repertoireId).toBeDefined();
     expect(rep.name).toBe(RS500_STARTER_TEMPLATE.name);
@@ -195,7 +218,11 @@ describe("createStarterRepertoire", () => {
 
   it("creates a repertoire with no tunes (tune population is deferred)", async () => {
     seedGenre("ITRAD");
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, ITRAD_STARTER_TEMPLATE);
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      ITRAD_STARTER_TEMPLATE
+    );
 
     // No tunes should exist yet — population is deferred to after catalog sync
     const row = sqlite
@@ -215,7 +242,11 @@ describe("createStarterRepertoire", () => {
 describe("populateStarterRepertoireFromCatalog", () => {
   it("returns (0 added, 0 skipped) when no matching catalog tunes exist", async () => {
     seedGenre("ITRAD");
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, ITRAD_STARTER_TEMPLATE);
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      ITRAD_STARTER_TEMPLATE
+    );
 
     // Catalog is empty — no ITRAD tunes yet
     const result = await populateStarterRepertoireFromCatalog(
@@ -232,7 +263,11 @@ describe("populateStarterRepertoireFromCatalog", () => {
   it("adds all matching catalog tunes to the repertoire", async () => {
     // Seed ITRAD genre before creating the repertoire (FK on genre_default)
     seedGenre("ITRAD");
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, ITRAD_STARTER_TEMPLATE);
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      ITRAD_STARTER_TEMPLATE
+    );
 
     // Seed two ITRAD catalog tunes and one non-ITRAD tune
     insertCatalogTune("tune-itrad-1", { genre: "ITRAD" });
@@ -257,12 +292,72 @@ describe("populateStarterRepertoireFromCatalog", () => {
     expect(row.cnt).toBe(2);
   });
 
-  it("uses origin filter for the RS500 template", async () => {
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, RS500_STARTER_TEMPLATE);
+  it("schedules starter tunes onto the current practice day so they enter today's queue", async () => {
+    seedGenre("ITRAD");
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      ITRAD_STARTER_TEMPLATE
+    );
 
-    insertCatalogTune("rs-1", { primaryOrigin: "rolling_stone_top_500_v1", genre: "Rock" });
-    insertCatalogTune("rs-2", { primaryOrigin: "rolling_stone_top_500_v1", genre: "Pop" });
-    insertCatalogTune("itrad-1", { primaryOrigin: "irishtune.info", genre: "ITRAD" });
+    insertCatalogTune("tune-itrad-1", { genre: "ITRAD" });
+    insertCatalogTune("tune-itrad-2", { genre: "ITRAD" });
+
+    const result = await populateStarterRepertoireFromCatalog(
+      db,
+      TEST_USER_ID,
+      rep.repertoireId,
+      ITRAD_STARTER_TEMPLATE
+    );
+
+    expect(result.added).toBe(2);
+
+    const scheduledRows = sqlite
+      .prepare(
+        "SELECT scheduled FROM repertoire_tune WHERE repertoire_ref = ? AND deleted = 0 ORDER BY tune_ref"
+      )
+      .all(rep.repertoireId) as Array<{ scheduled: string | null }>;
+
+    expect(scheduledRows).toHaveLength(2);
+    expect(scheduledRows.every((row) => row.scheduled !== null)).toBe(true);
+    expect(
+      scheduledRows.every(
+        (row) => row.scheduled === TEST_PRACTICE_DATE.toISOString()
+      )
+    ).toBe(true);
+
+    const queue = await generateOrGetPracticeQueue(
+      db,
+      TEST_USER_ID,
+      rep.repertoireId,
+      TEST_PRACTICE_DATE,
+      null,
+      "per_day",
+      true
+    );
+
+    expect(queue.length).toBeGreaterThan(0);
+  });
+
+  it("uses origin filter for the RS500 template", async () => {
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      RS500_STARTER_TEMPLATE
+    );
+
+    insertCatalogTune("rs-1", {
+      primaryOrigin: "rolling_stone_top_500_v1",
+      genre: "Rock",
+    });
+    insertCatalogTune("rs-2", {
+      primaryOrigin: "rolling_stone_top_500_v1",
+      genre: "Pop",
+    });
+    insertCatalogTune("itrad-1", {
+      primaryOrigin: "irishtune.info",
+      genre: "ITRAD",
+    });
 
     const result = await populateStarterRepertoireFromCatalog(
       db,
@@ -278,7 +373,11 @@ describe("populateStarterRepertoireFromCatalog", () => {
   it("skips tunes already in the repertoire", async () => {
     // Seed ITRAD genre before creating the repertoire (FK on genre_default)
     seedGenre("ITRAD");
-    const rep = await createStarterRepertoire(db, TEST_USER_ID, ITRAD_STARTER_TEMPLATE);
+    const rep = await createStarterRepertoire(
+      db,
+      TEST_USER_ID,
+      ITRAD_STARTER_TEMPLATE
+    );
     insertCatalogTune("tune-itrad-1", { genre: "ITRAD" });
 
     // Populate once

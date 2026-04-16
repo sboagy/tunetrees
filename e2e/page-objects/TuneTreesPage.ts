@@ -77,7 +77,7 @@ export class TuneTreesPage {
   // Toolbar Buttons - Generic (may not work on all tabs/viewports)
   readonly addTuneButton: Locator; // Generic by title
   readonly deleteButton: Locator; // Generic by role
-  readonly columnsButton: Locator; // Generic by role (text hidden on mobile)
+  readonly columnsButton: Locator; // Generic by role (label now always visible)
 
   // Tab-specific Toolbar Buttons (use these for reliable cross-viewport testing)
   readonly catalogAddTuneButton: Locator;
@@ -280,7 +280,7 @@ export class TuneTreesPage {
     // Generic Toolbar Buttons (may not work reliably across tabs/viewports)
     this.addTuneButton = page.getByRole("button", { name: "Add a new tune" });
     this.deleteButton = page.getByRole("button", { name: /Delete/i });
-    this.columnsButton = page.getByRole("button", { name: /Columns/i }); // Text hidden on mobile
+    this.columnsButton = page.locator('[data-testid$="-columns-button"]');
 
     // Tab-specific Toolbar Buttons - Catalog
     this.catalogAddTuneButton = page.getByTestId("catalog-add-tune-button");
@@ -1055,60 +1055,46 @@ export class TuneTreesPage {
    * is "good enough".
    */
   async refreshDateRolloverIfVisible(timeoutMs = 20000): Promise<boolean> {
-    const loadingMessage = this.page.getByText("Loading practice queue...");
-    const rowLocator = this.practiceGrid.locator("tbody tr[data-index]");
-    const startedAt = Date.now();
-    let settledWithoutRefreshSince: number | null = null;
+    const bannerVisible = await this.dateRolloverBanner
+      .isVisible()
+      .catch(() => false);
 
-    while (Date.now() - startedAt < timeoutMs) {
-      const [
-        loadingVisible,
-        bannerVisible,
-        refreshEnabled,
-        emptyVisible,
-        gridVisible,
-      ] = await Promise.all([
-        loadingMessage.isVisible().catch(() => false),
-        this.dateRolloverBanner.isVisible().catch(() => false),
-        this.dateRolloverRefreshButton.isEnabled().catch(() => false),
-        this.page
-          .getByText("All Caught Up!")
-          .isVisible()
-          .catch(() => false),
-        this.practiceGrid.isVisible().catch(() => false),
-      ]);
-
-      if (bannerVisible || refreshEnabled) {
-        await this.dateRolloverRefreshButton.click();
-        await expect(this.dateRolloverRefreshButton).toBeDisabled({
-          timeout: timeoutMs,
-        });
-        await expect(this.dateRolloverBanner).toBeHidden({
-          timeout: timeoutMs,
-        });
-        return true;
-      }
-
-      const rowCount = gridVisible
-        ? await rowLocator.count().catch(() => 0)
-        : 0;
-      const settledWithoutRefresh =
-        !loadingVisible && (emptyVisible || rowCount > 0);
-
-      if (settledWithoutRefresh) {
-        if (settledWithoutRefreshSince === null) {
-          settledWithoutRefreshSince = Date.now();
-        } else if (Date.now() - settledWithoutRefreshSince >= 1000) {
-          return false;
-        }
-      } else {
-        settledWithoutRefreshSince = null;
-      }
-
-      await this.page.waitForTimeout(200);
+    if (!bannerVisible) {
+      return false;
     }
 
-    return false;
+    await expect(this.dateRolloverRefreshButton).toBeVisible({
+      timeout: timeoutMs,
+    });
+    await expect(this.dateRolloverRefreshButton).toBeEnabled({
+      timeout: timeoutMs,
+    });
+    await this.dateRolloverRefreshButton.click();
+    await expect
+      .poll(
+        async () => {
+          const visible = await this.dateRolloverRefreshButton
+            .isVisible()
+            .catch(() => false);
+          if (!visible) {
+            return "hidden";
+          }
+
+          const enabled = await this.dateRolloverRefreshButton
+            .isEnabled()
+            .catch(() => false);
+          return enabled ? "enabled" : "disabled";
+        },
+        {
+          timeout: timeoutMs,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .not.toBe("enabled");
+    await expect(this.dateRolloverBanner).toBeHidden({
+      timeout: timeoutMs,
+    });
+    return true;
   }
 
   /**
@@ -1534,21 +1520,8 @@ export class TuneTreesPage {
 
       // Ensure the filter panel is closed so the grid is interactable.
       // (The panel may already be open from earlier steps.)
-      const panelStillVisible = await this.searchBoxPanel
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
-      if (panelStillVisible) {
-        const filtersVisible = await this.filtersButton
-          .isVisible({ timeout: 1000 })
-          .catch(() => false);
-        if (filtersVisible) {
-          await this.page.waitForTimeout(50); // Trying to help flaky test
-          await this.filtersButton.click();
-        } else {
-          await this.page.keyboard.press("Escape").catch(() => {});
-        }
-        await this.page.waitForTimeout(300);
-      }
+      await this.closeFilterPanelIfOpen();
+
       const noTunesFoundLocator = this.page.getByText("No tunes found");
 
       const matchingRow = grid
@@ -1758,9 +1731,16 @@ export class TuneTreesPage {
           : tab === "repertoire"
             ? this.repertoireAddTuneButton
             : this.addTuneButton;
+      if (tab === "catalog" || tab === "repertoire") {
+        await this.ensureToolbarActionVisible(tab, button);
+      }
       await expect(button).toBeVisible({ timeout: 5000 });
     }
     if (options.addToRepertoire) {
+      await this.ensureToolbarActionVisible(
+        "catalog",
+        this.catalogAddToRepertoireButton
+      );
       await expect(this.catalogAddToRepertoireButton).toBeVisible({
         timeout: 5000,
       });
@@ -1771,6 +1751,9 @@ export class TuneTreesPage {
         tab === "catalog" ? this.catalogDeleteButton : this.deleteButton;
 
       if (options.delete) {
+        if (tab === "catalog") {
+          await this.ensureToolbarActionVisible("catalog", deleteBtn);
+        }
         await expect(deleteBtn).toBeVisible();
         await expect(deleteBtn).toBeEnabled();
       } else {
@@ -1807,6 +1790,14 @@ export class TuneTreesPage {
     }
   }
 
+  private getGridForTab(tab: "catalog" | "repertoire" | "practice"): Locator {
+    return tab === "catalog"
+      ? this.catalogGrid
+      : tab === "repertoire"
+        ? this.repertoireGrid
+        : this.practiceGrid;
+  }
+
   private getColumnsButtonForTab(
     tab: "catalog" | "repertoire" | "practice"
   ): Locator {
@@ -1817,11 +1808,360 @@ export class TuneTreesPage {
         : this.practiceColumnsButton;
   }
 
+  private async isDisplayModeListEnabled(): Promise<boolean> {
+    const displayModeSwitch = this.page.getByTestId("display-mode-switch");
+    await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
+
+    const ariaChecked = await displayModeSwitch.getAttribute("aria-checked");
+    if (ariaChecked === "true") return true;
+    if (ariaChecked === "false") return false;
+
+    const switchInput = displayModeSwitch
+      .locator('input[type="checkbox"]')
+      .first();
+    const hasInput = (await switchInput.count().catch(() => 0)) > 0;
+    if (hasInput) {
+      return await switchInput.isChecked().catch(() => false);
+    }
+
+    return await displayModeSwitch.evaluate((element) => {
+      return (
+        element.hasAttribute("data-checked") ||
+        element.getAttribute("data-state") === "checked"
+      );
+    });
+  }
+
+  private async closeColumnVisibilityMenu(menu: Locator) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const menuVisible = await menu
+        .isVisible({ timeout: 200 })
+        .catch(() => false);
+      if (!menuVisible) break;
+
+      const box = await menu.boundingBox().catch(() => null);
+      if (box) {
+        const outsideX = Math.max(4, Math.floor(box.x) - 12);
+        const outsideY = Math.max(
+          4,
+          Math.floor(box.y + Math.min(box.height / 2, 24))
+        );
+        await this.page.mouse.click(outsideX, outsideY).catch(() => undefined);
+      } else {
+        await this.page.mouse.click(4, 4).catch(() => undefined);
+      }
+
+      await this.page.waitForTimeout(100);
+    }
+
+    await expect(menu).toBeHidden({ timeout: 5000 });
+  }
+
+  private async closeFilterPanelIfOpen() {
+    const filterPanel = this.page.locator('[data-filter-panel="true"]').last();
+    const panelVisible = await filterPanel
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+
+    if (!panelVisible) return;
+
+    const filtersVisible = await this.filtersButton
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+
+    if (filtersVisible) {
+      await this.filtersButton.click().catch(() => undefined);
+      const hiddenAfterToggle = await filterPanel
+        .isHidden({ timeout: 500 })
+        .catch(() => false);
+      if (hiddenAfterToggle) return;
+    }
+
+    const box = await filterPanel.boundingBox().catch(() => null);
+    if (box) {
+      const outsideX = Math.max(4, Math.floor(box.x) - 12);
+      const outsideY = Math.max(
+        4,
+        Math.floor(box.y + Math.min(box.height / 2, 24))
+      );
+      await this.page.mouse.click(outsideX, outsideY).catch(() => undefined);
+    } else {
+      await this.page.mouse.click(4, 4).catch(() => undefined);
+    }
+
+    await expect(filterPanel).toBeHidden({ timeout: 5000 });
+  }
+
+  async setViewMode(
+    tab: "catalog" | "repertoire" | "practice",
+    mode: "grid" | "list"
+  ) {
+    const columnsButton = this.getColumnsButtonForTab(tab);
+    const grid = this.getGridForTab(tab);
+    const menu = this.getColumnVisibilityMenu();
+
+    await expect(grid).toBeVisible({ timeout: 10000 });
+    await expect(columnsButton).toBeVisible({ timeout: 5000 });
+    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
+
+    const menuVisible = await menu
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await columnsButton.click();
+      await this.openDisplayOptionsEntryIfNeeded(columnsButton);
+      await expect(menu).toBeVisible({ timeout: 5000 });
+    }
+
+    const shouldUseList = mode === "list";
+    const displayModeSwitch = this.page.getByTestId("display-mode-switch");
+    const listEnabled = await this.isDisplayModeListEnabled();
+
+    if (listEnabled !== shouldUseList) {
+      await displayModeSwitch.click();
+      await expect
+        .poll(() => this.isDisplayModeListEnabled(), {
+          timeout: 5000,
+          intervals: [100, 250, 500],
+        })
+        .toBe(shouldUseList);
+    }
+
+    await this.closeColumnVisibilityMenu(menu);
+
+    if (mode === "grid") {
+      await expect(grid.locator("thead th").first()).toBeVisible({
+        timeout: 10000,
+      });
+    } else {
+      await expect(
+        grid.locator("li[data-testid^='stacked-item-']").first()
+      ).toBeVisible({ timeout: 10000 });
+    }
+  }
+
+  async ensureGridView(tab: "catalog" | "repertoire" | "practice") {
+    await this.setViewMode(tab, "grid");
+  }
+
+  async ensureListView(tab: "catalog" | "repertoire" | "practice") {
+    await this.setViewMode(tab, "list");
+  }
+
+  private async revealToolbarAction(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ): Promise<boolean> {
+    const alreadyVisible = await action
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (alreadyVisible) {
+      return false;
+    }
+
+    const overflowButton = this.getColumnsButtonForTab(tab);
+    await expect(overflowButton).toBeVisible({ timeout: 5000 });
+    await overflowButton.click();
+    await expect(action).toBeVisible({ timeout: 5000 });
+    return true;
+  }
+
+  private async ensureToolbarActionVisible(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ) {
+    await this.revealToolbarAction(tab, action);
+  }
+
+  private async getToolbarSwitchTarget(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ): Promise<Locator> {
+    await this.ensureToolbarActionVisible(tab, action);
+    const nestedSwitch = action.getByRole("switch");
+    const nestedVisible = await nestedSwitch
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    return nestedVisible ? nestedSwitch : action;
+  }
+
+  private async getToolbarSwitchChecked(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ): Promise<boolean> {
+    const openedOverflow = await this.revealToolbarAction(tab, action);
+
+    try {
+      const target = await this.getToolbarSwitchTarget(tab, action);
+      return (await target.getAttribute("aria-checked")) === "true";
+    } finally {
+      if (openedOverflow) {
+        await this.page.keyboard.press("Escape").catch(() => undefined);
+      }
+    }
+  }
+
+  private async setToolbarSwitchChecked(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator,
+    enabled: boolean,
+    settleMs: number = 300
+  ) {
+    const current = await this.getToolbarSwitchChecked(tab, action);
+    if (current === enabled) {
+      return;
+    }
+
+    await this.ensureToolbarActionVisible(tab, action);
+    await action.click();
+
+    await expect
+      .poll(() => this.getToolbarSwitchChecked(tab, action), {
+        timeout: 5000,
+        intervals: [100, 250, 500, 1000],
+      })
+      .toBe(enabled);
+
+    if (settleMs > 0) {
+      await this.page.waitForTimeout(settleMs);
+    }
+  }
+
+  async isShowSubmittedEnabled(): Promise<boolean> {
+    return this.getToolbarSwitchChecked(
+      "practice",
+      this.displaySubmittedSwitch
+    );
+  }
+
+  async isFlashcardModeDisabled(): Promise<boolean> {
+    const openedOverflow = await this.revealToolbarAction(
+      "practice",
+      this.flashcardModeSwitch
+    );
+
+    try {
+      const target = await this.getToolbarSwitchTarget(
+        "practice",
+        this.flashcardModeSwitch
+      );
+      const disabled = await target.isDisabled().catch(() => false);
+      if (disabled) {
+        return true;
+      }
+
+      return (await target.getAttribute("aria-disabled")) === "true";
+    } finally {
+      if (openedOverflow) {
+        await this.page.keyboard.press("Escape").catch(() => undefined);
+      }
+    }
+  }
+
+  async setShowSubmitted(enabled: boolean, settleMs: number = 300) {
+    await this.setToolbarSwitchChecked(
+      "practice",
+      this.displaySubmittedSwitch,
+      enabled,
+      settleMs
+    );
+  }
+
+  async toggleShowSubmitted(settleMs: number = 300) {
+    await this.setShowSubmitted(
+      !(await this.isShowSubmittedEnabled()),
+      settleMs
+    );
+  }
+
+  async clickCatalogAddToRepertoire() {
+    await this.ensureToolbarActionVisible(
+      "catalog",
+      this.catalogAddToRepertoireButton
+    );
+    await this.catalogAddToRepertoireButton.click({ timeout: 5000 });
+  }
+
+  async clickCatalogAddTune() {
+    await this.ensureToolbarActionVisible("catalog", this.catalogAddTuneButton);
+    await this.catalogAddTuneButton.click({ timeout: 5000 });
+  }
+
+  async clickCatalogDelete() {
+    await this.ensureToolbarActionVisible("catalog", this.catalogDeleteButton);
+    await this.catalogDeleteButton.click({ timeout: 5000 });
+  }
+
+  async clickRepertoireAddToReview() {
+    await this.ensureToolbarActionVisible(
+      "repertoire",
+      this.repertoireAddToReviewButton
+    );
+    await this.repertoireAddToReviewButton.click({ timeout: 5000 });
+  }
+
+  async clickRepertoireAddTune() {
+    await this.ensureToolbarActionVisible(
+      "repertoire",
+      this.repertoireAddTuneButton
+    );
+    await this.repertoireAddTuneButton.click({ timeout: 5000 });
+  }
+
+  async clickRepertoireRemove() {
+    await this.ensureToolbarActionVisible(
+      "repertoire",
+      this.repertoireRemoveButton
+    );
+    await this.repertoireRemoveButton.click({ timeout: 5000 });
+  }
+
   private getColumnVisibilityMenu(): Locator {
     return this.page
       .locator("div.fixed.w-64")
-      .filter({ hasText: "Show Columns" })
+      .filter({ hasText: /Show Columns|Display Options/i })
       .last();
+  }
+
+  private getDisplayOptionsButton(): Locator {
+    return this.page.getByTestId("display-options-entry-button").last();
+  }
+
+  private async openDisplayOptionsEntryIfNeeded(
+    columnsButton: Locator,
+    targetMenu: Locator = this.getColumnVisibilityMenu()
+  ): Promise<void> {
+    const ariaLabel = ((await columnsButton.getAttribute("aria-label")) ?? "")
+      .trim()
+      .toLowerCase();
+    const opensOverflowMenu = ariaLabel === "more options";
+
+    if (!opensOverflowMenu) {
+      return;
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) {
+        await columnsButton.click().catch(() => undefined);
+      }
+
+      const displayOptionsButton = this.getDisplayOptionsButton();
+      await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
+
+      // The Kobalte dropdown entry can detach as it closes itself while opening
+      // the nested menu surface. Trigger the handler directly and wait for the
+      // caller-specific target menu to appear.
+      await displayOptionsButton.dispatchEvent("click").catch(() => undefined);
+
+      const menuVisible = await targetMenu
+        .isVisible({ timeout: 1000 })
+        .catch(() => false);
+      if (menuVisible) {
+        return;
+      }
+    }
+
+    await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 
   async setGridColumnVisibility(
@@ -1841,6 +2181,7 @@ export class TuneTreesPage {
       .catch(() => false);
     if (!menuVisible) {
       await columnsButton.click();
+      await this.openDisplayOptionsEntryIfNeeded(columnsButton);
       await expect(menu).toBeVisible({ timeout: 5000 });
     }
 
@@ -1866,10 +2207,7 @@ export class TuneTreesPage {
       }
     }
 
-    await this.page.keyboard.press("Escape").catch(() => undefined);
-    await expect(menu)
-      .toBeHidden({ timeout: 5000 })
-      .catch(() => undefined);
+    await this.closeColumnVisibilityMenu(menu);
   }
 
   async ensureGridColumnVisible(
@@ -2315,7 +2653,12 @@ export class TuneTreesPage {
   // ===== Flashcard helpers =====
 
   async enableFlashcardMode(timeoutAfter: number = 800) {
-    await this.flashcardModeSwitch.click();
+    await this.setToolbarSwitchChecked(
+      "practice",
+      this.flashcardModeSwitch,
+      true,
+      0
+    );
     await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
 
     if (typeof timeoutAfter === "number") {
@@ -2323,9 +2666,68 @@ export class TuneTreesPage {
     }
   }
 
+  async enableFlashcardModeAllowingEmptyState(timeoutAfter: number = 800) {
+    const flashcardEmptyState = this.page.getByTestId("flashcard-empty-state");
+
+    await this.setToolbarSwitchChecked(
+      "practice",
+      this.flashcardModeSwitch,
+      true,
+      0
+    );
+
+    await expect
+      .poll(
+        async () => {
+          const [flashcardVisible, emptyVisible] = await Promise.all([
+            this.flashcardView.isVisible().catch(() => false),
+            flashcardEmptyState.isVisible().catch(() => false),
+          ]);
+
+          if (flashcardVisible) {
+            return "flashcard";
+          }
+          if (emptyVisible) {
+            return "empty";
+          }
+          return "pending";
+        },
+        {
+          timeout: 15000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .not.toBe("pending");
+
+    if (typeof timeoutAfter === "number") {
+      await this.page.waitForTimeout(timeoutAfter);
+    }
+  }
+
   async disableFlashcardMode() {
-    await this.flashcardModeSwitch.click();
-    await expect(this.flashcardView).not.toBeVisible({ timeout: 5000 });
+    const flashcardEmptyState = this.page.getByTestId("flashcard-empty-state");
+
+    await this.setToolbarSwitchChecked(
+      "practice",
+      this.flashcardModeSwitch,
+      false,
+      0
+    );
+    await expect
+      .poll(
+        async () => {
+          const [flashcardVisible, emptyVisible] = await Promise.all([
+            this.flashcardView.isVisible().catch(() => false),
+            flashcardEmptyState.isVisible().catch(() => false),
+          ]);
+          return flashcardVisible || emptyVisible;
+        },
+        {
+          timeout: 5000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(false);
   }
 
   async waitForNextCardButtonToBeEnabled(
@@ -2975,6 +3377,10 @@ export class TuneTreesPage {
       await expect(this.practiceColumnsButton).toBeVisible({ timeout: 5000 });
       await expect(this.practiceColumnsButton).toBeEnabled({ timeout: 5000 });
       await this.practiceColumnsButton.click();
+      await this.openDisplayOptionsEntryIfNeeded(
+        this.practiceColumnsButton,
+        this.flashcardFieldsMenu
+      );
 
       try {
         await expect(this.flashcardFieldsMenu).toBeVisible({ timeout: 6000 });
@@ -3012,8 +3418,9 @@ export class TuneTreesPage {
         await expect(checkbox).not.toBeChecked({ timeout: 3000 });
       }
     }
-    // Click outside to close menu (click Columns/Fields button again)
-    await this.practiceColumnsButton.click();
+    // Escape closes the floating menu on both desktop and mobile without
+    // reopening the mobile overflow trigger.
+    await this.page.keyboard.press("Escape").catch(() => undefined);
     await expect(this.flashcardFieldsMenu)
       .toBeHidden({ timeout: 5000 })
       .catch(() => undefined);

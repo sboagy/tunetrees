@@ -19,6 +19,7 @@
 
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { getPracticeDate } from "@/lib/utils/practice-date";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
@@ -466,12 +467,15 @@ export async function addTuneToRepertoire(
 
   // Create new association
   const now = new Date().toISOString();
+  const practiceDayTimestamp = getPracticeDate().toISOString();
   const newAssociation: NewRepertoireTune = {
     repertoireRef: repertoireId,
     tuneRef: tuneId,
     current: null,
     learned: null,
-    scheduled: now, // Schedule for immediate practice
+    // Normalize to the current practice day so new tunes land in today's queue
+    // regardless of the user's local time vs. UTC.
+    scheduled: practiceDayTimestamp,
     goal: "recall",
     deleted: 0,
     syncVersion: 1,
@@ -798,6 +802,7 @@ export async function addTunesToRepertoireBulk(
   }
 
   const now = new Date().toISOString();
+  const practiceDayTimestamp = getPracticeDate().toISOString();
   await db
     .insert(repertoireTune)
     .values(
@@ -806,7 +811,9 @@ export async function addTunesToRepertoireBulk(
         tuneRef: tuneId,
         current: null,
         learned: null,
-        scheduled: now,
+        // Normalize to the practice day so bulk starter/catalog additions are
+        // immediately eligible for today's queue across time zones.
+        scheduled: practiceDayTimestamp,
         goal: "recall",
         deleted: 0,
         syncVersion: 1,

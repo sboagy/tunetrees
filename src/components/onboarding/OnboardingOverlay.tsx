@@ -21,12 +21,16 @@ import {
   Switch,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useOnboarding } from "../../lib/context/OnboardingContext";
 import { getStarterTemplateById } from "../../lib/db/starter-repertoire-templates";
+import { generateOrGetPracticeQueue } from "../../lib/services/practice-queue";
 import {
   createStarterRepertoire,
   populateStarterRepertoireFromCatalog,
+  setSelectedRepertoireId,
 } from "../../lib/services/repertoire-service";
+import { getPracticeDate } from "../../lib/utils/practice-date";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
 
 /**
@@ -52,13 +56,16 @@ export const OnboardingOverlay: Component = () => {
   const {
     localDb,
     forceSyncDown,
+    forceSyncUp,
     remoteSyncDownCompletionVersion,
     user,
     userIdInt,
+    incrementPracticeListStagedChanged,
     incrementRepertoireListChanged,
     catalogSyncPending,
     triggerCatalogSync,
   } = useAuth();
+  const { setCurrentRepertoireId } = useCurrentRepertoire();
   const navigate = useNavigate();
   const [genres, setGenres] = createSignal<Genre[]>([]);
   const [selectedGenreIds, setSelectedGenreIds] = createSignal<string[]>([]);
@@ -194,6 +201,8 @@ export const OnboardingOverlay: Component = () => {
             userIntId,
             template
           );
+          setCurrentRepertoireId(newRepertoire.repertoireId);
+          setSelectedRepertoireId(userId, newRepertoire.repertoireId);
           // Store for genre-step population (Step B below)
           setPendingStarter(newRepertoire.repertoireId, template.id);
           // Reflect new repertoire in the top-nav dropdown
@@ -272,6 +281,19 @@ export const OnboardingOverlay: Component = () => {
             console.log(
               `✅ Added ${result.added} tunes to starter repertoire (${result.skipped} already present)`
             );
+            if (result.added > 0 || result.skipped > 0) {
+              await generateOrGetPracticeQueue(
+                db,
+                userId,
+                starterRepertoireId,
+                getPracticeDate(),
+                null,
+                "per_day",
+                true
+              );
+              await forceSyncUp();
+              incrementPracticeListStagedChanged();
+            }
             if (result.added === 0 && result.skipped === 0) {
               // Catalog may not have synced tunes yet; user can add from catalog manually
               setPopulationWarning(

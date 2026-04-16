@@ -9,11 +9,7 @@
  */
 
 import type { Column, Table } from "@tanstack/solid-table";
-import {
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  PinOff,
-} from "lucide-solid";
+import { ArrowLeftToLine, ArrowRightToLine, PinOff } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -24,6 +20,8 @@ import {
   Show,
 } from "solid-js";
 import { Portal } from "solid-js/web";
+import type { ITableDisplayOptionsMeta } from "../grids/types";
+import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 
 export interface ColumnVisibilityMenuProps {
   /** TanStack Table instance */
@@ -34,6 +32,17 @@ export interface ColumnVisibilityMenuProps {
   onClose: () => void;
   /** Reference to the trigger button for positioning */
   triggerRef?: HTMLElement;
+  /**
+   * Optional element to exclude from the outside-click close guard.
+   * When not provided, defaults to `triggerRef`.
+   * Pass `null` to disable the guard entirely so that any click outside the
+   * menu — including on the overflow trigger — will close the menu.  This is
+   * useful on mobile where the overflow button opens its own popover and should
+   * not keep the Display Options menu open.
+   */
+  closeGuardRef?: HTMLElement | null;
+  /** Optional menu title */
+  title?: string;
 }
 
 /**
@@ -145,12 +154,22 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       const handleClickOutside = (e: MouseEvent) => {
         const target = e.target as Node;
 
-        // Check if click is inside menu or trigger button
+        // Check if click is inside menu
         const isInsideMenu = menuRef?.contains(target);
-        const isInsideTrigger = props.triggerRef?.contains(target);
+
+        // Determine which element guards against outside-click dismissal.
+        // Three-state logic for closeGuardRef:
+        //   undefined  → not provided; fall back to triggerRef (backward-compatible default)
+        //   null       → explicitly disabled; any click outside the menu closes it
+        //   HTMLElement → use that element as the guard
+        const guardRef =
+          props.closeGuardRef !== undefined
+            ? props.closeGuardRef
+            : props.triggerRef;
+        const isInsideGuard = guardRef?.contains(target);
 
         // Only close if click is truly outside
-        if (!isInsideMenu && !isInsideTrigger) {
+        if (!isInsideMenu && !isInsideGuard) {
           props.onClose();
         }
       };
@@ -253,6 +272,17 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     return getToggleableColumns().filter((col) => col.getIsVisible()).length;
   };
 
+  const menuTitle = () => props.title ?? "Display Options";
+  const displayOptionsMeta = () => {
+    return props.table.options.meta as ITableDisplayOptionsMeta | undefined;
+  };
+  const currentViewMode = () => {
+    return displayOptionsMeta()?.getViewMode?.() ?? "grid";
+  };
+  const canToggleViewMode = () => {
+    return typeof displayOptionsMeta()?.setViewMode === "function";
+  };
+
   return (
     <Show when={props.isOpen}>
       <Portal>
@@ -268,7 +298,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
           <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200/30 dark:border-gray-700/30 px-3 py-2">
             <div class="flex items-center justify-between">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Show Columns
+                {menuTitle()}
               </span>
               <span class="text-xs text-gray-500 dark:text-gray-400">
                 {visibleCount()} / {getToggleableColumns().length}
@@ -292,6 +322,31 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                 Hide All
               </button>
             </div>
+
+            <Show when={canToggleViewMode()}>
+              <div class="mt-2 border-t border-gray-200/30 pt-2 dark:border-gray-700/30">
+                <Switch
+                  checked={currentViewMode() === "list"}
+                  onChange={(checked) => {
+                    displayOptionsMeta()?.setViewMode?.(
+                      checked ? "list" : "grid"
+                    );
+                  }}
+                  data-testid="display-mode-switch"
+                  class="flex w-full items-center gap-3 rounded-md px-1 py-1.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700/50"
+                >
+                  <SwitchLabel class="flex-1 cursor-pointer select-none">
+                    List View
+                  </SwitchLabel>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">
+                    {currentViewMode() === "list" ? "List" : "Grid"}
+                  </span>
+                  <SwitchControl class="ml-1">
+                    <SwitchThumb />
+                  </SwitchControl>
+                </Switch>
+              </div>
+            </Show>
           </div>
 
           {/* Column checkboxes */}

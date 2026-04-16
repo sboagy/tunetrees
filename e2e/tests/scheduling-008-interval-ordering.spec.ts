@@ -87,19 +87,13 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
     page,
     testUser,
   }) => {
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip(
-        true,
-        "Test uses row checkboxes to add tunes to repertoire/review, which are not available in the mobile stacked list."
-      );
-    }
     // Helper to create, configure, and add a tune to review
     async function createAndAddToReview(meta: RatedTuneMeta, tuneType: string) {
       // Clear saved catalog URL params so navigateToTab("catalog") doesn't restore
       // a stale search query from a previous iteration into the returnPath.
       await page.evaluate(() => localStorage.removeItem("tt:url:catalog"));
       await ttPage.navigateToTab("catalog");
-      await ttPage.catalogAddTuneButton.click();
+      await ttPage.clickCatalogAddTune();
       const newButton = page.getByRole("button", { name: /^new$/i });
       await newButton.click();
       await page.waitForLoadState("networkidle", { timeout: 15000 });
@@ -143,31 +137,35 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         `[SCHED-008 DEBUG ${meta.rating}] ${JSON.stringify(debugInfo)}`
       );
       // Wait for the filtered row to appear (Playwright retries every 100ms).
-      const tuneRowInCatalog = ttPage.catalogGrid
-        .locator("tbody tr")
-        .filter({ hasText: meta.title });
+      const tuneRowInCatalog = ttPage
+        .getRows("catalog")
+        .filter({ hasText: meta.title })
+        .first();
       await expect(tuneRowInCatalog).toBeVisible({ timeout: 10000 });
-      // Select the first data-row checkbox (nth(1) = index 1, after select-all header).
-      const firstCheckbox = ttPage.catalogGrid
+      const firstCheckbox = tuneRowInCatalog
         .locator('input[type="checkbox"]')
-        .nth(1);
+        .first();
       await firstCheckbox.check();
       await page.waitForTimeout(500);
       // Verify tune is selected before adding to repertoire.
       await expect(page.getByText(/1 tune selected/i)).toBeVisible({
         timeout: 3000,
       });
-      await ttPage.catalogAddToRepertoireButton.click();
+      await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(2000); // Wait for sync
       // Add to review
       await ttPage.navigateToTab("repertoire");
       await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10000 });
       await ttPage.searchForTune(meta.title, ttPage.repertoireGrid);
-      const repCheckbox = ttPage.repertoireGrid
+      const repertoireRow = ttPage
+        .getRows("repertoire")
+        .filter({ hasText: meta.title })
+        .first();
+      const repCheckbox = repertoireRow
         .locator('input[type="checkbox"]')
-        .nth(1);
+        .first();
       await repCheckbox.check();
-      await ttPage.repertoireAddToReviewButton.click();
+      await ttPage.clickRepertoireAddToReview();
       await page.waitForTimeout(1000);
     }
 

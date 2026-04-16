@@ -129,10 +129,10 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
     await expect
-      .poll(
-        () => getRepertoireCount(page, testUser.repertoireId),
-        { timeout: 20_000, intervals: [300, 500, 1000] }
-      )
+      .poll(() => getRepertoireCount(page, testUser.repertoireId), {
+        timeout: 20_000,
+        intervals: [300, 500, 1000],
+      })
       .toBe(QUEUE_TUNES.length + 1);
 
     await waitForTestApi(page);
@@ -142,11 +142,6 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     page,
     testUser,
   }) => {
-    // Skip on mobile — UI layout differs for evaluation controls.
-    if (test.info().project.name === "Mobile Chrome") {
-      test.skip();
-    }
-
     // STEP 1: Verify initial queue contains exactly the 2 scheduled tunes.
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20_000 });
 
@@ -175,10 +170,7 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
       .poll(
         async () => {
           const rows = await getQueueRows(page, testUser.repertoireId);
-          return (
-            rows.length > 0 &&
-            rows.every((r) => !!r.completed_at)
-          );
+          return rows.length > 0 && rows.every((r) => !!r.completed_at);
         },
         { timeout: 20_000, intervals: [300, 500, 1000] }
       )
@@ -221,11 +213,14 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     });
 
     // STEP 5: Click "Add To Review".
-    await page.getByTestId("add-to-review-button").click();
+    await ttPage.clickRepertoireAddToReview();
 
     // Wait deterministically for the dialog to fire and be handled.
     await expect
-      .poll(() => dialogMessage, { timeout: 10_000, intervals: [100, 250, 500] })
+      .poll(() => dialogMessage, {
+        timeout: 10_000,
+        intervals: [100, 250, 500],
+      })
       .toMatch(/Added \d+ tune/);
 
     // Confirm the dialog shows the tune was added.
@@ -263,8 +258,14 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
 
     // The newly added tune should be in the queue.
     const addedRow = finalRows.find((r) => r.tune_ref === EXTRA_TUNE);
-    expect(addedRow, "The newly added tune should be in the queue").toBeDefined();
-    expect(addedRow?.completed_at, "Newly added tune should be incomplete").toBeNull();
+    expect(
+      addedRow,
+      "The newly added tune should be in the queue"
+    ).toBeDefined();
+    expect(
+      addedRow?.completed_at,
+      "Newly added tune should be incomplete"
+    ).toBeNull();
 
     // The window start should be the same — no new queue was created.
     for (const row of finalRows) {
