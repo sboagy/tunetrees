@@ -1665,12 +1665,13 @@ export class TuneTreesPage {
    * Useful for locating a row when the ID column is not showing.
    */
   getRowInPracticeGridByTuneId(tuneId: string): Locator {
-    const row = this.page
-      .getByTestId(`recall-eval-${tuneId}`) // RecallEvalComboBox DropdownMenu.Trigger
-      .locator("..") // div?
-      .locator("..") // cell
-      .locator(".."); // row
-    return row;
+    return this.practiceGrid.locator(
+      [
+        `tr[data-index]:has([data-testid="recall-eval-${tuneId}"])`,
+        `tbody tr:has([data-testid="recall-eval-${tuneId}"])`,
+        `li[data-testid="stacked-item-${tuneId}"]`,
+      ].join(", ")
+    );
   }
 
   getRows(gridId: string): Locator {
@@ -1710,6 +1711,32 @@ export class TuneTreesPage {
   async clickTune(tuneName: string, grid: Locator) {
     const tuneLink = await this.getTuneLink(tuneName, grid);
     await tuneLink.click();
+  }
+
+  /**
+   * Select a grid row without accidentally activating inline stacked-list controls.
+   * Mobile stacked rows now include goal/schedule controls, so a center-point click
+   * can open an editor popover instead of selecting the tune.
+   */
+  async selectGridRow(row: Locator, opts?: { timeout?: number }) {
+    const timeout = opts?.timeout ?? 5000;
+
+    await row.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(row).toBeVisible({ timeout });
+
+    const rowTestId = await row.getAttribute("data-testid").catch(() => null);
+    if (rowTestId?.startsWith("stacked-item-")) {
+      await row.evaluate((element) => {
+        if (element instanceof HTMLElement) {
+          element.scrollIntoView({ block: "center", inline: "nearest" });
+          element.click();
+        }
+      });
+      await this.page.waitForTimeout(150);
+      return;
+    }
+
+    await row.click({ timeout });
   }
 
   /**

@@ -61,7 +61,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -90,7 +90,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ASSERT: Reopen editor and verify learned date was saved
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
     await editButton.click();
@@ -109,7 +109,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -136,7 +136,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ASSERT: Reopen and verify
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
     await editButton.click();
@@ -155,7 +155,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -183,7 +183,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ASSERT: Reopen and verify
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
     await editButton.click();
@@ -202,7 +202,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -228,7 +228,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -266,7 +266,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -297,7 +297,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -329,7 +329,7 @@ test.describe("TUNE-EDITOR-004: User-Specific Fields", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // ASSERT: Reopen and verify all fields
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await editButton.click();
     await page.waitForLoadState("networkidle", { timeout: 15000 });
