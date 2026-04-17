@@ -5,10 +5,6 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "http://127.0.0.1:54321";
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
-const TEST_PASSWORD = "TestPassword123!";
-
 import {
   TEST_REPERTOIRE_ALICE_ID,
   TEST_REPERTOIRE_BOB_ID,
@@ -35,6 +31,22 @@ import {
   TEST_USER_IRIS_EMAIL,
   TEST_USER_IRIS_ID,
 } from "../../tests/fixtures/test-data";
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "http://127.0.0.1:54321";
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+
+export function getRequiredTestPassword(): string {
+  const password =
+    process.env.ALICE_TEST_PASSWORD ?? process.env.TEST_USER_PASSWORD;
+
+  if (password && password.trim().length > 0) {
+    return password;
+  }
+
+  throw new Error(
+    "Missing ALICE_TEST_PASSWORD or TEST_USER_PASSWORD. Inject the shared test password from 1Password before running this test."
+  );
+}
 
 export type TestUser = {
   email: string;
@@ -122,7 +134,7 @@ export async function getTestUserClient(userKey: string) {
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: user.email,
-    password: TEST_PASSWORD,
+    password: getRequiredTestPassword(),
   });
 
   if (error) {

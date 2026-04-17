@@ -28,7 +28,20 @@ function getSupabaseServiceRoleKey(): string {
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
 const SUPABASE_SERVICE_ROLE_KEY = getSupabaseServiceRoleKey();
 
-const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
+function getRequiredTestPassword(): string {
+  const password =
+    process.env.ALICE_TEST_PASSWORD ?? process.env.TEST_USER_PASSWORD;
+
+  if (password && password.trim().length > 0) {
+    return password;
+  }
+
+  throw new Error(
+    "Missing ALICE_TEST_PASSWORD or TEST_USER_PASSWORD. Inject the shared test password from 1Password before running this script."
+  );
+}
+
+const TEST_PASSWORD = getRequiredTestPassword();
 
 // Test users with UUIDs matching tests/fixtures/test-data.ts
 const TEST_USERS = [

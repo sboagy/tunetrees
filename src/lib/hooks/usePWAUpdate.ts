@@ -60,6 +60,18 @@ export function usePWAUpdate(): PWAUpdateState {
 
       let updateCheckInterval: number | undefined;
       let registration: ServiceWorkerRegistration | undefined;
+      let handleVisibilityChange: (() => void) | undefined;
+
+      const checkForUpdateNow = () => {
+        if (!registration) return;
+
+        // Force an update check at startup and when the tab becomes visible
+        // so deployed fixes reach stale controlled clients faster than the
+        // default browser/service-worker polling cadence.
+        void registration.update().catch((error) => {
+          console.warn("[PWA] Service Worker update check failed:", error);
+        });
+      };
 
       const {
         needRefresh: [needRefreshSignal],
@@ -69,10 +81,19 @@ export function usePWAUpdate(): PWAUpdateState {
           console.log("[PWA] Service Worker registered:", reg);
           registration = reg;
 
+          checkForUpdateNow();
+
+          handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+              checkForUpdateNow();
+            }
+          };
+          document.addEventListener("visibilitychange", handleVisibilityChange);
+
           // Check for updates every hour
           updateCheckInterval = window.setInterval(
             () => {
-              registration?.update();
+              checkForUpdateNow();
             },
             60 * 60 * 1000
           );
@@ -101,6 +122,12 @@ export function usePWAUpdate(): PWAUpdateState {
       onCleanup(() => {
         if (updateCheckInterval !== undefined) {
           clearInterval(updateCheckInterval);
+        }
+        if (handleVisibilityChange) {
+          document.removeEventListener(
+            "visibilitychange",
+            handleVisibilityChange
+          );
         }
       });
     } catch (error) {
