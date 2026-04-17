@@ -174,7 +174,11 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 
   const handleDisplayOptionsOpen = () => {
     setShowOverflowMenu(false);
-    setShowColumnsDropdown(true);
+    // Let the mobile overflow popover finish closing before opening the
+    // Display Options portal, otherwise the nested menu can race on CI.
+    requestAnimationFrame(() => {
+      setShowColumnsDropdown(true);
+    });
   };
 
   const handleQueueSelectorOpen = () => {
