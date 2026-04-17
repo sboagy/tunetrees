@@ -17,6 +17,7 @@ import {
   validateScheduledDatesInFuture,
 } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
+import { getRequiredTestPassword } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 /**
@@ -304,7 +305,9 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         if (loginVisible) {
           console.log("Session lost, re-logging in...");
           await page.getByLabel("Email").fill(testUser.email);
-          await page.locator('input[type="password"]').fill("TestPassword123!");
+          await page
+            .locator('input[type="password"]')
+            .fill(getRequiredTestPassword());
           await page.getByRole("button", { name: "Sign In" }).click();
         }
 

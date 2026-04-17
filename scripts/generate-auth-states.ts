@@ -19,7 +19,20 @@ const TEST_USERS = [
   { email: "iris.test@tunetrees.test", name: "iris" },
 ];
 
-const PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
+function getRequiredTestPassword(): string {
+  const password =
+    process.env.ALICE_TEST_PASSWORD ?? process.env.TEST_USER_PASSWORD;
+
+  if (password && password.trim().length > 0) {
+    return password;
+  }
+
+  throw new Error(
+    "Missing ALICE_TEST_PASSWORD or TEST_USER_PASSWORD. Inject the shared test password from 1Password before running this script."
+  );
+}
+
+const PASSWORD = getRequiredTestPassword();
 const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
 
 async function generateAuthStates() {
