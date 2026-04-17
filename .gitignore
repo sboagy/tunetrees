@@ -106,6 +106,12 @@ backups/
 .vscode/mcp.json
 lighthouse_localhost_4173-20251007T123110.json
 
+# Local yalc link mirrors
+.yalc/
+worker/.yalc/
+yalc.lock
+worker/yalc.lock
+
 # Playwright
 /playwright-report/
 /blob-report/

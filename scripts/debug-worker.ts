@@ -9,9 +9,13 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 // Use 127.0.0.1 to avoid localhost resolution issues (IPv4 vs IPv6)
 const WORKER_URL = "http://127.0.0.1:8787";
+const TEST_PASSWORD =
+  process.env.ALICE_TEST_PASSWORD ?? process.env.TEST_USER_PASSWORD;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("Missing Supabase env vars");
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !TEST_PASSWORD) {
+  console.error(
+    "Missing Supabase env vars or injected test password (ALICE_TEST_PASSWORD / TEST_USER_PASSWORD)"
+  );
   process.exit(1);
 }
 
@@ -24,7 +28,7 @@ async function testWorker() {
     error,
   } = await supabase.auth.signInWithPassword({
     email: "alice.test@tunetrees.test",
-    password: process.env.ALICE_TEST_PASSWORD || "TestPassword123!",
+    password: TEST_PASSWORD,
   });
 
   if (error || !session) {

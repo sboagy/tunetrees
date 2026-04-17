@@ -13,6 +13,7 @@
  */
 
 import { test as base, expect } from "@playwright/test";
+import { getRequiredTestPassword } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 // Override the base test to NOT use stored auth state (we need fresh sessions)
@@ -32,6 +33,7 @@ function generateTestEmail(): string {
 
 test.describe("Anonymous User Account Conversion", () => {
   test.setTimeout(60000);
+  const testPassword = getRequiredTestPassword();
 
   // Run these tests serially to avoid parallel session conflicts
   test.describe.configure({ mode: "serial" });
@@ -140,7 +142,7 @@ test.describe("Anonymous User Account Conversion", () => {
     const testEmail = generateTestEmail();
     await ttPage.convertAnonymousAccount(
       testEmail,
-      "TestPassword123!",
+      testPassword,
       "Test Converted User"
     );
 
@@ -171,7 +173,6 @@ test.describe("Anonymous User Account Conversion", () => {
     await ttPage.clickCreateAccountOnBanner();
 
     const testEmail = generateTestEmail();
-    const testPassword = "TestPassword123!";
     await ttPage.convertAnonymousAccount(
       testEmail,
       testPassword,

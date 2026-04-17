@@ -302,20 +302,28 @@ test.describe("USERSETTINGS-001: Account Settings Form", () => {
       seedRepertoire: [],
     });
 
-    // Navigate to User Settings > Scheduling Options
+    // Navigate to User Settings > Account using the same mobile-aware sidebar
+    // flow that the navigation tests already rely on.
     await ttPage.userMenuButton.click();
-    await page.waitForTimeout(500);
+    await expect(ttPage.userSettingsButton).toBeVisible({ timeout: 5000 });
     await ttPage.userSettingsButton.click();
     await page.waitForTimeout(500);
+
     const ua = await page.evaluate(() => navigator.userAgent);
     const isMobileChrome = /Android.*Chrome\/\d+/i.test(ua);
+
     if (isMobileChrome) {
       await page.waitForTimeout(800);
       await ttPage.settingsMenuToggle.click();
+      await expect(ttPage.userSettingsAccountButton).toBeVisible({
+        timeout: 5000,
+      });
     }
-    await page.waitForTimeout(500);
+
     await ttPage.userSettingsAccountButton.click();
-    await page.waitForTimeout(500);
+    await expect(
+      page.getByRole("heading", { name: "Account", level: 3 })
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test("should display account settings form", async ({ page }) => {

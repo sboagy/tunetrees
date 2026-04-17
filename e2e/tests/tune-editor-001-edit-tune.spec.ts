@@ -56,14 +56,8 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
-    // Look for Edit button in sidebar
-    const editButton = ttPage.sidebarEditTuneButton;
-    await expect(editButton).toBeVisible({ timeout: 5000 });
-    await expect(editButton).toBeEnabled({ timeout: 5000 });
-
     // ACT: Open editor
-    await editButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.openTuneEditor();
 
     // Verify we're on the edit page or modal is open
     const tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -122,10 +116,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Open editor
-    const editButton = ttPage.sidebarEditTuneButton;
-    await expect(editButton).toBeVisible({ timeout: 5000 });
-    await editButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.openTuneEditor();
 
     // ACT: Modify title
     const tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -182,10 +173,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Open editor
-    const editButton = ttPage.sidebarEditTuneButton;
-    await expect(editButton).toBeVisible({ timeout: 5000 });
-    await editButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.openTuneEditor();
 
     // ACT: Modify multiple fields
     const tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -250,10 +238,7 @@ test.describe("TUNE-EDITOR-001: Edit Tune", () => {
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10000 });
 
     // Open editor
-    const editButton = ttPage.sidebarEditTuneButton;
-    await expect(editButton).toBeVisible({ timeout: 5000 });
-    await editButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.openTuneEditor();
 
     // ACT: Modify title (this should create an override)
     const tuneEditorForm = page.getByTestId("tune-editor-form");

@@ -17,6 +17,7 @@ import {
   validateScheduledDatesInFuture,
 } from "../helpers/scheduling-queries";
 import { test } from "../helpers/test-fixture";
+import { getRequiredTestPassword } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 import { BASE_URL } from "../test-config";
 
@@ -203,7 +204,9 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
           .catch(() => false);
         if (loginVisible) {
           await page.getByLabel("Email").fill(testUser.email);
-          await page.locator('input[type="password"]').fill("TestPassword123!");
+          await page
+            .locator('input[type="password"]')
+            .fill(getRequiredTestPassword());
           await page.getByRole("button", { name: "Sign In" }).click();
         }
 

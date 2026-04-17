@@ -12,15 +12,15 @@
  *   - SUPABASE_SERVICE_ROLE_KEY in environment
  *
  * Security Note:
- *   - The default password "TestPassword123!" is SAFE to commit
+ *   - The shared test-user password must be injected via ALICE_TEST_PASSWORD or
+ *     TEST_USER_PASSWORD before running this script
  *   - These are test-only accounts with .test@tunetrees.test emails
  *   - They only exist in local/CI environments, never production
- *   - For staging/production test accounts, override with TEST_USER_PASSWORD env var
  *
  * Environment Variables:
  *   - SUPABASE_URL: Defaults to http://127.0.0.1:54321 (local)
  *   - SUPABASE_SERVICE_ROLE_KEY: Defaults to local dev key
- *   - TEST_USER_PASSWORD: Defaults to "TestPassword123!" (optional override)
+ *   - ALICE_TEST_PASSWORD / TEST_USER_PASSWORD: Shared test-user password from 1Password
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -30,10 +30,20 @@ const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
-// Test password - safe to commit as this is only for local/CI test users
-// These credentials are well-known and documented in _notes/test-users.md
-// For production test users, set TEST_USER_PASSWORD environment variable
-const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || "TestPassword123!";
+function getRequiredTestPassword(): string {
+  const password =
+    process.env.ALICE_TEST_PASSWORD ?? process.env.TEST_USER_PASSWORD;
+
+  if (password && password.trim().length > 0) {
+    return password;
+  }
+
+  throw new Error(
+    "Missing ALICE_TEST_PASSWORD or TEST_USER_PASSWORD. Inject the shared test password from 1Password before running this script."
+  );
+}
+
+const TEST_PASSWORD = getRequiredTestPassword();
 
 // Test users configuration
 // These match the UUIDs in tests/fixtures/test-data.ts
