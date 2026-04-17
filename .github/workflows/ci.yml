@@ -103,14 +103,53 @@ jobs:
         env:
           CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
         run: |
+          has_remote_branch() {
+            local repo="$1"
+            local branch="$2"
+            git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$branch" >/dev/null 2>&1
+          }
+
+          repo_prefix() {
+            case "$1" in
+              sboagy/tunetrees) printf 'tt' ;;
+              sboagy/cubefsrs) printf 'cf' ;;
+              sboagy/oosync) printf 'os' ;;
+              sboagy/rhizome) printf 'rz' ;;
+              *) return 1 ;;
+            esac
+          }
+
           resolve_ref() {
             local repo="$1"
             local candidate="$2"
-            if git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$candidate" >/dev/null 2>&1; then
+            local target_prefix
+            local shared_suffix
+            local prefixed_candidate
+
+            if has_remote_branch "$repo" "$candidate"; then
               printf '%s\n' "$candidate"
-            else
-              printf 'main\n'
+              return
             fi
+
+            target_prefix="$(repo_prefix "$repo")" || {
+              printf 'main\n'
+              return
+            }
+
+            shared_suffix="$candidate"
+            case "$candidate" in
+              tt-*|cf-*|os-*|rz-*)
+                shared_suffix="${candidate#*-}"
+                ;;
+            esac
+
+            prefixed_candidate="${target_prefix}-${shared_suffix}"
+            if has_remote_branch "$repo" "$prefixed_candidate"; then
+              printf '%s\n' "$prefixed_candidate"
+              return
+            fi
+
+            printf 'main\n'
           }
 
           echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
@@ -366,14 +405,53 @@ jobs:
         env:
           CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
         run: |
+          has_remote_branch() {
+            local repo="$1"
+            local branch="$2"
+            git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$branch" >/dev/null 2>&1
+          }
+
+          repo_prefix() {
+            case "$1" in
+              sboagy/tunetrees) printf 'tt' ;;
+              sboagy/cubefsrs) printf 'cf' ;;
+              sboagy/oosync) printf 'os' ;;
+              sboagy/rhizome) printf 'rz' ;;
+              *) return 1 ;;
+            esac
+          }
+
           resolve_ref() {
             local repo="$1"
             local candidate="$2"
-            if git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$candidate" >/dev/null 2>&1; then
+            local target_prefix
+            local shared_suffix
+            local prefixed_candidate
+
+            if has_remote_branch "$repo" "$candidate"; then
               printf '%s\n' "$candidate"
-            else
-              printf 'main\n'
+              return
             fi
+
+            target_prefix="$(repo_prefix "$repo")" || {
+              printf 'main\n'
+              return
+            }
+
+            shared_suffix="$candidate"
+            case "$candidate" in
+              tt-*|cf-*|os-*|rz-*)
+                shared_suffix="${candidate#*-}"
+                ;;
+            esac
+
+            prefixed_candidate="${target_prefix}-${shared_suffix}"
+            if has_remote_branch "$repo" "$prefixed_candidate"; then
+              printf '%s\n' "$prefixed_candidate"
+              return
+            fi
+
+            printf 'main\n'
           }
 
           echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
