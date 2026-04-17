@@ -1808,8 +1808,14 @@ export class TuneTreesPage {
         : this.practiceColumnsButton;
   }
 
+  private getDisplayModeSwitch(): Locator {
+    return this.getColumnVisibilityMenu()
+      .getByTestId("display-mode-switch")
+      .first();
+  }
+
   private async isDisplayModeListEnabled(): Promise<boolean> {
-    const displayModeSwitch = this.page.getByTestId("display-mode-switch");
+    const displayModeSwitch = this.getDisplayModeSwitch();
     await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
 
     const ariaChecked = await displayModeSwitch.getAttribute("aria-checked");
@@ -1898,27 +1904,50 @@ export class TuneTreesPage {
   ) {
     const columnsButton = this.getColumnsButtonForTab(tab);
     const grid = this.getGridForTab(tab);
-    const menu = this.getColumnVisibilityMenu();
 
     await expect(grid).toBeVisible({ timeout: 10000 });
     await expect(columnsButton).toBeVisible({ timeout: 5000 });
     await expect(columnsButton).toBeEnabled({ timeout: 5000 });
 
-    const menuVisible = await menu
+    const initialMenu = this.getColumnVisibilityMenu();
+    const menuVisible = await initialMenu
       .isVisible({ timeout: 500 })
       .catch(() => false);
     if (!menuVisible) {
       await columnsButton.click();
       await this.openDisplayOptionsEntryIfNeeded(columnsButton);
+      const menu = this.getColumnVisibilityMenu();
       await expect(menu).toBeVisible({ timeout: 5000 });
     }
 
     const shouldUseList = mode === "list";
-    const displayModeSwitch = this.page.getByTestId("display-mode-switch");
     const listEnabled = await this.isDisplayModeListEnabled();
 
     if (listEnabled !== shouldUseList) {
-      await displayModeSwitch.click();
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const displayModeSwitch = this.getDisplayModeSwitch();
+        await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
+
+        const toggled = await (async () => {
+          try {
+            await displayModeSwitch.click({ timeout: 5000 });
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+
+        if (toggled) {
+          break;
+        }
+
+        if (attempt === 2) {
+          await displayModeSwitch.click({ timeout: 5000 });
+        }
+
+        await this.page.waitForTimeout(150);
+      }
+
       await expect
         .poll(() => this.isDisplayModeListEnabled(), {
           timeout: 5000,
@@ -1927,7 +1956,7 @@ export class TuneTreesPage {
         .toBe(shouldUseList);
     }
 
-    await this.closeColumnVisibilityMenu(menu);
+    await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
 
     if (mode === "grid") {
       await expect(grid.locator("thead th").first()).toBeVisible({
@@ -2119,7 +2148,7 @@ export class TuneTreesPage {
   private getColumnVisibilityMenu(): Locator {
     return this.page
       .locator("div.fixed.w-64")
-      .filter({ hasText: /Show Columns|Display Options/i })
+      .filter({ hasText: /Show All|Hide All/i })
       .last();
   }
 
@@ -2170,20 +2199,23 @@ export class TuneTreesPage {
     visible: boolean
   ) {
     const columnsButton = this.getColumnsButtonForTab(tab);
-    const menu = this.getColumnVisibilityMenu();
     const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     await expect(columnsButton).toBeVisible({ timeout: 5000 });
     await expect(columnsButton).toBeEnabled({ timeout: 5000 });
 
-    const menuVisible = await menu
+    const initialMenu = this.getColumnVisibilityMenu();
+    const menuVisible = await initialMenu
       .isVisible({ timeout: 500 })
       .catch(() => false);
     if (!menuVisible) {
       await columnsButton.click();
       await this.openDisplayOptionsEntryIfNeeded(columnsButton);
+      const menu = this.getColumnVisibilityMenu();
       await expect(menu).toBeVisible({ timeout: 5000 });
     }
+
+    const menu = this.getColumnVisibilityMenu();
 
     const label = menu
       .locator("button span")
