@@ -22,6 +22,8 @@ import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+const DEFAULT_GOAL = "recall";
+
 function formatJustDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   const date = new Date(dateStr);
@@ -326,7 +328,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
             const idVisible = () => isColVisible("id") && item.id != null;
             const showIdInMetadata = () => titleVisible() && idVisible();
             const goalValue = item.goal ?? item.latest_goal;
-            const goalDisplayValue = goalValue || "recall";
+            const goalDisplayValue = goalValue || DEFAULT_GOAL;
             const recallEval = getRecallEvalDisplay(item.recall_eval);
             const displayedScheduled = item.scheduled ?? item.latest_due ?? null;
             const scheduledDisplay = displayedScheduled
@@ -623,7 +625,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                             onGoalChange={
                               props.cellCallbacks?.onGoalChange
                                 ? (newGoal) =>
-                                    props.cellCallbacks?.onGoalChange?.(
+                                    props.cellCallbacks.onGoalChange(
                                       String(itemId),
                                       newGoal
                                     )

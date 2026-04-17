@@ -15,8 +15,14 @@ import type { ICellEditorCallbacks } from "../../../src/components/grids/types";
 import type { TablePurpose } from "../../../src/components/grids/types";
 
 vi.mock("../../../src/components/grids/GoalBadge", () => ({
-  GoalBadge: (props: { value: string }) => (
-    <div>{`Goal control: ${props.value}`}</div>
+  GoalBadge: (props: {
+    value: string;
+    goals?: () => Array<{ id: string; name: string }>;
+    onGoalChange?: (newGoal: string) => void;
+  }) => (
+    <button type="button" onClick={() => props.onGoalChange?.("session_ready")}>
+      {`Goal control: ${props.value}`}
+    </button>
   ),
 }));
 
@@ -27,8 +33,17 @@ vi.mock("../../../src/components/grids/RecallEvalComboBox", () => ({
 }));
 
 vi.mock("../../../src/components/grids/ScheduledOverridePicker", () => ({
-  ScheduledOverridePicker: (props: { triggerLabel?: string; value?: string }) => (
-    <div>{`Scheduled control: ${props.triggerLabel ?? props.value ?? "(empty)"}`}</div>
+  ScheduledOverridePicker: (props: {
+    triggerLabel?: string;
+    value?: string;
+    onChange?: (newValue: string | null) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => props.onChange?.("2026-04-12T15:30:00.000Z")}
+    >
+      {`Scheduled control: ${props.triggerLabel ?? props.value ?? "(empty)"}`}
+    </button>
   ),
 }));
 
@@ -341,5 +356,52 @@ describe("TuneStackedList column visibility", () => {
     expect(screen.getByText(/Scheduled control:/)).toBeDefined();
     expect(screen.queryByText(/Goal:/)).toBeNull();
     expect(screen.queryByText(/Scheduled:/)).toBeNull();
+  });
+
+  it("wires inline goal changes to the stacked-list row tune id", async () => {
+    const onGoalChange = vi.fn();
+
+    render(() => (
+      <TuneStackedList
+        data={[baseRow]}
+        tablePurpose="repertoire"
+        columnVisibility={buildVisibility(repertoireColumns, false, {
+          goal: true,
+        })}
+        cellCallbacks={{
+          onGoalChange,
+          goals: () => [{ id: "goal-1", name: "perform" }],
+        }}
+      />
+    ));
+
+    await fireEvent.click(screen.getByText("Goal control: perform"));
+
+    expect(onGoalChange).toHaveBeenCalledWith("tune-row-1", "session_ready");
+  });
+
+  it("wires inline scheduled changes to the stacked-list row tune id", async () => {
+    const onScheduledChange = vi.fn();
+
+    render(() => (
+      <TuneStackedList
+        data={[baseRow]}
+        tablePurpose="repertoire"
+        columnVisibility={buildVisibility(repertoireColumns, false, {
+          scheduled: true,
+        })}
+        cellCallbacks={{
+          onScheduledChange,
+          goals: () => [{ id: "goal-1", name: "perform" }],
+        }}
+      />
+    ));
+
+    await fireEvent.click(screen.getByText(/Scheduled control:/));
+
+    expect(onScheduledChange).toHaveBeenCalledWith(
+      "tune-row-1",
+      "2026-04-12T15:30:00.000Z"
+    );
   });
 });
