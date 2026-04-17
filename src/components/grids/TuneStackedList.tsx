@@ -329,8 +329,10 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
             const showIdInMetadata = () => titleVisible() && idVisible();
             const goalValue = item.goal ?? item.latest_goal;
             const goalDisplayValue = goalValue || DEFAULT_GOAL;
+            const onGoalChange = props.cellCallbacks?.onGoalChange;
             const recallEval = getRecallEvalDisplay(item.recall_eval);
-            const displayedScheduled = item.scheduled ?? item.latest_due ?? null;
+            const displayedScheduled =
+              item.scheduled ?? item.latest_due ?? null;
             const scheduledDisplay = displayedScheduled
               ? getRelativeLabel(displayedScheduled)
               : null;
@@ -623,12 +625,9 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                             value={goalDisplayValue}
                             goals={props.cellCallbacks?.goals}
                             onGoalChange={
-                              props.cellCallbacks?.onGoalChange
+                              onGoalChange
                                 ? (newGoal) =>
-                                    props.cellCallbacks.onGoalChange(
-                                      String(itemId),
-                                      newGoal
-                                    )
+                                    onGoalChange(String(itemId), newGoal)
                                 : undefined
                             }
                           />
@@ -732,8 +731,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                               item.latest_quality !== undefined
                             ) {
                               const quality = item.latest_quality;
-                              const technique =
-                                item.latest_technique || "fsrs";
+                              const technique = item.latest_technique || "fsrs";
                               if (technique === "sm2") {
                                 const sm2Labels: Record<number, string> = {
                                   0: "Complete blackout",
@@ -753,8 +751,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                                 };
                                 label =
                                   sm2Labels[quality] || `Quality ${quality}`;
-                                colorClass =
-                                  sm2Colors[quality] || colorClass;
+                                colorClass = sm2Colors[quality] || colorClass;
                               } else {
                                 const fsrsLabels: Record<number, string> = {
                                   1: "Again",
@@ -770,8 +767,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                                 };
                                 label =
                                   fsrsLabels[quality] || `Quality ${quality}`;
-                                colorClass =
-                                  fsrsColors[quality] || colorClass;
+                                colorClass = fsrsColors[quality] || colorClass;
                               }
                             } else if (item.recall_eval) {
                               const evalDisplay = getRecallEvalDisplay(
