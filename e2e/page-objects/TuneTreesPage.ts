@@ -1676,10 +1676,14 @@ export class TuneTreesPage {
   getRows(gridId: string): Locator {
     // Support both table mode (desktop) and stacked list mode (mobile).
     // On desktop the TanStack virtual table renders "tbody tr[data-index]".
-    // On mobile the TuneStackedList renders "li[data-testid^='stacked-item-']".
-    return this.page.locator(
-      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index], [data-testid="tunes-grid-${gridId}"] li[data-testid^="stacked-item-"]`
-    );
+    // In list mode the TuneStackedList renders visible
+    // "li[data-testid^='stacked-item-']" items under the same
+    // "tunes-grid-*" root, but outside the table element.
+    return this.page
+      .getByTestId(`tunes-grid-${gridId}`)
+      .locator(
+        "tbody tr[data-index], li[data-testid^='stacked-item-']:visible"
+      );
   }
 
   /**
