@@ -1724,14 +1724,19 @@ export class TuneTreesPage {
     await row.scrollIntoViewIfNeeded().catch(() => undefined);
     await expect(row).toBeVisible({ timeout });
 
-    const rowTestId = await row.getAttribute("data-testid").catch(() => null);
-    if (rowTestId?.startsWith("stacked-item-")) {
-      await row.evaluate((element) => {
-        if (element instanceof HTMLElement) {
-          element.scrollIntoView({ block: "center", inline: "nearest" });
-          element.click();
+    const clicked = await row
+      .evaluate((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
         }
-      });
+
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+        element.click();
+        return true;
+      })
+      .catch(() => false);
+
+    if (clicked) {
       await this.page.waitForTimeout(150);
       return;
     }
@@ -1815,6 +1820,27 @@ export class TuneTreesPage {
    * @param columnIds - Array of column IDs like ["title", "mode", "type"]
    */
   async expectColumnsVisible(columnIds: string[]) {
+    await expect
+      .poll(
+        async () => {
+          const states = await Promise.all(
+            columnIds.map((id) =>
+              this.page
+                .getByTestId(`ch-${id.toLowerCase()}`)
+                .isVisible({ timeout: 250 })
+                .catch(() => false)
+            )
+          );
+
+          return states.every(Boolean);
+        },
+        {
+          timeout: 10000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
+
     for (const id of columnIds) {
       const header = this.page.getByTestId(`ch-${id.toLowerCase()}`);
       await expect(header).toBeVisible({ timeout: 5000 });
