@@ -1808,42 +1808,76 @@ export class TuneTreesPage {
         : this.practiceColumnsButton;
   }
 
+  private getVisibleStackedItems(): Locator {
+    return this.page.locator("li[data-testid^='stacked-item-']:visible");
+  }
+
+  private async getRenderedViewMode(
+    tab: "catalog" | "repertoire" | "practice"
+  ): Promise<"grid" | "list" | null> {
+    const grid = this.getGridForTab(tab);
+    const gridHeaderVisible = await grid
+      .locator("thead th")
+      .first()
+      .isVisible({ timeout: 250 })
+      .catch(() => false);
+    if (gridHeaderVisible) {
+      return "grid";
+    }
+
+    const stackedItemVisible = await this.getVisibleStackedItems()
+      .first()
+      .isVisible({ timeout: 250 })
+      .catch(() => false);
+    if (stackedItemVisible) {
+      return "list";
+    }
+
+    return null;
+  }
+
+  private async waitForRenderedViewMode(
+    tab: "catalog" | "repertoire" | "practice",
+    timeout = 10000
+  ): Promise<"grid" | "list" | null> {
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+      const mode = await this.getRenderedViewMode(tab);
+      if (mode) {
+        return mode;
+      }
+
+      await this.page.waitForTimeout(100);
+    }
+
+    return this.getRenderedViewMode(tab);
+  }
+
   private getDisplayModeSwitch(): Locator {
     return this.getColumnVisibilityMenu()
       .getByTestId("display-mode-switch")
       .first();
   }
 
-  private async isDisplayModeListEnabled(): Promise<boolean> {
-    const displayModeSwitch = this.getDisplayModeSwitch();
-    await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
-
-    const ariaChecked = await displayModeSwitch.getAttribute("aria-checked");
-    if (ariaChecked === "true") return true;
-    if (ariaChecked === "false") return false;
-
-    const switchInput = displayModeSwitch
-      .locator('input[type="checkbox"]')
-      .first();
-    const hasInput = (await switchInput.count().catch(() => 0)) > 0;
-    if (hasInput) {
-      return await switchInput.isChecked().catch(() => false);
+  private async closeColumnVisibilityMenu(menu: Locator) {
+    if (this.page.isClosed()) {
+      return;
     }
 
-    return await displayModeSwitch.evaluate((element) => {
-      return (
-        element.hasAttribute("data-checked") ||
-        element.getAttribute("data-state") === "checked"
-      );
-    });
-  }
-
-  private async closeColumnVisibilityMenu(menu: Locator) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const menuVisible = await menu
         .isVisible({ timeout: 200 })
         .catch(() => false);
-      if (!menuVisible) break;
+      if (!menuVisible) {
+        return;
+      }
+
+      if (attempt === 0) {
+        await this.page.keyboard.press("Escape").catch(() => undefined);
+        await this.page.waitForTimeout(100);
+        continue;
+      }
 
       const box = await menu.boundingBox().catch(() => null);
       if (box) {
@@ -1860,7 +1894,24 @@ export class TuneTreesPage {
       await this.page.waitForTimeout(100);
     }
 
-    await expect(menu).toBeHidden({ timeout: 5000 });
+    if (this.page.isClosed()) {
+      return;
+    }
+
+    await expect(menu)
+      .toBeHidden({ timeout: 1500 })
+      .catch(async (error) => {
+        if (this.page.isClosed()) {
+          return;
+        }
+
+        const stillVisible = await menu
+          .isVisible({ timeout: 200 })
+          .catch(() => false);
+        if (stillVisible) {
+          throw error;
+        }
+      });
   }
 
   private async closeFilterPanelIfOpen() {
@@ -1904,8 +1955,20 @@ export class TuneTreesPage {
   ) {
     const columnsButton = this.getColumnsButtonForTab(tab);
     const grid = this.getGridForTab(tab);
+    const currentMode = await this.waitForRenderedViewMode(tab);
 
-    await expect(grid).toBeVisible({ timeout: 10000 });
+    if (currentMode === mode) {
+      const lingeringMenu = this.getColumnVisibilityMenu();
+      const lingeringMenuVisible = await lingeringMenu
+        .isVisible({ timeout: 200 })
+        .catch(() => false);
+      if (lingeringMenuVisible) {
+        await this.closeColumnVisibilityMenu(lingeringMenu);
+      }
+
+      return;
+    }
+
     await expect(columnsButton).toBeVisible({ timeout: 5000 });
     await expect(columnsButton).toBeEnabled({ timeout: 5000 });
 
@@ -1920,41 +1983,41 @@ export class TuneTreesPage {
       await expect(menu).toBeVisible({ timeout: 5000 });
     }
 
-    const shouldUseList = mode === "list";
-    const listEnabled = await this.isDisplayModeListEnabled();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const displayModeSwitch = this.getDisplayModeSwitch();
+      await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
 
-    if (listEnabled !== shouldUseList) {
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const displayModeSwitch = this.getDisplayModeSwitch();
-        await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
-
-        const toggled = await (async () => {
-          try {
-            await displayModeSwitch.click({ timeout: 5000 });
-            return true;
-          } catch {
-            return false;
-          }
-        })();
-
-        if (toggled) {
-          break;
-        }
-
+      try {
+        await displayModeSwitch.click({ timeout: 5000 });
+      } catch {
         if (attempt === 2) {
           await displayModeSwitch.click({ timeout: 5000 });
         }
-
-        await this.page.waitForTimeout(150);
       }
 
-      await expect
-        .poll(() => this.isDisplayModeListEnabled(), {
-          timeout: 5000,
-          intervals: [100, 250, 500],
-        })
-        .toBe(shouldUseList);
+      const renderedMode = await this.waitForRenderedViewMode(tab, 1500);
+      if (renderedMode === mode) {
+        break;
+      }
+
+      const reopenedMenu = this.getColumnVisibilityMenu();
+      const reopenedMenuVisible = await reopenedMenu
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (!reopenedMenuVisible) {
+        await columnsButton.click().catch(() => undefined);
+        await this.openDisplayOptionsEntryIfNeeded(columnsButton);
+      }
+
+      await this.page.waitForTimeout(150);
     }
+
+    await expect
+      .poll(() => this.getRenderedViewMode(tab), {
+        timeout: 5000,
+        intervals: [100, 250, 500],
+      })
+      .toBe(mode);
 
     await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
 
@@ -1963,9 +2026,9 @@ export class TuneTreesPage {
         timeout: 10000,
       });
     } else {
-      await expect(
-        grid.locator("li[data-testid^='stacked-item-']").first()
-      ).toBeVisible({ timeout: 10000 });
+      await expect(this.getVisibleStackedItems().first()).toBeVisible({
+        timeout: 10000,
+      });
     }
   }
 
@@ -2147,13 +2210,15 @@ export class TuneTreesPage {
 
   private getColumnVisibilityMenu(): Locator {
     return this.page
-      .locator("div.fixed.w-64")
+      .locator("div.fixed.w-64:visible")
       .filter({ hasText: /Show All|Hide All/i })
       .last();
   }
 
   private getDisplayOptionsButton(): Locator {
-    return this.page.getByTestId("display-options-entry-button").last();
+    return this.page
+      .locator('[data-testid="display-options-entry-button"]:visible')
+      .last();
   }
 
   private async openDisplayOptionsEntryIfNeeded(
@@ -2178,9 +2243,12 @@ export class TuneTreesPage {
       await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
 
       // The Kobalte dropdown entry can detach as it closes itself while opening
-      // the nested menu surface. Trigger the handler directly and wait for the
-      // caller-specific target menu to appear.
-      await displayOptionsButton.dispatchEvent("click").catch(() => undefined);
+      // the nested menu surface. Prefer a normal click, but fall back to a
+      // direct dispatch when the DOM is mid-transition.
+      await displayOptionsButton
+        .click({ timeout: 2000 })
+        .catch(() => displayOptionsButton.dispatchEvent("click"))
+        .catch(() => undefined);
 
       const menuVisible = await targetMenu
         .isVisible({ timeout: 1000 })
