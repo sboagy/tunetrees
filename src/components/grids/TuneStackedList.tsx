@@ -15,7 +15,9 @@
  */
 
 import { For, type JSX, Show } from "solid-js";
+import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -324,7 +326,12 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
             const idVisible = () => isColVisible("id") && item.id != null;
             const showIdInMetadata = () => titleVisible() && idVisible();
             const goalValue = item.goal ?? item.latest_goal;
+            const goalDisplayValue = goalValue || "recall";
             const recallEval = getRecallEvalDisplay(item.recall_eval);
+            const displayedScheduled = item.scheduled ?? item.latest_due ?? null;
+            const scheduledDisplay = displayedScheduled
+              ? getRelativeLabel(displayedScheduled)
+              : null;
 
             const tuneMetadata = (): JSX.Element[] => [
               ...(isColVisible("structure") && item.structure
@@ -368,18 +375,6 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           renderLabeledValue(
                             "Learned",
                             formatJustDate(item.learned)
-                          ),
-                        ]
-                      : []),
-                    ...(isColVisible("goal") && goalValue
-                      ? [renderLabeledValue("Goal", goalValue)]
-                      : []),
-                    ...(isColVisible("scheduled") &&
-                    (item.scheduled ?? item.latest_due)
-                      ? [
-                          renderRelativeValue(
-                            "Scheduled",
-                            item.scheduled ?? item.latest_due
                           ),
                         ]
                       : []),
@@ -610,6 +605,85 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                       </Show>
 
                       {/* Scheduled: Recall Eval dropdown or static text (controlled by "evaluation" column) */}
+                      <Show
+                        when={
+                          props.tablePurpose !== "catalog" &&
+                          isColVisible("goal")
+                        }
+                      >
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper prevents row selection while interacting with goal controls */}
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the contained dropdown trigger */}
+                        <div
+                          class="flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GoalBadge
+                            value={goalDisplayValue}
+                            goals={props.cellCallbacks?.goals}
+                            onGoalChange={
+                              props.cellCallbacks?.onGoalChange
+                                ? (newGoal) =>
+                                    props.cellCallbacks?.onGoalChange?.(
+                                      String(itemId),
+                                      newGoal
+                                    )
+                                : undefined
+                            }
+                          />
+                        </div>
+                      </Show>
+
+                      <Show
+                        when={
+                          props.tablePurpose !== "catalog" &&
+                          isColVisible("scheduled")
+                        }
+                      >
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper prevents row selection while interacting with schedule controls */}
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the contained picker trigger */}
+                        <div
+                          class="min-w-0 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Show
+                            when={props.cellCallbacks?.onScheduledChange}
+                            fallback={
+                              <Show
+                                when={scheduledDisplay}
+                                fallback={
+                                  <span class="text-gray-400 dark:text-gray-500">
+                                    —
+                                  </span>
+                                }
+                              >
+                                <span
+                                  class={`text-sm font-medium ${scheduledDisplay?.colorClass ?? ""}`}
+                                >
+                                  {scheduledDisplay?.label}
+                                </span>
+                              </Show>
+                            }
+                          >
+                            <ScheduledOverridePicker
+                              tuneId={String(itemId)}
+                              value={item.scheduled ?? ""}
+                              triggerLabel={scheduledDisplay?.label}
+                              triggerTextClass={
+                                scheduledDisplay
+                                  ? `text-sm font-medium ${scheduledDisplay.colorClass}`
+                                  : undefined
+                              }
+                              onChange={(newValue) => {
+                                props.cellCallbacks?.onScheduledChange?.(
+                                  String(itemId),
+                                  newValue
+                                );
+                              }}
+                            />
+                          </Show>
+                        </div>
+                      </Show>
+
                       <Show
                         when={
                           props.tablePurpose === "scheduled" &&
