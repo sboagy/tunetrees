@@ -23,6 +23,32 @@ function isHookAvailabilityRace(
   return message.includes(`${hookName} is not available`);
 }
 
+async function waitForAuthRoot(page: Page, timeoutMs: number) {
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(() => {
+            return Boolean(document.querySelector("[data-auth-initialized]"));
+          });
+        } catch (error) {
+          if (isTransientExecutionContextError(error)) {
+            return false;
+          }
+          throw error;
+        }
+      },
+      {
+        timeout: timeoutMs,
+        intervals: [100, 250, 500, 1000],
+        message: "Practice app did not remount in time",
+      }
+    )
+    .toBe(true);
+}
+
 /**
  * Wait for a browser test hook to exist after reload/navigation, then invoke it.
  *
@@ -34,6 +60,8 @@ export async function runTestHook(
   page: Page,
   hookName: TestHookName
 ): Promise<void> {
+  await waitForAuthRoot(page, 10000);
+
   await expect
     .poll(
       async () => {
@@ -75,6 +103,8 @@ export async function runTestHook(
         throw error;
       }
 
+      await waitForAuthRoot(page, 10000);
+
       await expect
         .poll(
           async () => {
@@ -90,7 +120,7 @@ export async function runTestHook(
             }
           },
           {
-            timeout: 5000,
+            timeout: 10000,
             intervals: [100, 250, 500],
             message: `${hookName} did not become available for retry`,
           }
@@ -131,22 +161,22 @@ export async function waitForPracticeViewSettled(
   await expect
     .poll(
       async () => {
-        const [loadingVisible, gridVisible, emptyVisible] = await Promise.all([
+        const [loadingVisible, emptyVisible, rowCount] = await Promise.all([
           loadingMessage.isVisible().catch(() => false),
-          ttPage.practiceGrid.isVisible().catch(() => false),
           emptyState.isVisible().catch(() => false),
+          practiceRows.count().catch(() => 0),
         ]);
 
         if (loadingVisible) {
           return false;
         }
 
-        if (gridVisible) {
-          latestRowCount = await practiceRows.count();
-          return !expectRows || latestRowCount > 0;
+        latestRowCount = rowCount;
+
+        if (rowCount > 0) {
+          return true;
         }
 
-        latestRowCount = 0;
         return emptyVisible && !expectRows;
       },
       {

@@ -1,6 +1,7 @@
 // spec: e2e/tests/notes-references-test-plan.md
 
 import { expect } from "@playwright/test";
+import { TEST_TUNE_BANISH_ID } from "../../tests/fixtures/test-data";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -37,9 +38,12 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await page.waitForTimeout(500); // Wait for filter to apply
 
-    const tuneRow = ttPage.getRows("catalog").first();
+    const tuneRow = ttPage.getTuneRowById(
+      TEST_TUNE_BANISH_ID,
+      ttPage.catalogGrid
+    );
     await expect(tuneRow).toBeVisible({ timeout: 5000 });
-    await tuneRow.click();
+    await ttPage.selectGridRow(tuneRow);
 
     // On mobile, expand the sidebar (collapsed by default)
     await ttPage.ensureSidebarExpanded();
@@ -52,30 +56,26 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
       timeout: 10000,
     });
 
-    // Create first note
-    await ttPage.notesAddButton.click();
-    await expect(ttPage.notesNewEditor).toBeVisible({
+    // Shared catalog tunes can pick up leftover note state during full-suite runs.
+    // Reset the selected tune in the UI so this spec always starts from two known notes.
+    await ttPage.deleteAllNotes();
+    await expect(ttPage.notesCount).toContainText("0 notes", {
       timeout: 10000,
-    });
-    const joditEditor = page.locator(".jodit-wysiwyg");
-    await joditEditor.click();
-    await joditEditor.fill("First note for reorder test");
-    await ttPage.notesSaveButton.click();
-    await expect(page.getByRole("heading", { name: "1 note" })).toBeVisible({
-      timeout: 15000,
     });
 
-    // Create second note
-    await ttPage.notesAddButton.click();
-    await expect(ttPage.notesNewEditor).toBeVisible({
-      timeout: 10000,
-    });
-    await joditEditor.click();
-    await joditEditor.fill("Second note for reorder test");
-    await ttPage.notesSaveButton.click();
-    await expect(page.getByRole("heading", { name: "2 notes" })).toBeVisible({
+    // Create first note
+    await ttPage.addNote("First note for reorder test");
+    await expect(ttPage.notesCount).toContainText("1 note", {
       timeout: 15000,
     });
+    await expect(ttPage.getAllNoteItems()).toHaveCount(1, { timeout: 10000 });
+
+    // Create second note
+    await ttPage.addNote("Second note for reorder test");
+    await expect(ttPage.notesCount).toContainText("2 notes", {
+      timeout: 15000,
+    });
+    await expect(ttPage.getAllNoteItems()).toHaveCount(2, { timeout: 10000 });
   });
 
   test("should display drag handles on notes", async ({ page }) => {

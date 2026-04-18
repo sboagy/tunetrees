@@ -53,14 +53,23 @@ test.describe
         timeout: 20000,
       });
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+      await ttPage.ensureGridView("practice");
+      await ttPage.expectGridHasContent(ttPage.practiceGrid);
+      await expect
+        .poll(async () => ttPage.getRows("scheduled").count(), {
+          timeout: 10000,
+          message: "expected both scheduled practice rows to render",
+        })
+        .toBeGreaterThanOrEqual(2);
+      await page.waitForTimeout(100); // small buffer
+
+      // Keep the ID-based row contract exercised, but only after the grid has settled.
       await expect(
         ttPage.getRowInPracticeGridByTuneId(privateTune1Id)
       ).toBeVisible({ timeout: 10000 });
       await expect(
         ttPage.getRowInPracticeGridByTuneId(TEST_TUNE_MORRISON_ID)
       ).toBeVisible({ timeout: 10000 });
-      await page.waitForTimeout(100); // small buffer
-      await ttPage.ensureGridView("practice");
     });
 
     test("should schedule 'Again' rating for tomorrow (not today)", async () => {

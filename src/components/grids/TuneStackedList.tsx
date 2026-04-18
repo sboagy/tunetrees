@@ -15,10 +15,18 @@
  */
 
 import { For, type JSX, Show } from "solid-js";
+import {
+  getRecallEvalDisplay,
+  getSubmittedEvaluationDisplay,
+} from "./evaluation-display";
+import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
+import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const DEFAULT_GOAL = "recall";
 
 function formatJustDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -64,31 +72,6 @@ function getRelativeLabel(value: string | null | undefined): {
             : `In ${diffDays}d`;
 
   return { label, colorClass };
-}
-
-function getRecallEvalDisplay(value: string | null | undefined): {
-  label: string;
-  colorClass: string;
-} | null {
-  if (!value) return null;
-
-  const labels: Record<string, string> = {
-    again: "Again",
-    hard: "Hard",
-    good: "Good",
-    easy: "Easy",
-  };
-  const colors: Record<string, string> = {
-    again: "text-red-600 dark:text-red-400",
-    hard: "text-orange-600 dark:text-orange-400",
-    good: "text-green-600 dark:text-green-400",
-    easy: "text-blue-600 dark:text-blue-400",
-  };
-
-  return {
-    label: labels[value] ?? value,
-    colorClass: colors[value] ?? "text-gray-600 dark:text-gray-400",
-  };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -212,12 +195,14 @@ export interface IStackedListRow {
   // Scheduled-specific
   bucket?: string | null;
   recall_eval?: string | null;
+  completed_at?: string | null; // Timestamp when evaluation was submitted
   learned?: string | null;
   latest_practiced?: string | null;
   latest_quality?: number | null;
   latest_easiness?: number | null;
   latest_stability?: number | null;
   latest_interval?: number | null;
+  latest_technique?: string | null;
   // latest_due is used in both scheduled (FSRS next-review date) and repertoire (due date display)
   latest_due?: string | null;
   // Repertoire-specific
@@ -322,7 +307,14 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
             const idVisible = () => isColVisible("id") && item.id != null;
             const showIdInMetadata = () => titleVisible() && idVisible();
             const goalValue = item.goal ?? item.latest_goal;
+            const goalDisplayValue = goalValue || DEFAULT_GOAL;
+            const onGoalChange = props.cellCallbacks?.onGoalChange;
             const recallEval = getRecallEvalDisplay(item.recall_eval);
+            const displayedScheduled =
+              item.scheduled ?? item.latest_due ?? null;
+            const scheduledDisplay = displayedScheduled
+              ? getRelativeLabel(displayedScheduled)
+              : null;
 
             const tuneMetadata = (): JSX.Element[] => [
               ...(isColVisible("structure") && item.structure
@@ -366,18 +358,6 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           renderLabeledValue(
                             "Learned",
                             formatJustDate(item.learned)
-                          ),
-                        ]
-                      : []),
-                    ...(isColVisible("goal") && goalValue
-                      ? [renderLabeledValue("Goal", goalValue)]
-                      : []),
-                    ...(isColVisible("scheduled") &&
-                    (item.scheduled ?? item.latest_due)
-                      ? [
-                          renderRelativeValue(
-                            "Scheduled",
-                            item.scheduled ?? item.latest_due
                           ),
                         ]
                       : []),
@@ -607,39 +587,137 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         <StateBadge value={item.latest_state} />
                       </Show>
 
-                      {/* Scheduled: Recall Eval dropdown (controlled by "evaluation" column) */}
+                      {/* Goal control (controlled by the "goal" column) */}
+                      <Show
+                        when={
+                          props.tablePurpose !== "catalog" &&
+                          isColVisible("goal")
+                        }
+                      >
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper prevents row selection while interacting with goal controls */}
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the contained dropdown trigger */}
+                        <div
+                          class="flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GoalBadge
+                            value={goalDisplayValue}
+                            goals={props.cellCallbacks?.goals}
+                            onGoalChange={
+                              onGoalChange
+                                ? (newGoal) =>
+                                    onGoalChange(String(itemId), newGoal)
+                                : undefined
+                            }
+                          />
+                        </div>
+                      </Show>
+
+                      <Show
+                        when={
+                          props.tablePurpose !== "catalog" &&
+                          isColVisible("scheduled")
+                        }
+                      >
+                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper prevents row selection while interacting with schedule controls */}
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the contained picker trigger */}
+                        <div
+                          class="min-w-0 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Show
+                            when={props.cellCallbacks?.onScheduledChange}
+                            fallback={
+                              <Show
+                                when={scheduledDisplay}
+                                fallback={
+                                  <span class="text-gray-400 dark:text-gray-500">
+                                    —
+                                  </span>
+                                }
+                              >
+                                <span
+                                  class={`text-sm font-medium ${scheduledDisplay?.colorClass ?? ""}`}
+                                >
+                                  {scheduledDisplay?.label}
+                                </span>
+                              </Show>
+                            }
+                          >
+                            <ScheduledOverridePicker
+                              tuneId={String(itemId)}
+                              value={item.scheduled ?? ""}
+                              triggerLabel={scheduledDisplay?.label}
+                              triggerTextClass={
+                                scheduledDisplay
+                                  ? `text-sm font-medium ${scheduledDisplay.colorClass}`
+                                  : undefined
+                              }
+                              onChange={(newValue) => {
+                                props.cellCallbacks?.onScheduledChange?.(
+                                  String(itemId),
+                                  newValue
+                                );
+                              }}
+                            />
+                          </Show>
+                        </div>
+                      </Show>
+
                       <Show
                         when={
                           props.tablePurpose === "scheduled" &&
                           isColVisible("evaluation")
                         }
                       >
-                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */}
-                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */}
-                        <div
-                          class="ml-auto w-40 flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
+                        <Show
+                          when={item.completed_at}
+                          fallback={
+                            /* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */
+                            /* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */
+                            <div
+                              class="ml-auto w-40 flex-shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <RecallEvalComboBox
+                                tuneId={String(itemId)}
+                                value={item.recall_eval ?? ""}
+                                open={props.cellCallbacks?.getRecallEvalOpen?.(
+                                  String(itemId)
+                                )}
+                                onOpenChange={(isOpen) =>
+                                  props.cellCallbacks?.setRecallEvalOpen?.(
+                                    String(itemId),
+                                    isOpen
+                                  )
+                                }
+                                onChange={(val) => {
+                                  props.cellCallbacks?.onRecallEvalChange?.(
+                                    String(itemId),
+                                    val
+                                  );
+                                }}
+                              />
+                            </div>
+                          }
                         >
-                          <RecallEvalComboBox
-                            tuneId={String(itemId)}
-                            value={item.recall_eval ?? ""}
-                            open={props.cellCallbacks?.getRecallEvalOpen?.(
-                              String(itemId)
-                            )}
-                            onOpenChange={(isOpen) =>
-                              props.cellCallbacks?.setRecallEvalOpen?.(
-                                String(itemId),
-                                isOpen
-                              )
-                            }
-                            onChange={(val) => {
-                              props.cellCallbacks?.onRecallEvalChange?.(
-                                String(itemId),
-                                val
-                              );
-                            }}
-                          />
-                        </div>
+                          {/* Tune already submitted: show static evaluation text */}
+                          {(() => {
+                            const evaluationDisplay =
+                              getSubmittedEvaluationDisplay({
+                                latestQuality: item.latest_quality,
+                                latestTechnique: item.latest_technique,
+                                recallEval: item.recall_eval,
+                              });
+                            return (
+                              <span
+                                class={`ml-auto text-sm italic font-medium ${evaluationDisplay.colorClass}`}
+                              >
+                                {evaluationDisplay.label}
+                              </span>
+                            );
+                          })()}
+                        </Show>
                       </Show>
                     </div>
 

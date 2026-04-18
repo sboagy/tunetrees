@@ -10,7 +10,8 @@
 
 import { FlipVertical2 } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createMemo, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { getSubmittedEvaluationDisplay } from "../grids/evaluation-display";
 import { RecallEvalComboBox } from "../grids/RecallEvalComboBox";
 import type { ITuneOverview } from "../grids/types";
 import type {
@@ -28,6 +29,16 @@ export interface FlashcardCardProps {
 }
 
 export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
+  const [isEvalDropdownOpen, setIsEvalDropdownOpen] = createSignal(false);
+
+  createEffect<string | number | undefined>((previousTuneId) => {
+    const currentTuneId = props.tune.id;
+    if (currentTuneId !== previousTuneId) {
+      setIsEvalDropdownOpen(false);
+    }
+    return currentTuneId;
+  });
+
   const handleEvalChange = (newValue: string) => {
     if (props.onRecallEvalChange) {
       props.onRecallEvalChange(newValue);
@@ -66,79 +77,18 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
 
     // If completed_at is set, show static text (tune already submitted)
     if (completedAt) {
-      let label = "(Not Set)";
-      let colorClass = "text-gray-600 dark:text-gray-400";
-
-      // Check if we have quality data to display
-      if (
-        props.tune.latest_quality !== null &&
-        props.tune.latest_quality !== undefined
-      ) {
-        const quality = props.tune.latest_quality;
-        const technique = props.tune.latest_technique || "fsrs";
-
-        if (technique === "sm2") {
-          // SM2 uses 0-5 scale
-          const sm2Labels: Record<number, string> = {
-            0: "Complete blackout",
-            1: "Incorrect response",
-            2: "Incorrect (easy to recall)",
-            3: "Correct (serious difficulty)",
-            4: "Correct (hesitation)",
-            5: "Perfect response",
-          };
-          const sm2Colors: Record<number, string> = {
-            0: "text-red-600 dark:text-red-400",
-            1: "text-red-600 dark:text-red-400",
-            2: "text-orange-600 dark:text-orange-400",
-            3: "text-yellow-600 dark:text-yellow-400",
-            4: "text-green-600 dark:text-green-400",
-            5: "text-blue-600 dark:text-blue-400",
-          };
-          label = sm2Labels[quality] || `Quality ${quality}`;
-          colorClass = sm2Colors[quality] || colorClass;
-        } else {
-          // FSRS uses 1-4 scale
-          const fsrsLabels: Record<number, string> = {
-            1: "Again",
-            2: "Hard",
-            3: "Good",
-            4: "Easy",
-          };
-          const fsrsColors: Record<number, string> = {
-            1: "text-red-600 dark:text-red-400",
-            2: "text-orange-600 dark:text-orange-400",
-            3: "text-green-600 dark:text-green-400",
-            4: "text-blue-600 dark:text-blue-400",
-          };
-          label = fsrsLabels[quality] || `Quality ${quality}`;
-          colorClass = fsrsColors[quality] || colorClass;
-        }
-      }
-      // Fallback to recall_eval text if quality not available
-      else if (props.currentEvaluation) {
-        const fsrsLabels: Record<string, string> = {
-          again: "Again",
-          hard: "Hard",
-          good: "Good",
-          easy: "Easy",
-        };
-        const fsrsColors: Record<string, string> = {
-          again: "text-red-600 dark:text-red-400",
-          hard: "text-orange-600 dark:text-orange-400",
-          good: "text-green-600 dark:text-green-400",
-          easy: "text-blue-600 dark:text-blue-400",
-        };
-        label = fsrsLabels[props.currentEvaluation] || props.currentEvaluation;
-        colorClass =
-          fsrsColors[props.currentEvaluation] ||
-          "text-gray-600 dark:text-gray-400";
-      }
+      const evaluationDisplay = getSubmittedEvaluationDisplay({
+        latestQuality: props.tune.latest_quality,
+        latestTechnique: props.tune.latest_technique,
+        recallEval: props.currentEvaluation,
+      });
 
       return (
         <div class="text-center">
-          <span class={`text-lg ${colorClass} italic font-medium`}>
-            {label}
+          <span
+            class={`text-lg ${evaluationDisplay.colorClass} italic font-medium`}
+          >
+            {evaluationDisplay.label}
           </span>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
             (Submitted)
@@ -152,6 +102,8 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
       <RecallEvalComboBox
         tuneId={props.tune.id}
         value={props.currentEvaluation}
+        open={isEvalDropdownOpen()}
+        onOpenChange={setIsEvalDropdownOpen}
         onChange={handleEvalChange}
       />
     );

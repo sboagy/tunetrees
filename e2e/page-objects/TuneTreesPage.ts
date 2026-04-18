@@ -1665,21 +1665,26 @@ export class TuneTreesPage {
    * Useful for locating a row when the ID column is not showing.
    */
   getRowInPracticeGridByTuneId(tuneId: string): Locator {
-    const row = this.page
-      .getByTestId(`recall-eval-${tuneId}`) // RecallEvalComboBox DropdownMenu.Trigger
-      .locator("..") // div?
-      .locator("..") // cell
-      .locator(".."); // row
-    return row;
+    return this.practiceGrid.locator(
+      [
+        `tr[data-index]:has([data-testid="recall-eval-${tuneId}"])`,
+        `tbody tr:has([data-testid="recall-eval-${tuneId}"])`,
+        `li[data-testid="stacked-item-${tuneId}"]`,
+      ].join(", ")
+    );
   }
 
   getRows(gridId: string): Locator {
     // Support both table mode (desktop) and stacked list mode (mobile).
     // On desktop the TanStack virtual table renders "tbody tr[data-index]".
-    // On mobile the TuneStackedList renders "li[data-testid^='stacked-item-']".
-    return this.page.locator(
-      `[data-testid="tunes-grid-${gridId}"] tbody tr[data-index], [data-testid="tunes-grid-${gridId}"] li[data-testid^="stacked-item-"]`
-    );
+    // In list mode the TuneStackedList renders visible
+    // "li[data-testid^='stacked-item-']" items under the same
+    // "tunes-grid-*" root, but outside the table element.
+    return this.page
+      .getByTestId(`tunes-grid-${gridId}`)
+      .locator(
+        "tbody tr[data-index], li[data-testid^='stacked-item-']:visible"
+      );
   }
 
   /**
@@ -1706,6 +1711,37 @@ export class TuneTreesPage {
   async clickTune(tuneName: string, grid: Locator) {
     const tuneLink = await this.getTuneLink(tuneName, grid);
     await tuneLink.click();
+  }
+
+  /**
+   * Select a grid row without accidentally activating inline stacked-list controls.
+   * Mobile stacked rows now include goal/schedule controls, so a center-point click
+   * can open an editor popover instead of selecting the tune.
+   */
+  async selectGridRow(row: Locator, opts?: { timeout?: number }) {
+    const timeout = opts?.timeout ?? 5000;
+
+    await row.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(row).toBeVisible({ timeout });
+
+    const clicked = await row
+      .evaluate((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+        element.click();
+        return true;
+      })
+      .catch(() => false);
+
+    if (clicked) {
+      await this.page.waitForTimeout(150);
+      return;
+    }
+
+    await row.click({ timeout });
   }
 
   /**
@@ -1784,6 +1820,27 @@ export class TuneTreesPage {
    * @param columnIds - Array of column IDs like ["title", "mode", "type"]
    */
   async expectColumnsVisible(columnIds: string[]) {
+    await expect
+      .poll(
+        async () => {
+          const states = await Promise.all(
+            columnIds.map((id) =>
+              this.page
+                .getByTestId(`ch-${id.toLowerCase()}`)
+                .isVisible({ timeout: 250 })
+                .catch(() => false)
+            )
+          );
+
+          return states.every(Boolean);
+        },
+        {
+          timeout: 10000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
+
     for (const id of columnIds) {
       const header = this.page.getByTestId(`ch-${id.toLowerCase()}`);
       await expect(header).toBeVisible({ timeout: 5000 });

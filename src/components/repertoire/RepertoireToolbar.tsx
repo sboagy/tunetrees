@@ -212,7 +212,11 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
   const openDisplayOptions = () => {
     setShowOverflowMenu(false);
-    setShowColumnsDropdown(true);
+    // Let the mobile overflow popover finish closing before opening the
+    // Display Options portal, otherwise the nested menu can race on CI.
+    requestAnimationFrame(() => {
+      setShowColumnsDropdown(true);
+    });
   };
 
   const displayOptionsTriggerRef = () =>

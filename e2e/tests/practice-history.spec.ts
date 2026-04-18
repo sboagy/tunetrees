@@ -72,7 +72,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
     // Now click the tune
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
 
     // Wait for sidebar to populate with tune details
     await page.waitForTimeout(1500);
@@ -113,7 +113,7 @@ test.describe("PRACTICE-HISTORY: Viewing Records", () => {
 
     const firstRow = ttPage.getRows("repertoire").first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
 
@@ -318,7 +318,7 @@ test.describe("PRACTICE-HISTORY: Editing Records", () => {
     await ttPage.searchForTune("Cooley", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
     const firstRow = ttPage.getRows("repertoire").first();
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
 
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });
@@ -449,7 +449,7 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
 
     // Now click the tune
     const firstRow = ttPage.getRows("repertoire").first();
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
 
     // Wait for sidebar to populate with tune details
     await page.waitForTimeout(1500);
@@ -597,7 +597,7 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
     await ttPage.searchForTune("Kesh", ttPage.repertoireGrid);
     await page.waitForTimeout(500);
     const firstRow = ttPage.getRows("repertoire").first();
-    await firstRow.click();
+    await ttPage.selectGridRow(firstRow);
     await page.waitForTimeout(500);
 
     await ttPage.ensureTuneInfoExpanded({ timeoutMs: 10_000 });

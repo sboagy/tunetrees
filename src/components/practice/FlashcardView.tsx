@@ -39,7 +39,6 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
   const [currentIndex, setCurrentIndex] = createSignal(0);
   const [isRevealed, setIsRevealed] = createSignal(false);
-  const [didInitFromSelection, setDidInitFromSelection] = createSignal(false);
   // Auth context currently only needed if future features require local staging directly
   // (evaluation staging now centralized in parent PracticeIndex)
   // const { incrementPracticeListStagedChanged } = useAuth();
@@ -79,21 +78,18 @@ export const FlashcardView: Component<FlashcardViewProps> = (props) => {
     }
   });
 
-  // On initial mount: if a current tune is selected in the grid, start on that tune's index
-  // Runs once when tunes are available and a selection exists
+  // Keep the flashcard index aligned to the selected tune id from the grid/sidebar.
+  // This covers the initial grid -> flashcard handoff and also preserves the same tune
+  // when the underlying list reorders or re-renders under slower mobile/CI timing.
   createEffect(() => {
-    if (didInitFromSelection()) return;
     const selectedId = currentTuneId?.() ?? null;
     const list = tunes();
-    if (!list || list.length === 0) return; // wait until tunes are ready
+    if (!list || list.length === 0 || selectedId === null) return;
 
-    if (selectedId !== null) {
-      const idx = list.findIndex((t) => t.id === selectedId);
-      if (idx >= 0) {
-        setCurrentIndex(idx);
-      }
+    const idx = list.findIndex((t) => t.id === selectedId);
+    if (idx >= 0 && idx !== currentIndex()) {
+      setCurrentIndex(idx);
     }
-    setDidInitFromSelection(true);
   });
 
   // Set current tune in context whenever flashcard changes
