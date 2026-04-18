@@ -587,7 +587,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         <StateBadge value={item.latest_state} />
                       </Show>
 
-                      {/* Scheduled: Recall Eval dropdown or static text (controlled by "evaluation" column) */}
+                      {/* Goal control (controlled by the "goal" column) */}
                       <Show
                         when={
                           props.tablePurpose !== "catalog" &&
