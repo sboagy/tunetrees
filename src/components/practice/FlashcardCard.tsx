@@ -31,7 +31,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
   const [isEvalDropdownOpen, setIsEvalDropdownOpen] = createSignal(false);
 
   createEffect(() => {
-    props.tune.id;
+    void props.tune.id;
     setIsEvalDropdownOpen(false);
   });
 
