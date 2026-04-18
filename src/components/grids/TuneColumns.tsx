@@ -7,6 +7,7 @@
 
 import type { ColumnDef, Table } from "@tanstack/solid-table";
 import { type Component, createEffect, Show } from "solid-js";
+import { getSubmittedEvaluationDisplay } from "./evaluation-display";
 import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
@@ -1057,73 +1058,17 @@ export function getScheduledColumns(
 
         // If completed_at is set, show static text (tune already submitted)
         if (completedAt) {
-          let label = "(Not Set)";
-          let colorClass = "text-gray-600 dark:text-gray-400";
-
-          // Check if we have quality data to display
-          if (row.latest_quality !== null && row.latest_quality !== undefined) {
-            const quality = row.latest_quality;
-            const technique = row.latest_technique || "fsrs"; // Default to FSRS if technique not set
-
-            if (technique === "sm2") {
-              // SM2 uses 0-5 scale
-              const sm2Labels: Record<number, string> = {
-                0: "Complete blackout",
-                1: "Incorrect response",
-                2: "Incorrect (easy to recall)",
-                3: "Correct (serious difficulty)",
-                4: "Correct (hesitation)",
-                5: "Perfect response",
-              };
-              const sm2Colors: Record<number, string> = {
-                0: "text-red-600 dark:text-red-400",
-                1: "text-red-600 dark:text-red-400",
-                2: "text-orange-600 dark:text-orange-400",
-                3: "text-yellow-600 dark:text-yellow-400",
-                4: "text-green-600 dark:text-green-400",
-                5: "text-blue-600 dark:text-blue-400",
-              };
-              label = sm2Labels[quality] || `Quality ${quality}`;
-              colorClass = sm2Colors[quality] || colorClass;
-            } else {
-              // FSRS uses 1-4 scale (Rating.Again=1, Rating.Hard=2, Rating.Good=3, Rating.Easy=4)
-              const fsrsLabels: Record<number, string> = {
-                1: "Again",
-                2: "Hard",
-                3: "Good",
-                4: "Easy",
-              };
-              const fsrsColors: Record<number, string> = {
-                1: "text-red-600 dark:text-red-400",
-                2: "text-orange-600 dark:text-orange-400",
-                3: "text-green-600 dark:text-green-400",
-                4: "text-blue-600 dark:text-blue-400",
-              };
-              label = fsrsLabels[quality] || `Quality ${quality}`;
-              colorClass = fsrsColors[quality] || colorClass;
-            }
-          }
-          // Fallback to recall_eval text if quality not available (shouldn't happen for completed tunes)
-          else if (currentEval) {
-            const fsrsLabels: Record<string, string> = {
-              again: "Again",
-              hard: "Hard",
-              good: "Good",
-              easy: "Easy",
-            };
-            const fsrsColors: Record<string, string> = {
-              again: "text-red-600 dark:text-red-400",
-              hard: "text-orange-600 dark:text-orange-400",
-              good: "text-green-600 dark:text-green-400",
-              easy: "text-blue-600 dark:text-blue-400",
-            };
-            label = fsrsLabels[currentEval] || currentEval;
-            colorClass = fsrsColors[currentEval] || colorClass;
-          }
+          const evaluationDisplay = getSubmittedEvaluationDisplay({
+            latestQuality: row.latest_quality,
+            latestTechnique: row.latest_technique,
+            recallEval: currentEval,
+          });
 
           return (
-            <span class={`text-sm ${colorClass} italic font-medium`}>
-              {label}
+            <span
+              class={`text-sm ${evaluationDisplay.colorClass} italic font-medium`}
+            >
+              {evaluationDisplay.label}
             </span>
           );
         }

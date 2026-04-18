@@ -15,6 +15,10 @@
  */
 
 import { For, type JSX, Show } from "solid-js";
+import {
+  getRecallEvalDisplay,
+  getSubmittedEvaluationDisplay,
+} from "./evaluation-display";
 import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
@@ -68,31 +72,6 @@ function getRelativeLabel(value: string | null | undefined): {
             : `In ${diffDays}d`;
 
   return { label, colorClass };
-}
-
-function getRecallEvalDisplay(value: string | null | undefined): {
-  label: string;
-  colorClass: string;
-} | null {
-  if (!value) return null;
-
-  const labels: Record<string, string> = {
-    again: "Again",
-    hard: "Hard",
-    good: "Good",
-    easy: "Easy",
-  };
-  const colors: Record<string, string> = {
-    again: "text-red-600 dark:text-red-400",
-    hard: "text-orange-600 dark:text-orange-400",
-    good: "text-green-600 dark:text-green-400",
-    easy: "text-blue-600 dark:text-blue-400",
-  };
-
-  return {
-    label: labels[value] ?? value,
-    colorClass: colors[value] ?? "text-gray-600 dark:text-gray-400",
-  };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -724,65 +703,17 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         >
                           {/* Tune already submitted: show static evaluation text */}
                           {(() => {
-                            let label = "(Not Set)";
-                            let colorClass = "text-gray-600 dark:text-gray-400";
-                            if (
-                              item.latest_quality !== null &&
-                              item.latest_quality !== undefined
-                            ) {
-                              const quality = item.latest_quality;
-                              const technique = item.latest_technique || "fsrs";
-                              if (technique === "sm2") {
-                                const sm2Labels: Record<number, string> = {
-                                  0: "Complete blackout",
-                                  1: "Incorrect response",
-                                  2: "Incorrect (easy to recall)",
-                                  3: "Correct (serious difficulty)",
-                                  4: "Correct (hesitation)",
-                                  5: "Perfect response",
-                                };
-                                const sm2Colors: Record<number, string> = {
-                                  0: "text-red-600 dark:text-red-400",
-                                  1: "text-red-600 dark:text-red-400",
-                                  2: "text-orange-600 dark:text-orange-400",
-                                  3: "text-yellow-600 dark:text-yellow-400",
-                                  4: "text-green-600 dark:text-green-400",
-                                  5: "text-blue-600 dark:text-blue-400",
-                                };
-                                label =
-                                  sm2Labels[quality] || `Quality ${quality}`;
-                                colorClass = sm2Colors[quality] || colorClass;
-                              } else {
-                                const fsrsLabels: Record<number, string> = {
-                                  1: "Again",
-                                  2: "Hard",
-                                  3: "Good",
-                                  4: "Easy",
-                                };
-                                const fsrsColors: Record<number, string> = {
-                                  1: "text-red-600 dark:text-red-400",
-                                  2: "text-orange-600 dark:text-orange-400",
-                                  3: "text-green-600 dark:text-green-400",
-                                  4: "text-blue-600 dark:text-blue-400",
-                                };
-                                label =
-                                  fsrsLabels[quality] || `Quality ${quality}`;
-                                colorClass = fsrsColors[quality] || colorClass;
-                              }
-                            } else if (item.recall_eval) {
-                              const evalDisplay = getRecallEvalDisplay(
-                                item.recall_eval
-                              );
-                              if (evalDisplay) {
-                                label = evalDisplay.label;
-                                colorClass = evalDisplay.colorClass;
-                              }
-                            }
+                            const evaluationDisplay =
+                              getSubmittedEvaluationDisplay({
+                                latestQuality: item.latest_quality,
+                                latestTechnique: item.latest_technique,
+                                recallEval: item.recall_eval,
+                              });
                             return (
                               <span
-                                class={`ml-auto text-sm italic font-medium ${colorClass}`}
+                                class={`ml-auto text-sm italic font-medium ${evaluationDisplay.colorClass}`}
                               >
-                                {label}
+                                {evaluationDisplay.label}
                               </span>
                             );
                           })()}
