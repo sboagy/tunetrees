@@ -30,41 +30,41 @@ test.describe("ANALYSIS-001: Analysis Charts", () => {
 
     await ttPage.navigateToTab("analysis");
     // Wait for the page to settle after navigation
-    await expect(
-      page.getByTestId("analysis-page")
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("analysis-page")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("analysis page renders and shows heading", async ({ page }) => {
-    await expect(
-      page.getByRole("heading", { name: /analysis/i })
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: /analysis/i })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test("FSRS retention curve card is visible", async ({ page }) => {
     // The card may show data, an empty state, or a loading state —
     // all of which are inside the data-testid container.
-    await expect(
-      page.getByTestId("fsrs-retention-chart")
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("fsrs-retention-chart")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("staleness factor chart card is visible", async ({ page }) => {
-    await expect(
-      page.getByTestId("staleness-chart")
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("staleness-chart")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("practice heatmap card is visible", async ({ page }) => {
-    await expect(
-      page.getByTestId("practice-heatmap")
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("practice-heatmap")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("repertoire coverage chart card is visible", async ({ page }) => {
-    await expect(
-      page.getByTestId("repertoire-coverage-chart")
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("repertoire-coverage-chart")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test("all four chart cards are visible simultaneously", async ({ page }) => {
