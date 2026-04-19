@@ -839,7 +839,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
   });
 
   /**
-   * Regression test for the bug where the DateRolloverBanner did not clear
+   * Regression test for the bug where the date-rollover banner did not clear
    * when another device created a new queue for today (delivered via sync).
    *
    * Scenario: Queue is incomplete, date advances, banner appears. Then a new
