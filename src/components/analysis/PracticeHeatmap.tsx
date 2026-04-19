@@ -2,7 +2,7 @@
  * Practice Heatmap
  *
  * Calendar heatmap showing daily practice sessions over the last 365 days.
- * Built with SolidJS <For> loops + @kobalte/core Tooltip (via shadcn-solid).
+ * Built with SolidJS <For> loops and native browser tooltips via `title`.
  *
  * @module components/analysis/PracticeHeatmap
  */
