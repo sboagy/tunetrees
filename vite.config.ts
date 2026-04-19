@@ -11,6 +11,12 @@ export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
   const disableHmrForE2E = process.env.VITE_DISABLE_HMR_FOR_E2E === "true";
+  const e2eArtifactWatchIgnore = [
+    "**/logs/**",
+    "**/test-results/**",
+    "**/playwright-report/**",
+    "**/e2e/.auth/**",
+  ];
 
   // Get build-time constants
   const getGitCommit = () => {
@@ -68,6 +74,13 @@ export default defineConfig(() => {
     // Development server configuration
     server: {
       hmr: disableHmrForE2E ? false : undefined,
+      // Local E2E runs write logs, traces, screenshots, and auth state under the
+      // repo root. If the dev server watches those directories, Vite can emit
+      // `full-reload` messages mid-test and frozen-clock specs will unexpectedly
+      // navigate away while Playwright advances time.
+      watch: {
+        ignored: e2eArtifactWatchIgnore,
+      },
       proxy: {
         // Proxy TheSession.org API requests to bypass CORS in development
         // This matches the pattern used by the import utils
