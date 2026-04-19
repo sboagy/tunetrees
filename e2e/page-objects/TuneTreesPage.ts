@@ -2260,7 +2260,9 @@ export class TuneTreesPage {
   }
 
   private getDisplayOptionsButton(): Locator {
-    return this.page.getByRole("button", { name: /^Display Options$/i }).last();
+    return this.page
+      .locator('[data-testid="display-options-entry-button"]:visible')
+      .last();
   }
 
   private async openColumnVisibilityMenu(
@@ -2298,12 +2300,36 @@ export class TuneTreesPage {
     }
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (attempt > 0) {
-        await columnsButton.click().catch(() => undefined);
+      const displayOptionsButton = this.getDisplayOptionsButton();
+      const targetMenuVisible = await targetMenu
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (targetMenuVisible) {
+        return;
       }
 
-      const displayOptionsButton = this.getDisplayOptionsButton();
-      await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
+      const displayOptionsVisible = await displayOptionsButton
+        .isVisible({ timeout: 750 })
+        .catch(() => false);
+      if (!displayOptionsVisible) {
+        if (attempt > 0) {
+          await columnsButton.scrollIntoViewIfNeeded().catch(() => undefined);
+          await columnsButton.click().catch(() => undefined);
+        }
+
+        const displayOptionsVisibleAfterRetry = await displayOptionsButton
+          .isVisible({ timeout: 1000 })
+          .catch(() => false);
+        if (!displayOptionsVisibleAfterRetry) {
+          if (this.page.isClosed()) {
+            return;
+          }
+
+          await this.page.waitForTimeout(150);
+          continue;
+        }
+      }
+
       await displayOptionsButton
         .scrollIntoViewIfNeeded()
         .catch(() => undefined);
@@ -2320,6 +2346,10 @@ export class TuneTreesPage {
         .isVisible({ timeout: 3000 })
         .catch(() => false);
       if (menuVisible) {
+        return;
+      }
+
+      if (this.page.isClosed()) {
         return;
       }
 
@@ -3034,6 +3064,9 @@ export class TuneTreesPage {
     const waitBetweenAttempts = async () => {
       if (!doTimeouts || this.page.isClosed()) return;
       const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
+      await this.page
+        .waitForLoadState("domcontentloaded", { timeout: 1500 })
+        .catch(() => undefined);
       await this.page.waitForTimeout(delay);
     };
 
@@ -3088,6 +3121,31 @@ export class TuneTreesPage {
         .toBe(true);
     };
 
+    const submitStateReflectsSelection = async () => {
+      if (evalValue === "not-set") {
+        return true;
+      }
+
+      const [title, textContent] = await Promise.all([
+        this.submitEvaluationsButton.getAttribute("title").catch(() => null),
+        this.submitEvaluationsButton.textContent().catch(() => null),
+      ]);
+
+      if (/staging evaluations/i.test(title ?? "")) {
+        return true;
+      }
+
+      const titleMatch = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
+      const textMatch = textContent?.match(/\b(\d+)\b/);
+      const count = titleMatch
+        ? Number(titleMatch[1])
+        : textMatch
+          ? Number(textMatch[1])
+          : 0;
+
+      return count >= 1;
+    };
+
     for (let attempt = 0; attempt < 3; attempt++) {
       if (await triggerAlreadySelected()) {
         return;
@@ -3126,14 +3184,16 @@ export class TuneTreesPage {
         await expect
           .poll(
             async () => {
-              const [triggerText, open] = await Promise.all([
+              const [triggerText, open, submitReady] = await Promise.all([
                 evalTrigger.textContent().catch(() => null),
                 isMenuOpen(),
+                submitStateReflectsSelection(),
               ]);
 
               return {
                 triggerText: triggerText ?? "",
                 open,
+                submitReady,
               };
             },
             {
@@ -3144,11 +3204,29 @@ export class TuneTreesPage {
           .toMatchObject({
             triggerText: expect.stringMatching(new RegExp(expectedLabel, "i")),
             open: false,
+            submitReady: true,
           });
       } catch {
         await closeMenu();
         await waitBetweenAttempts();
         continue;
+      }
+
+      if (evalValue !== "not-set" && !this.page.isClosed()) {
+        const settleDelay =
+          typeof doTimeouts === "number" ? Math.max(doTimeouts, 250) : 250;
+        await this.page.waitForTimeout(settleDelay);
+
+        const [stillSelected, submitReady] = await Promise.all([
+          triggerAlreadySelected().catch(() => false),
+          submitStateReflectsSelection(),
+        ]);
+
+        if (!stillSelected || !submitReady) {
+          await closeMenu();
+          await waitBetweenAttempts();
+          continue;
+        }
       }
 
       if (doTimeouts && !this.page.isClosed()) {

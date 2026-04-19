@@ -2,8 +2,14 @@ import type { Page } from "@playwright/test";
 import log from "loglevel";
 import { BASE_URL } from "../test-config";
 
+function resolveBaseUrl(path: string = ""): string {
+  const normalizedBase = `${String(BASE_URL).replace(/\/+$/, "")}/`;
+  const normalizedPath = path.replace(/^\/+/, "");
+  return new URL(normalizedPath, normalizedBase).toString();
+}
+
 export async function gotoE2eOrigin(page: Page): Promise<void> {
-  await page.goto(`${BASE_URL}/e2e-origin.html`, {
+  await page.goto(resolveBaseUrl("e2e-origin.html"), {
     waitUntil: "domcontentloaded",
   });
 }
@@ -252,6 +258,6 @@ export async function resetLocalDbAndResync(
 ): Promise<void> {
   await gotoE2eOrigin(page);
   await clearTunetreesClientStorage(page, { preserveAuth: opts.preserveAuth });
-  await page.goto(`${BASE_URL}`, { waitUntil: "domcontentloaded" });
+  await page.goto(resolveBaseUrl(), { waitUntil: "domcontentloaded" });
   await waitForSyncComplete(page);
 }
