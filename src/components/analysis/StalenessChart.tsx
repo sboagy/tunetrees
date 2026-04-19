@@ -2,7 +2,8 @@
  * Staleness Chart
  *
  * Bar chart showing tunes bucketed by how many days overdue they are.
- * Each bar is clickable and opens a Popover listing the overdue tunes.
+ * Popover triggers below the chart open lists of overdue tunes for each bucket;
+ * the chart bars themselves are not interactive.
  *
  * @module components/analysis/StalenessChart
  */
