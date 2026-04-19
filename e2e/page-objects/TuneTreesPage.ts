@@ -2304,7 +2304,9 @@ export class TuneTreesPage {
 
       const displayOptionsButton = this.getDisplayOptionsButton();
       await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
-      await displayOptionsButton.scrollIntoViewIfNeeded().catch(() => undefined);
+      await displayOptionsButton
+        .scrollIntoViewIfNeeded()
+        .catch(() => undefined);
 
       // The Kobalte dropdown entry can detach as it closes itself while opening
       // the nested menu surface. Prefer a normal click, but fall back to a
