@@ -2026,19 +2026,7 @@ export class TuneTreesPage {
       return;
     }
 
-    await expect(columnsButton).toBeVisible({ timeout: 5000 });
-    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
-
-    const initialMenu = this.getColumnVisibilityMenu();
-    const menuVisible = await initialMenu
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (!menuVisible) {
-      await columnsButton.click();
-      await this.openDisplayOptionsEntryIfNeeded(columnsButton);
-      const menu = this.getColumnVisibilityMenu();
-      await expect(menu).toBeVisible({ timeout: 5000 });
-    }
+    await this.openColumnVisibilityMenu(columnsButton);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const displayModeSwitch = this.getDisplayModeSwitch();
@@ -2062,8 +2050,7 @@ export class TuneTreesPage {
         .isVisible({ timeout: 250 })
         .catch(() => false);
       if (!reopenedMenuVisible) {
-        await columnsButton.click().catch(() => undefined);
-        await this.openDisplayOptionsEntryIfNeeded(columnsButton);
+        await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
       }
 
       await this.page.waitForTimeout(150);
@@ -2273,9 +2260,28 @@ export class TuneTreesPage {
   }
 
   private getDisplayOptionsButton(): Locator {
-    return this.page
-      .locator('[data-testid="display-options-entry-button"]:visible')
-      .last();
+    return this.page.getByRole("button", { name: /^Display Options$/i }).last();
+  }
+
+  private async openColumnVisibilityMenu(
+    columnsButton: Locator,
+    targetMenu: Locator = this.getColumnVisibilityMenu()
+  ): Promise<void> {
+    await this.closeFilterPanelIfOpen();
+
+    await expect(columnsButton).toBeVisible({ timeout: 5000 });
+    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
+
+    const menuVisible = await targetMenu
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (menuVisible) {
+      return;
+    }
+
+    await columnsButton.click();
+    await this.openDisplayOptionsEntryIfNeeded(columnsButton, targetMenu);
+    await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 
   private async openDisplayOptionsEntryIfNeeded(
@@ -2298,6 +2304,7 @@ export class TuneTreesPage {
 
       const displayOptionsButton = this.getDisplayOptionsButton();
       await expect(displayOptionsButton).toBeVisible({ timeout: 5000 });
+      await displayOptionsButton.scrollIntoViewIfNeeded().catch(() => undefined);
 
       // The Kobalte dropdown entry can detach as it closes itself while opening
       // the nested menu surface. Prefer a normal click, but fall back to a
@@ -2308,11 +2315,13 @@ export class TuneTreesPage {
         .catch(() => undefined);
 
       const menuVisible = await targetMenu
-        .isVisible({ timeout: 1000 })
+        .isVisible({ timeout: 3000 })
         .catch(() => false);
       if (menuVisible) {
         return;
       }
+
+      await this.page.waitForTimeout(150);
     }
 
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
@@ -2326,19 +2335,7 @@ export class TuneTreesPage {
     const columnsButton = this.getColumnsButtonForTab(tab);
     const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    await expect(columnsButton).toBeVisible({ timeout: 5000 });
-    await expect(columnsButton).toBeEnabled({ timeout: 5000 });
-
-    const initialMenu = this.getColumnVisibilityMenu();
-    const menuVisible = await initialMenu
-      .isVisible({ timeout: 500 })
-      .catch(() => false);
-    if (!menuVisible) {
-      await columnsButton.click();
-      await this.openDisplayOptionsEntryIfNeeded(columnsButton);
-      const menu = this.getColumnVisibilityMenu();
-      await expect(menu).toBeVisible({ timeout: 5000 });
-    }
+    await this.openColumnVisibilityMenu(columnsButton);
 
     const menu = this.getColumnVisibilityMenu();
 
