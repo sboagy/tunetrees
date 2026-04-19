@@ -189,25 +189,43 @@ function showTooltip(context: ChartContext) {
     model.yAlign ?? "no-transform"
   }`;
 
-  let content = "";
+  const children: Node[] = [];
 
   model.title.forEach((title) => {
-    content += `<h3 class="font-semibold leading-none tracking-tight">${title}</h3>`;
+    const titleEl = document.createElement("h3");
+    titleEl.className = "font-semibold leading-none tracking-tight";
+    titleEl.textContent = title;
+    children.push(titleEl);
   });
 
-  content += `<div class="mt-1 text-muted-foreground">`;
+  const bodyContainer = document.createElement("div");
+  bodyContainer.className = "mt-1 text-muted-foreground";
+
   const body = model.body.flatMap((b) => b.lines);
   body.forEach((line, i) => {
-    const colors = model.labelColors[i];
-    content += `
-      <div class="flex items-center">
-        <span class="inline-block h-2 w-2 mr-1 rounded-full border" style="background: ${colors.backgroundColor}; border-color: ${colors.borderColor}"></span>
-        ${line}
-      </div>`;
-  });
-  content += `</div>`;
+    const row = document.createElement("div");
+    row.className = "flex items-center";
 
-  el.innerHTML = content;
+    const indicator = document.createElement("span");
+    indicator.className = "inline-block h-2 w-2 mr-1 rounded-full border";
+
+    const colors = model.labelColors[i];
+    if (colors) {
+      if (typeof colors.backgroundColor === "string") {
+        indicator.style.backgroundColor = colors.backgroundColor;
+      }
+      if (typeof colors.borderColor === "string") {
+        indicator.style.borderColor = colors.borderColor;
+      }
+    }
+
+    row.appendChild(indicator);
+    row.appendChild(document.createTextNode(line));
+    bodyContainer.appendChild(row);
+  });
+
+  children.push(bodyContainer);
+  el.replaceChildren(...children);
 
   const pos = context.chart.canvas.getBoundingClientRect();
   el.style.opacity = "1";
