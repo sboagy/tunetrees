@@ -228,8 +228,8 @@ export async function getFsrsRetentionCurve(
   const stabilities = Array.from(latestByTune.values()).filter((s) => s > 0);
 
   if (stabilities.length === 0) {
-    // No data: return empty curve
-    return Array.from({ length: 61 }, (_, i) => ({ day: i, retention: 1 }));
+    // No data: return empty curve so the UI can render its empty state.
+    return [];
   }
 
   // For each day 0–60, compute average predicted retention across all tunes
