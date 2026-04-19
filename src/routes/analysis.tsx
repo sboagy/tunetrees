@@ -4,7 +4,11 @@
  * Practice statistics, charts, and FSRS analytics.
  * Shows progress over time, retention rates, and scheduling insights.
  *
- * Port from: legacy/frontend/app/(main)/pages/analysis/ (TODO: verify path)
+ * Charts:
+ * 1. FSRS Retention Curve — area chart, predicted memory decay
+ * 2. Staleness Factor     — bar chart, tunes grouped by days overdue
+ * 3. Practice Heatmap     — 365-day calendar grid
+ * 4. Repertoire Coverage  — donut chart, tune types
  *
  * @module routes/analysis
  */
@@ -13,20 +17,22 @@ import {
   type Component,
   createEffect,
   createSignal,
+  Match,
   onCleanup,
+  Switch,
 } from "solid-js";
 import { AIChatDrawer } from "../components/ai/AIChatDrawer";
+import { FsrsRetentionChart } from "../components/analysis/FsrsRetentionChart";
+import { PracticeHeatmap } from "../components/analysis/PracticeHeatmap";
+import { RepertoireCoverageChart } from "../components/analysis/RepertoireCoverageChart";
+import { StalenessChart } from "../components/analysis/StalenessChart";
+import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 
 /**
  * Analysis Page Component
  *
- * Features (TODO - Phase 6):
- * - Practice frequency charts
- * - Retention rate graphs
- * - FSRS parameter visualization
- * - Progress over time
- * - Streak tracking
- * - Goal progress
+ * Four data-driven chart cards displayed in a responsive 2-column grid on
+ * larger screens and stacked on mobile.
  *
  * @example
  * ```tsx
@@ -35,6 +41,7 @@ import { AIChatDrawer } from "../components/ai/AIChatDrawer";
  */
 const AnalysisPage: Component = () => {
   const [isChatOpen, setIsChatOpen] = createSignal(false);
+  const { currentRepertoireId } = useCurrentRepertoire();
 
   createEffect(() => {
     const handleOpenAssistant = () => setIsChatOpen(true);
@@ -45,74 +52,46 @@ const AnalysisPage: Component = () => {
   });
 
   return (
-    <div class="h-full flex flex-col">
+    <div class="flex h-full flex-col" data-testid="analysis-page">
       {/* Page Header */}
-      <div class="mb-6">
+      <div class="mb-4 shrink-0 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
-            📊 Analysis
-          </h2>
-          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Practice statistics and progress tracking
+          <h2 class="text-xl font-bold text-foreground">Analysis</h2>
+          <p class="mt-0.5 text-sm text-muted-foreground">
+            Practice statistics and FSRS insights
           </p>
         </div>
       </div>
 
-      {/* Placeholder Content */}
-      <div class="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow p-8">
-        <div class="max-w-2xl mx-auto text-center">
-          <div class="text-6xl mb-6">📊</div>
-          <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-            Analysis Coming Soon
-          </h3>
-          <p class="text-gray-600 dark:text-gray-400 mb-6">
-            This page will show practice statistics, progress charts, and FSRS
-            analytics.
-          </p>
-
-          {/* Preview of Future Features */}
-          <div class="grid gap-4 sm:grid-cols-2 text-left">
-            <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <h4 class="font-semibold text-blue-900 dark:text-blue-300 mb-1">
-                📈 Practice Frequency
-              </h4>
-              <p class="text-sm text-blue-700 dark:text-blue-400">
-                Daily practice counts and trends
+      {/* Charts — scrollable area, shown only when a repertoire is selected */}
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <Switch>
+          <Match when={!currentRepertoireId()}>
+            <div class="flex h-full items-center justify-center">
+              <p class="text-sm text-muted-foreground">
+                Select a repertoire to view analysis charts
               </p>
             </div>
+          </Match>
+          <Match when={currentRepertoireId()}>
+            {(rid) => (
+              /* True 2×2 grid so all four charts fit in one viewport on sm+ */
+              <div class="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2">
+                {/* 1. FSRS Retention Curve */}
+                <FsrsRetentionChart repertoireId={rid()} />
 
-            <div class="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-              <h4 class="font-semibold text-green-900 dark:text-green-300 mb-1">
-                🎯 Retention Rates
-              </h4>
-              <p class="text-sm text-green-700 dark:text-green-400">
-                Memory retention over time
-              </p>
-            </div>
+                {/* 2. Staleness Factor */}
+                <StalenessChart repertoireId={rid()} />
 
-            <div class="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-              <h4 class="font-semibold text-purple-900 dark:text-purple-300 mb-1">
-                🔬 FSRS Insights
-              </h4>
-              <p class="text-sm text-purple-700 dark:text-purple-400">
-                Stability and difficulty trends
-              </p>
-            </div>
+                {/* 3. Practice Heatmap (internal overflow-x-auto handles narrow cells) */}
+                <PracticeHeatmap repertoireId={rid()} />
 
-            <div class="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-              <h4 class="font-semibold text-orange-900 dark:text-orange-300 mb-1">
-                🔥 Streak Tracking
-              </h4>
-              <p class="text-sm text-orange-700 dark:text-orange-400">
-                Daily practice streaks
-              </p>
-            </div>
-          </div>
-
-          <p class="text-sm text-gray-500 dark:text-gray-500 mt-6">
-            📋 Planned for Phase 6 - Advanced Features
-          </p>
-        </div>
+                {/* 4. Repertoire Coverage */}
+                <RepertoireCoverageChart repertoireId={rid()} />
+              </div>
+            )}
+          </Match>
+        </Switch>
       </div>
 
       <AIChatDrawer

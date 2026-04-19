@@ -14,7 +14,7 @@ This section tracks implementation status against the phases below. The "Current
 | Phase | Status | Notes |
 |------|--------|-------|
 | Phase 1 | Complete | `useRolloverStateMachine.ts` was added and preserves the `queueReady()` / `queueReady.loading` gate before banner or auto-advance behavior can fire. |
-| Phase 2 | Complete | `DateRolloverBanner.tsx` is now a pure display component driven by parent props; rollover visibility moved to the route, and existing `data-testid` attributes were preserved. |
+| Phase 2 | Complete | The rollover UI was simplified to pure display, then inlined into `PracticeControlBanner`; rollover visibility moved to the route, and existing `data-testid` attributes were preserved. |
 | Phase 3 | Complete | `usePracticeListData.ts` and `usePracticePageGate.tsx` were added on top of the earlier route extractions, bringing `src/routes/practice.tsx` down to 372 lines while preserving the existing practice-page behavior. |
 | Phase 4 | Complete | `handlePracticeDateRefresh` was simplified to trust the state machine for auto-rollover decisions while keeping a queue-readiness guard for auto mode. |
 | Phase 5 | Complete | The heaviest `getPracticeList()` debug queries/logging were removed from `src/lib/db/queries/practice.ts`; result-level telemetry such as the join row count remains. |
@@ -44,7 +44,7 @@ Completed phases: **1, 2, 3, 4, 5, 6, 7, and 8**.
 |------|-------|------|
 | `src/routes/practice.tsx` | 1,079 | Main practice page — contains state machine, handlers, rendering |
 | `src/routes/practice/usePracticeQueueDate.ts` | 349 | Queue date resolution composable (DB-first, localStorage persistence) |
-| `src/components/practice/DateRolloverBanner.tsx` | 161 | Banner with internal polling, state, and `onDateChange` callback |
+| `src/components/practice/PracticeControlBanner.tsx` | ~700 | Practice toolbar, queue controls, and inline date-rollover UI |
 | `src/lib/services/practice-queue.ts` | 1,280 | Queue generation, bucket classification, DB operations |
 | `src/lib/db/queries/practice.ts` | 1,015 | Practice list queries (joins view + queue) |
 | `src/lib/utils/practice-date.ts` | 196 | Date utilities (getPracticeDate, hasPracticeDateChanged, formatAsWindowStart) |
@@ -55,7 +55,7 @@ Completed phases: **1, 2, 3, 4, 5, 6, 7, and 8**.
    - `handleDateRolloverDetection` (practice.tsx:884–895) — imperative callback
    - `handlePracticeDateRefresh` (practice.tsx:786–882) — re-derives conditions with async IO
    - `usePracticeQueueDate.ts` — evaluates 2 conditions eagerly at DB-read time
-   - `DateRolloverBanner.tsx` — internal polling loop + `showBanner` signal (leaks app state into UI)
+  - Standalone rollover banner UI — internal polling loop + `showBanner` signal (leaks app state into UI)
 
 2. **practice.tsx is too large** (1,079 lines) with too many responsibilities:
    - Queue date management
@@ -70,7 +70,7 @@ Completed phases: **1, 2, 3, 4, 5, 6, 7, and 8**.
    - Repertoire management
    - AI chat drawer
 
-3. **DateRolloverBanner has internal state that should be application state**:
+3. **Standalone rollover banner UI had internal state that should be application state**:
    - `showBanner` signal managed internally
    - `setInterval` polling loop
    - `onDateChange` callback pattern bridges UI→application state imperatively
@@ -131,7 +131,7 @@ However, the `computeSchedulingWindows` import from `practice.ts → practice-qu
 
 ```ts
 export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs {
-  // Single wall-clock polling signal (replaces DateRolloverBanner's internal interval)
+  // Single wall-clock polling signal (replaces the old standalone banner interval)
   // isSameDay compares local YYYY-MM-DD (reuse toLocalDateString from usePracticeQueueDate)
   const [wallClockDate, setWallClockDate] = createSignal(getPracticeDate(), {
     equals: (a, b) => isSameDay(a, b),
@@ -140,7 +140,7 @@ export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs 
   // Configurable polling interval (test override supported).
   // getRolloverIntervalMs(): returns 60000 in production, but checks
   // window.__TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__ for E2E overrides.
-  // (Moved here from DateRolloverBanner.tsx — same implementation.)
+  // (Moved here from the old standalone banner implementation — same implementation.)
   const intervalMs = getRolloverIntervalMs();
   const timer = setInterval(() => setWallClockDate(getPracticeDate()), intervalMs);
   onCleanup(() => clearInterval(timer));
@@ -209,51 +209,40 @@ export function useRolloverStateMachine(props: RolloverInputs): RolloverOutputs 
 
 **Impact on existing files**:
 - `practice.tsx`: Remove `handleDateRolloverDetection`, simplify `handlePracticeDateRefresh`
-- `DateRolloverBanner.tsx`: Strip all internal state/polling, become pure display
+- `PracticeControlBanner.tsx`: keep rollover UI pure display and route-driven
 
 ---
 
-### Phase 2: Simplify DateRolloverBanner (Pure Display Component)
+### Phase 2: Inline Pure Display Rollover UI into PracticeControlBanner
 
-**Goal**: Remove all internal state and polling — driven entirely by props.
+**Goal**: Keep the rollover UI pure display and remove the dedicated component by inlining the retained markup into `PracticeControlBanner`.
 
-**Before** (161 lines with internal state, polling, callbacks):
-```tsx
-<DateRolloverBanner
-  initialDate={queueDate()}
-  onRefresh={() => handlePracticeDateRefresh("manual")}
-  onDateChange={handleDateRolloverDetection}
-/>
-```
-
-**After** (~50 lines, pure display):
+**Before** (dedicated pure-display component rendered from the route):
 ```tsx
 <Show when={rolloverStatus().showBanner}>
-  <DateRolloverBanner
-    newDate={rolloverStatus().wallClockDate}
-    onRefresh={() => handlePracticeDateRefresh("manual")}
-  />
+  {/* dedicated rollover banner component */}
 </Show>
 ```
 
-**New props**:
-```ts
-interface DateRolloverBannerProps {
-  /** The new date to display in the banner */
-  newDate: Date;
-  /** Callback when user clicks "Refresh Now" */
-  onRefresh: () => void | Promise<void>;
-}
+**After** (same pure-display UI rendered inline by `PracticeControlBanner`):
+```tsx
+<PracticeControlBanner
+  rolloverPending={rolloverStatus().showBanner}
+  rolloverDate={rolloverStatus().wallClockDate}
+  onPracticeDateRefresh={() => handlePracticeDateRefresh("manual")}
+/>
 ```
 
+**Inputs preserved**:
+- `newDate` became `rolloverDate` on `PracticeControlBanner`
+- `onRefresh` became `onPracticeDateRefresh`
+- `data-testid="date-rollover-banner"` and `data-testid="date-rollover-refresh-button"` stayed intact
+
 **Removed**:
-- `initialDate` prop (no longer needed — visibility driven by parent `<Show>`)
-- `onDateChange` callback (replaced by declarative memo in parent)
-- Internal `showBanner` signal
-- Internal `newDate` signal
-- Internal `setInterval` polling loop
-- `getRolloverIntervalMs()` helper (moved to `useRolloverStateMachine`)
-- `hasPracticeDateChanged` import (no longer needed here)
+- Dedicated rollover banner component file
+- Old `initialDate` / `onDateChange` callback shape
+- Internal banner polling and visibility state
+- Component-level timer helpers that moved into `useRolloverStateMachine`
 
 **E2E test impact**: None — `data-testid="date-rollover-banner"` and `data-testid="date-rollover-refresh-button"` remain unchanged. The banner's visibility is now controlled by the parent `<Show>` rather than internal `showBanner()`, but the DOM structure and test IDs are identical.
 
@@ -537,8 +526,7 @@ src/routes/practice/
   └── history.tsx                                 (unchanged)
 
 src/components/practice/
-  ├── DateRolloverBanner.tsx                      (~50 lines, down from 161)
-  ├── PracticeControlBanner.tsx                   (unchanged)
+  ├── PracticeControlBanner.tsx                   (owns inline rollover UI + toolbar controls)
   └── ... other components                        (unchanged)
 
 src/lib/services/
@@ -561,7 +549,7 @@ src/lib/utils/
 
 1. **Phase 6** first, but split it into two steps: reconcile `queue-generator.ts` duplication, then extract the shared utility
 2. **Phase 1** (create `useRolloverStateMachine`) — core of the declarative refactor
-3. **Phase 2** (simplify `DateRolloverBanner`) — depends on Phase 1
+3. **Phase 2** (inline pure rollover UI into `PracticeControlBanner`) — depends on Phase 1
 4. **Phase 4** (simplify `handlePracticeDateRefresh`) — depends on Phase 1
 5. **Phase 3a–3d** (extract composables from practice.tsx) — independent extractions, can be done in any order
 6. **Phase 5** (clean up debug logging) — independent, low risk
@@ -596,7 +584,7 @@ Each phase should be followed by:
 
 1. **E2E tests pass unchanged** — especially `practice-005-date-rollover-banner.spec.ts`
 2. **State machine is in ONE place** — `useRolloverStateMachine.ts` with a single `createMemo`
-3. **DateRolloverBanner is pure display** — no internal state, no polling, no callbacks that determine visibility
+3. **Date-rollover UI is pure display** — no internal state, no polling, no callbacks that determine visibility
 4. **practice.tsx under 500 lines** — down from 1,079
 5. **No circular dependencies** — verified by import chain analysis
 6. **All `data-testid` attributes preserved** — no E2E locator changes needed

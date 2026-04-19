@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { CATALOG_TUNE_COOLEYS_ID } from "../../src/lib/db/catalog-tune-ids";
 import {
   setupDeterministicTestParallel,
@@ -82,6 +82,49 @@ async function openSettingsTab(
   await expect(page.getByTestId("settings-content")).toBeVisible({
     timeout: 10000,
   });
+}
+
+async function clickGoalBadgeMenuItem(
+  page: Page,
+  trigger: Locator,
+  itemName: string | RegExp
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
+    await expect(trigger).toBeVisible({ timeout: 10000 });
+
+    const menuItem = page.getByRole("menuitem", { name: itemName }).last();
+    const menuItemVisible = await menuItem
+      .isVisible({ timeout: 250 })
+      .catch(() => false);
+
+    if (!menuItemVisible) {
+      await trigger.click();
+      await expect(menuItem).toBeVisible({ timeout: 5000 });
+    }
+
+    const clicked = await menuItem
+      .click({ timeout: 2000 })
+      .then(() => true)
+      .catch(() => menuItem.dispatchEvent("click").then(() => true))
+      .catch(() =>
+        menuItem
+          .evaluate((el) => {
+            (el as HTMLElement).click();
+          })
+          .then(() => true)
+      )
+      .catch(() => false);
+
+    if (clicked) {
+      return;
+    }
+
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(100);
+  }
+
+  await page.getByRole("menuitem", { name: itemName }).last().click();
 }
 
 test.describe("GOALS-001: Goals settings", () => {
@@ -175,9 +218,7 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
 
     const goalTrigger = row.locator("button", { hasText: /recall/i }).first();
     await expect(goalTrigger).toBeVisible({ timeout: 10000 });
-    await goalTrigger.click();
-
-    await page.getByRole("menuitem", { name: "session_ready" }).click();
+    await clickGoalBadgeMenuItem(page, goalTrigger, "session_ready");
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(row.getByText("session_ready")).toBeVisible({
@@ -187,9 +228,7 @@ test.describe("GOALS-001: Repertoire goal badge", () => {
     const updatedGoalTrigger = row
       .locator("button", { hasText: /session_ready/i })
       .first();
-    await updatedGoalTrigger.click();
-
-    await page.getByRole("menuitem", { name: /Edit Goals/i }).click();
+    await clickGoalBadgeMenuItem(page, updatedGoalTrigger, /Edit Goals/i);
 
     const settingsModal = page.getByTestId("settings-modal");
     await expect(settingsModal).toBeVisible({ timeout: 10000 });

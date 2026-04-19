@@ -155,6 +155,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
         await page.evaluate(() => {
           localStorage.removeItem("TT_PRACTICE_FLASHCARD_MODE");
           localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
         });
 
         // Advance days difference between today and due (minimum 1)

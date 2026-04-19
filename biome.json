@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -21,7 +21,19 @@
       "recommended": true,
       "suspicious": {
         "noExplicitAny": "off",
-        "noUnknownAtRules": "off"
+        "noUnknownAtRules": "off",
+        "noImportCycles": {
+          "level": "error",
+          "options": {
+            "ignoreTypes": false
+          }
+        }
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 118 }
+        }
       },
       "style": {
         "noNonNullAssertion": "off"
@@ -29,6 +41,11 @@
     }
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
+    "globals": ["$"],
+    "jsxRuntime": "transparent",
     "formatter": {
       "quoteStyle": "double",
       "semicolons": "always",

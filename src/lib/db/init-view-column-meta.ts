@@ -1,4 +1,4 @@
-import type { SqliteDatabase } from "./client-sqlite";
+import type { BrowserSqliteDatabase as SqliteDatabase } from "oosync/runtime/browser-sqlite";
 
 export type ViewColumnDescription = {
   viewName: string;
