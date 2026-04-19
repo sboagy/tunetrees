@@ -17,7 +17,7 @@
  * @module lib/db/init-views
  */
 
-import type { SqliteDatabase } from "./client-sqlite";
+import type { BrowserSqliteDatabase as SqliteDatabase } from "oosync/runtime/browser-sqlite";
 
 /**
  * View 1: Repertoire with Instrument Information
