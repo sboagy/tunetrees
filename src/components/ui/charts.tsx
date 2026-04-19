@@ -89,6 +89,7 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
     },
     rawProps
   );
+  const setRefs = mergeRefs(props.ref, (el) => setCanvasRef(el));
 
   const init = () => {
     const ctx = canvasRef()?.getContext("2d") as ChartItem;
@@ -157,18 +158,12 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
 
   onCleanup(() => {
     chart()?.destroy();
-    mergeRefs(props.ref, null);
+    setRefs(null);
   });
 
   Chart.register(Colors, Filler, Legend, Tooltip);
 
-  return (
-    <canvas
-      ref={mergeRefs(props.ref, (el) => setCanvasRef(el))}
-      height={props.height}
-      width={props.width}
-    />
-  );
+  return <canvas ref={setRefs} height={props.height} width={props.width} />;
 };
 
 function showTooltip(context: ChartContext) {
