@@ -11,7 +11,7 @@
  *
  * Note: SQLite syntax differs from PostgreSQL:
  * - No STRING_AGG() - use GROUP_CONCAT() instead
- * - No DISTINCT ON() - use subqueries with MAX/MIN
+ * - No DISTINCT ON() - use window functions for latest-row selection
  * - Boolean as INTEGER (0/1)
  *
  * @module lib/db/init-views
@@ -44,6 +44,25 @@ FROM
   JOIN instrument i ON p.instrument_ref = i.id
 `;
 
+const LATEST_PRACTICE_RECORD_SUBQUERY = /* sql */ `
+  SELECT *
+  FROM (
+    SELECT
+      pr.*,
+      ROW_NUMBER() OVER (
+        PARTITION BY pr.tune_ref, pr.repertoire_ref
+        ORDER BY
+          CASE WHEN pr.practiced IS NULL THEN 1 ELSE 0 END ASC,
+          pr.practiced DESC,
+          CASE WHEN pr.last_modified_at IS NULL THEN 1 ELSE 0 END ASC,
+          pr.last_modified_at DESC,
+          pr.id DESC
+      ) AS row_num
+    FROM practice_record pr
+  ) latest_pr
+  WHERE latest_pr.row_num = 1
+`;
+
 /**
  * View 2: Practice List with Latest Practice Record
  *
@@ -52,7 +71,7 @@ FROM
  *
  * SQLite differences from PostgreSQL version:
  * - Uses GROUP_CONCAT(tag.tag_text, ' ') instead of STRING_AGG()
- * - Uses subquery with MAX(id) instead of DISTINCT ON()
+ * - Uses ROW_NUMBER() windowing instead of DISTINCT ON() for latest record selection
  * - Boolean fields as INTEGER (0/1)
  */
 const PRACTICE_LIST_JOINED = /* sql */ `
@@ -117,15 +136,7 @@ FROM
   LEFT JOIN tune_override ON tune_override.tune_ref = tune.id
     AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   LEFT JOIN (
-    SELECT pr.*
-    FROM practice_record pr
-    INNER JOIN (
-      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
-      FROM practice_record
-      GROUP BY tune_ref, repertoire_ref
-    ) latest ON pr.tune_ref = latest.tune_ref
-      AND pr.repertoire_ref = latest.repertoire_ref
-      AND pr.id = latest.max_id
+${LATEST_PRACTICE_RECORD_SUBQUERY}
   ) practice_record ON practice_record.tune_ref = tune.id
     AND practice_record.repertoire_ref = repertoire_tune.repertoire_ref
 `;
@@ -230,15 +241,7 @@ FROM
     AND (tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref)
   LEFT JOIN instrument ON instrument.id = repertoire.instrument_ref
   LEFT JOIN (
-    SELECT pr.*
-    FROM practice_record pr
-    INNER JOIN (
-      SELECT tune_ref, repertoire_ref, MAX(id) as max_id
-      FROM practice_record
-      GROUP BY tune_ref, repertoire_ref
-    ) latest ON pr.tune_ref = latest.tune_ref
-      AND pr.repertoire_ref = latest.repertoire_ref
-      AND pr.id = latest.max_id
+${LATEST_PRACTICE_RECORD_SUBQUERY}
   ) pr ON pr.tune_ref = tune.id
     AND pr.repertoire_ref = repertoire_tune.repertoire_ref
   LEFT JOIN table_transient_data td ON td.tune_id = tune.id
