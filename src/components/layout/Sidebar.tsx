@@ -60,6 +60,13 @@ interface SidebarProps {
 }
 
 /**
+ * Size (px) below which the sidebar auto-collapses when dragged.
+ * Approximately one line-height – the minimum "visible" size before it makes
+ * more sense to treat the panel as fully collapsed.
+ */
+const COLLAPSE_THRESHOLD = 40;
+
+/**
  * Sidebar Component
  *
  * Features:
@@ -137,6 +144,35 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   // Track RAF ID for cleanup
   let rafId: number | null = null;
 
+  // Shared helper: finalize a resize interaction.
+  // If finalWidth is below COLLAPSE_THRESHOLD the sidebar collapses and
+  // localWidth is reset to minWidth (so it reopens at a reasonable size).
+  // Otherwise the new width is propagated to the parent via onWidthChangeEnd.
+  const finalizeResize = (finalWidth: number) => {
+    if (finalWidth < COLLAPSE_THRESHOLD) {
+      setLocalWidth(minWidth());
+      if (!props.collapsed) {
+        props.onToggle();
+      }
+    } else {
+      // Notify parent of final width (which may now be below the old minWidth)
+      props.onWidthChangeEnd?.(finalWidth);
+    }
+  };
+
+  // Shared helper: trigger auto-collapse mid-drag when the requested size
+  // drops below COLLAPSE_THRESHOLD. The caller provides the cleanup callback
+  // that removes its own event listeners (mouse vs. touch differ here).
+  const triggerAutoCollapse = (cleanup: () => void) => {
+    rafId = null;
+    setIsResizing(false);
+    setLocalWidth(minWidth());
+    cleanup();
+    if (!props.collapsed) {
+      props.onToggle();
+    }
+  };
+
   // Handle resize drag with requestAnimationFrame throttling
   const handleMouseDown = (e: MouseEvent) => {
     e.preventDefault();
@@ -166,10 +202,22 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           delta = -delta;
         }
 
-        const newSize = Math.max(
-          minWidth(),
-          Math.min(maxWidth(), startSize + delta)
-        );
+        const requestedSize = startSize + delta;
+
+        // Auto-collapse when the user drags below the collapse threshold.
+        if (requestedSize < COLLAPSE_THRESHOLD) {
+          triggerAutoCollapse(() => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+          });
+          return;
+        }
+
+        // Allow sizes below minWidth() – the sidebar can now be shrunk to any
+        // size above COLLAPSE_THRESHOLD, not just down to minWidth.
+        const newSize = Math.min(maxWidth(), requestedSize);
         // Update local state only - fast and doesn't trigger parent re-render
         setLocalWidth(newSize);
         rafId = null;
@@ -182,10 +230,6 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         rafId = null;
       }
 
-      // Notify parent of final width
-      const finalWidth = localWidth();
-      props.onWidthChangeEnd?.(finalWidth);
-
       // End resizing state
       setIsResizing(false);
 
@@ -193,6 +237,9 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       document.removeEventListener("mouseup", handleMouseUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+
+      // Collapse or save the final width
+      finalizeResize(localWidth());
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -232,10 +279,21 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           delta = -delta;
         }
 
-        const newSize = Math.max(
-          minWidth(),
-          Math.min(maxWidth(), startSize + delta)
-        );
+        const requestedSize = startSize + delta;
+
+        // Auto-collapse when the user drags below the collapse threshold.
+        if (requestedSize < COLLAPSE_THRESHOLD) {
+          triggerAutoCollapse(() => {
+            document.removeEventListener("touchmove", handleTouchMove);
+            document.removeEventListener("touchend", handleTouchEnd);
+            document.body.style.userSelect = "";
+          });
+          return;
+        }
+
+        // Allow sizes below minWidth() – the sidebar can now be shrunk to any
+        // size above COLLAPSE_THRESHOLD, not just down to minWidth.
+        const newSize = Math.min(maxWidth(), requestedSize);
         // Update local state only - fast and doesn't trigger parent re-render
         setLocalWidth(newSize);
         rafId = null;
@@ -248,16 +306,15 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         rafId = null;
       }
 
-      // Notify parent of final width
-      const finalWidth = localWidth();
-      props.onWidthChangeEnd?.(finalWidth);
-
       // End resizing state
       setIsResizing(false);
 
       document.removeEventListener("touchmove", handleTouchMove);
       document.removeEventListener("touchend", handleTouchEnd);
       document.body.style.userSelect = "";
+
+      // Collapse or save the final width
+      finalizeResize(localWidth());
     };
 
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
