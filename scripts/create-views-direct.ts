@@ -15,10 +15,10 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
   console.error("❌ Missing environment variable: DATABASE_URL");
   console.error(
-    "   Add DATABASE_URL to .env.local with your Supabase connection string",
+    "   Add DATABASE_URL to .env.local with your Supabase connection string"
   );
   console.error(
-    "   Format: postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres",
+    "   Format: postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres"
   );
   process.exit(1);
 }
@@ -109,7 +109,7 @@ FROM
   LEFT JOIN (
     SELECT DISTINCT ON (tune_ref, playlist_ref) pr.*
     FROM practice_record pr
-    ORDER BY tune_ref, playlist_ref, id DESC
+    ORDER BY tune_ref, playlist_ref, practiced DESC NULLS LAST, last_modified_at DESC NULLS LAST, id DESC
   ) practice_record ON practice_record.tune_ref = tune.id
     AND practice_record.playlist_ref = playlist_tune.playlist_ref
   LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id)
@@ -203,7 +203,7 @@ FROM
   LEFT JOIN (
     SELECT DISTINCT ON (tune_ref, playlist_ref) pr.*
     FROM practice_record pr
-    ORDER BY tune_ref, playlist_ref, id DESC
+    ORDER BY tune_ref, playlist_ref, practiced DESC NULLS LAST, last_modified_at DESC NULLS LAST, id DESC
   ) pr ON pr.tune_ref = tune.id
     AND pr.playlist_ref = playlist_tune.playlist_ref
   LEFT JOIN tag ON tag.tune_ref = tune.id
@@ -236,7 +236,7 @@ async function createViews() {
     } catch (error: any) {
       console.error(
         `   ❌ Error creating view ${view.name}:`,
-        error?.message || error,
+        error?.message || error
       );
       errors++;
     }
@@ -263,7 +263,7 @@ async function createViews() {
 
   console.log(`\n${"=".repeat(60)}`);
   console.log(
-    `✅ View creation complete: ${created} created, ${errors} failed`,
+    `✅ View creation complete: ${created} created, ${errors} failed`
   );
 
   await sql.end();

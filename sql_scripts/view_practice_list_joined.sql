@@ -69,7 +69,7 @@ AS SELECT tune.id,
             pr.last_modified_at,
             pr.device_id
            FROM practice_record pr
-          ORDER BY pr.tune_ref, pr.repertoire_ref, pr.id DESC) practice_record
+          ORDER BY pr.tune_ref, pr.repertoire_ref, pr.practiced DESC NULLS LAST, pr.last_modified_at DESC NULLS LAST, pr.id DESC) practice_record
         ON practice_record.tune_ref = tune.id
        AND practice_record.playlist_ref = repertoire_tune.repertoire_ref
      LEFT JOIN tag ON tag.tune_ref = COALESCE(tune_override.id, tune.id)

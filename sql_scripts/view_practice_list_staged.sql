@@ -84,7 +84,7 @@ AS SELECT tune.id,
             pr_1.last_modified_at,
             pr_1.device_id
            FROM practice_record pr_1
-          ORDER BY pr_1.tune_ref, pr_1.repertoire_ref, pr_1.id DESC) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = repertoire_tune.repertoire_ref
+          ORDER BY pr_1.tune_ref, pr_1.repertoire_ref, pr_1.practiced DESC NULLS LAST, pr_1.last_modified_at DESC NULLS LAST, pr_1.id DESC) pr ON pr.tune_ref = tune.id AND pr.playlist_ref = repertoire_tune.repertoire_ref
      LEFT JOIN tag ON tag.tune_ref = tune.id
      LEFT JOIN table_transient_data td ON td.tune_id = tune.id AND td.repertoire_id = repertoire_tune.repertoire_ref
   WHERE tune_override.user_ref IS NULL OR tune_override.user_ref = repertoire.user_ref;
