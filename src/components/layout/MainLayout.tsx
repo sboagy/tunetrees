@@ -164,7 +164,6 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
               width={sidebarWidth()}
               onWidthChange={() => {}} // No-op during drag
               onWidthChangeEnd={handleSidebarWidthChangeEnd}
-              minWidth={240}
               maxWidth={600}
               dockPosition={dockPosition()}
               onDragStart={handleDragStart}
