@@ -42,6 +42,13 @@ import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import type { DockPosition } from "./SidebarDockContext";
 import { SidebarDragHandle } from "./SidebarDragHandle";
 import { useSidebarResize } from "./SidebarResizeContext";
+import {
+  getSidebarResizeAction,
+  getSidebarResizeStartSize,
+  normalizeSidebarResizeDelta,
+  SIDEBAR_COLLAPSED_SIZE,
+  shouldCollapseSidebar,
+} from "./sidebarResize";
 
 /**
  * Sidebar Component Props
@@ -52,7 +59,6 @@ interface SidebarProps {
   width: number;
   onWidthChange: (width: number) => void;
   onWidthChangeEnd?: (width: number) => void; // Called when drag ends (for localStorage save)
-  minWidth?: number;
   maxWidth?: number;
   dockPosition: DockPosition;
   onDragStart?: () => void; // Called when drag handle starts dragging
@@ -84,7 +90,6 @@ interface SidebarProps {
  * ```
  */
 export const Sidebar: Component<SidebarProps> = (props) => {
-  const minWidth = () => props.minWidth ?? 240;
   const maxWidth = () => props.maxWidth ?? 600;
   const [isResizing, setIsResizing] = createSignal(false);
   const { currentTuneId } = useCurrentTune();
@@ -137,14 +142,94 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   // Track RAF ID for cleanup
   let rafId: number | null = null;
 
+  // Shared helper: finalize a resize interaction.
+  // If finalWidth is at or below the collapse threshold, collapse the panel.
+  // Otherwise persist the exact size the user ended on.
+  const finalizeResize = (
+    finalWidth: number,
+    resizeState: { collapsed: boolean }
+  ) => {
+    if (shouldCollapseSidebar(finalWidth)) {
+      setLocalWidth(SIDEBAR_COLLAPSED_SIZE);
+      if (!resizeState.collapsed) {
+        props.onToggle();
+        resizeState.collapsed = true;
+      }
+    } else {
+      props.onWidthChangeEnd?.(finalWidth);
+    }
+  };
+
+  // Shared helper: trigger auto-collapse mid-drag when the requested size
+  // drops below COLLAPSE_THRESHOLD. The caller provides the cleanup callback
+  // that removes its own event listeners (mouse vs. touch differ here).
+  const triggerAutoCollapse = (
+    cleanup: () => void,
+    resizeState: { collapsed: boolean }
+  ) => {
+    rafId = null;
+    setIsResizing(false);
+    setLocalWidth(SIDEBAR_COLLAPSED_SIZE);
+    cleanup();
+    if (!resizeState.collapsed) {
+      props.onToggle();
+      resizeState.collapsed = true;
+    }
+  };
+
+  const beginResize = () => {
+    setIsResizing(true);
+
+    return {
+      collapsed: props.collapsed,
+      hasExpanded: false,
+      startedCollapsed: props.collapsed,
+      startSize: getSidebarResizeStartSize(props.collapsed, localWidth()),
+    };
+  };
+
+  const applyRequestedSize = (
+    requestedSize: number,
+    resizeState: {
+      collapsed: boolean;
+      hasExpanded: boolean;
+      startedCollapsed: boolean;
+    },
+    cleanup: () => void
+  ) => {
+    const action = getSidebarResizeAction({
+      requestedSize,
+      maxSize: maxWidth(),
+      startedCollapsed: resizeState.startedCollapsed,
+      hasExpanded: resizeState.hasExpanded,
+    });
+
+    if (action.type === "stay-collapsed") {
+      rafId = null;
+      return;
+    }
+
+    if (action.type === "collapse") {
+      triggerAutoCollapse(cleanup, resizeState);
+      return;
+    }
+
+    setLocalWidth(action.size);
+    if (action.expand) {
+      props.onToggle();
+      resizeState.collapsed = false;
+      resizeState.hasExpanded = true;
+    }
+    rafId = null;
+  };
+
   // Handle resize drag with requestAnimationFrame throttling
   const handleMouseDown = (e: MouseEvent) => {
     e.preventDefault();
-    setIsResizing(true);
 
     const horizontal = isHorizontal();
     const startPos = horizontal ? e.clientY : e.clientX;
-    const startSize = localWidth();
+    const resizeState = beginResize();
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       // Cancel any pending RAF
@@ -155,24 +240,18 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       // Throttle updates using requestAnimationFrame
       rafId = requestAnimationFrame(() => {
         const currentPos = horizontal ? moveEvent.clientY : moveEvent.clientX;
-        let delta = currentPos - startPos;
-
-        // For bottom position, we need to invert delta (dragging down = smaller)
-        if (horizontal) {
-          delta = -delta;
-        }
-        // For right position, we need to invert delta (dragging left = bigger)
-        if (props.dockPosition === "right") {
-          delta = -delta;
-        }
-
-        const newSize = Math.max(
-          minWidth(),
-          Math.min(maxWidth(), startSize + delta)
+        const delta = normalizeSidebarResizeDelta(
+          currentPos - startPos,
+          props.dockPosition
         );
-        // Update local state only - fast and doesn't trigger parent re-render
-        setLocalWidth(newSize);
-        rafId = null;
+        const requestedSize = resizeState.startSize + delta;
+
+        applyRequestedSize(requestedSize, resizeState, () => {
+          document.removeEventListener("mousemove", handleMouseMove);
+          document.removeEventListener("mouseup", handleMouseUp);
+          document.body.style.cursor = "";
+          document.body.style.userSelect = "";
+        });
       });
     };
 
@@ -182,9 +261,11 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         rafId = null;
       }
 
-      // Notify parent of final width
       const finalWidth = localWidth();
-      props.onWidthChangeEnd?.(finalWidth);
+
+      if (!resizeState.collapsed) {
+        finalizeResize(finalWidth, resizeState);
+      }
 
       // End resizing state
       setIsResizing(false);
@@ -204,12 +285,11 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   // Handle touch-based resize for mobile
   const handleTouchStart = (e: TouchEvent) => {
     e.preventDefault();
-    setIsResizing(true);
 
     const horizontal = isHorizontal();
     const touch = e.touches[0];
     const startPos = horizontal ? touch.clientY : touch.clientX;
-    const startSize = localWidth();
+    const resizeState = beginResize();
 
     const handleTouchMove = (moveEvent: TouchEvent) => {
       // Cancel any pending RAF
@@ -221,24 +301,17 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       rafId = requestAnimationFrame(() => {
         const touch = moveEvent.touches[0];
         const currentPos = horizontal ? touch.clientY : touch.clientX;
-        let delta = currentPos - startPos;
-
-        // For bottom position, we need to invert delta (dragging down = smaller)
-        if (horizontal) {
-          delta = -delta;
-        }
-        // For right position, we need to invert delta (dragging left = bigger)
-        if (props.dockPosition === "right") {
-          delta = -delta;
-        }
-
-        const newSize = Math.max(
-          minWidth(),
-          Math.min(maxWidth(), startSize + delta)
+        const delta = normalizeSidebarResizeDelta(
+          currentPos - startPos,
+          props.dockPosition
         );
-        // Update local state only - fast and doesn't trigger parent re-render
-        setLocalWidth(newSize);
-        rafId = null;
+        const requestedSize = resizeState.startSize + delta;
+
+        applyRequestedSize(requestedSize, resizeState, () => {
+          document.removeEventListener("touchmove", handleTouchMove);
+          document.removeEventListener("touchend", handleTouchEnd);
+          document.body.style.userSelect = "";
+        });
       });
     };
 
@@ -248,9 +321,11 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         rafId = null;
       }
 
-      // Notify parent of final width
       const finalWidth = localWidth();
-      props.onWidthChangeEnd?.(finalWidth);
+
+      if (!resizeState.collapsed) {
+        finalizeResize(finalWidth, resizeState);
+      }
 
       // End resizing state
       setIsResizing(false);
@@ -281,7 +356,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   // target when the sidebar is bottom-docked.
   const { registerHandlers } = useSidebarResize();
   createEffect(() => {
-    if (isHorizontal() && !props.collapsed) {
+    if (isHorizontal()) {
       registerHandlers({
         onMouseDown: handleMouseDown,
         onTouchStart: handleTouchStart,
@@ -310,7 +385,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       } ${isResizing() ? "" : "transition-all duration-300"} z-10`}
       style={{
         [isHorizontal() ? "height" : "width"]: props.collapsed
-          ? "40px"
+          ? `${SIDEBAR_COLLAPSED_SIZE}px`
           : `${localWidth()}px`,
         "will-change": isResizing()
           ? isHorizontal()
@@ -322,7 +397,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Keep a visible resize affordance on the bottom-docked sidebar even when
           the scheduled-grid footer is absent (for example in flashcard mode).
           The footer can still act as an additional resize target when present. */}
-      <Show when={isHorizontal() && !props.collapsed}>
+      <Show when={isHorizontal()}>
         <button
           type="button"
           class="flex-shrink-0 flex justify-center items-center py-0.5 cursor-row-resize select-none touch-none border-b border-gray-200/20 dark:border-gray-700/20 hover:bg-gray-200/20 dark:hover:bg-gray-700/20 transition-colors"
@@ -429,7 +504,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Resize Handle with GripVertical indicator (only when expanded and NOT bottom-docked).
           When bottom-docked, the sticky footer in TunesGridScheduled acts as the resize
           handle via SidebarResizeContext, so this button is hidden to avoid confusion. */}
-      <div class={`${props.collapsed || isHorizontal() ? "hidden" : ""}`}>
+      <div class={`${isHorizontal() ? "hidden" : ""}`}>
         <button
           type="button"
           class={`absolute z-20 select-none ${
@@ -441,6 +516,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           onTouchStart={handleTouchStart}
           title="Drag to resize sidebar"
           aria-label="Resize sidebar"
+          data-testid="sidebar-resize-handle-edge"
         >
           {/* GripVertical icon - centered, always slightly visible on mobile, hover on desktop */}
           <div
@@ -460,7 +536,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         <div
           class={`absolute z-30 select-none ${
             isHorizontal()
-              ? "top-0.5 right-3.5 flex items-center"
+              ? "top-4 right-3.5 flex items-center"
               : props.dockPosition === "right"
                 ? "top-3.5 left-1/2 -translate-x-1/2 flex items-center"
                 : "top-3.5 right-1/2 translate-x-1/2 flex items-center"
@@ -485,7 +561,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           isHorizontal() && !props.collapsed
             ? "hidden"
             : isHorizontal()
-              ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
+              ? "top-4 left-1/2 -translate-x-1/2 space-x-2"
               : props.dockPosition === "right"
                 ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
                 : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"

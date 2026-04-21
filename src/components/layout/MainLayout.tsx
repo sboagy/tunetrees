@@ -82,7 +82,7 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     const savedWidth = localStorage.getItem("sidebar-width");
     if (savedWidth) {
       const width = Number.parseInt(savedWidth, 10);
-      if (!Number.isNaN(width) && width >= 240 && width <= 600) {
+      if (!Number.isNaN(width) && width >= 40 && width <= 600) {
         setSidebarWidth(width);
       }
     }
@@ -164,7 +164,6 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
               width={sidebarWidth()}
               onWidthChange={() => {}} // No-op during drag
               onWidthChangeEnd={handleSidebarWidthChangeEnd}
-              minWidth={240}
               maxWidth={600}
               dockPosition={dockPosition()}
               onDragStart={handleDragStart}
