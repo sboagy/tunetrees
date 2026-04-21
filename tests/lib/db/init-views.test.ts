@@ -79,12 +79,16 @@ function createSchema(db: Database.Database): void {
       stability REAL,
       step INTEGER,
       repetitions INTEGER,
+      lapses INTEGER,
+      elapsed_days INTEGER,
       due TEXT,
       backup_practiced TEXT,
       goal TEXT,
       technique TEXT,
       state INTEGER,
-      last_modified_at TEXT
+      sync_version INTEGER,
+      last_modified_at TEXT,
+      device_id TEXT
     );
 
     CREATE TABLE tag (
