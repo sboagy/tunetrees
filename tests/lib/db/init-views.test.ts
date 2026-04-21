@@ -39,6 +39,9 @@ function createSchema(db: Database.Database): void {
       primary_origin TEXT,
       release_year INTEGER,
       private_for TEXT,
+      sync_version INTEGER,
+      last_modified_at TEXT,
+      device_id TEXT,
       deleted INTEGER
     );
 
