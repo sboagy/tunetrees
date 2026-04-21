@@ -6,7 +6,7 @@
  *
  * Typical use: when the sidebar is bottom-docked, the "N tunes due" sticky
  * footer in TunesGridScheduled reads from this context and becomes the resize
- * handle instead of the thin invisible strip at the top of the sidebar.
+ * handle instead of relying on the thin strip at the top of the sidebar.
  *
  * Usage:
  *   - Wrap the app (or MainLayout) with <SidebarResizeProvider>.
@@ -30,7 +30,7 @@ export interface ResizeHandlers {
 }
 
 interface SidebarResizeContextValue {
-  /** Resize handlers registered by the Sidebar. Null when sidebar is not bottom-docked or is collapsed. */
+  /** Resize handlers registered by the Sidebar. Null when sidebar is not bottom-docked. */
   handlers: () => ResizeHandlers | null;
   /** Called by Sidebar to register or clear resize handlers. */
   registerHandlers: (h: ResizeHandlers | null) => void;

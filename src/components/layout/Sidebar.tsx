@@ -356,7 +356,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
   // target when the sidebar is bottom-docked.
   const { registerHandlers } = useSidebarResize();
   createEffect(() => {
-    if (isHorizontal() && !props.collapsed) {
+    if (isHorizontal()) {
       registerHandlers({
         onMouseDown: handleMouseDown,
         onTouchStart: handleTouchStart,
@@ -536,7 +536,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         <div
           class={`absolute z-30 select-none ${
             isHorizontal()
-              ? "top-0.5 right-3.5 flex items-center"
+              ? "top-4 right-3.5 flex items-center"
               : props.dockPosition === "right"
                 ? "top-3.5 left-1/2 -translate-x-1/2 flex items-center"
                 : "top-3.5 right-1/2 translate-x-1/2 flex items-center"
@@ -561,7 +561,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           isHorizontal() && !props.collapsed
             ? "hidden"
             : isHorizontal()
-              ? "top-0.5 left-1/2 -translate-x-1/2 space-x-2"
+              ? "top-4 left-1/2 -translate-x-1/2 space-x-2"
               : props.dockPosition === "right"
                 ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
                 : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
