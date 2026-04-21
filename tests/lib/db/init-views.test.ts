@@ -46,6 +46,7 @@ function createSchema(db: Database.Database): void {
     );
 
     CREATE TABLE tune_override (
+      id TEXT PRIMARY KEY,
       tune_ref TEXT,
       user_ref TEXT,
       title TEXT,
@@ -57,7 +58,11 @@ function createSchema(db: Database.Database): void {
       composer TEXT,
       artist TEXT,
       id_foreign TEXT,
-      release_year INTEGER
+      release_year INTEGER,
+      deleted INTEGER,
+      sync_version INTEGER,
+      last_modified_at TEXT,
+      device_id TEXT
     );
 
     CREATE TABLE repertoire_tune (
