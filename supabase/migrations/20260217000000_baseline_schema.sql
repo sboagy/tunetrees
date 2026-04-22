@@ -1167,7 +1167,7 @@ CREATE OR REPLACE VIEW "public"."practice_list_joined" WITH ("security_invoker"=
             "pr"."last_modified_at",
             "pr"."device_id"
            FROM "public"."practice_record" "pr"
-          ORDER BY "pr"."tune_ref", "pr"."repertoire_ref", "pr"."id" DESC) "practice_record" ON ((("practice_record"."tune_ref" = "tune"."id") AND ("practice_record"."playlist_ref" = "repertoire_tune"."repertoire_ref"))))
+          ORDER BY "pr"."tune_ref", "pr"."repertoire_ref", "pr"."practiced" DESC NULLS LAST, "pr"."last_modified_at" DESC NULLS LAST, "pr"."id" DESC) "practice_record" ON ((("practice_record"."tune_ref" = "tune"."id") AND ("practice_record"."playlist_ref" = "repertoire_tune"."repertoire_ref"))))
      LEFT JOIN "public"."tag" ON (("tag"."tune_ref" = COALESCE("tune_override"."id", "tune"."id"))))
   WHERE (("tune_override"."user_ref" IS NULL) OR ("tune_override"."user_ref" = "repertoire"."user_ref"));
 
@@ -1512,7 +1512,7 @@ CREATE OR REPLACE VIEW "public"."practice_list_staged" WITH ("security_invoker"=
             "pr_1"."last_modified_at",
             "pr_1"."device_id"
            FROM "public"."practice_record" "pr_1"
-          ORDER BY "pr_1"."tune_ref", "pr_1"."repertoire_ref", "pr_1"."id" DESC) "pr" ON ((("pr"."tune_ref" = "tune"."id") AND ("pr"."playlist_ref" = "repertoire_tune"."repertoire_ref"))))
+          ORDER BY "pr_1"."tune_ref", "pr_1"."repertoire_ref", "pr_1"."practiced" DESC NULLS LAST, "pr_1"."last_modified_at" DESC NULLS LAST, "pr_1"."id" DESC) "pr" ON ((("pr"."tune_ref" = "tune"."id") AND ("pr"."playlist_ref" = "repertoire_tune"."repertoire_ref"))))
      LEFT JOIN "public"."tag" ON (("tag"."tune_ref" = "tune"."id")))
      LEFT JOIN "public"."table_transient_data" "td" ON ((("td"."tune_id" = "tune"."id") AND ("td"."repertoire_id" = "repertoire_tune"."repertoire_ref"))))
   WHERE (("tune_override"."user_ref" IS NULL) OR ("tune_override"."user_ref" = "repertoire"."user_ref"));

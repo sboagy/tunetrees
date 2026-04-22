@@ -1632,7 +1632,7 @@ async function migrateUIStateTables() {
  * Convert SQLite SQL to PostgreSQL SQL
  * - group_concat(field, ' ') → STRING_AGG(field, ' ')
  * - favorite = 1 → favorite = true
- * - INNER JOIN (SELECT MAX(id)) → DISTINCT ON (fields) ORDER BY
+ * - Latest-practice-record subqueries → timestamp-ordered DISTINCT ON
  */
 function convertSqliteToPostgres(sqliteSql: string): string {
   return (
@@ -1642,19 +1642,19 @@ function convertSqliteToPostgres(sqliteSql: string): string {
       // Replace integer boolean comparisons with proper boolean
       .replace(/\.favorite\s*=\s*1/gi, ".favorite = true")
       .replace(/\.favorite\s*=\s*0/gi, ".favorite = false")
-      // Replace SQLite's subquery pattern for "latest record" with PostgreSQL's DISTINCT ON
+      // Replace SQLite's legacy latest-record pattern with PostgreSQL DISTINCT ON
       .replace(
         /INNER JOIN \(\s*SELECT\s+tune_ref,\s+playlist_ref,\s+MAX\(id\)\s+[aA][sS]\s+max_id\s+FROM\s+practice_record\s+GROUP BY\s+tune_ref,\s+playlist_ref\s*\)\s+latest\s+ON\s+pr\.tune_ref\s*=\s*latest\.tune_ref\s+AND\s+pr\.playlist_ref\s*=\s*latest\.playlist_ref\s+AND\s+pr\.id\s*=\s*latest\.max_id/gi,
         ""
       )
-      // Clean up the practice_record subquery to use DISTINCT ON
+      // Clean up the practice_record subquery to use timestamp-ordered DISTINCT ON
       .replace(
         /\(\s*SELECT\s+pr\.\*\s+FROM\s+practice_record\s+pr\s+\)\s+pr\s+ON/gi,
-        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, id DESC) pr ON"
+        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, practiced DESC NULLS LAST, last_modified_at DESC NULLS LAST, id DESC) pr ON"
       )
       .replace(
         /\(\s*SELECT\s+pr\.\*\s+FROM\s+practice_record\s+pr\s+\)\s+practice_record\s+ON/gi,
-        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, id DESC) practice_record ON"
+        "(SELECT DISTINCT ON (tune_ref, playlist_ref) pr.* FROM practice_record pr ORDER BY tune_ref, playlist_ref, practiced DESC NULLS LAST, last_modified_at DESC NULLS LAST, id DESC) practice_record ON"
       )
   );
 }
