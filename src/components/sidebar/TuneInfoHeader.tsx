@@ -7,7 +7,7 @@
  * @module components/sidebar/TuneInfoHeader
  */
 
-import { A, useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { History, Music, Pencil, Settings2, Tag } from "lucide-solid";
 import { type Component, createResource, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -122,14 +122,20 @@ export const TuneInfoHeader: Component = () => {
 
           {/* Practice History Link */}
           <div class="pl-5">
-            <A
-              href={`/tunes/${tune()!.id}/practice-history`}
+            <button
+              type="button"
+              onClick={() => {
+                const fullPath = location.pathname + location.search;
+                navigate(`/tunes/${tune()!.id}/practice-history`, {
+                  state: { from: fullPath },
+                });
+              }}
               class={`inline-flex items-center gap-1 ${fontClasses().textSmall} text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
               data-testid="sidebar-practice-history-link"
             >
               <History class={fontClasses().iconSmall} />
               Practice History
-            </A>
+            </button>
           </div>
 
           {/* Type and Mode */}
