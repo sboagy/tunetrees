@@ -26,6 +26,7 @@ import {
   computeSchedulingWindows,
   generateOrGetPracticeQueue,
   getLatestActiveQueueWindow,
+  getRecentActiveQueueWindows,
 } from "./practice-queue";
 import {
   applyMigrations,
@@ -951,6 +952,211 @@ describe("getLatestActiveQueueWindow", () => {
     expect(result.windowStartUtc).toContain("2026-03-07");
     expect(result.hasIncompleteRows).toBe(true);
     expect(result.rowCount).toBe(2);
+  });
+});
+
+describe("getRecentActiveQueueWindows", () => {
+  function insertQueueRow(
+    id: string,
+    tuneRef: string,
+    windowStartUtc: string,
+    completedAt: string | null = null,
+    active = 1
+  ) {
+    db.run(sql`
+      INSERT INTO daily_practice_queue (
+        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+        window_start_utc, window_end_utc, active, completed_at,
+        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+      ) VALUES (
+        ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
+        1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
+        datetime('now'), datetime('now'), datetime('now'), 1
+      )
+    `);
+  }
+
+  it("should return newest distinct active queue windows first", async () => {
+    insertQueueRow("q1", tuneId(1), "2026-03-01 00:00:00", null);
+    insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", null);
+    insertQueueRow(
+      "q3",
+      tuneId(3),
+      "2026-03-05 00:00:00",
+      "2026-03-05 10:00:00"
+    );
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      5
+    );
+
+    expect(result.map((row) => row.windowStartUtc)).toEqual([
+      "2026-03-07 00:00:00",
+      "2026-03-05 00:00:00",
+      "2026-03-01 00:00:00",
+    ]);
+  });
+
+  it("should include row counts and incomplete state for each returned window", async () => {
+    insertQueueRow(
+      "q1",
+      tuneId(1),
+      "2026-03-07 00:00:00",
+      "2026-03-07 10:00:00"
+    );
+    insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", null);
+    insertQueueRow(
+      "q3",
+      tuneId(3),
+      "2026-03-05 00:00:00",
+      "2026-03-05 11:00:00"
+    );
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      5
+    );
+
+    expect(result).toEqual([
+      {
+        queueDate: "2026-03-07",
+        windowStartUtc: "2026-03-07 00:00:00",
+        hasIncompleteRows: true,
+        rowCount: 2,
+      },
+      {
+        queueDate: "2026-03-05",
+        windowStartUtc: "2026-03-05 00:00:00",
+        hasIncompleteRows: false,
+        rowCount: 1,
+      },
+    ]);
+  });
+
+  it("should ignore inactive windows and honor the limit", async () => {
+    insertQueueRow("q1", tuneId(1), "2026-03-09 00:00:00", null, 0);
+    insertQueueRow("q2", tuneId(2), "2026-03-08 00:00:00", null);
+    insertQueueRow("q3", tuneId(3), "2026-03-07 00:00:00", null);
+    insertQueueRow("q4", tuneId(4), "2026-03-06 00:00:00", null);
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      2
+    );
+
+    expect(result.map((row) => row.windowStartUtc)).toEqual([
+      "2026-03-08 00:00:00",
+      "2026-03-07 00:00:00",
+    ]);
+  });
+
+  it("should normalize T-separator queue windows", async () => {
+    insertQueueRow("q1", tuneId(1), "2026-03-07T00:00:00", null);
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      5
+    );
+
+    expect(result).toEqual([
+      {
+        queueDate: "2026-03-07",
+        windowStartUtc: "2026-03-07 00:00:00",
+        hasIncompleteRows: true,
+        rowCount: 1,
+      },
+    ]);
+  });
+
+  it("should page results by queue_date and honor offset", async () => {
+    insertQueueRow("q1", tuneId(1), "2026-03-09 00:00:00", null);
+    insertQueueRow("q2", tuneId(2), "2026-03-08 00:00:00", null);
+    insertQueueRow("q3", tuneId(3), "2026-03-07 00:00:00", null);
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      2,
+      1
+    );
+
+    expect(result.map((row) => row.queueDate)).toEqual([
+      "2026-03-08",
+      "2026-03-07",
+    ]);
+  });
+
+  it("should prefer explicit queue_date values for recent history ordering", async () => {
+    db.run(sql`
+      INSERT INTO daily_practice_queue (
+        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+        queue_date, window_start_utc, window_end_utc, active, completed_at,
+        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+      ) VALUES (
+        ${"q-explicit"}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneId(1)},
+        1, 0, ${"2026-03-01"}, ${"2026-03-07 00:00:00"}, ${"2026-03-07 00:00:00"}, 1, null,
+        datetime('now'), datetime('now'), datetime('now'), 1
+      )
+    `);
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      5
+    );
+
+    expect(result[0]?.queueDate).toBe("2026-03-01");
+    expect(result[0]?.windowStartUtc).toBe("2026-03-07 00:00:00");
+  });
+
+  it("should collapse duplicate queue dates stored in different string formats", async () => {
+    db.run(sql`
+      INSERT INTO daily_practice_queue (
+        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+        queue_date, window_start_utc, window_end_utc, active, completed_at,
+        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+      ) VALUES (
+        ${"q-date-only"}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneId(1)},
+        1, 0, ${"2026-03-07"}, ${"2026-03-07 00:00:00"}, ${"2026-03-07 00:00:00"}, 1, null,
+        datetime('now'), datetime('now'), datetime('now'), 1
+      )
+    `);
+    db.run(sql`
+      INSERT INTO daily_practice_queue (
+        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+        queue_date, window_start_utc, window_end_utc, active, completed_at,
+        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+      ) VALUES (
+        ${"q-datetime"}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneId(2)},
+        1, 1, ${"2026-03-07 00:00:00"}, ${"2026-03-07 12:00:00"}, ${"2026-03-07 12:00:00"}, 1, null,
+        datetime('now'), datetime('now'), datetime('now'), 1
+      )
+    `);
+
+    const result = await getRecentActiveQueueWindows(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      5
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      queueDate: "2026-03-07",
+      rowCount: 2,
+      hasIncompleteRows: true,
+    });
   });
 });
 

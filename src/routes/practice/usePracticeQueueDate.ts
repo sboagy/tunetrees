@@ -40,6 +40,7 @@ import type { SqliteDatabase } from "../../lib/db/client-sqlite";
 import {
   ensureDailyQueue,
   getLatestActiveQueueWindow,
+  getRecentActiveQueueWindows,
 } from "../../lib/services/practice-queue";
 import {
   formatAsWindowStart,
@@ -61,6 +62,12 @@ export interface PracticeQueueDateProps {
 export interface PracticeQueueDateState {
   /** Current resolved queue date (DB date, user-chosen, or today). */
   queueDate: Accessor<Date>;
+  /** Latest non-preview queue date available from active queue rows. */
+  latestQueueDate: Accessor<Date | null>;
+  /** Recent non-preview queue dates shown in the selector dialog. */
+  recentQueueDates: Accessor<Date[]>;
+  /** True when more recent queue history can be fetched. */
+  hasMoreRecentQueueDates: Accessor<boolean>;
   /** True when the user has explicitly chosen a non-today date this session. */
   isManual: Accessor<boolean>;
   /**
@@ -80,6 +87,12 @@ export interface PracticeQueueDateState {
    * The caller (handlePracticeDateRefresh) is responsible for that.
    */
   clearManualAndSetToday: () => void;
+  /** Return to the most recent queue instead of staying on a manual date. */
+  selectLatestQueueDate: () => Promise<void>;
+  /** Refresh latest/recent queue metadata after queue mutations. */
+  refreshQueueWindowState: () => Promise<void>;
+  /** Fetch the next page of recent queue history for the selector dialog. */
+  loadMoreRecentQueueDates: () => Promise<void>;
 }
 
 // --- Module-private helpers ---
@@ -142,6 +155,13 @@ function toLocalDateString(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function queueWindowToDate(windowStartUtc: string | null | undefined): Date | null {
+  if (!windowStartUtc) return null;
+  const datePart = windowStartUtc.substring(0, 10);
+  const localNoon = new Date(`${datePart}T12:00:00`);
+  return Number.isNaN(localNoon.getTime()) ? null : localNoon;
+}
+
 /** Write queue date + manual flag to localStorage. */
 function persistToStorage(date: Date, manual: boolean): void {
   localStorage.setItem(QUEUE_DATE_STORAGE_KEY, date.toISOString());
@@ -162,9 +182,68 @@ export function usePracticeQueueDate(
     storedInitial ?? getPracticeDate(),
     { equals: (a, b) => a.getTime() === b.getTime() }
   );
+  const [latestQueueDate, setLatestQueueDate] = createSignal<Date | null>(null, {
+    equals: (a, b) => a?.getTime() === b?.getTime(),
+  });
+  const [recentQueueDates, setRecentQueueDates] = createSignal<Date[]>([]);
+  const [recentQueueLimit, setRecentQueueLimit] = createSignal(10);
+  const [hasMoreRecentQueueDates, setHasMoreRecentQueueDates] =
+    createSignal(false);
   const [isManual, setIsManual] = createSignal(
     localStorage.getItem(QUEUE_DATE_MANUAL_FLAG_KEY) === "true"
   );
+
+  const syncQueueWindowState = async (
+    db: SqliteDatabase,
+    userId: string,
+    repertoireId: string,
+    limit = recentQueueLimit()
+  ): Promise<Date | null> => {
+    const summaries = await getRecentActiveQueueWindows(
+      db,
+      userId,
+      repertoireId,
+      limit + 1,
+      0,
+      toLocalDateString(getPracticeDate())
+    );
+    const visibleSummaries = summaries.slice(0, limit);
+    const visibleDates = visibleSummaries
+      .map((row) => parseStoredDate(row.queueDate))
+      .filter((date): date is Date => date !== null);
+
+    setRecentQueueLimit(limit);
+    setHasMoreRecentQueueDates(summaries.length > limit);
+    setRecentQueueDates(visibleDates);
+    setLatestQueueDate(visibleDates[0] ?? null);
+
+    return visibleDates[0] ?? null;
+  };
+
+  const refreshQueueWindowState = async (): Promise<void> => {
+    const db = props.localDb();
+    const uid = props.userId();
+    const rid = props.currentRepertoireId();
+
+    if (!db || !uid || !rid) {
+      setRecentQueueDates([]);
+      setLatestQueueDate(null);
+      setHasMoreRecentQueueDates(false);
+      return;
+    }
+
+    await syncQueueWindowState(db, uid, rid, recentQueueLimit());
+  };
+
+  const loadMoreRecentQueueDates = async (): Promise<void> => {
+    const db = props.localDb();
+    const uid = props.userId();
+    const rid = props.currentRepertoireId();
+
+    if (!db || !uid || !rid) return;
+
+    await syncQueueWindowState(db, uid, rid, recentQueueLimit() + 10);
+  };
 
   /**
    * Resource source: infrastructure changes ONLY.
@@ -247,6 +326,11 @@ export function usePracticeQueueDate(
               params.repertoireId,
               storedDate
             );
+            await syncQueueWindowState(
+              params.db,
+              params.userId,
+              params.repertoireId
+            );
             return true;
           }
 
@@ -271,14 +355,7 @@ export function usePracticeQueueDate(
 
       let resolvedDate: Date;
       if (latestWindow.windowStartUtc) {
-        // Use only the YYYY-MM-DD portion at local noon — do NOT pass through
-        // parseStoredDate, which appends "Z" (UTC midnight) and shifts the date
-        // back one day in timezones behind UTC (e.g. EST sees March 7 as March 6).
-        const datePart = latestWindow.windowStartUtc.substring(0, 10); // "YYYY-MM-DD"
-        const localNoon = new Date(`${datePart}T12:00:00`);
-        resolvedDate = Number.isNaN(localNoon.getTime())
-          ? getPracticeDate()
-          : localNoon;
+        resolvedDate = queueWindowToDate(latestWindow.windowStartUtc) ?? getPracticeDate();
       } else {
         resolvedDate = getPracticeDate();
       }
@@ -294,6 +371,7 @@ export function usePracticeQueueDate(
         params.repertoireId,
         resolvedDate
       );
+      await syncQueueWindowState(params.db, params.userId, params.repertoireId);
 
       console.log(
         `[usePracticeQueueDate] Resolved queue date to ${resolvedDate.toLocaleDateString()} (auto)`
@@ -331,6 +409,7 @@ export function usePracticeQueueDate(
     const rid = props.currentRepertoireId();
     if (db && uid && rid) {
       await ensureDailyQueue(db, uid, rid, dateAtNoon);
+      await syncQueueWindowState(db, uid, rid);
     }
   };
 
@@ -347,11 +426,33 @@ export function usePracticeQueueDate(
     persistToStorage(today, false);
   };
 
+  const selectLatestQueueDate = async (): Promise<void> => {
+    const targetDate = latestQueueDate() ?? getPracticeDate();
+
+    setQueueDate(targetDate);
+    setIsManual(false);
+    persistToStorage(targetDate, false);
+
+    const db = props.localDb();
+    const uid = props.userId();
+    const rid = props.currentRepertoireId();
+    if (db && uid && rid) {
+      await ensureDailyQueue(db, uid, rid, targetDate);
+      await syncQueueWindowState(db, uid, rid);
+    }
+  };
+
   return {
     queueDate,
+    latestQueueDate,
+    recentQueueDates,
+    hasMoreRecentQueueDates,
     isManual,
     queueReady,
     setManualDate,
     clearManualAndSetToday,
+    selectLatestQueueDate,
+    refreshQueueWindowState,
+    loadMoreRecentQueueDates,
   };
 }

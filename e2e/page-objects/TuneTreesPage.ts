@@ -437,11 +437,11 @@ export class TuneTreesPage {
       { name: /Dismiss/i }
     );
 
-    // Date Rollover Banner Elements
-    this.dateRolloverBanner = page.getByTestId("date-rollover-banner");
     this.dateRolloverRefreshButton = page.getByTestId(
       "date-rollover-refresh-button"
     );
+    // Legacy property name retained for tests that only care about visibility.
+    this.dateRolloverBanner = this.dateRolloverRefreshButton;
 
     // Conversion UI Elements
     this.conversionHeader = page.getByRole("heading", {
@@ -1045,7 +1045,7 @@ export class TuneTreesPage {
   }
 
   /**
-   * Refresh the practice queue when the date rollover banner is visible.
+  * Refresh the practice queue when the rollover action is visible.
    * Returns true when a refresh was triggered.
    *
    * If we want the cleanest long-term shape, this helper should be split
@@ -1055,7 +1055,7 @@ export class TuneTreesPage {
    * is "good enough".
    */
   async refreshDateRolloverIfVisible(timeoutMs = 20000): Promise<boolean> {
-    const bannerVisible = await this.dateRolloverBanner
+    const bannerVisible = await this.dateRolloverRefreshButton
       .isVisible()
       .catch(() => false);
 
@@ -1091,7 +1091,7 @@ export class TuneTreesPage {
         }
       )
       .not.toBe("enabled");
-    await expect(this.dateRolloverBanner).toBeHidden({
+    await expect(this.dateRolloverRefreshButton).toBeHidden({
       timeout: timeoutMs,
     });
     return true;
