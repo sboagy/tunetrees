@@ -20,7 +20,6 @@
     "schema:sqlite:gen": "npm run codegen:schema",
     "schema:sqlite:check": "npm run codegen:schema:check",
     "db:views:create": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx scripts/create-db-views.ts",
-    "create:test-users": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx scripts/setup-test-environment.ts",
     "link:local": "yalc link @rhizome/core oosync && cd worker && yalc link oosync",
     "unlink:local": "yalc remove --all && npm install && cd worker && yalc remove --all && npm install",
     "prep-for-ci-oosync": "npm update oosync --package-lock-only && npm update oosync --package-lock-only --prefix worker && echo '✅ Lockfile oosync entry updated for CI. Local yalc links preserved!'",
