@@ -7,8 +7,8 @@
  * @module components/sidebar/TuneInfoHeader
  */
 
-import { A, useLocation, useNavigate } from "@solidjs/router";
-import { History, Music, Pencil, Settings2, Tag } from "lucide-solid";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { History, Music, Pencil } from "lucide-solid";
 import { type Component, createResource, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
@@ -120,36 +120,40 @@ export const TuneInfoHeader: Component = () => {
             </p>
           </div>
 
-          {/* Practice History Link */}
+          {/* Practice History Button */}
           <div class="pl-5">
-            <A
-              href={`/tunes/${tune()!.id}/practice-history`}
-              class={`inline-flex items-center gap-1 ${fontClasses().textSmall} text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
+            <button
+              type="button"
+              onClick={() => {
+                const fullPath = location.pathname + location.search;
+                navigate(`/tunes/${tune()!.id}/practice-history`, {
+                  state: { from: fullPath },
+                });
+              }}
+              class={`inline-flex items-center gap-2 rounded-md border border-blue-300 px-3 py-1.5 ${fontClasses().textSmall} font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20 dark:hover:text-blue-300`}
               data-testid="sidebar-practice-history-link"
             >
               <History class={fontClasses().iconSmall} />
               Practice History
-            </A>
+            </button>
           </div>
 
           {/* Type and Mode */}
-          <div class="flex flex-wrap gap-1.5 pl-5">
+          <div class="pl-5 space-y-1">
             <Show when={tune()!.type}>
-              <span
-                class={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${fontClasses().textSmall} font-medium bg-blue-100/60 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border border-blue-200/30 dark:border-blue-700/30`}
+              <p
+                class={`${fontClasses().textSmall} text-gray-600 dark:text-gray-400`}
               >
-                <Tag class={fontClasses().iconSmall} />
-                {tune()!.type}
-              </span>
+                <span class="font-medium">Type:</span> {tune()!.type}
+              </p>
             </Show>
 
             <Show when={tune()!.mode}>
-              <span
-                class={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full ${fontClasses().textSmall} font-medium bg-green-100/60 dark:bg-green-900/40 text-green-800 dark:text-green-200 border border-green-200/30 dark:border-green-700/30`}
+              <p
+                class={`${fontClasses().textSmall} text-gray-600 dark:text-gray-400`}
               >
-                <Settings2 class={fontClasses().iconSmall} />
-                {tune()!.mode}
-              </span>
+                <span class="font-medium">Mode:</span> {tune()!.mode}
+              </p>
             </Show>
           </div>
 

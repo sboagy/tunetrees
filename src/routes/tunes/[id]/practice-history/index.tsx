@@ -1,8 +1,8 @@
 /**
  * Practice History Route
  *
- * Displays and allows editing of practice records for a tune.
- * Uses an editable TanStack Solid Table grid.
+ * Displays practice records for a tune in a read-only history table with
+ * lightweight FSRS analytics and an optional manual backfill form.
  *
  * @module routes/tunes/[id]/practice-history
  */
@@ -15,23 +15,47 @@ import {
   createResource,
   createSignal,
   For,
+  Match,
   Show,
+  Switch,
 } from "solid-js";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { BarChart, LineChart } from "@/components/ui/charts";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentRepertoire } from "@/lib/context/CurrentRepertoireContext";
 import {
-  createPracticeRecord,
   deletePracticeRecord,
   getPracticeRecordsForTune,
-  updatePracticeRecord,
 } from "@/lib/db/queries/practice-records";
 import { getTuneForUserById } from "@/lib/db/queries/tunes";
 import type { PracticeRecord } from "@/lib/db/types";
+import { FSRS_QUALITY_MAP } from "@/lib/scheduling/fsrs-service";
+import { recordPracticeRating } from "@/lib/services/practice-recording";
+import {
+  buildPracticeHistoryQualityChart,
+  buildPracticeHistoryStabilityChart,
+  buildPracticeHistorySummary,
+  formatPracticeHistoryDate,
+  getPracticeHistoryQualityDisplay,
+  getPracticeHistoryStateLabel,
+} from "./practice-history-utils";
+
+interface DraftPracticeRecord {
+  practiced: string;
+  quality: number;
+}
 
 /**
  * Practice History Page Component
  *
- * Shows all practice records for a tune with inline editing.
+ * Shows immutable historical FSRS reviews and tune-specific analytics.
  */
 const PracticeHistoryPage: Component = () => {
   const params = useParams();
@@ -40,27 +64,17 @@ const PracticeHistoryPage: Component = () => {
   const { localDb, userIdInt } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
 
-  // Track edits
-  const [editedRecords, setEditedRecords] = createSignal<
-    Map<string, Partial<PracticeRecord>>
-  >(new Map());
-  const [deletedIds, setDeletedIds] = createSignal<Set<string>>(new Set());
-  const [isSaving, setIsSaving] = createSignal(false);
-  const [dateValidationError, setDateValidationError] = createSignal<
-    string | null
-  >(null);
-  const [invalidDateFields, setInvalidDateFields] = createSignal<Set<string>>(
-    new Set()
-  );
-  const warnedInvalidDateValues = new Set<string>();
+  const [draftRecord, setDraftRecord] =
+    createSignal<DraftPracticeRecord | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = createSignal(false);
+  const [deletingIds, setDeletingIds] = createSignal<Set<string>>(new Set());
+  const [mutationError, setMutationError] = createSignal<string | null>(null);
 
-  // Return path for navigation
   const returnPath = createMemo(() => {
-    const state = location.state as any;
-    return state?.from || `/tunes/${params.id}/edit`;
+    const state = location.state as { from?: string } | undefined;
+    return state?.from || `/tunes/${params.id}`;
   });
 
-  // Fetch tune data
   const [tune] = createResource(
     () => {
       const db = localDb();
@@ -68,13 +82,16 @@ const PracticeHistoryPage: Component = () => {
       const uid = userIdInt();
       return db && tuneId && uid ? { db, tuneId, uid } : null;
     },
-    async (params) => {
-      if (!params) return null;
-      return await getTuneForUserById(params.db, params.tuneId, params.uid);
+    async (resource) => {
+      if (!resource) return null;
+      return await getTuneForUserById(
+        resource.db,
+        resource.tuneId,
+        resource.uid
+      );
     }
   );
 
-  // Fetch practice records
   const [practiceRecords, { refetch }] = createResource(
     () => {
       const db = localDb();
@@ -82,147 +99,51 @@ const PracticeHistoryPage: Component = () => {
       const repertoireId = currentRepertoireId();
       return db && tuneId && repertoireId ? { db, tuneId, repertoireId } : null;
     },
-    async (params) => {
-      if (!params) return [];
+    async (resource) => {
+      if (!resource) return [];
       return await getPracticeRecordsForTune(
-        params.db,
-        params.tuneId,
-        params.repertoireId
+        resource.db,
+        resource.tuneId,
+        resource.repertoireId
       );
     }
   );
 
-  // Check if there are unsaved changes
-  const hasChanges = createMemo(
-    () => editedRecords().size > 0 || deletedIds().size > 0
+  const summary = createMemo(() =>
+    buildPracticeHistorySummary(practiceRecords() ?? [])
   );
 
-  // Get display value for a field (edited or original)
-  const getFieldValue = (
-    record: PracticeRecord,
-    field: keyof PracticeRecord
-  ) => {
-    const edited = editedRecords().get(record.id);
-    if (edited && field in edited) {
-      return edited[field];
-    }
-    return record[field];
-  };
+  const qualityChart = createMemo(() =>
+    buildPracticeHistoryQualityChart(practiceRecords() ?? [])
+  );
 
-  // Update a field value
-  const updateField = (
-    recordId: string,
-    field: keyof PracticeRecord,
-    value: unknown
-  ) => {
-    setEditedRecords((prev) => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(recordId) || {};
-      newMap.set(recordId, { ...existing, [field]: value });
-      return newMap;
-    });
-  };
+  const stabilityChart = createMemo(() =>
+    buildPracticeHistoryStabilityChart(practiceRecords() ?? [])
+  );
 
-  // Mark a record for deletion
-  const markForDeletion = (recordId: string) => {
-    setDeletedIds((prev) => {
-      const newSet = new Set(prev);
-      newSet.add(recordId);
-      return newSet;
-    });
-  };
+  const canAddRecord = createMemo(() => {
+    return (
+      !!localDb() &&
+      !!currentRepertoireId() &&
+      !!params.id &&
+      !!userIdInt() &&
+      !practiceRecords.loading &&
+      !draftRecord()
+    );
+  });
 
-  // Restore a deleted record
-  const restoreRecord = (recordId: string) => {
-    setDeletedIds((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(recordId);
-      return newSet;
-    });
-  };
+  const createDefaultDraftRecord = (): DraftPracticeRecord => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
 
-  // Save all changes
-  const handleSave = async () => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-    if (!db || !repertoireId) return;
-    if (invalidDateFields().size > 0) {
-      setDateValidationError(
-        "One or more date fields are invalid. Please fix them before saving."
-      );
-      if (import.meta.env.DEV) {
-        console.warn(
-          "[PracticeHistory] Save blocked due to invalid date fields",
-          Array.from(invalidDateFields())
-        );
-      }
-      return;
-    }
-
-    setDateValidationError(null);
-    setIsSaving(true);
-    try {
-      // Delete marked records
-      for (const id of deletedIds()) {
-        await deletePracticeRecord(db, id);
-      }
-
-      // Update edited records
-      for (const [id, changes] of editedRecords()) {
-        if (!deletedIds().has(id)) {
-          await updatePracticeRecord(db, id, changes);
-        }
-      }
-
-      // Clear state and refetch
-      setEditedRecords(new Map());
-      setDeletedIds(new Set<string>());
-      setInvalidDateFields(new Set<string>());
-      await refetch();
-    } catch (error) {
-      setDateValidationError("Failed to save practice records. Try again.");
-      console.error("Error saving practice records:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Discard all changes
-  const handleDiscard = () => {
-    setEditedRecords(new Map());
-    setDeletedIds(new Set<string>());
-    setInvalidDateFields(new Set<string>());
-    setDateValidationError(null);
-  };
-
-  // Add new practice record
-  const handleAddRecord = async () => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-    const tuneId = params.id;
-    if (!db || !repertoireId || !tuneId) return;
-
-    try {
-      await createPracticeRecord(db, repertoireId, tuneId, {
-        practiced: new Date().toISOString(),
-        quality: 3,
-      });
-      await refetch();
-    } catch (error) {
-      console.error("Error creating practice record:", error);
-    }
-  };
-
-  const canAddRecord = () => {
-    const db = localDb();
-    const repertoireId = currentRepertoireId();
-    const tuneId = params.id;
-    return !!db && !!repertoireId && !!tuneId && !practiceRecords.loading;
-  };
-
-  // Navigate back
-  const handleBack = () => {
-    navigate(returnPath());
+    return {
+      practiced: `${year}-${month}-${day}T${hours}:${minutes}`,
+      quality: FSRS_QUALITY_MAP.GOOD,
+    };
   };
 
   const parseDateTimeLocalToIso = (value: string): string | null => {
@@ -232,372 +153,546 @@ const PracticeHistoryPage: Component = () => {
     return parsed.toISOString();
   };
 
-  const updateDateField = (
-    recordId: string,
-    field: "practiced" | "due",
-    value: string
-  ) => {
-    const fieldKey = `${recordId}:${field}`;
-    const isoValue = parseDateTimeLocalToIso(value);
-    if (value && !isoValue) {
-      setInvalidDateFields((prev) => {
-        const next = new Set(prev);
-        next.add(fieldKey);
-        return next;
-      });
-      setDateValidationError(
-        "One or more date fields are invalid. Please fix them before saving."
-      );
-      if (import.meta.env.DEV) {
-        console.warn("[PracticeHistory] Invalid datetime-local input", {
-          recordId,
-          field,
-          value,
-        });
-      }
+  const handleBack = () => {
+    navigate(returnPath());
+  };
+
+  const handleStartAdd = () => {
+    setMutationError(null);
+    setDraftRecord(createDefaultDraftRecord());
+  };
+
+  const handleCancelDraft = () => {
+    setMutationError(null);
+    setDraftRecord(null);
+  };
+
+  const handleSaveDraft = async () => {
+    const db = localDb();
+    const repertoireId = currentRepertoireId();
+    const tuneId = params.id;
+    const uid = userIdInt();
+    const draft = draftRecord();
+    const practicedIso = parseDateTimeLocalToIso(draft?.practiced ?? "");
+
+    if (!db || !repertoireId || !tuneId || !uid || !draft) {
       return;
     }
 
-    setInvalidDateFields((prev) => {
-      const next = new Set(prev);
-      next.delete(fieldKey);
-      if (next.size === 0) {
-        setDateValidationError(null);
-      }
-      return next;
-    });
+    if (!practicedIso) {
+      setMutationError("Enter a valid practice date and time before saving.");
+      return;
+    }
 
-    updateField(recordId, field, isoValue);
-  };
+    setMutationError(null);
+    setIsSavingDraft(true);
 
-  // Format date for input
-  const formatDateForInput = (dateStr: string | null | undefined) => {
-    if (!dateStr) return "";
     try {
-      const date = new Date(dateStr);
-      if (Number.isNaN(date.getTime())) {
-        if (import.meta.env.DEV && !warnedInvalidDateValues.has(dateStr)) {
-          warnedInvalidDateValues.add(dateStr);
-          console.warn("[PracticeHistory] Invalid persisted date value", {
-            tuneId: params.id,
-            dateStr,
-          });
-        }
-        return "";
+      const result = await recordPracticeRating(db, uid, {
+        repertoireRef: repertoireId,
+        tuneRef: tuneId,
+        quality: draft.quality,
+        practiced: new Date(practicedIso),
+        goal: "recall",
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Unable to save practice record.");
       }
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    } catch {
-      return "";
+
+      setDraftRecord(null);
+      await refetch();
+    } catch (error) {
+      setMutationError(
+        error instanceof Error
+          ? error.message
+          : "Failed to save practice history entry."
+      );
+    } finally {
+      setIsSavingDraft(false);
     }
   };
 
+  const handleDelete = async (recordId: string) => {
+    const db = localDb();
+    if (!db) {
+      return;
+    }
+
+    setMutationError(null);
+    setDeletingIds((current) => new Set(current).add(recordId));
+
+    try {
+      await deletePracticeRecord(db, recordId);
+      await refetch();
+    } catch (error) {
+      setMutationError(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete practice history entry."
+      );
+    } finally {
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(recordId);
+        return next;
+      });
+    }
+  };
+
+  const statTiles = createMemo(() => [
+    {
+      label: "Sessions",
+      value: summary().totalSessions.toString(),
+    },
+    {
+      label: "Success Rate",
+      value: `${summary().successRate}%`,
+    },
+    {
+      label: "Current Streak",
+      value: `${summary().currentStreak}`,
+    },
+    {
+      label: "Avg Interval",
+      value: `${summary().averageInterval}d`,
+    },
+  ]);
+
   return (
     <div
-      class="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-y-auto"
+      class="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900"
       data-testid="practice-history-container"
     >
-      <div class="max-w-6xl py-4 px-4 w-full">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-          {/* Header */}
-          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              Practice History
-              <Show when={tune()}>
-                <span class="text-gray-500 dark:text-gray-400 font-normal">
-                  {" "}
-                  — {tune()!.title}
-                </span>
-              </Show>
-            </h2>
+      <div class="w-full max-w-6xl px-4 py-4">
+        <Card class="shadow-lg">
+          <CardHeader class="border-b border-gray-200 dark:border-gray-700">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle class="text-lg font-semibold text-gray-900 dark:text-white">
+                  Practice History
+                  <Show when={tune()}>
+                    <span class="font-normal text-gray-500 dark:text-gray-400">
+                      {" "}
+                      — {tune()!.title}
+                    </span>
+                  </Show>
+                </CardTitle>
+                <CardDescription>
+                  Recorded FSRS reviews for this tune, plus tune-specific
+                  trends.
+                </CardDescription>
+              </div>
 
-            <div class="flex items-center gap-3">
-              <Show when={hasChanges()}>
-                <button
+              <div class="order-first flex flex-wrap items-center gap-2 self-end lg:order-none lg:self-auto">
+                <Button
                   type="button"
-                  onClick={handleDiscard}
-                  disabled={isSaving()}
-                  class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:underline disabled:opacity-50"
-                  data-testid="practice-history-discard-button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBack}
+                  data-testid="practice-history-cancel-button"
                 >
-                  <span>Discard</span>
-                  <X class="w-4 h-4" />
-                </button>
-                <button
+                  <span>Cancel</span>
+                  <CircleX class="ml-0.5 h-4 w-4" />
+                </Button>
+                <Button
                   type="button"
-                  onClick={handleSave}
-                  disabled={isSaving()}
-                  class="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-                  data-testid="practice-history-save-button"
+                  size="sm"
+                  onClick={handleStartAdd}
+                  disabled={!canAddRecord()}
+                  data-testid="practice-history-add-button"
                 >
-                  <span>Save</span>
-                  <Save class="w-4 h-4" />
-                </button>
-              </Show>
-              <button
-                type="button"
-                onClick={handleBack}
-                class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:underline"
-                aria-label="Cancel"
-                data-testid="practice-history-cancel-button"
-              >
-                <span>Cancel</span>
-                <CircleX class="w-5 h-5" />
-              </button>
-              <button
-                type="button"
-                onClick={handleAddRecord}
-                disabled={!canAddRecord()}
-                class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:underline disabled:opacity-50"
-                aria-label="Add practice record"
-                data-testid="practice-history-add-button"
-              >
-                <span>Add</span>
-                <Plus class="w-5 h-5" />
-              </button>
+                  <span>Add</span>
+                  <Plus class="ml-0.5 h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          </CardHeader>
 
-          {/* Content */}
-          <div class="p-6">
-            <Show when={dateValidationError()}>
+          <CardContent class="space-y-6 p-6">
+            <Show when={mutationError()}>
               <div
-                class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
                 role="alert"
               >
-                {dateValidationError()}
+                {mutationError()}
               </div>
             </Show>
+
+            <Show when={draftRecord()}>
+              {(draft) => (
+                <Card
+                  class="border-dashed"
+                  data-testid="practice-history-add-form"
+                >
+                  <CardHeader class="pb-3">
+                    <CardTitle class="text-base font-semibold">
+                      Add Practice Entry
+                    </CardTitle>
+                    <CardDescription>
+                      Manual backfill uses FSRS ratings and calculates the next
+                      due date automatically.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent class="space-y-4">
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <label class="grid gap-1.5 text-sm">
+                        <span class="font-medium text-foreground">
+                          Date Practiced
+                        </span>
+                        <input
+                          type="datetime-local"
+                          value={draft().practiced}
+                          onInput={(event) =>
+                            setDraftRecord((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    practiced: event.currentTarget.value,
+                                  }
+                                : current
+                            )
+                          }
+                          class="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                          data-testid="practice-history-practiced-input"
+                        />
+                      </label>
+
+                      <label class="grid gap-1.5 text-sm">
+                        <span class="font-medium text-foreground">
+                          FSRS Rating
+                        </span>
+                        <select
+                          value={String(draft().quality)}
+                          onChange={(event) =>
+                            setDraftRecord((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    quality: Number(event.currentTarget.value),
+                                  }
+                                : current
+                            )
+                          }
+                          class="h-9 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                          data-testid="practice-history-quality-select"
+                        >
+                          <option value={FSRS_QUALITY_MAP.AGAIN}>Again</option>
+                          <option value={FSRS_QUALITY_MAP.HARD}>Hard</option>
+                          <option value={FSRS_QUALITY_MAP.GOOD}>Good</option>
+                          <option value={FSRS_QUALITY_MAP.EASY}>Easy</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelDraft}
+                        disabled={isSavingDraft()}
+                        data-testid="practice-history-discard-button"
+                      >
+                        <span>Discard</span>
+                        <X class="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveDraft}
+                        disabled={isSavingDraft()}
+                        data-testid="practice-history-save-button"
+                      >
+                        <span>Save</span>
+                        <Save class="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </Show>
+
             <Show
               when={!practiceRecords.loading}
               fallback={
-                <div class="text-center py-8">
-                  <div class="animate-spin h-8 w-8 mx-auto border-4 border-blue-600 border-t-transparent rounded-full" />
+                <div class="py-8 text-center">
+                  <div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
                   <p class="mt-4 text-gray-600 dark:text-gray-400">
                     Loading practice history...
                   </p>
                 </div>
               }
             >
-              <Show
-                when={practiceRecords() && practiceRecords()!.length > 0}
-                fallback={
-                  <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Switch>
+                <Match
+                  when={
+                    (practiceRecords()?.length ?? 0) === 0 && !draftRecord()
+                  }
+                >
+                  <div class="py-8 text-center text-gray-500 dark:text-gray-400">
                     <p>No practice records found for this tune.</p>
-                    <p class="text-sm mt-2">
-                      Click "Add Record" to create your first practice entry.
+                    <p class="mt-2 text-sm">
+                      Use &quot;Add&quot; to backfill a prior session if needed.
                     </p>
                   </div>
-                }
-              >
-                {/* Practice Records Table */}
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
-                    <thead>
-                      <tr class="border-b border-gray-200 dark:border-gray-700">
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Date Practiced
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Quality (0-5)
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Due Date
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Stability
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Difficulty
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Reps
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          Lapses
-                        </th>
-                        <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
-                          State
-                        </th>
-                        <th class="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-300">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={practiceRecords()}>
-                        {(record) => (
-                          <tr
-                            class={`border-b border-gray-100 dark:border-gray-700/50 ${
-                              deletedIds().has(record.id)
-                                ? "opacity-50 bg-red-50 dark:bg-red-900/20 line-through"
-                                : editedRecords().has(record.id)
-                                  ? "bg-yellow-50 dark:bg-yellow-900/20"
-                                  : ""
-                            }`}
-                          >
-                            {/* Date Practiced - Editable */}
-                            <td class="px-3 py-2">
-                              <input
-                                type="datetime-local"
-                                value={formatDateForInput(
-                                  getFieldValue(record, "practiced") as string
-                                )}
-                                onInput={(e) =>
-                                  updateDateField(
-                                    record.id,
-                                    "practiced",
-                                    e.currentTarget.value
-                                  )
-                                }
-                                onChange={(e) =>
-                                  updateDateField(
-                                    record.id,
-                                    "practiced",
-                                    e.currentTarget.value
-                                  )
-                                }
-                                disabled={deletedIds().has(record.id)}
-                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs dark:bg-gray-700 dark:text-white disabled:opacity-50"
-                              />
-                            </td>
+                </Match>
 
-                            {/* Quality - Editable */}
-                            <td class="px-3 py-2">
-                              <select
-                                value={
-                                  (getFieldValue(
-                                    record,
-                                    "quality"
-                                  ) as number) ?? ""
-                                }
-                                onChange={(e) =>
-                                  updateField(
-                                    record.id,
-                                    "quality",
-                                    e.currentTarget.value
-                                      ? Number(e.currentTarget.value)
-                                      : null
-                                  )
-                                }
-                                disabled={deletedIds().has(record.id)}
-                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs dark:bg-gray-700 dark:text-white disabled:opacity-50"
-                              >
-                                <option value="">—</option>
-                                <option value="0">0 - Complete blackout</option>
-                                <option value="1">
-                                  1 - Incorrect, remembered
-                                </option>
-                                <option value="2">
-                                  2 - Incorrect, easy recall
-                                </option>
-                                <option value="3">
-                                  3 - Correct, difficult
-                                </option>
-                                <option value="4">
-                                  4 - Correct, hesitation
-                                </option>
-                                <option value="5">5 - Perfect response</option>
-                              </select>
-                            </td>
-
-                            {/* Due Date - Editable */}
-                            <td class="px-3 py-2">
-                              <input
-                                type="datetime-local"
-                                value={formatDateForInput(
-                                  getFieldValue(record, "due") as string
-                                )}
-                                onInput={(e) =>
-                                  updateDateField(
-                                    record.id,
-                                    "due",
-                                    e.currentTarget.value
-                                  )
-                                }
-                                onChange={(e) =>
-                                  updateDateField(
-                                    record.id,
-                                    "due",
-                                    e.currentTarget.value
-                                  )
-                                }
-                                disabled={deletedIds().has(record.id)}
-                                class="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs dark:bg-gray-700 dark:text-white disabled:opacity-50"
-                              />
-                            </td>
-
-                            {/* Stability - Read-only */}
-                            <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                              {record.stability?.toFixed(2) ?? "—"}
-                            </td>
-
-                            {/* Difficulty - Read-only */}
-                            <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                              {record.difficulty?.toFixed(2) ?? "—"}
-                            </td>
-
-                            {/* Reps - Read-only */}
-                            <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                              {record.repetitions ?? "—"}
-                            </td>
-
-                            {/* Lapses - Read-only */}
-                            <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                              {record.lapses ?? "—"}
-                            </td>
-
-                            {/* State - Read-only */}
-                            <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
-                              {record.state === 0
-                                ? "New"
-                                : record.state === 1
-                                  ? "Learning"
-                                  : record.state === 2
-                                    ? "Review"
-                                    : record.state === 3
-                                      ? "Relearning"
-                                      : "—"}
-                            </td>
-
-                            {/* Actions */}
-                            <td class="px-3 py-2 text-center">
-                              <Show
-                                when={!deletedIds().has(record.id)}
-                                fallback={
-                                  <button
-                                    type="button"
-                                    onClick={() => restoreRecord(record.id)}
-                                    class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 text-xs"
-                                  >
-                                    Restore
-                                  </button>
-                                }
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => markForDeletion(record.id)}
-                                  class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
-                                  title="Delete record"
-                                >
-                                  <Trash2 class="w-4 h-4" />
-                                </button>
-                              </Show>
-                            </td>
+                <Match when={(practiceRecords()?.length ?? 0) > 0}>
+                  <div class="space-y-6">
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-sm">
+                        <thead>
+                          <tr class="border-b border-gray-200 dark:border-gray-700">
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              Date Practiced
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              FSRS Rating
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              Due Date
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              Stability
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              Difficulty
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              Reps
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              Lapses
+                            </th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
+                              State
+                            </th>
+                            <th class="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-300">
+                              Actions
+                            </th>
                           </tr>
+                        </thead>
+                        <tbody>
+                          <For each={practiceRecords()}>
+                            {(record: PracticeRecord) => {
+                              const qualityDisplay =
+                                getPracticeHistoryQualityDisplay(
+                                  record.quality
+                                );
+
+                              return (
+                                <tr class="border-b border-gray-100 dark:border-gray-700/50">
+                                  <td class="px-3 py-2 text-gray-700 dark:text-gray-200">
+                                    {formatPracticeHistoryDate(
+                                      record.practiced
+                                    )}
+                                  </td>
+                                  <td class="px-3 py-2">
+                                    <span
+                                      class={`font-medium ${qualityDisplay.colorClass}`}
+                                    >
+                                      {qualityDisplay.label}
+                                    </span>
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {formatPracticeHistoryDate(record.due)}
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {record.stability?.toFixed(2) ?? "—"}
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {record.difficulty?.toFixed(2) ?? "—"}
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {record.repetitions ?? "—"}
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {record.lapses ?? "—"}
+                                  </td>
+                                  <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {getPracticeHistoryStateLabel(record.state)}
+                                  </td>
+                                  <td class="px-3 py-2 text-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDelete(record.id)}
+                                      disabled={deletingIds().has(record.id)}
+                                      title="Delete record"
+                                    >
+                                      <Trash2 class="h-4 w-4 text-red-600 dark:text-red-400" />
+                                      <span class="sr-only">
+                                        Delete practice history entry
+                                      </span>
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            }}
+                          </For>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div
+                      class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+                      data-testid="practice-history-summary"
+                    >
+                      <For each={statTiles()}>
+                        {(tile) => (
+                          <div class="rounded-lg border border-border bg-muted/40 p-3">
+                            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {tile.label}
+                            </div>
+                            <div class="mt-1 text-xl font-semibold text-foreground">
+                              {tile.value}
+                            </div>
+                          </div>
                         )}
                       </For>
-                    </tbody>
-                  </table>
-                </div>
-              </Show>
+                    </div>
+
+                    <div
+                      class="grid gap-4 lg:grid-cols-2"
+                      data-testid="practice-history-analytics"
+                    >
+                      <Card data-testid="practice-history-quality-chart">
+                        <CardHeader class="pb-2">
+                          <CardTitle class="text-base font-semibold">
+                            Rating Trend
+                          </CardTitle>
+                          <CardDescription>
+                            Review outcomes across this tune&apos;s practice
+                            history
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <Switch>
+                            <Match when={qualityChart()}>
+                              {(data) => (
+                                <div class="relative h-48 w-full">
+                                  <BarChart
+                                    data={data()}
+                                    options={{
+                                      responsive: true,
+                                      maintainAspectRatio: false,
+                                      scales: {
+                                        x: {
+                                          border: { display: false },
+                                          grid: { display: false },
+                                          ticks: { font: { size: 11 } },
+                                        },
+                                        y: {
+                                          min: 1,
+                                          max: 4,
+                                          border: { display: false },
+                                          ticks: {
+                                            stepSize: 1,
+                                            callback: (value) =>
+                                              getPracticeHistoryQualityDisplay(
+                                                Number(value)
+                                              ).label,
+                                            font: { size: 11 },
+                                          },
+                                          grid: {
+                                            color:
+                                              "hsla(240, 3.8%, 46.1%, 0.3)",
+                                          },
+                                        },
+                                      },
+                                      plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                          enabled: true,
+                                          callbacks: {
+                                            label: (context) =>
+                                              ` ${getPracticeHistoryQualityDisplay(context.parsed.y).label}`,
+                                          },
+                                        },
+                                      },
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </Match>
+                          </Switch>
+                        </CardContent>
+                      </Card>
+
+                      <Card data-testid="practice-history-stability-chart">
+                        <CardHeader class="pb-2">
+                          <CardTitle class="text-base font-semibold">
+                            Stability Trend
+                          </CardTitle>
+                          <CardDescription>
+                            How the tune&apos;s memory stability has changed
+                            over time
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <Switch>
+                            <Match when={stabilityChart()}>
+                              {(data) => (
+                                <div class="relative h-48 w-full">
+                                  <LineChart
+                                    data={data()}
+                                    options={{
+                                      responsive: true,
+                                      maintainAspectRatio: false,
+                                      scales: {
+                                        x: {
+                                          border: { display: false },
+                                          grid: { display: false },
+                                          ticks: { font: { size: 11 } },
+                                        },
+                                        y: {
+                                          beginAtZero: true,
+                                          border: { display: false },
+                                          ticks: { font: { size: 11 } },
+                                          grid: {
+                                            color:
+                                              "hsla(240, 3.8%, 46.1%, 0.3)",
+                                          },
+                                        },
+                                      },
+                                      plugins: {
+                                        legend: { display: false },
+                                        tooltip: {
+                                          enabled: true,
+                                          callbacks: {
+                                            label: (context) => {
+                                              const value =
+                                                typeof context.parsed.y ===
+                                                "number"
+                                                  ? context.parsed.y
+                                                  : 0;
+                                              return ` ${value.toFixed(2)} stability`;
+                                            },
+                                          },
+                                        },
+                                      },
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </Match>
+                            <Match when={!stabilityChart()}>
+                              <div class="flex h-48 items-center justify-center text-sm text-muted-foreground">
+                                Not enough stability data yet
+                              </div>
+                            </Match>
+                          </Switch>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </Match>
+              </Switch>
             </Show>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
