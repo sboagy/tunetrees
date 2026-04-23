@@ -9,7 +9,7 @@
  *
  * Prerequisites:
  *   - Supabase local stack running (supabase start)
- *   - SUPABASE_SERVICE_ROLE_KEY in environment
+ *   - SUPABASE_SERVICE_ROLE_KEY in environment, or a running local Supabase stack
  *
  * Security Note:
  *   - The shared test-user password must be injected via ALICE_TEST_PASSWORD or
@@ -19,16 +19,45 @@
  *
  * Environment Variables:
  *   - SUPABASE_URL: Defaults to http://127.0.0.1:54321 (local)
- *   - SUPABASE_SERVICE_ROLE_KEY: Defaults to local dev key
+ *   - SUPABASE_SERVICE_ROLE_KEY: Falls back to local `supabase status` output
  *   - ALICE_TEST_PASSWORD / TEST_USER_PASSWORD: Shared test-user password from 1Password
  */
 
+import { execSync } from "node:child_process";
 import { createClient } from "@supabase/supabase-js";
 
+function getSupabaseServiceRoleKey(): string {
+  const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (envKey) {
+    return envKey;
+  }
+
+  try {
+    const statusJson = execSync("supabase status --output json", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const status = JSON.parse(statusJson) as { SERVICE_ROLE_KEY?: string };
+    const serviceRoleKey = status.SERVICE_ROLE_KEY?.trim();
+
+    if (!serviceRoleKey) {
+      throw new Error(
+        "SERVICE_ROLE_KEY missing from `supabase status --output json`"
+      );
+    }
+
+    return serviceRoleKey;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Missing SUPABASE_SERVICE_ROLE_KEY and failed to get the local value from \`supabase status\`: ${message}`
+    );
+  }
+}
+
 const SUPABASE_URL = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+const SUPABASE_SERVICE_ROLE_KEY = getSupabaseServiceRoleKey();
 
 function getRequiredTestPassword(): string {
   const password =
