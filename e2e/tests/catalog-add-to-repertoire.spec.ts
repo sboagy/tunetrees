@@ -137,6 +137,8 @@ test.describe
       await page.waitForTimeout(2000);
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(500);
+      // Playwright setup exports both names in different contexts:
+      // VITE_SUPABASE_ANON_KEY for the app build, SUPABASE_ANON_KEY for direct test use.
       const anonKey =
         process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
       if (!anonKey) {

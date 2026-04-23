@@ -38,7 +38,13 @@ function getSupabaseServiceRoleKey(): string {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const status = JSON.parse(statusJson) as { SERVICE_ROLE_KEY?: string };
+    let status: { SERVICE_ROLE_KEY?: string };
+    try {
+      status = JSON.parse(statusJson) as { SERVICE_ROLE_KEY?: string };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid JSON from \`supabase status\`: ${message}`);
+    }
     const serviceRoleKey = status.SERVICE_ROLE_KEY?.trim();
 
     if (!serviceRoleKey) {
