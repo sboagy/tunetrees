@@ -5,6 +5,7 @@ import {
   createSignal,
   onCleanup,
   onMount,
+  untrack,
 } from "solid-js";
 import "jodit/es2021/jodit.min.css";
 
@@ -21,6 +22,10 @@ interface NotesEditorProps {
  */
 const getCurrentTheme = (): "light" | "dark" => {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
+};
+
+const getJoditTheme = (theme: "light" | "dark"): "default" | "dark" => {
+  return theme === "dark" ? "dark" : "default";
 };
 
 /**
@@ -61,7 +66,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     ],
 
     // Theme configuration - use Jodit's built-in dark theme
-    theme: theme === "dark" ? "dark" : "default",
+    theme: getJoditTheme(theme),
 
     // Editor settings
     placeholder: props.placeholder || "Write your notes here...",
@@ -89,6 +94,20 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     },
   });
 
+  const applyEditorTheme = (theme: "light" | "dark") => {
+    if (!joditInstance) {
+      return;
+    }
+
+    const joditTheme = getJoditTheme(theme);
+    joditInstance.options.theme = joditTheme;
+    joditInstance.container.classList.remove(
+      "jodit_theme_dark",
+      "jodit_theme_default"
+    );
+    joditInstance.container.classList.add(`jodit_theme_${joditTheme}`);
+  };
+
   // Initialize editor
   const initEditor = () => {
     if (editorRef) {
@@ -100,6 +119,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
 
       // Initialize Jodit editor with current theme
       joditInstance = Jodit.make(editorRef, createEditorConfig(currentTheme()));
+      applyEditorTheme(currentTheme());
 
       // Set initial content
       lastContent = props.content || "";
@@ -130,26 +150,30 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     });
   });
 
-  // Re-initialize editor when theme changes (not on initial mount)
+  // Update the editor theme in place when the app theme changes
   createEffect(() => {
     const theme = currentTheme();
-    // Only reinitialize if theme actually changed (not on initial mount)
+    // Only update if theme actually changed (not on initial mount)
     if (theme !== previousTheme && joditInstance) {
-      const currentContent = joditInstance.value;
       previousTheme = theme;
-      initEditor();
-      if (joditInstance) {
-        joditInstance.value = currentContent;
-      }
+      applyEditorTheme(theme);
     }
   });
 
   // Update editor content when prop changes (external update)
   createEffect(() => {
-    if (joditInstance && props.content !== joditInstance.value) {
-      lastContent = props.content || "";
-      joditInstance.value = lastContent;
+    const incomingContent = props.content || "";
+    const editor = joditInstance;
+    if (!editor) {
+      return;
     }
+
+    untrack(() => {
+      if (incomingContent !== editor.value) {
+        lastContent = incomingContent;
+        editor.value = incomingContent;
+      }
+    });
   });
 
   onCleanup(() => {
