@@ -119,7 +119,6 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
 
       // Initialize Jodit editor with current theme
       joditInstance = Jodit.make(editorRef, createEditorConfig(currentTheme()));
-      applyEditorTheme(currentTheme());
 
       // Set initial content
       lastContent = props.content || "";

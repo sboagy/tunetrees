@@ -35,15 +35,17 @@ vi.mock("jodit", () => ({
 }));
 
 class MockMutationObserver {
-  private static callbacks: MutationCallback[] = [];
+  private static callbacks = new Map<MockMutationObserver, MutationCallback>();
 
   constructor(callback: MutationCallback) {
-    MockMutationObserver.callbacks.push(callback);
+    MockMutationObserver.callbacks.set(this, callback);
   }
 
   observe() {}
 
-  disconnect() {}
+  disconnect() {
+    MockMutationObserver.callbacks.delete(this);
+  }
 
   takeRecords(): MutationRecord[] {
     return [];
@@ -57,7 +59,7 @@ class MockMutationObserver {
   }
 
   static reset() {
-    MockMutationObserver.callbacks = [];
+    MockMutationObserver.callbacks.clear();
   }
 }
 
@@ -147,7 +149,7 @@ describe("NotesEditor", () => {
   });
 
   it("only pushes external content updates into Jodit when the value changes", async () => {
-    let setContent: Setter<string>;
+    let setContent: Setter<string> | undefined;
 
     const Host = () => {
       const [content, updateContent] = createSignal("<p>Initial note</p>");
@@ -167,12 +169,18 @@ describe("NotesEditor", () => {
     const editor = createdEditors[0];
     expect(editor.valueAssignments).toBe(1);
 
-    setContent!("<p>Initial note</p>");
+    const updateContent = setContent;
+    expect(updateContent).toBeDefined();
+    if (!updateContent) {
+      throw new Error("Expected test host content setter to be assigned");
+    }
+
+    updateContent("<p>Initial note</p>");
     await waitFor(() => {
       expect(editor.valueAssignments).toBe(1);
     });
 
-    setContent!("<p>Updated note</p>");
+    updateContent("<p>Updated note</p>");
     await waitFor(() => {
       expect(editor.value).toBe("<p>Updated note</p>");
       expect(editor.valueAssignments).toBe(2);
