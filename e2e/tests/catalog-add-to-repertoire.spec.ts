@@ -137,21 +137,36 @@ test.describe
       await page.waitForTimeout(2000);
       await ttPage.navigateToTab("repertoire");
       await page.waitForTimeout(500);
+      // Playwright setup exports both names in different contexts:
+      // VITE_SUPABASE_ANON_KEY for the app build, SUPABASE_ANON_KEY for direct test use.
+      const anonKey =
+        process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
+      if (!anonKey) {
+        throw new Error("Missing VITE_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY");
+      }
 
-      const supabaseCount = await page.evaluate(async (repertoireId) => {
-        const response = await fetch(
-          `http://localhost:54321/rest/v1/repertoire_tune?repertoire_ref=eq.${repertoireId}&select=tune_ref`,
-          {
-            headers: {
-              apikey:
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        const data = await response.json();
-        return data.length;
-      }, currentTestUser.repertoireId);
+      const supabaseCount = await page.evaluate(
+        async ({
+          repertoireId,
+          anonKey,
+        }: {
+          repertoireId: string;
+          anonKey: string;
+        }) => {
+          const response = await fetch(
+            `http://localhost:54321/rest/v1/repertoire_tune?repertoire_ref=eq.${repertoireId}&select=tune_ref`,
+            {
+              headers: {
+                apikey: anonKey,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          const data = await response.json();
+          return data.length;
+        },
+        { repertoireId: currentTestUser.repertoireId, anonKey }
+      );
       console.log(
         `🔍 Supabase has ${supabaseCount} tunes for user ${currentTestUser.repertoireId}`
       );
