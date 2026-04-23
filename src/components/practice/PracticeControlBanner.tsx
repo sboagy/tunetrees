@@ -365,7 +365,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 class={mobileMenuItemClasses}
                 onClick={handleQueueSelectorOpen}
               >
-                <span>Practice Date</span>
+                <span>Select Practice Queue</span>
                 <span class={mobileMenuMetaClasses}>
                   {formatQueueDate(props.queueDate || new Date())}
                 </span>
