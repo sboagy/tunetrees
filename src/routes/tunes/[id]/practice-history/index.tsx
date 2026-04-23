@@ -36,8 +36,8 @@ import {
 } from "@/lib/db/queries/practice-records";
 import { getTuneForUserById } from "@/lib/db/queries/tunes";
 import type { PracticeRecord } from "@/lib/db/types";
-import { recordPracticeRating } from "@/lib/services/practice-recording";
 import { FSRS_QUALITY_MAP } from "@/lib/scheduling/fsrs-service";
+import { recordPracticeRating } from "@/lib/services/practice-recording";
 import {
   buildPracticeHistoryQualityChart,
   buildPracticeHistoryStabilityChart,
@@ -64,9 +64,8 @@ const PracticeHistoryPage: Component = () => {
   const { localDb, userIdInt } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
 
-  const [draftRecord, setDraftRecord] = createSignal<DraftPracticeRecord | null>(
-    null
-  );
+  const [draftRecord, setDraftRecord] =
+    createSignal<DraftPracticeRecord | null>(null);
   const [isSavingDraft, setIsSavingDraft] = createSignal(false);
   const [deletingIds, setDeletingIds] = createSignal<Set<string>>(new Set());
   const [mutationError, setMutationError] = createSignal<string | null>(null);
@@ -85,7 +84,11 @@ const PracticeHistoryPage: Component = () => {
     },
     async (resource) => {
       if (!resource) return null;
-      return await getTuneForUserById(resource.db, resource.tuneId, resource.uid);
+      return await getTuneForUserById(
+        resource.db,
+        resource.tuneId,
+        resource.uid
+      );
     }
   );
 
@@ -276,11 +279,12 @@ const PracticeHistoryPage: Component = () => {
                   </Show>
                 </CardTitle>
                 <CardDescription>
-                  Recorded FSRS reviews for this tune, plus tune-specific trends.
+                  Recorded FSRS reviews for this tune, plus tune-specific
+                  trends.
                 </CardDescription>
               </div>
 
-              <div class="flex flex-wrap items-center gap-2">
+              <div class="order-first flex flex-wrap items-center gap-2 self-end lg:order-none lg:self-auto">
                 <Button
                   type="button"
                   variant="outline"
@@ -289,7 +293,7 @@ const PracticeHistoryPage: Component = () => {
                   data-testid="practice-history-cancel-button"
                 >
                   <span>Cancel</span>
-                  <CircleX class="h-4 w-4" />
+                  <CircleX class="ml-0.5 h-4 w-4" />
                 </Button>
                 <Button
                   type="button"
@@ -299,7 +303,7 @@ const PracticeHistoryPage: Component = () => {
                   data-testid="practice-history-add-button"
                 >
                   <span>Add</span>
-                  <Plus class="h-4 w-4" />
+                  <Plus class="ml-0.5 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -326,8 +330,8 @@ const PracticeHistoryPage: Component = () => {
                       Add Practice Entry
                     </CardTitle>
                     <CardDescription>
-                      Manual backfill uses FSRS ratings and calculates the next due
-                      date automatically.
+                      Manual backfill uses FSRS ratings and calculates the next
+                      due date automatically.
                     </CardDescription>
                   </CardHeader>
                   <CardContent class="space-y-4">
@@ -355,7 +359,9 @@ const PracticeHistoryPage: Component = () => {
                       </label>
 
                       <label class="grid gap-1.5 text-sm">
-                        <span class="font-medium text-foreground">FSRS Rating</span>
+                        <span class="font-medium text-foreground">
+                          FSRS Rating
+                        </span>
                         <select
                           value={String(draft().quality)}
                           onChange={(event) =>
@@ -420,7 +426,9 @@ const PracticeHistoryPage: Component = () => {
             >
               <Switch>
                 <Match
-                  when={(practiceRecords()?.length ?? 0) === 0 && !draftRecord()}
+                  when={
+                    (practiceRecords()?.length ?? 0) === 0 && !draftRecord()
+                  }
                 >
                   <div class="py-8 text-center text-gray-500 dark:text-gray-400">
                     <p>No practice records found for this tune.</p>
@@ -469,12 +477,16 @@ const PracticeHistoryPage: Component = () => {
                           <For each={practiceRecords()}>
                             {(record: PracticeRecord) => {
                               const qualityDisplay =
-                                getPracticeHistoryQualityDisplay(record.quality);
+                                getPracticeHistoryQualityDisplay(
+                                  record.quality
+                                );
 
                               return (
                                 <tr class="border-b border-gray-100 dark:border-gray-700/50">
                                   <td class="px-3 py-2 text-gray-700 dark:text-gray-200">
-                                    {formatPracticeHistoryDate(record.practiced)}
+                                    {formatPracticeHistoryDate(
+                                      record.practiced
+                                    )}
                                   </td>
                                   <td class="px-3 py-2">
                                     <span
@@ -552,7 +564,8 @@ const PracticeHistoryPage: Component = () => {
                             Rating Trend
                           </CardTitle>
                           <CardDescription>
-                            Review outcomes across this tune&apos;s practice history
+                            Review outcomes across this tune&apos;s practice
+                            history
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -614,7 +627,8 @@ const PracticeHistoryPage: Component = () => {
                             Stability Trend
                           </CardTitle>
                           <CardDescription>
-                            How the tune&apos;s memory stability has changed over time
+                            How the tune&apos;s memory stability has changed
+                            over time
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
