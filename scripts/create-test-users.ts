@@ -51,7 +51,8 @@ function getSupabaseServiceRoleKey(): string {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Missing SUPABASE_SERVICE_ROLE_KEY and failed to get the local value from \`supabase status\`: ${message}`
+      "Missing SUPABASE_SERVICE_ROLE_KEY and failed to get the local value from `supabase status`. Set SUPABASE_SERVICE_ROLE_KEY explicitly or make sure the Supabase CLI is installed and the local stack is running. " +
+        `Original error: ${message}`
     );
   }
 }
