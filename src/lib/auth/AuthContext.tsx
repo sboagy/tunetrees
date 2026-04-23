@@ -107,6 +107,9 @@ interface AuthState {
   /** Force sync up to Supabase (push local changes immediately) */
   forceSyncUp: (opts?: { allowDeletes?: boolean }) => Promise<void>;
 
+  /** Clear the local SQLite mirror while keeping the auth session, then rebuild from sync. */
+  forceCleanLocalReset: () => Promise<void>;
+
   /** Catalog sync pending (true if initial sync excluded catalog tables until after onboarding) */
   catalogSyncPending: Accessor<boolean>;
 

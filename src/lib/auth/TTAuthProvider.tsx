@@ -30,6 +30,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import {
+  clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
   getSqliteInstance,
   initializeDb as initializeSqliteDb,
@@ -137,6 +138,8 @@ export interface AuthState {
   forceSyncDown: (opts?: { full?: boolean }) => Promise<void>;
   /** Force sync up to Supabase (push local changes immediately) */
   forceSyncUp: (opts?: { allowDeletes?: boolean }) => Promise<void>;
+  /** Clear the local SQLite mirror while keeping the auth session, then rebuild from sync. */
+  forceCleanLocalReset: () => Promise<void>;
   /** Catalog sync pending (true if initial sync excluded catalog tables until after onboarding) */
   catalogSyncPending: Accessor<boolean>;
   /** Trigger catalog sync after onboarding completion (pulls catalog tables with genre filter) */
@@ -1245,6 +1248,69 @@ const TTInner: ParentComponent = (props) => {
     }
   };
 
+  const forceCleanLocalReset = async () => {
+    const currentUser = rhizome.user();
+    if (!currentUser) {
+      throw new Error("Cannot reset local database without an active session");
+    }
+
+    try {
+      catalogSelectionReconciledKey = null;
+      reconcileRunCount = 0;
+
+      const serviceWithDestroy = syncServiceInstance as
+        | (SyncService & {
+            destroy?: () => Promise<void>;
+          })
+        | null;
+      if (serviceWithDestroy?.destroy) {
+        try {
+          await serviceWithDestroy.destroy();
+        } catch (error) {
+          console.warn(
+            "[ForceCleanLocalReset] Failed to destroy sync service cleanly:",
+            error
+          );
+        }
+      }
+
+      if (stopSyncWorker) {
+        stopSyncWorker();
+        stopSyncWorker = null;
+      }
+      syncServiceInstance = null;
+
+      if (autoPersistCleanup) {
+        autoPersistCleanup();
+        autoPersistCleanup = null;
+      }
+
+      setLocalDb(null);
+      setUserIdInt(null);
+      setInitialSyncComplete(false);
+      setLastSyncTimestamp(null);
+      setLastSyncMode(null);
+      setLastSyncSuccess(null);
+      setLastSyncErrorCount(0);
+      setLastSyncErrorSummary(null);
+
+      await clearSqliteDb();
+
+      if (isUserAnonymous(currentUser)) {
+        await initializeAnonymousDatabase(currentUser.id);
+      } else {
+        await initializeLocalDatabase(currentUser.id);
+      }
+
+      if (navigator.onLine && syncServiceInstance) {
+        await forceSyncDown({ full: true });
+      }
+    } catch (error) {
+      console.error("❌ [ForceCleanLocalReset] Local reset failed:", error);
+      throw error;
+    }
+  };
+
   const syncPracticeScope = async () => {
     if (!syncServiceInstance) return;
     if (!navigator.onLine) return;
@@ -1325,6 +1391,7 @@ const TTInner: ParentComponent = (props) => {
     signOut,
     forceSyncDown,
     forceSyncUp,
+    forceCleanLocalReset,
     triggerCatalogSync: async () => {
       if (catalogSyncPending()) {
         console.log(
@@ -1365,6 +1432,15 @@ const TTInner: ParentComponent = (props) => {
           await forceSyncDown({ full: true });
         } catch (e) {
           console.warn("__forceSyncDownForTest failed", e);
+        }
+      };
+    }
+    if (!w.__forceCleanLocalResetForTest) {
+      w.__forceCleanLocalResetForTest = async () => {
+        try {
+          await forceCleanLocalReset();
+        } catch (e) {
+          console.warn("__forceCleanLocalResetForTest failed", e);
         }
       };
     }

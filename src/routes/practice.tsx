@@ -223,18 +223,21 @@ const PracticePage: Component = () => {
     suppressNextViewRefresh,
   });
 
-  const { handleSubmitEvaluations, handleAddTunes, handleQueueReset: resetQueue } =
-    usePracticeSubmit({
-      localDb,
-      getUserId,
-      currentRepertoireId,
-      queueDate,
-      evaluationsCount,
-      isStaging,
-      clearEvaluations,
-      incrementPracticeListStagedChanged,
-      syncPracticeScope,
-    });
+  const {
+    handleSubmitEvaluations,
+    handleAddTunes,
+    handleQueueReset: resetQueue,
+  } = usePracticeSubmit({
+    localDb,
+    getUserId,
+    currentRepertoireId,
+    queueDate,
+    evaluationsCount,
+    isStaging,
+    clearEvaluations,
+    incrementPracticeListStagedChanged,
+    syncPracticeScope,
+  });
 
   // Handle schedule override change from the in-grid date-time picker.
   const handleScheduledChange = async (

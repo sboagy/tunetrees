@@ -773,6 +773,7 @@ export const TopNav: Component = () => {
     signOut,
     forceSyncDown,
     forceSyncUp,
+    forceCleanLocalReset,
     remoteSyncDownCompletionVersion,
     isAnonymous,
     lastSyncTimestamp,
@@ -788,6 +789,8 @@ export const TopNav: Component = () => {
     createSignal(false);
   const [pendingDeleteCount, setPendingDeleteCount] = createSignal(0);
   const [forceSyncUpBusy, setForceSyncUpBusy] = createSignal(false);
+  const [forceCleanLocalResetBusy, setForceCleanLocalResetBusy] =
+    createSignal(false);
 
   const canOpenAssistant = createMemo(() => {
     const tab = new URLSearchParams(location.search).get("tab");
@@ -829,6 +832,20 @@ export const TopNav: Component = () => {
       toast.error("Failed to upload changes");
     } finally {
       setForceSyncUpBusy(false);
+      setShowDbMenu(false);
+    }
+  };
+
+  const runForceCleanLocalReset = async () => {
+    setForceCleanLocalResetBusy(true);
+    try {
+      await forceCleanLocalReset();
+      toast.success("Local database cleared and resynced");
+    } catch (error) {
+      console.error("❌ [Force Clean Local Reset] Reset failed:", error);
+      toast.error("Failed to reset local database");
+    } finally {
+      setForceCleanLocalResetBusy(false);
       setShowDbMenu(false);
     }
   };
@@ -1469,6 +1486,50 @@ export const TopNav: Component = () => {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+
+                    <Show when={!isAnonymous()}>
+                      <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          type="button"
+                          onClick={runForceCleanLocalReset}
+                          class="w-full px-4 py-2 text-left text-sm text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors flex items-center gap-2 rounded-md font-medium"
+                          disabled={!isOnline() || forceCleanLocalResetBusy()}
+                          classList={{
+                            "opacity-50 cursor-not-allowed":
+                              !isOnline() || forceCleanLocalResetBusy(),
+                          }}
+                          data-testid="force-clean-local-reset-button"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" />
+                            <path d="M19 6v13a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                          </svg>
+                          Force Clean Local Reset
+                          {!isOnline() && (
+                            <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                              (Offline)
+                            </span>
+                          )}
+                        </button>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          Clears the local SQLite mirror, keeps you signed in,
+                          then downloads fresh data from Supabase.
+                        </p>
+                      </div>
+                    </Show>
 
                     {/* Force Sync Down Button */}
                     <div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700">

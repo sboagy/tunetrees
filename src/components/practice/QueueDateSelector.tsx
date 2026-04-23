@@ -131,9 +131,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
 
   const handleReset = async () => {
     if (
-      confirm(
-        "Reset today's queue? This will regenerate it on next access."
-      )
+      confirm("Reset today's queue? This will regenerate it on next access.")
     ) {
       await props.onReset();
       props.onClose();
@@ -336,7 +334,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
                       >
                         <div class="text-lg leading-none">...</div>
                         <div class="mt-1 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                          {isLoadingMore() ? "Loading more queues" : "Load 10 more"}
+                          {isLoadingMore()
+                            ? "Loading more queues"
+                            : "Load 10 more"}
                         </div>
                       </button>
                     </Show>

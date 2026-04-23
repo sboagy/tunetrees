@@ -155,7 +155,9 @@ function toLocalDateString(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function queueWindowToDate(windowStartUtc: string | null | undefined): Date | null {
+function queueWindowToDate(
+  windowStartUtc: string | null | undefined
+): Date | null {
   if (!windowStartUtc) return null;
   const datePart = windowStartUtc.substring(0, 10);
   const localNoon = new Date(`${datePart}T12:00:00`);
@@ -182,9 +184,12 @@ export function usePracticeQueueDate(
     storedInitial ?? getPracticeDate(),
     { equals: (a, b) => a.getTime() === b.getTime() }
   );
-  const [latestQueueDate, setLatestQueueDate] = createSignal<Date | null>(null, {
-    equals: (a, b) => a?.getTime() === b?.getTime(),
-  });
+  const [latestQueueDate, setLatestQueueDate] = createSignal<Date | null>(
+    null,
+    {
+      equals: (a, b) => a?.getTime() === b?.getTime(),
+    }
+  );
   const [recentQueueDates, setRecentQueueDates] = createSignal<Date[]>([]);
   const [recentQueueLimit, setRecentQueueLimit] = createSignal(10);
   const [hasMoreRecentQueueDates, setHasMoreRecentQueueDates] =
@@ -355,7 +360,8 @@ export function usePracticeQueueDate(
 
       let resolvedDate: Date;
       if (latestWindow.windowStartUtc) {
-        resolvedDate = queueWindowToDate(latestWindow.windowStartUtc) ?? getPracticeDate();
+        resolvedDate =
+          queueWindowToDate(latestWindow.windowStartUtc) ?? getPracticeDate();
       } else {
         resolvedDate = getPracticeDate();
       }
