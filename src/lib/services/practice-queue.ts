@@ -225,6 +225,56 @@ export interface LatestActiveQueueWindow {
   rowCount: number;
 }
 
+export interface ActiveQueueWindowSummary {
+  queueDate: string;
+  windowStartUtc: string;
+  hasIncompleteRows: boolean;
+  rowCount: number;
+}
+
+async function fetchActiveQueueWindowSummaries(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  limit: number,
+  offset = 0,
+  maxQueueDateInclusive?: string
+): Promise<ActiveQueueWindowSummary[]> {
+  const normalizedLimit = Math.max(1, Math.trunc(limit));
+  const normalizedOffset = Math.max(0, Math.trunc(offset));
+  const dateFilter = maxQueueDateInclusive
+    ? sql`AND substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) <= ${maxQueueDateInclusive}`
+    : sql``;
+  const rows = await db.all<{
+    queueDate: string;
+    windowStartUtc: string;
+    totalCount: number;
+    incompleteCount: number;
+  }>(sql`
+    SELECT
+      substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) as queueDate,
+      MAX(substr(replace(window_start_utc, 'T', ' '), 1, 19)) as windowStartUtc,
+      COUNT(*) as totalCount,
+      SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) as incompleteCount
+    FROM daily_practice_queue
+    WHERE user_ref = ${userRef}
+      AND repertoire_ref = ${repertoireRef}
+      AND active = 1
+      ${dateFilter}
+    GROUP BY substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10)
+    ORDER BY queueDate DESC
+    LIMIT ${normalizedLimit}
+    OFFSET ${normalizedOffset}
+  `);
+
+  return rows.map((row) => ({
+    queueDate: String(row.queueDate),
+    windowStartUtc: String(row.windowStartUtc),
+    hasIncompleteRows: Number(row.incompleteCount) > 0,
+    rowCount: Number(row.totalCount ?? 0),
+  }));
+}
+
 /**
  * Get the latest active queue window for a user/repertoire and whether it is complete.
  *
@@ -240,26 +290,12 @@ export async function getLatestActiveQueueWindow(
   userRef: string,
   repertoireRef: string
 ): Promise<LatestActiveQueueWindow> {
-  // Step 1: Find the chronologically latest active queue window (any completion state).
-  const rows = await db.all<{
-    windowStartUtc: string;
-    totalCount: number;
-    incompleteCount: number;
-  }>(sql`
-    SELECT
-      substr(replace(window_start_utc, 'T', ' '), 1, 19) as windowStartUtc,
-      COUNT(*) as totalCount,
-      SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) as incompleteCount
-    FROM daily_practice_queue
-    WHERE user_ref = ${userRef}
-      AND repertoire_ref = ${repertoireRef}
-      AND active = 1
-    GROUP BY substr(replace(window_start_utc, 'T', ' '), 1, 19)
-    ORDER BY windowStartUtc DESC
-    LIMIT 1
-  `);
-
-  const latest = rows[0];
+  const [latest] = await fetchActiveQueueWindowSummaries(
+    db,
+    userRef,
+    repertoireRef,
+    1
+  );
   if (!latest) {
     return {
       windowStartUtc: null,
@@ -269,10 +305,34 @@ export async function getLatestActiveQueueWindow(
   }
 
   return {
-    windowStartUtc: String(latest.windowStartUtc),
-    hasIncompleteRows: Number(latest.incompleteCount) > 0,
-    rowCount: Number(latest.totalCount ?? 0),
+    windowStartUtc: latest.windowStartUtc,
+    hasIncompleteRows: latest.hasIncompleteRows,
+    rowCount: latest.rowCount,
   };
+}
+
+/**
+ * Get the most recent active queue windows for a user/repertoire.
+ *
+ * This powers queue-history UI where the user needs to jump back to the latest
+ * active queue after manually previewing an older or future date.
+ */
+export async function getRecentActiveQueueWindows(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  limit = 5,
+  offset = 0,
+  maxQueueDateInclusive?: string
+): Promise<ActiveQueueWindowSummary[]> {
+  return fetchActiveQueueWindowSummaries(
+    db,
+    userRef,
+    repertoireRef,
+    limit,
+    offset,
+    maxQueueDateInclusive
+  );
 }
 
 /**

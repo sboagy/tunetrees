@@ -165,10 +165,16 @@ const PracticePage: Component = () => {
 
   const {
     queueDate,
+    latestQueueDate,
+    recentQueueDates,
+    hasMoreRecentQueueDates,
     isManual,
     queueReady,
     setManualDate,
     clearManualAndSetToday,
+    selectLatestQueueDate,
+    refreshQueueWindowState,
+    loadMoreRecentQueueDates,
   } = usePracticeQueueDate({
     localDb,
     userId,
@@ -217,18 +223,21 @@ const PracticePage: Component = () => {
     suppressNextViewRefresh,
   });
 
-  const { handleSubmitEvaluations, handleAddTunes, handleQueueReset } =
-    usePracticeSubmit({
-      localDb,
-      getUserId,
-      currentRepertoireId,
-      queueDate,
-      evaluationsCount,
-      isStaging,
-      clearEvaluations,
-      incrementPracticeListStagedChanged,
-      syncPracticeScope,
-    });
+  const {
+    handleSubmitEvaluations,
+    handleAddTunes,
+    handleQueueReset: resetQueue,
+  } = usePracticeSubmit({
+    localDb,
+    getUserId,
+    currentRepertoireId,
+    queueDate,
+    evaluationsCount,
+    isStaging,
+    clearEvaluations,
+    incrementPracticeListStagedChanged,
+    syncPracticeScope,
+  });
 
   // Handle schedule override change from the in-grid date-time picker.
   const handleScheduledChange = async (
@@ -311,7 +320,13 @@ const PracticePage: Component = () => {
     console.log(
       `[PracticePage] Refreshing queue for ${practiceDate.toLocaleDateString()}`
     );
+    await refreshQueueWindowState();
     incrementPracticeListStagedChanged();
+  };
+
+  const handleQueueReset = async () => {
+    await resetQueue();
+    await refreshQueueWindowState();
   };
 
   const { rolloverStatus } = useRolloverStateMachine({
@@ -334,7 +349,12 @@ const PracticePage: Component = () => {
         onSubmitEvaluations={handleSubmitEvaluations}
         onAddTunes={handleAddTunes}
         queueDate={queueDate()}
+        latestQueueDate={latestQueueDate()}
+        recentQueueDates={recentQueueDates()}
+        hasMoreRecentQueues={hasMoreRecentQueueDates()}
         onQueueDateChange={handleQueueDateChange}
+        onSelectLatestQueue={selectLatestQueueDate}
+        onLoadMoreRecentQueues={loadMoreRecentQueueDates}
         onQueueReset={handleQueueReset}
         showSubmitted={showSubmitted()}
         onShowSubmittedChange={setShowSubmitted}
