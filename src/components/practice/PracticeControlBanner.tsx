@@ -22,8 +22,8 @@ import {
   ChevronRight,
   Columns,
   EllipsisVertical,
+  ListRestart,
   Plus,
-  RefreshCw,
   Send,
 } from "lucide-solid";
 import type { Component } from "solid-js";
@@ -76,13 +76,22 @@ export interface PracticeControlBannerProps {
   onAddTunes?: (count: number) => void;
   /** Current queue date */
   queueDate?: Date;
+  /** Latest non-preview queue date available in the database */
+  latestQueueDate?: Date | null;
+  /** Recent non-preview queue dates for selector history */
+  recentQueueDates?: Date[];
+  /** True when more recent queue history can be loaded */
+  hasMoreRecentQueues?: boolean;
   /** Handler for queue date selection */
   onQueueDateChange?: (date: Date, isPreview: boolean) => void;
+  /** Return to the most recent queue rather than a manual date selection */
+  onSelectLatestQueue?: () => void | Promise<void>;
+  /** Load the next page of recent queue history */
+  onLoadMoreRecentQueues?: () => void | Promise<void>;
   /** Handler for queue reset */
-  onQueueReset?: () => void;
+  onQueueReset?: () => void | Promise<void>;
   /**
-   * When true, the practice date has rolled over and the queue needs a refresh.
-   * The refresh button is always visible but only enabled when this is true.
+   * When true, the practice date has rolled over and the user can build a new queue.
    */
   rolloverPending?: boolean;
   /** The new wall-clock date that is now current (shown in tooltip when rollover is pending) */
@@ -99,6 +108,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const [showQueueSelector, setShowQueueSelector] = createSignal(false);
   const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
+  const [isRefreshingQueue, setIsRefreshingQueue] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
   const { incrementPracticeListStagedChanged } = useAuth();
 
@@ -150,15 +160,32 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
     }
   };
 
-  const handleQueueReset = () => {
+  const handleSelectLatestQueue = async () => {
+    if (props.onSelectLatestQueue) {
+      await props.onSelectLatestQueue();
+    }
+  };
+
+  const handleLoadMoreRecentQueues = async () => {
+    if (props.onLoadMoreRecentQueues) {
+      await props.onLoadMoreRecentQueues();
+    }
+  };
+
+  const handleQueueReset = async () => {
     if (props.onQueueReset) {
-      props.onQueueReset();
+      await props.onQueueReset();
     }
   };
 
   const handlePracticeDateRefresh = async () => {
-    if (props.onPracticeDateRefresh) {
+    if (isRefreshingQueue() || !props.onPracticeDateRefresh) return;
+
+    setIsRefreshingQueue(true);
+    try {
       await props.onPracticeDateRefresh();
+    } finally {
+      setIsRefreshingQueue(false);
     }
   };
 
@@ -240,40 +267,20 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
           </button>
 
           <Show when={props.rolloverPending}>
-            <output
-              data-testid="date-rollover-banner"
-              class="flex max-w-[8rem] items-center gap-1 rounded-md border border-amber-400/80 bg-amber-50 px-2 py-2 text-xs font-medium text-amber-700 dark:border-amber-600/70 dark:bg-amber-900/20 dark:text-amber-300"
-              title={`Practice date is now ${props.rolloverDate?.toLocaleDateString() ?? "today"}`}
-              aria-live="polite"
-            >
-              <svg
-                class="h-3.5 w-3.5 flex-none"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span class="truncate">New day</span>
-            </output>
-          </Show>
-
-          <Show when={props.rolloverPending}>
             <button
               type="button"
               data-testid="date-rollover-refresh-button"
               onClick={handlePracticeDateRefresh}
-              title={`Practice date has changed to ${props.rolloverDate?.toLocaleDateString() ?? "today"}. Rebuild the queue.`}
+              disabled={isRefreshingQueue()}
+              title={
+                isRefreshingQueue()
+                  ? "Building a new practice queue..."
+                  : `Practice date has changed to ${props.rolloverDate?.toLocaleDateString() ?? "today"}. Build a new practice queue.`
+              }
               class="flex h-10 w-10 items-center justify-center rounded-md border border-amber-400/80 text-amber-600 transition-colors hover:bg-amber-50 dark:border-amber-600/70 dark:text-amber-400 dark:hover:bg-amber-900/20"
             >
-              <RefreshCw class="h-4 w-4" />
-              <span class="sr-only">Rebuild Queue</span>
+              <ListRestart class="h-4 w-4" />
+              <span class="sr-only">New Practice Queue</span>
             </button>
           </Show>
         </div>
@@ -358,7 +365,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 class={mobileMenuItemClasses}
                 onClick={handleQueueSelectorOpen}
               >
-                <span>Practice Date</span>
+                <span>Select Practice Queue</span>
                 <span class={mobileMenuMetaClasses}>
                   {formatQueueDate(props.queueDate || new Date())}
                 </span>
@@ -488,71 +495,29 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 <span>Add More</span>
               </button>
 
-              {/* Date-rollover indicator — only rendered (and therefore visible to
-              Playwright) when the practice date has rolled past the current queue.
-              Kept as a lightweight inline element so it doesn't shift the layout. */}
               <Show when={props.rolloverPending}>
-                <output
-                  data-testid="date-rollover-banner"
-                  class="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
-                  title={`Practice date is now ${props.rolloverDate?.toLocaleDateString() ?? "today"}`}
-                  aria-live="polite"
+                <button
+                  type="button"
+                  data-testid="date-rollover-refresh-button"
+                  onClick={handlePracticeDateRefresh}
+                  disabled={isRefreshingQueue()}
+                  title={
+                    isRefreshingQueue()
+                      ? "Building a new practice queue..."
+                      : `Practice date has changed to ${props.rolloverDate?.toLocaleDateString() ?? "today"}. Build a new practice queue.`
+                  }
+                  class={`${TOOLBAR_BUTTON_BASE}`}
+                  classList={{
+                    "text-amber-600 dark:text-amber-400 border-amber-400/70 dark:border-amber-600/70 hover:bg-amber-50 dark:hover:bg-amber-900/20":
+                      !isRefreshingQueue(),
+                    "cursor-not-allowed opacity-70 text-amber-500 dark:text-amber-300 border-amber-300/70 dark:border-amber-500/70":
+                      isRefreshingQueue(),
+                  }}
                 >
-                  <svg
-                    class={TOOLBAR_ICON_SIZE}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span>New day</span>
-                </output>
+                  <ListRestart size={14} />
+                  <span>New Practice Queue</span>
+                </button>
               </Show>
-
-              {/* Refresh Queue button — always visible, enabled only when rollover is
-              pending. Uses amber styling when active so it draws the eye without
-              being as intrusive as the old full-width banner. */}
-              <button
-                type="button"
-                data-testid="date-rollover-refresh-button"
-                onClick={handlePracticeDateRefresh}
-                disabled={!props.rolloverPending}
-                title={
-                  props.rolloverPending
-                    ? `Practice date has changed to ${props.rolloverDate?.toLocaleDateString() ?? "today"}. Click to refresh the queue.`
-                    : "Queue is up to date"
-                }
-                class={`${TOOLBAR_BUTTON_BASE}`}
-                classList={{
-                  "text-amber-600 dark:text-amber-400 border-amber-400/70 dark:border-amber-600/70 hover:bg-amber-50 dark:hover:bg-amber-900/20":
-                    !!props.rolloverPending,
-                  "text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed":
-                    !props.rolloverPending,
-                }}
-              >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                <span>Refresh</span>
-              </button>
 
               {/* Queue control button */}
               <button
@@ -696,7 +661,12 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
       <QueueDateSelector
         isOpen={showQueueSelector()}
         currentDate={props.queueDate || new Date()}
+        latestQueueDate={props.latestQueueDate ?? null}
+        recentQueueDates={props.recentQueueDates ?? []}
+        hasMoreRecentQueues={props.hasMoreRecentQueues ?? false}
         onSelectDate={handleQueueDateSelect}
+        onSelectLatestQueue={handleSelectLatestQueue}
+        onLoadMoreRecentQueues={handleLoadMoreRecentQueues}
         onReset={handleQueueReset}
         onClose={() => setShowQueueSelector(false)}
       />
