@@ -1045,7 +1045,7 @@ export class TuneTreesPage {
   }
 
   /**
-  * Refresh the practice queue when the rollover action is visible.
+   * Refresh the practice queue when the rollover action is visible.
    * Returns true when a refresh was triggered.
    *
    * If we want the cleanest long-term shape, this helper should be split
@@ -3126,14 +3126,11 @@ export class TuneTreesPage {
         return true;
       }
 
-      const [title, textContent] = await Promise.all([
+      const [title, textContent, enabled] = await Promise.all([
         this.submitEvaluationsButton.getAttribute("title").catch(() => null),
         this.submitEvaluationsButton.textContent().catch(() => null),
+        this.submitEvaluationsButton.isEnabled().catch(() => false),
       ]);
-
-      if (/staging evaluations/i.test(title ?? "")) {
-        return true;
-      }
 
       const titleMatch = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
       const textMatch = textContent?.match(/\b(\d+)\b/);
@@ -3143,7 +3140,7 @@ export class TuneTreesPage {
           ? Number(textMatch[1])
           : 0;
 
-      return count >= 1;
+      return enabled && count >= 1;
     };
 
     for (let attempt = 0; attempt < 3; attempt++) {
