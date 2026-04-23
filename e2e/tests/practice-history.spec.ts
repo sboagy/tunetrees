@@ -72,16 +72,14 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
   }) => {
     await page.getByTestId("practice-history-add-button").click();
 
-    await expect(
-      page.getByTestId("practice-history-add-form")
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("practice-history-add-form")).toBeVisible({
+      timeout: 10_000,
+    });
 
     await page
       .getByTestId("practice-history-practiced-input")
       .fill("2026-04-20T10:15");
-    await page
-      .getByTestId("practice-history-quality-select")
-      .selectOption("4");
+    await page.getByTestId("practice-history-quality-select").selectOption("4");
 
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
@@ -92,7 +90,9 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     await expect(page.getByTestId("practice-history-analytics")).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByTestId("practice-history-quality-chart")).toBeVisible();
+    await expect(
+      page.getByTestId("practice-history-quality-chart")
+    ).toBeVisible();
     await expect(
       page.getByTestId("practice-history-stability-chart")
     ).toBeVisible();
@@ -103,9 +103,7 @@ test.describe("PRACTICE-HISTORY: Manual Backfill", () => {
     await page
       .getByTestId("practice-history-practiced-input")
       .fill("2026-04-18T09:00");
-    await page
-      .getByTestId("practice-history-quality-select")
-      .selectOption("3");
+    await page.getByTestId("practice-history-quality-select").selectOption("3");
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
 
@@ -131,9 +129,7 @@ test.describe("PRACTICE-HISTORY: Deleting Records", () => {
     await page
       .getByTestId("practice-history-practiced-input")
       .fill("2026-04-21T08:30");
-    await page
-      .getByTestId("practice-history-quality-select")
-      .selectOption("2");
+    await page.getByTestId("practice-history-quality-select").selectOption("2");
     await page.getByTestId("practice-history-save-button").click();
     await page.waitForLoadState("networkidle", { timeout: 15_000 });
   });
@@ -185,7 +181,16 @@ test.describe("PRACTICE-HISTORY: Navigation", () => {
 
     await page.getByTestId("practice-history-cancel-button").click();
 
-    await expect(page).toHaveURL(/\/repertoire/, { timeout: 20_000 });
+    await expect(
+      page,
+      "cancel should restore the originating repertoire grid URL"
+    ).toHaveURL(
+      (url) =>
+        url.pathname === "/" &&
+        url.searchParams.get("tab") === "repertoire" &&
+        url.searchParams.get("r_q") === "Kesh",
+      { timeout: 20_000 }
+    );
     await expect(ttPage.repertoireGrid).toBeVisible({ timeout: 10_000 });
   });
 });
