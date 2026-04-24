@@ -178,6 +178,41 @@ describe("worker media routes", () => {
     expect(consoleInfoSpy).toHaveBeenCalled();
   });
 
+  it("rejects upload requests that only provide a query-string token", async () => {
+    const vault = createVault();
+    const env: MediaWorkerEnv = {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      TUNETREES_VAULT: vault.bucket as unknown as R2Bucket,
+    };
+
+    const fetchSpy = vi.fn();
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: fetchSpy,
+    });
+
+    const formData = new FormData();
+    formData.append(
+      "files[0]",
+      new File(["png-bytes"], "note image.png", { type: "image/png" })
+    );
+
+    const uploadRequest = {
+      method: "POST",
+      url: "https://worker.example.com/api/media/upload?token=upload-token",
+      headers: new Headers(),
+      formData: async () => formData,
+    } as unknown as Request;
+
+    const response = await handleMediaRequest(uploadRequest, env);
+
+    expect(response?.status).toBe(401);
+    expect(vault.bucket.put).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("serves stored media only when the key belongs to the authenticated user", async () => {
     const vault = createVault();
     const key = "users/user-1/notes/example.png";

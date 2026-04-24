@@ -204,11 +204,14 @@ async function authenticateMediaRequest(
   env: MediaWorkerEnv
 ) {
   const url = new URL(request.url);
+  const allowQueryToken =
+    request.method === "GET" && url.pathname === MEDIA_VIEW_PATH;
   const authHeader = request.headers.get("Authorization");
   const bearerToken = authHeader?.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length)
     : null;
-  const token = bearerToken || url.searchParams.get("token");
+  const token =
+    bearerToken || (allowQueryToken ? url.searchParams.get("token") : null);
 
   if (!token) {
     return null;

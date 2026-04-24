@@ -2,7 +2,7 @@ import generatedWorker from "./index";
 import { getCorsHeaders, handleMediaRequest, type MediaWorkerEnv } from "./media";
 
 const worker: ExportedHandler<MediaWorkerEnv> = {
-  async fetch(request, env, _ctx) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -15,7 +15,7 @@ const worker: ExportedHandler<MediaWorkerEnv> = {
       return mediaResponse;
     }
 
-    return generatedWorker.fetch(request, env);
+    return generatedWorker.fetch(request, env, ctx);
   },
 };
 
