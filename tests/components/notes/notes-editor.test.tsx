@@ -28,6 +28,7 @@ type MockEditorConfig = {
   width?: string;
   editorClassName?: string;
   uploader?: {
+    url?: string;
     insertImageAsBase64URI?: boolean;
     customUploadFunction?: (
       requestData: unknown,
@@ -401,6 +402,7 @@ describe("NotesEditor", () => {
     });
 
     const options = makeEditor.mock.calls[0]?.[1];
+    expect(options?.uploader?.url).toBe(buildMediaUploadUrl());
     expect(options?.uploader?.insertImageAsBase64URI).toBe(false);
 
     const uploadedUrl = buildMediaViewUrl("users/user-1/notes/uploaded.png");
@@ -462,6 +464,63 @@ describe("NotesEditor", () => {
     expect(handleContentChange).toHaveBeenCalledWith(
       `<p><img src="${uploadedUrl}"></p>`
     );
+  });
+
+  it("replaces pasted data-uri images with worker URLs before saving note content", async () => {
+    const handleContentChange = vi.fn();
+    render(() => (
+      <NotesEditor content="<p>Initial note</p>" onContentChange={handleContentChange} />
+    ));
+
+    await waitFor(() => {
+      expect(makeEditor).toHaveBeenCalledTimes(1);
+    });
+
+    const options = makeEditor.mock.calls[0]?.[1];
+    const editor = createdEditors[0];
+    const uploadedUrl = buildMediaViewUrl("users/user-1/notes/pasted-image-1.png");
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          success: true,
+          time: new Date().toISOString(),
+          data: {
+            files: [uploadedUrl],
+            isImages: [true],
+            path: "users/user-1/notes/pasted-image-1.png",
+            baseurl: "",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+    );
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: fetchMock,
+    });
+
+    const pastedDataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2C9f8AAAAASUVORK5CYII=";
+
+    options?.events?.change?.(`<p><img src="${pastedDataUrl}"></p>`);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(buildMediaUploadUrl());
+    await waitFor(() => {
+      expect(handleContentChange).toHaveBeenCalledWith(
+        `<p><img src="${uploadedUrl}"></p>`
+      );
+    });
+    expect(editor.valueAssignments).toBeGreaterThan(1);
   });
 
   it("applies list formatting through Jodit's commitStyle API", async () => {

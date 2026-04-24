@@ -66,6 +66,8 @@ const NOTES_EDITOR_MENU_THEME = {
   },
 } as const;
 
+const EMBEDDED_MEDIA_SELECTOR = 'img[src^="data:image/"]';
+
 const TOOLBAR_BUTTON_WIDTH = 36;
 const TOOLBAR_ACTION_GAP = 6;
 const TOOLBAR_SECTION_GAP = 8;
@@ -164,6 +166,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   let editorRef: HTMLTextAreaElement | undefined;
   let joditInstance: Jodit | undefined;
   let lastContent = props.content || "";
+  let embeddedMediaReplacementVersion = 0;
   const [currentTheme, setCurrentTheme] = createSignal<"light" | "dark">(
     getCurrentTheme()
   );
@@ -192,6 +195,122 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   const getEditorDisplayContent = (content: string) =>
     attachMediaAuthToken(content, session()?.access_token);
 
+  const uploadMediaFormData = async (
+    requestData: FormData,
+    showProgress: (progress: number) => void
+  ) => {
+    const accessToken = session()?.access_token;
+    if (!accessToken) {
+      throw new Error("You must be signed in to upload note media.");
+    }
+
+    showProgress(25);
+    const response = await fetch(buildMediaUploadUrl(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: requestData,
+    });
+    const payload = (await response.json()) as {
+      error?: string;
+      data?: {
+        files?: string[];
+      };
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.error || "Media upload failed.");
+    }
+
+    showProgress(100);
+    return {
+      ...payload,
+      data: {
+        ...payload.data,
+        files:
+          payload.data?.files?.map((url) =>
+            attachMediaAuthTokenToUrl(url, accessToken)
+          ) || [],
+      },
+    };
+  };
+
+  const dataUrlToFile = (dataUrl: string, index: number) => {
+    const matches = dataUrl.match(/^data:(image\/[^;,]+)(;base64)?,(.*)$/);
+    if (!matches) {
+      return null;
+    }
+
+    const [, mimeType, encodingFlag, payload] = matches;
+    if (!mimeType || !payload) {
+      return null;
+    }
+
+    const extension = mimeType.split("/")[1] || "png";
+    const binaryPayload = encodingFlag ? atob(payload) : decodeURIComponent(payload);
+    const bytes = Uint8Array.from(binaryPayload, (character) =>
+      character.charCodeAt(0)
+    );
+
+    return new File([bytes], `pasted-image-${index + 1}.${extension}`, {
+      type: mimeType,
+    });
+  };
+
+  const replaceEmbeddedMediaSources = async (content: string) => {
+    const template = document.createElement("template");
+    template.innerHTML = content;
+
+    const images = Array.from(
+      template.content.querySelectorAll<HTMLImageElement>(EMBEDDED_MEDIA_SELECTOR)
+    );
+
+    if (images.length === 0) {
+      return null;
+    }
+
+    const replacements = new Map<string, string>();
+
+    for (const [index, image] of images.entries()) {
+      const source = image.getAttribute("src");
+      if (!source || replacements.has(source)) {
+        continue;
+      }
+
+      const file = dataUrlToFile(source, index);
+      if (!file) {
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append("files[0]", file, file.name);
+      const uploadResponse = await uploadMediaFormData(formData, () => undefined);
+      const uploadedUrl = uploadResponse.data?.files?.[0];
+      if (uploadedUrl) {
+        replacements.set(source, uploadedUrl);
+      }
+    }
+
+    if (replacements.size === 0) {
+      return null;
+    }
+
+    for (const image of images) {
+      const source = image.getAttribute("src");
+      if (!source) {
+        continue;
+      }
+
+      const uploadedUrl = replacements.get(source);
+      if (uploadedUrl) {
+        image.setAttribute("src", uploadedUrl);
+      }
+    }
+
+    return template.innerHTML;
+  };
+
   // Create the Jodit editor configuration
   const createEditorConfig = (theme: "light" | "dark") => ({
     toolbar: false,
@@ -218,49 +337,17 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     showXPathInStatusbar: false,
 
     uploader: {
+      url: buildMediaUploadUrl(),
       insertImageAsBase64URI: false,
       customUploadFunction: async (
         requestData: unknown,
         showProgress: (progress: number) => void
       ) => {
-        const accessToken = session()?.access_token;
-        if (!accessToken) {
-          throw new Error("You must be signed in to upload note media.");
-        }
         if (!(requestData instanceof FormData)) {
           throw new Error("Unexpected media upload payload.");
         }
 
-        showProgress(25);
-        const response = await fetch(buildMediaUploadUrl(), {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: requestData,
-        });
-        const payload = (await response.json()) as {
-          error?: string;
-          data?: {
-            files?: string[];
-          };
-        };
-
-        if (!response.ok) {
-          throw new Error(payload.error || "Media upload failed.");
-        }
-
-        showProgress(100);
-        return {
-          ...payload,
-          data: {
-            ...payload.data,
-            files:
-              payload.data?.files?.map((url) =>
-                attachMediaAuthTokenToUrl(url, accessToken)
-              ) || [],
-          },
-        };
+        return uploadMediaFormData(requestData, showProgress);
       },
     },
 
@@ -269,6 +356,31 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       change: (newContent: string) => {
         const sanitizedContent = stripMediaAuthToken(newContent);
         if (sanitizedContent === lastContent) return;
+
+        if (sanitizedContent.includes("data:image/")) {
+          const replacementVersion = ++embeddedMediaReplacementVersion;
+          void replaceEmbeddedMediaSources(newContent)
+            .then((updatedContent) => {
+              if (
+                !updatedContent ||
+                replacementVersion !== embeddedMediaReplacementVersion ||
+                !joditInstance
+              ) {
+                return;
+              }
+
+              lastContent = stripMediaAuthToken(updatedContent);
+              joditInstance.value = updatedContent;
+              props.onContentChange(lastContent);
+            })
+            .catch((error) => {
+              console.error("Failed to replace embedded note media:", error);
+              lastContent = sanitizedContent;
+              props.onContentChange(sanitizedContent);
+            });
+          return;
+        }
+
         lastContent = sanitizedContent;
         props.onContentChange(sanitizedContent);
       },
