@@ -34,7 +34,7 @@ type StoredObject = {
   body: string;
 };
 
-const isMockJwksKey = (key: Uint8Array | { kind: string }) =>
+const isMockJwksObject = (key: Uint8Array | { kind: string }) =>
   typeof key === "object" && key !== null && "kind" in key && key.kind === "jwks";
 
 const createVault = () => {
@@ -104,7 +104,7 @@ describe("worker media routes", () => {
       throw new Error("invalid token");
     });
     jwtVerifyMock.mockImplementation(async (token, key) => {
-      if (token === "local-rs-token" && isMockJwksKey(key)) {
+      if (token === "local-rs-token" && isMockJwksObject(key)) {
         return { payload: { sub: "user-1" } };
       }
 

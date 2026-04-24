@@ -110,6 +110,16 @@ function buildMediaViewUrl(request: Request, key: string) {
   return url.toString();
 }
 
+function isSupportedJwtAlgorithm(algorithm: string) {
+  return (
+    algorithm.startsWith("HS") ||
+    algorithm.startsWith("RS") ||
+    algorithm.startsWith("ES") ||
+    algorithm.startsWith("PS") ||
+    algorithm.startsWith("Ed")
+  );
+}
+
 async function verifyJwtLocally(
   token: string,
   env: MediaWorkerEnv
@@ -122,6 +132,10 @@ async function verifyJwtLocally(
     if (!algorithm) {
       return null;
     }
+    if (!isSupportedJwtAlgorithm(algorithm)) {
+      console.warn("[media.auth] Unsupported JWT algorithm", algorithm);
+      return null;
+    }
 
     let result: Awaited<ReturnType<typeof jwtVerify>> | null = null;
 
@@ -132,12 +146,7 @@ async function verifyJwtLocally(
           new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
         );
       }
-    } else if (
-      algorithm.startsWith("RS") ||
-      algorithm.startsWith("ES") ||
-      algorithm.startsWith("PS") ||
-      algorithm.startsWith("Ed")
-    ) {
+    } else {
       result = await jwtVerify(token, getJwks(env.SUPABASE_URL));
     }
 
@@ -224,6 +233,8 @@ function findUploadedFile(formData: FormData): UploadFileLike | null {
       typeof value !== "string" &&
       typeof (value as UploadFileLike).name === "string"
     ) {
+      // Some test/runtime shims may provide Blob-like file objects that are not
+      // actual File instances but still expose a filename. Accept those too.
       return value as UploadFileLike;
     }
   }
