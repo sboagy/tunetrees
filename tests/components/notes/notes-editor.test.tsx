@@ -64,6 +64,8 @@ class MockMutationObserver {
 }
 
 const createdEditors: MockJoditInstance[] = [];
+let originalWindowMutationObserver: typeof window.MutationObserver;
+let originalGlobalMutationObserver: typeof globalThis.MutationObserver;
 
 const createMockEditor = (options?: MockEditorConfig): MockJoditInstance => {
   const container = document.createElement("div");
@@ -98,6 +100,8 @@ describe("NotesEditor", () => {
     createdEditors.length = 0;
     document.documentElement.className = "";
     MockMutationObserver.reset();
+    originalWindowMutationObserver = window.MutationObserver;
+    originalGlobalMutationObserver = globalThis.MutationObserver;
 
     Object.defineProperty(window, "MutationObserver", {
       configurable: true,
@@ -119,6 +123,17 @@ describe("NotesEditor", () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(window, "MutationObserver", {
+      configurable: true,
+      writable: true,
+      value: originalWindowMutationObserver,
+    });
+    Object.defineProperty(globalThis, "MutationObserver", {
+      configurable: true,
+      writable: true,
+      value: originalGlobalMutationObserver,
+    });
+    MockMutationObserver.reset();
     cleanup();
   });
 
