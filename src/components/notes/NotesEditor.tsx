@@ -5,7 +5,6 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  untrack,
 } from "solid-js";
 import "jodit/es2021/jodit.min.css";
 
@@ -167,12 +166,10 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       return;
     }
 
-    untrack(() => {
-      if (incomingContent !== editor.value) {
-        lastContent = incomingContent;
-        editor.value = incomingContent;
-      }
-    });
+    if (incomingContent !== editor.value) {
+      lastContent = incomingContent;
+      editor.value = incomingContent;
+    }
   });
 
   onCleanup(() => {
