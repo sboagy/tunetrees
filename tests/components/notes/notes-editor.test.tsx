@@ -33,8 +33,15 @@ type MockEditorConfig = {
       requestData: unknown,
       showProgress: (progress: number) => void
     ) => Promise<{
+      success?: boolean;
+      time?: string;
       data?: {
         files?: string[];
+      };
+      file?: {
+        key?: string;
+        size?: number;
+        contentType?: string;
       };
     }>;
   };

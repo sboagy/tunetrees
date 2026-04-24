@@ -197,8 +197,9 @@ async function authenticateMediaRequest(
 function getFirstUploadedFile(formData: FormData): UploadFileLike | null {
   for (const value of formData.values()) {
     if (
-      value instanceof Blob &&
-      (value instanceof File || typeof (value as UploadFileLike).name === "string")
+      value instanceof File ||
+      (value instanceof Blob &&
+        typeof (value as UploadFileLike).name === "string")
     ) {
       return value as UploadFileLike;
     }
