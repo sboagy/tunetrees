@@ -50,16 +50,21 @@ function getJwks(supabaseUrl: string): ReturnType<typeof createRemoteJWKSet> {
 }
 
 export function getCorsHeaders(request: Request): Record<string, string> {
-  const origin = request.headers.get("Origin") || "*";
-  return {
-    "Access-Control-Allow-Origin": origin,
+  const origin = request.headers.get("Origin");
+  const corsHeaders: Record<string, string> = {
+    "Access-Control-Allow-Origin": origin || "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers":
       "Content-Type, Authorization, apikey, x-client-info",
-    "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
     "Access-Control-Max-Age": "86400",
   };
+
+  if (origin) {
+    corsHeaders["Access-Control-Allow-Credentials"] = "true";
+  }
+
+  return corsHeaders;
 }
 
 function jsonResponse(
