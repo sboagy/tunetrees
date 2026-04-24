@@ -7,7 +7,12 @@
  * @module components/references/ReferenceForm
  */
 
+import { Save, X } from "lucide-solid";
 import { type Component, createEffect, createSignal } from "solid-js";
+import {
+  getSidebarFontClasses,
+  useUIPreferences,
+} from "@/lib/context/UIPreferencesContext";
 import type { Reference } from "@/lib/db/queries/references";
 import {
   detectReferenceType,
@@ -41,6 +46,10 @@ const REFERENCE_TYPES = [
 ];
 
 export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
+  const { sidebarFontSize } = useUIPreferences();
+  const heading = () =>
+    props.reference ? "Edit Reference" : "Add New Reference";
+
   // Form state
   const [url, setUrl] = createSignal(props.reference?.url || "");
   const [title, setTitle] = createSignal(props.reference?.title || "");
@@ -54,6 +63,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
 
   // Validation state
   const [urlError, setUrlError] = createSignal<string | null>(null);
+  const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
 
   // Auto-detect reference type and suggest title when URL changes
   createEffect(() => {
@@ -111,6 +121,33 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       class="space-y-4"
       data-testid="reference-form"
     >
+      <div class="flex items-center justify-between mb-1">
+        <span
+          class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300`}
+        >
+          {heading()}
+        </span>
+        <div class="flex gap-1.5">
+          <button
+            type="button"
+            onClick={props.onCancel}
+            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+            data-testid="reference-cancel-button"
+          >
+            Cancel
+            <X class={fontClasses().iconSmall} />
+          </button>
+          <button
+            type="submit"
+            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+            data-testid="reference-submit-button"
+          >
+            Save
+            <Save class={fontClasses().iconSmall} />
+          </button>
+        </div>
+      </div>
+
       {/* URL Input */}
       <div>
         <label
@@ -221,25 +258,6 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         >
           ⭐ Mark as favorite
         </label>
-      </div>
-
-      {/* Form Actions */}
-      <div class="flex gap-3 pt-2">
-        <button
-          type="submit"
-          class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          data-testid="reference-submit-button"
-        >
-          {props.reference ? "Update Reference" : "Add Reference"}
-        </button>
-        <button
-          type="button"
-          onClick={props.onCancel}
-          class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-          data-testid="reference-cancel-button"
-        >
-          Cancel
-        </button>
       </div>
     </form>
   );

@@ -148,3 +148,527 @@
     color: hsl(var(--foreground));
   }
 }
+
+@layer components {
+  .notes-editor {
+    width: 100%;
+    min-width: 0;
+    --notes-editor-surface: #ffffff;
+    --notes-editor-panel: #f8fafc;
+    --notes-editor-panel-strong: #edf4ff;
+    --notes-editor-border: #cbd5e1;
+    --notes-editor-text: #0f172a;
+    --notes-editor-muted: #64748b;
+    --notes-editor-link: #2563eb;
+    --notes-editor-hover: rgba(37, 99, 235, 0.12);
+    --notes-editor-hover-strong: rgba(37, 99, 235, 0.2);
+    --notes-editor-ring: rgba(37, 99, 235, 0.18);
+    --notes-editor-shadow: rgba(15, 23, 42, 0.14);
+  }
+
+  .dark .notes-editor {
+    --notes-editor-surface: #0f172a;
+    --notes-editor-panel: #162235;
+    --notes-editor-panel-strong: #22314b;
+    --notes-editor-border: #334155;
+    --notes-editor-text: #e2e8f0;
+    --notes-editor-muted: #94a3b8;
+    --notes-editor-link: #93c5fd;
+    --notes-editor-hover: rgba(96, 165, 250, 0.18);
+    --notes-editor-hover-strong: rgba(96, 165, 250, 0.28);
+    --notes-editor-ring: rgba(96, 165, 250, 0.24);
+    --notes-editor-shadow: rgba(2, 6, 23, 0.45);
+  }
+
+  .notes-editor .jodit,
+  .notes-editor .jodit-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    --jd-color-white: var(--notes-editor-surface);
+    --jd-color-gray: var(--notes-editor-border);
+    --jd-color-gray-dark: var(--notes-editor-muted);
+    --jd-color-dark: var(--notes-editor-text);
+    --jd-color-default: var(--notes-editor-text);
+    --jd-color-text: var(--notes-editor-text);
+    --jd-color-label: var(--notes-editor-muted);
+    --jd-color-border: var(--notes-editor-border);
+    --jd-color-border-dark: var(--notes-editor-border);
+    --jd-color-border-selected: var(--notes-editor-link);
+    --jd-color-border-active: var(--notes-editor-border);
+    --jd-color-placeholder: var(--notes-editor-muted);
+    --jd-color-panel: var(--notes-editor-panel);
+    --jd-color-background-default: var(--notes-editor-surface);
+    --jd-color-background-light-gray: var(--notes-editor-panel-strong);
+    --jd-color-background-gray: var(--notes-editor-panel-strong);
+    --jd-color-background-gray-hover: var(--notes-editor-panel);
+    --jd-color-background-button-hover: var(--notes-editor-hover);
+    --jd-color-background-active: var(--notes-editor-link);
+    --jd-color-background-selection: var(--notes-editor-hover-strong);
+    --jd-color-text-icons: var(--notes-editor-text);
+    --jd-color-icon: var(--notes-editor-text);
+    --jd-color-button-background-hover: var(--notes-editor-hover);
+    --jd-color-button-background-hover-opacity40: var(--notes-editor-hover);
+    --jd-color-button-background-hover-opacity60: var(
+      --notes-editor-hover-strong
+    );
+    --jd-focus-input-box-shadow: 0 0 0 3px var(--notes-editor-ring);
+    --jd-dark-background-color: var(--notes-editor-panel);
+    --jd-dark-background-ligher: var(--notes-editor-panel-strong);
+    --jd-dark-background-darknes: var(--notes-editor-surface);
+    --jd-dark-border-color: var(--notes-editor-border);
+    --jd-dark-text-color: var(--notes-editor-text);
+    --jd-dark-text-color-opacity80: var(--notes-editor-muted);
+    --jd-dark-text-color-opacity50: var(--notes-editor-muted);
+    --jd-dark-icon-color: var(--notes-editor-text);
+    --jd-dark-toolbar-color: var(--notes-editor-panel);
+    --jd-dark-toolbar-seperator-color1: var(--notes-editor-panel-strong);
+    --jd-dark-toolbar-seperator-color2: var(--notes-editor-border);
+    --jd-dark-toolbar-seperator-color3: var(--notes-editor-hover);
+    --jd-dark-color-border-selected: var(--notes-editor-link);
+  }
+
+  .notes-editor .jodit-wysiwyg ul,
+  .notes-editor .jodit-wysiwyg ol {
+    margin: 1em 0;
+    padding-inline-start: 1.625rem;
+  }
+
+  .notes-editor .jodit-wysiwyg ul {
+    list-style-type: disc;
+  }
+
+  .notes-editor .jodit-wysiwyg ul ul {
+    list-style-type: circle;
+  }
+
+  .notes-editor .jodit-wysiwyg ul ul ul {
+    list-style-type: square;
+  }
+
+  .notes-editor .jodit-wysiwyg ol {
+    list-style-type: decimal;
+  }
+
+  .notes-editor .jodit-wysiwyg ol ol {
+    list-style-type: lower-alpha;
+  }
+
+  .notes-editor .jodit-wysiwyg ol ol ol {
+    list-style-type: lower-roman;
+  }
+
+  .notes-editor .jodit-wysiwyg li {
+    margin: 0.2em 0;
+  }
+
+  .notes-editor__toolbar {
+    align-items: center;
+    background: linear-gradient(
+      180deg,
+      var(--notes-editor-panel) 0%,
+      var(--notes-editor-panel-strong) 100%
+    );
+    border: 1px solid var(--notes-editor-border);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 8px;
+  }
+
+  .notes-editor__toolbar-actions {
+    align-items: center;
+    display: flex;
+    flex: 1;
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .notes-editor__toolbar-button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: var(--notes-editor-text);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 36px;
+    justify-content: center;
+    transition:
+      background-color 0.15s ease,
+      box-shadow 0.15s ease,
+      color 0.15s ease;
+    width: 36px;
+  }
+
+  .notes-editor__toolbar-button:hover,
+  .notes-editor__toolbar-button:focus-visible {
+    background-color: var(--notes-editor-hover);
+    box-shadow: 0 0 0 2px var(--notes-editor-ring);
+    outline: none;
+  }
+
+  .notes-editor__toolbar-menu {
+    background: var(--notes-editor-surface);
+    border: 1px solid var(--notes-editor-border);
+    border-radius: 12px;
+    box-shadow: 0 18px 36px -24px var(--notes-editor-shadow);
+    min-width: 12rem;
+    padding: 6px;
+    z-index: 50;
+  }
+
+  .notes-editor__toolbar-menu-item {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    color: var(--notes-editor-text);
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    padding: 8px 10px;
+    text-align: left;
+    transition: background-color 0.15s ease;
+    width: 100%;
+  }
+
+  .notes-editor__toolbar-menu-item:hover,
+  .notes-editor__toolbar-menu-item:focus-visible {
+    background-color: var(--notes-editor-hover);
+    outline: none;
+  }
+
+  .jodit-dialog_theme_default,
+  .jodit-dialog_theme_default .jodit-dialog__panel {
+    --notes-editor-dialog-surface: #ffffff;
+    --notes-editor-dialog-panel: #f8fafc;
+    --notes-editor-dialog-panel-strong: #edf4ff;
+    --notes-editor-dialog-border: #cbd5e1;
+    --notes-editor-dialog-text: #0f172a;
+    --notes-editor-dialog-muted: #64748b;
+    --notes-editor-dialog-link: #2563eb;
+    --notes-editor-dialog-hover: rgba(37, 99, 235, 0.12);
+    --notes-editor-dialog-ring: rgba(37, 99, 235, 0.18);
+    --notes-editor-dialog-shadow: rgba(15, 23, 42, 0.14);
+    --jd-color-white: var(--notes-editor-dialog-surface);
+    --jd-color-gray: var(--notes-editor-dialog-panel-strong);
+    --jd-color-dark: var(--notes-editor-dialog-text);
+    --jd-color-default: var(--notes-editor-dialog-text);
+    --jd-color-text: var(--notes-editor-dialog-text);
+    --jd-color-label: var(--notes-editor-dialog-muted);
+    --jd-color-border: var(--notes-editor-dialog-border);
+    --jd-color-background-gray: var(--notes-editor-dialog-panel-strong);
+    --jd-color-background-light-gray: var(--notes-editor-dialog-panel);
+    --jd-color-background-button-hover: var(--notes-editor-dialog-hover);
+    --jd-color-background-selection: var(--notes-editor-dialog-ring);
+  }
+
+  .jodit-dialog_theme_dark,
+  .jodit-dialog_theme_dark .jodit-dialog__panel {
+    --notes-editor-dialog-surface: #0f172a;
+    --notes-editor-dialog-panel: #162235;
+    --notes-editor-dialog-panel-strong: #22314b;
+    --notes-editor-dialog-border: #334155;
+    --notes-editor-dialog-text: #e2e8f0;
+    --notes-editor-dialog-muted: #94a3b8;
+    --notes-editor-dialog-link: #60a5fa;
+    --notes-editor-dialog-hover: rgba(96, 165, 250, 0.18);
+    --notes-editor-dialog-ring: rgba(96, 165, 250, 0.24);
+    --notes-editor-dialog-shadow: rgba(2, 6, 23, 0.45);
+    --jd-color-white: var(--notes-editor-dialog-surface);
+    --jd-color-gray: var(--notes-editor-dialog-panel-strong);
+    --jd-color-dark: var(--notes-editor-dialog-text);
+    --jd-color-default: var(--notes-editor-dialog-text);
+    --jd-color-text: var(--notes-editor-dialog-text);
+    --jd-color-label: var(--notes-editor-dialog-muted);
+    --jd-color-border: var(--notes-editor-dialog-border);
+    --jd-color-background-gray: var(--notes-editor-dialog-panel-strong);
+    --jd-color-background-light-gray: var(--notes-editor-dialog-panel);
+    --jd-color-background-button-hover: var(--notes-editor-dialog-hover);
+    --jd-color-background-selection: var(--notes-editor-dialog-ring);
+    --jd-dark-background-color: var(--notes-editor-dialog-panel);
+    --jd-dark-background-ligher: var(--notes-editor-dialog-panel-strong);
+    --jd-dark-background-darknes: var(--notes-editor-dialog-panel);
+    --jd-dark-border-color: var(--notes-editor-dialog-border);
+    --jd-dark-text-color: var(--notes-editor-dialog-text);
+    --jd-dark-text-color-opacity80: var(--notes-editor-dialog-muted);
+    --jd-dark-icon-color: var(--notes-editor-dialog-text);
+  }
+
+  .jodit-dialog_theme_default .jodit-dialog__panel,
+  .jodit-dialog_theme_dark .jodit-dialog__panel {
+    background: var(--notes-editor-dialog-panel);
+    border: 1px solid var(--notes-editor-dialog-border);
+    border-radius: 16px;
+    box-shadow: 0 24px 48px -28px var(--notes-editor-dialog-shadow);
+    color: var(--notes-editor-dialog-text);
+  }
+
+  .jodit-dialog_theme_default .jodit-dialog__header,
+  .jodit-dialog_theme_dark .jodit-dialog__header,
+  .jodit-dialog_theme_default .jodit-dialog__content,
+  .jodit-dialog_theme_dark .jodit-dialog__content,
+  .jodit-dialog_theme_default .jodit-dialog_alert,
+  .jodit-dialog_theme_dark .jodit-dialog_alert,
+  .jodit-dialog_theme_default .jodit-form,
+  .jodit-dialog_theme_dark .jodit-form,
+  .jodit-dialog_theme_default .jodit-form__container,
+  .jodit-dialog_theme_dark .jodit-form__container,
+  .jodit-dialog_theme_default .jodit-form__group,
+  .jodit-dialog_theme_dark .jodit-form__group {
+    background: transparent;
+    color: var(--notes-editor-dialog-text);
+  }
+
+  .jodit-dialog_theme_default .jodit-dialog__header,
+  .jodit-dialog_theme_dark .jodit-dialog__header {
+    background: linear-gradient(
+      180deg,
+      var(--notes-editor-dialog-panel) 0%,
+      var(--notes-editor-dialog-panel-strong) 100%
+    );
+    border-bottom: 1px solid var(--notes-editor-dialog-border);
+  }
+
+  .jodit-dialog_theme_default .jodit-dialog__header-title,
+  .jodit-dialog_theme_dark .jodit-dialog__header-title,
+  .jodit-dialog_theme_default .jodit-dialog__header-button,
+  .jodit-dialog_theme_dark .jodit-dialog__header-button,
+  .jodit-dialog_theme_default .jodit-form__group label,
+  .jodit-dialog_theme_dark .jodit-form__group label,
+  .jodit-dialog_theme_default .jodit-label,
+  .jodit-dialog_theme_dark .jodit-label,
+  .jodit-dialog_theme_default .jodit-ui-input__label,
+  .jodit-dialog_theme_dark .jodit-ui-input__label {
+    color: var(--notes-editor-dialog-text);
+  }
+
+  .jodit-dialog_theme_default .jodit-dialog__header-button:hover,
+  .jodit-dialog_theme_dark .jodit-dialog__header-button:hover {
+    background: var(--notes-editor-dialog-hover);
+  }
+
+  .jodit-dialog_theme_default .jodit-ui-input__wrapper,
+  .jodit-dialog_theme_dark .jodit-ui-input__wrapper,
+  .jodit-dialog_theme_default .jodit-ui-input__input,
+  .jodit-dialog_theme_dark .jodit-ui-input__input,
+  .jodit-dialog_theme_default .jodit-input,
+  .jodit-dialog_theme_dark .jodit-input,
+  .jodit-dialog_theme_default .jodit-textarea,
+  .jodit-dialog_theme_dark .jodit-textarea {
+    background: var(--notes-editor-dialog-surface);
+    border-color: var(--notes-editor-dialog-border);
+    border-radius: 12px;
+    color: var(--notes-editor-dialog-text);
+  }
+
+  .jodit-dialog_theme_default .jodit-ui-input__wrapper,
+  .jodit-dialog_theme_dark .jodit-ui-input__wrapper {
+    border: 1px solid var(--notes-editor-dialog-border);
+    box-shadow: none;
+  }
+
+  .jodit-dialog_theme_default
+    .jodit-ui-input_focused_true
+    .jodit-ui-input__wrapper,
+  .jodit-dialog_theme_dark
+    .jodit-ui-input_focused_true
+    .jodit-ui-input__wrapper,
+  .jodit-dialog_theme_default .jodit-input:focus,
+  .jodit-dialog_theme_dark .jodit-input:focus,
+  .jodit-dialog_theme_default .jodit-ui-input__input:focus,
+  .jodit-dialog_theme_dark .jodit-ui-input__input:focus,
+  .jodit-dialog_theme_default .jodit-textarea:focus,
+  .jodit-dialog_theme_dark .jodit-textarea:focus {
+    border-color: var(--notes-editor-dialog-link);
+    box-shadow: 0 0 0 3px var(--notes-editor-dialog-ring);
+    outline: none;
+  }
+
+  .jodit-dialog_theme_default .jodit-form__group,
+  .jodit-dialog_theme_dark .jodit-form__group {
+    gap: 8px;
+  }
+
+  .jodit-dialog_theme_default input[type="checkbox"],
+  .jodit-dialog_theme_dark input[type="checkbox"] {
+    accent-color: var(--notes-editor-dialog-link);
+  }
+
+  .jodit-dialog_theme_default .jodit-button,
+  .jodit-dialog_theme_dark .jodit-button {
+    border: 1px solid var(--notes-editor-dialog-border);
+    border-radius: 12px;
+    color: var(--notes-editor-dialog-text);
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .jodit-dialog_theme_default .jodit-button:hover,
+  .jodit-dialog_theme_dark .jodit-button:hover {
+    background: var(--notes-editor-dialog-hover);
+  }
+
+  .jodit-dialog_theme_default .jodit-button:focus-visible,
+  .jodit-dialog_theme_dark .jodit-button:focus-visible {
+    box-shadow: 0 0 0 3px var(--notes-editor-dialog-ring);
+    outline: none;
+  }
+
+  .jodit-dialog_theme_default .jodit-button[type="submit"],
+  .jodit-dialog_theme_dark .jodit-button[type="submit"] {
+    background: var(--notes-editor-dialog-link);
+    border-color: transparent;
+    color: #eff6ff;
+  }
+
+  .jodit-dialog_theme_default .jodit-button[type="submit"]:hover,
+  .jodit-dialog_theme_dark .jodit-button[type="submit"]:hover {
+    background: color-mix(in srgb, var(--notes-editor-dialog-link) 88%, black);
+  }
+
+  .notes-editor_has-custom-toolbar .jodit-toolbar__box:not(:empty) {
+    display: none;
+  }
+
+  .notes-editor .jodit-container:not(.jodit_inline) {
+    background: var(--notes-editor-surface);
+    border: 1px solid var(--notes-editor-border);
+    border-radius: 16px;
+    box-shadow: 0 14px 32px -24px var(--notes-editor-shadow);
+    overflow: hidden;
+    transition:
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .notes-editor_has-custom-toolbar .jodit-container:not(.jodit_inline) {
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  .notes-editor .jodit-container:not(.jodit_inline):focus-within {
+    border-color: var(--notes-editor-link);
+    box-shadow:
+      0 0 0 4px var(--notes-editor-ring),
+      0 18px 36px -24px var(--notes-editor-shadow);
+  }
+
+  .notes-editor .jodit-toolbar__box:not(:empty) {
+    background: linear-gradient(
+      180deg,
+      var(--notes-editor-panel) 0%,
+      var(--notes-editor-panel-strong) 100%
+    );
+    border-bottom: 1px solid var(--notes-editor-border);
+    overflow-x: hidden;
+    overflow-y: hidden;
+    padding: 6px;
+    scrollbar-width: thin;
+  }
+
+  .notes-editor .jodit-toolbar-editor-collection,
+  .notes-editor .jodit-toolbar-editor-collection_mode_horizontal,
+  .notes-editor .jodit-ui-group_line_true {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .notes-editor .jodit-toolbar-editor-collection_mode_horizontal {
+    background-image: none;
+  }
+
+  .notes-editor .jodit-ui-group {
+    flex-wrap: nowrap;
+    max-width: none;
+  }
+
+  .notes-editor .jodit-ui-group:not(.jodit-ui-group_line_true) {
+    gap: 4px;
+  }
+
+  .notes-editor
+    .jodit-ui-group_separated_true:not(:last-child):not(
+      .jodit-ui-group_before-spacer_true
+    ):after,
+  .notes-editor .jodit-ui-separator {
+    border-right-color: var(--notes-editor-border);
+    opacity: 0.7;
+  }
+
+  .notes-editor .jodit-toolbar-button,
+  .notes-editor .jodit-toolbar-content,
+  .notes-editor .jodit-toolbar-select {
+    border-radius: 10px;
+    margin: 0;
+  }
+
+  .notes-editor .jodit-toolbar-button__button,
+  .notes-editor .jodit-toolbar-button__trigger,
+  .notes-editor .jodit-toolbar-select,
+  .notes-editor .jodit-toolbar-select__button,
+  .notes-editor .jodit-toolbar-select__trigger {
+    border-radius: 10px;
+    color: var(--notes-editor-text);
+    transition:
+      background-color 0.15s ease,
+      box-shadow 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .notes-editor .jodit-toolbar-button__button:focus-visible:not([disabled]),
+  .notes-editor .jodit-toolbar-button__trigger:focus-visible:not([disabled]),
+  .notes-editor .jodit-toolbar-select__button:focus-visible:not([disabled]),
+  .notes-editor .jodit-toolbar-select__trigger:focus-visible:not([disabled]) {
+    box-shadow: 0 0 0 2px var(--notes-editor-ring);
+  }
+
+  .notes-editor
+    .jodit-toolbar-button__button[aria-pressed="true"]:not([disabled]),
+  .notes-editor
+    .jodit-toolbar-button__trigger[aria-pressed="true"]:not([disabled]),
+  .notes-editor .jodit-toolbar-select[aria-pressed="true"]:not([disabled]) {
+    background-color: var(--notes-editor-hover-strong);
+    color: var(--notes-editor-text);
+  }
+
+  .notes-editor .jodit-workplace {
+    background: var(--notes-editor-surface);
+    min-width: 0;
+  }
+
+  .notes-editor .jodit-container:not(.jodit_inline) .jodit-wysiwyg,
+  .notes-editor .jodit-container:not(.jodit_inline) .notes-editor__content {
+    background: var(--notes-editor-surface);
+    color: var(--notes-editor-text);
+    line-height: 1.65;
+    padding: 14px 16px 18px;
+  }
+
+  .notes-editor .jodit-placeholder {
+    color: var(--notes-editor-muted);
+    padding: 14px 16px;
+  }
+
+  .notes-editor .jodit-wysiwyg a,
+  .notes-editor .notes-editor__content a {
+    color: var(--notes-editor-link);
+    text-decoration: underline;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.16em;
+  }
+}
