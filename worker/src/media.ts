@@ -139,7 +139,8 @@ async function verifyJwtLocally(
     return typeof userId === "string" && userId.length > 0
       ? { id: userId }
       : null;
-  } catch {
+  } catch (error) {
+    console.warn("[media.auth] Local JWT verification failed", error);
     return null;
   }
 }
@@ -194,7 +195,7 @@ async function authenticateMediaRequest(
   }
 }
 
-function getFirstUploadedFile(formData: FormData): UploadFileLike | null {
+function findUploadedFile(formData: FormData): UploadFileLike | null {
   for (const value of formData.values()) {
     if (
       value instanceof File ||
@@ -223,7 +224,7 @@ async function handleMediaUpload(
   }
 
   const formData = await request.formData();
-  const file = getFirstUploadedFile(formData);
+  const file = findUploadedFile(formData);
   if (!file) {
     return errorResponse("No upload file was provided", 400, corsHeaders);
   }

@@ -4,7 +4,7 @@ const DEFAULT_WORKER_URL =
 const MEDIA_VIEW_PATH = "/api/media/view";
 const MEDIA_TOKEN_PARAM = "token";
 
-const rewriteManagedMediaUrl = (
+const applyAuthTokenToMediaUrl = (
   rawUrl: string,
   token: string | undefined,
   workerUrl = DEFAULT_WORKER_URL
@@ -27,7 +27,7 @@ const rewriteManagedMediaUrl = (
   }
 };
 
-const rewriteManagedMediaHtml = (
+const applyAuthTokenToMediaHtml = (
   html: string,
   token: string | undefined,
   workerUrl = DEFAULT_WORKER_URL
@@ -50,7 +50,7 @@ const rewriteManagedMediaHtml = (
 
     element.setAttribute(
       attr,
-      rewriteManagedMediaUrl(currentValue, token, workerUrl)
+      applyAuthTokenToMediaUrl(currentValue, token, workerUrl)
     );
   }
 
@@ -70,15 +70,15 @@ export const attachMediaAuthToken = (
   html: string,
   token: string | undefined,
   workerUrl = DEFAULT_WORKER_URL
-) => rewriteManagedMediaHtml(html, token, workerUrl);
+) => applyAuthTokenToMediaHtml(html, token, workerUrl);
 
 export const stripMediaAuthToken = (
   html: string,
   workerUrl = DEFAULT_WORKER_URL
-) => rewriteManagedMediaHtml(html, undefined, workerUrl);
+) => applyAuthTokenToMediaHtml(html, undefined, workerUrl);
 
 export const attachMediaAuthTokenToUrl = (
   url: string,
   token: string,
   workerUrl = DEFAULT_WORKER_URL
-) => rewriteManagedMediaUrl(url, token, workerUrl);
+) => applyAuthTokenToMediaUrl(url, token, workerUrl);
