@@ -123,20 +123,23 @@ async function verifyJwtLocally(
       return null;
     }
 
-    const result =
-      algorithm.startsWith("HS")
-        ? env.SUPABASE_JWT_SECRET
-          ? await jwtVerify(
-              token,
-              new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
-            )
-          : null
-        : algorithm.startsWith("RS") ||
-            algorithm.startsWith("ES") ||
-            algorithm.startsWith("PS") ||
-            algorithm.startsWith("Ed")
-        ? await jwtVerify(token, getJwks(env.SUPABASE_URL))
-        : null;
+    let result: Awaited<ReturnType<typeof jwtVerify>> | null = null;
+
+    if (algorithm.startsWith("HS")) {
+      if (env.SUPABASE_JWT_SECRET) {
+        result = await jwtVerify(
+          token,
+          new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
+        );
+      }
+    } else if (
+      algorithm.startsWith("RS") ||
+      algorithm.startsWith("ES") ||
+      algorithm.startsWith("PS") ||
+      algorithm.startsWith("Ed")
+    ) {
+      result = await jwtVerify(token, getJwks(env.SUPABASE_URL));
+    }
 
     if (!result) {
       return null;

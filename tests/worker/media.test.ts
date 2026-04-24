@@ -34,6 +34,9 @@ type StoredObject = {
   body: string;
 };
 
+const isMockJwksKey = (key: Uint8Array | { kind: string }) =>
+  typeof key === "object" && key !== null && "kind" in key && key.kind === "jwks";
+
 const createVault = () => {
   const objects = new Map<string, StoredObject>();
 
@@ -101,13 +104,7 @@ describe("worker media routes", () => {
       throw new Error("invalid token");
     });
     jwtVerifyMock.mockImplementation(async (token, key) => {
-      if (
-        token === "local-rs-token" &&
-        typeof key === "object" &&
-        key !== null &&
-        "kind" in key &&
-        key.kind === "jwks"
-      ) {
+      if (token === "local-rs-token" && isMockJwksKey(key)) {
         return { payload: { sub: "user-1" } };
       }
 
@@ -226,7 +223,7 @@ describe("worker media routes", () => {
     expect(forbiddenResponse?.status).toBe(403);
   });
 
-  it("verifies asymmetric JWTs locally via jose JWKS handling before falling back to Supabase", async () => {
+  it("verifies asymmetric JWTs locally via jose JWKS handling without hitting Supabase", async () => {
     const vault = createVault();
     const env: MediaWorkerEnv = {
       SUPABASE_URL: "https://example.supabase.co",
