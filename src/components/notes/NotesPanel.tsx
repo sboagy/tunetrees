@@ -311,16 +311,6 @@ export const NotesPanel: Component = () => {
             <div class="flex gap-1.5">
               <button
                 type="button"
-                onClick={handleCreateNote}
-                class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
-                disabled={!newNoteContent().trim()}
-                data-testid="notes-save-button"
-              >
-                Save
-                <Save class={fontClasses().iconSmall} />
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   setIsAdding(false);
                   setNewNoteContent("");
@@ -330,6 +320,16 @@ export const NotesPanel: Component = () => {
               >
                 Cancel
                 <X class={fontClasses().iconSmall} />
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateNote}
+                class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
+                disabled={!newNoteContent().trim()}
+                data-testid="notes-save-button"
+              >
+                Save
+                <Save class={fontClasses().iconSmall} />
               </button>
             </div>
           </div>

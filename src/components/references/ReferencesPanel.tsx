@@ -187,11 +187,6 @@ export const ReferencesPanel: Component = () => {
           class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
           data-testid="references-add-form"
         >
-          <h5
-            class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}
-          >
-            Add New Reference
-          </h5>
           <ReferenceForm
             onSubmit={handleCreateReference}
             onCancel={handleCancel}
@@ -206,11 +201,6 @@ export const ReferencesPanel: Component = () => {
             class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
             data-testid="references-edit-form"
           >
-            <h5
-              class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300 mb-2`}
-            >
-              Edit Reference
-            </h5>
             <ReferenceForm
               reference={ref()}
               onSubmit={handleUpdateReference}
