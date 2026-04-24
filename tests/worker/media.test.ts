@@ -1,3 +1,28 @@
+const {
+  createRemoteJWKSetMock,
+  decodeProtectedHeaderMock,
+  jwtVerifyMock,
+} = vi.hoisted(() => ({
+  createRemoteJWKSetMock: vi.fn(() => ({ kind: "jwks" })),
+  decodeProtectedHeaderMock: vi.fn<
+    (token: string) => {
+      alg?: string;
+    }
+  >(),
+  jwtVerifyMock: vi.fn<
+    (
+      token: string,
+      key: Uint8Array | { kind: string }
+    ) => Promise<{ payload: { sub?: string } }>
+  >(),
+}));
+
+vi.mock("jose", () => ({
+  createRemoteJWKSet: createRemoteJWKSetMock,
+  decodeProtectedHeader: decodeProtectedHeaderMock,
+  jwtVerify: jwtVerifyMock,
+}));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleMediaRequest,
@@ -60,6 +85,34 @@ describe("worker media routes", () => {
   beforeEach(() => {
     originalFetch = globalThis.fetch;
     consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    createRemoteJWKSetMock.mockClear();
+    decodeProtectedHeaderMock.mockReset();
+    jwtVerifyMock.mockReset();
+
+    decodeProtectedHeaderMock.mockImplementation((token) => {
+      if (token === "upload-token" || token === "view-token") {
+        return { alg: "HS256" };
+      }
+
+      if (token === "local-rs-token") {
+        return { alg: "RS256" };
+      }
+
+      throw new Error("invalid token");
+    });
+    jwtVerifyMock.mockImplementation(async (token, key) => {
+      if (
+        token === "local-rs-token" &&
+        typeof key === "object" &&
+        key !== null &&
+        "kind" in key &&
+        key.kind === "jwks"
+      ) {
+        return { payload: { sub: "user-1" } };
+      }
+
+      throw new Error("jwt verify failed");
+    });
   });
 
   afterEach(() => {
@@ -171,5 +224,46 @@ describe("worker media routes", () => {
     );
 
     expect(forbiddenResponse?.status).toBe(403);
+  });
+
+  it("verifies asymmetric JWTs locally via jose JWKS handling before falling back to Supabase", async () => {
+    const vault = createVault();
+    const env: MediaWorkerEnv = {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      TUNETREES_VAULT: vault.bucket as unknown as R2Bucket,
+    };
+
+    const fetchSpy = vi.fn();
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: fetchSpy,
+    });
+
+    const formData = new FormData();
+    formData.append(
+      "files[0]",
+      new File(["png-bytes"], "note image.png", { type: "image/png" })
+    );
+
+    const uploadRequest = {
+      method: "POST",
+      url: "https://worker.example.com/api/media/upload",
+      headers: new Headers({
+        Authorization: "Bearer local-rs-token",
+      }),
+      formData: async () => formData,
+    } as unknown as Request;
+
+    const response = await handleMediaRequest(uploadRequest, env);
+
+    expect(response?.status).toBe(200);
+    expect(decodeProtectedHeaderMock).toHaveBeenCalledWith("local-rs-token");
+    expect(createRemoteJWKSetMock).toHaveBeenCalledWith(
+      new URL("https://example.supabase.co/auth/v1/.well-known/jwks.json")
+    );
+    expect(jwtVerifyMock).toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

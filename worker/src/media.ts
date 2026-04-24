@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from "jose";
 
 export interface MediaWorkerEnv {
   SUPABASE_URL: string;
@@ -115,26 +115,28 @@ async function verifyJwtLocally(
   env: MediaWorkerEnv
 ): Promise<MediaAuthUser | null> {
   try {
-    const [headerBase64] = token.split(".");
-    if (!headerBase64) {
+    const header = decodeProtectedHeader(token) as {
+      alg?: string;
+    };
+    const algorithm = header.alg;
+    if (!algorithm) {
       return null;
     }
 
-    const header = JSON.parse(
-      atob(headerBase64.replace(/-/g, "+").replace(/_/g, "/"))
-    ) as {
-      alg?: string;
-    };
-
     const result =
-      header.alg === "ES256"
-        ? await jwtVerify(token, getJwks(env.SUPABASE_URL))
-        : env.SUPABASE_JWT_SECRET
+      algorithm.startsWith("HS")
+        ? env.SUPABASE_JWT_SECRET
           ? await jwtVerify(
               token,
               new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
             )
-          : null;
+          : null
+        : algorithm.startsWith("RS") ||
+            algorithm.startsWith("ES") ||
+            algorithm.startsWith("PS") ||
+            algorithm.startsWith("Ed")
+        ? await jwtVerify(token, getJwks(env.SUPABASE_URL))
+        : null;
 
     if (!result) {
       return null;
@@ -211,10 +213,13 @@ async function authenticateMediaRequest(
 
 function findUploadedFile(formData: FormData): UploadFileLike | null {
   for (const value of formData.values()) {
+    if (value instanceof File) {
+      return value as UploadFileLike;
+    }
+
     if (
-      value instanceof File ||
-      (value instanceof Blob &&
-        typeof (value as UploadFileLike).name === "string")
+      typeof value !== "string" &&
+      typeof (value as UploadFileLike).name === "string"
     ) {
       return value as UploadFileLike;
     }
@@ -251,16 +256,16 @@ async function handleMediaUpload(
     key,
     typeof file.stream === "function" ? file.stream() : file,
     {
-    httpMetadata: {
-      contentType,
-      contentDisposition: `inline; filename="${sanitizeFilename(originalFilename)}"`,
-    },
-    customMetadata: {
-      ownerUserId: user.id,
-      originalFilename,
-      sizeBytes: String(file.size),
-      uploadedAt: new Date().toISOString(),
-    },
+      httpMetadata: {
+        contentType,
+        contentDisposition: `inline; filename="${sanitizeFilename(originalFilename)}"`,
+      },
+      customMetadata: {
+        ownerUserId: user.id,
+        originalFilename,
+        sizeBytes: String(file.size),
+        uploadedAt: new Date().toISOString(),
+      },
     }
   );
 
