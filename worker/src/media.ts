@@ -186,12 +186,21 @@ async function authenticateMediaRequest(
   }
 
   try {
-    return (
-      (await verifyJwtWithSupabase(token, env)) ||
-      (await verifyJwtLocally(token, env))
-    );
+    // Prefer local verification to avoid an external network call on the
+    // common path. If local verification cannot validate the token, fall
+    // back to Supabase as a compatibility path.
+    const localUser = await verifyJwtLocally(token, env);
+    if (localUser) {
+      return localUser;
+    }
   } catch {
-    return verifyJwtLocally(token, env);
+    // Ignore local verification errors and try the remote fallback below.
+  }
+
+  try {
+    return await verifyJwtWithSupabase(token, env);
+  } catch {
+    return null;
   }
 }
 
