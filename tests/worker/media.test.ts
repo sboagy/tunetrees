@@ -35,7 +35,11 @@ type StoredObject = {
 };
 
 const isMockJwksObject = (key: Uint8Array | { kind: string }) =>
-  typeof key === "object" && key !== null && "kind" in key && key.kind === "jwks";
+  !(key instanceof Uint8Array) &&
+  typeof key === "object" &&
+  key !== null &&
+  "kind" in key &&
+  key.kind === "jwks";
 
 const createVault = () => {
   const objects = new Map<string, StoredObject>();

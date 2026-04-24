@@ -37,6 +37,22 @@ type MediaUploadResponse = {
   };
 };
 
+const SUPPORTED_JWT_ALGORITHMS = new Set([
+  "HS256",
+  "HS384",
+  "HS512",
+  "RS256",
+  "RS384",
+  "RS512",
+  "ES256",
+  "ES384",
+  "ES512",
+  "PS256",
+  "PS384",
+  "PS512",
+  "EdDSA",
+]);
+
 let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 let cachedJwksUrl: string | null = null;
 
@@ -111,13 +127,7 @@ function buildMediaViewUrl(request: Request, key: string) {
 }
 
 function isSupportedJwtAlgorithm(algorithm: string) {
-  return (
-    algorithm.startsWith("HS") ||
-    algorithm.startsWith("RS") ||
-    algorithm.startsWith("ES") ||
-    algorithm.startsWith("PS") ||
-    algorithm.startsWith("Ed")
-  );
+  return SUPPORTED_JWT_ALGORITHMS.has(algorithm);
 }
 
 async function verifyJwtLocally(
