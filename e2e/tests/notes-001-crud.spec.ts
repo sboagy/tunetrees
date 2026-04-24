@@ -1,6 +1,6 @@
 // spec: e2e/tests/notes-references-test-plan.md
 
-import { expect } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -14,6 +14,30 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 let ttPage: TuneTreesPage;
+
+const PASTED_IMAGE_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2C9f8AAAAASUVORK5CYII=";
+
+async function pastePngImageIntoEditor(page: Page, editor: Locator) {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+
+  await page.evaluate(async (base64Image) => {
+    const html = `<p><img src="data:image/png;base64,${base64Image}" alt=""></p>`;
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": new Blob([html], {
+          type: "text/html",
+        }),
+        "text/plain": new Blob([""], {
+          type: "text/plain",
+        }),
+      }),
+    ]);
+  }, PASTED_IMAGE_BASE64);
+
+  await editor.click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+V" : "Control+V");
+}
 
 test.describe("NOTES-001: Notes CRUD Operations", () => {
   // Run tests serially to avoid database conflicts on shared tune
@@ -111,6 +135,68 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
     await expect(page.getByText("Test note content")).toBeVisible({
       timeout: 5000,
     });
+  });
+
+  test("should persist pasted images as worker media URLs instead of base64 html", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "chromium",
+      "Synthetic clipboard image paste is only covered in the desktop Chromium project"
+    );
+
+    await ttPage.notesAddButton.click();
+    await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
+
+    const joditEditor = ttPage.notesNewEditor.locator(".jodit-wysiwyg");
+    await expect(joditEditor).toBeVisible({ timeout: 10000 });
+
+    await pastePngImageIntoEditor(page, joditEditor);
+
+    await expect
+      .poll(async () => joditEditor.locator("img").count(), { timeout: 15000 })
+      .toBe(1);
+
+    await expect
+      .poll(async () => ttPage.notesSaveButton.isEnabled(), { timeout: 15000 })
+      .toBe(true);
+
+    await ttPage.notesSaveButton.click();
+    await expect(ttPage.notesNewEditor).not.toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+    await expect(ttPage.notesCount).toContainText("1 note", {
+      timeout: 15000,
+    });
+
+    const firstNote = ttPage.getAllNoteItems().first();
+    const firstNoteTestId = await firstNote.getAttribute("data-testid");
+    expect(firstNoteTestId).toMatch(/^note-item-/);
+    const noteId = (firstNoteTestId ?? "").replace("note-item-", "");
+
+    const firstNoteContent = ttPage.getNoteContent(noteId);
+    const renderedImage = firstNoteContent.locator("img");
+    await expect(renderedImage).toBeVisible({ timeout: 10000 });
+    await expect(renderedImage).toHaveAttribute("src", /\/api\/media\/view\?key=/);
+
+    const firstNoteEditButton = ttPage.getNoteEditButton(noteId);
+    await expect(firstNoteEditButton).toBeVisible({ timeout: 5000 });
+    await firstNoteEditButton.click();
+
+    const noteEditor = ttPage.getNoteEditor(noteId);
+    await expect(noteEditor).toBeVisible({ timeout: 5000 });
+
+    const editorTextarea = noteEditor.locator("textarea");
+    await expect
+      .poll(async () => (await editorTextarea.inputValue().catch(() => "")).trim())
+      .toContain("/api/media/view?key=");
+    await expect
+      .poll(async () =>
+        (await editorTextarea.inputValue().catch(() => "")).includes(
+          "data:image/"
+        )
+      )
+      .toBe(false);
   });
 
   test("should edit an existing note with text content", async ({ page }) => {
