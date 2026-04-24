@@ -14,6 +14,13 @@ if (process.env.SUPABASE_JWT_SECRET) {
   args.push("--var", `SUPABASE_JWT_SECRET:${process.env.SUPABASE_JWT_SECRET}`);
 }
 
+if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  args.push(
+    "--var",
+    `SUPABASE_SERVICE_ROLE_KEY:${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+  );
+}
+
 args.push(...process.argv.slice(2));
 
 const command = process.platform === "win32" ? "npx.cmd" : "npx";

@@ -1,0 +1,346 @@
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+export interface MediaWorkerEnv {
+  SUPABASE_URL: string;
+  SUPABASE_JWT_SECRET?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  TUNETREES_VAULT?: R2Bucket;
+}
+
+const MEDIA_UPLOAD_PATH = "/api/media/upload";
+const MEDIA_VIEW_PATH = "/api/media/view";
+const USER_ROOT_PREFIX = "users";
+
+type MediaAuthUser = {
+  id: string;
+};
+
+type UploadFileLike = Blob & {
+  name?: string;
+  stream?: () => ReadableStream;
+};
+
+type MediaUploadResponse = {
+  success: boolean;
+  time: string;
+  data: {
+    files: string[];
+    isImages: boolean[];
+    path: string;
+    baseurl: string;
+    messages?: string[];
+  };
+  file: {
+    key: string;
+    size: number;
+    contentType: string;
+  };
+};
+
+let cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+let cachedJwksUrl: string | null = null;
+
+function getJwks(supabaseUrl: string): ReturnType<typeof createRemoteJWKSet> {
+  const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
+  if (!cachedJwks || cachedJwksUrl !== jwksUrl) {
+    cachedJwks = createRemoteJWKSet(new URL(jwksUrl));
+    cachedJwksUrl = jwksUrl;
+  }
+  return cachedJwks;
+}
+
+export function getCorsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get("Origin") || "*";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, apikey, x-client-info",
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+function jsonResponse(
+  data: unknown,
+  status: number,
+  corsHeaders: Record<string, string>
+) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+function errorResponse(
+  message: string,
+  status: number,
+  corsHeaders: Record<string, string>
+) {
+  return jsonResponse({ error: message }, status, corsHeaders);
+}
+
+function sanitizeFilename(filename: string) {
+  const trimmedName = filename.trim();
+  const sanitized = trimmedName
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}._-]+/gu, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return sanitized.length > 0 ? sanitized.slice(0, 120) : "upload";
+}
+
+function buildMediaObjectKey(userId: string, filename: string) {
+  return `${USER_ROOT_PREFIX}/${userId}/notes/${crypto.randomUUID()}-${sanitizeFilename(filename)}`;
+}
+
+function buildMediaViewUrl(request: Request, key: string) {
+  const url = new URL(MEDIA_VIEW_PATH, request.url);
+  url.searchParams.set("key", key);
+  return url.toString();
+}
+
+async function verifyJwtLocally(
+  token: string,
+  env: MediaWorkerEnv
+): Promise<MediaAuthUser | null> {
+  try {
+    const [headerBase64] = token.split(".");
+    if (!headerBase64) {
+      return null;
+    }
+
+    const header = JSON.parse(
+      atob(headerBase64.replace(/-/g, "+").replace(/_/g, "/"))
+    ) as {
+      alg?: string;
+    };
+
+    const result =
+      header.alg === "ES256"
+        ? await jwtVerify(token, getJwks(env.SUPABASE_URL))
+        : env.SUPABASE_JWT_SECRET
+          ? await jwtVerify(
+              token,
+              new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
+            )
+          : null;
+
+    if (!result) {
+      return null;
+    }
+
+    const userId = result.payload.sub;
+    return typeof userId === "string" && userId.length > 0
+      ? { id: userId }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function verifyJwtWithSupabase(
+  token: string,
+  env: MediaWorkerEnv
+): Promise<MediaAuthUser | null> {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  const response = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = (await response.json()) as { id?: string };
+  return typeof data.id === "string" && data.id.length > 0
+    ? { id: data.id }
+    : null;
+}
+
+async function authenticateMediaRequest(
+  request: Request,
+  env: MediaWorkerEnv
+) {
+  const url = new URL(request.url);
+  const authHeader = request.headers.get("Authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : null;
+  const token = bearerToken || url.searchParams.get("token");
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return (
+      (await verifyJwtWithSupabase(token, env)) ||
+      (await verifyJwtLocally(token, env))
+    );
+  } catch {
+    return verifyJwtLocally(token, env);
+  }
+}
+
+function getFirstUploadedFile(formData: FormData): UploadFileLike | null {
+  for (const value of formData.values()) {
+    if (
+      value instanceof Blob &&
+      (value instanceof File || typeof (value as UploadFileLike).name === "string")
+    ) {
+      return value as UploadFileLike;
+    }
+  }
+
+  return null;
+}
+
+async function handleMediaUpload(
+  request: Request,
+  env: MediaWorkerEnv,
+  corsHeaders: Record<string, string>
+) {
+  if (!env.TUNETREES_VAULT) {
+    return errorResponse("Media storage is not configured", 500, corsHeaders);
+  }
+
+  const user = await authenticateMediaRequest(request, env);
+  if (!user) {
+    return errorResponse("Unauthorized", 401, corsHeaders);
+  }
+
+  const formData = await request.formData();
+  const file = getFirstUploadedFile(formData);
+  if (!file) {
+    return errorResponse("No upload file was provided", 400, corsHeaders);
+  }
+
+  const originalFilename = file.name || "upload";
+  const key = buildMediaObjectKey(user.id, originalFilename);
+  const contentType = file.type || "application/octet-stream";
+
+  await env.TUNETREES_VAULT.put(
+    key,
+    typeof file.stream === "function" ? file.stream() : file,
+    {
+    httpMetadata: {
+      contentType,
+      contentDisposition: `inline; filename="${sanitizeFilename(originalFilename)}"`,
+    },
+    customMetadata: {
+      ownerUserId: user.id,
+      originalFilename,
+      sizeBytes: String(file.size),
+      uploadedAt: new Date().toISOString(),
+    },
+    }
+  );
+
+  console.info(
+    "[media.upload]",
+    JSON.stringify({
+      userId: user.id,
+      key,
+      sizeBytes: file.size,
+      contentType,
+    })
+  );
+
+  const response: MediaUploadResponse = {
+    success: true,
+    time: new Date().toISOString(),
+    data: {
+      files: [buildMediaViewUrl(request, key)],
+      isImages: [contentType.startsWith("image/")],
+      path: key,
+      baseurl: "",
+      messages: [],
+    },
+    file: {
+      key,
+      size: file.size,
+      contentType,
+    },
+  };
+
+  return jsonResponse(response, 200, corsHeaders);
+}
+
+async function handleMediaView(
+  request: Request,
+  env: MediaWorkerEnv,
+  corsHeaders: Record<string, string>
+) {
+  if (!env.TUNETREES_VAULT) {
+    return errorResponse("Media storage is not configured", 500, corsHeaders);
+  }
+
+  const user = await authenticateMediaRequest(request, env);
+  if (!user) {
+    return errorResponse("Unauthorized", 401, corsHeaders);
+  }
+
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
+  if (!key) {
+    return errorResponse("Missing media key", 400, corsHeaders);
+  }
+
+  const userPrefix = `${USER_ROOT_PREFIX}/${user.id}/`;
+  if (!key.startsWith(userPrefix)) {
+    return errorResponse("Forbidden", 403, corsHeaders);
+  }
+
+  const object = await env.TUNETREES_VAULT.get(key);
+  if (!object?.body) {
+    return errorResponse("Media not found", 404, corsHeaders);
+  }
+
+  const headers = new Headers(corsHeaders);
+  object.writeHttpMetadata(headers);
+  headers.set("Cache-Control", "private, no-store");
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/octet-stream");
+  }
+  if (typeof object.size === "number") {
+    headers.set("Content-Length", String(object.size));
+  }
+  if (object.etag) {
+    headers.set("ETag", object.etag);
+  }
+
+  return new Response(object.body, {
+    status: 200,
+    headers,
+  });
+}
+
+export async function handleMediaRequest(
+  request: Request,
+  env: MediaWorkerEnv
+): Promise<Response | null> {
+  const corsHeaders = getCorsHeaders(request);
+  const url = new URL(request.url);
+
+  if (request.method === "POST" && url.pathname === MEDIA_UPLOAD_PATH) {
+    return handleMediaUpload(request, env, corsHeaders);
+  }
+
+  if (request.method === "GET" && url.pathname === MEDIA_VIEW_PATH) {
+    return handleMediaView(request, env, corsHeaders);
+  }
+
+  return null;
+}

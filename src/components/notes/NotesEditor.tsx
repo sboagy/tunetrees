@@ -21,6 +21,13 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { useAuth } from "@/lib/auth/AuthContext";
+import {
+  attachMediaAuthToken,
+  attachMediaAuthTokenToUrl,
+  buildMediaUploadUrl,
+  stripMediaAuthToken,
+} from "./media-auth";
 import "jodit/es2021/jodit.min.css";
 
 interface NotesEditorProps {
@@ -151,6 +158,7 @@ const resolveToolbarLayout = (toolbarWidth: number | null) => {
  * - Theme-aware (light/dark mode support)
  */
 export const NotesEditor: Component<NotesEditorProps> = (props) => {
+  const { session } = useAuth();
   let editorWrapperRef: HTMLDivElement | undefined;
   let toolbarRef: HTMLDivElement | undefined;
   let editorRef: HTMLTextAreaElement | undefined;
@@ -181,6 +189,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     };
   });
 
+  const getEditorDisplayContent = (content: string) =>
+    attachMediaAuthToken(content, session()?.access_token);
+
   // Create the Jodit editor configuration
   const createEditorConfig = (theme: "light" | "dark") => ({
     toolbar: false,
@@ -206,12 +217,60 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     showWordsCounter: false,
     showXPathInStatusbar: false,
 
+    uploader: {
+      insertImageAsBase64URI: false,
+      customUploadFunction: async (
+        requestData: unknown,
+        showProgress: (progress: number) => void
+      ) => {
+        const accessToken = session()?.access_token;
+        if (!accessToken) {
+          throw new Error("You must be signed in to upload note media.");
+        }
+        if (!(requestData instanceof FormData)) {
+          throw new Error("Unexpected media upload payload.");
+        }
+
+        showProgress(25);
+        const response = await fetch(buildMediaUploadUrl(), {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: requestData,
+        });
+        const payload = (await response.json()) as {
+          error?: string;
+          data?: {
+            files?: string[];
+          };
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Media upload failed.");
+        }
+
+        showProgress(100);
+        return {
+          ...payload,
+          data: {
+            ...payload.data,
+            files:
+              payload.data?.files?.map((url) =>
+                attachMediaAuthTokenToUrl(url, accessToken)
+              ) || [],
+          },
+        };
+      },
+    },
+
     // Events
     events: {
       change: (newContent: string) => {
-        if (newContent === lastContent) return;
-        lastContent = newContent;
-        props.onContentChange(newContent);
+        const sanitizedContent = stripMediaAuthToken(newContent);
+        if (sanitizedContent === lastContent) return;
+        lastContent = sanitizedContent;
+        props.onContentChange(sanitizedContent);
       },
     },
   });
@@ -321,8 +380,8 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       joditInstance = Jodit.make(editorRef, createEditorConfig(currentTheme()));
 
       // Set initial content
-      lastContent = props.content || "";
-      joditInstance.value = lastContent;
+      lastContent = stripMediaAuthToken(props.content || "");
+      joditInstance.value = getEditorDisplayContent(props.content || "");
     }
   };
 
@@ -375,14 +434,15 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   // Update editor content when prop changes (external update)
   createEffect(() => {
     const incomingContent = props.content || "";
+    const displayContent = getEditorDisplayContent(incomingContent);
     const editor = joditInstance;
     if (!editor) {
       return;
     }
 
-    if (incomingContent !== editor.value) {
-      lastContent = incomingContent;
-      editor.value = incomingContent;
+    if (displayContent !== editor.value) {
+      lastContent = stripMediaAuthToken(incomingContent);
+      editor.value = displayContent;
     }
   });
 

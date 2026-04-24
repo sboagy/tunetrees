@@ -7,15 +7,37 @@ import {
 } from "@solidjs/testing-library";
 import { createSignal, type Setter } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildMediaUploadUrl, buildMediaViewUrl } from "../../../src/components/notes/media-auth";
 import { NotesEditor } from "../../../src/components/notes/NotesEditor";
 
 vi.mock("jodit/es2021/jodit.min.css", () => ({}));
+
+const mockSession = {
+  access_token: "test-access-token",
+};
+
+vi.mock("@/lib/auth/AuthContext", () => ({
+  useAuth: () => ({
+    session: () => mockSession,
+  }),
+}));
 
 type MockEditorConfig = {
   theme?: string;
   toolbar?: boolean;
   width?: string;
   editorClassName?: string;
+  uploader?: {
+    insertImageAsBase64URI?: boolean;
+    customUploadFunction?: (
+      requestData: unknown,
+      showProgress: (progress: number) => void
+    ) => Promise<{
+      data?: {
+        files?: string[];
+      };
+    }>;
+  };
   events?: {
     change?: (newContent: string) => void;
   };
@@ -119,6 +141,7 @@ let originalWindowMutationObserver: typeof window.MutationObserver;
 let originalGlobalMutationObserver: typeof globalThis.MutationObserver;
 let originalWindowResizeObserver: typeof window.ResizeObserver;
 let originalGlobalResizeObserver: typeof globalThis.ResizeObserver;
+let originalFetch: typeof globalThis.fetch;
 
 const createMockEditor = (options?: MockEditorConfig): MockJoditInstance => {
   const container = document.createElement("div");
@@ -188,6 +211,7 @@ describe("NotesEditor", () => {
     originalGlobalMutationObserver = globalThis.MutationObserver;
     originalWindowResizeObserver = window.ResizeObserver;
     originalGlobalResizeObserver = globalThis.ResizeObserver;
+    originalFetch = globalThis.fetch;
 
     Object.defineProperty(window, "MutationObserver", {
       configurable: true,
@@ -238,6 +262,11 @@ describe("NotesEditor", () => {
       configurable: true,
       writable: true,
       value: originalGlobalResizeObserver,
+    });
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: originalFetch,
     });
     MockMutationObserver.reset();
     MockResizeObserver.reset();
@@ -352,6 +381,80 @@ describe("NotesEditor", () => {
     await waitFor(() => {
       expect(editor.execCommand).toHaveBeenCalledWith("undo");
     });
+  });
+
+  it("uploads note images through the worker and strips runtime auth tokens from saved HTML", async () => {
+    const handleContentChange = vi.fn();
+    render(() => (
+      <NotesEditor content="<p>Initial note</p>" onContentChange={handleContentChange} />
+    ));
+
+    await waitFor(() => {
+      expect(makeEditor).toHaveBeenCalledTimes(1);
+    });
+
+    const options = makeEditor.mock.calls[0]?.[1];
+    expect(options?.uploader?.insertImageAsBase64URI).toBe(false);
+
+    const uploadedUrl = buildMediaViewUrl("users/user-1/notes/uploaded.png");
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          success: true,
+          time: new Date().toISOString(),
+          data: {
+            files: [uploadedUrl],
+            isImages: [true],
+            path: "users/user-1/notes/uploaded.png",
+            baseurl: "",
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+    );
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: fetchMock,
+    });
+
+    const requestData = new FormData();
+    requestData.append(
+      "files[0]",
+      new File(["image-bytes"], "uploaded.png", { type: "image/png" })
+    );
+    const showProgress = vi.fn();
+
+    const uploadResponse = await options?.uploader?.customUploadFunction?.(
+      requestData,
+      showProgress
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(buildMediaUploadUrl(), {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-access-token",
+      },
+      body: requestData,
+    });
+    expect(showProgress).toHaveBeenCalledWith(25);
+    expect(showProgress).toHaveBeenCalledWith(100);
+    expect(uploadResponse?.data?.files?.[0]).toBe(
+      `${uploadedUrl}&token=test-access-token`
+    );
+
+    options?.events?.change?.(
+      `<p><img src="${uploadedUrl}&token=test-access-token"></p>`
+    );
+
+    expect(handleContentChange).toHaveBeenCalledWith(
+      `<p><img src="${uploadedUrl}"></p>`
+    );
   });
 
   it("applies list formatting through Jodit's commitStyle API", async () => {

@@ -68,15 +68,29 @@ npm install
 
 ### Worker Secrets
 
-⚠️ **CRITICAL**: The worker MUST have these secrets configured or it will fail with CORS errors:
+⚠️ **CRITICAL**: The worker MUST have these secrets configured or it will fail with auth/media or CORS errors:
 
 ```bash
 npx wrangler secret put SUPABASE_JWT_SECRET
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 npx wrangler secret put DATABASE_URL
 ```
 
 - `SUPABASE_JWT_SECRET`: From Supabase Dashboard → Settings → API → JWT Secret
+- `SUPABASE_SERVICE_ROLE_KEY`: From Supabase Dashboard → Settings → API → service_role key
 - `DATABASE_URL`: Supabase connection string (use "Session pooler" for Workers)
+
+### Worker Storage Bindings
+
+The note-media upload/view routes require the `TUNETREES_VAULT` R2 binding in
+`worker/wrangler.toml`.
+
+Create the configured buckets before deploying if they do not already exist:
+
+```bash
+npx wrangler r2 bucket create tunetrees-vault
+npx wrangler r2 bucket create tunetrees-vault-preview
+```
 
 ### Worker Diagnostics (Optional)
 
