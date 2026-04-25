@@ -1090,9 +1090,21 @@ export class TuneTreesPage {
    * is "good enough".
    */
   async refreshDateRolloverIfVisible(timeoutMs = 20000): Promise<boolean> {
-    const bannerVisible = await this.dateRolloverRefreshButton
+    // After reload + sync, the rollover refresh can appear slightly after the
+    // main practice chrome. Give it a short grace period before deciding there
+    // is nothing to refresh.
+    const appearanceTimeoutMs = Math.min(timeoutMs, 2500);
+    const appearanceDeadline = Date.now() + appearanceTimeoutMs;
+    let bannerVisible = await this.dateRolloverRefreshButton
       .isVisible()
       .catch(() => false);
+
+    while (!bannerVisible && Date.now() < appearanceDeadline) {
+      await this.page.waitForTimeout(100);
+      bannerVisible = await this.dateRolloverRefreshButton
+        .isVisible()
+        .catch(() => false);
+    }
 
     if (!bannerVisible) {
       return false;
