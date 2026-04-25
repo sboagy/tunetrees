@@ -523,6 +523,7 @@ const TTInner: ParentComponent = (props) => {
             pullTables: [
               "tune",
               "reference",
+              "media_asset",
               "note",
               "repertoire_tune",
               "practice_record",

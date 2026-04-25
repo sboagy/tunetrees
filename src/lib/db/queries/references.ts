@@ -7,7 +7,7 @@
  * @module lib/db/queries/references
  */
 
-import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -64,10 +64,7 @@ export async function getReferencesByTune(
   ];
 
   const visibilityCondition = userId
-    ? or(
-        eq(schema.reference.userRef, userId),
-        isNull(schema.reference.userRef)
-      )
+    ? or(eq(schema.reference.userRef, userId), isNull(schema.reference.userRef))
     : isNull(schema.reference.userRef);
 
   return await db
@@ -263,6 +260,15 @@ export async function deleteReference(
     .where(eq(schema.reference.id, referenceId))
     .returning()
     .get();
+
+  await db
+    .update(schema.mediaAsset)
+    .set({
+      deleted: 1,
+      syncVersion: sql.raw(`${schema.mediaAsset.syncVersion.name} + 1`),
+      lastModifiedAt: now,
+    })
+    .where(eq(schema.mediaAsset.referenceRef, referenceId));
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 

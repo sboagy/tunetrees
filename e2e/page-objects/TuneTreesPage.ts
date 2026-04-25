@@ -160,8 +160,22 @@ export class TuneTreesPage {
   readonly referenceTypeSelect: Locator;
   readonly referenceCommentInput: Locator;
   readonly referenceFavoriteCheckbox: Locator;
+  readonly referenceAudioSourceUploadButton: Locator;
+  readonly referenceAudioSourceUrlButton: Locator;
+  readonly referenceAudioFileInput: Locator;
+  readonly referenceAudioDropzone: Locator;
+  readonly referenceAudioSelectedFile: Locator;
   readonly referenceSubmitButton: Locator;
   readonly referenceCancelButton: Locator;
+
+  // Audio Player Overlay
+  readonly audioPlayerOverlay: Locator;
+  readonly audioPlayerTitle: Locator;
+  readonly audioPlayerCloseButton: Locator;
+  readonly audioPlayerPlayToggle: Locator;
+  readonly audioPlayerTempoSlider: Locator;
+  readonly audioPlayerLoopToggle: Locator;
+  readonly audioPlayerWaveform: Locator;
 
   // Login/Auth Elements
   readonly anonymousSignInButton: Locator;
@@ -401,8 +415,29 @@ export class TuneTreesPage {
     this.referenceFavoriteCheckbox = page.getByTestId(
       "reference-favorite-checkbox"
     );
+    this.referenceAudioSourceUploadButton = page.getByTestId(
+      "reference-audio-source-upload-button"
+    );
+    this.referenceAudioSourceUrlButton = page.getByTestId(
+      "reference-audio-source-url-button"
+    );
+    this.referenceAudioFileInput = page.getByTestId(
+      "reference-audio-file-input"
+    );
+    this.referenceAudioDropzone = page.getByTestId("reference-audio-dropzone");
+    this.referenceAudioSelectedFile = page.getByTestId(
+      "reference-audio-selected-file"
+    );
     this.referenceSubmitButton = page.getByTestId("reference-submit-button");
     this.referenceCancelButton = page.getByTestId("reference-cancel-button");
+
+    this.audioPlayerOverlay = page.getByTestId("audio-player-overlay");
+    this.audioPlayerTitle = page.getByTestId("audio-player-title");
+    this.audioPlayerCloseButton = page.getByTestId("audio-player-close-button");
+    this.audioPlayerPlayToggle = page.getByTestId("audio-player-play-toggle");
+    this.audioPlayerTempoSlider = page.getByTestId("audio-player-tempo-slider");
+    this.audioPlayerLoopToggle = page.getByTestId("audio-player-loop-toggle");
+    this.audioPlayerWaveform = page.getByTestId("audio-player-waveform");
 
     // Login/Auth Elements
     this.anonymousSignInButton = page.getByRole("button", {

@@ -136,6 +136,35 @@ export const instrument = sqliteTable(
   ]
 );
 
+export const mediaAsset = sqliteTable(
+  "media_asset",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    referenceRef: text("reference_ref")
+      .notNull()
+      .references(() => reference.id),
+    userRef: text("user_ref")
+      .notNull()
+      .references(() => userProfile.id),
+    storagePath: text("storage_path").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    fileSizeBytes: integer("file_size_bytes").notNull(),
+    durationSeconds: real("duration_seconds"),
+    regionsJson: text("regions_json"),
+    deleted: integer("deleted").notNull().default(0),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    uniqueIndex("media_asset_reference_ref_key").on(t.referenceRef),
+    uniqueIndex("media_asset_storage_path_key").on(t.storagePath),
+    index("idx_media_asset_user_ref").on(t.userRef),
+  ]
+);
+
 export const note = sqliteTable(
   "note",
   {

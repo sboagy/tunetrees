@@ -94,6 +94,27 @@ export const instrument = pgTable("instrument", {
   deviceId: text("device_id"),
 });
 
+export const mediaAsset = pgTable("media_asset", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  referenceRef: uuid("reference_ref").notNull(),
+  userRef: uuid("user_ref").notNull(),
+  storagePath: text("storage_path").notNull(),
+  originalFilename: text("original_filename").notNull(),
+  contentType: text("content_type").notNull(),
+  fileSizeBytes: integer("file_size_bytes").notNull(),
+  durationSeconds: real("duration_seconds"),
+  regionsJson: text("regions_json"),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const note = pgTable("note", {
   id: uuid("id")
     .notNull()
@@ -434,6 +455,7 @@ export const tables = {
   genre_tune_type: genreTuneType,
   goal: goal,
   instrument: instrument,
+  media_asset: mediaAsset,
   note: note,
   plugin: plugin,
   practice_record: practiceRecord,

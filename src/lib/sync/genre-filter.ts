@@ -277,5 +277,30 @@ export async function purgeOrphanedAnnotations(
     }
   }
 
+  const orphanedMediaAssetCountResult = sqliteDb.exec(`
+    SELECT COUNT(*) as count
+    FROM media_asset
+    WHERE reference_ref NOT IN (
+      SELECT id FROM reference WHERE deleted = 0
+    )
+  `);
+  const orphanedMediaAssetCount =
+    (orphanedMediaAssetCountResult[0]?.values[0]?.[0] as number) ?? 0;
+
+  if (orphanedMediaAssetCount > 0) {
+    sqliteDb.run(`
+      DELETE FROM media_asset
+      WHERE reference_ref NOT IN (
+        SELECT id FROM reference WHERE deleted = 0
+      )
+    `);
+    deletedCounts.media_asset = orphanedMediaAssetCount;
+    console.log(
+      `[GenreFilter] Purged ${orphanedMediaAssetCount} orphaned media_asset records`
+    );
+  } else {
+    deletedCounts.media_asset = 0;
+  }
+
   return { deletedCounts };
 }

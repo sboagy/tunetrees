@@ -136,6 +136,25 @@ const TABLE_EXTRAS: Record<
       sync_version: "Sync version for conflict resolution.",
     },
   },
+  media_asset: {
+    changeCategory: "repertoire",
+    columnDescriptions: {
+      content_type: "Uploaded media MIME type.",
+      deleted: "Soft-delete flag for the media asset.",
+      device_id: "Device that last modified this record.",
+      duration_seconds: "Decoded audio duration in seconds.",
+      file_size_bytes: "Uploaded media size in bytes.",
+      last_modified_at: "Timestamp of last modification.",
+      original_filename:
+        "Original client-side filename captured at upload time.",
+      reference_ref: "Reference row that owns this uploaded media asset.",
+      regions_json:
+        "JSON-encoded WaveSurfer regions/markers for looping and annotations.",
+      storage_path: "Private R2 object key under the user namespace.",
+      sync_version: "Sync version for conflict resolution.",
+      user_ref: "Owner user_profile.id for auth scoping and sync.",
+    },
+  },
   note: {
     changeCategory: "repertoire",
     columnDescriptions: {
@@ -541,6 +560,7 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   genre_tune_type: 3,
   goal: 6,
   instrument: 7,
+  media_asset: 18,
   note: 15,
   plugin: 8,
   practice_record: 16,
@@ -548,15 +568,15 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   prefs_spaced_repetition: 10,
   reference: 17,
   repertoire: 11,
-  repertoire_tune: 18,
+  repertoire_tune: 19,
   tab_group_main_state: 12,
   table_state: 13,
-  table_transient_data: 19,
-  tag: 20,
+  table_transient_data: 20,
+  tag: 21,
   tune: 14,
-  tune_override: 21,
+  tune_override: 22,
   tune_type: 2,
-  user_genre_selection: 22,
+  user_genre_selection: 23,
   user_profile: 4,
 };
 
@@ -566,6 +586,7 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   genre_tune_type: "genreTuneType",
   goal: "goal",
   instrument: "instrument",
+  media_asset: "mediaAsset",
   note: "note",
   plugin: "plugin",
   practice_record: "practiceRecord",
