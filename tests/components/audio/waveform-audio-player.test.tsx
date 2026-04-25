@@ -201,16 +201,23 @@ function getLastPersistCall(): {
   const referenceId = call.at(1);
   const payload = call.at(2);
   if (typeof referenceId !== "string") {
-    throw new Error("Expected persisted media asset call to include a reference id");
+    throw new Error(
+      "Expected persisted media asset call to include a reference id"
+    );
   }
 
   if (!payload || typeof payload !== "object" || !("regionsJson" in payload)) {
-    throw new Error("Expected persisted media asset call to include regionsJson");
+    throw new Error(
+      "Expected persisted media asset call to include regionsJson"
+    );
   }
 
   return {
     referenceId,
-    payload: payload as { regionsJson: string; durationSeconds?: number | null },
+    payload: payload as {
+      regionsJson: string;
+      durationSeconds?: number | null;
+    },
   };
 }
 

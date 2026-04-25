@@ -297,7 +297,6 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   let isRestoringRegions = false;
   let hasPendingStateChanges = false;
 
-
   const setPreservePitch = () => {
     if (!audioElement) {
       return;
