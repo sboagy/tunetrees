@@ -37,6 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
+import { attachMediaAuthToken } from "./media-auth";
 import { NotesEditor } from "./NotesEditor";
 
 /**
@@ -54,7 +55,7 @@ import { NotesEditor } from "./NotesEditor";
  */
 export const NotesPanel: Component = () => {
   const { currentTuneId } = useCurrentTune();
-  const { user } = useAuth();
+  const { session, user } = useAuth();
   const { sidebarFontSize } = useUIPreferences();
 
   // Get dynamic font classes
@@ -266,6 +267,9 @@ export const NotesPanel: Component = () => {
     setDraggedNoteId(null);
     setDragOverNoteId(null);
   };
+
+  const renderNoteContent = (content: string) =>
+    attachMediaAuthToken(content, session()?.access_token);
 
   return (
     <div class="notes-panel" data-testid="notes-panel">
@@ -492,7 +496,7 @@ export const NotesPanel: Component = () => {
                   fallback={
                     <div
                       class={`${fontClasses().text} text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none`}
-                      innerHTML={note.noteText || ""}
+                      innerHTML={renderNoteContent(note.noteText || "")}
                       data-testid={`note-content-${note.id}`}
                     />
                   }
