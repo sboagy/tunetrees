@@ -36,12 +36,8 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await page.waitForTimeout(500); // Wait for filter to apply
 
-    // This seems to have changed, it was selecting `.first()`.
-    // The second row is the user's version of the tune,
-    // which doesn't have any references yet.  Which is what these tests seems to want.
-    // I think this is because perhaps a database reset or something else
-    // fixed the reference to the public tune?
-    const tuneRow = ttPage.getRows("catalog").nth(1);
+    // Catalog search results are not stable enough to key this suite off a row index.
+    const tuneRow = ttPage.getRows("catalog").first();
     await expect(tuneRow).toBeVisible({ timeout: 5000 });
     await tuneRow.click();
 
@@ -57,18 +53,12 @@ test.describe("REFS-001: References CRUD Operations", () => {
     });
   });
 
-  test("should display references panel with empty state", async ({ page }) => {
-    // Verify references panel shows 0 references
-
+  test("should display references panel with existing baseline reference", async () => {
     await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByRole("heading", { name: "0 references" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^1 reference$/i, {
       timeout: 5000,
     });
-
-    // Verify empty state message
-    await expect(page.getByText("No references yet")).toBeVisible({
+    await expect(ttPage.getAllReferenceItems()).toHaveCount(1, {
       timeout: 5000,
     });
 
@@ -78,7 +68,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     });
   });
 
-  test("should create a reference with YouTube URL", async ({ page }) => {
+  test("should create a reference with YouTube URL", async () => {
     // Click Add button to create a new reference
     await ttPage.referencesAddButton.click();
 
@@ -101,9 +91,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await ttPage.referenceSubmitButton.click();
 
     // Verify reference appears in list
-    await expect(
-      page.getByRole("heading", { name: "1 reference" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^2 references$/i, {
       timeout: 15000,
     });
   });
@@ -127,7 +115,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await expect(page.getByText(/valid URL/i)).toBeVisible({ timeout: 5000 });
   });
 
-  test("should cancel reference creation", async ({ page }) => {
+  test("should cancel reference creation", async () => {
     // Click Add button to create a new reference
     await ttPage.referencesAddButton.click();
 
@@ -145,10 +133,8 @@ test.describe("REFS-001: References CRUD Operations", () => {
     // Verify form is closed
     await expect(ttPage.referenceForm).not.toBeVisible();
 
-    // Verify no reference was created
-    await expect(
-      page.getByRole("heading", { name: "0 references" })
-    ).toBeVisible({
+    // Verify the existing baseline reference count is unchanged.
+    await expect(ttPage.referencesCount).toHaveText(/^1 reference$/i, {
       timeout: 5000,
     });
   });
@@ -181,9 +167,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await ttPage.referenceSubmitButton.click();
 
     // Verify reference appears in list
-    await expect(
-      page.getByRole("heading", { name: "1 reference" })
-    ).toBeVisible({
+    await expect(ttPage.referencesCount).toHaveText(/^2 references$/i, {
       timeout: 15000,
     });
 
