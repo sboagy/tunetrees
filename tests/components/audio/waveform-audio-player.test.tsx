@@ -18,6 +18,7 @@ type MockRegion = {
 };
 
 const {
+  audioPauseMock,
   emitWaveEvent,
   resetMocks,
   waveSurferInstance,
@@ -55,6 +56,7 @@ const {
     }
   };
 
+  const audioPauseMock = vi.fn();
   const updateMediaAssetByReferenceId = vi.fn(async () => undefined);
   const toastError = vi.fn();
 
@@ -114,6 +116,7 @@ const {
     regionHandlers.clear();
     mockRegions = [];
 
+    audioPauseMock.mockClear();
     updateMediaAssetByReferenceId.mockClear();
     toastError.mockClear();
     regionsPluginInstance.addRegion.mockClear();
@@ -132,6 +135,7 @@ const {
   };
 
   return {
+    audioPauseMock,
     emitWaveEvent: (event: string, ...args: unknown[]) =>
       emit(waveHandlers, event, ...args),
     resetMocks,
@@ -176,6 +180,7 @@ class MockAudioElement {
   preload = "";
   crossOrigin: string | null = null;
   duration = 180;
+  pause = audioPauseMock;
   preservesPitch?: boolean;
   mozPreservesPitch?: boolean;
   webkitPreservesPitch?: boolean;
@@ -293,6 +298,28 @@ describe("WaveformAudioPlayer persistence", () => {
       kind: "loop",
       label: "Loop 1",
     });
+  });
+
+  it("stops audio playback when the player closes", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-stop",
+          referenceTitle: "Stop Audio",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Fstop.mp3",
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    await fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
+    expect(waveSurferInstance.play).toHaveBeenCalled();
+
+    view.unmount();
+
+    expect(waveSurferInstance.pause).toHaveBeenCalled();
+    expect(audioPauseMock).toHaveBeenCalled();
   });
 
   it("restores saved settings and annotations from persisted state", async () => {

@@ -313,6 +313,12 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     mediaElement.webkitPreservesPitch = true;
   };
 
+  const stopPlayback = () => {
+    waveSurfer?.pause();
+    audioElement?.pause();
+    setIsPlaying(false);
+  };
+
   const collectSerializedRegions = () => {
     if (!regionsPlugin) {
       return regions();
@@ -634,6 +640,8 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   });
 
   onCleanup(() => {
+    stopPlayback();
+
     document.removeEventListener("keydown", handleAnnotationHotkeys);
 
     if (persistTimer) {
