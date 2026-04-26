@@ -29,6 +29,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   const [error, setError] = createSignal<string | null>(null);
   const [executionTime, setExecutionTime] = createSignal<number>(0);
   const [tipsOpen, setTipsOpen] = createSignal(false);
+  const [sidebarOpen, setSidebarOpen] = createSignal(false);
   const [compareRunning, setCompareRunning] = createSignal(false);
   const [compareTable, setCompareTable] = createSignal<string>("__all__");
 
@@ -143,11 +144,13 @@ export default function DatabaseBrowser(): ReturnType<Component> {
 
   const loadPresetQuery = (sql: string) => {
     setQuery(sql);
+    setSidebarOpen(false);
   };
 
   const browseTable = async (tableName: string) => {
     const sql = `SELECT * FROM ${tableName} LIMIT 100;`;
     setQuery(sql);
+    setSidebarOpen(false);
     // Execute query immediately after setting it
     // Use setTimeout to ensure the query signal has updated
     setTimeout(() => executeQuery(), 0);
@@ -413,9 +416,9 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   return (
     <div class="fixed inset-0 flex flex-col bg-white dark:bg-gray-950">
       {/* Header */}
-      <div class="p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
-        <h1 class="text-3xl font-bold">SQLite WASM Database Browser</h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+      <div class="px-3 py-2 sm:p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
+        <h1 class="text-lg sm:text-3xl font-bold">SQLite WASM Database Browser</h1>
+        <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           💡 <strong>Tip:</strong> Each browser tab has its own database copy.
           After making changes in another tab,{" "}
           <button
@@ -429,12 +432,27 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         </p>
       </div>
 
+      {/* Mobile: sidebar toggle bar */}
+      <div class="md:hidden flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!sidebarOpen())}
+          class="w-full px-3 py-2 flex items-center justify-between text-sm font-medium bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <span>📋 Tables & Queries</span>
+          <span class="text-gray-500">{sidebarOpen() ? "▲" : "▼"}</span>
+        </button>
+      </div>
+
       {/* Main Content - Flex to fill remaining space */}
-      <div class="flex-1 flex overflow-hidden">
-        {/* Sidebar - Tables & Presets */}
-        <div class="w-80 p-6 space-y-4 overflow-y-auto border-r border-gray-200 dark:border-gray-700">
+      <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* Sidebar - Tables & Presets (always visible on md+, toggleable on mobile) */}
+        <div
+          class="md:w-72 lg:w-80 flex-shrink-0 p-3 sm:p-6 space-y-4 overflow-y-auto border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 max-h-[45vh] md:max-h-none"
+          classList={{ "md:block": true, hidden: !sidebarOpen() }}
+        >
           {/* Tables List */}
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-col h-96">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-col max-h-40 md:h-96">
             <h2 class="text-lg font-semibold mb-3">Tables</h2>
             <Show
               when={!tables.loading}
@@ -520,22 +538,22 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         </div>
 
         {/* Main Query Panel - Fill remaining space */}
-        <div class="flex-1 p-6 flex flex-col space-y-4 overflow-y-auto">
+        <div class="flex-1 p-3 sm:p-6 flex flex-col space-y-4 overflow-y-auto min-h-0">
           {/* Query Editor */}
-          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex-shrink-0">
-            <h2 class="text-lg font-semibold mb-3">SQL Query</h2>
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex-shrink-0">
+            <h2 class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">SQL Query</h2>
             <textarea
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}
-              rows={6}
+              rows={4}
               class="w-full px-3 py-2 border rounded-md font-mono text-sm bg-gray-50 dark:bg-gray-900 border-gray-300 dark:border-gray-600"
               placeholder="Enter SQL query..."
             />
-            <div class="mt-3 flex items-center gap-3">
+            <div class="mt-2 sm:mt-3 flex items-center gap-3">
               <button
                 type="button"
                 onClick={executeQuery}
-                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
               >
                 ▶ Execute Query
               </button>
