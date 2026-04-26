@@ -34,8 +34,8 @@ export interface PWAUpdateState {
 
 /**
  * Hook to access PWA update state and functions
- * Only works in production builds
- * First call initializes the service worker, subsequent calls return the same state
+ * Initializes the service worker in production builds.
+ * In development it returns inert state/actions so UI can render consistently.
  */
 export function usePWAUpdate(): PWAUpdateState {
   const [needRefresh, setNeedRefresh] = createSignal(false);
@@ -138,6 +138,10 @@ export function usePWAUpdate(): PWAUpdateState {
   return {
     needRefresh: import.meta.env.DEV ? () => false : needRefresh,
     updateServiceWorker: async (reloadPage?: boolean) => {
+      if (import.meta.env.DEV) {
+        return;
+      }
+
       if (!globalUpdateServiceWorker) {
         console.warn("[PWA] updateServiceWorker not initialized");
         return;
@@ -146,6 +150,10 @@ export function usePWAUpdate(): PWAUpdateState {
       await globalUpdateServiceWorker(reloadPage);
     },
     checkForUpdate: () => {
+      if (import.meta.env.DEV) {
+        return;
+      }
+
       if (!globalCheckForUpdate) {
         console.warn("[PWA] checkForUpdate not initialized");
         return;

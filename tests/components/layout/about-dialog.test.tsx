@@ -18,7 +18,10 @@ describe("AboutDialog", () => {
   it("renders the credits section with required open-source projects", () => {
     render(() => <AboutDialog isOpen={true} onClose={() => {}} />);
 
+    expect(screen.getByText("Check for Update")).toBeDefined();
     expect(screen.getByText("Credits & Open Source")).toBeDefined();
+    expect(screen.getByTestId("about-credits-scroll")).toBeDefined();
+    expect(screen.getByTestId("about-credits-fade")).toBeDefined();
     expect(screen.getByText("wavesurfer.js")).toBeDefined();
     expect(screen.getByText("ts-fsrs")).toBeDefined();
     expect(screen.getByText("abcjs")).toBeDefined();

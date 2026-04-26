@@ -40,3 +40,34 @@ h1 {
 }
 
 /* Button styles removed - using Tailwind classes instead */
+
+.about-credits-scrollbar {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.9) transparent;
+}
+
+.about-credits-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.about-credits-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.about-credits-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.9);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+
+.dark .about-credits-scrollbar {
+  scrollbar-color: rgba(148, 163, 184, 0.75) transparent;
+}
+
+.dark .about-credits-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.75);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
