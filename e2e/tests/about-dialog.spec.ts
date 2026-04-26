@@ -136,6 +136,7 @@ test.describe("ABOUT-001: About TuneTrees Dialog", () => {
     await expect(ttPage.aboutCreditsSection).toContainText("abcjs");
     await expect(ttPage.aboutCreditsSection).toContainText("chart.js");
     await expect(ttPage.aboutCreditsSection).toContainText("Jodit");
+    await expect(ttPage.aboutWaveSurferCredit).toContainText("wavesurfer.js");
 
     await ttPage.aboutWaveSurferLicense.locator("summary").click();
 

@@ -15,24 +15,25 @@ describe("AboutDialog", () => {
     cleanup();
   });
 
-  it("renders the credits section with required open-source projects", () => {
+  it("renders the credits section with required open-source projects", async () => {
     render(() => <AboutDialog isOpen={true} onClose={() => {}} />);
 
     expect(screen.getByText("Check for Update")).toBeDefined();
     expect(screen.getByText("Credits & Open Source")).toBeDefined();
     expect(screen.getByTestId("about-credits-scroll")).toBeDefined();
     expect(screen.getByTestId("about-credits-fade")).toBeDefined();
-    expect(screen.getByText("wavesurfer.js")).toBeDefined();
-    expect(screen.getByText("ts-fsrs")).toBeDefined();
-    expect(screen.getByText("abcjs")).toBeDefined();
-    expect(screen.getByText("chart.js")).toBeDefined();
-    expect(screen.getByText("Jodit")).toBeDefined();
+    expect(screen.getByTestId("about-credits-loading")).toBeDefined();
+    expect(await screen.findByText("wavesurfer.js")).toBeDefined();
+    expect(await screen.findByText("ts-fsrs")).toBeDefined();
+    expect(await screen.findByText("abcjs")).toBeDefined();
+    expect(await screen.findByText("chart.js")).toBeDefined();
+    expect(await screen.findByText("Jodit")).toBeDefined();
   });
 
   it("shows the wavesurfer.js license inside a collapsible details element", async () => {
     render(() => <AboutDialog isOpen={true} onClose={() => {}} />);
 
-    const details = screen.getByTestId("about-license-wavesurfer-js");
+    const details = await screen.findByTestId("about-license-wavesurfer-js");
     expect(details.hasAttribute("open")).toBe(false);
 
     await fireEvent.click(screen.getByText("View BSD 3-Clause License"));
