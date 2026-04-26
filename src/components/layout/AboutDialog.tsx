@@ -8,7 +8,7 @@
  */
 
 import type { Component } from "solid-js";
-import { createSignal, Show } from "solid-js";
+import { createResource, createSignal, For, Show } from "solid-js";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { usePWAUpdate } from "@/lib/hooks/usePWAUpdate";
+import type { AboutCredit } from "./about-dialog-credits";
 
 interface AboutDialogProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ interface AboutDialogProps {
  * - Environment (dev/production)
  * - Copyright and license info
  * - Links to GitHub and documentation
- * - Update button (if update available or to check for updates)
+ * - Footer update action (if update available or to check for updates)
  */
 export const AboutDialog: Component<AboutDialogProps> = (props) => {
   // Get build-time constants injected by Vite
@@ -52,6 +53,17 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
   // PWA update state (only in production)
   const { needRefresh, updateServiceWorker, checkForUpdate } = usePWAUpdate();
   const [checking, setChecking] = createSignal(false);
+  const [credits] = createResource(
+    () => props.isOpen,
+    async (isOpen): Promise<readonly AboutCredit[]> => {
+      if (!isOpen) {
+        return [];
+      }
+
+      const { aboutCredits } = await import("./about-dialog-credits");
+      return aboutCredits;
+    }
+  );
 
   // Delay after clicking "Check for Update" to show "Checking..." state
   const UPDATE_CHECK_TIMEOUT = 2000;
@@ -71,6 +83,15 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
     await updateServiceWorker(true);
   };
 
+  const handleUpdateAction = async () => {
+    if (needRefresh()) {
+      await handleUpdate();
+      return;
+    }
+
+    await handleCheckForUpdate();
+  };
+
   return (
     <AlertDialog
       open={props.isOpen}
@@ -78,7 +99,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
     >
       <AlertDialogContent
         data-testid="about-dialog"
-        class="bg-white dark:bg-gray-900"
+        class="flex max-h-[90vh] flex-col overflow-hidden bg-white dark:bg-gray-900"
       >
         <AlertDialogCloseButton />
         <AlertDialogHeader>
@@ -99,7 +120,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
           </div>
         </AlertDialogHeader>
 
-        <div class="py-4">
+        <div class="py-4 pb-6">
           <dl class="space-y-3 text-sm">
             <div class="flex justify-between">
               <dt class="font-medium text-gray-600 dark:text-gray-400">
@@ -149,54 +170,81 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
 
           <div class="border-t border-gray-200 dark:border-gray-700 my-4" />
 
-          {/* Update section - only show in production */}
-          <Show when={!import.meta.env.DEV}>
-            <div class="mb-4">
-              <Show
-                when={needRefresh()}
-                fallback={
-                  <Button
-                    onClick={handleCheckForUpdate}
-                    variant="outline"
-                    size="sm"
-                    class="w-full"
-                    disabled={checking()}
-                    data-testid="about-check-update-button"
-                  >
-                    {checking() ? "Checking..." : "Check for Update"}
-                  </Button>
-                }
-              >
-                <div class="space-y-2">
-                  <p class="text-sm text-center text-green-600 dark:text-green-400 font-medium">
-                    Update Available!
-                  </p>
-                  <Button
-                    onClick={handleUpdate}
-                    variant="default"
-                    size="sm"
-                    class="w-full"
-                    data-testid="about-update-button"
-                  >
-                    Update Now
-                  </Button>
-                </div>
-              </Show>
-            </div>
-            <div class="border-t border-gray-200 dark:border-gray-700 mb-4" />
-          </Show>
-
-          <div class="text-center space-y-1">
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              © 2024 TuneTrees Contributors
-            </p>
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Licensed under MIT
-            </p>
+          <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
+            <span>© 2024 TuneTrees Contributors</span>
+            <span aria-hidden="true" class="opacity-60">
+              •
+            </span>
+            <span>Licensed under MIT</span>
           </div>
+
+          <div class="border-t border-gray-200 dark:border-gray-700 my-4" />
+
+          <section class="space-y-3" data-testid="about-credits-section">
+            <div class="space-y-1">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Credits & Open Source
+              </h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                TuneTrees is made possible by these open-source projects:
+              </p>
+            </div>
+
+            <div class="relative h-80 overflow-hidden rounded-md">
+              <div
+                class="about-credits-scrollbar h-full space-y-3 overflow-y-auto pb-14 pr-2"
+                data-testid="about-credits-scroll"
+              >
+                <Show
+                  when={credits()?.length}
+                  fallback={
+                    <p
+                      class="text-sm text-gray-600 dark:text-gray-400"
+                      data-testid="about-credits-loading"
+                    >
+                      Loading open-source credits...
+                    </p>
+                  }
+                >
+                  <For each={credits()}>
+                    {(credit) => (
+                      <div
+                        class="rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700"
+                        data-testid={`about-credit-${credit.testId}`}
+                      >
+                        <p class="font-semibold text-gray-900 dark:text-gray-100">
+                          {credit.name}
+                        </p>
+                        <p class="mt-1 text-gray-600 dark:text-gray-400">
+                          {credit.copyright}
+                        </p>
+                        <details
+                          class="mt-2"
+                          data-testid={`about-license-${credit.testId}`}
+                        >
+                          <summary class="cursor-pointer font-medium text-blue-600 dark:text-blue-400">
+                            View {credit.licenseName}
+                          </summary>
+                          <pre class="mt-2 whitespace-pre-wrap rounded-md bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                            {credit.licenseText}
+                          </pre>
+                        </details>
+                      </div>
+                    )}
+                  </For>
+                </Show>
+              </div>
+
+              <div
+                class="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/98 to-transparent dark:from-gray-900 dark:via-gray-900/98"
+                aria-hidden="true"
+                data-testid="about-credits-fade"
+              />
+            </div>
+          </section>
         </div>
 
-        <AlertDialogFooter class="flex-row justify-center gap-2">
+        <AlertDialogFooter class="relative z-10 shrink-0 border-t border-gray-200 bg-white pt-4 dark:border-gray-700 dark:bg-gray-900 flex-row justify-center gap-2">
           <Button
             as="a"
             href="https://github.com/sboagy/tunetrees"
@@ -226,6 +274,19 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
             data-testid="about-close-button"
           >
             Close
+          </Button>
+          <Button
+            onClick={handleUpdateAction}
+            variant="outline"
+            size="sm"
+            disabled={checking()}
+            data-testid="about-check-update-button"
+          >
+            {checking()
+              ? "Checking..."
+              : needRefresh()
+                ? "Update Now"
+                : "Check for Update"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
