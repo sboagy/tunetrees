@@ -59,7 +59,8 @@ CREATE POLICY "Users can insert own media assets"
 CREATE POLICY "Users can update own media assets"
   ON "public"."media_asset"
   FOR UPDATE
-  USING ("user_ref" = "auth"."uid"());
+  USING ("user_ref" = "auth"."uid"())
+  WITH CHECK ("user_ref" = "auth"."uid"());
 
 CREATE POLICY "Users can delete own media assets"
   ON "public"."media_asset"
