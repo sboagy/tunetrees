@@ -55,8 +55,29 @@ export const ReferencesPanel: Component = () => {
   const [isAdding, setIsAdding] = createSignal(false);
   const [editingReference, setEditingReference] =
     createSignal<Reference | null>(null);
+  const [isPanelDragActive, setIsPanelDragActive] = createSignal(false);
+  const [addDraft, setAddDraft] = createSignal<
+    Partial<ReferenceFormData> | undefined
+  >();
   const defaultAudioTitle = (filename: string) =>
     filename.replace(/\.[^.]+$/, "");
+
+  const openAddForm = (initialData?: Partial<ReferenceFormData>) => {
+    setAddDraft(initialData);
+    setEditingReference(null);
+    setIsAdding(true);
+  };
+
+  const hasFileDrop = (dataTransfer: DataTransfer | null | undefined) =>
+    Boolean(dataTransfer?.types?.includes("Files"));
+
+  const isAudioFile = (file: File) => {
+    if (file.type.startsWith("audio/")) {
+      return true;
+    }
+
+    return /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name);
+  };
 
   // Load references for current tune
   const [references, { refetch }] = createResource(
@@ -154,6 +175,7 @@ export const ReferencesPanel: Component = () => {
       }
 
       // Reset form
+      setAddDraft(undefined);
       setIsAdding(false);
 
       // Reload references
@@ -183,6 +205,7 @@ export const ReferencesPanel: Component = () => {
       });
 
       // Reset form
+      setAddDraft(undefined);
       setEditingReference(null);
 
       // Reload references
@@ -265,107 +288,176 @@ export const ReferencesPanel: Component = () => {
   // Handle edit button click
   const handleEditClick = (reference: Reference) => {
     setEditingReference(reference);
+    setAddDraft(undefined);
     setIsAdding(false); // Close add form if open
   };
 
   // Handle cancel
   const handleCancel = () => {
+    setAddDraft(undefined);
     setIsAdding(false);
     setEditingReference(null);
   };
 
+  const handlePanelDragOver = (event: DragEvent) => {
+    if (!hasFileDrop(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsPanelDragActive(true);
+  };
+
+  const handlePanelDragLeave = (event: DragEvent) => {
+    if (!hasFileDrop(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsPanelDragActive(false);
+  };
+
+  const handlePanelDrop = (event: DragEvent) => {
+    if (!hasFileDrop(event.dataTransfer)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsPanelDragActive(false);
+
+    if (!currentTuneId()) {
+      toast.error("Select a tune before dropping an audio reference.");
+      return;
+    }
+
+    const droppedFile = event.dataTransfer?.files?.[0] || null;
+    if (!droppedFile) {
+      return;
+    }
+
+    if (!isAudioFile(droppedFile)) {
+      toast.error("Drop an audio file to create an audio reference.");
+      return;
+    }
+
+    openAddForm({
+      refType: "audio",
+      sourceMode: "upload",
+      uploadFile: droppedFile,
+      title: defaultAudioTitle(droppedFile.name),
+    });
+  };
+
   return (
-    <div class="references-panel" data-testid="references-panel">
-      {/* Header with icon and Add Reference button */}
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-1.5">
-          <Link
-            class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
-          />
-          <h4
-            class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
-            data-testid="references-count"
-          >
-            {references()?.length || 0}{" "}
-            {references()?.length === 1 ? "reference" : "references"}
-          </h4>
+    <>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: panel acts as a drag-and-drop target for audio files while its keyboard interactions remain with contained controls */}
+      <div
+        class="references-panel rounded-lg transition-colors"
+        classList={{
+          "bg-blue-50/40 dark:bg-blue-950/20": isPanelDragActive(),
+        }}
+        onDragOver={(event) =>
+          handlePanelDragOver(event as unknown as DragEvent)
+        }
+        onDragLeave={(event) =>
+          handlePanelDragLeave(event as unknown as DragEvent)
+        }
+        onDrop={(event) => handlePanelDrop(event as unknown as DragEvent)}
+        data-testid="references-panel"
+      >
+        {/* Header with icon and Add Reference button */}
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-1.5">
+            <Link
+              class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
+            />
+            <h4
+              class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
+              data-testid="references-count"
+            >
+              {references()?.length || 0}{" "}
+              {references()?.length === 1 ? "reference" : "references"}
+            </h4>
+          </div>
+          <Show when={currentTuneId() && !isAdding() && !editingReference()}>
+            <button
+              type="button"
+              onClick={() => openAddForm()}
+              class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
+              title="Add new reference"
+              data-testid="references-add-button"
+            >
+              Add
+              <Plus class={fontClasses().iconSmall} />
+            </button>
+          </Show>
         </div>
-        <Show when={currentTuneId() && !isAdding() && !editingReference()}>
-          <button
-            type="button"
-            onClick={() => setIsAdding(true)}
-            class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
-            title="Add new reference"
-            data-testid="references-add-button"
-          >
-            Add
-            <Plus class={fontClasses().iconSmall} />
-          </button>
-        </Show>
-      </div>
 
-      {/* Add reference form */}
-      <Show when={isAdding()}>
-        <div
-          class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
-          data-testid="references-add-form"
-        >
-          <ReferenceForm
-            onSubmit={handleCreateReference}
-            onCancel={handleCancel}
-          />
-        </div>
-      </Show>
-
-      {/* Edit reference form */}
-      <Show when={editingReference()}>
-        {(ref) => (
+        {/* Add reference form */}
+        <Show when={isAdding()}>
           <div
             class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
-            data-testid="references-edit-form"
+            data-testid="references-add-form"
           >
             <ReferenceForm
-              reference={ref()}
-              onSubmit={handleUpdateReference}
+              initialData={addDraft()}
+              autoOpenTypeSelect={!addDraft()?.uploadFile}
+              onSubmit={handleCreateReference}
               onCancel={handleCancel}
             />
           </div>
-        )}
-      </Show>
+        </Show>
 
-      {/* No tune selected */}
-      <Show when={!currentTuneId()}>
-        <p
-          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
-          data-testid="references-no-tune-message"
-        >
-          Select a tune to view references
-        </p>
-      </Show>
+        {/* Edit reference form */}
+        <Show when={editingReference()}>
+          {(ref) => (
+            <div
+              class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
+              data-testid="references-edit-form"
+            >
+              <ReferenceForm
+                reference={ref()}
+                onSubmit={handleUpdateReference}
+                onCancel={handleCancel}
+              />
+            </div>
+          )}
+        </Show>
 
-      {/* Loading state */}
-      <Show when={references.loading}>
-        <p
-          class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
-          data-testid="references-loading"
-        >
-          Loading references...
-        </p>
-      </Show>
+        {/* No tune selected */}
+        <Show when={!currentTuneId()}>
+          <p
+            class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
+            data-testid="references-no-tune-message"
+          >
+            Select a tune to view references
+          </p>
+        </Show>
 
-      {/* References list */}
-      <Show when={!isAdding() && !editingReference()}>
-        <ReferenceList
-          references={references() || []}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteReference}
-          onOpenReference={handleOpenReference}
-          onReorder={handleReorderReferences}
-          urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
-          showActions={true}
-          groupByType={false}
-        />
-      </Show>
-    </div>
+        {/* Loading state */}
+        <Show when={references.loading}>
+          <p
+            class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
+            data-testid="references-loading"
+          >
+            Loading references...
+          </p>
+        </Show>
+
+        {/* References list */}
+        <Show when={!isAdding() && !editingReference()}>
+          <ReferenceList
+            references={references() || []}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteReference}
+            onOpenReference={handleOpenReference}
+            onReorder={handleReorderReferences}
+            urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
+            showActions={true}
+            groupByType={false}
+          />
+        </Show>
+      </div>
+    </>
   );
 };

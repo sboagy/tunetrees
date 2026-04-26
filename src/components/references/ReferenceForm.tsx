@@ -9,6 +9,15 @@
 
 import { Save, X } from "lucide-solid";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
+import { toast } from "solid-sonner";
+import {
+  Select,
+  SelectContent,
+  SelectHiddenSelect,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   getSidebarFontClasses,
   useUIPreferences,
@@ -24,6 +33,8 @@ interface ReferenceFormProps {
   reference?: Reference; // If editing existing reference
   onSubmit: (data: ReferenceFormData) => Promise<void> | void;
   onCancel: () => void;
+  initialData?: Partial<ReferenceFormData>;
+  autoOpenTypeSelect?: boolean;
 }
 
 export interface ReferenceFormData {
@@ -47,36 +58,97 @@ const REFERENCE_TYPES = [
   { value: "other", label: "🔗 Other" },
 ];
 
+function getReferenceTypeLabel(value: string): string {
+  return (
+    REFERENCE_TYPES.find((type) => type.value === value)?.label ||
+    "Select type..."
+  );
+}
+
+function getDefaultSourceMode(
+  reference: Reference | undefined,
+  initialData: Partial<ReferenceFormData> | undefined
+): "url" | "upload" {
+  if (initialData?.sourceMode) {
+    return initialData.sourceMode;
+  }
+
+  return reference ? "url" : "upload";
+}
+
 export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const { sidebarFontSize } = useUIPreferences();
   const heading = () =>
     props.reference ? "Edit Reference" : "Add New Reference";
   const defaultAudioTitle = (filename: string) =>
     filename.replace(/\.[^.]+$/, "");
+  const debugPickerBlockedMessage =
+    "File choosers are blocked in debugger-controlled Chrome sessions. Open TuneTrees in a normal Chrome window, or drag an audio file onto the references panel.";
+  let audioFileInputRef: HTMLInputElement | undefined;
 
   // Form state
-  const [url, setUrl] = createSignal(props.reference?.url || "");
-  const [title, setTitle] = createSignal(props.reference?.title || "");
+  const [url, setUrl] = createSignal(
+    props.reference?.url || props.initialData?.url || ""
+  );
+  const [title, setTitle] = createSignal(
+    props.reference?.title || props.initialData?.title || ""
+  );
   const [refType, setRefType] = createSignal(
-    props.reference?.refType || "other"
+    props.reference?.refType || props.initialData?.refType || "other"
   );
-  const [comment, setComment] = createSignal(props.reference?.comment || "");
+  const [comment, setComment] = createSignal(
+    props.reference?.comment || props.initialData?.comment || ""
+  );
   const [favorite, setFavorite] = createSignal(
-    props.reference?.favorite === 1 || false
+    props.reference?.favorite === 1 || props.initialData?.favorite || false
   );
-  const [sourceMode, setSourceMode] = createSignal<"url" | "upload">("url");
-  const [selectedFile, setSelectedFile] = createSignal<File | null>(null);
+  const [sourceMode, setSourceMode] = createSignal<"url" | "upload">(
+    getDefaultSourceMode(props.reference, props.initialData)
+  );
+  const [selectedFile, setSelectedFile] = createSignal<File | null>(
+    props.initialData?.uploadFile || null
+  );
   const [fileError, setFileError] = createSignal<string | null>(null);
   const [isDragActive, setIsDragActive] = createSignal(false);
+  const [isTypeMenuOpen, setIsTypeMenuOpen] = createSignal(
+    props.autoOpenTypeSelect ?? !props.reference
+  );
 
   // Validation state
   const [urlError, setUrlError] = createSignal<string | null>(null);
   const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
   const isAudioUploadMode = () =>
     !props.reference && refType() === "audio" && sourceMode() === "upload";
+  const canSubmit = () => {
+    if (isAudioUploadMode()) {
+      return selectedFile() !== null;
+    }
 
-  const handleSelectedFiles = (files: FileList | null) => {
-    const nextFile = files?.[0] || null;
+    const currentUrl = url().trim();
+    return currentUrl.length > 0 && isValidUrl(currentUrl);
+  };
+
+  createEffect(() => {
+    const initialData = props.initialData;
+    if (props.reference || !initialData) {
+      return;
+    }
+
+    setUrl(initialData.url || "");
+    setTitle(initialData.title || "");
+    setRefType(initialData.refType || "other");
+    setComment(initialData.comment || "");
+    setFavorite(initialData.favorite || false);
+    setSourceMode(getDefaultSourceMode(props.reference, initialData));
+    setSelectedFile(initialData.uploadFile || null);
+    setUrlError(null);
+    setFileError(null);
+    setIsTypeMenuOpen(props.autoOpenTypeSelect ?? false);
+  });
+
+  const handleSelectedFile = (nextFile: File | null) => {
+    console.log("Audio file selection changed", nextFile?.name ?? "(none)");
+
     if (!nextFile) {
       return;
     }
@@ -92,6 +164,81 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
     if (!title()) {
       setTitle(defaultAudioTitle(nextFile.name));
     }
+  };
+
+  const handleSelectedFiles = (files: FileList | null) => {
+    handleSelectedFile(files?.[0] || null);
+  };
+
+  const handleChooseAudioFile = async () => {
+    console.log("Choose Audio File button clicked");
+
+    const browserWindow = window as Window & {
+      showOpenFilePicker?: (options?: {
+        multiple?: boolean;
+        excludeAcceptAllOption?: boolean;
+        types?: Array<{
+          description?: string;
+          accept: Record<string, string[]>;
+        }>;
+      }) => Promise<Array<{ getFile: () => Promise<File> }>>;
+      __TT_ALLOW_DEBUG_FILE_PICKER__?: boolean;
+    };
+    const isDebugControlledBrowser = navigator.webdriver === true;
+    const allowDebugFilePicker =
+      browserWindow.__TT_ALLOW_DEBUG_FILE_PICKER__ === true;
+
+    console.log("Choose Audio File capabilities", {
+      showOpenFilePicker: typeof browserWindow.showOpenFilePicker,
+      webdriver: navigator.webdriver,
+      allowDebugFilePicker,
+    });
+
+    if (isDebugControlledBrowser && !allowDebugFilePicker) {
+      console.log(
+        "Blocking file chooser in debugger-controlled browser session"
+      );
+      toast.error(debugPickerBlockedMessage);
+      return;
+    }
+
+    if (typeof browserWindow.showOpenFilePicker === "function") {
+      try {
+        console.log("Using window.showOpenFilePicker");
+        const [fileHandle] = await browserWindow.showOpenFilePicker({
+          multiple: false,
+          excludeAcceptAllOption: false,
+          types: [
+            {
+              description: "Audio Files",
+              accept: {
+                "audio/mpeg": [".mp3"],
+                "audio/wav": [".wav"],
+                "audio/ogg": [".ogg"],
+                "audio/mp4": [".m4a"],
+                "audio/x-m4a": [".m4a"],
+                "audio/aac": [".aac"],
+                "audio/flac": [".flac"],
+              },
+            },
+          ],
+        });
+        const file = await fileHandle.getFile();
+        console.log("showOpenFilePicker resolved", file.name);
+        handleSelectedFile(file);
+        return;
+      } catch (error) {
+        console.log("showOpenFilePicker failed", error);
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        toast.error(debugPickerBlockedMessage);
+        return;
+      }
+    }
+
+    console.log("Falling back to native input click");
+    audioFileInputRef?.click();
   };
 
   // Auto-detect reference type and suggest title when URL changes
@@ -193,6 +340,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           </button>
           <button
             type="submit"
+            disabled={!canSubmit()}
             class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
             data-testid="reference-submit-button"
           >
@@ -210,17 +358,41 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         >
           Type
         </label>
-        <select
+        <Select
           id="ref-type"
           value={refType()}
-          onChange={(e) => setRefType(e.currentTarget.value)}
-          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          data-testid="reference-type-select"
+          onChange={(value) => {
+            setRefType(String(value));
+            setIsTypeMenuOpen(false);
+          }}
+          options={REFERENCE_TYPES.map((type) => type.value)}
+          open={isTypeMenuOpen()}
+          onOpenChange={setIsTypeMenuOpen}
+          sameWidth
+          itemComponent={(itemProps) => {
+            const optionValue = String(itemProps.item.rawValue);
+
+            return (
+              <SelectItem
+                item={itemProps.item}
+                data-testid={`reference-type-option-${optionValue}`}
+              >
+                {getReferenceTypeLabel(optionValue)}
+              </SelectItem>
+            );
+          }}
         >
-          {REFERENCE_TYPES.map((type) => (
-            <option value={type.value}>{type.label}</option>
-          ))}
-        </select>
+          <SelectHiddenSelect name="refType" />
+          <SelectTrigger
+            data-testid="reference-type-select"
+            aria-label="Reference type"
+          >
+            <SelectValue<string>>
+              {(state) => getReferenceTypeLabel(state.selectedOption() || "")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent />
+        </Select>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
           Auto-detected based on URL
         </p>
@@ -301,20 +473,12 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       </Show>
 
       <Show when={isAudioUploadMode()}>
-        <fieldset>
-          <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <div>
+          <div class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Audio File <span class="text-red-500">*</span>
-          </legend>
-          <input
-            id="reference-audio-file-input"
-            type="file"
-            accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
-            class="hidden"
-            onChange={(event) => handleSelectedFiles(event.currentTarget.files)}
-            data-testid="reference-audio-file-input"
-          />
-          <label
-            for="reference-audio-file-input"
+          </div>
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop stays on the container while file selection is handled by the explicit button */}
+          <div
             class="rounded-md border-2 border-dashed px-4 py-5 text-center transition-colors"
             classList={{
               "border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-blue-950/30":
@@ -343,9 +507,34 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Single-file upload for worker-backed practice audio.
             </p>
-            <span class="mt-3 inline-flex cursor-pointer items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+            <button
+              type="button"
+              onClick={() => {
+                void handleChooseAudioFile();
+              }}
+              class="mt-3 inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              data-testid="reference-audio-choose-file-button"
+            >
               Choose Audio File
-            </span>
+            </button>
+            <div class="mt-3">
+              <input
+                id="reference-audio-file-input"
+                ref={audioFileInputRef}
+                type="file"
+                accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
+                class="hidden"
+                onClick={() => {
+                  console.log("Choose Audio File input clicked");
+                }}
+                onChange={(event) => {
+                  console.log("Choose Audio File input onChange fired");
+                  handleSelectedFiles(event.currentTarget.files);
+                }}
+                aria-label="Choose audio file"
+                data-testid="reference-audio-file-input"
+              />
+            </div>
             <Show when={selectedFile()}>
               <p
                 class="mt-3 text-sm text-gray-700 dark:text-gray-300"
@@ -359,8 +548,8 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
                 {fileError()}
               </p>
             </Show>
-          </label>
-        </fieldset>
+          </div>
+        </div>
       </Show>
 
       {/* Title Input */}

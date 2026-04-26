@@ -162,6 +162,7 @@ export class TuneTreesPage {
   readonly referenceFavoriteCheckbox: Locator;
   readonly referenceAudioSourceUploadButton: Locator;
   readonly referenceAudioSourceUrlButton: Locator;
+  readonly referenceAudioChooseFileButton: Locator;
   readonly referenceAudioFileInput: Locator;
   readonly referenceAudioDropzone: Locator;
   readonly referenceAudioSelectedFile: Locator;
@@ -174,8 +175,13 @@ export class TuneTreesPage {
   readonly audioPlayerCloseButton: Locator;
   readonly audioPlayerPlayToggle: Locator;
   readonly audioPlayerTempoSlider: Locator;
+  readonly audioPlayerZoomSlider: Locator;
+  readonly audioPlayerZoomValue: Locator;
   readonly audioPlayerLoopToggle: Locator;
   readonly audioPlayerWaveform: Locator;
+  readonly audioPlayerAddRegionButton: Locator;
+  readonly audioPlayerAddBeatButton: Locator;
+  readonly audioPlayerRegionList: Locator;
 
   // Login/Auth Elements
   readonly anonymousSignInButton: Locator;
@@ -421,6 +427,9 @@ export class TuneTreesPage {
     this.referenceAudioSourceUrlButton = page.getByTestId(
       "reference-audio-source-url-button"
     );
+    this.referenceAudioChooseFileButton = page.getByTestId(
+      "reference-audio-choose-file-button"
+    );
     this.referenceAudioFileInput = page.getByTestId(
       "reference-audio-file-input"
     );
@@ -436,8 +445,17 @@ export class TuneTreesPage {
     this.audioPlayerCloseButton = page.getByTestId("audio-player-close-button");
     this.audioPlayerPlayToggle = page.getByTestId("audio-player-play-toggle");
     this.audioPlayerTempoSlider = page.getByTestId("audio-player-tempo-slider");
+    this.audioPlayerZoomSlider = page.getByTestId("audio-player-zoom-slider");
+    this.audioPlayerZoomValue = page.getByTestId("audio-player-zoom-value");
     this.audioPlayerLoopToggle = page.getByTestId("audio-player-loop-toggle");
     this.audioPlayerWaveform = page.getByTestId("audio-player-waveform");
+    this.audioPlayerAddRegionButton = page.getByTestId(
+      "audio-player-add-region-button"
+    );
+    this.audioPlayerAddBeatButton = page.getByTestId(
+      "audio-player-add-beat-button"
+    );
+    this.audioPlayerRegionList = page.getByTestId("audio-player-region-list");
 
     // Login/Auth Elements
     this.anonymousSignInButton = page.getByRole("button", {
@@ -3924,6 +3942,63 @@ export class TuneTreesPage {
   /**
    * Add a new reference with the given URL
    */
+  async selectReferenceType(optionLabelOrValue: string) {
+    const typeLabelMap: Record<string, string> = {
+      video: "Video",
+      audio: "Audio",
+      "sheet-music": "Sheet Music",
+      website: "Website",
+      article: "Article",
+      social: "Social Media",
+      lesson: "Lesson",
+      other: "Other",
+    };
+
+    const optionLabel =
+      typeLabelMap[optionLabelOrValue] ?? optionLabelOrValue.trim();
+    const listbox = this.page.getByRole("listbox");
+    const listboxVisible = await listbox
+      .isVisible({ timeout: 200 })
+      .catch(() => false);
+
+    if (!listboxVisible) {
+      await this.referenceTypeSelect.click();
+      await listbox
+        .waitFor({ state: "visible", timeout: 5000 })
+        .catch(() => {});
+    }
+
+    await this.page
+      .getByRole("option", { name: new RegExp(optionLabel, "i") })
+      .first()
+      .click();
+  }
+
+  async dropAudioFileOnReferencesPanel(options: {
+    fileName: string;
+    mimeType?: string;
+    contents?: string;
+  }) {
+    const dataTransfer = await this.page.evaluateHandle(
+      ({ fileName, mimeType, contents }) => {
+        const transfer = new DataTransfer();
+        const file = new File([contents], fileName, {
+          type: mimeType,
+        });
+        transfer.items.add(file);
+        return transfer;
+      },
+      {
+        fileName: options.fileName,
+        mimeType: options.mimeType || "audio/mpeg",
+        contents: options.contents || "audio-bytes",
+      }
+    );
+
+    await this.referencesPanel.dispatchEvent("dragover", { dataTransfer });
+    await this.referencesPanel.dispatchEvent("drop", { dataTransfer });
+  }
+
   async addReference(
     url: string,
     options?: {
@@ -3940,7 +4015,7 @@ export class TuneTreesPage {
       await this.referenceTitleInput.fill(options.title);
     }
     if (options?.type) {
-      await this.referenceTypeSelect.selectOption(options.type);
+      await this.selectReferenceType(options.type);
     }
     if (options?.comment) {
       await this.referenceCommentInput.fill(options.comment);

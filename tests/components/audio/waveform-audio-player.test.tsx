@@ -121,6 +121,7 @@ const {
     toastError.mockClear();
     regionsPluginInstance.addRegion.mockClear();
     regionsPluginInstance.getRegions.mockClear();
+    regionsPluginInstance.getRegions.mockImplementation(() => mockRegions);
     regionsPluginInstance.clearRegions.mockClear();
     regionsPluginInstance.on.mockClear();
     waveSurferInstance.on.mockClear();
@@ -159,6 +160,10 @@ vi.mock("@/lib/auth/AuthContext", () => ({
   }),
 }));
 
+vi.mock("@/lib/db/client-sqlite", () => ({
+  getDb: () => ({ kind: "fallback-db" }),
+}));
+
 vi.mock("@/lib/db/queries/media-assets", () => ({
   updateMediaAssetByReferenceId,
 }));
@@ -191,6 +196,9 @@ class MockAudioElement {
 }
 
 const originalAudio = globalThis.Audio;
+const originalPrompt = window.prompt;
+const promptMock =
+  vi.fn<(message?: string, defaultValue?: string) => string | null>();
 
 function getLastPersistCall(): {
   referenceId: string;
@@ -234,6 +242,13 @@ describe("WaveformAudioPlayer persistence", () => {
       writable: true,
       value: MockAudioElement,
     });
+    Object.defineProperty(window, "prompt", {
+      configurable: true,
+      writable: true,
+      value: promptMock,
+    });
+    promptMock.mockReset();
+    promptMock.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -242,6 +257,11 @@ describe("WaveformAudioPlayer persistence", () => {
       configurable: true,
       writable: true,
       value: originalAudio,
+    });
+    Object.defineProperty(window, "prompt", {
+      configurable: true,
+      writable: true,
+      value: originalPrompt,
     });
   });
 
@@ -322,6 +342,34 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(audioPauseMock).toHaveBeenCalled();
   });
 
+  it("disables looping until a loop region is selected", async () => {
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-loop",
+          referenceTitle: "Loop Toggle",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Floop.wav",
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    const loopToggle = screen.getByTestId(
+      "audio-player-loop-toggle"
+    ) as HTMLInputElement;
+    expect(loopToggle.disabled).toBe(true);
+
+    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+    expect(loopToggle.disabled).toBe(true);
+
+    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    expect(loopToggle.disabled).toBe(false);
+
+    await fireEvent.click(loopToggle);
+    expect(loopToggle.checked).toBe(true);
+  });
+
   it("restores saved settings and annotations from persisted state", async () => {
     render(() => (
       <WaveformAudioPlayer
@@ -362,9 +410,334 @@ describe("WaveformAudioPlayer persistence", () => {
       "80 px/s"
     );
     expect(
-      screen.getByTestId("audio-player-loop-toggle").textContent
-    ).toContain("Looping Selected Region");
+      (screen.getByTestId("audio-player-loop-toggle") as HTMLInputElement)
+        .disabled
+    ).toBe(true);
     expect(screen.getByText("Beat 1")).toBeDefined();
+  });
+
+  it("renders saved marks and regions sorted by time occurrence", async () => {
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-sorted",
+          referenceTitle: "Sorted Regions",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Fsorted.mp3",
+          regionsJson: JSON.stringify({
+            version: 2,
+            regions: [
+              { id: "beat-late", start: 18, kind: "beat", label: "Late" },
+              {
+                id: "measure-early",
+                start: 4,
+                kind: "measure",
+                label: "Early",
+              },
+              {
+                id: "section-mid",
+                start: 11,
+                kind: "section",
+                label: "Middle",
+              },
+            ],
+            settings: {
+              playbackRate: 1,
+              zoomLevel: 0,
+              loopEnabled: false,
+            },
+          }),
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    const renderedIds = Array.from(
+      screen
+        .getByTestId("audio-player-region-list")
+        .querySelectorAll('[role="option"]')
+    ).map((row) => row.getAttribute("data-testid"));
+
+    expect(renderedIds).toEqual([
+      "audio-player-region-measure-early",
+      "audio-player-region-section-mid",
+      "audio-player-region-beat-late",
+    ]);
+  });
+
+  it("updates point annotation kinds from the list control and persists them", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-type",
+          referenceTitle: "Type Change",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ftype.wav",
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+
+    const typeSelect = view.container.querySelector(
+      '[data-testid^="audio-player-region-type-"]'
+    ) as HTMLSelectElement | null;
+    expect(typeSelect).toBeTruthy();
+
+    await fireEvent.change(typeSelect!, {
+      target: { value: "measure" },
+    });
+
+    view.unmount();
+
+    await waitFor(() => {
+      expect(updateMediaAssetByReferenceId).toHaveBeenCalled();
+    });
+
+    const { payload } = getLastPersistCall();
+    const storedState = JSON.parse(payload.regionsJson) as {
+      regions: Array<{ kind: string; label: string }>;
+    };
+
+    expect(storedState.regions).toMatchObject([
+      { kind: "measure", label: "Measure 1" },
+    ]);
+  });
+
+  it("renames saved marks from the list action and persists the new label", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-rename",
+          referenceTitle: "Rename Mark",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Frename.mp3",
+          regionsJson: JSON.stringify({
+            version: 2,
+            regions: [
+              { id: "beat-1", start: 3.5, kind: "beat", label: "Beat 1" },
+            ],
+            settings: {
+              playbackRate: 1,
+              zoomLevel: 0,
+              loopEnabled: false,
+            },
+          }),
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+    promptMock.mockReturnValueOnce("Pickup Beat");
+
+    await fireEvent.click(
+      screen.getByTestId("audio-player-region-rename-beat-1")
+    );
+
+    expect(promptMock).toHaveBeenCalledWith("Rename mark or region", "Beat 1");
+    expect(screen.getByText("Pickup Beat")).toBeDefined();
+
+    view.unmount();
+
+    await waitFor(() => {
+      expect(updateMediaAssetByReferenceId).toHaveBeenCalled();
+    });
+
+    const { payload } = getLastPersistCall();
+    const storedState = JSON.parse(payload.regionsJson) as {
+      regions: Array<{ id: string; label: string }>;
+    };
+
+    expect(storedState.regions).toMatchObject([
+      { id: "beat-1", label: "Pickup Beat" },
+    ]);
+  });
+
+  it("persists the region list from signal state even if the plugin stops returning regions at save time", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-plugin-mismatch",
+          referenceTitle: "Plugin Mismatch",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Fplugin-mismatch.wav",
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+
+    regionsPluginInstance.getRegions.mockImplementation(() => []);
+
+    await fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
+      target: { value: "1.25" },
+    });
+
+    view.unmount();
+
+    await waitFor(() => {
+      expect(updateMediaAssetByReferenceId).toHaveBeenCalled();
+    });
+
+    const { payload } = getLastPersistCall();
+    const storedState = JSON.parse(payload.regionsJson) as {
+      regions: Array<{ kind: string; label: string }>;
+      settings: { playbackRate: number };
+    };
+
+    expect(storedState.settings.playbackRate).toBe(1.25);
+    expect(storedState.regions).toMatchObject([
+      { kind: "loop", label: "Loop 1" },
+      { kind: "beat", label: "Beat 1" },
+    ]);
+  });
+
+  it("does not let destroy-time region removals overwrite the final saved regions", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-destroy-overwrite",
+          referenceTitle: "Destroy Overwrite",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Fdestroy-overwrite.wav",
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+    await fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
+      target: { value: "1.25" },
+    });
+
+    waveSurferInstance.destroy.mockImplementationOnce(() => {
+      for (const region of [...regionsPluginInstance.getRegions()]) {
+        region.remove();
+      }
+    });
+
+    view.unmount();
+
+    await waitFor(() => {
+      expect(updateMediaAssetByReferenceId).toHaveBeenCalled();
+    });
+
+    const { payload } = getLastPersistCall();
+    const storedState = JSON.parse(payload.regionsJson) as {
+      regions: Array<{ kind: string; label: string }>;
+      settings: { playbackRate: number };
+    };
+
+    expect(storedState.settings.playbackRate).toBe(1.25);
+    expect(storedState.regions).toMatchObject([
+      { kind: "loop", label: "Loop 1" },
+      { kind: "beat", label: "Beat 1" },
+    ]);
+  });
+
+  it("keeps range multi-selection when clicking label text in the list", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-multi",
+          referenceTitle: "Multi Select",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Fmulti.wav",
+          regionsJson: JSON.stringify({
+            version: 2,
+            regions: [
+              { id: "beat-1", start: 1, kind: "beat", label: "Beat 1" },
+              { id: "beat-2", start: 2, kind: "beat", label: "Beat 2" },
+              { id: "beat-3", start: 3, kind: "beat", label: "Beat 3" },
+            ],
+            settings: {
+              playbackRate: 1,
+              zoomLevel: 0,
+              loopEnabled: false,
+            },
+          }),
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    await fireEvent.click(screen.getByText("Beat 1"));
+    await fireEvent.click(screen.getByText("Beat 2"), {
+      shiftKey: true,
+    });
+
+    expect(
+      screen.getByTestId("audio-player-region-beat-1").className
+    ).toContain("border-blue-500");
+    expect(
+      screen.getByTestId("audio-player-region-beat-2").className
+    ).toContain("border-blue-500");
+
+    await fireEvent.click(
+      screen.getByTestId("audio-player-remove-region-button")
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("audio-player-region-beat-1")).toBeNull();
+      expect(screen.queryByTestId("audio-player-region-beat-2")).toBeNull();
+    });
+
+    expect(screen.getByTestId("audio-player-region-beat-3")).toBeDefined();
+
+    view.unmount();
+  });
+
+  it("shows a clear-selection control and clears the current selection", async () => {
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-clear-selection",
+          referenceTitle: "Clear Selection",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Fclear-selection.wav",
+          regionsJson: JSON.stringify({
+            version: 2,
+            regions: [
+              { id: "beat-1", start: 1, kind: "beat", label: "Beat 1" },
+            ],
+            settings: {
+              playbackRate: 1,
+              zoomLevel: 0,
+              loopEnabled: false,
+            },
+          }),
+        }}
+      />
+    ));
+
+    emitWaveEvent("ready");
+
+    expect(
+      screen.queryByTestId("audio-player-clear-selection-button")
+    ).toBeNull();
+
+    await fireEvent.click(screen.getByText("Beat 1"));
+
+    expect(
+      screen
+        .getByTestId("audio-player-region-beat-1")
+        .getAttribute("aria-selected")
+    ).toBe("true");
+
+    await fireEvent.click(
+      screen.getByTestId("audio-player-clear-selection-button")
+    );
+
+    expect(
+      screen
+        .getByTestId("audio-player-region-beat-1")
+        .getAttribute("aria-selected")
+    ).toBe("false");
+    expect(
+      screen.queryByTestId("audio-player-clear-selection-button")
+    ).toBeNull();
   });
 
   it("adds beat, measure, and section marks from keyboard shortcuts", async () => {
