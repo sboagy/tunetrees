@@ -399,6 +399,28 @@ async function handleMediaView(
     return errorResponse("Forbidden", 403, corsHeaders);
   }
 
+  // For HEAD requests, use head() to fetch metadata only — no bytes streamed.
+  if (request.method === "HEAD") {
+    const objectHead = await env.TUNETREES_VAULT.head(key);
+    if (!objectHead) {
+      return errorResponse("Media not found", 404, corsHeaders);
+    }
+    const headers = new Headers(corsHeaders);
+    objectHead.writeHttpMetadata(headers);
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("Cache-Control", "private, no-store");
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/octet-stream");
+    }
+    if (typeof objectHead.size === "number") {
+      headers.set("Content-Length", String(objectHead.size));
+    }
+    if (objectHead.etag) {
+      headers.set("ETag", objectHead.etag);
+    }
+    return new Response(null, { status: 200, headers });
+  }
+
   const requestedRange = request.headers.get("Range");
   const object = requestedRange
     ? await env.TUNETREES_VAULT.get(key, { range: request.headers })
