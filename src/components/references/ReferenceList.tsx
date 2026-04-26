@@ -16,6 +16,8 @@ interface ReferenceListProps {
   onEdit?: (reference: Reference) => void;
   onDelete?: (referenceId: string) => void;
   onReorder?: (referenceIds: string[]) => void;
+  onOpenReference?: (reference: Reference) => void;
+  urlLabelByReferenceId?: ReadonlyMap<string, string>;
   showActions?: boolean;
   groupByType?: boolean;
 }
@@ -27,6 +29,8 @@ function getTypeIcon(refType: string | null): string {
   switch (refType) {
     case "video":
       return "🎥";
+    case "audio":
+      return "🎵";
     case "sheet-music":
       return "🎼";
     case "article":
@@ -45,6 +49,8 @@ function getTypeLabel(refType: string | null): string {
   switch (refType) {
     case "video":
       return "Video";
+    case "audio":
+      return "Audio";
     case "sheet-music":
       return "Sheet Music";
     case "article":
@@ -77,14 +83,23 @@ function groupReferencesByType(
 
 export const ReferenceList: Component<ReferenceListProps> = (props) => {
   const showActions = () => props.showActions ?? true;
+  const getReferenceUrlLabel = (reference: Reference) =>
+    props.urlLabelByReferenceId?.get(reference.id) || reference.url;
+  const getReferencePrimaryLabel = (reference: Reference) =>
+    reference.title || getReferenceUrlLabel(reference);
 
   // Drag-and-drop state
   const [draggedRefId, setDraggedRefId] = createSignal<string | null>(null);
   const [dragOverRefId, setDragOverRefId] = createSignal<string | null>(null);
 
   // Handle opening link in new tab
-  const handleOpenLink = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+  const handleOpenReference = (reference: Reference) => {
+    if (props.onOpenReference) {
+      props.onOpenReference(reference);
+      return;
+    }
+
+    window.open(reference.url, "_blank", "noopener,noreferrer");
   };
 
   // Drag-and-drop handlers
@@ -196,12 +211,13 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
         {/* Title or URL */}
         <button
           type="button"
-          onClick={() => handleOpenLink(itemProps.reference.url)}
+          onClick={() => handleOpenReference(itemProps.reference)}
           class="text-left w-full text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
-          title="Open in new tab"
+          title="Open reference"
+          aria-label="Open reference"
           data-testid={`reference-link-${itemProps.reference.id}`}
         >
-          {itemProps.reference.title || itemProps.reference.url}
+          {getReferencePrimaryLabel(itemProps.reference)}
         </button>
 
         {/* Type label */}
@@ -220,17 +236,17 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
         <Show
           when={
             itemProps.reference.title &&
-            itemProps.reference.title !== itemProps.reference.url
+            itemProps.reference.title !==
+              getReferenceUrlLabel(itemProps.reference)
           }
         >
-          <a
-            href={itemProps.reference.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-xs text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 break-all block mt-1"
+          <button
+            type="button"
+            onClick={() => handleOpenReference(itemProps.reference)}
+            class="mt-1 block break-all text-left text-xs text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
           >
-            {itemProps.reference.url}
-          </a>
+            {getReferenceUrlLabel(itemProps.reference)}
+          </button>
         </Show>
       </div>
 

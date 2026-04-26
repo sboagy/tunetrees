@@ -4,7 +4,13 @@ import type {
 } from "@oosync/shared/protocol";
 import { applyRemoteChangesToLocalDb, WorkerClient } from "@oosync/sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database as SqlJsDatabase } from "sql.js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import {
+  areSyncTriggersSuppressed,
+  enableSyncTriggers,
+  suppressSyncTriggers,
+} from "@/lib/db/install-triggers";
 import {
   getRepertoireGenreDefaultsForUser,
   getRepertoireTuneGenreIdsForUser,
@@ -28,6 +34,223 @@ function isNetworkSyncError(error: unknown): boolean {
     message.includes("Timed out while waiting for an open slot in the pool") ||
     message.includes("Sync failed: 503")
   );
+}
+
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function quoteSqlString(value: string): string {
+  return `'${escapeSqlString(value)}'`;
+}
+
+function readFirstColumn(sqliteDb: SqlJsDatabase, query: string): string[] {
+  const result = sqliteDb.exec(query);
+  return (result[0]?.values ?? [])
+    .map((row) => row[0])
+    .filter((value): value is string => typeof value === "string");
+}
+
+function readCount(sqliteDb: SqlJsDatabase, query: string): number {
+  const result = sqliteDb.exec(query);
+  const rawCount = result[0]?.values?.[0]?.[0];
+  return typeof rawCount === "number" ? rawCount : Number(rawCount ?? 0);
+}
+
+function deleteRowsWithoutSyncArtifacts(
+  sqliteDb: SqlJsDatabase,
+  tableName: string,
+  rowIds: string[]
+): number {
+  if (rowIds.length === 0) {
+    return 0;
+  }
+
+  const quotedIds = rowIds.map(quoteSqlString).join(", ");
+  sqliteDb.run(`
+    DELETE FROM sync_push_queue
+    WHERE table_name = ${quoteSqlString(tableName)}
+      AND row_id IN (${quotedIds})
+  `);
+  sqliteDb.run(`DELETE FROM ${tableName} WHERE id IN (${quotedIds})`);
+  return rowIds.length;
+}
+
+export function repairPendingMediaAssetSyncStateInSqlite(
+  sqliteDb: SqlJsDatabase
+): {
+  requeuedReferenceCount: number;
+  prunedMediaAssetCount: number;
+  clearedMediaAssetOutboxCount: number;
+} {
+  const pendingRows = sqliteDb.exec(`
+    SELECT DISTINCT
+      q.row_id,
+      CASE WHEN m.id IS NULL THEN 0 ELSE 1 END AS has_media_asset,
+      COALESCE(m.reference_ref, '') AS reference_ref,
+      CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS has_reference
+    FROM sync_push_queue q
+    LEFT JOIN media_asset m
+      ON m.id = q.row_id
+    LEFT JOIN reference r
+      ON r.id = m.reference_ref
+    WHERE q.table_name = 'media_asset'
+      AND q.status IN ('pending', 'in_progress', 'failed')
+  `);
+
+  const rows = pendingRows[0]?.values ?? [];
+  const mediaAssetRowIdsToClear = new Set<string>();
+  const orphanedMediaAssetIds = new Set<string>();
+  const parentReferenceIds = new Set<string>();
+
+  for (const row of rows) {
+    const rowId = typeof row[0] === "string" ? row[0] : "";
+    const hasMediaAsset = Number(row[1] ?? 0) === 1;
+    const referenceRef =
+      typeof row[2] === "string" && row[2].length > 0 ? row[2] : null;
+    const hasReference = Number(row[3] ?? 0) === 1;
+
+    if (!rowId) {
+      continue;
+    }
+
+    if (!hasMediaAsset) {
+      mediaAssetRowIdsToClear.add(rowId);
+      continue;
+    }
+
+    if (!referenceRef || !hasReference) {
+      mediaAssetRowIdsToClear.add(rowId);
+      orphanedMediaAssetIds.add(rowId);
+      continue;
+    }
+
+    parentReferenceIds.add(referenceRef);
+  }
+
+  const queuedReferenceIds = new Set(
+    parentReferenceIds.size === 0
+      ? []
+      : readFirstColumn(
+          sqliteDb,
+          `
+            SELECT DISTINCT row_id
+            FROM sync_push_queue
+            WHERE table_name = 'reference'
+              AND status IN ('pending', 'in_progress', 'failed')
+              AND row_id IN (${Array.from(parentReferenceIds)
+                .map(quoteSqlString)
+                .join(", ")})
+          `
+        )
+  );
+
+  const nowIso = new Date().toISOString();
+  const referenceIdsToQueue = Array.from(parentReferenceIds).filter(
+    (referenceId) => !queuedReferenceIds.has(referenceId)
+  );
+
+  for (const referenceId of referenceIdsToQueue) {
+    sqliteDb.run(`
+      INSERT INTO sync_push_queue (
+        id,
+        table_name,
+        row_id,
+        operation,
+        status,
+        changed_at,
+        attempts,
+        last_error,
+        synced_at
+      ) VALUES (
+        ${quoteSqlString(crypto.randomUUID())},
+        'reference',
+        ${quoteSqlString(referenceId)},
+        'UPDATE',
+        'pending',
+        ${quoteSqlString(nowIso)},
+        0,
+        NULL,
+        NULL
+      )
+    `);
+  }
+
+  const mediaAssetIdsToDelete = Array.from(orphanedMediaAssetIds);
+  const mediaAssetQueueIdsToDelete = Array.from(mediaAssetRowIdsToClear);
+  const clearedMediaAssetOutboxCount =
+    mediaAssetQueueIdsToDelete.length === 0
+      ? 0
+      : readCount(
+          sqliteDb,
+          `
+            SELECT COUNT(*)
+            FROM sync_push_queue
+            WHERE table_name = 'media_asset'
+              AND row_id IN (${mediaAssetQueueIdsToDelete
+                .map(quoteSqlString)
+                .join(", ")})
+          `
+        );
+
+  const wasSuppressed = areSyncTriggersSuppressed(sqliteDb);
+  if (!wasSuppressed) {
+    suppressSyncTriggers(sqliteDb);
+  }
+
+  try {
+    if (mediaAssetQueueIdsToDelete.length > 0) {
+      sqliteDb.run(`
+        DELETE FROM sync_push_queue
+        WHERE table_name = 'media_asset'
+          AND row_id IN (${mediaAssetQueueIdsToDelete
+            .map(quoteSqlString)
+            .join(", ")})
+      `);
+    }
+
+    if (mediaAssetIdsToDelete.length > 0) {
+      sqliteDb.run(`
+        DELETE FROM media_asset
+        WHERE id IN (${mediaAssetIdsToDelete.map(quoteSqlString).join(", ")})
+      `);
+    }
+  } finally {
+    if (!wasSuppressed) {
+      enableSyncTriggers(sqliteDb);
+    }
+  }
+
+  return {
+    requeuedReferenceCount: referenceIdsToQueue.length,
+    prunedMediaAssetCount: mediaAssetIdsToDelete.length,
+    clearedMediaAssetOutboxCount,
+  };
+}
+
+export async function repairPendingMediaAssetSyncState(): Promise<{
+  requeuedReferenceCount: number;
+  prunedMediaAssetCount: number;
+  clearedMediaAssetOutboxCount: number;
+}> {
+  const { getSqliteInstance, persistDb } = await import(
+    "@/lib/db/client-sqlite"
+  );
+  const sqliteDb = await getSqliteInstance();
+  if (!sqliteDb) {
+    throw new Error("SQLite instance not available");
+  }
+
+  const result = repairPendingMediaAssetSyncStateInSqlite(sqliteDb);
+  if (
+    result.requeuedReferenceCount > 0 ||
+    result.prunedMediaAssetCount > 0 ||
+    result.clearedMediaAssetOutboxCount > 0
+  ) {
+    await persistDb();
+  }
+
+  return result;
 }
 
 export async function preSyncMetadataViaWorker(params: {
@@ -245,35 +468,62 @@ export async function purgeOrphanedAnnotations(
 
   const tables = ["note", "reference"] as const; // NOT practice_record - filtered by repertoire
   const deletedCounts: Record<string, number> = {};
+  const wasSuppressed = areSyncTriggersSuppressed(sqliteDb);
+  if (!wasSuppressed) {
+    suppressSyncTriggers(sqliteDb);
+  }
 
-  for (const tableName of tables) {
-    // Count orphaned rows before deletion
-    const countResult = sqliteDb.exec(`
-      SELECT COUNT(*) as count
-      FROM ${tableName}
-      WHERE tune_ref NOT IN (
-        SELECT id FROM tune WHERE deleted = 0
-      )
-    `);
+  try {
+    for (const tableName of tables) {
+      const orphanIds = readFirstColumn(
+        sqliteDb,
+        `
+          SELECT id
+          FROM ${tableName}
+          WHERE tune_ref NOT IN (
+            SELECT id FROM tune WHERE deleted = 0
+          )
+        `
+      );
 
-    const orphanCount = (countResult[0]?.values[0]?.[0] as number) ?? 0;
+      deletedCounts[tableName] = deleteRowsWithoutSyncArtifacts(
+        sqliteDb,
+        tableName,
+        orphanIds
+      );
 
-    // Delete rows where tune_ref is NOT in the tune table (orphaned)
-    if (orphanCount > 0) {
-      sqliteDb.run(`
-        DELETE FROM ${tableName}
-        WHERE tune_ref NOT IN (
-          SELECT id FROM tune WHERE deleted = 0
-        )
-      `);
+      if (deletedCounts[tableName] > 0) {
+        console.log(
+          `[GenreFilter] Purged ${deletedCounts[tableName]} orphaned ${tableName} records`
+        );
+      }
     }
 
-    deletedCounts[tableName] = orphanCount;
+    const orphanedMediaAssetIds = readFirstColumn(
+      sqliteDb,
+      `
+        SELECT id
+        FROM media_asset
+        WHERE reference_ref NOT IN (
+          SELECT id FROM reference WHERE deleted = 0
+        )
+      `
+    );
 
-    if (deletedCounts[tableName] > 0) {
+    deletedCounts.media_asset = deleteRowsWithoutSyncArtifacts(
+      sqliteDb,
+      "media_asset",
+      orphanedMediaAssetIds
+    );
+
+    if (deletedCounts.media_asset > 0) {
       console.log(
-        `[GenreFilter] Purged ${deletedCounts[tableName]} orphaned ${tableName} records`
+        `[GenreFilter] Purged ${deletedCounts.media_asset} orphaned media_asset records`
       );
+    }
+  } finally {
+    if (!wasSuppressed) {
+      enableSyncTriggers(sqliteDb);
     }
   }
 

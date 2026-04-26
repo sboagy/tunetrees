@@ -21,6 +21,7 @@ export const SYNCABLE_TABLES = [
   "genre_tune_type",
   "goal",
   "instrument",
+  "media_asset",
   "note",
   "plugin",
   "practice_record",
@@ -147,6 +148,30 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       private_to_user:
         "User ID if this is a private instrument (null = public).",
       sync_version: "Sync version for conflict resolution.",
+    },
+  },
+  media_asset: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      content_type: "Uploaded media MIME type.",
+      deleted: "Soft-delete flag for the media asset.",
+      device_id: "Device that last modified this record.",
+      duration_seconds: "Decoded audio duration in seconds.",
+      file_size_bytes: "Uploaded media size in bytes.",
+      last_modified_at: "Timestamp of last modification.",
+      original_filename:
+        "Original client-side filename captured at upload time.",
+      reference_ref: "Reference row that owns this uploaded media asset.",
+      regions_json:
+        "JSON-encoded WaveSurfer regions/markers for looping and annotations.",
+      storage_path: "Private R2 object key under the user namespace.",
+      sync_version: "Sync version for conflict resolution.",
+      user_ref: "Owner user_profile.id for auth scoping and sync.",
     },
   },
   note: {

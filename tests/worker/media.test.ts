@@ -1,23 +1,22 @@
-const {
-  createRemoteJWKSetMock,
-  decodeProtectedHeaderMock,
-  jwtVerifyMock,
-} = vi.hoisted(() => ({
-  createRemoteJWKSetMock: vi.fn(() => ({ kind: "jwks" })),
-  decodeProtectedHeaderMock: vi.fn<
-    (token: string) => {
-      alg?: string;
-    }
-  >(),
-  jwtVerifyMock: vi.fn<
-    (
-      token: string,
-      key: Uint8Array | { kind: string }
-    ) => Promise<{ payload: { sub?: string } }>
-  >(),
-}));
+const { createRemoteJWKSetMock, decodeProtectedHeaderMock, jwtVerifyMock } =
+  vi.hoisted(() => ({
+    createRemoteJWKSetMock: vi.fn(() => ({ kind: "jwks" })),
+    decodeProtectedHeaderMock:
+      vi.fn<
+        (token: string) => {
+          alg?: string;
+        }
+      >(),
+    jwtVerifyMock:
+      vi.fn<
+        (
+          token: string,
+          key: Uint8Array | { kind: string }
+        ) => Promise<{ payload: { sub?: string } }>
+      >(),
+  }));
 
-vi.mock("jose", () => ({
+vi.mock("../../worker/src/jose", () => ({
   createRemoteJWKSet: createRemoteJWKSetMock,
   decodeProtectedHeader: decodeProtectedHeaderMock,
   jwtVerify: jwtVerifyMock,
@@ -32,6 +31,33 @@ import {
 type StoredObject = {
   contentType: string;
   body: string;
+};
+
+const parseRangeHeader = (value: string | null, size: number) => {
+  if (!value) {
+    return null;
+  }
+
+  const match = /^bytes=(\d+)-(\d+)?$/i.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+
+  const start = Number.parseInt(match[1], 10);
+  const end = match[2] ? Number.parseInt(match[2], 10) : size - 1;
+  if (
+    Number.isNaN(start) ||
+    Number.isNaN(end) ||
+    start > end ||
+    start >= size
+  ) {
+    return null;
+  }
+
+  return {
+    start,
+    end: Math.min(end, size - 1),
+  };
 };
 
 const isMockJwksObject = (key: Uint8Array | { kind: string }) =>
@@ -66,16 +92,28 @@ const createVault = () => {
           });
         }
       ),
-      get: vi.fn(async (key: string) => {
+      get: vi.fn(async (key: string, options?: { range?: Headers }) => {
         const object = objects.get(key);
         if (!object) {
           return null;
         }
 
+        const rangeHeader = options?.range?.get("Range") || null;
+        const range = parseRangeHeader(rangeHeader, object.body.length);
+        const body = range
+          ? object.body.slice(range.start, range.end + 1)
+          : object.body;
+
         return {
-          body: object.body,
+          body,
           size: object.body.length,
           etag: "etag-1",
+          range: range
+            ? {
+                offset: range.start,
+                length: body.length,
+              }
+            : undefined,
           writeHttpMetadata(headers: Headers) {
             headers.set("Content-Type", object.contentType);
           },
@@ -91,7 +129,9 @@ describe("worker media routes", () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
-    consoleInfoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    consoleInfoSpy = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
     createRemoteJWKSetMock.mockClear();
     decodeProtectedHeaderMock.mockReset();
     jwtVerifyMock.mockReset();
@@ -133,11 +173,12 @@ describe("worker media routes", () => {
       TUNETREES_VAULT: vault.bucket as unknown as R2Bucket,
     };
 
-    const authFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ id: "user-1" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    const authFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: "user-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
@@ -176,6 +217,56 @@ describe("worker media routes", () => {
     expect(payload.file.size).toBe(9);
     expect(payload.file.contentType).toBe("image/png");
     expect(consoleInfoSpy).toHaveBeenCalled();
+  });
+
+  it("stores uploaded audio media in the authenticated user's audio folder", async () => {
+    const vault = createVault();
+    const env: MediaWorkerEnv = {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      TUNETREES_VAULT: vault.bucket as unknown as R2Bucket,
+    };
+
+    const authFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: "user-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+    );
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: authFetch,
+    });
+
+    const formData = new FormData();
+    formData.append("mediaKind", "audio");
+    formData.append(
+      "files[0]",
+      new File(["mp3-bytes"], "take-1.mp3", { type: "audio/mpeg" })
+    );
+
+    const uploadRequest = {
+      method: "POST",
+      url: "https://worker.example.com/api/media/upload",
+      headers: new Headers({
+        Authorization: "Bearer upload-token",
+      }),
+      formData: async () => formData,
+    } as unknown as Request;
+
+    const response = await handleMediaRequest(uploadRequest, env);
+
+    expect(response?.status).toBe(200);
+    const payload = (await response?.json()) as {
+      data: { path: string };
+      file: { size: number; contentType: string };
+    };
+
+    expect(payload.data.path).toMatch(/^users\/user-1\/audio\//);
+    expect(payload.file.size).toBe(9);
+    expect(payload.file.contentType).toBe("audio/mpeg");
   });
 
   it("rejects upload requests that only provide a query-string token", async () => {
@@ -227,11 +318,12 @@ describe("worker media routes", () => {
       TUNETREES_VAULT: vault.bucket as unknown as R2Bucket,
     };
 
-    const authFetch = vi.fn(async () =>
-      new Response(JSON.stringify({ id: "user-1" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })
+    const authFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: "user-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
@@ -260,6 +352,51 @@ describe("worker media routes", () => {
     );
 
     expect(forbiddenResponse?.status).toBe(403);
+  });
+
+  it("supports ranged media responses for authenticated audio playback", async () => {
+    const vault = createVault();
+    const key = "users/user-1/audio/example.mp3";
+    vault.objects.set(key, {
+      body: "0123456789",
+      contentType: "audio/mpeg",
+    });
+
+    const env: MediaWorkerEnv = {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      TUNETREES_VAULT: vault.bucket as unknown as R2Bucket,
+    };
+
+    const authFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ id: "user-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+    );
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: authFetch,
+    });
+
+    const response = await handleMediaRequest(
+      new Request(
+        `https://worker.example.com/api/media/view?key=${encodeURIComponent(key)}&token=view-token`,
+        {
+          headers: {
+            Range: "bytes=2-5",
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response?.status).toBe(206);
+    expect(response?.headers.get("Accept-Ranges")).toBe("bytes");
+    expect(response?.headers.get("Content-Range")).toBe("bytes 2-5/10");
+    expect(await response?.text()).toBe("2345");
   });
 
   it("verifies asymmetric JWTs locally via jose JWKS handling without hitting Supabase", async () => {

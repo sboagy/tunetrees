@@ -99,6 +99,15 @@ beforeEach(async () => {
   `);
 
   db.run(`
+    CREATE TABLE media_asset (
+      id TEXT PRIMARY KEY NOT NULL,
+      reference_ref TEXT,
+      user_ref TEXT,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
     CREATE TABLE tag (
       id TEXT PRIMARY KEY NOT NULL,
       user_ref TEXT,
@@ -337,11 +346,13 @@ describe("getSyncTriggerCount", () => {
 
   it("returns correct count after installation", () => {
     installSyncTriggers(db);
-    // This counts INSERT triggers (19) but the implementation counts all three types
-    // The actual implementation has a bug in the SQL - let's check what it returns
     const count = getSyncTriggerCount(db);
-    // Should be at least 19 (one type per table)
-    expect(count).toBeGreaterThanOrEqual(19);
+    const tableCount = Object.keys(TABLE_REGISTRY).length;
+    const autoModifiedCount = Object.values(TABLE_REGISTRY).filter(
+      (meta) => meta.supportsIncremental
+    ).length;
+
+    expect(count).toBe(tableCount * 3 + autoModifiedCount);
   });
 });
 

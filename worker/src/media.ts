@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from "jose";
+import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from "./jose";
 
 export interface MediaWorkerEnv {
   SUPABASE_URL: string;
@@ -10,6 +10,12 @@ export interface MediaWorkerEnv {
 const MEDIA_UPLOAD_PATH = "/api/media/upload";
 const MEDIA_VIEW_PATH = "/api/media/view";
 const USER_ROOT_PREFIX = "users";
+const MEDIA_KIND_FORM_FIELD = "mediaKind";
+const NOTES_MEDIA_KIND = "notes";
+const AUDIO_MEDIA_KIND = "audio";
+const MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+type MediaKind = typeof NOTES_MEDIA_KIND | typeof AUDIO_MEDIA_KIND;
 
 type MediaAuthUser = {
   id: string;
@@ -69,9 +75,9 @@ export function getCorsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("Origin");
   const corsHeaders: Record<string, string> = {
     "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, apikey, x-client-info",
+      "Content-Type, Authorization, Range, apikey, x-client-info",
     Vary: "Origin",
     "Access-Control-Max-Age": "86400",
   };
@@ -116,8 +122,17 @@ function sanitizeFilename(filename: string) {
   return sanitized.length > 0 ? sanitized.slice(0, 120) : "upload";
 }
 
-function buildMediaObjectKey(userId: string, filename: string) {
-  return `${USER_ROOT_PREFIX}/${userId}/notes/${crypto.randomUUID()}-${sanitizeFilename(filename)}`;
+function getMediaKind(formData: FormData): MediaKind {
+  const mediaKind = formData.get(MEDIA_KIND_FORM_FIELD);
+  return mediaKind === AUDIO_MEDIA_KIND ? AUDIO_MEDIA_KIND : NOTES_MEDIA_KIND;
+}
+
+function buildMediaObjectKey(
+  userId: string,
+  mediaKind: MediaKind,
+  filename: string
+) {
+  return `${USER_ROOT_PREFIX}/${userId}/${mediaKind}/${crypto.randomUUID()}-${sanitizeFilename(filename)}`;
 }
 
 function buildMediaViewUrl(request: Request, key: string) {
@@ -199,13 +214,11 @@ async function verifyJwtWithSupabase(
     : null;
 }
 
-async function authenticateMediaRequest(
-  request: Request,
-  env: MediaWorkerEnv
-) {
+async function authenticateMediaRequest(request: Request, env: MediaWorkerEnv) {
   const url = new URL(request.url);
   const allowQueryToken =
-    request.method === "GET" && url.pathname === MEDIA_VIEW_PATH;
+    (request.method === "GET" || request.method === "HEAD") &&
+    url.pathname === MEDIA_VIEW_PATH;
   const authHeader = request.headers.get("Authorization");
   const bearerToken = authHeader?.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length)
@@ -255,6 +268,34 @@ function findUploadedFile(formData: FormData): UploadFileLike | null {
   return null;
 }
 
+function validateUploadedFile(
+  file: UploadFileLike,
+  mediaKind: MediaKind,
+  corsHeaders: Record<string, string>
+) {
+  if (mediaKind !== AUDIO_MEDIA_KIND) {
+    return null;
+  }
+
+  if (!file.type?.startsWith("audio/")) {
+    return errorResponse(
+      "Audio uploads must use an audio/* content type",
+      400,
+      corsHeaders
+    );
+  }
+
+  if (file.size > MAX_AUDIO_UPLOAD_BYTES) {
+    return errorResponse(
+      "Audio uploads are limited to 50 MB",
+      413,
+      corsHeaders
+    );
+  }
+
+  return null;
+}
+
 async function handleMediaUpload(
   request: Request,
   env: MediaWorkerEnv,
@@ -270,13 +311,19 @@ async function handleMediaUpload(
   }
 
   const formData = await request.formData();
+  const mediaKind = getMediaKind(formData);
   const file = findUploadedFile(formData);
   if (!file) {
     return errorResponse("No upload file was provided", 400, corsHeaders);
   }
 
+  const validationError = validateUploadedFile(file, mediaKind, corsHeaders);
+  if (validationError) {
+    return validationError;
+  }
+
   const originalFilename = file.name || "upload";
-  const key = buildMediaObjectKey(user.id, originalFilename);
+  const key = buildMediaObjectKey(user.id, mediaKind, originalFilename);
   const contentType = file.type || "application/octet-stream";
 
   await env.TUNETREES_VAULT.put(
@@ -301,6 +348,7 @@ async function handleMediaUpload(
     JSON.stringify({
       userId: user.id,
       key,
+      mediaKind,
       sizeBytes: file.size,
       contentType,
     })
@@ -351,18 +399,58 @@ async function handleMediaView(
     return errorResponse("Forbidden", 403, corsHeaders);
   }
 
-  const object = await env.TUNETREES_VAULT.get(key);
+  // For HEAD requests, use head() to fetch metadata only — no bytes streamed.
+  if (request.method === "HEAD") {
+    const objectHead = await env.TUNETREES_VAULT.head(key);
+    if (!objectHead) {
+      return errorResponse("Media not found", 404, corsHeaders);
+    }
+    const headers = new Headers(corsHeaders);
+    objectHead.writeHttpMetadata(headers);
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("Cache-Control", "private, no-store");
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/octet-stream");
+    }
+    if (typeof objectHead.size === "number") {
+      headers.set("Content-Length", String(objectHead.size));
+    }
+    if (objectHead.etag) {
+      headers.set("ETag", objectHead.etag);
+    }
+    return new Response(null, { status: 200, headers });
+  }
+
+  const requestedRange = request.headers.get("Range");
+  const object = requestedRange
+    ? await env.TUNETREES_VAULT.get(key, { range: request.headers })
+    : await env.TUNETREES_VAULT.get(key);
   if (!object?.body) {
     return errorResponse("Media not found", 404, corsHeaders);
   }
 
   const headers = new Headers(corsHeaders);
   object.writeHttpMetadata(headers);
+  headers.set("Accept-Ranges", "bytes");
   headers.set("Cache-Control", "private, no-store");
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/octet-stream");
   }
-  if (typeof object.size === "number") {
+  const objectRange = "range" in object ? object.range : undefined;
+  const isPartialResponse =
+    Boolean(requestedRange) &&
+    Boolean(objectRange) &&
+    typeof objectRange?.offset === "number" &&
+    typeof objectRange?.length === "number" &&
+    typeof object.size === "number";
+
+  if (isPartialResponse && objectRange) {
+    headers.set(
+      "Content-Range",
+      `bytes ${objectRange.offset}-${objectRange.offset + objectRange.length - 1}/${object.size}`
+    );
+    headers.set("Content-Length", String(objectRange.length));
+  } else if (typeof object.size === "number") {
     headers.set("Content-Length", String(object.size));
   }
   if (object.etag) {
@@ -370,7 +458,7 @@ async function handleMediaView(
   }
 
   return new Response(object.body, {
-    status: 200,
+    status: isPartialResponse ? 206 : 200,
     headers,
   });
 }
@@ -386,7 +474,10 @@ export async function handleMediaRequest(
     return handleMediaUpload(request, env, corsHeaders);
   }
 
-  if (request.method === "GET" && url.pathname === MEDIA_VIEW_PATH) {
+  if (
+    (request.method === "GET" || request.method === "HEAD") &&
+    url.pathname === MEDIA_VIEW_PATH
+  ) {
     return handleMediaView(request, env, corsHeaders);
   }
 

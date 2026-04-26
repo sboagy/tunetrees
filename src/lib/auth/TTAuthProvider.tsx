@@ -523,6 +523,7 @@ const TTInner: ParentComponent = (props) => {
             pullTables: [
               "tune",
               "reference",
+              "media_asset",
               "note",
               "repertoire_tune",
               "practice_record",
@@ -570,6 +571,28 @@ const TTInner: ParentComponent = (props) => {
         return null;
       }
     };
+
+    try {
+      const { repairPendingMediaAssetSyncState } = await import(
+        "@/lib/sync/genre-filter"
+      );
+      const repairResult = await repairPendingMediaAssetSyncState();
+      if (
+        repairResult.requeuedReferenceCount > 0 ||
+        repairResult.prunedMediaAssetCount > 0 ||
+        repairResult.clearedMediaAssetOutboxCount > 0
+      ) {
+        console.warn(
+          "[TTAuthProvider] Repaired pending media_asset sync state before startup sync",
+          repairResult
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[TTAuthProvider] Failed to repair pending media_asset sync state before startup sync",
+        error
+      );
+    }
 
     const syncWorker = startSyncWorker(db, {
       supabase,

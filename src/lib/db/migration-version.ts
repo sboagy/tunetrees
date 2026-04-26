@@ -112,6 +112,7 @@ export async function clearLocalDatabaseForMigration(
     // Import schema tables
     const {
       dailyPracticeQueue,
+      mediaAsset,
       practiceRecord,
       repertoireTune,
       note,
@@ -127,6 +128,7 @@ export async function clearLocalDatabaseForMigration(
     // Clear all user data tables (preserve reference data: genre, tuneType, instrument)
     const tablesToClear = [
       dailyPracticeQueue,
+      mediaAsset,
       practiceRecord,
       repertoireTune,
       note,

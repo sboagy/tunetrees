@@ -22,6 +22,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "private_to_user",
     },
+    mediaAssetIds: {
+      table: "media_asset",
+      idColumn: "id",
+      ownerColumn: "user_ref",
+    },
     noteIds: {
       table: "note",
       idColumn: "id",
@@ -101,6 +106,28 @@ export const WORKER_SYNC_CONFIG = {
       instrument: {
         kind: "orNullEqUserId",
         column: "private_to_user",
+      },
+      media_asset: {
+        kind: "rpc",
+        functionName: "sync_get_user_media_assets",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       note: {
         kind: "rpc",
@@ -292,6 +319,26 @@ export const WORKER_SYNC_CONFIG = {
             },
           ],
         },
+      },
+      media_asset: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "durationSeconds",
+              kind: "float",
+            },
+            {
+              prop: "fileSizeBytes",
+              kind: "int",
+            },
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+        bindAuthUserIdProps: ["userRef"],
+        denyDelete: false,
       },
       note: {
         sanitize: {
