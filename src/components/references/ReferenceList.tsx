@@ -213,7 +213,8 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
           type="button"
           onClick={() => handleOpenReference(itemProps.reference)}
           class="text-left w-full text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
-          title="Open in new tab"
+          title="Open reference"
+          aria-label="Open reference"
           data-testid={`reference-link-${itemProps.reference.id}`}
         >
           {getReferencePrimaryLabel(itemProps.reference)}
