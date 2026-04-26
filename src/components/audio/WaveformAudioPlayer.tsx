@@ -485,21 +485,22 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   };
 
   const toggleSelectionMembership = (regionId: string) => {
-    setSelectedRegionIds((currentIds) => {
-      if (currentIds.includes(regionId)) {
-        const nextIds = currentIds.filter((id) => id !== regionId);
-        if (selectedRegionId() === regionId) {
-          setSelectedRegionId(nextIds.at(-1) ?? null);
-        }
-        return nextIds;
-      }
+    const currentIds = selectedRegionIds();
+    const currentSelectedRegionId = selectedRegionId();
+    const isCurrentlySelected = currentIds.includes(regionId);
+    const nextIds = isCurrentlySelected
+      ? currentIds.filter((id) => id !== regionId)
+      : [...currentIds, regionId];
 
-      return [...currentIds, regionId];
-    });
+    const nextSelectedRegionId = isCurrentlySelected
+      ? currentSelectedRegionId === regionId
+        ? nextIds.at(-1) ?? null
+        : currentSelectedRegionId
+      : regionId;
+
+    setSelectedRegionIds(nextIds);
+    setSelectedRegionId(nextSelectedRegionId);
     setSelectionAnchorId(regionId);
-    if (!selectedRegionIds().includes(regionId)) {
-      setSelectedRegionId(regionId);
-    }
   };
 
   const reconcileSelection = (nextRegions: StoredAudioRegion[]) => {
