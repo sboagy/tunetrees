@@ -299,13 +299,15 @@ test.describe("ABOUT-001: About TuneTrees Dialog", () => {
     await page.waitForTimeout(500);
     await expect(ttPage.aboutDialog).toBeVisible();
 
-    // Tab through dialog elements
-    await page.keyboard.press("Tab"); // Should focus first link (GitHub)
-    await page.keyboard.press("Tab"); // Should focus second link (Docs)
-    await page.keyboard.press("Tab"); // Should focus Close button
+    const firstLicenseSummary =
+      ttPage.aboutWaveSurferLicense.locator("summary");
+
+    // Tab should move focus into the first interactive control inside the dialog.
+    await page.keyboard.press("Tab");
+    await expect(firstLicenseSummary).toBeFocused();
 
     // Close with keyboard
-    await page.keyboard.press("Enter");
+    await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
     await expect(ttPage.aboutDialog).not.toBeVisible();
   });

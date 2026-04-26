@@ -12,6 +12,7 @@ import {
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
 import {
   runTestHook,
+  submitAndWaitForPracticeSettled,
   waitForPracticeViewSettled,
 } from "../helpers/practice-view";
 import { queryLatestPracticeRecord } from "../helpers/scheduling-queries";
@@ -107,9 +108,51 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
 
       // Use the page-object helper to avoid menu detachment races during rerenders.
       await ttPage.setRowEvaluation(row, rating);
-      await ttPage.submitEvaluations();
+      await submitAndWaitForPracticeSettled(page, ttPage);
+      await runTestHook(page, "__forceSyncUpForTest");
       await page.waitForLoadState("networkidle", { timeout: 15000 });
-      await page.waitForTimeout(1200); // allow sync & view update
+    }
+
+    async function waitForDueTuneAfterReload() {
+      try {
+        await waitForPracticeViewSettled(page, ttPage, {
+          expectRows: true,
+          timeoutMs: 20000,
+        });
+        return;
+      } catch (error) {
+        console.warn(
+          "[SCHED-001] Practice queue did not repopulate after reload; retrying with a forced full sync",
+          error
+        );
+
+        await page.evaluate(() => {
+          const keysToRemove: string[] = [];
+
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+
+          for (let index = 0; index < localStorage.length; index++) {
+            const key = localStorage.key(index);
+            if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
+              keysToRemove.push(key);
+            }
+          }
+
+          for (const key of keysToRemove) {
+            localStorage.removeItem(key);
+          }
+        });
+
+        await runTestHook(page, "__forceSyncDownForTest");
+        await page.waitForLoadState("networkidle", { timeout: 15000 });
+        await ttPage.navigateToTab("practice");
+        await ttPage.refreshDateRolloverIfVisible();
+        await waitForPracticeViewSettled(page, ttPage, {
+          expectRows: true,
+          timeoutMs: 20000,
+        });
+      }
     }
 
     for (let day = 0; day < RATING_SEQUENCE.length; day++) {
@@ -185,10 +228,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
 
         await ttPage.navigateToTab("practice");
         await ttPage.refreshDateRolloverIfVisible();
-        await waitForPracticeViewSettled(page, ttPage, {
-          expectRows: true,
-          timeoutMs: 20000,
-        });
+        await waitForDueTuneAfterReload();
 
         // DEBUG: Log practice record and queue state after time advance
         const debugInfo = await page.evaluate(

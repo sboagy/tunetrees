@@ -187,7 +187,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
           </div>
         </AlertDialogHeader>
 
-        <div class="flex min-h-0 flex-1 flex-col py-4 pb-6">
+        <div class="py-4 pb-6">
           <dl class="space-y-3 text-sm">
             <div class="flex justify-between">
               <dt class="font-medium text-gray-600 dark:text-gray-400">
@@ -247,10 +247,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
 
           <div class="border-t border-gray-200 dark:border-gray-700 my-4" />
 
-          <section
-            class="flex min-h-0 flex-1 flex-col space-y-3"
-            data-testid="about-credits-section"
-          >
+          <section class="space-y-3" data-testid="about-credits-section">
             <div class="space-y-1">
               <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
                 Credits & Open Source
@@ -260,7 +257,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
               </p>
             </div>
 
-            <div class="relative h-80 overflow-hidden">
+            <div class="relative h-80 overflow-hidden rounded-md">
               <div
                 class="about-credits-scrollbar h-full space-y-3 overflow-y-auto pb-14 pr-2"
                 data-testid="about-credits-scroll"
@@ -304,19 +301,6 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
 
         <AlertDialogFooter class="relative z-10 shrink-0 border-t border-gray-200 bg-white pt-4 dark:border-gray-700 dark:bg-gray-900 flex-row justify-center gap-2">
           <Button
-            onClick={handleUpdateAction}
-            variant="outline"
-            size="sm"
-            disabled={checking()}
-            data-testid="about-check-update-button"
-          >
-            {checking()
-              ? "Checking..."
-              : needRefresh()
-                ? "Update Now"
-                : "Check for Update"}
-          </Button>
-          <Button
             as="a"
             href="https://github.com/sboagy/tunetrees"
             target="_blank"
@@ -345,6 +329,19 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
             data-testid="about-close-button"
           >
             Close
+          </Button>
+          <Button
+            onClick={handleUpdateAction}
+            variant="outline"
+            size="sm"
+            disabled={checking()}
+            data-testid="about-check-update-button"
+          >
+            {checking()
+              ? "Checking..."
+              : needRefresh()
+                ? "Update Now"
+                : "Check for Update"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
