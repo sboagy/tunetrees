@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from "jose";
+import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from "./jose";
 
 export interface MediaWorkerEnv {
   SUPABASE_URL: string;

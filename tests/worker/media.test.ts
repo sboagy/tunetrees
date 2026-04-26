@@ -16,7 +16,7 @@ const { createRemoteJWKSetMock, decodeProtectedHeaderMock, jwtVerifyMock } =
       >(),
   }));
 
-vi.mock("jose", () => ({
+vi.mock("../../worker/src/jose", () => ({
   createRemoteJWKSet: createRemoteJWKSetMock,
   decodeProtectedHeader: decodeProtectedHeaderMock,
   jwtVerify: jwtVerifyMock,
