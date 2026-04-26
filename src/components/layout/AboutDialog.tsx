@@ -8,7 +8,7 @@
  */
 
 import type { Component } from "solid-js";
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -25,6 +25,85 @@ interface AboutDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+const mitLicenseText = `Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+const aboutCredits = [
+  {
+    name: "wavesurfer.js",
+    testId: "wavesurfer-js",
+    copyright: "Copyright (c) 2012-2023, katspaugh and contributors",
+    licenseName: "BSD 3-Clause License",
+    licenseText: `Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`,
+  },
+  {
+    name: "ts-fsrs",
+    testId: "ts-fsrs",
+    copyright: "Copyright (c) 2025 Open Spaced Repetition",
+    licenseName: "MIT License",
+    licenseText: mitLicenseText,
+  },
+  {
+    name: "abcjs",
+    testId: "abcjs",
+    copyright: "Copyright (c) 2009-2024 Paul Rosen and Gregory Dyke",
+    licenseName: "MIT License",
+    licenseText: mitLicenseText,
+  },
+  {
+    name: "chart.js",
+    testId: "chart-js",
+    copyright: "Copyright (c) 2014-2024 Chart.js Contributors",
+    licenseName: "MIT License",
+    licenseText: mitLicenseText,
+  },
+  {
+    name: "Jodit",
+    testId: "jodit",
+    copyright: "Copyright (c) 2013-2026 https://xdsoft.net",
+    licenseName: "MIT License",
+    licenseText: mitLicenseText,
+  },
+] as const;
 
 /**
  * About TuneTrees Dialog
@@ -78,7 +157,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
     >
       <AlertDialogContent
         data-testid="about-dialog"
-        class="bg-white dark:bg-gray-900"
+        class="max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900"
       >
         <AlertDialogCloseButton />
         <AlertDialogHeader>
@@ -194,6 +273,48 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
               Licensed under MIT
             </p>
           </div>
+
+          <div class="border-t border-gray-200 dark:border-gray-700 my-4" />
+
+          <section class="space-y-3" data-testid="about-credits-section">
+            <div class="space-y-1">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Credits & Open Source
+              </h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                TuneTrees is made possible by these open-source projects:
+              </p>
+            </div>
+
+            <div class="space-y-3">
+              <For each={aboutCredits}>
+                {(credit) => (
+                  <div
+                    class="rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700"
+                    data-testid={`about-credit-${credit.testId}`}
+                  >
+                    <p class="font-semibold text-gray-900 dark:text-gray-100">
+                      {credit.name}
+                    </p>
+                    <p class="mt-1 text-gray-600 dark:text-gray-400">
+                      {credit.copyright}
+                    </p>
+                    <details
+                      class="mt-2"
+                      data-testid={`about-license-${credit.testId}`}
+                    >
+                      <summary class="cursor-pointer font-medium text-blue-600 dark:text-blue-400">
+                        View {credit.licenseName}
+                      </summary>
+                      <pre class="mt-2 whitespace-pre-wrap rounded-md bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                        {credit.licenseText}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+              </For>
+            </div>
+          </section>
         </div>
 
         <AlertDialogFooter class="flex-row justify-center gap-2">

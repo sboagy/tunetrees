@@ -55,6 +55,9 @@ export class TuneTreesPage {
   readonly aboutBuild: Locator;
   readonly aboutBranch: Locator;
   readonly aboutEnvironment: Locator;
+  readonly aboutCreditsSection: Locator;
+  readonly aboutWaveSurferCredit: Locator;
+  readonly aboutWaveSurferLicense: Locator;
   readonly aboutGithubLink: Locator;
   readonly aboutDocsLink: Locator;
   readonly aboutCloseButton: Locator;
@@ -274,6 +277,11 @@ export class TuneTreesPage {
     this.aboutBuild = page.getByTestId("about-build");
     this.aboutBranch = page.getByTestId("about-branch");
     this.aboutEnvironment = page.getByTestId("about-environment");
+    this.aboutCreditsSection = page.getByTestId("about-credits-section");
+    this.aboutWaveSurferCredit = page.getByTestId("about-credit-wavesurfer-js");
+    this.aboutWaveSurferLicense = page.getByTestId(
+      "about-license-wavesurfer-js"
+    );
     this.aboutGithubLink = page.getByTestId("about-github-link");
     this.aboutDocsLink = page.getByTestId("about-docs-link");
     this.aboutCloseButton = page.getByTestId("about-close-button");

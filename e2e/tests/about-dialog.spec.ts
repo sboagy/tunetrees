@@ -119,6 +119,34 @@ test.describe("ABOUT-001: About TuneTrees Dialog", () => {
     await expect(ttPage.aboutDialog).toContainText("Licensed under MIT");
   });
 
+  test("should display open-source credits with expandable license text", async ({
+    page,
+  }) => {
+    // Open About dialog
+    await ttPage.logoDropdownButton.click();
+    await page.waitForTimeout(300);
+    await ttPage.logoDropdownAboutButton.click();
+    await page.waitForTimeout(500);
+
+    await expect(ttPage.aboutCreditsSection).toContainText(
+      "Credits & Open Source"
+    );
+    await expect(ttPage.aboutCreditsSection).toContainText("wavesurfer.js");
+    await expect(ttPage.aboutCreditsSection).toContainText("ts-fsrs");
+    await expect(ttPage.aboutCreditsSection).toContainText("abcjs");
+    await expect(ttPage.aboutCreditsSection).toContainText("chart.js");
+    await expect(ttPage.aboutCreditsSection).toContainText("Jodit");
+
+    await ttPage.aboutWaveSurferLicense.locator("summary").click();
+
+    await expect(ttPage.aboutWaveSurferCredit).toContainText(
+      "Copyright (c) 2012-2023, katspaugh and contributors"
+    );
+    await expect(ttPage.aboutWaveSurferCredit).toContainText(
+      "Redistribution and use in source and binary forms"
+    );
+  });
+
   test("should have working GitHub link", async ({ page }) => {
     // Open About dialog
     await ttPage.logoDropdownButton.click();
