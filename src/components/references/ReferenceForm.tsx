@@ -113,6 +113,16 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const [isTypeMenuOpen, setIsTypeMenuOpen] = createSignal(
     props.autoOpenTypeSelect ?? !props.reference
   );
+  const setAudioSourceMode = (mode: "url" | "upload") => {
+    setSourceMode(mode);
+
+    if (mode === "upload") {
+      setUrlError(null);
+      return;
+    }
+
+    setFileError(null);
+  };
 
   // Validation state
   const [urlError, setUrlError] = createSignal<string | null>(null);
@@ -403,41 +413,79 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Audio Source
           </legend>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSourceMode("upload");
-                setUrlError(null);
-              }}
-              class="rounded-md border px-3 py-2 text-sm font-medium transition-colors"
+          <div
+            class="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-900/60"
+            role="radiogroup"
+            aria-label="Audio source"
+          >
+            <label
+              for="reference-audio-source-upload"
+              class="cursor-pointer rounded-md px-3 py-2 text-sm font-medium transition-all"
               classList={{
-                "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200":
+                "bg-white text-gray-800 shadow-sm dark:bg-gray-800/80 dark:text-gray-100":
                   sourceMode() === "upload",
-                "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800":
+                "text-gray-700 hover:bg-white/80 dark:text-gray-200 dark:hover:bg-gray-800/70":
                   sourceMode() !== "upload",
               }}
-              data-testid="reference-audio-source-upload-button"
+              data-testid="reference-audio-source-upload-option"
             >
-              Upload File
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSourceMode("url");
-                setFileError(null);
-              }}
-              class="rounded-md border px-3 py-2 text-sm font-medium transition-colors"
+              <input
+                id="reference-audio-source-upload"
+                type="radio"
+                name="reference-audio-source"
+                value="upload"
+                checked={sourceMode() === "upload"}
+                onChange={() => setAudioSourceMode("upload")}
+                class="sr-only"
+              />
+              <span class="flex items-center justify-center gap-2">
+                <span
+                  class="h-3.5 w-3.5 rounded-full border transition-colors"
+                  classList={{
+                    "border-blue-600 bg-blue-600 ring-2 ring-blue-200 dark:border-blue-300 dark:bg-blue-300 dark:ring-blue-900/60":
+                      sourceMode() === "upload",
+                    "border-gray-400 bg-transparent dark:border-gray-500":
+                      sourceMode() !== "upload",
+                  }}
+                  aria-hidden="true"
+                />
+                <span>Upload File</span>
+              </span>
+            </label>
+            <label
+              for="reference-audio-source-url"
+              class="cursor-pointer rounded-md px-3 py-2 text-sm font-medium transition-all"
               classList={{
-                "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-200":
+                "bg-white text-gray-800 shadow-sm dark:bg-gray-800/80 dark:text-gray-100":
                   sourceMode() === "url",
-                "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800":
+                "text-gray-700 hover:bg-white/80 dark:text-gray-200 dark:hover:bg-gray-800/70":
                   sourceMode() !== "url",
               }}
-              data-testid="reference-audio-source-url-button"
+              data-testid="reference-audio-source-url-option"
             >
-              External URL
-            </button>
+              <input
+                id="reference-audio-source-url"
+                type="radio"
+                name="reference-audio-source"
+                value="url"
+                checked={sourceMode() === "url"}
+                onChange={() => setAudioSourceMode("url")}
+                class="sr-only"
+              />
+              <span class="flex items-center justify-center gap-2">
+                <span
+                  class="h-3.5 w-3.5 rounded-full border transition-colors"
+                  classList={{
+                    "border-blue-600 bg-blue-600 ring-2 ring-blue-200 dark:border-blue-300 dark:bg-blue-300 dark:ring-blue-900/60":
+                      sourceMode() === "url",
+                    "border-gray-400 bg-transparent dark:border-gray-500":
+                      sourceMode() !== "url",
+                  }}
+                  aria-hidden="true"
+                />
+                <span>External URL</span>
+              </span>
+            </label>
           </div>
         </fieldset>
       </Show>
