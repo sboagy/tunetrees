@@ -1,5 +1,5 @@
 const MEDIA_VAULT_DB_NAME = "tunetrees-media-vault";
-const MEDIA_VAULT_DB_VERSION = 1;
+const MEDIA_VAULT_DB_VERSION = 2;
 const MEDIA_VAULT_STORE = "media-vault";
 const MEDIA_DRAFT_STORE = "media-drafts";
 
@@ -40,7 +40,14 @@ function openDatabase(): Promise<IDBDatabase> {
         const db = request.result;
 
         if (!db.objectStoreNames.contains(MEDIA_VAULT_STORE)) {
-          db.createObjectStore(MEDIA_VAULT_STORE, { keyPath: "key" });
+          const store = db.createObjectStore(MEDIA_VAULT_STORE, { keyPath: "key" });
+          store.createIndex("kind", "kind", { unique: false });
+        } else {
+          const transaction = request.transaction;
+          const store = transaction?.objectStore(MEDIA_VAULT_STORE);
+          if (store && !store.indexNames.contains("kind")) {
+            store.createIndex("kind", "kind", { unique: false });
+          }
         }
 
         if (!db.objectStoreNames.contains(MEDIA_DRAFT_STORE)) {
@@ -148,10 +155,10 @@ export async function listMediaVaultKeysByKind(
   const records = ((await runTransaction<MediaVaultRecord[]>(
     MEDIA_VAULT_STORE,
     "readonly",
-    (store) => store.getAll()
+    (store) => store.index("kind").getAll(kind)
   )) ?? []) as MediaVaultRecord[];
 
-  return records.filter((record) => record.kind === kind).map((record) => record.key);
+  return records.map((record) => record.key);
 }
 
 export async function putMediaDraft(record: MediaDraftRecord): Promise<void> {

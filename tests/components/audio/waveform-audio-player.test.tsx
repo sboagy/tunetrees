@@ -837,6 +837,8 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
+    // Click the player surface first so the subsequent keyboard events follow
+    // the same focused-interaction path a user would take in the browser.
     await fireEvent.click(screen.getByTestId("audio-player-panel"));
 
     await fireEvent.keyDown(document.body, {
