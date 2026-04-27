@@ -4,7 +4,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { detectReferenceType } from "@/lib/db/queries/references";
+import {
+  detectReferenceType,
+  extractTitleFromUrl,
+} from "@/lib/db/queries/references";
 
 describe("detectReferenceType", () => {
   it("should detect video platforms", () => {
@@ -94,5 +97,40 @@ describe("detectReferenceType", () => {
       const detected = detectReferenceType(url);
       expect(validTypes).toContain(detected);
     }
+  });
+
+  it("should ignore spoofed hostnames and query strings", () => {
+    expect(
+      detectReferenceType("https://thesession.org.evil.example/tunes/123")
+    ).toBe("website");
+    expect(
+      detectReferenceType("https://example.com/watch?v=123&redirect=youtube.com")
+    ).toBe("website");
+    expect(
+      detectReferenceType("https://example.com/file?download=song.mp3")
+    ).toBe("website");
+  });
+});
+
+describe("extractTitleFromUrl", () => {
+  it("should extract known-site titles from trusted hostnames only", () => {
+    expect(extractTitleFromUrl("https://youtube.com/watch?v=abc123")).toBe(
+      "YouTube Video (abc123)"
+    );
+    expect(extractTitleFromUrl("https://youtu.be/xyz789")).toBe(
+      "YouTube Video (xyz789)"
+    );
+    expect(extractTitleFromUrl("https://thesession.org/tunes/the-kesh")).toBe(
+      "The Session: the kesh"
+    );
+  });
+
+  it("should fall back to the actual hostname for spoofed urls", () => {
+    expect(
+      extractTitleFromUrl("https://youtube.com.evil.example/watch?v=abc123")
+    ).toBe("youtube.com.evil.example");
+    expect(
+      extractTitleFromUrl("https://thesession.org.evil.example/tunes/the-kesh")
+    ).toBe("thesession.org.evil.example");
   });
 });

@@ -20,6 +20,11 @@ import { getPluginsByCapability } from "@/lib/db/queries/plugins";
 import type { Plugin } from "@/lib/db/types";
 import { runPluginFunction } from "@/lib/plugins/runtime";
 import {
+  hasHttpProtocol,
+  matchesHostname,
+  parseAbsoluteUrl,
+} from "@/lib/utils/url";
+import {
   extractIncipitFromTheSessionJson,
   fetchTheSessionURLsFromTitle,
   fetchTuneInfoFromTheSessionURL,
@@ -160,7 +165,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
    */
   const handleNew = () => {
     const title = urlOrTitle();
-    const isUrl = title.startsWith("http://") || title.startsWith("https://");
+    const isUrl = hasHttpProtocol(title);
     const fullPath = location.pathname + location.search;
 
     if (isUrl) {
@@ -195,10 +200,21 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         return;
       }
 
-      if (input.startsWith("https://thesession.org")) {
+      const parsedUrl = parseAbsoluteUrl(input);
+      const isSecureUrl = parsedUrl?.protocol === "https:";
+
+      if (
+        parsedUrl &&
+        isSecureUrl &&
+        matchesHostname(parsedUrl, "thesession.org")
+      ) {
         // Direct URL import
         await importFromTheSessionURL(input);
-      } else if (input.startsWith("https://www.irishtune.info")) {
+      } else if (
+        parsedUrl &&
+        isSecureUrl &&
+        matchesHostname(parsedUrl, "irishtune.info")
+      ) {
         // IrishTune.info not implemented in this minimal version
         setImportError("IrishTune.info import not yet implemented");
       } else {
@@ -293,7 +309,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
     const payload = {
       input,
       genre: selectedGenre(),
-      isUrl: input.startsWith("http://") || input.startsWith("https://"),
+      isUrl: hasHttpProtocol(input),
     };
 
     const result = await runPluginFunction({
@@ -687,7 +703,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
             >
               {isImporting()
                 ? "Importing..."
-                : urlOrTitle().startsWith("https://")
+                : hasHttpProtocol(urlOrTitle())
                   ? "Import"
                   : "Search"}
             </Button>

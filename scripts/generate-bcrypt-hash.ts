@@ -24,7 +24,6 @@ async function generateHash() {
   }
 
   console.log("🔐 Generating bcrypt hash...\n");
-  console.log(`Password: ${password}`);
   console.log(`Salt rounds: ${saltRounds}\n`);
 
   try {

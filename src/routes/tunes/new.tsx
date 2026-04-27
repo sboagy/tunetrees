@@ -16,6 +16,11 @@ import { TuneEditor } from "../../components/tunes";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { createReference } from "../../lib/db/queries/references";
 import { createTune } from "../../lib/db/queries/tunes";
+import {
+  getUrlPathSegments,
+  matchesHostname,
+  parseAbsoluteUrl,
+} from "../../lib/utils/url";
 
 /**
  * New Tune Page Component
@@ -25,6 +30,21 @@ const NewTunePage: Component = () => {
   const location = useLocation();
   const { localDb, userIdInt, user } = useAuth();
   const [searchParams] = useSearchParams();
+
+  const getImportedSourceReferenceTitle = (sourceUrl: string): string => {
+    const parsedUrl = parseAbsoluteUrl(sourceUrl);
+    const foreignId = getUrlPathSegments(parsedUrl ?? sourceUrl).at(-1);
+
+    if (parsedUrl && matchesHostname(parsedUrl, "irishtune.info")) {
+      return foreignId ? `irishtune.info #${foreignId}` : "irishtune.info";
+    }
+
+    if (parsedUrl && matchesHostname(parsedUrl, "thesession.org")) {
+      return foreignId ? `thesession.org #${foreignId}` : "thesession.org";
+    }
+
+    return foreignId ? `Source #${foreignId}` : "Source";
+  };
 
   // Store the location we came from (referrer) for proper back navigation
   const returnPath = createMemo(() => {
@@ -101,19 +121,12 @@ const NewTunePage: Component = () => {
         const authUserId = user()?.id;
         if (userId && authUserId) {
           try {
-            const foreignId = sourceUrl.split("/").filter(Boolean).pop();
-            const title = sourceUrl.includes("://www.irishtune.info")
-              ? `irishtune.info #${foreignId}`
-              : sourceUrl.includes("://thesession.org")
-                ? `thesession.org #${foreignId}`
-                : `Source #${foreignId}`;
-
             await createReference(
               db,
               {
                 tuneRef: newTune.id,
                 url: sourceUrl,
-                title: title,
+                title: getImportedSourceReferenceTitle(sourceUrl),
                 refType: "website",
                 favorite: false,
                 public: true,

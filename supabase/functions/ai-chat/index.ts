@@ -415,11 +415,11 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error("Edge function error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Edge function error:", errorMessage);
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        details: error instanceof Error ? error.message : String(error),
       }),
       {
         status: 500,

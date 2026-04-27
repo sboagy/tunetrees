@@ -8,6 +8,11 @@
  */
 
 import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import {
+  matchesHostname,
+  parseAbsoluteUrl,
+  pathHasExtension,
+} from "@/lib/utils/url";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -317,45 +322,49 @@ export function isValidUrl(url: string): boolean {
  * @returns Reference type (video, sheet-music, article, other)
  */
 export function detectReferenceType(url: string): string {
-  const urlLower = url.toLowerCase();
+  const parsedUrl = parseAbsoluteUrl(url);
+
+  if (!parsedUrl) {
+    return "website";
+  }
 
   // Video platforms
   if (
-    urlLower.includes("youtube.com") ||
-    urlLower.includes("youtu.be") ||
-    urlLower.includes("vimeo.com")
+    matchesHostname(parsedUrl, "youtube.com") ||
+    matchesHostname(parsedUrl, "youtu.be") ||
+    matchesHostname(parsedUrl, "vimeo.com")
   ) {
     return "video";
   }
 
   // Sheet music / PDF
   if (
-    urlLower.includes("thesession.org") ||
-    urlLower.includes(".pdf") ||
-    urlLower.includes("musescore.com")
+    matchesHostname(parsedUrl, "thesession.org") ||
+    pathHasExtension(parsedUrl, ".pdf") ||
+    matchesHostname(parsedUrl, "musescore.com")
   ) {
     return "sheet-music";
   }
 
   // Audio platforms
   if (
-    urlLower.includes("soundcloud.com") ||
-    urlLower.includes("spotify.com") ||
-    urlLower.includes("bandcamp.com") ||
-    urlLower.includes(".mp3") ||
-    urlLower.includes(".wav") ||
-    urlLower.includes(".ogg") ||
-    urlLower.includes(".m4a")
+    matchesHostname(parsedUrl, "soundcloud.com") ||
+    matchesHostname(parsedUrl, "spotify.com") ||
+    matchesHostname(parsedUrl, "bandcamp.com") ||
+    pathHasExtension(parsedUrl, ".mp3") ||
+    pathHasExtension(parsedUrl, ".wav") ||
+    pathHasExtension(parsedUrl, ".ogg") ||
+    pathHasExtension(parsedUrl, ".m4a")
   ) {
     return "audio";
   }
 
   // Social media
   if (
-    urlLower.includes("facebook.com") ||
-    urlLower.includes("instagram.com") ||
-    urlLower.includes("twitter.com") ||
-    urlLower.includes("x.com")
+    matchesHostname(parsedUrl, "facebook.com") ||
+    matchesHostname(parsedUrl, "instagram.com") ||
+    matchesHostname(parsedUrl, "twitter.com") ||
+    matchesHostname(parsedUrl, "x.com")
   ) {
     return "social";
   }
@@ -376,7 +385,7 @@ export function extractTitleFromUrl(url: string): string {
     const urlObj = new URL(url);
 
     // Special case for YouTube
-    if (urlObj.hostname.includes("youtube.com")) {
+    if (matchesHostname(urlObj, "youtube.com")) {
       const videoId = urlObj.searchParams.get("v");
       if (videoId) {
         return `YouTube Video (${videoId})`;
@@ -384,7 +393,7 @@ export function extractTitleFromUrl(url: string): string {
     }
 
     // Special case for youtu.be short links
-    if (urlObj.hostname.includes("youtu.be")) {
+    if (matchesHostname(urlObj, "youtu.be")) {
       const videoId = urlObj.pathname.substring(1);
       if (videoId) {
         return `YouTube Video (${videoId})`;
@@ -392,7 +401,7 @@ export function extractTitleFromUrl(url: string): string {
     }
 
     // Special case for The Session
-    if (urlObj.hostname.includes("thesession.org")) {
+    if (matchesHostname(urlObj, "thesession.org")) {
       const parts = urlObj.pathname.split("/");
       const tuneName = parts[parts.length - 1];
       if (tuneName) {
