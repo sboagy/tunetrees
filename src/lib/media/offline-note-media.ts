@@ -82,6 +82,26 @@ async function uploadNoteMediaToWorker(
   };
 }
 
+function replaceBlobUrlInHtml(
+  html: string,
+  blobUrl: string,
+  uploadedUrl: string
+): string {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+
+  for (const element of template.content.querySelectorAll<HTMLElement>(
+    "img[src],a[href]"
+  )) {
+    const attr = element.tagName === "IMG" ? "src" : "href";
+    if (element.getAttribute(attr) === blobUrl) {
+      element.setAttribute(attr, uploadedUrl);
+    }
+  }
+
+  return template.innerHTML;
+}
+
 export async function queueOfflineNoteMedia({
   db,
   file,
@@ -174,19 +194,39 @@ export async function processPendingNoteMediaDrafts({
     const upload = await uploadNoteMediaToWorker(file, accessToken);
     const uploadedUrl = upload.data.files[0];
     const now = new Date().toISOString();
-
-    await db.run(sql`
-      UPDATE note
-      SET
-        note_text = REPLACE(note_text, ${entry.blobUrl}, ${uploadedUrl}),
-        last_modified_at = ${now},
-        sync_version = sync_version + 1
+    const notesToUpdate = await db.all<{ id: string; noteText: string | null }>(sql`
+      SELECT
+        id as id,
+        note_text as noteText
+      FROM note
       WHERE
         user_ref = ${userId}
         AND deleted = 0
         AND note_text IS NOT NULL
         AND instr(note_text, ${entry.blobUrl}) > 0
     `);
+
+    for (const note of notesToUpdate) {
+      const noteText = note.noteText ?? "";
+      const nextNoteText = replaceBlobUrlInHtml(
+        noteText,
+        entry.blobUrl,
+        uploadedUrl
+      );
+
+      if (nextNoteText === noteText) {
+        continue;
+      }
+
+      await db.run(sql`
+        UPDATE note
+        SET
+          note_text = ${nextNoteText},
+          last_modified_at = ${now},
+          sync_version = sync_version + 1
+        WHERE id = ${note.id}
+      `);
+    }
 
     await deleteMediaDraftUpload(db, entry.id);
     await deleteMediaDraft(entry.id);

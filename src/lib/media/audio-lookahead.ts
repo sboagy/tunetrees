@@ -22,24 +22,30 @@ async function listUpcomingAudioReferenceUrls(
 ): Promise<string[]> {
   const dayModifier = `+${Math.max(0, Math.trunc(lookaheadDays))} day`;
   const results = await db.all<{ url: string }>(sql`
-    SELECT DISTINCT r.url AS url
-    FROM reference r
-    INNER JOIN media_asset ma
-      ON ma.reference_ref = r.id
-     AND ma.deleted = 0
-    INNER JOIN repertoire_tune rt
-      ON rt.tune_ref = r.tune_ref
-     AND rt.deleted = 0
-    INNER JOIN repertoire rep
-      ON rep.repertoire_id = rt.repertoire_ref
-     AND rep.deleted = 0
-    WHERE rep.user_ref = ${userId}
-      AND r.user_ref = ${userId}
-      AND r.deleted = 0
-      AND r.ref_type = 'audio'
-      AND rt.scheduled IS NOT NULL
-      AND datetime(replace(substr(rt.scheduled, 1, 19), 'T', ' ')) <= datetime('now', ${dayModifier})
-    ORDER BY datetime(replace(substr(rt.scheduled, 1, 19), 'T', ' ')) ASC
+    WITH scheduled_audio AS (
+      SELECT
+        r.url AS url,
+        datetime(replace(substr(rt.scheduled, 1, 19), 'T', ' ')) AS scheduled_at
+      FROM reference r
+      INNER JOIN media_asset ma
+        ON ma.reference_ref = r.id
+       AND ma.deleted = 0
+      INNER JOIN repertoire_tune rt
+        ON rt.tune_ref = r.tune_ref
+       AND rt.deleted = 0
+      INNER JOIN repertoire rep
+        ON rep.repertoire_id = rt.repertoire_ref
+       AND rep.deleted = 0
+      WHERE rep.user_ref = ${userId}
+        AND r.user_ref = ${userId}
+        AND r.deleted = 0
+        AND r.ref_type = 'audio'
+        AND rt.scheduled IS NOT NULL
+    )
+    SELECT DISTINCT url
+    FROM scheduled_audio
+    WHERE scheduled_at <= datetime('now', ${dayModifier})
+    ORDER BY scheduled_at ASC
   `);
 
   return results

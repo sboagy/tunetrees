@@ -11,6 +11,7 @@ export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
   const disableHmrForE2E = process.env.VITE_DISABLE_HMR_FOR_E2E === "true";
+  const MEDIA_AUTH_TOKEN_QUERY_PARAM = "token";
   const e2eArtifactWatchIgnore = [
     "**/logs/**",
     "**/test-results/**",
@@ -78,7 +79,7 @@ export default defineConfig(() => {
     }): Promise<string> => {
       const url = new URL(request.url);
       if (url.pathname === "/api/media/view") {
-        url.searchParams.delete("token");
+        url.searchParams.delete(MEDIA_AUTH_TOKEN_QUERY_PARAM);
       }
       return url.toString();
     },

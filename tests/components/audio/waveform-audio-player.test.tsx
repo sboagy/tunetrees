@@ -258,6 +258,10 @@ async function emitReadyAfterInit() {
     expect(waveSurferInstance.on).toHaveBeenCalled();
   });
 
+  // The player now resolves its media source asynchronously so it can check
+  // the IndexedDB media vault before creating the Audio element. Flush one
+  // microtask before and after the mocked ready event so document-level
+  // listeners and Wavesurfer callbacks are fully wired before test actions run.
   await Promise.resolve();
   emitWaveEvent("ready");
   await Promise.resolve();

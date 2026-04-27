@@ -205,7 +205,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       (value): value is File => value instanceof File
     );
     if (!file) {
-      throw new Error("Unexpected media upload payload.");
+      throw new Error("Unexpected media upload payload: expected a FormData containing one File.");
     }
 
     const db = auth.localDb?.() ?? getDb();

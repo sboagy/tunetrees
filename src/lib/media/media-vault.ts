@@ -65,12 +65,14 @@ function runTransaction<T>(
   return openDatabase().then(
     (db) =>
       new Promise<T | undefined>((resolve, reject) => {
+        let settled = false;
         const transaction = db.transaction(storeName, mode);
         const store = transaction.objectStore(storeName);
         const request = operation(store);
 
         transaction.oncomplete = () => {
-          if (!request) {
+          if (!request && !settled) {
+            settled = true;
             resolve(undefined);
           }
         };
@@ -80,7 +82,12 @@ function runTransaction<T>(
           reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
 
         if (request) {
-          request.onsuccess = () => resolve(request.result);
+          request.onsuccess = () => {
+            if (!settled) {
+              settled = true;
+              resolve(request.result);
+            }
+          };
           request.onerror = () =>
             reject(request.error ?? new Error("IndexedDB request failed."));
         }
