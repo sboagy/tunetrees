@@ -250,7 +250,10 @@ export default defineConfig(() => {
                 request.destination === "image" &&
                 (url.pathname === "/api/media/view" ||
                   url.pathname === "/api/media/view/"),
-              handler: "StaleWhileRevalidate",
+              // Note-media objects are immutable after upload. Prefer the first
+              // successful fetch and avoid background revalidation churn against
+              // an auth-bound endpoint.
+              handler: "CacheFirst",
               options: {
                 cacheName: "media-view-image-cache",
                 expiration: {
