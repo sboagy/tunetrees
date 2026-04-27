@@ -108,18 +108,31 @@ export async function queueOfflineNoteMedia({
   userId,
   showProgress,
 }: QueueOfflineNoteMediaParams): Promise<NoteMediaUploadResult> {
+  if (typeof indexedDB === "undefined") {
+    throw new Error(
+      "Offline media queueing is unavailable because persistent browser storage is not supported."
+    );
+  }
+
   const draftId = crypto.randomUUID();
   const blobUrl = URL.createObjectURL(file);
   const createdAt = new Date().toISOString();
 
-  await putMediaDraft({
-    id: draftId,
-    blobUrl,
-    blob: file,
-    fileName: file.name,
-    contentType: file.type || "application/octet-stream",
-    createdAt,
-  });
+  try {
+    await putMediaDraft({
+      id: draftId,
+      blobUrl,
+      blob: file,
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      createdAt,
+    });
+  } catch (error) {
+    // Avoid leaking an object URL when durable offline storage fails and
+    // ensure we do not enqueue an upload entry that cannot be fulfilled.
+    URL.revokeObjectURL(blobUrl);
+    throw error;
+  }
   await enqueueMediaDraftUpload(db, {
     id: draftId,
     userRef: userId,
