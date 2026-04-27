@@ -23,6 +23,7 @@ export function matchesHostname(
       ? urlOrHostname
       : urlOrHostname.hostname;
 
+  // Some fully-qualified hostnames may legally include a trailing dot.
   const normalizedHostname = hostname.toLowerCase().replace(/\.+$/, "");
   const normalizedExpected = expectedHostname.toLowerCase();
 

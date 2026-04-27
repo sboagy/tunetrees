@@ -33,7 +33,7 @@ const NewTunePage: Component = () => {
 
   const getImportedSourceReferenceTitle = (sourceUrl: string): string => {
     const parsedUrl = parseAbsoluteUrl(sourceUrl);
-    const foreignId = getUrlPathSegments(parsedUrl ?? sourceUrl).at(-1);
+    const foreignId = parsedUrl ? getUrlPathSegments(parsedUrl).at(-1) : null;
 
     if (parsedUrl && matchesHostname(parsedUrl, "irishtune.info")) {
       return foreignId ? `irishtune.info #${foreignId}` : "irishtune.info";
