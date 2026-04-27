@@ -1025,7 +1025,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       const sourceUrl = nextObjectUrl ?? networkSourceUrl;
 
       if (pinnedBlob) {
-        objectUrlToRevoke = nextObjectUrl;
+        objectUrlToRevoke = sourceUrl;
         setAudioSourceState("pinned");
       } else if (typeof navigator !== "undefined" && !navigator.onLine) {
         setAudioSourceState("offline-missing");

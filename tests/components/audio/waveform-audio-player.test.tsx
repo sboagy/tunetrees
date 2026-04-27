@@ -378,6 +378,8 @@ describe("WaveformAudioPlayer persistence", () => {
     resolveVaultLookup?.(new Blob(["audio-bytes"], { type: "audio/mpeg" }));
     await Promise.resolve();
 
+    // The late resolution should be ignored entirely, so no blob URL is
+    // created and there is nothing to revoke during cleanup.
     expect(createObjectUrlMock).not.toHaveBeenCalled();
     expect(waveSurferInstance.on).not.toHaveBeenCalled();
     expect(revokeObjectUrlMock).not.toHaveBeenCalled();
