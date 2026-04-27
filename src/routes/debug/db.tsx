@@ -20,6 +20,236 @@ interface QueryResult {
   values: unknown[][];
 }
 
+type CompareMismatch = {
+  table: string;
+  type: "missing_in_supabase" | "missing_in_sqlite" | "last_modified_at_diff";
+  row_id: string;
+  local_last_modified_at: string | null;
+  remote_last_modified_at: string | null;
+};
+
+type CompareResult = {
+  truncated: boolean;
+  remoteError?: string;
+};
+
+type QueryableDb = {
+  all<T = Record<string, unknown>>(sql: string): T[] | Promise<T[]>;
+};
+
+const MAX_COMPARE_MISMATCH_ROWS = 2000;
+
+const addCompareMismatch = (
+  mismatchRows: CompareMismatch[],
+  mismatch: CompareMismatch
+) => {
+  mismatchRows.push(mismatch);
+  return mismatchRows.length >= MAX_COMPARE_MISMATCH_ROWS;
+};
+
+const buildRowKey = (
+  tableName: string,
+  pk: string | string[],
+  row: Record<string, unknown>
+) => {
+  if (Array.isArray(pk)) {
+    const obj: Record<string, unknown> = {};
+    for (const k of pk) {
+      if (!(k in row)) {
+        throw new Error(
+          `Missing primary key column "${k}" in ${tableName} comparison row`
+        );
+      }
+      obj[k] = row[k];
+    }
+    return JSON.stringify(obj);
+  }
+  if (!(pk in row)) {
+    throw new Error(
+      `Missing primary key column "${pk}" in ${tableName} comparison row`
+    );
+  }
+  return String(row[pk]);
+};
+
+const getRowLastModifiedAt = (row: Record<string, unknown>) =>
+  (row.last_modified_at as string | null | undefined) ?? null;
+
+const buildLocalRowMap = async (
+  db: QueryableDb,
+  tableName: string,
+  columns: string[],
+  primaryKey: string | string[],
+  hasLastModified: boolean
+) => {
+  const localSql = `SELECT ${columns.join(", ")} FROM ${tableName};`;
+  const localRows = await db.all<Record<string, unknown>>(localSql);
+  const localMap = new Map<string, string | null>();
+
+  for (const row of localRows) {
+    localMap.set(
+      buildRowKey(tableName, primaryKey, row),
+      hasLastModified ? getRowLastModifiedAt(row) : null
+    );
+  }
+
+  return localMap;
+};
+
+const buildRemoteRowMap = async (
+  tableName: string,
+  pkCols: string[],
+  columns: string[],
+  primaryKey: string | string[],
+  hasLastModified: boolean
+) => {
+  const remoteMap = new Map<string, string | null>();
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    let query = supabase.from(tableName).select(columns.join(","));
+    for (const pk of pkCols) {
+      query = query.order(pk, { ascending: true });
+    }
+    const { data, error } = await query.range(from, from + pageSize - 1);
+
+    if (error) {
+      return { remoteMap, remoteError: error.message };
+    }
+
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
+    if (page.length === 0) {
+      return { remoteMap };
+    }
+
+    for (const row of page) {
+      remoteMap.set(
+        buildRowKey(tableName, primaryKey, row),
+        hasLastModified ? getRowLastModifiedAt(row) : null
+      );
+    }
+
+    if (page.length < pageSize) {
+      return { remoteMap };
+    }
+
+    from += page.length;
+  }
+};
+
+const compareLocalRows = (
+  tableName: string,
+  localMap: Map<string, string | null>,
+  remoteMap: Map<string, string | null>,
+  mismatchRows: CompareMismatch[]
+) => {
+  for (const [key, localLm] of localMap) {
+    if (!remoteMap.has(key)) {
+      const truncated = addCompareMismatch(mismatchRows, {
+        table: tableName,
+        type: "missing_in_supabase",
+        row_id: key,
+        local_last_modified_at: localLm,
+        remote_last_modified_at: null,
+      });
+      if (truncated) return true;
+    }
+  }
+
+  return false;
+};
+
+const compareRemoteRows = (
+  tableName: string,
+  hasLastModified: boolean,
+  localMap: Map<string, string | null>,
+  remoteMap: Map<string, string | null>,
+  mismatchRows: CompareMismatch[]
+) => {
+  for (const [key, remoteLm] of remoteMap) {
+    const localLm = localMap.get(key);
+    let truncated = false;
+
+    if (!localMap.has(key)) {
+      truncated = addCompareMismatch(mismatchRows, {
+        table: tableName,
+        type: "missing_in_sqlite",
+        row_id: key,
+        local_last_modified_at: null,
+        remote_last_modified_at: remoteLm,
+      });
+    } else if (hasLastModified && localLm !== remoteLm) {
+      truncated = addCompareMismatch(mismatchRows, {
+        table: tableName,
+        type: "last_modified_at_diff",
+        row_id: key,
+        local_last_modified_at: localLm ?? null,
+        remote_last_modified_at: remoteLm ?? null,
+      });
+    }
+
+    if (truncated) return true;
+  }
+
+  return false;
+};
+
+const compareTableWithSupabase = async (
+  db: QueryableDb,
+  tableName: string,
+  meta: (typeof TABLE_REGISTRY)[keyof typeof TABLE_REGISTRY],
+  mismatchRows: CompareMismatch[]
+): Promise<CompareResult> => {
+  const pkCols = Array.isArray(meta.primaryKey)
+    ? meta.primaryKey
+    : [meta.primaryKey];
+  const hasLastModified = meta.supportsIncremental;
+  const columns = hasLastModified ? [...pkCols, "last_modified_at"] : [...pkCols];
+
+  const localMap = await buildLocalRowMap(
+    db,
+    tableName,
+    columns,
+    meta.primaryKey,
+    hasLastModified
+  );
+  const { remoteMap, remoteError } = await buildRemoteRowMap(
+    tableName,
+    pkCols,
+    columns,
+    meta.primaryKey,
+    hasLastModified
+  );
+
+  if (remoteError) {
+    return {
+      truncated: addCompareMismatch(mismatchRows, {
+        table: tableName,
+        type: "missing_in_supabase",
+        row_id: `__error__: ${remoteError}`,
+        local_last_modified_at: null,
+        remote_last_modified_at: null,
+      }),
+      remoteError,
+    };
+  }
+
+  if (compareLocalRows(tableName, localMap, remoteMap, mismatchRows)) {
+    return { truncated: true };
+  }
+
+  return {
+    truncated: compareRemoteRows(
+      tableName,
+      hasLastModified,
+      localMap,
+      remoteMap,
+      mismatchRows
+    ),
+  };
+};
+
 export default function DatabaseBrowser(): ReturnType<Component> {
   const { localDb, isAnonymous } = useAuth();
   const [query, setQuery] = createSignal(
@@ -205,15 +435,6 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     }
   };
 
-  const buildRowKey = (pk: string | string[], row: Record<string, unknown>) => {
-    if (Array.isArray(pk)) {
-      const obj: Record<string, unknown> = {};
-      for (const k of pk) obj[k] = row[k];
-      return JSON.stringify(obj);
-    }
-    return String(row[pk]);
-  };
-
   const compareWithSupabase = async () => {
     setError(null);
     setResults(null);
@@ -256,125 +477,17 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         local_last_modified_at: string | null;
         remote_last_modified_at: string | null;
       }> = [];
-
-      const MAX_MISMATCH_ROWS = 2000;
       let truncated = false;
 
       for (const [tableName, meta] of Object.entries(TABLE_REGISTRY)) {
         if (tableFilter && tableName !== tableFilter) continue;
         if (!localTables.has(tableName)) continue;
 
-        const pkCols = Array.isArray(meta.primaryKey)
-          ? meta.primaryKey
-          : [meta.primaryKey];
-        const hasLastModified = meta.supportsIncremental;
-        const columns = hasLastModified
-          ? [...pkCols, "last_modified_at"]
-          : [...pkCols];
-
-        // Local keys
-        const localSql = `SELECT ${columns.join(", ")} FROM ${tableName};`;
-        const localRows = await db.all<Record<string, unknown>>(localSql);
-        const localMap = new Map<string, string | null>();
-
-        for (const row of localRows) {
-          const key = buildRowKey(meta.primaryKey, row);
-          const lm = hasLastModified
-            ? ((row as { last_modified_at?: string | null }).last_modified_at ??
-              null)
-            : null;
-          localMap.set(key, lm);
+        const result = await compareTableWithSupabase(db, tableName, meta, mismatchRows);
+        if (result.truncated) {
+          truncated = true;
+          break;
         }
-
-        // Remote keys (paged)
-        const remoteMap = new Map<string, string | null>();
-        const pageSize = 1000;
-        let from = 0;
-
-        while (true) {
-          let q = supabase.from(tableName).select(columns.join(","));
-          for (const pk of pkCols) {
-            q = q.order(pk, { ascending: true });
-          }
-          const { data, error: remoteError } = await q.range(
-            from,
-            from + pageSize - 1
-          );
-
-          if (remoteError) {
-            // Skip table if RLS or schema mismatch; surface error once.
-            mismatchRows.push({
-              table: tableName,
-              type: "missing_in_supabase",
-              row_id: `__error__: ${remoteError.message}`,
-              local_last_modified_at: null,
-              remote_last_modified_at: null,
-            });
-            break;
-          }
-
-          const page = data ?? [];
-          if (page.length === 0) break;
-
-          for (const row of page as unknown as Record<string, unknown>[]) {
-            const key = buildRowKey(meta.primaryKey, row);
-            const lm = hasLastModified
-              ? ((row as { last_modified_at?: string | null })
-                  .last_modified_at ?? null)
-              : null;
-            remoteMap.set(key, lm);
-          }
-
-          if (page.length < pageSize) break;
-          from += page.length;
-        }
-
-        // Missing in Supabase
-        for (const [key, localLm] of localMap) {
-          if (!remoteMap.has(key)) {
-            mismatchRows.push({
-              table: tableName,
-              type: "missing_in_supabase",
-              row_id: key,
-              local_last_modified_at: localLm,
-              remote_last_modified_at: null,
-            });
-            if (mismatchRows.length >= MAX_MISMATCH_ROWS) {
-              truncated = true;
-              break;
-            }
-          }
-        }
-        if (truncated) break;
-
-        // Missing in SQLite + timestamp differences
-        for (const [key, remoteLm] of remoteMap) {
-          const localLm = localMap.get(key);
-          if (!localMap.has(key)) {
-            mismatchRows.push({
-              table: tableName,
-              type: "missing_in_sqlite",
-              row_id: key,
-              local_last_modified_at: null,
-              remote_last_modified_at: remoteLm,
-            });
-          } else if (hasLastModified && localLm !== remoteLm) {
-            mismatchRows.push({
-              table: tableName,
-              type: "last_modified_at_diff",
-              row_id: key,
-              local_last_modified_at: localLm ?? null,
-              remote_last_modified_at: remoteLm ?? null,
-            });
-          }
-
-          if (mismatchRows.length >= MAX_MISMATCH_ROWS) {
-            truncated = true;
-            break;
-          }
-        }
-
-        if (truncated) break;
       }
 
       const end = performance.now();
