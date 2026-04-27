@@ -91,6 +91,11 @@ export async function syncPinnedAudioVault({
 
     const response = await fetch(attachMediaAuthTokenToUrl(url, accessToken));
     if (!response.ok) {
+      console.warn(
+        "[audio-lookahead] Failed to pin audio reference:",
+        url,
+        response.status
+      );
       continue;
     }
 

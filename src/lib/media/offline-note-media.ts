@@ -193,6 +193,9 @@ export async function processPendingNoteMediaDrafts({
     });
     const upload = await uploadNoteMediaToWorker(file, accessToken);
     const uploadedUrl = upload.data.files[0];
+    if (!uploadedUrl) {
+      throw new Error("Media upload completed without a file URL.");
+    }
     const now = new Date().toISOString();
     const notesToUpdate = await db.all<{ id: string; noteText: string | null }>(sql`
       SELECT

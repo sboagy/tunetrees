@@ -100,11 +100,11 @@ export async function getMediaVaultBlob(key: string): Promise<Blob | null> {
     return null;
   }
 
-  const record = (await runTransaction<MediaVaultRecord | undefined>(
+  const record = await runTransaction<MediaVaultRecord | undefined>(
     MEDIA_VAULT_STORE,
     "readonly",
     (store) => store.get(key)
-  )) as MediaVaultRecord | undefined;
+  );
 
   return record?.blob ?? null;
 }
@@ -169,11 +169,11 @@ export async function getMediaDraft(id: string): Promise<MediaDraftRecord | null
     return null;
   }
 
-  const record = (await runTransaction<MediaDraftRecord | undefined>(
+  const record = await runTransaction<MediaDraftRecord | undefined>(
     MEDIA_DRAFT_STORE,
     "readonly",
     (store) => store.get(id)
-  )) as MediaDraftRecord | undefined;
+  );
 
   return record ?? null;
 }
