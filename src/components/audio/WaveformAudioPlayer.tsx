@@ -998,6 +998,9 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     didDragSelectionChange = false;
   };
 
+  const shouldAbortMediaInitialization = () =>
+    isDisposing || !waveformContainerRef;
+
   onMount(() => {
     props.onPersistRequestChange?.(() => flushPendingPersist(true));
 
@@ -1007,12 +1010,22 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
         ? attachMediaAuthTokenToUrl(props.track.url, accessToken)
         : props.track.url;
       const pinnedBlob = await getMediaVaultBlob(props.track.url);
-      const sourceUrl = pinnedBlob
-        ? URL.createObjectURL(pinnedBlob)
-        : networkSourceUrl;
+      if (shouldAbortMediaInitialization()) {
+        return;
+      }
+
+      const nextObjectUrl = pinnedBlob ? URL.createObjectURL(pinnedBlob) : null;
+      if (shouldAbortMediaInitialization()) {
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+        return;
+      }
+
+      const sourceUrl = nextObjectUrl ?? networkSourceUrl;
 
       if (pinnedBlob) {
-        objectUrlToRevoke = sourceUrl;
+        objectUrlToRevoke = nextObjectUrl;
         setAudioSourceState("pinned");
       } else if (typeof navigator !== "undefined" && !navigator.onLine) {
         setAudioSourceState("offline-missing");
@@ -1020,11 +1033,28 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
         setAudioSourceState("network");
       }
 
+      if (shouldAbortMediaInitialization()) {
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+        return;
+      }
+
       regionsPlugin = RegionsPlugin.create();
       audioElement = new Audio(sourceUrl);
       audioElement.preload = "auto";
       audioElement.crossOrigin = "anonymous";
       setPreservePitch();
+
+      if (shouldAbortMediaInitialization()) {
+        audioElement.pause();
+        audioElement = null;
+        regionsPlugin = null;
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+        return;
+      }
 
       waveSurfer = WaveSurfer.create({
         container: waveformContainerRef!,

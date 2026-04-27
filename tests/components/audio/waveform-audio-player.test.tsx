@@ -349,6 +349,40 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:pinned-audio");
   });
 
+  it("does not initialize audio resources after unmount if the vault lookup resolves late", async () => {
+    let resolveVaultLookup: ((value: Blob | null) => void) | undefined;
+    getMediaVaultBlob.mockImplementation(
+      () =>
+        new Promise<Blob | null>((resolve) => {
+          resolveVaultLookup = resolve;
+        })
+    );
+
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-late-vault",
+          referenceTitle: "Late Vault Lookup",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Flate.mp3",
+        }}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(getMediaVaultBlob).toHaveBeenCalledWith(
+        "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Flate.mp3"
+      );
+    });
+
+    view.unmount();
+    resolveVaultLookup?.(new Blob(["audio-bytes"], { type: "audio/mpeg" }));
+    await Promise.resolve();
+
+    expect(createObjectUrlMock).not.toHaveBeenCalled();
+    expect(waveSurferInstance.on).not.toHaveBeenCalled();
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
+  });
+
   it("flushes pending annotation and setting changes when the player closes", async () => {
     const view = render(() => (
       <WaveformAudioPlayer
