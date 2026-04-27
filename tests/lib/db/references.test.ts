@@ -99,7 +99,10 @@ describe("detectReferenceType", () => {
     }
   });
 
-  it("should ignore spoofed hostnames and query strings", () => {
+  it("should ignore spoofed hostnames and query-string bait URLs", () => {
+    expect(detectReferenceType("https://notyoutube.com/watch?v=123")).toBe(
+      "website"
+    );
     expect(
       detectReferenceType("https://thesession.org.evil.example/tunes/123")
     ).toBe("website");

@@ -26,11 +26,12 @@ export function matchesHostname(
   // Some fully-qualified hostnames may legally include a trailing dot.
   const normalizedHostname = hostname.toLowerCase().replace(/\.+$/, "");
   const normalizedExpected = expectedHostname.toLowerCase();
-
-  return (
-    normalizedHostname === normalizedExpected ||
-    normalizedHostname.endsWith(`.${normalizedExpected}`)
+  const exactMatch = normalizedHostname === normalizedExpected;
+  const subdomainMatch = normalizedHostname.endsWith(
+    `.${normalizedExpected}`
   );
+
+  return exactMatch || subdomainMatch;
 }
 
 export function getUrlPathSegments(urlOrValue: URL | string): string[] {
