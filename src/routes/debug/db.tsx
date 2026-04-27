@@ -34,7 +34,7 @@ type CompareResult = {
 };
 
 type QueryableDb = {
-  all<T = Record<string, unknown>>(sql: string): Promise<T[]>;
+  all<T = Record<string, unknown>>(sql: string): T[] | Promise<T[]>;
 };
 
 const MAX_COMPARE_MISMATCH_ROWS = 2000;
@@ -118,7 +118,7 @@ const buildRemoteRowMap = async (
       return { remoteMap, remoteError: error.message };
     }
 
-    const page = (data ?? []) as Record<string, unknown>[];
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
     if (page.length === 0) {
       return { remoteMap };
     }
