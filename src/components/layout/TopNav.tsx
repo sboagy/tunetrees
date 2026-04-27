@@ -80,6 +80,183 @@ const getRepertoireDisplayName = (
   return instrument;
 };
 
+type TopNavDbSnapshot = {
+  phase: "before" | "after" | "afterError";
+  user: string;
+  version: string;
+  at: string;
+  hasSqliteInstance?: boolean;
+  jsHeap?: {
+    usedBytes: number;
+    totalBytes: number;
+    limitBytes: number;
+  };
+  wasmHeapBytes?: number;
+  dbApproxBytes?: number;
+  pageCount?: number;
+  pageSize?: number;
+  freelistCount?: number;
+  tableCounts?: Record<string, number>;
+  errors?: string[];
+};
+
+type SqliteInstance = NonNullable<Awaited<ReturnType<typeof getSqliteInstance>>>;
+
+type PerformanceWithMemory = Performance & {
+  memory?: {
+    usedJSHeapSize?: unknown;
+    totalJSHeapSize?: unknown;
+    jsHeapSizeLimit?: unknown;
+  };
+};
+
+const appendTopNavSnapshotError = (
+  errors: string[],
+  prefix: string,
+  error: unknown
+) => {
+  errors.push(
+    `${prefix}: ${error instanceof Error ? error.message : String(error)}`
+  );
+};
+
+const captureTopNavJsHeap = (
+  snapshot: TopNavDbSnapshot,
+  errors: string[]
+) => {
+  try {
+    const perfMemory = (performance as PerformanceWithMemory).memory;
+    if (!perfMemory) return;
+
+    snapshot.jsHeap = {
+      usedBytes: Number(perfMemory.usedJSHeapSize ?? 0),
+      totalBytes: Number(perfMemory.totalJSHeapSize ?? 0),
+      limitBytes: Number(perfMemory.jsHeapSizeLimit ?? 0),
+    };
+  } catch (error) {
+    appendTopNavSnapshotError(errors, "jsHeap", error);
+  }
+};
+
+const captureTopNavWasmHeap = async (
+  snapshot: TopNavDbSnapshot,
+  errors: string[]
+) => {
+  try {
+    const { getSqlJsDebugInfo } = await import("../../lib/db/client-sqlite");
+    const dbg = getSqlJsDebugInfo();
+    if (dbg.wasmHeapBytes) snapshot.wasmHeapBytes = dbg.wasmHeapBytes;
+  } catch (error) {
+    appendTopNavSnapshotError(errors, "wasmHeap", error);
+  }
+};
+
+const captureTopNavPragmas = (
+  sqliteDb: SqliteInstance,
+  snapshot: TopNavDbSnapshot,
+  errors: string[]
+) => {
+  try {
+    const pageSizeRes = sqliteDb.exec("PRAGMA page_size;");
+    const pageCountRes = sqliteDb.exec("PRAGMA page_count;");
+    const freelistRes = sqliteDb.exec("PRAGMA freelist_count;");
+
+    const pageSize = Number(pageSizeRes?.[0]?.values?.[0]?.[0] ?? 0);
+    const pageCount = Number(pageCountRes?.[0]?.values?.[0]?.[0] ?? 0);
+    const freelistCount = Number(freelistRes?.[0]?.values?.[0]?.[0] ?? 0);
+
+    if (pageSize > 0) snapshot.pageSize = pageSize;
+    if (pageCount > 0) snapshot.pageCount = pageCount;
+    snapshot.freelistCount = freelistCount;
+    if (pageSize > 0 && pageCount > 0) {
+      snapshot.dbApproxBytes = pageSize * pageCount;
+    }
+  } catch (error) {
+    appendTopNavSnapshotError(errors, "pragma", error);
+  }
+};
+
+const captureTopNavTableCounts = (
+  sqliteDb: SqliteInstance,
+  snapshot: TopNavDbSnapshot,
+  errors: string[]
+) => {
+  try {
+    const master = sqliteDb.exec(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+    );
+    const names: string[] = (master?.[0]?.values ?? []).map((row) =>
+      String((row as [unknown])[0])
+    );
+
+    const counts: Record<string, number> = {};
+    for (const name of names) {
+      try {
+        const res = sqliteDb.exec(
+          `SELECT COUNT(*) as c FROM "${name.replaceAll('"', '""')}";`
+        );
+        counts[name] = Number(res?.[0]?.values?.[0]?.[0] ?? 0);
+      } catch (error) {
+        counts[name] = -1;
+        appendTopNavSnapshotError(errors, `count:${name}`, error);
+      }
+    }
+    snapshot.tableCounts = counts;
+  } catch (error) {
+    appendTopNavSnapshotError(errors, "sqlite_master", error);
+  }
+};
+
+const captureTopNavSqliteSnapshot = async (
+  snapshot: TopNavDbSnapshot,
+  errors: string[]
+) => {
+  try {
+    const sqliteDb = await getSqliteInstance();
+    snapshot.hasSqliteInstance = !!sqliteDb;
+    if (!sqliteDb) {
+      errors.push("sqliteInstance: null (db not initialized yet or init failed)");
+      return;
+    }
+
+    await captureTopNavWasmHeap(snapshot, errors);
+    captureTopNavPragmas(sqliteDb, snapshot, errors);
+    captureTopNavTableCounts(sqliteDb, snapshot, errors);
+  } catch (error) {
+    appendTopNavSnapshotError(errors, "sqlite", error);
+  }
+};
+
+const emitTopNavSnapshot = (snapshot: TopNavDbSnapshot) => {
+  try {
+    const header = {
+      phase: snapshot.phase,
+      user: snapshot.user,
+      version: snapshot.version,
+      at: snapshot.at,
+      hasSqliteInstance: snapshot.hasSqliteInstance,
+      jsHeap: snapshot.jsHeap,
+      wasmHeapBytes: snapshot.wasmHeapBytes,
+      pageSize: snapshot.pageSize,
+      pageCount: snapshot.pageCount,
+      freelistCount: snapshot.freelistCount,
+      dbApproxBytes: snapshot.dbApproxBytes,
+      errors: snapshot.errors,
+    };
+    console.log(`[TopNavDiag] ${JSON.stringify(header)}`);
+
+    if (snapshot.tableCounts) {
+      console.log(
+        `[TopNavDiag] tables user=${snapshot.user} ${JSON.stringify(snapshot.tableCounts)}`
+      );
+    }
+  } catch (error) {
+    console.log(
+      `[TopNavDiag] failed to emit snapshot: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+};
+
 /**
  * Top Navigation Component
  *
@@ -366,34 +543,14 @@ const RepertoireDropdown: Component<{
       const userShort = params.userId.slice(0, 8);
       const diagKey = `${params.userId}:${params.version}`;
 
-      type ITopNavDbSnapshot = {
-        phase: "before" | "after" | "afterError";
-        user: string;
-        version: string;
-        at: string;
-        hasSqliteInstance?: boolean;
-        jsHeap?: {
-          usedBytes: number;
-          totalBytes: number;
-          limitBytes: number;
-        };
-        wasmHeapBytes?: number;
-        dbApproxBytes?: number;
-        pageCount?: number;
-        pageSize?: number;
-        freelistCount?: number;
-        tableCounts?: Record<string, number>;
-        errors?: string[];
-      };
-
       const collectTopNavDbSnapshot = async (
-        phase: ITopNavDbSnapshot["phase"],
+        phase: TopNavDbSnapshot["phase"],
         opts?: { always?: boolean; error?: unknown }
-      ): Promise<ITopNavDbSnapshot | null> => {
+      ): Promise<TopNavDbSnapshot | null> => {
         if (!shouldTopNavDump) return null;
         if (!opts?.always && lastTopNavDiagKey === diagKey) return null;
 
-        const snapshot: ITopNavDbSnapshot = {
+        const snapshot: TopNavDbSnapshot = {
           phase,
           user: userShort,
           version: params.version,
@@ -401,140 +558,16 @@ const RepertoireDropdown: Component<{
         };
 
         const errors: string[] = [];
-        try {
-          const perfAny = performance as any;
-          if (perfAny?.memory) {
-            snapshot.jsHeap = {
-              usedBytes: Number(perfAny.memory.usedJSHeapSize ?? 0),
-              totalBytes: Number(perfAny.memory.totalJSHeapSize ?? 0),
-              limitBytes: Number(perfAny.memory.jsHeapSizeLimit ?? 0),
-            };
-          }
-        } catch (e) {
-          errors.push(`jsHeap: ${e instanceof Error ? e.message : String(e)}`);
-        }
-
-        try {
-          const sqliteDb = await getSqliteInstance();
-          snapshot.hasSqliteInstance = !!sqliteDb;
-          if (!sqliteDb) {
-            errors.push(
-              "sqliteInstance: null (db not initialized yet or init failed)"
-            );
-          }
-          if (sqliteDb) {
-            // WASM heap size is per sql.js Module, not per Database.
-            try {
-              const { getSqlJsDebugInfo } = await import(
-                "../../lib/db/client-sqlite"
-              );
-              const dbg = getSqlJsDebugInfo();
-              if (dbg.wasmHeapBytes) snapshot.wasmHeapBytes = dbg.wasmHeapBytes;
-            } catch (e) {
-              errors.push(
-                `wasmHeap: ${e instanceof Error ? e.message : String(e)}`
-              );
-            }
-
-            // DB size approximation + free pages (cheap pragmas).
-            try {
-              const pageSizeRes = sqliteDb.exec("PRAGMA page_size;");
-              const pageCountRes = sqliteDb.exec("PRAGMA page_count;");
-              const freelistRes = sqliteDb.exec("PRAGMA freelist_count;");
-
-              const pageSize = Number(pageSizeRes?.[0]?.values?.[0]?.[0] ?? 0);
-              const pageCount = Number(
-                pageCountRes?.[0]?.values?.[0]?.[0] ?? 0
-              );
-              const freelistCount = Number(
-                freelistRes?.[0]?.values?.[0]?.[0] ?? 0
-              );
-
-              if (pageSize > 0) snapshot.pageSize = pageSize;
-              if (pageCount > 0) snapshot.pageCount = pageCount;
-              snapshot.freelistCount = freelistCount;
-              if (pageSize > 0 && pageCount > 0) {
-                snapshot.dbApproxBytes = pageSize * pageCount;
-              }
-            } catch (e) {
-              errors.push(
-                `pragma: ${e instanceof Error ? e.message : String(e)}`
-              );
-            }
-
-            // Complete table row counts (tables only; excludes views).
-            try {
-              const master = sqliteDb.exec(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
-              );
-              const names: string[] = (master?.[0]?.values ?? []).map(
-                (row: unknown) => String((row as any)[0])
-              );
-
-              const counts: Record<string, number> = {};
-              for (const name of names) {
-                try {
-                  const res = sqliteDb.exec(
-                    `SELECT COUNT(*) as c FROM "${name.replaceAll('"', '""')}";`
-                  );
-                  counts[name] = Number(res?.[0]?.values?.[0]?.[0] ?? 0);
-                } catch (e) {
-                  // Keep going; don't hide the failure.
-                  counts[name] = -1;
-                  errors.push(
-                    `count:${name}: ${e instanceof Error ? e.message : String(e)}`
-                  );
-                }
-              }
-              snapshot.tableCounts = counts;
-            } catch (e) {
-              errors.push(
-                `sqlite_master: ${e instanceof Error ? e.message : String(e)}`
-              );
-            }
-          }
-        } catch (e) {
-          errors.push(`sqlite: ${e instanceof Error ? e.message : String(e)}`);
-        }
+        captureTopNavJsHeap(snapshot, errors);
+        await captureTopNavSqliteSnapshot(snapshot, errors);
 
         if (opts?.error) {
-          const msg =
-            opts.error instanceof Error
-              ? opts.error.message
-              : String(opts.error);
-          errors.push(`error: ${msg}`);
+          appendTopNavSnapshotError(errors, "error", opts.error);
         }
 
         if (errors.length > 0) snapshot.errors = errors;
 
-        // Emit as two lines: header + optional tableCounts payload.
-        try {
-          const header = {
-            phase: snapshot.phase,
-            user: snapshot.user,
-            version: snapshot.version,
-            at: snapshot.at,
-            hasSqliteInstance: snapshot.hasSqliteInstance,
-            jsHeap: snapshot.jsHeap,
-            wasmHeapBytes: snapshot.wasmHeapBytes,
-            pageSize: snapshot.pageSize,
-            pageCount: snapshot.pageCount,
-            freelistCount: snapshot.freelistCount,
-            dbApproxBytes: snapshot.dbApproxBytes,
-            errors: snapshot.errors,
-          };
-          console.log(`[TopNavDiag] ${JSON.stringify(header)}`);
-
-          if (snapshot.tableCounts) {
-            console.log(
-              `[TopNavDiag] tables user=${snapshot.user} ${JSON.stringify(snapshot.tableCounts)}`
-            );
-          }
-        } catch (e) {
-          console.log(
-            `[TopNavDiag] failed to emit snapshot: ${e instanceof Error ? e.message : String(e)}`
-          );
-        }
+        emitTopNavSnapshot(snapshot);
 
         lastTopNavDiagKey = diagKey;
         return snapshot;
