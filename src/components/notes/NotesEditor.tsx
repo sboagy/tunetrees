@@ -1,5 +1,9 @@
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Jodit } from "jodit";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
+import { uploadNoteMediaFile } from "@/lib/media/offline-note-media";
+import "jodit/es2021/jodit.min.css";
 import {
   Bold,
   EllipsisVertical,
@@ -21,16 +25,12 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import { useAuth } from "@/lib/auth/AuthContext";
 import {
   attachMediaAuthToken,
   attachMediaAuthTokenToUrl,
   buildMediaUploadUrl,
   stripMediaAuthToken,
 } from "./media-auth";
-import { getDb } from "@/lib/db/client-sqlite";
-import { uploadNoteMediaFile } from "@/lib/media/offline-note-media";
-import "jodit/es2021/jodit.min.css";
 
 interface NotesEditorProps {
   content: string;
@@ -205,7 +205,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       (value): value is File => value instanceof File
     );
     if (!file) {
-      throw new Error("Unexpected media upload payload: expected a FormData containing one File.");
+      throw new Error(
+        "Unexpected media upload payload: expected a FormData containing one File."
+      );
     }
 
     const db = auth.localDb?.() ?? getDb();
@@ -250,7 +252,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     }
 
     const extension = mimeType.split("/")[1] || "png";
-    const binaryPayload = encodingFlag ? atob(payload) : decodeURIComponent(payload);
+    const binaryPayload = encodingFlag
+      ? atob(payload)
+      : decodeURIComponent(payload);
     const bytes = Uint8Array.from(binaryPayload, (character) =>
       character.charCodeAt(0)
     );
@@ -265,7 +269,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     template.innerHTML = content;
 
     const images = Array.from(
-      template.content.querySelectorAll<HTMLImageElement>(EMBEDDED_MEDIA_SELECTOR)
+      template.content.querySelectorAll<HTMLImageElement>(
+        EMBEDDED_MEDIA_SELECTOR
+      )
     );
 
     if (images.length === 0) {
@@ -287,7 +293,10 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
 
       const formData = new FormData();
       formData.append("files[0]", file, file.name);
-      const uploadResponse = await uploadMediaFormData(formData, () => undefined);
+      const uploadResponse = await uploadMediaFormData(
+        formData,
+        () => undefined
+      );
       const uploadedUrl = uploadResponse.data?.files?.[0];
       if (uploadedUrl) {
         replacements.set(source, uploadedUrl);

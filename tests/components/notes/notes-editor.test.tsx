@@ -7,9 +7,12 @@ import {
 } from "@solidjs/testing-library";
 import { createSignal, type Setter } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildMediaUploadUrl, buildMediaViewUrl } from "../../../src/components/notes/media-auth";
-import * as offlineNoteMedia from "../../../src/lib/media/offline-note-media";
+import {
+  buildMediaUploadUrl,
+  buildMediaViewUrl,
+} from "../../../src/components/notes/media-auth";
 import { NotesEditor } from "../../../src/components/notes/NotesEditor";
+import * as offlineNoteMedia from "../../../src/lib/media/offline-note-media";
 
 vi.mock("jodit/es2021/jodit.min.css", () => ({}));
 
@@ -400,7 +403,10 @@ describe("NotesEditor", () => {
   it("uploads note images through the worker and strips runtime auth tokens from saved HTML", async () => {
     const handleContentChange = vi.fn();
     render(() => (
-      <NotesEditor content="<p>Initial note</p>" onContentChange={handleContentChange} />
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
     ));
 
     await waitFor(() => {
@@ -412,25 +418,26 @@ describe("NotesEditor", () => {
     expect(options?.uploader?.insertImageAsBase64URI).toBe(false);
 
     const uploadedUrl = buildMediaViewUrl("users/user-1/notes/uploaded.png");
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: true,
-          time: new Date().toISOString(),
-          data: {
-            files: [uploadedUrl],
-            isImages: [true],
-            path: "users/user-1/notes/uploaded.png",
-            baseurl: "",
-          },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      )
+    const fetchMock = vi.fn(
+      async (..._args: Parameters<typeof fetch>) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            time: new Date().toISOString(),
+            data: {
+              files: [uploadedUrl],
+              isImages: [true],
+              path: "users/user-1/notes/uploaded.png",
+              baseurl: "",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
@@ -475,7 +482,10 @@ describe("NotesEditor", () => {
   it("replaces pasted data-uri images with worker URLs before saving note content", async () => {
     const handleContentChange = vi.fn();
     render(() => (
-      <NotesEditor content="<p>Initial note</p>" onContentChange={handleContentChange} />
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
     ));
 
     await waitFor(() => {
@@ -484,26 +494,29 @@ describe("NotesEditor", () => {
 
     const options = makeEditor.mock.calls[0]?.[1];
     const editor = createdEditors[0];
-    const uploadedUrl = buildMediaViewUrl("users/user-1/notes/pasted-image-1.png");
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: true,
-          time: new Date().toISOString(),
-          data: {
-            files: [uploadedUrl],
-            isImages: [true],
-            path: "users/user-1/notes/pasted-image-1.png",
-            baseurl: "",
-          },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      )
+    const uploadedUrl = buildMediaViewUrl(
+      "users/user-1/notes/pasted-image-1.png"
+    );
+    const fetchMock = vi.fn(
+      async (..._args: Parameters<typeof fetch>) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            time: new Date().toISOString(),
+            data: {
+              files: [uploadedUrl],
+              isImages: [true],
+              path: "users/user-1/notes/pasted-image-1.png",
+              baseurl: "",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
@@ -540,7 +553,10 @@ describe("NotesEditor", () => {
       });
 
     render(() => (
-      <NotesEditor content="<p>Initial note</p>" onContentChange={() => undefined} />
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={() => undefined}
+      />
     ));
 
     await waitFor(() => {

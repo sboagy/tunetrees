@@ -78,7 +78,10 @@ export default defineConfig(() => {
       request: Request;
     }): Promise<string> => {
       const url = new URL(request.url);
-      if (url.pathname === "/api/media/view" || url.pathname === "/api/media/view/") {
+      if (
+        url.pathname === "/api/media/view" ||
+        url.pathname === "/api/media/view/"
+      ) {
         url.searchParams.delete(MEDIA_AUTH_TOKEN_QUERY_PARAM);
       }
       return url.toString();

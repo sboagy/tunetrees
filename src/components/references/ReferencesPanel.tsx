@@ -69,15 +69,17 @@ export const ReferencesPanel: Component = () => {
     setIsAdding(true);
   };
 
-  const getDataTransferTypes = (dataTransfer: DataTransfer | null | undefined) =>
-    dataTransfer?.types ? Array.from(dataTransfer.types) : [];
+  const getDataTransferTypes = (
+    dataTransfer: DataTransfer | null | undefined
+  ) => (dataTransfer?.types ? Array.from(dataTransfer.types) : []);
 
   const hasFileDrop = (dataTransfer: DataTransfer | null | undefined) =>
     getDataTransferTypes(dataTransfer).includes("Files");
 
   const hasInternalReferenceDrag = (
     dataTransfer: DataTransfer | null | undefined
-  ) => getDataTransferTypes(dataTransfer).includes(INTERNAL_REFERENCE_DRAG_TYPE);
+  ) =>
+    getDataTransferTypes(dataTransfer).includes(INTERNAL_REFERENCE_DRAG_TYPE);
 
   const hasUrlDrop = (dataTransfer: DataTransfer | null | undefined) => {
     if (!dataTransfer) {
