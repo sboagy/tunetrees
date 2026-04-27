@@ -100,7 +100,7 @@ type TopNavDbSnapshot = {
   errors?: string[];
 };
 
-type SqliteInstance = NonNullable<Awaited<ReturnType<typeof getSqliteInstance>>>;
+type SqliteInstance = import("sql.js").Database;
 
 type PerformanceWithMemory = Performance & {
   memory?: {

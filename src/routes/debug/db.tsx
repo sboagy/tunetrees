@@ -47,11 +47,27 @@ const addCompareMismatch = (
   return mismatchRows.length >= MAX_COMPARE_MISMATCH_ROWS;
 };
 
-const buildRowKey = (pk: string | string[], row: Record<string, unknown>) => {
+const buildRowKey = (
+  tableName: string,
+  pk: string | string[],
+  row: Record<string, unknown>
+) => {
   if (Array.isArray(pk)) {
     const obj: Record<string, unknown> = {};
-    for (const k of pk) obj[k] = row[k];
+    for (const k of pk) {
+      if (!(k in row)) {
+        throw new Error(
+          `Missing primary key column "${k}" in ${tableName} comparison row`
+        );
+      }
+      obj[k] = row[k];
+    }
     return JSON.stringify(obj);
+  }
+  if (!(pk in row)) {
+    throw new Error(
+      `Missing primary key column "${pk}" in ${tableName} comparison row`
+    );
   }
   return String(row[pk]);
 };
@@ -72,7 +88,7 @@ const buildLocalRowMap = async (
 
   for (const row of localRows) {
     localMap.set(
-      buildRowKey(primaryKey, row),
+      buildRowKey(tableName, primaryKey, row),
       hasLastModified ? getRowLastModifiedAt(row) : null
     );
   }
@@ -109,7 +125,7 @@ const buildRemoteRowMap = async (
 
     for (const row of page) {
       remoteMap.set(
-        buildRowKey(primaryKey, row),
+        buildRowKey(tableName, primaryKey, row),
         hasLastModified ? getRowLastModifiedAt(row) : null
       );
     }
@@ -153,23 +169,25 @@ const compareRemoteRows = (
 ) => {
   for (const [key, remoteLm] of remoteMap) {
     const localLm = localMap.get(key);
-    const truncated = !localMap.has(key)
-      ? addCompareMismatch(mismatchRows, {
-          table: tableName,
-          type: "missing_in_sqlite",
-          row_id: key,
-          local_last_modified_at: null,
-          remote_last_modified_at: remoteLm,
-        })
-      : hasLastModified && localLm !== remoteLm
-        ? addCompareMismatch(mismatchRows, {
-            table: tableName,
-            type: "last_modified_at_diff",
-            row_id: key,
-            local_last_modified_at: localLm ?? null,
-            remote_last_modified_at: remoteLm ?? null,
-          })
-        : false;
+    let truncated = false;
+
+    if (!localMap.has(key)) {
+      truncated = addCompareMismatch(mismatchRows, {
+        table: tableName,
+        type: "missing_in_sqlite",
+        row_id: key,
+        local_last_modified_at: null,
+        remote_last_modified_at: remoteLm,
+      });
+    } else if (hasLastModified && localLm !== remoteLm) {
+      truncated = addCompareMismatch(mismatchRows, {
+        table: tableName,
+        type: "last_modified_at_diff",
+        row_id: key,
+        local_last_modified_at: localLm ?? null,
+        remote_last_modified_at: remoteLm ?? null,
+      });
+    }
 
     if (truncated) return true;
   }
