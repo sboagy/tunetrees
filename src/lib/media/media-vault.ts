@@ -56,8 +56,17 @@ function openDatabase(): Promise<IDBDatabase> {
       };
 
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () =>
+      request.onerror = () => {
+        // Clear the cached open attempt so a later call can retry.
+        dbPromise = null;
         reject(request.error ?? new Error("Failed to open media vault."));
+      };
+      request.onblocked = () => {
+        // A blocked open cannot make progress; clear the cache so callers
+        // are not permanently stuck with this failed attempt.
+        dbPromise = null;
+        reject(new Error("Failed to open media vault because the database is blocked."));
+      };
     });
   }
 
