@@ -427,7 +427,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
                 "text-gray-700 hover:bg-white/80 dark:text-gray-200 dark:hover:bg-gray-800/70":
                   sourceMode() !== "upload",
               }}
-              data-testid="reference-audio-source-upload-option"
+              data-testid="reference-audio-source-upload-button"
             >
               <input
                 id="reference-audio-source-upload"
@@ -461,7 +461,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
                 "text-gray-700 hover:bg-white/80 dark:text-gray-200 dark:hover:bg-gray-800/70":
                   sourceMode() !== "url",
               }}
-              data-testid="reference-audio-source-url-option"
+              data-testid="reference-audio-source-url-button"
             >
               <input
                 id="reference-audio-source-url"
