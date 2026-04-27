@@ -28,6 +28,8 @@ import {
   buildMediaUploadUrl,
   stripMediaAuthToken,
 } from "./media-auth";
+import { getDb } from "@/lib/db/client-sqlite";
+import { uploadNoteMediaFile } from "@/lib/media/offline-note-media";
 import "jodit/es2021/jodit.min.css";
 
 interface NotesEditorProps {
@@ -160,7 +162,7 @@ const resolveToolbarLayout = (toolbarWidth: number | null) => {
  * - Theme-aware (light/dark mode support)
  */
 export const NotesEditor: Component<NotesEditorProps> = (props) => {
-  const { session } = useAuth();
+  const auth = useAuth();
   let editorWrapperRef: HTMLDivElement | undefined;
   let toolbarRef: HTMLDivElement | undefined;
   let editorRef: HTMLTextAreaElement | undefined;
@@ -193,45 +195,45 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   });
 
   const getEditorDisplayContent = (content: string) =>
-    attachMediaAuthToken(content, session()?.access_token);
+    attachMediaAuthToken(content, auth.session?.()?.access_token);
 
   const uploadMediaFormData = async (
     requestData: FormData,
     showProgress: (progress: number) => void
   ) => {
-    const accessToken = session()?.access_token;
-    if (!accessToken) {
+    const file = Array.from(requestData.values()).find(
+      (value): value is File => value instanceof File
+    );
+    if (!file) {
+      throw new Error("Unexpected media upload payload.");
+    }
+
+    const db = auth.localDb?.() ?? getDb();
+    const userId = auth.user?.()?.id;
+    if (!db || !userId) {
       throw new Error("You must be signed in to upload note media.");
     }
 
-    showProgress(25);
-    const response = await fetch(buildMediaUploadUrl(), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: requestData,
+    const upload = await uploadNoteMediaFile({
+      db,
+      file,
+      userId,
+      accessToken: auth.session?.()?.access_token,
+      showProgress,
     });
-    const payload = (await response.json()) as {
-      error?: string;
-      data?: {
-        files?: string[];
-      };
-    };
+    const accessToken = auth.session?.()?.access_token;
 
-    if (!response.ok) {
-      throw new Error(payload.error || "Media upload failed.");
-    }
-
-    showProgress(100);
     return {
-      ...payload,
+      ...upload,
       data: {
-        ...payload.data,
-        files:
-          payload.data?.files?.map((url) =>
-            attachMediaAuthTokenToUrl(url, accessToken)
-          ) || [],
+        ...upload.data,
+        files: upload.data.files.map((url) =>
+          url.startsWith("blob:")
+            ? url
+            : accessToken
+              ? attachMediaAuthTokenToUrl(url, accessToken)
+              : url
+        ),
       },
     };
   };

@@ -70,6 +70,20 @@ export default defineConfig(() => {
     return undefined;
   };
 
+  const mediaCacheKeyPlugin = {
+    cacheKeyWillBeUsed: async ({
+      request,
+    }: {
+      request: Request;
+    }): Promise<string> => {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/media/view") {
+        url.searchParams.delete("token");
+      }
+      return url.toString();
+    },
+  };
+
   return {
     // Development server configuration
     server: {
@@ -228,6 +242,19 @@ export default defineConfig(() => {
                   maxEntries: 100,
                   maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
                 },
+              },
+            },
+            {
+              urlPattern: ({ request, url }) =>
+                request.destination === "image" && url.pathname === "/api/media/view",
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "media-view-image-cache",
+                expiration: {
+                  maxEntries: 200,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                plugins: [mediaCacheKeyPlugin],
               },
             },
           ],

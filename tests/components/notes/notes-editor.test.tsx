@@ -8,6 +8,7 @@ import {
 import { createSignal, type Setter } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMediaUploadUrl, buildMediaViewUrl } from "../../../src/components/notes/media-auth";
+import * as offlineNoteMedia from "../../../src/lib/media/offline-note-media";
 import { NotesEditor } from "../../../src/components/notes/NotesEditor";
 
 vi.mock("jodit/es2021/jodit.min.css", () => ({}));
@@ -19,6 +20,11 @@ const mockSession = {
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({
     session: () => mockSession,
+    user: () => ({ id: "user-1" }),
+    localDb: () => ({
+      run: vi.fn(async () => undefined),
+      all: vi.fn(async () => []),
+    }),
   }),
 }));
 
@@ -521,6 +527,46 @@ describe("NotesEditor", () => {
       );
     });
     expect(editor.valueAssignments).toBeGreaterThan(1);
+  });
+
+  it("returns a blob URL immediately when note media is queued offline", async () => {
+    const offlineUploadSpy = vi
+      .spyOn(offlineNoteMedia, "uploadNoteMediaFile")
+      .mockResolvedValue({
+        success: true,
+        data: {
+          files: ["blob:offline-note-image"],
+        },
+      });
+
+    render(() => (
+      <NotesEditor content="<p>Initial note</p>" onContentChange={() => undefined} />
+    ));
+
+    await waitFor(() => {
+      expect(makeEditor).toHaveBeenCalledTimes(1);
+    });
+
+    const options = makeEditor.mock.calls[0]?.[1];
+    const requestData = new FormData();
+    const offlineFile = new File(["offline-image"], "offline.png", {
+      type: "image/png",
+    });
+    requestData.append("files[0]", offlineFile);
+
+    const uploadResponse = await options?.uploader?.customUploadFunction?.(
+      requestData,
+      vi.fn()
+    );
+
+    expect(offlineUploadSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: offlineFile,
+        userId: "user-1",
+        accessToken: "test-access-token",
+      })
+    );
+    expect(uploadResponse?.data?.files).toEqual(["blob:offline-note-image"]);
   });
 
   it("applies list formatting through Jodit's commitStyle API", async () => {

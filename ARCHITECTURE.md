@@ -120,11 +120,12 @@ In TuneTrees, schema agreement is produced by codegen rather than maintained man
 3. SQLite triggers write row changes into the local outbox table `sync_push_queue`.
 4. `src/lib/db/oosync-browser-sqlite-hooks.ts` supplies TuneTrees-specific browser DB hooks such as view initialization, compatibility objects, and migration-time local cleanup.
 5. `src/lib/sync/runtime-config.ts` injects TuneTrees runtime dependencies into oosync via the generated browser runtime wrapper: local schema, syncable tables, table ordering, SQLite instance access, trigger control, outbox backup helpers, persistence, and logging.
-6. `AuthContext` starts the oosync sync service with the local DB, auth session, and any request overrides.
-7. The browser sends pending changes and pull state to the Cloudflare Worker via `/api/sync`.
-8. The worker evaluates generated sync rules, applies push policy against Postgres, pulls matching remote rows, and returns remote changes.
-9. oosync applies those remote changes back into local SQLite, suppressing triggers while applying remote data and restoring them afterward.
-10. SolidJS reacts to local DB changes. The UI continues to read local state; it does not switch to remote reads after sync.
+6. Offline media uses external browser storage rather than SQLite blobs: `src/lib/media/media-vault.ts` stores pinned audio and queued note-upload drafts in IndexedDB, while a local-only SQLite table (`media_draft_outbox`) tracks pending note-media uploads that still need an authenticated worker round-trip.
+7. `AuthContext` starts the oosync sync service with the local DB, auth session, and any request overrides, and also runs offline-media maintenance (draft upload replay plus pinned-audio lookahead prefetch) when the app is online.
+8. The browser sends pending changes and pull state to the Cloudflare Worker via `/api/sync`, while authenticated media uploads/downloads go through `/api/media/*`.
+9. The worker evaluates generated sync rules, applies push policy against Postgres, pulls matching remote rows, and returns remote changes.
+10. oosync applies those remote changes back into local SQLite, suppressing triggers while applying remote data and restoring them afterward.
+11. SolidJS reacts to local DB changes. The UI continues to read local state; it does not switch to remote reads after sync.
 
 At runtime, the browser always renders from the local database. Sync only changes what is in that local database.
 
