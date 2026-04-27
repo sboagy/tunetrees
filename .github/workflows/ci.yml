@@ -24,6 +24,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  actions: write
+  contents: read
+
 # Opt into Node.js 24 for all JavaScript actions (required before June 2026 forced migration).
 # This silences Node.js 20 deprecation warnings, including 1password/install-cli-action@v2
 # which has no Node 24-native release yet.
