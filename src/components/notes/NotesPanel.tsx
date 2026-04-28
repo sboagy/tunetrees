@@ -145,7 +145,7 @@ export const NotesPanel: Component = () => {
     note.userRef === currentUserId();
   const canReorderNotes = () => (notes() ?? []).every((note) => canManageNote(note));
   const getVisibilityLabel = (note: { public: number | null }) =>
-    note.public === 1 ? "Public" : "Shared";
+    note.public === 1 ? "Public" : "Read-only";
 
   // Format date for display
   const formatDate = (isoString: string | null) => {
