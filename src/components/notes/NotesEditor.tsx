@@ -204,7 +204,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   const displayUrlByDraftUrl = new Map<string, string>();
   const draftUrlByDisplayUrl = new Map<string, string>();
 
-  const syncDraftDisplayMappings = (
+  const revokeAndSyncDraftDisplayMappings = (
     nextDisplayUrlByDraftUrl: ReadonlyMap<string, string>
   ) => {
     const nextDisplayUrls = new Set(nextDisplayUrlByDraftUrl.values());
@@ -240,7 +240,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     lastResolvedContentInput = incomingContent;
 
     if (!hasOfflineNoteMediaDraftUrlsInHtml(incomingContent)) {
-      syncDraftDisplayMappings(new Map());
+      revokeAndSyncDraftDisplayMappings(new Map());
 
       const displayContent = attachMediaAuthToken(
         incomingContent,
@@ -271,7 +271,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
         return;
       }
 
-      syncDraftDisplayMappings(resolvedContent.displayUrlByDraftUrl);
+      revokeAndSyncDraftDisplayMappings(resolvedContent.displayUrlByDraftUrl);
 
       const displayContent = attachMediaAuthToken(
         resolvedContent.html,
@@ -291,7 +291,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       }
 
       console.error("Failed to resolve offline note media drafts:", error);
-      syncDraftDisplayMappings(new Map());
+      revokeAndSyncDraftDisplayMappings(new Map());
 
       const fallbackContent = attachMediaAuthToken(
         incomingContent,
@@ -693,7 +693,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   });
 
   onCleanup(() => {
-    syncDraftDisplayMappings(new Map());
+    revokeAndSyncDraftDisplayMappings(new Map());
 
     // Destroy Jodit instance
     if (joditInstance) {
