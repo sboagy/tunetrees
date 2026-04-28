@@ -6,11 +6,7 @@ import {
   enqueueMediaDraftUpload,
   listMediaDraftUploads,
 } from "@/lib/db/queries/media-draft-outbox";
-import {
-  deleteMediaDraft,
-  getMediaDraft,
-  putMediaDraft,
-} from "./media-vault";
+import { deleteMediaDraft, getMediaDraft, putMediaDraft } from "./media-vault";
 
 interface UploadResponsePayload {
   error?: string;
@@ -23,6 +19,7 @@ export interface NoteMediaUploadResult {
   success: boolean;
   data: {
     files: string[];
+    persistedFiles?: string[];
   };
 }
 
@@ -45,6 +42,128 @@ interface ProcessPendingNoteMediaDraftsParams {
 
 const isBrowserOnline = () =>
   typeof navigator === "undefined" ? true : navigator.onLine;
+
+const OFFLINE_NOTE_MEDIA_DRAFT_URL_PREFIX = "tunetrees-note-media-draft://";
+
+export const buildOfflineNoteMediaDraftUrl = (draftId: string) =>
+  `${OFFLINE_NOTE_MEDIA_DRAFT_URL_PREFIX}${draftId}`;
+
+export const hasOfflineNoteMediaDraftUrlsInHtml = (html: string) =>
+  html.includes(OFFLINE_NOTE_MEDIA_DRAFT_URL_PREFIX);
+
+function getOfflineNoteMediaDraftId(url: string): string | null {
+  if (!url.startsWith(OFFLINE_NOTE_MEDIA_DRAFT_URL_PREFIX)) {
+    return null;
+  }
+
+  const draftId = url.slice(OFFLINE_NOTE_MEDIA_DRAFT_URL_PREFIX.length);
+  return draftId || null;
+}
+
+function replaceNoteMediaUrlsInHtml(
+  html: string,
+  replacements: ReadonlyMap<string, string>
+): string {
+  if (!html || replacements.size === 0) {
+    return html;
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+
+  for (const element of template.content.querySelectorAll<HTMLElement>(
+    "img[src],a[href]"
+  )) {
+    const attr = element.tagName === "IMG" ? "src" : "href";
+    const currentValue = element.getAttribute(attr);
+    if (!currentValue) {
+      continue;
+    }
+
+    const nextValue = replacements.get(currentValue);
+    if (nextValue) {
+      element.setAttribute(attr, nextValue);
+    }
+  }
+
+  return template.innerHTML;
+}
+
+export function persistOfflineNoteMediaDraftUrlsInHtml(
+  html: string,
+  displayUrlToDraftUrl: ReadonlyMap<string, string>
+): string {
+  return replaceNoteMediaUrlsInHtml(html, displayUrlToDraftUrl);
+}
+
+export interface ResolvedOfflineNoteMediaHtml {
+  html: string;
+  displayUrlByDraftUrl: Map<string, string>;
+  revoke: () => void;
+}
+
+export async function resolveOfflineNoteMediaDraftUrlsInHtml(
+  html: string,
+  options: {
+    reuseDisplayUrlByDraftUrl?: ReadonlyMap<string, string>;
+  } = {}
+): Promise<ResolvedOfflineNoteMediaHtml> {
+  if (!html) {
+    return {
+      html,
+      displayUrlByDraftUrl: new Map(),
+      revoke: () => undefined,
+    };
+  }
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+
+  const displayUrlByDraftUrl = new Map<string, string>();
+  const createdDisplayUrls: string[] = [];
+
+  for (const element of template.content.querySelectorAll<HTMLElement>(
+    "img[src],a[href]"
+  )) {
+    const attr = element.tagName === "IMG" ? "src" : "href";
+    const currentValue = element.getAttribute(attr);
+    if (!currentValue) {
+      continue;
+    }
+
+    const draftId = getOfflineNoteMediaDraftId(currentValue);
+    if (!draftId) {
+      continue;
+    }
+
+    let displayUrl =
+      displayUrlByDraftUrl.get(currentValue) ??
+      options.reuseDisplayUrlByDraftUrl?.get(currentValue);
+
+    if (!displayUrl) {
+      const draft = await getMediaDraft(draftId);
+      if (!draft) {
+        continue;
+      }
+
+      displayUrl = URL.createObjectURL(draft.blob);
+      createdDisplayUrls.push(displayUrl);
+    }
+
+    displayUrlByDraftUrl.set(currentValue, displayUrl);
+    element.setAttribute(attr, displayUrl);
+  }
+
+  return {
+    html: template.innerHTML,
+    displayUrlByDraftUrl,
+    revoke: () => {
+      for (const displayUrl of createdDisplayUrls) {
+        URL.revokeObjectURL(displayUrl);
+      }
+    },
+  };
+}
 
 async function uploadNoteMediaToWorker(
   file: File,
@@ -82,26 +201,6 @@ async function uploadNoteMediaToWorker(
   };
 }
 
-function replaceBlobUrlInHtml(
-  html: string,
-  blobUrl: string,
-  uploadedUrl: string
-): string {
-  const template = document.createElement("template");
-  template.innerHTML = html;
-
-  for (const element of template.content.querySelectorAll<HTMLElement>(
-    "img[src],a[href]"
-  )) {
-    const attr = element.tagName === "IMG" ? "src" : "href";
-    if (element.getAttribute(attr) === blobUrl) {
-      element.setAttribute(attr, uploadedUrl);
-    }
-  }
-
-  return template.innerHTML;
-}
-
 export async function queueOfflineNoteMedia({
   db,
   file,
@@ -115,6 +214,7 @@ export async function queueOfflineNoteMedia({
   }
 
   const draftId = crypto.randomUUID();
+  const draftUrl = buildOfflineNoteMediaDraftUrl(draftId);
   const blobUrl = URL.createObjectURL(file);
   const createdAt = new Date().toISOString();
 
@@ -136,7 +236,7 @@ export async function queueOfflineNoteMedia({
   await enqueueMediaDraftUpload(db, {
     id: draftId,
     userRef: userId,
-    blobUrl,
+    blobUrl: draftUrl,
     fileName: file.name,
     contentType: file.type || "application/octet-stream",
     createdAt,
@@ -147,6 +247,7 @@ export async function queueOfflineNoteMedia({
     success: true,
     data: {
       files: [blobUrl],
+      persistedFiles: [draftUrl],
     },
   };
 }
@@ -209,25 +310,46 @@ export async function processPendingNoteMediaDrafts({
     if (!uploadedUrl) {
       throw new Error("Media upload completed without a file URL.");
     }
-    const now = new Date().toISOString();
-    const notesToUpdate = await db.all<{ id: string; noteText: string | null }>(sql`
-      SELECT
-        id as id,
-        note_text as noteText
-      FROM note
-      WHERE
-        user_ref = ${userId}
-        AND deleted = 0
-        AND note_text IS NOT NULL
-        AND instr(note_text, ${entry.blobUrl}) > 0
-    `);
 
-    for (const note of notesToUpdate) {
+    const referencesToReplace = new Map<string, string>([
+      [entry.blobUrl, uploadedUrl],
+    ]);
+    if (draft.blobUrl && draft.blobUrl !== entry.blobUrl) {
+      referencesToReplace.set(draft.blobUrl, uploadedUrl);
+    }
+
+    const now = new Date().toISOString();
+    const notesToUpdate = new Map<
+      string,
+      { id: string; noteText: string | null }
+    >();
+
+    for (const referenceUrl of referencesToReplace.keys()) {
+      const matchingNotes = await db.all<{
+        id: string;
+        noteText: string | null;
+      }>(sql`
+        SELECT
+          id as id,
+          note_text as noteText
+        FROM note
+        WHERE
+          user_ref = ${userId}
+          AND deleted = 0
+          AND note_text IS NOT NULL
+          AND instr(note_text, ${referenceUrl}) > 0
+      `);
+
+      for (const note of matchingNotes) {
+        notesToUpdate.set(note.id, note);
+      }
+    }
+
+    for (const note of notesToUpdate.values()) {
       const noteText = note.noteText ?? "";
-      const nextNoteText = replaceBlobUrlInHtml(
+      const nextNoteText = replaceNoteMediaUrlsInHtml(
         noteText,
-        entry.blobUrl,
-        uploadedUrl
+        referencesToReplace
       );
 
       if (nextNoteText === noteText) {

@@ -2,7 +2,12 @@ import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Jodit } from "jodit";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getDb } from "@/lib/db/client-sqlite";
-import { uploadNoteMediaFile } from "@/lib/media/offline-note-media";
+import {
+  hasOfflineNoteMediaDraftUrlsInHtml,
+  persistOfflineNoteMediaDraftUrlsInHtml,
+  resolveOfflineNoteMediaDraftUrlsInHtml,
+  uploadNoteMediaFile,
+} from "@/lib/media/offline-note-media";
 import "jodit/es2021/jodit.min.css";
 import {
   Bold,
@@ -169,6 +174,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   let joditInstance: Jodit | undefined;
   let lastContent = props.content || "";
   let embeddedMediaReplacementVersion = 0;
+  let resolvedDraftDisplayCleanup: (() => void) | undefined;
+  let resolvedDraftDisplayVersion = 0;
+  let lastResolvedContentInput: string | undefined;
   const [currentTheme, setCurrentTheme] = createSignal<"light" | "dark">(
     getCurrentTheme()
   );
@@ -194,8 +202,81 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     };
   });
 
-  const getEditorDisplayContent = (content: string) =>
-    attachMediaAuthToken(content, auth.session?.()?.access_token);
+  const displayUrlByDraftUrl = new Map<string, string>();
+  const draftUrlByDisplayUrl = new Map<string, string>();
+
+  const resetDraftDisplayMappings = (
+    nextDisplayUrlByDraftUrl: ReadonlyMap<string, string>
+  ) => {
+    displayUrlByDraftUrl.clear();
+    draftUrlByDisplayUrl.clear();
+
+    for (const [draftUrl, displayUrl] of nextDisplayUrlByDraftUrl.entries()) {
+      displayUrlByDraftUrl.set(draftUrl, displayUrl);
+      draftUrlByDisplayUrl.set(displayUrl, draftUrl);
+    }
+  };
+
+  const getPersistedEditorContent = (content: string) =>
+    stripMediaAuthToken(
+      persistOfflineNoteMediaDraftUrlsInHtml(content, draftUrlByDisplayUrl)
+    );
+
+  const applyResolvedEditorContent = async (incomingContent: string) => {
+    const editor = joditInstance;
+    if (!editor) {
+      return;
+    }
+
+    lastResolvedContentInput = incomingContent;
+
+    if (!hasOfflineNoteMediaDraftUrlsInHtml(incomingContent)) {
+      resolvedDraftDisplayCleanup?.();
+      resolvedDraftDisplayCleanup = undefined;
+      resetDraftDisplayMappings(new Map());
+
+      const displayContent = attachMediaAuthToken(
+        incomingContent,
+        auth.session?.()?.access_token
+      );
+
+      lastContent = stripMediaAuthToken(incomingContent);
+      if (displayContent !== editor.value) {
+        editor.value = displayContent;
+      }
+      return;
+    }
+
+    const resolutionVersion = ++resolvedDraftDisplayVersion;
+    const resolvedContent = await resolveOfflineNoteMediaDraftUrlsInHtml(
+      incomingContent,
+      {
+        reuseDisplayUrlByDraftUrl: displayUrlByDraftUrl,
+      }
+    );
+
+    if (
+      resolutionVersion !== resolvedDraftDisplayVersion ||
+      editor !== joditInstance
+    ) {
+      resolvedContent.revoke();
+      return;
+    }
+
+    resolvedDraftDisplayCleanup?.();
+    resolvedDraftDisplayCleanup = resolvedContent.revoke;
+    resetDraftDisplayMappings(resolvedContent.displayUrlByDraftUrl);
+
+    const displayContent = attachMediaAuthToken(
+      resolvedContent.html,
+      auth.session?.()?.access_token
+    );
+
+    lastContent = stripMediaAuthToken(incomingContent);
+    if (displayContent !== editor.value) {
+      editor.value = displayContent;
+    }
+  };
 
   const uploadMediaFormData = async (
     requestData: FormData,
@@ -223,6 +304,18 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       accessToken: auth.session?.()?.access_token,
       showProgress,
     });
+
+    const persistedFiles = upload.data.persistedFiles ?? upload.data.files;
+    for (const [index, fileUrl] of upload.data.files.entries()) {
+      const persistedUrl = persistedFiles[index];
+      if (!fileUrl || !persistedUrl || fileUrl === persistedUrl) {
+        continue;
+      }
+
+      displayUrlByDraftUrl.set(persistedUrl, fileUrl);
+      draftUrlByDisplayUrl.set(fileUrl, persistedUrl);
+    }
+
     const accessToken = auth.session?.()?.access_token;
 
     return {
@@ -386,14 +479,14 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
             })
             .catch((error) => {
               console.error("Failed to replace embedded note media:", error);
-              lastContent = sanitizedContent;
-              props.onContentChange(sanitizedContent);
+              lastContent = getPersistedEditorContent(newContent);
+              props.onContentChange(lastContent);
             });
           return;
         }
 
-        lastContent = sanitizedContent;
-        props.onContentChange(sanitizedContent);
+        lastContent = getPersistedEditorContent(newContent);
+        props.onContentChange(lastContent);
       },
     },
   });
@@ -504,7 +597,8 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
 
       // Set initial content
       lastContent = stripMediaAuthToken(props.content || "");
-      joditInstance.value = getEditorDisplayContent(props.content || "");
+      joditInstance.value = "";
+      void applyResolvedEditorContent(props.content || "");
     }
   };
 
@@ -557,16 +651,12 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   // Update editor content when prop changes (external update)
   createEffect(() => {
     const incomingContent = props.content || "";
-    const displayContent = getEditorDisplayContent(incomingContent);
     const editor = joditInstance;
-    if (!editor) {
+    if (!editor || incomingContent === lastResolvedContentInput) {
       return;
     }
 
-    if (displayContent !== editor.value) {
-      lastContent = stripMediaAuthToken(incomingContent);
-      editor.value = displayContent;
-    }
+    void applyResolvedEditorContent(incomingContent);
   });
 
   createEffect(() => {
@@ -576,6 +666,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   });
 
   onCleanup(() => {
+    resolvedDraftDisplayCleanup?.();
+    resolvedDraftDisplayCleanup = undefined;
+
     // Destroy Jodit instance
     if (joditInstance) {
       joditInstance.destruct();

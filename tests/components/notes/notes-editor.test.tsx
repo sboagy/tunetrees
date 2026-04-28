@@ -47,6 +47,7 @@ type MockEditorConfig = {
       time?: string;
       data?: {
         files?: string[];
+        persistedFiles?: string[];
       };
       file?: {
         key?: string;
@@ -549,13 +550,16 @@ describe("NotesEditor", () => {
         success: true,
         data: {
           files: ["blob:offline-note-image"],
+          persistedFiles: ["tunetrees-note-media-draft://draft-1"],
         },
       });
+
+    const handleContentChange = vi.fn();
 
     render(() => (
       <NotesEditor
         content="<p>Initial note</p>"
-        onContentChange={() => undefined}
+        onContentChange={handleContentChange}
       />
     ));
 
@@ -583,6 +587,47 @@ describe("NotesEditor", () => {
       })
     );
     expect(uploadResponse?.data?.files).toEqual(["blob:offline-note-image"]);
+
+    const optionsEvents = makeEditor.mock.calls[0]?.[1]?.events;
+    optionsEvents?.change?.(`<p><img src="blob:offline-note-image"></p>`);
+
+    expect(handleContentChange).toHaveBeenCalledWith(
+      '<p><img src="tunetrees-note-media-draft://draft-1"></p>'
+    );
+  });
+
+  it("rehydrates stored offline draft references into fresh blob URLs in the editor", async () => {
+    const resolveDraftHtmlSpy = vi
+      .spyOn(offlineNoteMedia, "resolveOfflineNoteMediaDraftUrlsInHtml")
+      .mockResolvedValue({
+        html: '<p><img src="blob:rehydrated-note-image"></p>',
+        displayUrlByDraftUrl: new Map([
+          [
+            "tunetrees-note-media-draft://draft-1",
+            "blob:rehydrated-note-image",
+          ],
+        ]),
+        revoke: vi.fn(),
+      });
+
+    render(() => (
+      <NotesEditor
+        content={'<p><img src="tunetrees-note-media-draft://draft-1"></p>'}
+        onContentChange={() => undefined}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(resolveDraftHtmlSpy).toHaveBeenCalledWith(
+        '<p><img src="tunetrees-note-media-draft://draft-1"></p>',
+        expect.objectContaining({
+          reuseDisplayUrlByDraftUrl: expect.any(Map),
+        })
+      );
+      expect(createdEditors[0]?.value).toBe(
+        '<p><img src="blob:rehydrated-note-image"></p>'
+      );
+    });
   });
 
   it("applies list formatting through Jodit's commitStyle API", async () => {
@@ -687,7 +732,7 @@ describe("NotesEditor", () => {
     });
 
     const editor = createdEditors[0];
-    expect(editor.valueAssignments).toBe(1);
+    expect(editor.valueAssignments).toBe(2);
 
     const updateContent = setContent;
     expect(updateContent).toBeDefined();
@@ -697,13 +742,13 @@ describe("NotesEditor", () => {
 
     updateContent("<p>Initial note</p>");
     await waitFor(() => {
-      expect(editor.valueAssignments).toBe(1);
+      expect(editor.valueAssignments).toBe(2);
     });
 
     updateContent("<p>Updated note</p>");
     await waitFor(() => {
       expect(editor.value).toBe("<p>Updated note</p>");
-      expect(editor.valueAssignments).toBe(2);
+      expect(editor.valueAssignments).toBe(3);
     });
   });
 });
