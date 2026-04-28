@@ -20,6 +20,12 @@ const REPERTOIRE_TUNE_FIELDS = ["learned", "goal", "scheduled"] as const;
 type BaseTuneField = (typeof BASE_TUNE_FIELDS)[number];
 type RepertoireTuneField = (typeof REPERTOIRE_TUNE_FIELDS)[number];
 
+function normalizeOptionalText(
+  value: string | null | undefined
+): string | null {
+  return value === undefined || value === null || value === "" ? null : value;
+}
+
 export function buildBaseTuneUpdateInput(
   tuneData: Partial<TuneEditorData>
 ): Partial<CreateTuneInput> {
@@ -58,8 +64,8 @@ export function buildRepertoireTuneUpdate(
   tuneData: Partial<TuneEditorData>
 ): Record<RepertoireTuneField, string | null> {
   return {
-    learned: tuneData.learned || null,
-    goal: tuneData.goal || null,
-    scheduled: tuneData.scheduled || null,
+    learned: normalizeOptionalText(tuneData.learned),
+    goal: normalizeOptionalText(tuneData.goal),
+    scheduled: normalizeOptionalText(tuneData.scheduled),
   };
 }
