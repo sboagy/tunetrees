@@ -141,9 +141,15 @@ export const NotesPanel: Component = () => {
     const db = getDb();
     return await getNotesByTune(db, tuneId);
   });
-  const canManageNote = (note: { userRef: string | null }) =>
-    note.userRef === currentUserId();
-  const canReorderNotes = () => (notes() ?? []).every((note) => canManageNote(note));
+  const canManageNote = (note: { userRef: string | null }) => {
+    // Do not treat matching nulls as ownership while auth/user state is still loading.
+    const userId = currentUserId();
+    return userId !== null && note.userRef === userId;
+  };
+  const canReorderNotes = () => {
+    const userId = currentUserId();
+    return userId !== null && (notes() ?? []).every((note) => note.userRef === userId);
+  };
   const getVisibilityLabel = (note: {
     public: number | null;
     userRef: string | null;
