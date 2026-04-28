@@ -28,7 +28,7 @@ function normalizeOptionalText(
 
 function normalizeGoalValue(value: string | null | undefined): string | null {
   // Goal is enum-like, but the edit form still uses blank values to clear it.
-  return value === undefined || value === null || value === "" ? null : value;
+  return normalizeOptionalText(value);
 }
 
 export function buildBaseTuneUpdateInput(
