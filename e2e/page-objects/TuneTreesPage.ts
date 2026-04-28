@@ -19,6 +19,9 @@ type OnboardingRepertoireArgs = {
   genres_filter?: string[] | null;
 };
 
+const OVERFLOW_MENU_MAX_RETRIES = 3;
+const OVERFLOW_MENU_RETRY_DELAY_MS = 150;
+
 /**
  * Page Object Model for TuneTrees SolidJS PWA
  * Based on legacy React implementation with adaptations for new stack
@@ -2161,7 +2164,7 @@ export class TuneTreesPage {
     overflowButton: Locator,
     target: Locator
   ) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < OVERFLOW_MENU_MAX_RETRIES; attempt += 1) {
       const targetVisible = await target
         .isVisible({ timeout: 300 })
         .catch(() => false);
@@ -2185,7 +2188,7 @@ export class TuneTreesPage {
         return;
       }
 
-      await this.page.waitForTimeout(150);
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
     }
 
     await expect(target).toBeVisible({ timeout: 5000 });
@@ -2407,7 +2410,7 @@ export class TuneTreesPage {
     const displayOptionsButton = this.getDisplayOptionsButton();
     await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < OVERFLOW_MENU_MAX_RETRIES; attempt += 1) {
       const targetMenuVisible = await targetMenu
         .isVisible({ timeout: 250 })
         .catch(() => false);
@@ -2439,7 +2442,7 @@ export class TuneTreesPage {
       }
 
       await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
-      await this.page.waitForTimeout(150);
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
     }
 
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
