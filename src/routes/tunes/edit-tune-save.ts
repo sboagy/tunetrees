@@ -2,22 +2,19 @@ import type { TuneEditorData } from "../../components/tunes";
 import type { TuneOverrideInput } from "../../lib/db/queries/tune-overrides";
 import type { CreateTuneInput } from "../../lib/db/types";
 
-const BASE_TUNE_FIELDS = [
-  "title",
-  "type",
-  "mode",
-  "structure",
-  "incipit",
-  "genre",
-  "composer",
-  "artist",
-  "idForeign",
-  "releaseYear",
-] as const;
-
 const REPERTOIRE_TUNE_FIELDS = ["learned", "goal", "scheduled"] as const;
 
-type BaseTuneField = (typeof BASE_TUNE_FIELDS)[number];
+type BaseTuneField =
+  | "title"
+  | "type"
+  | "mode"
+  | "structure"
+  | "incipit"
+  | "genre"
+  | "composer"
+  | "artist"
+  | "idForeign"
+  | "releaseYear";
 type RepertoireTuneField = (typeof REPERTOIRE_TUNE_FIELDS)[number];
 
 function normalizeOptionalText(
@@ -29,15 +26,18 @@ function normalizeOptionalText(
 export function buildBaseTuneUpdateInput(
   tuneData: Partial<TuneEditorData>
 ): Partial<CreateTuneInput> {
-  const input: Partial<CreateTuneInput> = {};
-
-  // Keep the full editable shape so the direct-update path mirrors the
-  // previous inline object literal and stays predictable for future fields.
-  for (const field of BASE_TUNE_FIELDS) {
-    input[field] = tuneData[field] ?? undefined;
-  }
-
-  return input;
+  return {
+    title: tuneData.title ?? undefined,
+    type: tuneData.type ?? undefined,
+    mode: tuneData.mode ?? undefined,
+    structure: tuneData.structure ?? undefined,
+    incipit: tuneData.incipit ?? undefined,
+    genre: tuneData.genre ?? undefined,
+    composer: tuneData.composer ?? undefined,
+    artist: tuneData.artist ?? undefined,
+    idForeign: tuneData.idForeign ?? undefined,
+    releaseYear: tuneData.releaseYear ?? undefined,
+  };
 }
 
 export function buildChangedTuneOverrideInput(
@@ -46,12 +46,26 @@ export function buildChangedTuneOverrideInput(
 ): TuneOverrideInput {
   const overrideInput: TuneOverrideInput = {};
 
-  for (const field of BASE_TUNE_FIELDS) {
-    const nextValue = tuneData[field];
-    if (nextValue !== currentTune[field]) {
-      overrideInput[field] = nextValue ?? undefined;
-    }
-  }
+  if (tuneData.title !== currentTune.title)
+    overrideInput.title = tuneData.title ?? undefined;
+  if (tuneData.type !== currentTune.type)
+    overrideInput.type = tuneData.type ?? undefined;
+  if (tuneData.mode !== currentTune.mode)
+    overrideInput.mode = tuneData.mode ?? undefined;
+  if (tuneData.structure !== currentTune.structure)
+    overrideInput.structure = tuneData.structure ?? undefined;
+  if (tuneData.incipit !== currentTune.incipit)
+    overrideInput.incipit = tuneData.incipit ?? undefined;
+  if (tuneData.genre !== currentTune.genre)
+    overrideInput.genre = tuneData.genre ?? undefined;
+  if (tuneData.composer !== currentTune.composer)
+    overrideInput.composer = tuneData.composer ?? undefined;
+  if (tuneData.artist !== currentTune.artist)
+    overrideInput.artist = tuneData.artist ?? undefined;
+  if (tuneData.idForeign !== currentTune.idForeign)
+    overrideInput.idForeign = tuneData.idForeign ?? undefined;
+  if (tuneData.releaseYear !== currentTune.releaseYear)
+    overrideInput.releaseYear = tuneData.releaseYear ?? undefined;
 
   return overrideInput;
 }
