@@ -945,7 +945,7 @@ async function purgeTunesByTitlePrefixes(user: TestUser, prefixes: string[]) {
 function getDeterministicTablesToVerify(
   opts: DeterministicSetupOptions
 ): string[] {
-  const tables = [...DETERMINISTIC_TABLES];
+  const tables: string[] = [...DETERMINISTIC_TABLES];
 
   if (opts.clearNotesAndReferences) {
     tables.push("note", "reference");
