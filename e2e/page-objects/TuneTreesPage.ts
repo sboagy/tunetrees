@@ -19,6 +19,9 @@ type OnboardingRepertoireArgs = {
   genres_filter?: string[] | null;
 };
 
+const OVERFLOW_MENU_MAX_RETRIES = 3;
+const OVERFLOW_MENU_RETRY_DELAY_MS = 150;
+
 /**
  * Page Object Model for TuneTrees SolidJS PWA
  * Based on legacy React implementation with adaptations for new stack
@@ -2157,6 +2160,58 @@ export class TuneTreesPage {
     await this.setViewMode(tab, "list");
   }
 
+  private async clickOverflowButton(overflowButton: Locator) {
+    await overflowButton
+      .click({ timeout: 2000 })
+      // Kobalte can detach/recreate the trigger while the mobile menu opens.
+      // Fall back to a direct event so CI retries can recover from that churn.
+      .catch(() => overflowButton.dispatchEvent("click"))
+      .catch(() => undefined);
+  }
+
+  /**
+   * Open a mobile overflow menu entry with bounded retries.
+   *
+   * The toolbar can briefly detach/recreate its Kobalte trigger while the menu
+   * is opening on CI Mobile Chrome, so we allow a few reopen attempts before
+   * failing the test. `overflowButton` is the trigger button, and `target` is
+   * the menu entry that should become visible once the menu is open.
+   */
+  private async openOverflowMenuEntry(
+    overflowButton: Locator,
+    target: Locator
+  ) {
+    for (
+      let retryAttempt = 0;
+      retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
+      retryAttempt += 1
+    ) {
+      const isTargetVisibleBeforeClick = await target
+        .isVisible({ timeout: 300 })
+        .catch(() => false);
+      if (isTargetVisibleBeforeClick) {
+        return;
+      }
+
+      await overflowButton.scrollIntoViewIfNeeded().catch(() => undefined);
+      await expect(overflowButton).toBeVisible({ timeout: 5000 });
+      await expect(overflowButton).toBeEnabled({ timeout: 5000 });
+
+      await this.clickOverflowButton(overflowButton);
+
+      const isTargetVisibleAfterClick = await target
+        .isVisible({ timeout: 1500 })
+        .catch(() => false);
+      if (isTargetVisibleAfterClick) {
+        return;
+      }
+
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+    }
+
+    await expect(target).toBeVisible({ timeout: 5000 });
+  }
+
   private async revealToolbarAction(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2169,9 +2224,7 @@ export class TuneTreesPage {
     }
 
     const overflowButton = this.getColumnsButtonForTab(tab);
-    await expect(overflowButton).toBeVisible({ timeout: 5000 });
-    await overflowButton.click();
-    await expect(action).toBeVisible({ timeout: 5000 });
+    await this.openOverflowMenuEntry(overflowButton, action);
     return true;
   }
 
@@ -2372,35 +2425,19 @@ export class TuneTreesPage {
       return;
     }
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const displayOptionsButton = this.getDisplayOptionsButton();
+    const displayOptionsButton = this.getDisplayOptionsButton();
+    await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
+
+    for (
+      let retryAttempt = 0;
+      retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
+      retryAttempt += 1
+    ) {
       const targetMenuVisible = await targetMenu
         .isVisible({ timeout: 250 })
         .catch(() => false);
       if (targetMenuVisible) {
         return;
-      }
-
-      const displayOptionsVisible = await displayOptionsButton
-        .isVisible({ timeout: 750 })
-        .catch(() => false);
-      if (!displayOptionsVisible) {
-        if (attempt > 0) {
-          await columnsButton.scrollIntoViewIfNeeded().catch(() => undefined);
-          await columnsButton.click().catch(() => undefined);
-        }
-
-        const displayOptionsVisibleAfterRetry = await displayOptionsButton
-          .isVisible({ timeout: 1000 })
-          .catch(() => false);
-        if (!displayOptionsVisibleAfterRetry) {
-          if (this.page.isClosed()) {
-            return;
-          }
-
-          await this.page.waitForTimeout(150);
-          continue;
-        }
       }
 
       await displayOptionsButton
@@ -2426,7 +2463,8 @@ export class TuneTreesPage {
         return;
       }
 
-      await this.page.waitForTimeout(150);
+      await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
     }
 
     await expect(targetMenu).toBeVisible({ timeout: 5000 });

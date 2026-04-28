@@ -199,8 +199,12 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
     setShowOverflowMenu(false);
     // Let the mobile overflow popover finish closing before opening the
     // Display Options portal, otherwise the nested menu can race on CI.
+    // One frame was still occasionally too eager for Playwright's mobile shard,
+    // leaving the portal to open and immediately dismiss.
     requestAnimationFrame(() => {
-      setShowColumnsDropdown(true);
+      requestAnimationFrame(() => {
+        setShowColumnsDropdown(true);
+      });
     });
   };
 
