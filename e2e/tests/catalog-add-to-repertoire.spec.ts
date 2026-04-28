@@ -52,8 +52,6 @@ test.describe
     test("should keep Add To Repertoire disabled until rows are selected", async ({
       page,
     }) => {
-      const isMobileChrome = test.info().project.name === "Mobile Chrome";
-
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 10000,
       });
@@ -61,25 +59,29 @@ test.describe
         addToRepertoire: true,
         tab: "catalog",
       });
-
-      if (isMobileChrome) {
-        await ttPage.catalogColumnsButton.click();
-      }
       await expect(ttPage.catalogAddToRepertoireButton).toBeDisabled();
 
-      if (isMobileChrome) {
-        await page.keyboard.press("Escape").catch(() => undefined);
-      }
+      await page.keyboard.press("Escape").catch(() => undefined);
 
       await ttPage.setGridRowChecked(
         CATALOG_TUNE_A_FIG_FOR_A_KISS,
         ttPage.catalogGrid
       );
 
-      if (isMobileChrome) {
-        await ttPage.catalogColumnsButton.click();
-      }
-      await expect(ttPage.catalogAddToRepertoireButton).toBeEnabled();
+      await ttPage.expectToolbarVisible({
+        addToRepertoire: true,
+        tab: "catalog",
+      });
+      await expect
+        .poll(
+          () =>
+            ttPage.catalogAddToRepertoireButton.isEnabled().catch(() => false),
+          {
+            timeout: 5000,
+            intervals: [100, 250, 500, 1000],
+          }
+        )
+        .toBe(true);
     });
 
     test("should add selected tunes to repertoire @side-effects", async ({
