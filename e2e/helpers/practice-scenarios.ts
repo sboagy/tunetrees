@@ -798,6 +798,10 @@ const DETERMINISTIC_TABLES = [
   "plugin",
 ] as const;
 
+/**
+ * Returns true when the page is currently on the TuneTrees app itself rather
+ * than on a blank page or transient data URL.
+ */
 function isAppUrl(url: string): boolean {
   return !!url && url !== "about:blank" && !url.startsWith("data:");
 }
@@ -1031,6 +1035,7 @@ export async function setupDeterministicTestParallel(
   // while we clear/verify deterministic state.
   const currentUrl = page.url();
   const shouldIsolateSync = isAppUrl(currentUrl);
+  let setupSucceeded = false;
   if (shouldIsolateSync) {
     await page.context().setOffline(true);
   }
@@ -1048,8 +1053,19 @@ export async function setupDeterministicTestParallel(
 
     await scheduleDeterministicTunes(user, opts.scheduleTunes);
     await ensureDeterministicSetupPageReady(page, currentUrl);
+    setupSucceeded = true;
   } finally {
     if (shouldIsolateSync) {
+      if (!setupSucceeded) {
+        // Best-effort recovery only: move away from the running app before
+        // restoring network so a partially reset page cannot immediately sync.
+        await page.goto("about:blank").catch((error) => {
+          log.warn(
+            `[${user.name}] Failed to navigate away from the app during setup recovery:`,
+            error
+          );
+        });
+      }
       await page.context().setOffline(false);
     }
   }

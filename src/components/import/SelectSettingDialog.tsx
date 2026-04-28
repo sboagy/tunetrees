@@ -10,7 +10,6 @@
 import abcjs from "abcjs";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
-import { extractIncipitFromTheSessionJson } from "../../lib/import/import-utils";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -38,15 +37,57 @@ export interface SelectSettingDialogProps {
   onSettingSelect: (settingIndex: number) => void;
 }
 
+function extractSettingPreviewMeasures(
+  tuneParsed: ReturnType<typeof abcjs.parseOnly>,
+  abc: string
+): string | null {
+  const firstTune = tuneParsed[0];
+  if (!firstTune) {
+    return null;
+  }
+
+  let abcSnippet = "";
+  let barCount = 0;
+
+  for (const line of firstTune.lines) {
+    if (!line.staff) continue;
+
+    for (const element of line.staff) {
+      for (const subElement of element.voices?.flat() || []) {
+        if (subElement.el_type === "bar") {
+          barCount++;
+        }
+        if (barCount >= 2) break;
+
+        if (
+          (subElement.el_type === "note" || subElement.el_type === "bar") &&
+          "startChar" in subElement &&
+          "endChar" in subElement
+        ) {
+          abcSnippet += abc.slice(subElement.startChar, subElement.endChar);
+        }
+      }
+
+      if (barCount >= 2) break;
+    }
+
+    if (barCount >= 2) break;
+  }
+
+  return abcSnippet ? `${abcSnippet}|` : null;
+}
+
+/**
+ * Build a short ABC preview containing the first two measures of a setting.
+ *
+ * Returns null when no ABC notation is available or the notation cannot be
+ * parsed into a tune preview.
+ */
 export function buildSettingPreviewAbc(abc: string): string | null {
   if (!abc) return null;
 
   const tuneParsed = abcjs.parseOnly(abc);
-  if (tuneParsed.length === 0) {
-    return null;
-  }
-
-  return extractIncipitFromTheSessionJson(tuneParsed, abc, 2, null).incipit;
+  return extractSettingPreviewMeasures(tuneParsed, abc);
 }
 
 /**
@@ -67,7 +108,6 @@ const SettingOption: Component<{
       const abcPreview = buildSettingPreviewAbc(props.setting.abc);
       if (!abcPreview) return;
 
-      abcContainer.innerHTML = "";
       abcjs.renderAbc(abcContainer, abcPreview, {
         scale: 0.75,
         paddingleft: 0,
