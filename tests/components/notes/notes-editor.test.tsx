@@ -596,6 +596,51 @@ describe("NotesEditor", () => {
     );
   });
 
+  it("persists stable draft URLs when pasted data-uri images are queued offline", async () => {
+    const offlineUploadSpy = vi
+      .spyOn(offlineNoteMedia, "uploadNoteMediaFile")
+      .mockResolvedValue({
+        success: true,
+        data: {
+          files: ["blob:offline-pasted-note-image"],
+          persistedFiles: ["tunetrees-note-media-draft://draft-2"],
+        },
+      });
+    offlineUploadSpy.mockClear();
+
+    const handleContentChange = vi.fn();
+    render(() => (
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(makeEditor).toHaveBeenCalledTimes(1);
+    });
+
+    const options = makeEditor.mock.calls[0]?.[1];
+    const editor = createdEditors[0];
+    const pastedDataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2C9f8AAAAASUVORK5CYII=";
+
+    options?.events?.change?.(`<p><img src="${pastedDataUrl}"></p>`);
+
+    await waitFor(() => {
+      expect(offlineUploadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(editor.value).toBe(
+        '<p><img src="blob:offline-pasted-note-image"></p>'
+      );
+      expect(handleContentChange).toHaveBeenCalledWith(
+        '<p><img src="tunetrees-note-media-draft://draft-2"></p>'
+      );
+    });
+  });
+
   it("rehydrates stored offline draft references into fresh blob URLs in the editor", async () => {
     const resolveDraftHtmlSpy = vi
       .spyOn(offlineNoteMedia, "resolveOfflineNoteMediaDraftUrlsInHtml")

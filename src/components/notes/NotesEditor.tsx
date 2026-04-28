@@ -473,7 +473,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
                 return;
               }
 
-              lastContent = stripMediaAuthToken(updatedContent);
+              lastContent = getPersistedEditorContent(updatedContent);
               joditInstance.value = updatedContent;
               props.onContentChange(lastContent);
             })
