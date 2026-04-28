@@ -27,7 +27,7 @@ import {
   Send,
 } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
@@ -110,10 +110,23 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [isRefreshingQueue, setIsRefreshingQueue] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
+  const [pendingDisplayOptionsOpen, setPendingDisplayOptionsOpen] =
+    createSignal(false);
   const { incrementPracticeListStagedChanged } = useAuth();
 
   let columnsButtonRef: HTMLButtonElement | undefined;
   let mobileOverflowButtonRef: HTMLButtonElement | undefined;
+
+  createEffect(() => {
+    if (!pendingDisplayOptionsOpen() || showOverflowMenu()) {
+      return;
+    }
+
+    setPendingDisplayOptionsOpen(false);
+    queueMicrotask(() => {
+      setShowColumnsDropdown(true);
+    });
+  });
 
   const handleSubmit = async () => {
     // Protect against rapid clicks by disabling immediately
@@ -200,12 +213,8 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   };
 
   const handleDisplayOptionsOpen = () => {
+    setPendingDisplayOptionsOpen(true);
     setShowOverflowMenu(false);
-    // Let the mobile overflow popover finish closing before opening the
-    // Display Options portal, otherwise the nested menu can race on CI.
-    requestAnimationFrame(() => {
-      setShowColumnsDropdown(true);
-    });
   };
 
   const handleQueueSelectorOpen = () => {

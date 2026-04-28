@@ -53,7 +53,6 @@ test.describe
         timeout: 20000,
       });
       await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
-      await ttPage.ensureGridView("practice");
       await ttPage.expectGridHasContent(ttPage.practiceGrid);
       await expect
         .poll(async () => ttPage.getRows("scheduled").count(), {
@@ -84,15 +83,8 @@ test.describe
       // ASSERT: Verify dropdown shows "Again"
       await expect(evalDropdown).toContainText(/Again/i, { timeout: 5000 });
 
-      // Verify "Scheduled" column does NOT show "Today"
-      const scheduledColumnIndex = await ttPage.getColumnIndexByHeaderText(
-        "tunes-grid-scheduled",
-        "scheduled"
-      );
-      const scheduledCell = firstRow
-        .getByRole("cell")
-        .nth(scheduledColumnIndex);
-      const scheduledText = await scheduledCell.textContent();
+      // Verify scheduling text does NOT show "Today" in both table and stacked list modes.
+      const scheduledText = await firstRow.textContent();
 
       console.log(`Scheduled text after "Again" rating: "${scheduledText}"`);
       expect(scheduledText).not.toContain("Today");
@@ -123,6 +115,14 @@ test.describe
     });
 
     test("should evaluate second tune as Hard", async () => {
+      await expect
+        .poll(async () => ttPage.getRows("scheduled").count(), {
+          timeout: 15000,
+          message:
+            "expected at least two scheduled rows before rating second row",
+        })
+        .toBeGreaterThanOrEqual(2);
+
       const rows = ttPage.getRows("scheduled");
       const secondRow = rows.nth(1);
 

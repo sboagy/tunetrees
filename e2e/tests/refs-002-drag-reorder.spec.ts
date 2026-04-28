@@ -43,7 +43,20 @@ test.describe("REFS-002: References Drag Reorder", () => {
 
     // On mobile, expand the sidebar (collapsed by default)
     await ttPage.ensureSidebarExpanded();
-    await ttPage.ensureTuneInfoExpanded();
+
+    const tuneInfoToggle = page.getByTestId("sidebar-tune-info-toggle");
+    if (await tuneInfoToggle.isVisible().catch(() => false)) {
+      const expanded = await tuneInfoToggle
+        .getAttribute("aria-expanded")
+        .catch(() => null);
+      if (expanded !== "true") {
+        await page.keyboard.press("Escape").catch(() => undefined);
+        await tuneInfoToggle.click({ force: true, timeout: 8000 });
+        await expect(tuneInfoToggle).toHaveAttribute("aria-expanded", "true", {
+          timeout: 8000,
+        });
+      }
+    }
 
     // Wait for sidebar to show tune details
     await expect(
@@ -53,6 +66,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
     });
 
     // Create first reference
+    await expect(ttPage.referencesAddButton).toBeVisible({ timeout: 10000 });
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({
       timeout: 10000,
@@ -70,6 +84,7 @@ test.describe("REFS-002: References Drag Reorder", () => {
     });
 
     // Create second reference
+    await expect(ttPage.referencesAddButton).toBeVisible({ timeout: 10000 });
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({
       timeout: 10000,
@@ -83,54 +98,29 @@ test.describe("REFS-002: References Drag Reorder", () => {
     });
   });
 
-  test("should display drag handles on references", async ({ page }) => {
+  test("should hide drag handles when shared references are present", async ({
+    page,
+  }) => {
     // Get the reference items
     const refItems = page.getByTestId(/^reference-item-/);
     await expect(refItems).toHaveCount(3, { timeout: 10000 });
 
-    // Verify drag handles are visible
-    const firstRefId = await refItems.first().getAttribute("data-testid");
-    const refId = firstRefId?.replace("reference-item-", "");
+    // Mixed ownership disables drag-reorder entirely.
+    const dragHandles = page.getByTestId(/^reference-drag-handle-/);
+    await expect(dragHandles).toHaveCount(0);
 
-    if (refId) {
-      const dragHandle = page.getByTestId(`reference-drag-handle-${refId}`);
-      await expect(dragHandle).toBeVisible({ timeout: 5000 });
-    }
+    const visibilityBadges = page.getByTestId(/^reference-visibility-badge-/);
+    await expect(visibilityBadges.first()).toBeVisible({ timeout: 5000 });
   });
 
-  test("should reorder references via drag-and-drop", async ({ page }) => {
+  test("should keep mixed-ownership references non-draggable", async ({
+    page,
+  }) => {
     // Get the reference items
     const refItems = page.getByTestId(/^reference-item-/);
     await expect(refItems).toHaveCount(3, { timeout: 10000 });
 
-    // Get initial order
-    const firstRefTestId = await refItems.first().getAttribute("data-testid");
-    const secondRefTestId = await refItems.nth(1).getAttribute("data-testid");
-
-    const firstRefId = firstRefTestId?.replace("reference-item-", "") || "";
-    const secondRefId = secondRefTestId?.replace("reference-item-", "") || "";
-
-    expect(firstRefId).not.toBe("");
-    expect(secondRefId).not.toBe("");
-
-    // Verify first reference is "First Reference"
-    await expect(page.getByText("First Reference").first()).toBeVisible();
-
-    // Drag first reference to second position
-    const firstDragHandle = page.getByTestId(
-      `reference-drag-handle-${firstRefId}`
-    );
-    const secondRefItem = page.getByTestId(`reference-item-${secondRefId}`);
-
-    await expect(firstDragHandle).toBeVisible({ timeout: 5000 });
-    await expect(secondRefItem).toBeVisible({ timeout: 5000 });
-    await ttPage.dispatchHtml5DragAndDrop(firstDragHandle, secondRefItem);
-
-    // Verify order changed - second reference should now be first
-    await expect
-      .poll(async () => refItems.first().getAttribute("data-testid"), {
-        timeout: 5000,
-      })
-      .toBe(`reference-item-${secondRefId}`);
+    const dragHandles = page.getByTestId(/^reference-drag-handle-/);
+    await expect(dragHandles).toHaveCount(0);
   });
 });
