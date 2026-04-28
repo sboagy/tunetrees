@@ -10,6 +10,7 @@ import {
   DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG,
 } from "../helpers/fsrs-test-config";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
+import { waitForPracticeViewSettled } from "../helpers/practice-view";
 import {
   queryLatestPracticeRecord,
   queryPracticeRecords,
@@ -118,6 +119,10 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     await ttPage.navigateToTab("practice");
     await expect(ttPage.practiceColumnsButton).toBeVisible({ timeout: 20000 });
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+    await waitForPracticeViewSettled(page, ttPage, {
+      expectRows: true,
+      timeoutMs: 30000,
+    });
 
     // Enable flashcard mode for easier evaluation
     await ttPage.enableFlashcardMode();
@@ -274,6 +279,15 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         await page.evaluate(() => (window as any).__persistDbForTest?.());
         await diagAuth(page, `day-${day}-before-advance`);
 
+        // Avoid carrying queue-window UI state or flashcard-mode state across the
+        // date jump. Those keys can make the reloaded practice page point at a
+        // stale queue and incorrectly render "All Caught Up!" on the next due day.
+        await page.evaluate(() => {
+          localStorage.removeItem("TT_PRACTICE_FLASHCARD_MODE");
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+        });
+
         const nextDue = new Date(record.due);
         // Guard: ensure nextDue is in the future relative to currentDate
         if (nextDue.getTime() <= currentDate.getTime()) {
@@ -324,6 +338,10 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         // Re-enter flashcard mode for next evaluation
         await ttPage.disableFlashcardMode();
         await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
+        await waitForPracticeViewSettled(page, ttPage, {
+          expectRows: true,
+          timeoutMs: 30000,
+        });
         await ttPage.enableFlashcardMode();
         await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
       }

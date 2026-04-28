@@ -1483,6 +1483,14 @@ export async function setupForPracticeTestsParallel(
   // 4-5) Reset local DB and trigger a fresh sync from Supabase.
   await resetLocalDbAndResync(page);
 
+  // Practice tests should not inherit a cached queue date from auth storageState.
+  // Those keys can point the UI at a stale/future queue window and surface an
+  // incorrect "All Caught Up!" state even when setup just seeded due tunes.
+  await page.evaluate(() => {
+    localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+    localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+  });
+
   // 6. Navigate to starting tab (skip if already active)
   await navigateToTabForTest(page, startTab);
 
