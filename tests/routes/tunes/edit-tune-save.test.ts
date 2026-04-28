@@ -103,4 +103,10 @@ describe("edit tune save helpers", () => {
       scheduled: "2026-04-22T10:00",
     });
   });
+
+  it("only includes repertoire keys that were supplied by the caller", () => {
+    expect(buildRepertoireTuneUpdate({ goal: "maintenance" })).toEqual({
+      goal: "maintenance",
+    });
+  });
 });

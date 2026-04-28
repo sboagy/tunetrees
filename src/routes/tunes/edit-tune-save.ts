@@ -26,11 +26,6 @@ function normalizeOptionalText(
   return value === undefined || value === null || value === "" ? null : value;
 }
 
-function normalizeGoalValue(value: string | null | undefined): string | null {
-  // Goal is enum-like, but the edit form still uses blank values to clear it.
-  return normalizeOptionalText(value);
-}
-
 export function buildBaseTuneUpdateInput(
   tuneData: Partial<TuneEditorData>
 ): Partial<CreateTuneInput> {
@@ -69,12 +64,20 @@ export function hasRepertoireTuneChanges(
 
 export function buildRepertoireTuneUpdate(
   tuneData: Partial<TuneEditorData>
-): Record<RepertoireTuneField, string | null> {
-  // Preserve the route's prior semantics: once any repertoire field is being
-  // saved, blank inputs clear their stored values instead of leaving stale data.
-  return {
-    learned: normalizeOptionalText(tuneData.learned),
-    goal: normalizeGoalValue(tuneData.goal),
-    scheduled: normalizeOptionalText(tuneData.scheduled),
-  };
+): Partial<Record<RepertoireTuneField, string | null>> {
+  const update: Partial<Record<RepertoireTuneField, string | null>> = {};
+
+  // Only write fields the caller actually supplied, while still preserving the
+  // edit form's blank-to-null clearing behavior for included keys.
+  if ("learned" in tuneData) {
+    update.learned = normalizeOptionalText(tuneData.learned);
+  }
+  if ("goal" in tuneData) {
+    update.goal = normalizeOptionalText(tuneData.goal);
+  }
+  if ("scheduled" in tuneData) {
+    update.scheduled = normalizeOptionalText(tuneData.scheduled);
+  }
+
+  return update;
 }
