@@ -2164,7 +2164,11 @@ export class TuneTreesPage {
     overflowButton: Locator,
     target: Locator
   ) {
-    for (let attempt = 0; attempt < OVERFLOW_MENU_MAX_RETRIES; attempt += 1) {
+    for (
+      let retryAttempt = 0;
+      retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
+      retryAttempt += 1
+    ) {
       const targetVisible = await target
         .isVisible({ timeout: 300 })
         .catch(() => false);
@@ -2410,7 +2414,11 @@ export class TuneTreesPage {
     const displayOptionsButton = this.getDisplayOptionsButton();
     await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
 
-    for (let attempt = 0; attempt < OVERFLOW_MENU_MAX_RETRIES; attempt += 1) {
+    for (
+      let retryAttempt = 0;
+      retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
+      retryAttempt += 1
+    ) {
       const targetMenuVisible = await targetMenu
         .isVisible({ timeout: 250 })
         .catch(() => false);
