@@ -2157,6 +2157,40 @@ export class TuneTreesPage {
     await this.setViewMode(tab, "list");
   }
 
+  private async openOverflowMenuEntry(
+    overflowButton: Locator,
+    target: Locator
+  ) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const targetVisible = await target
+        .isVisible({ timeout: 300 })
+        .catch(() => false);
+      if (targetVisible) {
+        return;
+      }
+
+      await overflowButton.scrollIntoViewIfNeeded().catch(() => undefined);
+      await expect(overflowButton).toBeVisible({ timeout: 5000 });
+      await expect(overflowButton).toBeEnabled({ timeout: 5000 });
+
+      await overflowButton
+        .click({ timeout: 2000 })
+        .catch(() => overflowButton.dispatchEvent("click"))
+        .catch(() => undefined);
+
+      const visibleAfterClick = await target
+        .isVisible({ timeout: 1500 })
+        .catch(() => false);
+      if (visibleAfterClick) {
+        return;
+      }
+
+      await this.page.waitForTimeout(150);
+    }
+
+    await expect(target).toBeVisible({ timeout: 5000 });
+  }
+
   private async revealToolbarAction(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2169,9 +2203,7 @@ export class TuneTreesPage {
     }
 
     const overflowButton = this.getColumnsButtonForTab(tab);
-    await expect(overflowButton).toBeVisible({ timeout: 5000 });
-    await overflowButton.click();
-    await expect(action).toBeVisible({ timeout: 5000 });
+    await this.openOverflowMenuEntry(overflowButton, action);
     return true;
   }
 
@@ -2372,35 +2404,15 @@ export class TuneTreesPage {
       return;
     }
 
+    const displayOptionsButton = this.getDisplayOptionsButton();
+    await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const displayOptionsButton = this.getDisplayOptionsButton();
       const targetMenuVisible = await targetMenu
         .isVisible({ timeout: 250 })
         .catch(() => false);
       if (targetMenuVisible) {
         return;
-      }
-
-      const displayOptionsVisible = await displayOptionsButton
-        .isVisible({ timeout: 750 })
-        .catch(() => false);
-      if (!displayOptionsVisible) {
-        if (attempt > 0) {
-          await columnsButton.scrollIntoViewIfNeeded().catch(() => undefined);
-          await columnsButton.click().catch(() => undefined);
-        }
-
-        const displayOptionsVisibleAfterRetry = await displayOptionsButton
-          .isVisible({ timeout: 1000 })
-          .catch(() => false);
-        if (!displayOptionsVisibleAfterRetry) {
-          if (this.page.isClosed()) {
-            return;
-          }
-
-          await this.page.waitForTimeout(150);
-          continue;
-        }
       }
 
       await displayOptionsButton
@@ -2426,6 +2438,7 @@ export class TuneTreesPage {
         return;
       }
 
+      await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
       await this.page.waitForTimeout(150);
     }
 
