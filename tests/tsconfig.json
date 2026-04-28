@@ -1,7 +1,33 @@
 {
   "extends": "../tsconfig.app.json",
-  "include": ["./**/*.ts", "./**/*.tsx"],
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx",
+    "../src/vite-env.d.ts",
+    "../src/types/**/*.d.ts"
+  ],
   "compilerOptions": {
-    "types": ["vite/client", "vitest/globals"]
+    "types": [
+      "vite/client",
+      "vite-plugin-pwa/client",
+      "vitest/globals",
+      "@cloudflare/workers-types",
+      "node"
+    ],
+    "paths": {
+      "@oosync/sync": ["tests/types/oosync-sync-stub.d.ts"],
+      "@oosync/sync/*": ["tests/types/oosync-sync-stub.d.ts"],
+      "@oosync/shared/protocol": ["tests/types/oosync-protocol-stub.d.ts"],
+      "oosync/sync": ["tests/types/oosync-package-stub.d.ts"],
+      "@/*": ["./src/*"],
+      "@oosync/*": ["./node_modules/oosync/src/*"],
+      "@shared-generated/*": ["./shared/generated/*"],
+      "@sync-schema/*": ["./shared/sync-schema/*"],
+      "drizzle-orm": ["./node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["./node_modules/drizzle-orm/*"],
+      "@supabase/supabase-js": ["./node_modules/@supabase/supabase-js"],
+      "sql.js": ["./node_modules/@types/sql.js/index.d.ts"],
+      "solid-sonner": ["./node_modules/solid-sonner"]
+    }
   }
 }

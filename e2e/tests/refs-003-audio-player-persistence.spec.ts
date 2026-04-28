@@ -14,9 +14,9 @@ let ttPage: TuneTreesPage;
 
 async function readPersistedAudioState(page: Page, referenceId: string) {
   return page.evaluate(async (id) => {
-    const { getDb } = await import("/src/lib/db/client-sqlite.ts");
+    const { getDb } = await import("@/lib/db/client-sqlite");
     const { getMediaAssetByReferenceId } = await import(
-      "/src/lib/db/queries/media-assets.ts"
+      "@/lib/db/queries/media-assets"
     );
 
     const db = getDb();

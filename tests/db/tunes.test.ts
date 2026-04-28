@@ -9,6 +9,7 @@ import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SqliteDatabase } from "../../src/lib/db/client-sqlite";
 import {
   createTune,
   deleteTune,
@@ -29,11 +30,11 @@ vi.mock("../../src/lib/db/client-sqlite", () => ({
 }));
 
 // Test database setup
-let db: BetterSQLite3Database;
+let db: BetterSQLite3Database & SqliteDatabase;
 
 beforeEach(() => {
   const sqlite = new Database(":memory:");
-  db = drizzle(sqlite) as BetterSQLite3Database;
+  db = drizzle(sqlite) as unknown as BetterSQLite3Database & SqliteDatabase;
 
   // Apply production schema from migrations
   applyMigrations(db);

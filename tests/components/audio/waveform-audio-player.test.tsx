@@ -17,18 +17,18 @@ type MockRegion = {
   remove: () => void;
 };
 
-  const {
-    audioPauseMock,
-    emitWaveEvent,
-    getMediaVaultBlob,
-    resetMocks,
-    revokeObjectUrlMock,
-    createObjectUrlMock,
-    waveSurferInstance,
-    regionsPluginInstance,
-    updateMediaAssetByReferenceId,
-    toastError,
-  } = vi.hoisted(() => {
+const {
+  audioPauseMock,
+  emitWaveEvent,
+  getMediaVaultBlob,
+  resetMocks,
+  revokeObjectUrlMock,
+  createObjectUrlMock,
+  waveSurferInstance,
+  regionsPluginInstance,
+  updateMediaAssetByReferenceId,
+  toastError,
+} = vi.hoisted(() => {
   const waveHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
   const regionHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
   let mockRegions: MockRegion[] = [];
@@ -59,12 +59,12 @@ type MockRegion = {
     }
   };
 
-    const audioPauseMock = vi.fn();
-    const updateMediaAssetByReferenceId = vi.fn(async () => undefined);
-    const toastError = vi.fn();
-    const getMediaVaultBlob = vi.fn(async () => null);
-    const createObjectUrlMock = vi.fn(() => "blob:pinned-audio");
-    const revokeObjectUrlMock = vi.fn();
+  const audioPauseMock = vi.fn();
+  const updateMediaAssetByReferenceId = vi.fn(async () => undefined);
+  const toastError = vi.fn();
+  const getMediaVaultBlob = vi.fn<() => Promise<Blob | null>>(async () => null);
+  const createObjectUrlMock = vi.fn(() => "blob:pinned-audio");
+  const revokeObjectUrlMock = vi.fn();
 
   const regionsPluginInstance = {
     addRegion: vi.fn(
@@ -122,13 +122,13 @@ type MockRegion = {
     regionHandlers.clear();
     mockRegions = [];
 
-      audioPauseMock.mockClear();
-      getMediaVaultBlob.mockClear();
-      getMediaVaultBlob.mockResolvedValue(null);
-      createObjectUrlMock.mockClear();
-      revokeObjectUrlMock.mockClear();
-      updateMediaAssetByReferenceId.mockClear();
-      toastError.mockClear();
+    audioPauseMock.mockClear();
+    getMediaVaultBlob.mockClear();
+    getMediaVaultBlob.mockResolvedValue(null);
+    createObjectUrlMock.mockClear();
+    revokeObjectUrlMock.mockClear();
+    updateMediaAssetByReferenceId.mockClear();
+    toastError.mockClear();
     regionsPluginInstance.addRegion.mockClear();
     regionsPluginInstance.getRegions.mockClear();
     regionsPluginInstance.getRegions.mockImplementation(() => mockRegions);
@@ -146,18 +146,18 @@ type MockRegion = {
   };
 
   return {
-      audioPauseMock,
-      emitWaveEvent: (event: string, ...args: unknown[]) =>
-        emit(waveHandlers, event, ...args),
-      getMediaVaultBlob,
-      resetMocks,
-      revokeObjectUrlMock,
-      createObjectUrlMock,
-      waveSurferInstance,
-      regionsPluginInstance,
-      updateMediaAssetByReferenceId,
-      toastError,
-    };
+    audioPauseMock,
+    emitWaveEvent: (event: string, ...args: unknown[]) =>
+      emit(waveHandlers, event, ...args),
+    getMediaVaultBlob,
+    resetMocks,
+    revokeObjectUrlMock,
+    createObjectUrlMock,
+    waveSurferInstance,
+    regionsPluginInstance,
+    updateMediaAssetByReferenceId,
+    toastError,
+  };
 });
 
 vi.mock("solid-sonner", () => ({

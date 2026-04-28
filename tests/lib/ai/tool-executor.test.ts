@@ -10,6 +10,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { executeToolCall } from "../../../src/lib/ai/tool-executor";
 import type { ToolCall } from "../../../src/lib/ai/types";
+import type { SqliteDatabase } from "../../../src/lib/db/client-sqlite";
 import { applyMigrations } from "../../../src/lib/services/test-schema-loader";
 
 // Mock the sync module to avoid Supabase dependency in tests
@@ -19,7 +20,8 @@ vi.mock("../../../src/lib/sync", () => ({
 
 // Mock the persistDb function to avoid IndexedDB dependency in tests
 vi.mock("../../../src/lib/db/client-sqlite", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../src/lib/db/client-sqlite")>();
+  const actual =
+    await importOriginal<typeof import("../../../src/lib/db/client-sqlite")>();
   return {
     ...actual,
     persistDb: vi.fn(() => Promise.resolve()),
@@ -27,13 +29,13 @@ vi.mock("../../../src/lib/db/client-sqlite", async (importOriginal) => {
 });
 
 // Test database setup
-let db: BetterSQLite3Database;
+let db: BetterSQLite3Database & SqliteDatabase;
 const TEST_USER_ID = "test-user-123";
 const TEST_PLAYLIST_ID = "test-playlist-123";
 
 beforeEach(() => {
   const sqlite = new Database(":memory:");
-  db = drizzle(sqlite) as BetterSQLite3Database;
+  db = drizzle(sqlite) as unknown as BetterSQLite3Database & SqliteDatabase;
 
   // Apply production schema from migrations
   applyMigrations(db);
@@ -124,7 +126,7 @@ describe("AI Tool Executor", () => {
       const result = await executeToolCall(toolCall, {
         localDb: db,
         userId: TEST_USER_ID,
-        currentPlaylistId: TEST_PLAYLIST_ID,
+        currentRepertoireId: TEST_PLAYLIST_ID,
       });
 
       expect(result.success).toBe(false);

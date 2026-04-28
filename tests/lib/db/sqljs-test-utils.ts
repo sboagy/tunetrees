@@ -7,13 +7,17 @@ type SqlJsModule = Awaited<ReturnType<typeof initSqlJs>>;
 
 let sqlJsPromise: Promise<SqlJsModule> | null = null;
 
-function loadSqlWasmBinary(): Uint8Array {
+function loadSqlWasmBinary(): ArrayBuffer {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   const wasmPath = join(
     currentDir,
     "../../../node_modules/sql.js/dist/sql-wasm.wasm"
   );
-  return readFileSync(wasmPath);
+  const wasmBytes = readFileSync(wasmPath);
+  return wasmBytes.buffer.slice(
+    wasmBytes.byteOffset,
+    wasmBytes.byteOffset + wasmBytes.byteLength
+  );
 }
 
 export async function getTestSqlJs(): Promise<SqlJsModule> {
