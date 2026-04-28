@@ -26,6 +26,11 @@ function normalizeOptionalText(
   return value === undefined || value === null || value === "" ? null : value;
 }
 
+function normalizeGoalValue(value: string | null | undefined): string | null {
+  // Goal is enum-like, but the edit form still uses blank values to clear it.
+  return value === undefined || value === null || value === "" ? null : value;
+}
+
 export function buildBaseTuneUpdateInput(
   tuneData: Partial<TuneEditorData>
 ): Partial<CreateTuneInput> {
@@ -69,7 +74,7 @@ export function buildRepertoireTuneUpdate(
   // saved, blank inputs clear their stored values instead of leaving stale data.
   return {
     learned: normalizeOptionalText(tuneData.learned),
-    goal: normalizeOptionalText(tuneData.goal),
+    goal: normalizeGoalValue(tuneData.goal),
     scheduled: normalizeOptionalText(tuneData.scheduled),
   };
 }
