@@ -255,7 +255,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
             class="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300"
             data-testid={`reference-visibility-badge-${itemProps.reference.id}`}
           >
-            {itemProps.reference.public ? "Public" : "Read-only"}
+            {itemProps.reference.public ? "Public" : "System"}
           </div>
         </Show>
 

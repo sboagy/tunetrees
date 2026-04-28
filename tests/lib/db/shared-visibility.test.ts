@@ -111,8 +111,7 @@ describe("shared visibility query helpers", () => {
     );
     expect(
       visibleReferences.some(
-        (reference) =>
-          reference.url === "https://example.com/private" && reference.public !== 1
+        (reference) => reference.url === "https://example.com/private"
       )
     ).toBe(false);
   });
