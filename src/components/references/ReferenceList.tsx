@@ -20,6 +20,8 @@ interface ReferenceListProps {
   urlLabelByReferenceId?: ReadonlyMap<string, string>;
   showActions?: boolean;
   groupByType?: boolean;
+  canEditReference?: (reference: Reference) => boolean;
+  canReorder?: boolean;
 }
 
 /**
@@ -83,6 +85,9 @@ function groupReferencesByType(
 
 export const ReferenceList: Component<ReferenceListProps> = (props) => {
   const showActions = () => props.showActions ?? true;
+  const canReorder = () => props.canReorder ?? true;
+  const canEditReference = (reference: Reference) =>
+    props.canEditReference ? props.canEditReference(reference) : true;
   const INTERNAL_REFERENCE_DRAG_TYPE = "application/x-tunetrees-reference-id";
   const hasInternalReferenceDrag = (
     dataTransfer: DataTransfer | null | undefined
@@ -150,7 +155,12 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
     e.preventDefault();
     const sourceRefId = draggedRefId();
 
-    if (!sourceRefId || sourceRefId === targetRefId || !props.onReorder) {
+    if (
+      !sourceRefId ||
+      sourceRefId === targetRefId ||
+      !props.onReorder ||
+      !canReorder()
+    ) {
       setDraggedRefId(null);
       setDragOverRefId(null);
       return;
@@ -200,7 +210,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
       }
     >
       {/* Drag handle */}
-      <Show when={props.onReorder}>
+      <Show when={props.onReorder && canReorder()}>
         <button
           type="button"
           draggable={true}
@@ -240,6 +250,14 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
           {getTypeLabel(itemProps.reference.refType)}
         </div>
+        <Show when={!canEditReference(itemProps.reference)}>
+          <div
+            class="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300"
+            data-testid={`reference-visibility-badge-${itemProps.reference.id}`}
+          >
+            {itemProps.reference.public ? "Public" : "Shared"}
+          </div>
+        </Show>
 
         {/* Comment */}
         <Show when={itemProps.reference.comment}>
@@ -267,7 +285,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
       </div>
 
       {/* Actions */}
-      <Show when={showActions()}>
+      <Show when={showActions() && canEditReference(itemProps.reference)}>
         <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <Show when={props.onEdit}>
             <button

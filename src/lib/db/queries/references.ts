@@ -69,8 +69,12 @@ export async function getReferencesByTune(
   ];
 
   const visibilityCondition = userId
-    ? or(eq(schema.reference.userRef, userId), isNull(schema.reference.userRef))
-    : isNull(schema.reference.userRef);
+    ? or(
+        eq(schema.reference.userRef, userId),
+        isNull(schema.reference.userRef),
+        eq(schema.reference.public, 1)
+      )
+    : or(isNull(schema.reference.userRef), eq(schema.reference.public, 1));
 
   return await db
     .select()
@@ -127,8 +131,7 @@ export async function createReference(
       refType: data.refType || null,
       title: data.title || null,
       comment: data.comment || null,
-      // `public` is ignored for visibility; all user-created references are private for now.
-      public: 0,
+      public: data.public ? 1 : 0,
       favorite: data.favorite ? 1 : 0,
       deleted: 0,
       lastModifiedAt: now,
@@ -182,10 +185,8 @@ export async function updateReference(
     updateData.comment = data.comment;
   }
 
-  // `public` is ignored for visibility; for now we don't allow user-created
-  // references to become public via client-side updates.
   if (data.public !== undefined) {
-    updateData.public = 0;
+    updateData.public = data.public ? 1 : 0;
   }
 
   if (data.favorite !== undefined) {

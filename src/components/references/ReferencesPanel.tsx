@@ -48,6 +48,7 @@ export const ReferencesPanel: Component = () => {
   const { openTrack } = useAudioPlayer();
   const { session, user } = useAuth();
   const { sidebarFontSize } = useUIPreferences();
+  const currentUserId = () => user()?.id ?? null;
 
   // Get dynamic font classes
   const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
@@ -159,6 +160,11 @@ export const ReferencesPanel: Component = () => {
       (mediaAssets() || []).map((asset) => [asset.referenceRef, asset])
     );
   });
+  const canManageReference = (reference: Reference) =>
+    reference.userRef === currentUserId();
+  const canReorderReferences = createMemo(() =>
+    (references() ?? []).every((reference) => canManageReference(reference))
+  );
 
   const mediaUrlLabelsByReferenceId = createMemo(() => {
     return new Map(
@@ -198,7 +204,7 @@ export const ReferencesPanel: Component = () => {
             refType: "audio",
             comment: data.comment || undefined,
             favorite: data.favorite,
-            public: false,
+            public: data.public,
           },
           currentUser.id
         );
@@ -224,7 +230,7 @@ export const ReferencesPanel: Component = () => {
           refType: data.refType,
           comment: data.comment || undefined,
           favorite: data.favorite,
-          public: false, // Default to private
+          public: data.public,
         };
 
         await createReference(db, createData, currentUser.id);
@@ -258,6 +264,7 @@ export const ReferencesPanel: Component = () => {
         refType: data.refType,
         comment: data.comment || undefined,
         favorite: data.favorite,
+        public: data.public,
       });
 
       // Reset form
@@ -531,10 +538,14 @@ export const ReferencesPanel: Component = () => {
               onEdit={handleEditClick}
               onDelete={handleDeleteReference}
               onOpenReference={handleOpenReference}
-              onReorder={handleReorderReferences}
+              onReorder={
+                canReorderReferences() ? handleReorderReferences : undefined
+              }
               urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
               showActions={true}
               groupByType={false}
+              canEditReference={canManageReference}
+              canReorder={canReorderReferences()}
             />
           </div>
         </Show>
