@@ -1010,7 +1010,10 @@ async function scheduleDeterministicTunes(
   }
 }
 
-async function ensureDeterministicSetupPageReady(page: Page, currentUrl: string) {
+async function ensureDeterministicSetupPageReady(
+  page: Page,
+  currentUrl: string
+) {
   if (isAppUrl(currentUrl)) {
     return;
   }
