@@ -89,4 +89,18 @@ describe("edit tune save helpers", () => {
       scheduled: null,
     });
   });
+
+  it("preserves valid repertoire values", () => {
+    expect(
+      buildRepertoireTuneUpdate({
+        learned: "2026-04-20T10:00",
+        goal: "maintenance",
+        scheduled: "2026-04-22T10:00",
+      })
+    ).toEqual({
+      learned: "2026-04-20T10:00",
+      goal: "maintenance",
+      scheduled: "2026-04-22T10:00",
+    });
+  });
 });

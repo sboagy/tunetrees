@@ -31,6 +31,8 @@ export function buildBaseTuneUpdateInput(
 ): Partial<CreateTuneInput> {
   const input: Partial<CreateTuneInput> = {};
 
+  // Keep the full editable shape so the direct-update path mirrors the
+  // previous inline object literal and stays predictable for future fields.
   for (const field of BASE_TUNE_FIELDS) {
     input[field] = tuneData[field] ?? undefined;
   }
@@ -63,6 +65,8 @@ export function hasRepertoireTuneChanges(
 export function buildRepertoireTuneUpdate(
   tuneData: Partial<TuneEditorData>
 ): Record<RepertoireTuneField, string | null> {
+  // Preserve the route's prior semantics: once any repertoire field is being
+  // saved, blank inputs clear their stored values instead of leaving stale data.
   return {
     learned: normalizeOptionalText(tuneData.learned),
     goal: normalizeOptionalText(tuneData.goal),
