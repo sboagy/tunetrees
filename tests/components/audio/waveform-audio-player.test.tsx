@@ -385,6 +385,38 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(revokeObjectUrlMock).not.toHaveBeenCalled();
   });
 
+  it("falls back to the network source if the media-vault lookup fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    getMediaVaultBlob.mockRejectedValue(new Error("vault blocked"));
+
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-network-fallback",
+          referenceTitle: "Network Fallback",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ffallback.mp3",
+        }}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(getMediaVaultBlob).toHaveBeenCalledWith(
+        "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ffallback.mp3"
+      );
+      expect(waveSurferInstance.on).toHaveBeenCalled();
+      expect(createObjectUrlMock).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("audio-player-source-status")).toBeNull();
+      expect(screen.queryByText("vault blocked")).toBeNull();
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to load pinned audio from media vault:",
+      expect.any(Error)
+    );
+  });
+
   it("flushes pending annotation and setting changes when the player closes", async () => {
     const view = render(() => (
       <WaveformAudioPlayer

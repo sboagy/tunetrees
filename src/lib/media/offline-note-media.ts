@@ -122,36 +122,43 @@ export async function resolveOfflineNoteMediaDraftUrlsInHtml(
   const displayUrlByDraftUrl = new Map<string, string>();
   const createdDisplayUrls: string[] = [];
 
-  for (const element of template.content.querySelectorAll<HTMLElement>(
-    "img[src],a[href]"
-  )) {
-    const attr = element.tagName === "IMG" ? "src" : "href";
-    const currentValue = element.getAttribute(attr);
-    if (!currentValue) {
-      continue;
-    }
-
-    const draftId = getOfflineNoteMediaDraftId(currentValue);
-    if (!draftId) {
-      continue;
-    }
-
-    let displayUrl =
-      displayUrlByDraftUrl.get(currentValue) ??
-      options.reuseDisplayUrlByDraftUrl?.get(currentValue);
-
-    if (!displayUrl) {
-      const draft = await getMediaDraft(draftId);
-      if (!draft) {
+  try {
+    for (const element of template.content.querySelectorAll<HTMLElement>(
+      "img[src],a[href]"
+    )) {
+      const attr = element.tagName === "IMG" ? "src" : "href";
+      const currentValue = element.getAttribute(attr);
+      if (!currentValue) {
         continue;
       }
 
-      displayUrl = URL.createObjectURL(draft.blob);
-      createdDisplayUrls.push(displayUrl);
-    }
+      const draftId = getOfflineNoteMediaDraftId(currentValue);
+      if (!draftId) {
+        continue;
+      }
 
-    displayUrlByDraftUrl.set(currentValue, displayUrl);
-    element.setAttribute(attr, displayUrl);
+      let displayUrl =
+        displayUrlByDraftUrl.get(currentValue) ??
+        options.reuseDisplayUrlByDraftUrl?.get(currentValue);
+
+      if (!displayUrl) {
+        const draft = await getMediaDraft(draftId);
+        if (!draft) {
+          continue;
+        }
+
+        displayUrl = URL.createObjectURL(draft.blob);
+        createdDisplayUrls.push(displayUrl);
+      }
+
+      displayUrlByDraftUrl.set(currentValue, displayUrl);
+      element.setAttribute(attr, displayUrl);
+    }
+  } catch (error) {
+    for (const displayUrl of createdDisplayUrls) {
+      URL.revokeObjectURL(displayUrl);
+    }
+    throw error;
   }
 
   return {
@@ -323,6 +330,7 @@ export async function processPendingNoteMediaDrafts({
       string,
       { id: string; noteText: string | null }
     >();
+    let didUpdateNotes = false;
 
     for (const referenceUrl of referencesToReplace.keys()) {
       const matchingNotes = await db.all<{
@@ -364,6 +372,12 @@ export async function processPendingNoteMediaDrafts({
           sync_version = sync_version + 1
         WHERE id = ${note.id}
       `);
+      didUpdateNotes = true;
+    }
+
+    if (didUpdateNotes) {
+      const { persistDb } = await import("../db/client-sqlite");
+      await persistDb();
     }
 
     await deleteMediaDraftUpload(db, entry.id);

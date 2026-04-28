@@ -1009,7 +1009,12 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       const networkSourceUrl = accessToken
         ? attachMediaAuthTokenToUrl(props.track.url, accessToken)
         : props.track.url;
-      const pinnedBlob = await getMediaVaultBlob(props.track.url);
+      let pinnedBlob: Blob | null = null;
+      try {
+        pinnedBlob = await getMediaVaultBlob(props.track.url);
+      } catch (error) {
+        console.error("Failed to load pinned audio from media vault:", error);
+      }
       if (shouldAbortMediaInitialization()) {
         return;
       }

@@ -160,6 +160,7 @@ let originalGlobalMutationObserver: typeof globalThis.MutationObserver;
 let originalWindowResizeObserver: typeof window.ResizeObserver;
 let originalGlobalResizeObserver: typeof globalThis.ResizeObserver;
 let originalFetch: typeof globalThis.fetch;
+let originalRevokeObjectURL: typeof URL.revokeObjectURL;
 
 const createMockEditor = (options?: MockEditorConfig): MockJoditInstance => {
   const container = document.createElement("div");
@@ -230,6 +231,7 @@ describe("NotesEditor", () => {
     originalWindowResizeObserver = window.ResizeObserver;
     originalGlobalResizeObserver = globalThis.ResizeObserver;
     originalFetch = globalThis.fetch;
+    originalRevokeObjectURL = URL.revokeObjectURL;
 
     Object.defineProperty(window, "MutationObserver", {
       configurable: true,
@@ -285,6 +287,11 @@ describe("NotesEditor", () => {
       configurable: true,
       writable: true,
       value: originalFetch,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: originalRevokeObjectURL,
     });
     MockMutationObserver.reset();
     MockResizeObserver.reset();
@@ -597,16 +604,15 @@ describe("NotesEditor", () => {
   });
 
   it("persists stable draft URLs when pasted data-uri images are queued offline", async () => {
-    const offlineUploadSpy = vi
-      .spyOn(offlineNoteMedia, "uploadNoteMediaFile")
-      .mockResolvedValue({
+    const offlineUploadSpy = vi.spyOn(offlineNoteMedia, "uploadNoteMediaFile");
+    offlineUploadSpy.mockReset();
+    offlineUploadSpy.mockResolvedValue({
         success: true,
         data: {
           files: ["blob:offline-pasted-note-image"],
           persistedFiles: ["tunetrees-note-media-draft://draft-2"],
         },
       });
-    offlineUploadSpy.mockClear();
 
     const handleContentChange = vi.fn();
     render(() => (
@@ -639,6 +645,74 @@ describe("NotesEditor", () => {
         '<p><img src="tunetrees-note-media-draft://draft-2"></p>'
       );
     });
+  });
+
+  it("falls back to the raw editor content when offline draft resolution fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.spyOn(
+      offlineNoteMedia,
+      "resolveOfflineNoteMediaDraftUrlsInHtml"
+    ).mockRejectedValue(new Error("IndexedDB blocked"));
+
+    render(() => (
+      <NotesEditor
+        content={'<p><img src="tunetrees-note-media-draft://draft-1"></p>'}
+        onContentChange={() => undefined}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(createdEditors[0]?.value).toBe(
+        '<p><img src="tunetrees-note-media-draft://draft-1"></p>'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to resolve offline note media drafts:",
+        expect.any(Error)
+      );
+    });
+  });
+
+  it("revokes tracked offline draft blob URLs when the editor unmounts", async () => {
+    const revokeObjectUrlMock = vi.fn();
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: revokeObjectUrlMock,
+    });
+    vi.spyOn(
+      offlineNoteMedia,
+      "resolveOfflineNoteMediaDraftUrlsInHtml"
+    ).mockResolvedValue({
+      html: '<p><img src="blob:rehydrated-note-image"></p>',
+      displayUrlByDraftUrl: new Map([
+        [
+          "tunetrees-note-media-draft://draft-1",
+          "blob:rehydrated-note-image",
+        ],
+      ]),
+      revoke: vi.fn(),
+    });
+
+    const view = render(() => (
+      <NotesEditor
+        content={'<p><img src="tunetrees-note-media-draft://draft-1"></p>'}
+        onContentChange={() => undefined}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(createdEditors[0]?.value).toBe(
+        '<p><img src="blob:rehydrated-note-image"></p>'
+      );
+    });
+
+    view.unmount();
+
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith(
+      "blob:rehydrated-note-image"
+    );
   });
 
   it("rehydrates stored offline draft references into fresh blob URLs in the editor", async () => {

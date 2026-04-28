@@ -174,7 +174,6 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   let joditInstance: Jodit | undefined;
   let lastContent = props.content || "";
   let embeddedMediaReplacementVersion = 0;
-  let resolvedDraftDisplayCleanup: (() => void) | undefined;
   let resolvedDraftDisplayVersion = 0;
   let lastResolvedContentInput: string | undefined;
   const [currentTheme, setCurrentTheme] = createSignal<"light" | "dark">(
@@ -205,9 +204,19 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   const displayUrlByDraftUrl = new Map<string, string>();
   const draftUrlByDisplayUrl = new Map<string, string>();
 
-  const resetDraftDisplayMappings = (
+  const syncDraftDisplayMappings = (
     nextDisplayUrlByDraftUrl: ReadonlyMap<string, string>
   ) => {
+    const nextDisplayUrls = new Set(nextDisplayUrlByDraftUrl.values());
+
+    for (const displayUrl of displayUrlByDraftUrl.values()) {
+      if (!displayUrl.startsWith("blob:") || nextDisplayUrls.has(displayUrl)) {
+        continue;
+      }
+
+      URL.revokeObjectURL(displayUrl);
+    }
+
     displayUrlByDraftUrl.clear();
     draftUrlByDisplayUrl.clear();
 
@@ -231,9 +240,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     lastResolvedContentInput = incomingContent;
 
     if (!hasOfflineNoteMediaDraftUrlsInHtml(incomingContent)) {
-      resolvedDraftDisplayCleanup?.();
-      resolvedDraftDisplayCleanup = undefined;
-      resetDraftDisplayMappings(new Map());
+      syncDraftDisplayMappings(new Map());
 
       const displayContent = attachMediaAuthToken(
         incomingContent,
@@ -248,33 +255,53 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     }
 
     const resolutionVersion = ++resolvedDraftDisplayVersion;
-    const resolvedContent = await resolveOfflineNoteMediaDraftUrlsInHtml(
-      incomingContent,
-      {
-        reuseDisplayUrlByDraftUrl: displayUrlByDraftUrl,
+    try {
+      const resolvedContent = await resolveOfflineNoteMediaDraftUrlsInHtml(
+        incomingContent,
+        {
+          reuseDisplayUrlByDraftUrl: displayUrlByDraftUrl,
+        }
+      );
+
+      if (
+        resolutionVersion !== resolvedDraftDisplayVersion ||
+        editor !== joditInstance
+      ) {
+        resolvedContent.revoke();
+        return;
       }
-    );
 
-    if (
-      resolutionVersion !== resolvedDraftDisplayVersion ||
-      editor !== joditInstance
-    ) {
-      resolvedContent.revoke();
-      return;
-    }
+      syncDraftDisplayMappings(resolvedContent.displayUrlByDraftUrl);
 
-    resolvedDraftDisplayCleanup?.();
-    resolvedDraftDisplayCleanup = resolvedContent.revoke;
-    resetDraftDisplayMappings(resolvedContent.displayUrlByDraftUrl);
+      const displayContent = attachMediaAuthToken(
+        resolvedContent.html,
+        auth.session?.()?.access_token
+      );
 
-    const displayContent = attachMediaAuthToken(
-      resolvedContent.html,
-      auth.session?.()?.access_token
-    );
+      lastContent = stripMediaAuthToken(incomingContent);
+      if (displayContent !== editor.value) {
+        editor.value = displayContent;
+      }
+    } catch (error) {
+      if (
+        resolutionVersion !== resolvedDraftDisplayVersion ||
+        editor !== joditInstance
+      ) {
+        return;
+      }
 
-    lastContent = stripMediaAuthToken(incomingContent);
-    if (displayContent !== editor.value) {
-      editor.value = displayContent;
+      console.error("Failed to resolve offline note media drafts:", error);
+      syncDraftDisplayMappings(new Map());
+
+      const fallbackContent = attachMediaAuthToken(
+        incomingContent,
+        auth.session?.()?.access_token
+      );
+
+      lastContent = stripMediaAuthToken(incomingContent);
+      if (fallbackContent !== editor.value) {
+        editor.value = fallbackContent;
+      }
     }
   };
 
@@ -666,8 +693,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   });
 
   onCleanup(() => {
-    resolvedDraftDisplayCleanup?.();
-    resolvedDraftDisplayCleanup = undefined;
+    syncDraftDisplayMappings(new Map());
 
     // Destroy Jodit instance
     if (joditInstance) {
