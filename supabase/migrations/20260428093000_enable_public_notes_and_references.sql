@@ -6,7 +6,7 @@ CREATE POLICY "Users can view own or public notes" ON public.note
   USING (
     user_ref IS NULL
     OR user_ref = auth.uid()
-    OR COALESCE(public, false) = true
+    OR COALESCE(public, false)
   );
 
 DROP POLICY IF EXISTS "Users can view own references" ON public.reference;
@@ -15,7 +15,7 @@ CREATE POLICY "Users can view own or public references" ON public.reference
   USING (
     user_ref IS NULL
     OR user_ref = auth.uid()
-    OR COALESCE(public, false) = true
+    OR COALESCE(public, false)
   );
 
 CREATE OR REPLACE FUNCTION public.sync_get_user_notes(
@@ -37,7 +37,7 @@ CREATE OR REPLACE FUNCTION public.sync_get_user_notes(
   AND (
     n.user_ref IS NULL
     OR n.user_ref = p_user_id
-    OR COALESCE(n.public, false) = TRUE
+    OR COALESCE(n.public, false)
   )
   AND (
     p_after_timestamp IS NULL OR n.last_modified_at > p_after_timestamp
@@ -67,7 +67,7 @@ CREATE OR REPLACE FUNCTION public.sync_get_user_references(
   AND (
     r.user_ref IS NULL
     OR r.user_ref = p_user_id
-    OR COALESCE(r.public, false) = TRUE
+    OR COALESCE(r.public, false)
   )
   AND (
     p_after_timestamp IS NULL OR r.last_modified_at > p_after_timestamp
