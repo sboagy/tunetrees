@@ -26,6 +26,8 @@ import {
   createEffect,
   createSignal,
   on,
+  onCleanup,
+  onMount,
   type ParentComponent,
 } from "solid-js";
 import { toast } from "solid-sonner";
@@ -222,12 +224,62 @@ const TTInner: ParentComponent = (props) => {
   const RECONCILE_CHECK_INTERVAL = 10;
 
   let isInitializing = false;
+  let offlineMediaMaintenancePromise: Promise<void> | null = null;
 
   const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
   let syncDiagnosticsRan = false;
 
   const diagLog = (...args: unknown[]): void => {
     if (SYNC_DIAGNOSTICS) console.log(...args);
+  };
+
+  const runOfflineMediaMaintenance = async () => {
+    const db = localDb();
+    const currentUser = rhizome.user();
+    const accessToken = rhizome.session()?.access_token;
+
+    if (
+      !db ||
+      !currentUser?.id ||
+      !accessToken ||
+      (typeof navigator !== "undefined" && !navigator.onLine)
+    ) {
+      return;
+    }
+
+    if (offlineMediaMaintenancePromise) {
+      return await offlineMediaMaintenancePromise;
+    }
+
+    offlineMediaMaintenancePromise = (async () => {
+      try {
+        const [{ processPendingNoteMediaDrafts }, { syncPinnedAudioVault }] =
+          await Promise.all([
+            import("@/lib/media/offline-note-media"),
+            import("@/lib/media/audio-lookahead"),
+          ]);
+
+        await processPendingNoteMediaDrafts({
+          db,
+          userId: currentUser.id,
+          accessToken,
+        });
+        await syncPinnedAudioVault({
+          db,
+          userId: currentUser.id,
+          accessToken,
+        });
+      } catch (error) {
+        console.warn(
+          "[TTAuthProvider] Offline media maintenance failed:",
+          error
+        );
+      } finally {
+        offlineMediaMaintenancePromise = null;
+      }
+    })();
+
+    await offlineMediaMaintenancePromise;
   };
 
   // ---------------------------------------------------------------------------
@@ -722,6 +774,8 @@ const TTInner: ParentComponent = (props) => {
         } catch (e) {
           log.error("[TTAuthProvider] Error in granular signaling:", e);
         }
+
+        await runOfflineMediaMaintenance();
       },
     });
 
@@ -1037,6 +1091,28 @@ const TTInner: ParentComponent = (props) => {
       }
     })
   );
+
+  createEffect(() => {
+    void localDb();
+    void rhizome.user();
+    void rhizome.session();
+    void runOfflineMediaMaintenance();
+  });
+
+  onMount(() => {
+    const handleOnline = () => {
+      void runOfflineMediaMaintenance();
+    };
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.addEventListener("online", handleOnline);
+    onCleanup(() => {
+      window.removeEventListener("online", handleOnline);
+    });
+  });
 
   // ---------------------------------------------------------------------------
   // Auth method wrappers - adapt rhizome's throw-on-error to TT's {error} return

@@ -17,6 +17,7 @@ import { attachMediaAuthTokenToUrl } from "@/components/notes/media-auth";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import { updateMediaAssetByReferenceId } from "@/lib/db/queries/media-assets";
+import { getMediaVaultBlob } from "@/lib/media/media-vault";
 import type { AudioPlayerTrack } from "./AudioPlayerContext";
 
 const DEFAULT_REGION_COLOR = "rgba(37, 99, 235, 0.18)";
@@ -394,6 +395,9 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     initialStoredState.regions
   );
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
+  const [audioSourceState, setAudioSourceState] = createSignal<
+    "network" | "pinned" | "offline-missing"
+  >("network");
 
   let waveformContainerRef: HTMLDivElement | undefined;
   let waveSurfer: WaveSurfer | null = null;
@@ -405,6 +409,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   let isDisposing = false;
   let didDragSelectionChange = false;
   let suppressNextRowClick = false;
+  let objectUrlToRevoke: string | null = null;
 
   type RegionListModifiers = {
     shiftKey: boolean;
@@ -993,143 +998,196 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     didDragSelectionChange = false;
   };
 
+  const shouldAbortMediaInitialization = () =>
+    isDisposing || !waveformContainerRef;
+
   onMount(() => {
     props.onPersistRequestChange?.(() => flushPendingPersist(true));
 
-    const accessToken = session()?.access_token;
-    const sourceUrl = accessToken
-      ? attachMediaAuthTokenToUrl(props.track.url, accessToken)
-      : props.track.url;
-
-    regionsPlugin = RegionsPlugin.create();
-    audioElement = new Audio(sourceUrl);
-    audioElement.preload = "auto";
-    audioElement.crossOrigin = "anonymous";
-    setPreservePitch();
-
-    waveSurfer = WaveSurfer.create({
-      container: waveformContainerRef!,
-      media: audioElement,
-      waveColor: "#94a3b8",
-      progressColor: "#0f172a",
-      cursorColor: "#2563eb",
-      barWidth: 2,
-      barGap: 1,
-      height: 128,
-      normalize: true,
-      dragToSeek: true,
-      plugins: [regionsPlugin],
-    });
-
-    waveSurfer.setPlaybackRate(playbackRate(), true);
-
-    waveSurfer.on("ready", () => {
-      setIsReady(true);
-      setDuration(
-        waveSurfer?.getDuration() || props.track.durationSeconds || 0
-      );
-      if (zoomLevel() > 0) {
-        waveSurfer?.zoom(zoomLevel());
+    void (async () => {
+      const accessToken = session()?.access_token;
+      const networkSourceUrl = accessToken
+        ? attachMediaAuthTokenToUrl(props.track.url, accessToken)
+        : props.track.url;
+      let pinnedBlob: Blob | null = null;
+      try {
+        pinnedBlob = await getMediaVaultBlob(props.track.url);
+      } catch (error) {
+        console.error("Failed to load pinned audio from media vault:", error);
+      }
+      if (shouldAbortMediaInitialization()) {
+        return;
       }
 
-      const persistedRegions = parseStoredAudioState(
-        props.track.regionsJson
-      ).regions;
-      isRestoringRegions = true;
-      regionsPlugin?.clearRegions();
-      for (const region of persistedRegions) {
-        const kind = getAudioRegionKind(region);
-        const label = region.label || getAnnotationKindLabel(kind);
-        const restoredRegion = regionsPlugin?.addRegion({
-          id: region.id,
-          start: region.start,
-          ...(isRangeAnnotation(kind) &&
-          region.end !== null &&
-          region.end !== undefined
-            ? { end: region.end }
-            : {}),
-          content: label,
-          color: region.color || getAnnotationColor(kind),
-          drag: true,
-          resize: isRangeAnnotation(kind),
-        });
-        if (restoredRegion) {
-          setAudioRegionMetadata(
-            restoredRegion as AudioRegionInstance,
-            kind,
-            label,
-            region.color || getAnnotationColor(kind)
-          );
+      const nextObjectUrl = pinnedBlob ? URL.createObjectURL(pinnedBlob) : null;
+      if (shouldAbortMediaInitialization()) {
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
         }
+        return;
       }
-      isRestoringRegions = false;
-      syncSerializedRegions();
-    });
 
-    waveSurfer.on("play", () => setIsPlaying(true));
-    waveSurfer.on("pause", () => setIsPlaying(false));
-    waveSurfer.on("timeupdate", (time) => setCurrentTime(time));
-    waveSurfer.on("error", (error) => {
+      const sourceUrl = nextObjectUrl ?? networkSourceUrl;
+
+      if (pinnedBlob) {
+        objectUrlToRevoke = sourceUrl;
+        setAudioSourceState("pinned");
+      } else if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setAudioSourceState("offline-missing");
+      } else {
+        setAudioSourceState("network");
+      }
+
+      if (shouldAbortMediaInitialization()) {
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+        return;
+      }
+
+      regionsPlugin = RegionsPlugin.create();
+      audioElement = new Audio(sourceUrl);
+      audioElement.preload = "auto";
+      audioElement.crossOrigin = "anonymous";
+      setPreservePitch();
+
+      if (shouldAbortMediaInitialization()) {
+        audioElement.pause();
+        audioElement = null;
+        regionsPlugin = null;
+        if (nextObjectUrl) {
+          URL.revokeObjectURL(nextObjectUrl);
+        }
+        return;
+      }
+
+      waveSurfer = WaveSurfer.create({
+        container: waveformContainerRef!,
+        media: audioElement,
+        waveColor: "#94a3b8",
+        progressColor: "#0f172a",
+        cursorColor: "#2563eb",
+        barWidth: 2,
+        barGap: 1,
+        height: 128,
+        normalize: true,
+        dragToSeek: true,
+        plugins: [regionsPlugin],
+      });
+
+      waveSurfer.setPlaybackRate(playbackRate(), true);
+
+      waveSurfer.on("ready", () => {
+        setIsReady(true);
+        setDuration(
+          waveSurfer?.getDuration() || props.track.durationSeconds || 0
+        );
+        if (zoomLevel() > 0) {
+          waveSurfer?.zoom(zoomLevel());
+        }
+
+        const persistedRegions = parseStoredAudioState(
+          props.track.regionsJson
+        ).regions;
+        isRestoringRegions = true;
+        regionsPlugin?.clearRegions();
+        for (const region of persistedRegions) {
+          const kind = getAudioRegionKind(region);
+          const label = region.label || getAnnotationKindLabel(kind);
+          const restoredRegion = regionsPlugin?.addRegion({
+            id: region.id,
+            start: region.start,
+            ...(isRangeAnnotation(kind) &&
+            region.end !== null &&
+            region.end !== undefined
+              ? { end: region.end }
+              : {}),
+            content: label,
+            color: region.color || getAnnotationColor(kind),
+            drag: true,
+            resize: isRangeAnnotation(kind),
+          });
+          if (restoredRegion) {
+            setAudioRegionMetadata(
+              restoredRegion as AudioRegionInstance,
+              kind,
+              label,
+              region.color || getAnnotationColor(kind)
+            );
+          }
+        }
+        isRestoringRegions = false;
+        syncSerializedRegions();
+      });
+
+      waveSurfer.on("play", () => setIsPlaying(true));
+      waveSurfer.on("pause", () => setIsPlaying(false));
+      waveSurfer.on("timeupdate", (time) => setCurrentTime(time));
+      waveSurfer.on("error", (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setErrorMessage(message);
+      });
+
+      regionsPlugin.on("region-created", (region) => {
+        if (isRestoringRegions || isDisposing) {
+          return;
+        }
+        setSingleSelection(region.id);
+        syncSerializedRegions();
+        schedulePersist();
+      });
+
+      regionsPlugin.on("region-updated", () => {
+        if (isRestoringRegions || isDisposing) {
+          return;
+        }
+        syncSerializedRegions();
+        schedulePersist();
+      });
+
+      regionsPlugin.on("region-removed", (region) => {
+        if (isDisposing) {
+          return;
+        }
+
+        if (selectedRegionId() === region.id) {
+          setSelectedRegionId(null);
+        }
+        if (isRestoringRegions) {
+          return;
+        }
+        syncSerializedRegions();
+        disableLoopIfSelectionIsInvalid(false);
+        schedulePersist();
+      });
+
+      regionsPlugin.on("region-clicked", (region, event) => {
+        event.stopPropagation();
+        setSingleSelection(region.id);
+        if (
+          getAudioRegionKind(region as AudioRegionInstance) === "loop" &&
+          typeof region.end === "number" &&
+          waveSurfer
+        ) {
+          void waveSurfer.play(region.start, region.end);
+        } else if (waveSurfer) {
+          waveSurfer.setTime(region.start);
+        }
+        disableLoopIfSelectionIsInvalid(true);
+      });
+
+      regionsPlugin.on("region-out", (region) => {
+        if (!loopEnabled() || selectedRegionId() !== region.id || !waveSurfer) {
+          return;
+        }
+
+        if (typeof region.end === "number") {
+          void waveSurfer.play(region.start, region.end);
+        }
+      });
+    })().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       setErrorMessage(message);
-    });
-
-    regionsPlugin.on("region-created", (region) => {
-      if (isRestoringRegions || isDisposing) {
-        return;
-      }
-      setSingleSelection(region.id);
-      syncSerializedRegions();
-      schedulePersist();
-    });
-
-    regionsPlugin.on("region-updated", () => {
-      if (isRestoringRegions || isDisposing) {
-        return;
-      }
-      syncSerializedRegions();
-      schedulePersist();
-    });
-
-    regionsPlugin.on("region-removed", (region) => {
-      if (isDisposing) {
-        return;
-      }
-
-      if (selectedRegionId() === region.id) {
-        setSelectedRegionId(null);
-      }
-      if (isRestoringRegions) {
-        return;
-      }
-      syncSerializedRegions();
-      disableLoopIfSelectionIsInvalid(false);
-      schedulePersist();
-    });
-
-    regionsPlugin.on("region-clicked", (region, event) => {
-      event.stopPropagation();
-      setSingleSelection(region.id);
-      if (
-        getAudioRegionKind(region as AudioRegionInstance) === "loop" &&
-        typeof region.end === "number" &&
-        waveSurfer
-      ) {
-        void waveSurfer.play(region.start, region.end);
-      } else if (waveSurfer) {
-        waveSurfer.setTime(region.start);
-      }
-      disableLoopIfSelectionIsInvalid(true);
-    });
-
-    regionsPlugin.on("region-out", (region) => {
-      if (!loopEnabled() || selectedRegionId() !== region.id || !waveSurfer) {
-        return;
-      }
-
-      if (typeof region.end === "number") {
-        void waveSurfer.play(region.start, region.end);
-      }
     });
 
     document.addEventListener("keydown", handleAnnotationHotkeys);
@@ -1150,6 +1208,10 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     waveSurfer = null;
     audioElement = null;
     regionsPlugin = null;
+    if (objectUrlToRevoke) {
+      URL.revokeObjectURL(objectUrlToRevoke);
+      objectUrlToRevoke = null;
+    }
   });
 
   return (
@@ -1167,6 +1229,17 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
         <Show when={errorMessage()}>
           <p class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
             {errorMessage()}
+          </p>
+        </Show>
+
+        <Show when={audioSourceState() !== "network"}>
+          <p
+            class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200"
+            data-testid="audio-player-source-status"
+          >
+            {audioSourceState() === "pinned"
+              ? "Playing from pinned offline audio."
+              : "Offline audio is not pinned for this tune yet."}
           </p>
         </Show>
 

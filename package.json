@@ -72,6 +72,10 @@
     "perf:test": "node scripts/performance-test.js",
     "perf:test:mobile": "node scripts/performance-test.js --mobile --view",
     "perf:test:both": "node scripts/performance-test.js --both --view",
+    "r2:local:list": "cd worker && sqlite3 -header -column \"$(find .wrangler/state/v3/r2/miniflare-R2BucketObject -name '*.sqlite' | head -n 1)\" \"select key, size, datetime(uploaded/1000,'unixepoch') as uploaded_utc from _mf_objects order by uploaded desc;\"",
+    "r2:local:list:notes": "cd worker && sqlite3 -header -column \"$(find .wrangler/state/v3/r2/miniflare-R2BucketObject -name '*.sqlite' | head -n 1)\" \"select key, size, datetime(uploaded/1000,'unixepoch') as uploaded_utc from _mf_objects where key like '%/notes/%' order by uploaded desc;\"",
+    "r2:local:list:audio": "cd worker && sqlite3 -header -column \"$(find .wrangler/state/v3/r2/miniflare-R2BucketObject -name '*.sqlite' | head -n 1)\" \"select key, size, datetime(uploaded/1000,'unixepoch') as uploaded_utc from _mf_objects where key like '%/audio/%' order by uploaded desc;\"",
+    "r2:local:head": "sh -c 'cd worker && test -n \"$1\" || { echo \"Usage: npm run r2:local:head -- <key>\"; exit 1; }; npx wrangler r2 object get tunetrees-vault-preview/\"$1\" --local --pipe | wc -c' --",
     "ingest:top500": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx ingest/top500/top500.ts",
     "view:top500": "cd ingest/top500 && python3 -m http.server 8888"
   },

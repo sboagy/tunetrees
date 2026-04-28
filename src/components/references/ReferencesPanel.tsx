@@ -59,6 +59,7 @@ export const ReferencesPanel: Component = () => {
   const [addDraft, setAddDraft] = createSignal<
     Partial<ReferenceFormData> | undefined
   >();
+  const INTERNAL_REFERENCE_DRAG_TYPE = "application/x-tunetrees-reference-id";
   const defaultAudioTitle = (filename: string) =>
     filename.replace(/\.[^.]+$/, "");
 
@@ -68,8 +69,63 @@ export const ReferencesPanel: Component = () => {
     setIsAdding(true);
   };
 
+  const getDataTransferTypes = (
+    dataTransfer: DataTransfer | null | undefined
+  ) => (dataTransfer?.types ? Array.from(dataTransfer.types) : []);
+
   const hasFileDrop = (dataTransfer: DataTransfer | null | undefined) =>
-    Boolean(dataTransfer?.types?.includes("Files"));
+    getDataTransferTypes(dataTransfer).includes("Files");
+
+  const hasInternalReferenceDrag = (
+    dataTransfer: DataTransfer | null | undefined
+  ) =>
+    getDataTransferTypes(dataTransfer).includes(INTERNAL_REFERENCE_DRAG_TYPE);
+
+  const hasUrlDrop = (dataTransfer: DataTransfer | null | undefined) => {
+    if (!dataTransfer) {
+      return false;
+    }
+
+    const types = getDataTransferTypes(dataTransfer);
+    if (types.includes("text/uri-list")) {
+      return true;
+    }
+
+    const plainText = dataTransfer.getData("text/plain").trim();
+    return plainText.startsWith("http://") || plainText.startsWith("https://");
+  };
+
+  const getDroppedUrl = (dataTransfer: DataTransfer | null | undefined) => {
+    if (!dataTransfer) {
+      return null;
+    }
+
+    const uriList = dataTransfer
+      .getData("text/uri-list")
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .find((value) => value && !value.startsWith("#"));
+    if (uriList) {
+      return uriList;
+    }
+
+    const plainText = dataTransfer.getData("text/plain").trim();
+    if (plainText.startsWith("http://") || plainText.startsWith("https://")) {
+      return plainText;
+    }
+
+    return null;
+  };
+
+  const hasCreateReferenceDrop = (
+    dataTransfer: DataTransfer | null | undefined
+  ) => {
+    if (hasInternalReferenceDrag(dataTransfer)) {
+      return false;
+    }
+
+    return hasFileDrop(dataTransfer) || hasUrlDrop(dataTransfer);
+  };
 
   const isAudioFile = (file: File) => {
     if (file.type.startsWith("audio/")) {
@@ -300,25 +356,38 @@ export const ReferencesPanel: Component = () => {
   };
 
   const handlePanelDragOver = (event: DragEvent) => {
-    if (!hasFileDrop(event.dataTransfer)) {
+    if (!hasCreateReferenceDrop(event.dataTransfer)) {
       return;
     }
 
     event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "copy";
+    }
     setIsPanelDragActive(true);
   };
 
   const handlePanelDragLeave = (event: DragEvent) => {
-    if (!hasFileDrop(event.dataTransfer)) {
+    if (!hasCreateReferenceDrop(event.dataTransfer)) {
       return;
     }
 
     event.preventDefault();
+    const currentTarget = event.currentTarget;
+    const relatedTarget = event.relatedTarget;
+    if (
+      currentTarget instanceof Node &&
+      relatedTarget instanceof Node &&
+      currentTarget.contains(relatedTarget)
+    ) {
+      return;
+    }
+
     setIsPanelDragActive(false);
   };
 
   const handlePanelDrop = (event: DragEvent) => {
-    if (!hasFileDrop(event.dataTransfer)) {
+    if (!hasCreateReferenceDrop(event.dataTransfer)) {
       return;
     }
 
@@ -326,7 +395,16 @@ export const ReferencesPanel: Component = () => {
     setIsPanelDragActive(false);
 
     if (!currentTuneId()) {
-      toast.error("Select a tune before dropping an audio reference.");
+      toast.error("Select a tune before dropping a reference.");
+      return;
+    }
+
+    const droppedUrl = getDroppedUrl(event.dataTransfer);
+    if (droppedUrl) {
+      openAddForm({
+        url: droppedUrl,
+        sourceMode: "url",
+      });
       return;
     }
 
@@ -336,7 +414,7 @@ export const ReferencesPanel: Component = () => {
     }
 
     if (!isAudioFile(droppedFile)) {
-      toast.error("Drop an audio file to create an audio reference.");
+      toast.error("Drop a web link or an audio file to create a reference.");
       return;
     }
 
@@ -352,9 +430,10 @@ export const ReferencesPanel: Component = () => {
     <>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: panel acts as a drag-and-drop target for audio files while its keyboard interactions remain with contained controls */}
       <div
-        class="references-panel rounded-lg transition-colors"
+        class="references-panel rounded-lg border border-transparent transition-colors"
         classList={{
-          "bg-blue-50/40 dark:bg-blue-950/20": isPanelDragActive(),
+          "bg-blue-50/30 dark:bg-blue-950/15 border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/60 dark:ring-blue-700/60":
+            isPanelDragActive(),
         }}
         onDragOver={(event) =>
           handlePanelDragOver(event as unknown as DragEvent)
@@ -401,7 +480,7 @@ export const ReferencesPanel: Component = () => {
           >
             <ReferenceForm
               initialData={addDraft()}
-              autoOpenTypeSelect={!addDraft()?.uploadFile}
+              autoOpenTypeSelect={!addDraft()}
               onSubmit={handleCreateReference}
               onCancel={handleCancel}
             />
@@ -446,16 +525,18 @@ export const ReferencesPanel: Component = () => {
 
         {/* References list */}
         <Show when={!isAdding() && !editingReference()}>
-          <ReferenceList
-            references={references() || []}
-            onEdit={handleEditClick}
-            onDelete={handleDeleteReference}
-            onOpenReference={handleOpenReference}
-            onReorder={handleReorderReferences}
-            urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
-            showActions={true}
-            groupByType={false}
-          />
+          <div data-testid="references-list-drop-target">
+            <ReferenceList
+              references={references() || []}
+              onEdit={handleEditClick}
+              onDelete={handleDeleteReference}
+              onOpenReference={handleOpenReference}
+              onReorder={handleReorderReferences}
+              urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
+              showActions={true}
+              groupByType={false}
+            />
+          </div>
         </Show>
       </div>
     </>

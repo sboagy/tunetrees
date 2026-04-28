@@ -17,15 +17,18 @@ type MockRegion = {
   remove: () => void;
 };
 
-const {
-  audioPauseMock,
-  emitWaveEvent,
-  resetMocks,
-  waveSurferInstance,
-  regionsPluginInstance,
-  updateMediaAssetByReferenceId,
-  toastError,
-} = vi.hoisted(() => {
+  const {
+    audioPauseMock,
+    emitWaveEvent,
+    getMediaVaultBlob,
+    resetMocks,
+    revokeObjectUrlMock,
+    createObjectUrlMock,
+    waveSurferInstance,
+    regionsPluginInstance,
+    updateMediaAssetByReferenceId,
+    toastError,
+  } = vi.hoisted(() => {
   const waveHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
   const regionHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
   let mockRegions: MockRegion[] = [];
@@ -56,9 +59,12 @@ const {
     }
   };
 
-  const audioPauseMock = vi.fn();
-  const updateMediaAssetByReferenceId = vi.fn(async () => undefined);
-  const toastError = vi.fn();
+    const audioPauseMock = vi.fn();
+    const updateMediaAssetByReferenceId = vi.fn(async () => undefined);
+    const toastError = vi.fn();
+    const getMediaVaultBlob = vi.fn(async () => null);
+    const createObjectUrlMock = vi.fn(() => "blob:pinned-audio");
+    const revokeObjectUrlMock = vi.fn();
 
   const regionsPluginInstance = {
     addRegion: vi.fn(
@@ -116,9 +122,13 @@ const {
     regionHandlers.clear();
     mockRegions = [];
 
-    audioPauseMock.mockClear();
-    updateMediaAssetByReferenceId.mockClear();
-    toastError.mockClear();
+      audioPauseMock.mockClear();
+      getMediaVaultBlob.mockClear();
+      getMediaVaultBlob.mockResolvedValue(null);
+      createObjectUrlMock.mockClear();
+      revokeObjectUrlMock.mockClear();
+      updateMediaAssetByReferenceId.mockClear();
+      toastError.mockClear();
     regionsPluginInstance.addRegion.mockClear();
     regionsPluginInstance.getRegions.mockClear();
     regionsPluginInstance.getRegions.mockImplementation(() => mockRegions);
@@ -136,15 +146,18 @@ const {
   };
 
   return {
-    audioPauseMock,
-    emitWaveEvent: (event: string, ...args: unknown[]) =>
-      emit(waveHandlers, event, ...args),
-    resetMocks,
-    waveSurferInstance,
-    regionsPluginInstance,
-    updateMediaAssetByReferenceId,
-    toastError,
-  };
+      audioPauseMock,
+      emitWaveEvent: (event: string, ...args: unknown[]) =>
+        emit(waveHandlers, event, ...args),
+      getMediaVaultBlob,
+      resetMocks,
+      revokeObjectUrlMock,
+      createObjectUrlMock,
+      waveSurferInstance,
+      regionsPluginInstance,
+      updateMediaAssetByReferenceId,
+      toastError,
+    };
 });
 
 vi.mock("solid-sonner", () => ({
@@ -166,6 +179,10 @@ vi.mock("@/lib/db/client-sqlite", () => ({
 
 vi.mock("@/lib/db/queries/media-assets", () => ({
   updateMediaAssetByReferenceId,
+}));
+
+vi.mock("@/lib/media/media-vault", () => ({
+  getMediaVaultBlob,
 }));
 
 vi.mock("wavesurfer.js", () => ({
@@ -197,6 +214,8 @@ class MockAudioElement {
 
 const originalAudio = globalThis.Audio;
 const originalPrompt = window.prompt;
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
 const promptMock =
   vi.fn<(message?: string, defaultValue?: string) => string | null>();
 
@@ -234,6 +253,20 @@ function getLastPersistCall(): {
   };
 }
 
+async function emitReadyAfterInit() {
+  await waitFor(() => {
+    expect(waveSurferInstance.on).toHaveBeenCalled();
+  });
+
+  // The player now resolves its media source asynchronously so it can check
+  // the IndexedDB media vault before creating the Audio element. Flush one
+  // microtask before and after the mocked ready event so document-level
+  // listeners and Wavesurfer callbacks are fully wired before test actions run.
+  await Promise.resolve();
+  emitWaveEvent("ready");
+  await Promise.resolve();
+}
+
 describe("WaveformAudioPlayer persistence", () => {
   beforeEach(() => {
     resetMocks();
@@ -246,6 +279,16 @@ describe("WaveformAudioPlayer persistence", () => {
       configurable: true,
       writable: true,
       value: promptMock,
+    });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      writable: true,
+      value: createObjectUrlMock,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: revokeObjectUrlMock,
     });
     promptMock.mockReset();
     promptMock.mockReturnValue(null);
@@ -263,6 +306,115 @@ describe("WaveformAudioPlayer persistence", () => {
       writable: true,
       value: originalPrompt,
     });
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      writable: true,
+      value: originalCreateObjectURL,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: originalRevokeObjectURL,
+    });
+  });
+
+  it("loads pinned audio from the media vault before falling back to the network URL", async () => {
+    getMediaVaultBlob.mockResolvedValue(
+      new Blob(["audio-bytes"], { type: "audio/mpeg" })
+    );
+
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-1",
+          referenceTitle: "Chief O'Neill's Favorite",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ffile.mp3",
+        }}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(getMediaVaultBlob).toHaveBeenCalledWith(
+        "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ffile.mp3"
+      );
+      expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("audio-player-source-status").textContent).toBe(
+        "Playing from pinned offline audio."
+      );
+    });
+
+    await emitReadyAfterInit();
+    view.unmount();
+
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:pinned-audio");
+  });
+
+  it("does not initialize audio resources after unmount if the vault lookup resolves late", async () => {
+    let resolveVaultLookup: ((value: Blob | null) => void) | undefined;
+    getMediaVaultBlob.mockImplementation(
+      () =>
+        new Promise<Blob | null>((resolve) => {
+          resolveVaultLookup = resolve;
+        })
+    );
+
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-late-vault",
+          referenceTitle: "Late Vault Lookup",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Flate.mp3",
+        }}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(getMediaVaultBlob).toHaveBeenCalledWith(
+        "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Flate.mp3"
+      );
+    });
+
+    view.unmount();
+    resolveVaultLookup?.(new Blob(["audio-bytes"], { type: "audio/mpeg" }));
+    await Promise.resolve();
+
+    // The late resolution should be ignored entirely, so no blob URL is
+    // created and there is nothing to revoke during cleanup.
+    expect(createObjectUrlMock).not.toHaveBeenCalled();
+    expect(waveSurferInstance.on).not.toHaveBeenCalled();
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the network source if the media-vault lookup fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    getMediaVaultBlob.mockRejectedValue(new Error("vault blocked"));
+
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-network-fallback",
+          referenceTitle: "Network Fallback",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ffallback.mp3",
+        }}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(getMediaVaultBlob).toHaveBeenCalledWith(
+        "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ffallback.mp3"
+      );
+      expect(waveSurferInstance.on).toHaveBeenCalled();
+      expect(createObjectUrlMock).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("audio-player-source-status")).toBeNull();
+      expect(screen.queryByText("vault blocked")).toBeNull();
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "Failed to load pinned audio from media vault:",
+      expect.any(Error)
+    );
   });
 
   it("flushes pending annotation and setting changes when the player closes", async () => {
@@ -276,7 +428,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
     await fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
@@ -331,7 +483,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
     expect(waveSurferInstance.play).toHaveBeenCalled();
@@ -353,7 +505,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     const loopToggle = screen.getByTestId(
       "audio-player-loop-toggle"
@@ -398,7 +550,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await waitFor(() => {
       expect(waveSurferInstance.zoom).toHaveBeenCalledWith(80);
@@ -450,7 +602,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     const renderedIds = Array.from(
       screen
@@ -476,7 +628,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
 
@@ -527,7 +679,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
     promptMock.mockReturnValueOnce("Pickup Beat");
 
     await fireEvent.click(
@@ -564,7 +716,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
     await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
@@ -605,7 +757,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
     await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
@@ -662,7 +814,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     await fireEvent.click(screen.getByText("Beat 1"));
     await fireEvent.click(screen.getByText("Beat 2"), {
@@ -712,7 +864,7 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
     expect(
       screen.queryByTestId("audio-player-clear-selection-button")
@@ -751,11 +903,27 @@ describe("WaveformAudioPlayer persistence", () => {
       />
     ));
 
-    emitWaveEvent("ready");
+    await emitReadyAfterInit();
 
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "b" }));
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "m" }));
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "s" }));
+    // Click the player surface first so the subsequent keyboard events follow
+    // the same focused-interaction path a user would take in the browser.
+    await fireEvent.click(screen.getByTestId("audio-player-panel"));
+
+    await fireEvent.keyDown(document.body, {
+      key: "b",
+      code: "KeyB",
+      bubbles: true,
+    });
+    await fireEvent.keyDown(document.body, {
+      key: "m",
+      code: "KeyM",
+      bubbles: true,
+    });
+    await fireEvent.keyDown(document.body, {
+      key: "s",
+      code: "KeyS",
+      bubbles: true,
+    });
 
     view.unmount();
 

@@ -9,9 +9,11 @@ import {
 } from "lucide-solid";
 import {
   type Component,
+  createEffect,
   createResource,
   createSignal,
   For,
+  onCleanup,
   Show,
 } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -29,6 +31,10 @@ import {
   updateNoteOrder,
 } from "@/lib/db/queries/notes";
 import {
+  hasOfflineNoteMediaDraftUrlsInHtml,
+  resolveOfflineNoteMediaDraftUrlsInHtml,
+} from "@/lib/media/offline-note-media";
+import {
   AlertDialog,
   AlertDialogCloseButton,
   AlertDialogContent,
@@ -39,6 +45,60 @@ import {
 } from "../ui/alert-dialog";
 import { attachMediaAuthToken } from "./media-auth";
 import { NotesEditor } from "./NotesEditor";
+
+const ResolvedNoteContent: Component<{
+  class: string;
+  content: string;
+  testId: string;
+  token: string | undefined;
+}> = (props) => {
+  const [resolvedHtml, setResolvedHtml] = createSignal(
+    attachMediaAuthToken(props.content, props.token)
+  );
+  let resolvedDraftCleanup: (() => void) | undefined;
+  let resolutionVersion = 0;
+
+  createEffect(() => {
+    const rawContent = props.content;
+    const token = props.token;
+    const currentVersion = ++resolutionVersion;
+
+    setResolvedHtml(attachMediaAuthToken(rawContent, token));
+
+    if (!hasOfflineNoteMediaDraftUrlsInHtml(rawContent)) {
+      resolvedDraftCleanup?.();
+      resolvedDraftCleanup = undefined;
+      return;
+    }
+
+    void resolveOfflineNoteMediaDraftUrlsInHtml(rawContent)
+      .then((result) => {
+        if (currentVersion !== resolutionVersion) {
+          result.revoke();
+          return;
+        }
+
+        resolvedDraftCleanup?.();
+        resolvedDraftCleanup = result.revoke;
+        setResolvedHtml(attachMediaAuthToken(result.html, token));
+      })
+      .catch((error) => {
+        console.error("Failed to resolve offline note media drafts:", error);
+      });
+  });
+
+  onCleanup(() => {
+    resolvedDraftCleanup?.();
+  });
+
+  return (
+    <div
+      class={props.class}
+      innerHTML={resolvedHtml()}
+      data-testid={props.testId}
+    />
+  );
+};
 
 /**
  * NotesPanel - Display and manage notes for the current tune
@@ -268,9 +328,6 @@ export const NotesPanel: Component = () => {
     setDragOverNoteId(null);
   };
 
-  const renderNoteContent = (content: string) =>
-    attachMediaAuthToken(content, session()?.access_token);
-
   return (
     <div class="notes-panel" data-testid="notes-panel">
       {/* Header with icon and Add Note button */}
@@ -494,10 +551,11 @@ export const NotesPanel: Component = () => {
                 <Show
                   when={isEditing()}
                   fallback={
-                    <div
+                    <ResolvedNoteContent
                       class={`${fontClasses().text} text-gray-700 dark:text-gray-300 prose dark:prose-invert max-w-none`}
-                      innerHTML={renderNoteContent(note.noteText || "")}
-                      data-testid={`note-content-${note.id}`}
+                      content={note.noteText || ""}
+                      token={session()?.access_token}
+                      testId={`note-content-${note.id}`}
                     />
                   }
                 >

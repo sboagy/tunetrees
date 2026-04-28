@@ -7,8 +7,12 @@ import {
 } from "@solidjs/testing-library";
 import { createSignal, type Setter } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildMediaUploadUrl, buildMediaViewUrl } from "../../../src/components/notes/media-auth";
+import {
+  buildMediaUploadUrl,
+  buildMediaViewUrl,
+} from "../../../src/components/notes/media-auth";
 import { NotesEditor } from "../../../src/components/notes/NotesEditor";
+import * as offlineNoteMedia from "../../../src/lib/media/offline-note-media";
 
 vi.mock("jodit/es2021/jodit.min.css", () => ({}));
 
@@ -19,6 +23,11 @@ const mockSession = {
 vi.mock("@/lib/auth/AuthContext", () => ({
   useAuth: () => ({
     session: () => mockSession,
+    user: () => ({ id: "user-1" }),
+    localDb: () => ({
+      run: vi.fn(async () => undefined),
+      all: vi.fn(async () => []),
+    }),
   }),
 }));
 
@@ -38,6 +47,7 @@ type MockEditorConfig = {
       time?: string;
       data?: {
         files?: string[];
+        persistedFiles?: string[];
       };
       file?: {
         key?: string;
@@ -150,6 +160,7 @@ let originalGlobalMutationObserver: typeof globalThis.MutationObserver;
 let originalWindowResizeObserver: typeof window.ResizeObserver;
 let originalGlobalResizeObserver: typeof globalThis.ResizeObserver;
 let originalFetch: typeof globalThis.fetch;
+let originalRevokeObjectURL: typeof URL.revokeObjectURL;
 
 const createMockEditor = (options?: MockEditorConfig): MockJoditInstance => {
   const container = document.createElement("div");
@@ -220,6 +231,7 @@ describe("NotesEditor", () => {
     originalWindowResizeObserver = window.ResizeObserver;
     originalGlobalResizeObserver = globalThis.ResizeObserver;
     originalFetch = globalThis.fetch;
+    originalRevokeObjectURL = URL.revokeObjectURL;
 
     Object.defineProperty(window, "MutationObserver", {
       configurable: true,
@@ -275,6 +287,11 @@ describe("NotesEditor", () => {
       configurable: true,
       writable: true,
       value: originalFetch,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: originalRevokeObjectURL,
     });
     MockMutationObserver.reset();
     MockResizeObserver.reset();
@@ -394,7 +411,10 @@ describe("NotesEditor", () => {
   it("uploads note images through the worker and strips runtime auth tokens from saved HTML", async () => {
     const handleContentChange = vi.fn();
     render(() => (
-      <NotesEditor content="<p>Initial note</p>" onContentChange={handleContentChange} />
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
     ));
 
     await waitFor(() => {
@@ -406,25 +426,26 @@ describe("NotesEditor", () => {
     expect(options?.uploader?.insertImageAsBase64URI).toBe(false);
 
     const uploadedUrl = buildMediaViewUrl("users/user-1/notes/uploaded.png");
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: true,
-          time: new Date().toISOString(),
-          data: {
-            files: [uploadedUrl],
-            isImages: [true],
-            path: "users/user-1/notes/uploaded.png",
-            baseurl: "",
-          },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      )
+    const fetchMock = vi.fn(
+      async (..._args: Parameters<typeof fetch>) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            time: new Date().toISOString(),
+            data: {
+              files: [uploadedUrl],
+              isImages: [true],
+              path: "users/user-1/notes/uploaded.png",
+              baseurl: "",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
@@ -469,7 +490,10 @@ describe("NotesEditor", () => {
   it("replaces pasted data-uri images with worker URLs before saving note content", async () => {
     const handleContentChange = vi.fn();
     render(() => (
-      <NotesEditor content="<p>Initial note</p>" onContentChange={handleContentChange} />
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
     ));
 
     await waitFor(() => {
@@ -478,26 +502,29 @@ describe("NotesEditor", () => {
 
     const options = makeEditor.mock.calls[0]?.[1];
     const editor = createdEditors[0];
-    const uploadedUrl = buildMediaViewUrl("users/user-1/notes/pasted-image-1.png");
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: true,
-          time: new Date().toISOString(),
-          data: {
-            files: [uploadedUrl],
-            isImages: [true],
-            path: "users/user-1/notes/pasted-image-1.png",
-            baseurl: "",
-          },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      )
+    const uploadedUrl = buildMediaViewUrl(
+      "users/user-1/notes/pasted-image-1.png"
+    );
+    const fetchMock = vi.fn(
+      async (..._args: Parameters<typeof fetch>) =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            time: new Date().toISOString(),
+            data: {
+              files: [uploadedUrl],
+              isImages: [true],
+              path: "users/user-1/notes/pasted-image-1.png",
+              baseurl: "",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
@@ -521,6 +548,205 @@ describe("NotesEditor", () => {
       );
     });
     expect(editor.valueAssignments).toBeGreaterThan(1);
+  });
+
+  it("returns a blob URL immediately when note media is queued offline", async () => {
+    const offlineUploadSpy = vi
+      .spyOn(offlineNoteMedia, "uploadNoteMediaFile")
+      .mockResolvedValue({
+        success: true,
+        data: {
+          files: ["blob:offline-note-image"],
+          persistedFiles: ["tunetrees-note-media-draft://draft-1"],
+        },
+      });
+
+    const handleContentChange = vi.fn();
+
+    render(() => (
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(makeEditor).toHaveBeenCalledTimes(1);
+    });
+
+    const options = makeEditor.mock.calls[0]?.[1];
+    const requestData = new FormData();
+    const offlineFile = new File(["offline-image"], "offline.png", {
+      type: "image/png",
+    });
+    requestData.append("files[0]", offlineFile);
+
+    const uploadResponse = await options?.uploader?.customUploadFunction?.(
+      requestData,
+      vi.fn()
+    );
+
+    expect(offlineUploadSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: offlineFile,
+        userId: "user-1",
+        accessToken: "test-access-token",
+      })
+    );
+    expect(uploadResponse?.data?.files).toEqual(["blob:offline-note-image"]);
+
+    const optionsEvents = makeEditor.mock.calls[0]?.[1]?.events;
+    optionsEvents?.change?.(`<p><img src="blob:offline-note-image"></p>`);
+
+    expect(handleContentChange).toHaveBeenCalledWith(
+      '<p><img src="tunetrees-note-media-draft://draft-1"></p>'
+    );
+  });
+
+  it("persists stable draft URLs when pasted data-uri images are queued offline", async () => {
+    const offlineUploadSpy = vi.spyOn(offlineNoteMedia, "uploadNoteMediaFile");
+    offlineUploadSpy.mockReset();
+    offlineUploadSpy.mockResolvedValue({
+        success: true,
+        data: {
+          files: ["blob:offline-pasted-note-image"],
+          persistedFiles: ["tunetrees-note-media-draft://draft-2"],
+        },
+      });
+
+    const handleContentChange = vi.fn();
+    render(() => (
+      <NotesEditor
+        content="<p>Initial note</p>"
+        onContentChange={handleContentChange}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(makeEditor).toHaveBeenCalledTimes(1);
+    });
+
+    const options = makeEditor.mock.calls[0]?.[1];
+    const editor = createdEditors[0];
+    const pastedDataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2C9f8AAAAASUVORK5CYII=";
+
+    options?.events?.change?.(`<p><img src="${pastedDataUrl}"></p>`);
+
+    await waitFor(() => {
+      expect(offlineUploadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(editor.value).toBe(
+        '<p><img src="blob:offline-pasted-note-image"></p>'
+      );
+      expect(handleContentChange).toHaveBeenCalledWith(
+        '<p><img src="tunetrees-note-media-draft://draft-2"></p>'
+      );
+    });
+  });
+
+  it("falls back to the raw editor content when offline draft resolution fails", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    vi.spyOn(
+      offlineNoteMedia,
+      "resolveOfflineNoteMediaDraftUrlsInHtml"
+    ).mockRejectedValue(new Error("IndexedDB blocked"));
+
+    render(() => (
+      <NotesEditor
+        content={'<p><img src="tunetrees-note-media-draft://draft-1"></p>'}
+        onContentChange={() => undefined}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(createdEditors[0]?.value).toBe(
+        '<p><img src="tunetrees-note-media-draft://draft-1"></p>'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to resolve offline note media drafts:",
+        expect.any(Error)
+      );
+    });
+  });
+
+  it("revokes tracked offline draft blob URLs when the editor unmounts", async () => {
+    const revokeObjectUrlMock = vi.fn();
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      writable: true,
+      value: revokeObjectUrlMock,
+    });
+    vi.spyOn(
+      offlineNoteMedia,
+      "resolveOfflineNoteMediaDraftUrlsInHtml"
+    ).mockResolvedValue({
+      html: '<p><img src="blob:rehydrated-note-image"></p>',
+      displayUrlByDraftUrl: new Map([
+        [
+          "tunetrees-note-media-draft://draft-1",
+          "blob:rehydrated-note-image",
+        ],
+      ]),
+      revoke: vi.fn(),
+    });
+
+    const view = render(() => (
+      <NotesEditor
+        content={'<p><img src="tunetrees-note-media-draft://draft-1"></p>'}
+        onContentChange={() => undefined}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(createdEditors[0]?.value).toBe(
+        '<p><img src="blob:rehydrated-note-image"></p>'
+      );
+    });
+
+    view.unmount();
+
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith(
+      "blob:rehydrated-note-image"
+    );
+  });
+
+  it("rehydrates stored offline draft references into fresh blob URLs in the editor", async () => {
+    const resolveDraftHtmlSpy = vi
+      .spyOn(offlineNoteMedia, "resolveOfflineNoteMediaDraftUrlsInHtml")
+      .mockResolvedValue({
+        html: '<p><img src="blob:rehydrated-note-image"></p>',
+        displayUrlByDraftUrl: new Map([
+          [
+            "tunetrees-note-media-draft://draft-1",
+            "blob:rehydrated-note-image",
+          ],
+        ]),
+        revoke: vi.fn(),
+      });
+
+    render(() => (
+      <NotesEditor
+        content={'<p><img src="tunetrees-note-media-draft://draft-1"></p>'}
+        onContentChange={() => undefined}
+      />
+    ));
+
+    await waitFor(() => {
+      expect(resolveDraftHtmlSpy).toHaveBeenCalledWith(
+        '<p><img src="tunetrees-note-media-draft://draft-1"></p>',
+        expect.objectContaining({
+          reuseDisplayUrlByDraftUrl: expect.any(Map),
+        })
+      );
+      expect(createdEditors[0]?.value).toBe(
+        '<p><img src="blob:rehydrated-note-image"></p>'
+      );
+    });
   });
 
   it("applies list formatting through Jodit's commitStyle API", async () => {
@@ -625,7 +851,7 @@ describe("NotesEditor", () => {
     });
 
     const editor = createdEditors[0];
-    expect(editor.valueAssignments).toBe(1);
+    expect(editor.valueAssignments).toBe(2);
 
     const updateContent = setContent;
     expect(updateContent).toBeDefined();
@@ -635,13 +861,13 @@ describe("NotesEditor", () => {
 
     updateContent("<p>Initial note</p>");
     await waitFor(() => {
-      expect(editor.valueAssignments).toBe(1);
+      expect(editor.valueAssignments).toBe(2);
     });
 
     updateContent("<p>Updated note</p>");
     await waitFor(() => {
       expect(editor.value).toBe("<p>Updated note</p>");
-      expect(editor.valueAssignments).toBe(2);
+      expect(editor.valueAssignments).toBe(3);
     });
   });
 });

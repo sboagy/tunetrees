@@ -11,6 +11,7 @@ export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
   const disableHmrForE2E = process.env.VITE_DISABLE_HMR_FOR_E2E === "true";
+  const MEDIA_AUTH_TOKEN_QUERY_PARAM = "token";
   const e2eArtifactWatchIgnore = [
     "**/logs/**",
     "**/test-results/**",
@@ -68,6 +69,23 @@ export default defineConfig(() => {
     }
 
     return undefined;
+  };
+
+  const mediaCacheKeyPlugin = {
+    cacheKeyWillBeUsed: async ({
+      request,
+    }: {
+      request: Request;
+    }): Promise<string> => {
+      const url = new URL(request.url);
+      if (
+        url.pathname === "/api/media/view" ||
+        url.pathname === "/api/media/view/"
+      ) {
+        url.searchParams.delete(MEDIA_AUTH_TOKEN_QUERY_PARAM);
+      }
+      return url.toString();
+    },
   };
 
   return {
@@ -228,6 +246,24 @@ export default defineConfig(() => {
                   maxEntries: 100,
                   maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
                 },
+              },
+            },
+            {
+              urlPattern: ({ request, url }) =>
+                request.destination === "image" &&
+                (url.pathname === "/api/media/view" ||
+                  url.pathname === "/api/media/view/"),
+              // Note-media objects are immutable after upload. Prefer the first
+              // successful fetch and avoid background revalidation churn against
+              // an auth-bound endpoint.
+              handler: "CacheFirst",
+              options: {
+                cacheName: "media-view-image-cache",
+                expiration: {
+                  maxEntries: 200,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                plugins: [mediaCacheKeyPlugin],
               },
             },
           ],

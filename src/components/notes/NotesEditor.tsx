@@ -1,5 +1,14 @@
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { Jodit } from "jodit";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { getDb } from "@/lib/db/client-sqlite";
+import {
+  hasOfflineNoteMediaDraftUrlsInHtml,
+  persistOfflineNoteMediaDraftUrlsInHtml,
+  resolveOfflineNoteMediaDraftUrlsInHtml,
+  uploadNoteMediaFile,
+} from "@/lib/media/offline-note-media";
+import "jodit/es2021/jodit.min.css";
 import {
   Bold,
   EllipsisVertical,
@@ -21,14 +30,12 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import { useAuth } from "@/lib/auth/AuthContext";
 import {
   attachMediaAuthToken,
   attachMediaAuthTokenToUrl,
   buildMediaUploadUrl,
   stripMediaAuthToken,
 } from "./media-auth";
-import "jodit/es2021/jodit.min.css";
 
 interface NotesEditorProps {
   content: string;
@@ -160,13 +167,15 @@ const resolveToolbarLayout = (toolbarWidth: number | null) => {
  * - Theme-aware (light/dark mode support)
  */
 export const NotesEditor: Component<NotesEditorProps> = (props) => {
-  const { session } = useAuth();
+  const auth = useAuth();
   let editorWrapperRef: HTMLDivElement | undefined;
   let toolbarRef: HTMLDivElement | undefined;
   let editorRef: HTMLTextAreaElement | undefined;
   let joditInstance: Jodit | undefined;
   let lastContent = props.content || "";
   let embeddedMediaReplacementVersion = 0;
+  let resolvedDraftDisplayVersion = 0;
+  let lastResolvedContentInput: string | undefined;
   const [currentTheme, setCurrentTheme] = createSignal<"light" | "dark">(
     getCurrentTheme()
   );
@@ -192,46 +201,161 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     };
   });
 
-  const getEditorDisplayContent = (content: string) =>
-    attachMediaAuthToken(content, session()?.access_token);
+  const displayUrlByDraftUrl = new Map<string, string>();
+  const draftUrlByDisplayUrl = new Map<string, string>();
+
+  const revokeAndSyncDraftDisplayMappings = (
+    nextDisplayUrlByDraftUrl: ReadonlyMap<string, string>
+  ) => {
+    const nextDisplayUrls = new Set(nextDisplayUrlByDraftUrl.values());
+
+    for (const displayUrl of displayUrlByDraftUrl.values()) {
+      if (!displayUrl.startsWith("blob:") || nextDisplayUrls.has(displayUrl)) {
+        continue;
+      }
+
+      URL.revokeObjectURL(displayUrl);
+    }
+
+    displayUrlByDraftUrl.clear();
+    draftUrlByDisplayUrl.clear();
+
+    for (const [draftUrl, displayUrl] of nextDisplayUrlByDraftUrl.entries()) {
+      displayUrlByDraftUrl.set(draftUrl, displayUrl);
+      draftUrlByDisplayUrl.set(displayUrl, draftUrl);
+    }
+  };
+
+  const getPersistedEditorContent = (content: string) =>
+    stripMediaAuthToken(
+      persistOfflineNoteMediaDraftUrlsInHtml(content, draftUrlByDisplayUrl)
+    );
+
+  const applyResolvedEditorContent = async (incomingContent: string) => {
+    const editor = joditInstance;
+    if (!editor) {
+      return;
+    }
+
+    lastResolvedContentInput = incomingContent;
+
+    if (!hasOfflineNoteMediaDraftUrlsInHtml(incomingContent)) {
+      revokeAndSyncDraftDisplayMappings(new Map());
+
+      const displayContent = attachMediaAuthToken(
+        incomingContent,
+        auth.session?.()?.access_token
+      );
+
+      lastContent = stripMediaAuthToken(incomingContent);
+      if (displayContent !== editor.value) {
+        editor.value = displayContent;
+      }
+      return;
+    }
+
+    const resolutionVersion = ++resolvedDraftDisplayVersion;
+    try {
+      const resolvedContent = await resolveOfflineNoteMediaDraftUrlsInHtml(
+        incomingContent,
+        {
+          reuseDisplayUrlByDraftUrl: displayUrlByDraftUrl,
+        }
+      );
+
+      if (
+        resolutionVersion !== resolvedDraftDisplayVersion ||
+        editor !== joditInstance
+      ) {
+        resolvedContent.revoke();
+        return;
+      }
+
+      revokeAndSyncDraftDisplayMappings(resolvedContent.displayUrlByDraftUrl);
+
+      const displayContent = attachMediaAuthToken(
+        resolvedContent.html,
+        auth.session?.()?.access_token
+      );
+
+      lastContent = stripMediaAuthToken(incomingContent);
+      if (displayContent !== editor.value) {
+        editor.value = displayContent;
+      }
+    } catch (error) {
+      if (
+        resolutionVersion !== resolvedDraftDisplayVersion ||
+        editor !== joditInstance
+      ) {
+        return;
+      }
+
+      console.error("Failed to resolve offline note media drafts:", error);
+      revokeAndSyncDraftDisplayMappings(new Map());
+
+      const fallbackContent = attachMediaAuthToken(
+        incomingContent,
+        auth.session?.()?.access_token
+      );
+
+      lastContent = stripMediaAuthToken(incomingContent);
+      if (fallbackContent !== editor.value) {
+        editor.value = fallbackContent;
+      }
+    }
+  };
 
   const uploadMediaFormData = async (
     requestData: FormData,
     showProgress: (progress: number) => void
   ) => {
-    const accessToken = session()?.access_token;
-    if (!accessToken) {
+    const file = Array.from(requestData.values()).find(
+      (value): value is File => value instanceof File
+    );
+    if (!file) {
+      throw new Error(
+        "Unexpected media upload payload: expected a FormData containing one File."
+      );
+    }
+
+    const db = auth.localDb?.() ?? getDb();
+    const userId = auth.user?.()?.id;
+    if (!db || !userId) {
       throw new Error("You must be signed in to upload note media.");
     }
 
-    showProgress(25);
-    const response = await fetch(buildMediaUploadUrl(), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: requestData,
+    const upload = await uploadNoteMediaFile({
+      db,
+      file,
+      userId,
+      accessToken: auth.session?.()?.access_token,
+      showProgress,
     });
-    const payload = (await response.json()) as {
-      error?: string;
-      data?: {
-        files?: string[];
-      };
-    };
 
-    if (!response.ok) {
-      throw new Error(payload.error || "Media upload failed.");
+    const persistedFiles = upload.data.persistedFiles ?? upload.data.files;
+    for (const [index, fileUrl] of upload.data.files.entries()) {
+      const persistedUrl = persistedFiles[index];
+      if (!fileUrl || !persistedUrl || fileUrl === persistedUrl) {
+        continue;
+      }
+
+      displayUrlByDraftUrl.set(persistedUrl, fileUrl);
+      draftUrlByDisplayUrl.set(fileUrl, persistedUrl);
     }
 
-    showProgress(100);
+    const accessToken = auth.session?.()?.access_token;
+
     return {
-      ...payload,
+      ...upload,
       data: {
-        ...payload.data,
-        files:
-          payload.data?.files?.map((url) =>
-            attachMediaAuthTokenToUrl(url, accessToken)
-          ) || [],
+        ...upload.data,
+        files: upload.data.files.map((url) =>
+          url.startsWith("blob:")
+            ? url
+            : accessToken
+              ? attachMediaAuthTokenToUrl(url, accessToken)
+              : url
+        ),
       },
     };
   };
@@ -248,7 +372,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     }
 
     const extension = mimeType.split("/")[1] || "png";
-    const binaryPayload = encodingFlag ? atob(payload) : decodeURIComponent(payload);
+    const binaryPayload = encodingFlag
+      ? atob(payload)
+      : decodeURIComponent(payload);
     const bytes = Uint8Array.from(binaryPayload, (character) =>
       character.charCodeAt(0)
     );
@@ -263,7 +389,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     template.innerHTML = content;
 
     const images = Array.from(
-      template.content.querySelectorAll<HTMLImageElement>(EMBEDDED_MEDIA_SELECTOR)
+      template.content.querySelectorAll<HTMLImageElement>(
+        EMBEDDED_MEDIA_SELECTOR
+      )
     );
 
     if (images.length === 0) {
@@ -285,7 +413,10 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
 
       const formData = new FormData();
       formData.append("files[0]", file, file.name);
-      const uploadResponse = await uploadMediaFormData(formData, () => undefined);
+      const uploadResponse = await uploadMediaFormData(
+        formData,
+        () => undefined
+      );
       const uploadedUrl = uploadResponse.data?.files?.[0];
       if (uploadedUrl) {
         replacements.set(source, uploadedUrl);
@@ -369,20 +500,20 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
                 return;
               }
 
-              lastContent = stripMediaAuthToken(updatedContent);
+              lastContent = getPersistedEditorContent(updatedContent);
               joditInstance.value = updatedContent;
               props.onContentChange(lastContent);
             })
             .catch((error) => {
               console.error("Failed to replace embedded note media:", error);
-              lastContent = sanitizedContent;
-              props.onContentChange(sanitizedContent);
+              lastContent = getPersistedEditorContent(newContent);
+              props.onContentChange(lastContent);
             });
           return;
         }
 
-        lastContent = sanitizedContent;
-        props.onContentChange(sanitizedContent);
+        lastContent = getPersistedEditorContent(newContent);
+        props.onContentChange(lastContent);
       },
     },
   });
@@ -493,7 +624,8 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
 
       // Set initial content
       lastContent = stripMediaAuthToken(props.content || "");
-      joditInstance.value = getEditorDisplayContent(props.content || "");
+      joditInstance.value = "";
+      void applyResolvedEditorContent(props.content || "");
     }
   };
 
@@ -546,16 +678,12 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   // Update editor content when prop changes (external update)
   createEffect(() => {
     const incomingContent = props.content || "";
-    const displayContent = getEditorDisplayContent(incomingContent);
     const editor = joditInstance;
-    if (!editor) {
+    if (!editor || incomingContent === lastResolvedContentInput) {
       return;
     }
 
-    if (displayContent !== editor.value) {
-      lastContent = stripMediaAuthToken(incomingContent);
-      editor.value = displayContent;
-    }
+    void applyResolvedEditorContent(incomingContent);
   });
 
   createEffect(() => {
@@ -565,6 +693,8 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   });
 
   onCleanup(() => {
+    revokeAndSyncDraftDisplayMappings(new Map());
+
     // Destroy Jodit instance
     if (joditInstance) {
       joditInstance.destruct();

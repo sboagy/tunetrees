@@ -68,6 +68,20 @@ function ensureTuneTreesCompatibilityObjects(rawDb: SqliteRawDatabase): void {
   );
 
   rawDb.run(`
+    CREATE TABLE IF NOT EXISTS media_draft_outbox (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_ref TEXT NOT NULL,
+      blob_url TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  rawDb.run(
+    "CREATE INDEX IF NOT EXISTS idx_media_draft_outbox_user_created ON media_draft_outbox(user_ref, created_at)"
+  );
+
+  rawDb.run(`
     CREATE TABLE IF NOT EXISTS user_genre_selection (
       user_id TEXT NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
       genre_id TEXT NOT NULL REFERENCES genre(id) ON DELETE CASCADE,

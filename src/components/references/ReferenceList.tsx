@@ -83,6 +83,13 @@ function groupReferencesByType(
 
 export const ReferenceList: Component<ReferenceListProps> = (props) => {
   const showActions = () => props.showActions ?? true;
+  const INTERNAL_REFERENCE_DRAG_TYPE = "application/x-tunetrees-reference-id";
+  const hasInternalReferenceDrag = (
+    dataTransfer: DataTransfer | null | undefined
+  ) =>
+    dataTransfer?.types
+      ? Array.from(dataTransfer.types).includes(INTERNAL_REFERENCE_DRAG_TYPE)
+      : false;
   const getReferenceUrlLabel = (reference: Reference) =>
     props.urlLabelByReferenceId?.get(reference.id) || reference.url;
   const getReferencePrimaryLabel = (reference: Reference) =>
@@ -107,6 +114,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
     setDraggedRefId(refId);
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData(INTERNAL_REFERENCE_DRAG_TYPE, refId);
       e.dataTransfer.setData("text/plain", refId);
     }
   };
@@ -117,6 +125,10 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
   };
 
   const handleDragOver = (e: DragEvent, refId: string) => {
+    if (!hasInternalReferenceDrag(e.dataTransfer)) {
+      return;
+    }
+
     e.preventDefault();
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "move";
@@ -131,6 +143,10 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
   };
 
   const handleDrop = (e: DragEvent, targetRefId: string) => {
+    if (!hasInternalReferenceDrag(e.dataTransfer)) {
+      return;
+    }
+
     e.preventDefault();
     const sourceRefId = draggedRefId();
 
