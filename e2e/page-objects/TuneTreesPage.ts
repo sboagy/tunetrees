@@ -2160,6 +2160,23 @@ export class TuneTreesPage {
     await this.setViewMode(tab, "list");
   }
 
+  private async clickOverflowButton(overflowButton: Locator) {
+    await overflowButton
+      .click({ timeout: 2000 })
+      // Kobalte can detach/recreate the trigger while the mobile menu opens.
+      // Fall back to a direct event so CI retries can recover from that churn.
+      .catch(() => overflowButton.dispatchEvent("click"))
+      .catch(() => undefined);
+  }
+
+  /**
+   * Open a mobile overflow menu entry with bounded retries.
+   *
+   * The toolbar can briefly detach/recreate its Kobalte trigger while the menu
+   * is opening on CI Mobile Chrome, so we allow a few reopen attempts before
+   * failing the test. `overflowButton` is the trigger button, and `target` is
+   * the menu entry that should become visible once the menu is open.
+   */
   private async openOverflowMenuEntry(
     overflowButton: Locator,
     target: Locator
@@ -2169,10 +2186,10 @@ export class TuneTreesPage {
       retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
       retryAttempt += 1
     ) {
-      const targetVisible = await target
+      const isTargetVisibleBeforeClick = await target
         .isVisible({ timeout: 300 })
         .catch(() => false);
-      if (targetVisible) {
+      if (isTargetVisibleBeforeClick) {
         return;
       }
 
@@ -2180,15 +2197,12 @@ export class TuneTreesPage {
       await expect(overflowButton).toBeVisible({ timeout: 5000 });
       await expect(overflowButton).toBeEnabled({ timeout: 5000 });
 
-      await overflowButton
-        .click({ timeout: 2000 })
-        .catch(() => overflowButton.dispatchEvent("click"))
-        .catch(() => undefined);
+      await this.clickOverflowButton(overflowButton);
 
-      const visibleAfterClick = await target
+      const isTargetVisibleAfterClick = await target
         .isVisible({ timeout: 1500 })
         .catch(() => false);
-      if (visibleAfterClick) {
+      if (isTargetVisibleAfterClick) {
         return;
       }
 
