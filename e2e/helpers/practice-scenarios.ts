@@ -779,6 +779,242 @@ async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
   );
 }
 
+type DeterministicSetupOptions = {
+  clearRepertoire?: boolean;
+  seedRepertoire?: string[];
+  scheduleTunes?: { tuneIds: string[]; daysAgo: number };
+  /** Optional list of title prefixes to purge (cascade delete) before setup */
+  purgeTitlePrefixes?: string[];
+  /** When true, clears user-created notes and references before syncing */
+  clearNotesAndReferences?: boolean;
+};
+
+const DETERMINISTIC_TABLES = [
+  "daily_practice_queue",
+  "practice_record",
+  "tune_override",
+  "prefs_scheduling_options",
+  "prefs_spaced_repetition",
+  "plugin",
+] as const;
+
+function isAppUrl(url: string): boolean {
+  return !!url && url !== "about:blank" && !url.startsWith("data:");
+}
+
+async function collectTuneIdsForPrefixes(
+  supabase: any,
+  user: TestUser,
+  prefixes: string[]
+): Promise<string[]> {
+  const allTuneIds: string[] = [];
+
+  for (const prefix of prefixes) {
+    const { data, error } = await supabase
+      .from("tune")
+      .select("id,title")
+      .ilike("title", `${prefix}%`);
+
+    if (error) {
+      console.warn(
+        `[${user.name}] Failed to query tunes for purge prefix '${prefix}': ${error.message}`
+      );
+      continue;
+    }
+
+    for (const row of data ?? []) {
+      if (row?.id) {
+        allTuneIds.push(row.id);
+      }
+    }
+  }
+
+  return [...new Set(allTuneIds)];
+}
+
+async function deleteDependentTuneRows(
+  supabase: any,
+  user: TestUser,
+  tuneIds: string[]
+) {
+  const tablesToDelete: {
+    table: string;
+    column: string;
+    extraFilters?: (q: any) => any;
+  }[] = [
+    {
+      table: "table_transient_data",
+      column: "tune_id",
+      extraFilters: (q) =>
+        q.eq("user_id", user.userId).eq("repertoire_id", user.repertoireId),
+    },
+    {
+      table: "daily_practice_queue",
+      column: "tune_ref",
+      extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
+    },
+    {
+      table: "practice_record",
+      column: "tune_ref",
+      extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
+    },
+    {
+      table: "repertoire_tune",
+      column: "tune_ref",
+      extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
+    },
+    { table: "tune_override", column: "tune_ref" },
+  ];
+
+  for (const { table, column, extraFilters } of tablesToDelete) {
+    try {
+      if (table === "practice_record") {
+        const { error } = await supabase.rpc(
+          "e2e_delete_practice_record_by_tunes",
+          {
+            target_repertoire: user.repertoireId,
+            tune_ids: tuneIds,
+          }
+        );
+        if (error) {
+          console.warn(
+            `[${user.name}] Error deleting from ${table}: ${error.message}`
+          );
+        }
+        continue;
+      }
+
+      let del = supabase.from(table).delete().in(column, tuneIds);
+      if (extraFilters) {
+        del = extraFilters(del);
+      }
+
+      const { error } = await del;
+      if (error) {
+        console.warn(
+          `[${user.name}] Error deleting from ${table}: ${error.message}`
+        );
+      }
+    } catch (err: any) {
+      console.warn(
+        `[${user.name}] Exception deleting from ${table}: ${err?.message || err}`
+      );
+    }
+  }
+}
+
+async function purgeTunesByTitlePrefixes(user: TestUser, prefixes: string[]) {
+  try {
+    const userKey = user.email.split(".")[0];
+    const { supabase } = await getTestUserClient(userKey);
+    const tuneIds = await collectTuneIdsForPrefixes(supabase, user, prefixes);
+
+    if (tuneIds.length === 0) {
+      return;
+    }
+
+    log.debug(
+      `[${user.name}] Purging ${tuneIds.length} tune(s) matching prefixes: ${prefixes.join(", ")}`
+    );
+    await deleteDependentTuneRows(supabase, user, tuneIds);
+
+    const { error: tuneDeleteError } = await supabase
+      .from("tune")
+      .delete()
+      .in("id", tuneIds);
+
+    if (tuneDeleteError) {
+      console.warn(
+        `[${user.name}] Error deleting tunes: ${tuneDeleteError.message}`
+      );
+      return;
+    }
+
+    log.debug(`[${user.name}] ✅ Purged test tunes: ${tuneIds.join(", ")}`);
+  } catch (err: any) {
+    console.warn(
+      `[${user.name}] Failed purgeTitlePrefixes pass: ${err?.message || err}`
+    );
+  }
+}
+
+function getDeterministicTablesToVerify(
+  opts: DeterministicSetupOptions
+): string[] {
+  const tables = [...DETERMINISTIC_TABLES];
+
+  if (opts.clearNotesAndReferences) {
+    tables.push("note", "reference");
+  }
+
+  if (opts.clearRepertoire) {
+    tables.push("repertoire_tune");
+  }
+
+  return tables;
+}
+
+async function clearDeterministicUserState(
+  user: TestUser,
+  opts: DeterministicSetupOptions
+) {
+  if (opts.clearRepertoire) {
+    await clearUserTable(user, "repertoire_tune");
+  }
+
+  await clearUserTable(user, "user_genre_selection");
+
+  if (opts.clearNotesAndReferences) {
+    await clearUserTable(user, "note");
+    await clearUserTable(user, "reference");
+  }
+
+  for (const tableName of DETERMINISTIC_TABLES) {
+    await clearUserTable(user, tableName);
+  }
+
+  await clearUserTable(user, "table_transient_data");
+  await verifyTablesEmpty(user, getDeterministicTablesToVerify(opts));
+  await normalizeUserRepertoireRow(user);
+  await resetUserProfileAvatar(user);
+}
+
+async function scheduleDeterministicTunes(
+  user: TestUser,
+  scheduleTunes: DeterministicSetupOptions["scheduleTunes"]
+) {
+  if (!scheduleTunes) {
+    return;
+  }
+
+  const userKey = user.email.split(".")[0];
+  const { supabase } = await getTestUserClient(userKey);
+  const pastDate = new Date();
+  pastDate.setDate(pastDate.getDate() - scheduleTunes.daysAgo);
+  const scheduledDateStr = pastDate.toISOString();
+
+  for (const tuneId of scheduleTunes.tuneIds) {
+    const { error } = await supabase
+      .from("repertoire_tune")
+      .update({ scheduled: scheduledDateStr })
+      .eq("repertoire_ref", user.repertoireId)
+      .eq("tune_ref", tuneId);
+
+    if (error) {
+      throw new Error(`Failed to schedule tune ${tuneId}: ${error.message}`);
+    }
+  }
+}
+
+async function ensureDeterministicSetupPageReady(page: Page, currentUrl: string) {
+  if (isAppUrl(currentUrl)) {
+    return;
+  }
+
+  await page.goto(`${BASE_URL}`);
+  await page.waitForLoadState("domcontentloaded");
+}
+
 /**
  * Parallel-safe version of setupDeterministicTest
  * Sets up a deterministic test state for a specific user
@@ -786,15 +1022,7 @@ async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
 export async function setupDeterministicTestParallel(
   page: Page,
   user: TestUser,
-  opts: {
-    clearRepertoire?: boolean;
-    seedRepertoire?: string[];
-    scheduleTunes?: { tuneIds: string[]; daysAgo: number };
-    /** Optional list of title prefixes to purge (cascade delete) before setup */
-    purgeTitlePrefixes?: string[];
-    /** When true, clears user-created notes and references before syncing */
-    clearNotesAndReferences?: boolean;
-  } = {}
+  opts: DeterministicSetupOptions = {}
 ) {
   log.debug(`🔧 [${user.name}] Setting up deterministic test state...`);
 
@@ -802,205 +1030,30 @@ export async function setupDeterministicTestParallel(
   // If the app is already loaded, temporarily force offline so it can't re-upload rows
   // while we clear/verify deterministic state.
   const currentUrl = page.url();
-  const shouldIsolateSync =
-    !!currentUrl &&
-    currentUrl !== "about:blank" &&
-    !currentUrl.startsWith("data:");
+  const shouldIsolateSync = isAppUrl(currentUrl);
   if (shouldIsolateSync) {
     await page.context().setOffline(true);
   }
 
-  // Optional purge of tunes by title prefix (handles leftover test-created tunes)
-  if (opts.purgeTitlePrefixes && opts.purgeTitlePrefixes.length > 0) {
-    try {
-      const userKey = user.email.split(".")[0];
-      const { supabase } = await getTestUserClient(userKey);
-      const prefixes = opts.purgeTitlePrefixes;
-      const allTuneIds: string[] = [];
-      for (const prefix of prefixes) {
-        // Use ilike with wildcard for prefix matching
-        const { data, error } = await supabase
-          .from("tune")
-          .select("id,title")
-          .ilike("title", `${prefix}%`);
-        if (error) {
-          console.warn(
-            `[${user.name}] Failed to query tunes for purge prefix '${prefix}': ${error.message}`
-          );
-          continue;
-        }
-        if (data) {
-          for (const row of data) {
-            if (row?.id) allTuneIds.push(row.id);
-          }
-        }
-      }
-      const uniqueIds = [...new Set(allTuneIds)];
-      if (uniqueIds.length > 0) {
-        log.debug(
-          `[${user.name}] Purging ${uniqueIds.length} tune(s) matching prefixes: ${prefixes.join(", ")}`
-        );
-        // Cascade delete dependent rows first
-        const tablesToDelete: {
-          table: string;
-          column: string;
-          extraFilters?: (q: any) => any;
-        }[] = [
-          {
-            table: "table_transient_data",
-            column: "tune_id",
-            extraFilters: (q) =>
-              q
-                .eq("user_id", user.userId)
-                .eq("repertoire_id", user.repertoireId),
-          },
-          {
-            table: "daily_practice_queue",
-            column: "tune_ref",
-            extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
-          },
-          {
-            table: "practice_record",
-            column: "tune_ref",
-            extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
-          },
-          {
-            table: "repertoire_tune",
-            column: "tune_ref",
-            extraFilters: (q) => q.eq("repertoire_ref", user.repertoireId),
-          },
-          { table: "tune_override", column: "tune_ref" },
-        ];
-        for (const { table, column, extraFilters } of tablesToDelete) {
-          try {
-            if (table === "practice_record") {
-              const { error } = await supabase.rpc(
-                "e2e_delete_practice_record_by_tunes",
-                {
-                  target_repertoire: user.repertoireId,
-                  tune_ids: uniqueIds,
-                }
-              );
-              if (error) {
-                console.warn(
-                  `[${user.name}] Error deleting from ${table}: ${error.message}`
-                );
-              }
-              continue;
-            }
-            let del = supabase.from(table).delete().in(column, uniqueIds);
-            if (extraFilters) del = extraFilters(del);
-            const { error } = await del;
-            if (error) {
-              console.warn(
-                `[${user.name}] Error deleting from ${table}: ${error.message}`
-              );
-            }
-          } catch (err: any) {
-            console.warn(
-              `[${user.name}] Exception deleting from ${table}: ${err?.message || err}`
-            );
-          }
-        }
-        // Finally delete the tunes themselves
-        const { error: tuneDeleteError } = await supabase
-          .from("tune")
-          .delete()
-          .in("id", uniqueIds);
-        if (tuneDeleteError) {
-          console.warn(
-            `[${user.name}] Error deleting tunes: ${tuneDeleteError.message}`
-          );
-        } else {
-          log.debug(
-            `[${user.name}] ✅ Purged test tunes: ${uniqueIds.join(", ")}`
-          );
-        }
-      }
-    } catch (err: any) {
-      console.warn(
-        `[${user.name}] Failed purgeTitlePrefixes pass: ${err?.message || err}`
-      );
+  try {
+    if (opts.purgeTitlePrefixes && opts.purgeTitlePrefixes.length > 0) {
+      await purgeTunesByTitlePrefixes(user, opts.purgeTitlePrefixes);
+    }
+
+    await clearDeterministicUserState(user, opts);
+
+    if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
+      await seedUserRepertoire(user, opts.seedRepertoire);
+    }
+
+    await scheduleDeterministicTunes(user, opts.scheduleTunes);
+    await ensureDeterministicSetupPageReady(page, currentUrl);
+  } finally {
+    if (shouldIsolateSync) {
+      await page.context().setOffline(false);
     }
   }
 
-  let whichTables = [
-    "daily_practice_queue",
-    "practice_record",
-    "tune_override",
-    "prefs_scheduling_options",
-    "prefs_spaced_repetition",
-    "plugin",
-  ];
-
-  if (opts.clearNotesAndReferences) {
-    whichTables = [...whichTables, "note", "reference"];
-  }
-
-  // Step 1: Clear user's state
-  if (opts.clearRepertoire) {
-    // Clear user's repertoire via generic table helper and verify
-    await clearUserTable(user, "repertoire_tune");
-    whichTables = [...whichTables, "repertoire_tune"];
-  }
-  await clearUserTable(user, "user_genre_selection");
-  if (opts.clearNotesAndReferences) {
-    await clearUserTable(user, "note");
-    await clearUserTable(user, "reference");
-  }
-  await clearUserTable(user, "daily_practice_queue");
-  await clearUserTable(user, "practice_record");
-  await clearUserTable(user, "tune_override");
-  await clearUserTable(user, "prefs_scheduling_options");
-  await clearUserTable(user, "prefs_spaced_repetition");
-  await clearUserTable(user, "table_transient_data");
-  await clearUserTable(user, "plugin");
-
-  await verifyTablesEmpty(user, whichTables);
-  await normalizeUserRepertoireRow(user);
-  await resetUserProfileAvatar(user);
-
-  // Step 2: Seed user's repertoire if specified
-  if (opts.seedRepertoire && opts.seedRepertoire.length > 0) {
-    await seedUserRepertoire(user, opts.seedRepertoire);
-  }
-
-  // Step 3: Schedule tunes if specified
-  if (opts.scheduleTunes) {
-    const userKey = user.email.split(".")[0]; // alice.test@... → alice
-    const { supabase } = await getTestUserClient(userKey);
-
-    const daysAgo = opts.scheduleTunes.daysAgo;
-    const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - daysAgo);
-    const scheduledDateStr = pastDate.toISOString();
-
-    for (const tuneId of opts.scheduleTunes.tuneIds) {
-      const { error } = await supabase
-        .from("repertoire_tune")
-        .update({ scheduled: scheduledDateStr })
-        .eq("repertoire_ref", user.repertoireId)
-        .eq("tune_ref", tuneId);
-
-      if (error) {
-        throw new Error(`Failed to schedule tune ${tuneId}: ${error.message}`);
-      }
-    }
-  }
-
-  // Step 4: Clear local cache
-  if (
-    !currentUrl ||
-    currentUrl === "about:blank" ||
-    currentUrl.startsWith("data:")
-  ) {
-    await page.goto(`${BASE_URL}`);
-    await page.waitForLoadState("domcontentloaded");
-  }
-
-  if (shouldIsolateSync) {
-    await page.context().setOffline(false);
-  }
   await resetLocalDbAndResync(page);
 
   log.debug(`✅ [${user.name}] Deterministic test state ready`);
