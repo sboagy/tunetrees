@@ -19,17 +19,13 @@ export function matchesHostname(
   expectedHostname: string
 ): boolean {
   const hostname =
-    typeof urlOrHostname === "string"
-      ? urlOrHostname
-      : urlOrHostname.hostname;
+    typeof urlOrHostname === "string" ? urlOrHostname : urlOrHostname.hostname;
 
   // Some fully-qualified hostnames may legally include a trailing dot.
   const normalizedHostname = hostname.toLowerCase().replace(/\.+$/, "");
   const normalizedExpected = expectedHostname.toLowerCase();
   const exactMatch = normalizedHostname === normalizedExpected;
-  const subdomainMatch = normalizedHostname.endsWith(
-    `.${normalizedExpected}`
-  );
+  const subdomainMatch = normalizedHostname.endsWith(`.${normalizedExpected}`);
 
   return exactMatch || subdomainMatch;
 }

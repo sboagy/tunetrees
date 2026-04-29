@@ -499,7 +499,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
 
     const nextSelectedRegionId = isCurrentlySelected
       ? currentSelectedRegionId === regionId
-        ? nextIds.at(-1) ?? null
+        ? (nextIds.at(-1) ?? null)
         : currentSelectedRegionId
       : regionId;
 

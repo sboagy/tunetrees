@@ -69,7 +69,9 @@ export const RepertoireEditor: Component<RepertoireEditorProps> = (props) => {
   // Dev-only: warn if component mounts more than once per open
   onMount(() => {
     if (DEV && mounted) {
-      console.warn("[RepertoireEditor] Mounted more than once for a single open");
+      console.warn(
+        "[RepertoireEditor] Mounted more than once for a single open"
+      );
     }
     mounted = true;
   });

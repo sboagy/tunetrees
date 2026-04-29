@@ -60,7 +60,10 @@ const applyAuthTokenToMediaHtml = (
 export const buildMediaUploadUrl = (workerUrl = DEFAULT_WORKER_URL) =>
   new URL("/api/media/upload", workerUrl).toString();
 
-export const buildMediaViewUrl = (key: string, workerUrl = DEFAULT_WORKER_URL) => {
+export const buildMediaViewUrl = (
+  key: string,
+  workerUrl = DEFAULT_WORKER_URL
+) => {
   const url = new URL(MEDIA_VIEW_PATH, workerUrl);
   url.searchParams.set("key", key);
   return url.toString();

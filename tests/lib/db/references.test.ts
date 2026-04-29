@@ -107,7 +107,9 @@ describe("detectReferenceType", () => {
       detectReferenceType("https://thesession.org.evil.example/tunes/123")
     ).toBe("website");
     expect(
-      detectReferenceType("https://example.com/watch?v=123&redirect=youtube.com")
+      detectReferenceType(
+        "https://example.com/watch?v=123&redirect=youtube.com"
+      )
     ).toBe("website");
     expect(
       detectReferenceType("https://example.com/file?download=song.mp3")

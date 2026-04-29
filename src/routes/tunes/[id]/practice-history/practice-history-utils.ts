@@ -15,28 +15,29 @@ export interface PracticeHistorySummary {
   averageInterval: number;
 }
 
-const QUALITY_DISPLAY_BY_VALUE: Record<number, PracticeHistoryQualityDisplay> = {
-  [FSRS_QUALITY_MAP.AGAIN]: {
-    label: "Again",
-    colorClass: "text-red-600 dark:text-red-400",
-    chartColor: "hsla(0, 84%, 60%, 0.85)",
-  },
-  [FSRS_QUALITY_MAP.HARD]: {
-    label: "Hard",
-    colorClass: "text-orange-600 dark:text-orange-400",
-    chartColor: "hsla(25, 95%, 53%, 0.85)",
-  },
-  [FSRS_QUALITY_MAP.GOOD]: {
-    label: "Good",
-    colorClass: "text-green-600 dark:text-green-400",
-    chartColor: "hsla(142, 71%, 45%, 0.85)",
-  },
-  [FSRS_QUALITY_MAP.EASY]: {
-    label: "Easy",
-    colorClass: "text-blue-600 dark:text-blue-400",
-    chartColor: "hsla(221, 83%, 53%, 0.85)",
-  },
-};
+const QUALITY_DISPLAY_BY_VALUE: Record<number, PracticeHistoryQualityDisplay> =
+  {
+    [FSRS_QUALITY_MAP.AGAIN]: {
+      label: "Again",
+      colorClass: "text-red-600 dark:text-red-400",
+      chartColor: "hsla(0, 84%, 60%, 0.85)",
+    },
+    [FSRS_QUALITY_MAP.HARD]: {
+      label: "Hard",
+      colorClass: "text-orange-600 dark:text-orange-400",
+      chartColor: "hsla(25, 95%, 53%, 0.85)",
+    },
+    [FSRS_QUALITY_MAP.GOOD]: {
+      label: "Good",
+      colorClass: "text-green-600 dark:text-green-400",
+      chartColor: "hsla(142, 71%, 45%, 0.85)",
+    },
+    [FSRS_QUALITY_MAP.EASY]: {
+      label: "Easy",
+      colorClass: "text-blue-600 dark:text-blue-400",
+      chartColor: "hsla(221, 83%, 53%, 0.85)",
+    },
+  };
 
 const STATE_LABELS: Record<number, string> = {
   0: "New",
@@ -190,7 +191,8 @@ export function buildPracticeHistoryQualityChart(
         label: "FSRS rating",
         data: orderedRecords.map((record) => record.quality ?? 0),
         backgroundColor: orderedRecords.map(
-          (record) => getPracticeHistoryQualityDisplay(record.quality).chartColor
+          (record) =>
+            getPracticeHistoryQualityDisplay(record.quality).chartColor
         ),
         borderRadius: 4,
       },

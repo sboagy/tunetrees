@@ -148,7 +148,10 @@ export const NotesPanel: Component = () => {
   };
   const canReorderNotes = () => {
     const userId = currentUserId();
-    return userId !== null && (notes() ?? []).every((note) => note.userRef === userId);
+    return (
+      userId !== null &&
+      (notes() ?? []).every((note) => note.userRef === userId)
+    );
   };
   const getVisibilityLabel = (note: {
     public: number | null;
