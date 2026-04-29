@@ -201,6 +201,55 @@ beforeEach(async () => {
   `);
 
   db.run(`
+    CREATE TABLE user_group (
+      id TEXT PRIMARY KEY NOT NULL,
+      owner_user_ref TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      deleted INTEGER,
+      created_at TEXT,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE group_member (
+      id TEXT PRIMARY KEY NOT NULL,
+      group_ref TEXT NOT NULL,
+      user_ref TEXT NOT NULL,
+      role TEXT,
+      deleted INTEGER,
+      joined_at TEXT,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE tune_set (
+      id TEXT PRIMARY KEY NOT NULL,
+      owner_user_ref TEXT,
+      group_ref TEXT,
+      name TEXT,
+      description TEXT,
+      set_kind TEXT,
+      deleted INTEGER,
+      created_at TEXT,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE tune_set_item (
+      id TEXT PRIMARY KEY NOT NULL,
+      tune_set_ref TEXT NOT NULL,
+      tune_ref TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      deleted INTEGER,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
     CREATE TABLE prefs_scheduling_options (
       user_id TEXT PRIMARY KEY NOT NULL,
       settings TEXT,
