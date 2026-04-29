@@ -37,6 +37,59 @@ export interface SelectSettingDialogProps {
   onSettingSelect: (settingIndex: number) => void;
 }
 
+function extractSettingPreviewMeasures(
+  tuneParsed: ReturnType<typeof abcjs.parseOnly>,
+  abc: string
+): string | null {
+  const firstTune = tuneParsed[0];
+  if (!firstTune) {
+    return null;
+  }
+
+  let abcSnippet = "";
+  let barCount = 0;
+
+  for (const line of firstTune.lines) {
+    if (!line.staff) continue;
+
+    for (const element of line.staff) {
+      for (const subElement of element.voices?.flat() || []) {
+        if (subElement.el_type === "bar") {
+          barCount++;
+        }
+        if (barCount >= 2) break;
+
+        if (
+          (subElement.el_type === "note" || subElement.el_type === "bar") &&
+          "startChar" in subElement &&
+          "endChar" in subElement
+        ) {
+          abcSnippet += abc.slice(subElement.startChar, subElement.endChar);
+        }
+      }
+
+      if (barCount >= 2) break;
+    }
+
+    if (barCount >= 2) break;
+  }
+
+  return abcSnippet ? `${abcSnippet}|` : null;
+}
+
+/**
+ * Build a short ABC preview containing the first two measures of a setting.
+ *
+ * Returns null when no ABC notation is available or the notation cannot be
+ * parsed into a tune preview.
+ */
+export function buildSettingPreviewAbc(abc: string): string | null {
+  if (!abc) return null;
+
+  const tuneParsed = abcjs.parseOnly(abc);
+  return extractSettingPreviewMeasures(tuneParsed, abc);
+}
+
 /**
  * Renders a single setting option with ABC notation preview
  */
@@ -49,57 +102,23 @@ const SettingOption: Component<{
   let abcContainer: HTMLDivElement | undefined;
 
   createEffect(() => {
-    if (abcContainer && props.setting.abc) {
-      try {
-        // Parse ABC to extract first 2 bars for preview
-        const tuneParsed = abcjs.parseOnly(props.setting.abc);
-        if (tuneParsed.length > 0) {
-          const firstTune = tuneParsed[0];
-          let abcSnippet = "";
-          let barCount = 0;
+    if (!abcContainer || !props.setting.abc) return;
 
-          for (const line of firstTune.lines) {
-            if (!line.staff) continue;
-            for (const element of line.staff) {
-              for (const subElement of element.voices?.flat() || []) {
-                if (subElement.el_type === "bar") {
-                  barCount++;
-                }
-                if (barCount > 2) break;
+    try {
+      const abcPreview = buildSettingPreviewAbc(props.setting.abc);
+      if (!abcPreview) return;
 
-                if (
-                  (subElement.el_type === "note" ||
-                    subElement.el_type === "bar") &&
-                  "startChar" in subElement &&
-                  "endChar" in subElement
-                ) {
-                  abcSnippet += props.setting.abc.slice(
-                    subElement.startChar,
-                    subElement.endChar
-                  );
-                }
-              }
-              if (barCount > 2) break;
-            }
-            if (barCount > 2) break;
-          }
-
-          // Render the snippet
-          abcjs.renderAbc(abcContainer, `${abcSnippet}|`, {
-            scale: 0.75,
-            paddingleft: 0,
-            paddingright: 0,
-            paddingtop: 0,
-            paddingbottom: 0,
-            responsive: "resize",
-          });
-        }
-      } catch (error) {
-        console.error("Error rendering ABC notation:", error);
-        if (abcContainer) {
-          abcContainer.textContent = "Error rendering notation";
-        }
-      }
+      abcjs.renderAbc(abcContainer, abcPreview, {
+        scale: 0.75,
+        paddingleft: 0,
+        paddingright: 0,
+        paddingtop: 0,
+        paddingbottom: 0,
+        responsive: "resize",
+      });
+    } catch (error) {
+      console.error("Error rendering ABC notation:", error);
+      abcContainer.textContent = "Error rendering notation";
     }
   });
 

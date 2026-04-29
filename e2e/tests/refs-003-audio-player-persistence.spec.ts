@@ -14,9 +14,18 @@ let ttPage: TuneTreesPage;
 
 async function readPersistedAudioState(page: Page, referenceId: string) {
   return page.evaluate(async (id) => {
-    const { getDb } = await import("/src/lib/db/client-sqlite.ts");
+    const clientSqliteUrl = new URL(
+      "/src/lib/db/client-sqlite.ts",
+      window.location.origin
+    ).toString();
+    const mediaAssetsUrl = new URL(
+      "/src/lib/db/queries/media-assets.ts",
+      window.location.origin
+    ).toString();
+
+    const { getDb } = await import(clientSqliteUrl);
     const { getMediaAssetByReferenceId } = await import(
-      "/src/lib/db/queries/media-assets.ts"
+      mediaAssetsUrl
     );
 
     const db = getDb();
@@ -123,21 +132,17 @@ test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
     await expect(ttPage.audioPlayerOverlay).toBeVisible({ timeout: 10000 });
     await expect(ttPage.audioPlayerTitle).toContainText("tt-e2e-audio-persist");
 
+    // Ensure WaveSurfer and regions plugin are fully ready before annotation clicks.
+    await expect(ttPage.audioPlayerPlayToggle).toBeEnabled({ timeout: 10000 });
+
     await ttPage.audioPlayerAddRegionButton.click();
+    await expect(ttPage.audioPlayerRegionList).toContainText("Loop 1");
     await ttPage.audioPlayerAddBeatButton.click();
-    await page
-      .locator('[data-testid^="audio-player-region-"]')
-      .first()
-      .waitFor({
-        state: "visible",
-        timeout: 5000,
-      });
+    await expect(ttPage.audioPlayerRegionList).toContainText("Beat 1");
 
     await ttPage.audioPlayerTempoSlider.fill("1.25");
     await ttPage.audioPlayerZoomSlider.fill("80");
 
-    await expect(ttPage.audioPlayerRegionList).toContainText("Loop 1");
-    await expect(ttPage.audioPlayerRegionList).toContainText("Beat 1");
     await expect(ttPage.audioPlayerZoomValue).toHaveText("80 px/s");
     await expect(ttPage.audioPlayerTempoSlider).toHaveValue("1.25");
 
