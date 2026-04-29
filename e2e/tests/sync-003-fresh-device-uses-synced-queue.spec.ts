@@ -191,6 +191,21 @@ test.describe("SYNC-003: Fresh device picks up synced queue window from Supabase
     const expectedDatePortion = dateOnly(windowStartIso); // "2025-07-19"
     const todayDatePortion = dateOnly(currentDate.toISOString()); // "2025-07-20"
 
+    await expect
+      .poll(
+        async () => {
+          queueInfo = await getQueueInfo(page, testUser.repertoireId);
+          return dateOnly(queueInfo.windowStartUtc || "");
+        },
+        {
+          timeout: 45_000,
+          intervals: [500, 1000, 2000],
+          message:
+            "expected local queue window to converge to the synced Supabase window after fresh-device resync",
+        }
+      )
+      .toBe(expectedDatePortion);
+
     expect(
       dateOnly(queueInfo.windowStartUtc),
       `After fresh-device resync the app resolved to "${dateOnly(queueInfo.windowStartUtc)}" ` +
