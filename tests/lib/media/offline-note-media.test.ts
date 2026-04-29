@@ -4,8 +4,8 @@ import * as mediaDraftOutbox from "../../../src/lib/db/queries/media-draft-outbo
 import * as mediaVault from "../../../src/lib/media/media-vault";
 import {
   buildOfflineNoteMediaDraftUrl,
-  processPendingNoteMediaDrafts,
   persistOfflineNoteMediaDraftUrlsInHtml,
+  processPendingNoteMediaDrafts,
   resolveOfflineNoteMediaDraftUrlsInHtml,
 } from "../../../src/lib/media/offline-note-media";
 

@@ -4,5 +4,5 @@
  * @module components/repertoire
  */
 
-export { RepertoireToolbar } from "./RepertoireToolbar";
 export { RepertoireEmptyState } from "./EmptyState";
+export { RepertoireToolbar } from "./RepertoireToolbar";

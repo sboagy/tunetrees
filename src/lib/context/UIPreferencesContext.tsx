@@ -11,8 +11,8 @@ import {
   createContext,
   createSignal,
   onMount,
-  useContext,
   type ParentComponent,
+  useContext,
 } from "solid-js";
 
 export type SidebarFontSize = "small" | "medium" | "large";
