@@ -17,7 +17,9 @@
       "@oosync/*": ["../node_modules/oosync/src/*"],
       "@oosync-worker/*": ["../node_modules/oosync/worker/src/*"],
       "@shared-generated/*": ["../shared/generated/*"],
-      "@sync-schema/*": ["../shared/sync-schema/*"]
+      "@sync-schema/*": ["../shared/sync-schema/*"],
+      "drizzle-orm": ["../node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["../node_modules/drizzle-orm/*"]
     }
   },
   "include": [

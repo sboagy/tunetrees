@@ -48,6 +48,7 @@
     "css.lint.unknownAtRules": "ignore",
     // Formatting configuration
     "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file",
     "editor.defaultFormatter": "biomejs.biome",
     "[typescript]": {
         "editor.defaultFormatter": "biomejs.biome",
