@@ -1993,6 +1993,56 @@ export class TuneTreesPage {
       .first();
   }
 
+  private async getDisplayModeSwitchChecked(
+    displayModeSwitch: Locator
+  ): Promise<boolean | null> {
+    const ariaChecked = await displayModeSwitch
+      .getAttribute("aria-checked")
+      .catch(() => null);
+    if (ariaChecked === "true") {
+      return true;
+    }
+    if (ariaChecked === "false") {
+      return false;
+    }
+
+    const dataChecked = await displayModeSwitch
+      .getAttribute("data-checked")
+      .catch(() => null);
+    if (dataChecked !== null) {
+      return true;
+    }
+
+    const inputChecked = await displayModeSwitch
+      .locator('input[type="checkbox"], input[type="hidden"]')
+      .first()
+      .evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          return null;
+        }
+
+        return element.checked;
+      })
+      .catch(() => null);
+    if (typeof inputChecked === "boolean") {
+      return inputChecked;
+    }
+
+    return null;
+  }
+
+  private async doesDisplayModeSwitchMatchMode(
+    displayModeSwitch: Locator,
+    mode: "grid" | "list"
+  ): Promise<boolean | null> {
+    const checked = await this.getDisplayModeSwitchChecked(displayModeSwitch);
+    if (checked === null) {
+      return null;
+    }
+
+    return checked === (mode === "list");
+  }
+
   private async closeColumnVisibilityMenu(menu: Locator) {
     if (this.page.isClosed()) {
       return;
@@ -2086,6 +2136,10 @@ export class TuneTreesPage {
     tab: "catalog" | "repertoire" | "practice",
     mode: "grid" | "list"
   ) {
+    const throwPageClosedError = () => {
+      throw new Error(`Page closed while setting ${tab} view mode to ${mode}`);
+    };
+
     const columnsButton = this.getColumnsButtonForTab(tab);
     const grid = this.getGridForTab(tab);
     const currentMode = await this.waitForRenderedViewMode(tab);
@@ -2105,12 +2159,43 @@ export class TuneTreesPage {
     await this.openColumnVisibilityMenu(columnsButton);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (this.page.isClosed()) {
+        throwPageClosedError();
+      }
+
       const displayModeSwitch = this.getDisplayModeSwitch();
-      await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
+      const switchVisible = await displayModeSwitch
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+      if (!switchVisible) {
+        const reopenedMenu = this.getColumnVisibilityMenu();
+        const reopenedMenuVisible = await reopenedMenu
+          .isVisible({ timeout: 250 })
+          .catch(() => false);
+        if (!reopenedMenuVisible) {
+          await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
+        }
+        await this.page.waitForTimeout(150);
+        continue;
+      }
+
+      await displayModeSwitch.scrollIntoViewIfNeeded().catch(() => undefined);
+
+      const switchMatchesRequestedModeBeforeClick =
+        await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode);
+      if (switchMatchesRequestedModeBeforeClick === true) {
+        break;
+      }
 
       try {
         await displayModeSwitch.click({ timeout: 5000 });
       } catch {
+        const switchMatchesRequestedModeAfterFailedClick =
+          await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode);
+        if (switchMatchesRequestedModeAfterFailedClick === true) {
+          break;
+        }
+
         if (attempt === 2) {
           await displayModeSwitch.click({ timeout: 5000 });
         }
@@ -2132,12 +2217,20 @@ export class TuneTreesPage {
       await this.page.waitForTimeout(150);
     }
 
+    if (this.page.isClosed()) {
+      throwPageClosedError();
+    }
+
     await expect
       .poll(() => this.getRenderedViewMode(tab), {
         timeout: 5000,
         intervals: [100, 250, 500],
       })
       .toBe(mode);
+
+    if (this.page.isClosed()) {
+      throwPageClosedError();
+    }
 
     await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
 
