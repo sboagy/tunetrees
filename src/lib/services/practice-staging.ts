@@ -247,5 +247,7 @@ export async function clearAllStagedForRepertoire(
     WHERE repertoire_id = ${repertoireId}
   `);
 
-  console.log(`🗑️  Cleared all staged evaluations for repertoire ${repertoireId}`);
+  console.log(
+    `🗑️  Cleared all staged evaluations for repertoire ${repertoireId}`
+  );
 }

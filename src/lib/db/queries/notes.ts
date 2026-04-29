@@ -47,7 +47,10 @@ export async function getNotesByRepertoire(
     .select()
     .from(schema.note)
     .where(
-      and(eq(schema.note.repertoireRef, repertoireId), eq(schema.note.deleted, 0))
+      and(
+        eq(schema.note.repertoireRef, repertoireId),
+        eq(schema.note.deleted, 0)
+      )
     )
     .orderBy(asc(schema.note.displayOrder), desc(schema.note.createdDate))
     .all();

@@ -11,8 +11,10 @@ import {
   type IStackedListRow,
   TuneStackedList,
 } from "../../../src/components/grids/TuneStackedList";
-import type { ICellEditorCallbacks } from "../../../src/components/grids/types";
-import type { TablePurpose } from "../../../src/components/grids/types";
+import type {
+  ICellEditorCallbacks,
+  TablePurpose,
+} from "../../../src/components/grids/types";
 
 vi.mock("../../../src/components/grids/GoalBadge", () => ({
   GoalBadge: (props: {

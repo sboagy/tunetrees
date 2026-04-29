@@ -107,11 +107,11 @@ describe("practice-history utils", () => {
   });
 
   it("maps FSRS quality and state labels for display", () => {
-    expect(getPracticeHistoryQualityDisplay(FSRS_QUALITY_MAP.GOOD)).toMatchObject(
-      {
-        label: "Good",
-      }
-    );
+    expect(
+      getPracticeHistoryQualityDisplay(FSRS_QUALITY_MAP.GOOD)
+    ).toMatchObject({
+      label: "Good",
+    });
     expect(getPracticeHistoryStateLabel(3)).toBe("Relearning");
   });
 });

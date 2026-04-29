@@ -48,9 +48,7 @@ async function listUpcomingAudioReferenceUrls(
     ORDER BY scheduled_at ASC
   `);
 
-  return results
-    .map((row) => row.url)
-    .filter((url) => typeof url === "string");
+  return results.map((row) => row.url).filter((url) => typeof url === "string");
 }
 
 export async function syncPinnedAudioVault({

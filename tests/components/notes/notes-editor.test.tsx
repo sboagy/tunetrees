@@ -607,12 +607,12 @@ describe("NotesEditor", () => {
     const offlineUploadSpy = vi.spyOn(offlineNoteMedia, "uploadNoteMediaFile");
     offlineUploadSpy.mockReset();
     offlineUploadSpy.mockResolvedValue({
-        success: true,
-        data: {
-          files: ["blob:offline-pasted-note-image"],
-          persistedFiles: ["tunetrees-note-media-draft://draft-2"],
-        },
-      });
+      success: true,
+      data: {
+        files: ["blob:offline-pasted-note-image"],
+        persistedFiles: ["tunetrees-note-media-draft://draft-2"],
+      },
+    });
 
     const handleContentChange = vi.fn();
     render(() => (
@@ -687,10 +687,7 @@ describe("NotesEditor", () => {
     ).mockResolvedValue({
       html: '<p><img src="blob:rehydrated-note-image"></p>',
       displayUrlByDraftUrl: new Map([
-        [
-          "tunetrees-note-media-draft://draft-1",
-          "blob:rehydrated-note-image",
-        ],
+        ["tunetrees-note-media-draft://draft-1", "blob:rehydrated-note-image"],
       ]),
       revoke: vi.fn(),
     });

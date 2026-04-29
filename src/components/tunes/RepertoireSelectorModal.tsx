@@ -40,9 +40,9 @@ interface RepertoireSelectorModalProps {
   onCancel: () => void;
 }
 
-export const RepertoireSelectorModal: Component<RepertoireSelectorModalProps> = (
-  props
-) => {
+export const RepertoireSelectorModal: Component<
+  RepertoireSelectorModalProps
+> = (props) => {
   const { localDb, user } = useAuth();
   const [selectedRepertoireId, setSelectedRepertoireId] = createSignal<
     string | null
