@@ -1,12 +1,9 @@
-const {
-  generatedFetchMock,
-  getCorsHeadersMock,
-  handleMediaRequestMock,
-} = vi.hoisted(() => ({
-  generatedFetchMock: vi.fn(),
-  getCorsHeadersMock: vi.fn(),
-  handleMediaRequestMock: vi.fn(),
-}));
+const { generatedFetchMock, getCorsHeadersMock, handleMediaRequestMock } =
+  vi.hoisted(() => ({
+    generatedFetchMock: vi.fn(),
+    getCorsHeadersMock: vi.fn(),
+    handleMediaRequestMock: vi.fn(),
+  }));
 
 vi.mock("../../worker/src/index", () => ({
   default: {
@@ -31,7 +28,9 @@ describe("worker handler", () => {
   });
 
   it("forwards ExecutionContext when delegating to the generated worker", async () => {
-    const request = new Request("https://worker.example.com/api/sync");
+    const request = new Request(
+      "https://worker.example.com/api/sync"
+    ) as unknown as Request<unknown, IncomingRequestCfProperties<unknown>>;
     const env = {} as MediaWorkerEnv;
     const ctx = {
       waitUntil: vi.fn(),
@@ -42,9 +41,9 @@ describe("worker handler", () => {
     handleMediaRequestMock.mockResolvedValue(null);
     generatedFetchMock.mockResolvedValue(delegatedResponse);
 
-    const response = await worker.fetch(request, env, ctx);
+    const response = await worker.fetch!(request, env, ctx);
 
     expect(response).toBe(delegatedResponse);
-    expect(generatedFetchMock).toHaveBeenCalledWith(request, env, ctx);
+    expect(generatedFetchMock).toHaveBeenCalledWith(request, env);
   });
 });

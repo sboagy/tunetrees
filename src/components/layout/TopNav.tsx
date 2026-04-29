@@ -120,10 +120,7 @@ const appendTopNavSnapshotError = (
   );
 };
 
-const captureTopNavJsHeap = (
-  snapshot: TopNavDbSnapshot,
-  errors: string[]
-) => {
+const captureTopNavJsHeap = (snapshot: TopNavDbSnapshot, errors: string[]) => {
   try {
     const perfMemory = (performance as PerformanceWithMemory).memory;
     if (!perfMemory) return;
@@ -215,7 +212,9 @@ const captureTopNavSqliteSnapshot = async (
     const sqliteDb = await getSqliteInstance();
     snapshot.hasSqliteInstance = !!sqliteDb;
     if (!sqliteDb) {
-      errors.push("sqliteInstance: null (db not initialized yet or init failed)");
+      errors.push(
+        "sqliteInstance: null (db not initialized yet or init failed)"
+      );
       return;
     }
 

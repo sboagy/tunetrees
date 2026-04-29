@@ -652,10 +652,17 @@ const TTInner: ParentComponent = (props) => {
       realtimeEnabled:
         !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
       syncIntervalMs: isAnonymousUser ? 30000 : 5000,
-      notifyError: (message, options) => toast.error(message, options),
+      notifyError: (message: string, _options?: { duration?: number }) => {
+        toast.error(message);
+      },
       pullOnly: isAnonymousUser,
       requestOverridesProvider,
-      onSyncComplete: async (result) => {
+      onSyncComplete: async (result: {
+        success?: boolean;
+        errors?: unknown[];
+        timestamp?: string;
+        affectedTables?: string[];
+      }) => {
         const isFirstSyncCompletion = !firstSyncCompletionHandled;
         if (isFirstSyncCompletion) firstSyncCompletionHandled = true;
 

@@ -117,6 +117,7 @@ export const NotesPanel: Component = () => {
   const { currentTuneId } = useCurrentTune();
   const { session, user } = useAuth();
   const { sidebarFontSize } = useUIPreferences();
+  const currentUserId = () => user()?.id ?? null;
 
   // Get dynamic font classes
   const fontClasses = () => getSidebarFontClasses(sidebarFontSize());
@@ -140,6 +141,22 @@ export const NotesPanel: Component = () => {
     const db = getDb();
     return await getNotesByTune(db, tuneId);
   });
+  const canManageNote = (note: { userRef: string | null }) => {
+    // Do not treat matching nulls as ownership while auth/user state is still loading.
+    const userId = currentUserId();
+    return userId !== null && note.userRef === userId;
+  };
+  const canReorderNotes = () => {
+    const userId = currentUserId();
+    return (
+      userId !== null &&
+      (notes() ?? []).every((note) => note.userRef === userId)
+    );
+  };
+  const getVisibilityLabel = (note: {
+    public: number | null;
+    userRef: string | null;
+  }) => (note.public === 1 ? "Public" : note.userRef ? "Shared" : "System");
 
   // Format date for display
   const formatDate = (isoString: string | null) => {
@@ -286,6 +303,12 @@ export const NotesPanel: Component = () => {
 
   const handleDrop = async (e: DragEvent, targetNoteId: string) => {
     e.preventDefault();
+    if (!canReorderNotes()) {
+      setDraggedNoteId(null);
+      setDragOverNoteId(null);
+      return;
+    }
+
     const sourceNoteId = draggedNoteId();
 
     if (!sourceNoteId || sourceNoteId === targetNoteId) {
@@ -459,57 +482,69 @@ export const NotesPanel: Component = () => {
                 <div class="flex items-center justify-between mb-1.5">
                   <div class="flex items-center gap-1">
                     {/* Drag handle */}
-                    <button
-                      type="button"
-                      draggable={true}
-                      onDragStart={(e) =>
-                        handleDragStart(e as unknown as DragEvent, note.id)
-                      }
-                      onDragEnd={handleDragEnd}
-                      class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      title="Drag to reorder"
-                      aria-label="Drag to reorder note"
-                      data-testid={`note-drag-handle-${note.id}`}
-                    >
-                      <GripVertical class={fontClasses().iconSmall} />
-                    </button>
+                    <Show when={canReorderNotes()}>
+                      <button
+                        type="button"
+                        draggable={true}
+                        onDragStart={(e) =>
+                          handleDragStart(e as unknown as DragEvent, note.id)
+                        }
+                        onDragEnd={handleDragEnd}
+                        class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        title="Drag to reorder"
+                        aria-label="Drag to reorder note"
+                        data-testid={`note-drag-handle-${note.id}`}
+                      >
+                        <GripVertical class={fontClasses().iconSmall} />
+                      </button>
+                    </Show>
                     <span
                       class={`${fontClasses().textSmall} text-gray-500 dark:text-gray-400`}
                       data-testid={`note-date-${note.id}`}
                     >
                       {formatDate(note.createdDate)}
                     </span>
+                    <Show when={!canManageNote(note)}>
+                      <span
+                        class={`${fontClasses().textSmall} rounded-full bg-blue-50 px-1.5 py-0.5 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200`}
+                        data-testid={`note-visibility-badge-${note.id}`}
+                      >
+                        {getVisibilityLabel(note)}
+                      </span>
+                    </Show>
                   </div>
 
                   <Show
                     when={isEditing()}
                     fallback={
-                      <div class="flex gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingNoteId(note.id);
-                            setEditingContent(note.noteText || "");
-                          }}
-                          class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
-                          title="Edit note"
-                          data-testid={`note-edit-button-${note.id}`}
-                        >
-                          Edit
-                          <Edit class={fontClasses().iconSmall} />
-                        </button>
+                      <Show when={canManageNote(note)}>
+                        <div class="flex gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingNoteId(note.id);
+                              setEditingContent(note.noteText || "");
+                            }}
+                            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
+                            title="Edit note"
+                            data-testid={`note-edit-button-${note.id}`}
+                          >
+                            Edit
+                            <Edit class={fontClasses().iconSmall} />
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() => requestDeleteNote(note.id)}
-                          class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
-                          title="Delete note"
-                          data-testid={`note-delete-button-${note.id}`}
-                        >
-                          Delete
-                          <Trash2 class={fontClasses().iconSmall} />
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => requestDeleteNote(note.id)}
+                            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
+                            title="Delete note"
+                            data-testid={`note-delete-button-${note.id}`}
+                          >
+                            Delete
+                            <Trash2 class={fontClasses().iconSmall} />
+                          </button>
+                        </div>
+                      </Show>
                     }
                   >
                     <div class="flex gap-0.5">

@@ -42,9 +42,9 @@ interface RepertoireManagerDialogProps {
  * />
  * ```
  */
-export const RepertoireManagerDialog: Component<RepertoireManagerDialogProps> = (
-  props
-) => {
+export const RepertoireManagerDialog: Component<
+  RepertoireManagerDialogProps
+> = (props) => {
   const { incrementRepertoireListChanged } = useAuth();
   const [showEditorDialog, setShowEditorDialog] = createSignal(false);
   const [editingRepertoireId, setEditingRepertoireId] = createSignal<

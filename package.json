@@ -31,7 +31,7 @@
     "format:prettier:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\" \"e2e/**/*.{ts,tsx,js,jsx}\" \"tests/**/*.{ts,tsx,js,jsx}\"",
     "check": "biome check src e2e tests worker",
     "fix": "biome check --write src e2e tests worker",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tests/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json --noEmit && npm --prefix worker exec -- tsc -p tsconfig.json --noEmit",
     "db:local:client:reset": "rm -rf .vscode/chrome-session && npm run db:local:auth:clear",
     "db:local:auth:clear": "rm -rf e2e/.auth",
     "db:local:reset": "npm run db:local:auth:clear && FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright clear-cache && RESET_DB=true FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup && npm run db:local:seed",
@@ -145,5 +145,8 @@
     "vite-plugin-static-copy": "^3.2.0",
     "workbox-window": "^7.4.0",
     "wrangler": "^4.80.0"
+  },
+  "overrides": {
+    "serialize-javascript": "7.0.5"
   }
 }

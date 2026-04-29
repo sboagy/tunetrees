@@ -15,10 +15,11 @@ name: CI - Tests
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
-  workflow_dispatch: # <-- This is your manual trigger
+    branches: [ main ]
+  workflow_dispatch:
+    # <-- This is your manual trigger
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -40,12 +41,45 @@ env:
 
 jobs:
   # --------------------------------------------------------------------------
-  # JOB 0: UNIT TESTS (VITEST)
+  # JOB 0: STATIC QUALITY CHECKS
+  # --------------------------------------------------------------------------
+  quality:
+    name: Run Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout TuneTrees
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Biome check
+        run: npm run check
+
+      - name: Install worker dependencies
+        run: npm ci --prefix worker
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+  # --------------------------------------------------------------------------
+  # JOB 1: UNIT TESTS (VITEST)
   # --------------------------------------------------------------------------
   test-unit:
     name: Run Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: [ quality ]
     environment: tunetrees_ci_env
     env:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
@@ -73,16 +107,17 @@ jobs:
         run: npm run test
 
   # --------------------------------------------------------------------------
-  # JOB 1: PLAYWRIGHT E2E TESTS (Sharded)
+  # JOB 2: PLAYWRIGHT E2E TESTS (Sharded)
   # --------------------------------------------------------------------------
   test:
     name: Run Playwright Tests
     runs-on: ubuntu-latest
+    needs: [ quality ]
 
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [ 1, 2, 3, 4 ]
 
     timeout-minutes: 60
     environment: tunetrees_ci_env
@@ -384,12 +419,13 @@ jobs:
         run: cd rhizome && supabase stop --no-backup
 
   # --------------------------------------------------------------------------
-  # JOB 2: PWA OFFLINE TEST (Production Build + Preview)
+  # JOB 3: PWA OFFLINE TEST (Production Build + Preview)
   # --------------------------------------------------------------------------
   test-pwa-offline:
     name: Run PWA Offline Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: [ quality ]
     environment: tunetrees_ci_env
     env:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
@@ -703,12 +739,12 @@ jobs:
         run: cd rhizome && supabase stop --no-backup
 
   # --------------------------------------------------------------------------
-  # JOB 3: MERGE REPORTS
+  # JOB 4: MERGE REPORTS
   # --------------------------------------------------------------------------
   merge-reports:
     name: Merge Playwright Reports
     if: always()
-    needs: [test, test-pwa-offline]
+    needs: [ test, test-pwa-offline ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout TuneTrees
@@ -776,13 +812,14 @@ jobs:
           retention-days: 30
 
   # --------------------------------------------------------------------------
-  # JOB 4: DEPLOY (Pages + Worker)
+  # JOB 5: DEPLOY (Pages + Worker)
   # --------------------------------------------------------------------------
   deploy:
     name: Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
-    needs: [test-unit, test, test-pwa-offline]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
+    needs: [ test-unit, test, test-pwa-offline ]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/tt_rz_refactor')
     environment: tunetrees_ci_env
     env:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
@@ -827,8 +864,9 @@ jobs:
   deploy-worker:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
-    needs: [test-unit, test, test-pwa-offline]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tt_rz_refactor')
+    needs: [ test-unit, test, test-pwa-offline ]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/tt_rz_refactor')
     environment: tunetrees_ci_env
 
     steps:

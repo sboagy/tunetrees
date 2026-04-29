@@ -21,7 +21,7 @@ import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
 import { ChevronRight, Columns, EllipsisVertical, Plus } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
@@ -104,8 +104,21 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
+  const [pendingDisplayOptionsOpen, setPendingDisplayOptionsOpen] =
+    createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
   let mobileOverflowButtonRef: HTMLButtonElement | undefined;
+
+  createEffect(() => {
+    if (!pendingDisplayOptionsOpen() || showOverflowMenu()) {
+      return;
+    }
+
+    setPendingDisplayOptionsOpen(false);
+    queueMicrotask(() => {
+      setShowColumnsDropdown(true);
+    });
+  });
 
   const activeRepertoireId = () => props.repertoireId;
   const hasSelectedRows = () =>
@@ -196,12 +209,8 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
   };
 
   const openDisplayOptions = () => {
+    setPendingDisplayOptionsOpen(true);
     setShowOverflowMenu(false);
-    // Let the mobile overflow popover finish closing before opening the
-    // Display Options portal, otherwise the nested menu can race on CI.
-    requestAnimationFrame(() => {
-      setShowColumnsDropdown(true);
-    });
   };
 
   const displayOptionsTriggerRef = () =>

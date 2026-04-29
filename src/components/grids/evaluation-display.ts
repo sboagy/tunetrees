@@ -68,8 +68,7 @@ export function getRecallEvalDisplay(
   return {
     label: RECALL_EVAL_LABELS[recallEval] ?? recallEval,
     colorClass:
-      RECALL_EVAL_COLORS[recallEval] ??
-      DEFAULT_EVALUATION_DISPLAY.colorClass,
+      RECALL_EVAL_COLORS[recallEval] ?? DEFAULT_EVALUATION_DISPLAY.colorClass,
   };
 }
 

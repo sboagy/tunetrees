@@ -19,6 +19,9 @@ type OnboardingRepertoireArgs = {
   genres_filter?: string[] | null;
 };
 
+const OVERFLOW_MENU_MAX_RETRIES = 3;
+const OVERFLOW_MENU_RETRY_DELAY_MS = 150;
+
 /**
  * Page Object Model for TuneTrees SolidJS PWA
  * Based on legacy React implementation with adaptations for new stack
@@ -1990,6 +1993,56 @@ export class TuneTreesPage {
       .first();
   }
 
+  private async getDisplayModeSwitchChecked(
+    displayModeSwitch: Locator
+  ): Promise<boolean | null> {
+    const ariaChecked = await displayModeSwitch
+      .getAttribute("aria-checked")
+      .catch(() => null);
+    if (ariaChecked === "true") {
+      return true;
+    }
+    if (ariaChecked === "false") {
+      return false;
+    }
+
+    const dataChecked = await displayModeSwitch
+      .getAttribute("data-checked")
+      .catch(() => null);
+    if (dataChecked !== null) {
+      return true;
+    }
+
+    const inputChecked = await displayModeSwitch
+      .locator('input[type="checkbox"], input[type="hidden"]')
+      .first()
+      .evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          return null;
+        }
+
+        return element.checked;
+      })
+      .catch(() => null);
+    if (typeof inputChecked === "boolean") {
+      return inputChecked;
+    }
+
+    return null;
+  }
+
+  private async doesDisplayModeSwitchMatchMode(
+    displayModeSwitch: Locator,
+    mode: "grid" | "list"
+  ): Promise<boolean | null> {
+    const checked = await this.getDisplayModeSwitchChecked(displayModeSwitch);
+    if (checked === null) {
+      return null;
+    }
+
+    return checked === (mode === "list");
+  }
+
   private async closeColumnVisibilityMenu(menu: Locator) {
     if (this.page.isClosed()) {
       return;
@@ -2083,6 +2136,10 @@ export class TuneTreesPage {
     tab: "catalog" | "repertoire" | "practice",
     mode: "grid" | "list"
   ) {
+    const throwPageClosedError = () => {
+      throw new Error(`Page closed while setting ${tab} view mode to ${mode}`);
+    };
+
     const columnsButton = this.getColumnsButtonForTab(tab);
     const grid = this.getGridForTab(tab);
     const currentMode = await this.waitForRenderedViewMode(tab);
@@ -2102,12 +2159,43 @@ export class TuneTreesPage {
     await this.openColumnVisibilityMenu(columnsButton);
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (this.page.isClosed()) {
+        throwPageClosedError();
+      }
+
       const displayModeSwitch = this.getDisplayModeSwitch();
-      await expect(displayModeSwitch).toBeVisible({ timeout: 5000 });
+      const switchVisible = await displayModeSwitch
+        .isVisible({ timeout: 500 })
+        .catch(() => false);
+      if (!switchVisible) {
+        const reopenedMenu = this.getColumnVisibilityMenu();
+        const reopenedMenuVisible = await reopenedMenu
+          .isVisible({ timeout: 250 })
+          .catch(() => false);
+        if (!reopenedMenuVisible) {
+          await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
+        }
+        await this.page.waitForTimeout(150);
+        continue;
+      }
+
+      await displayModeSwitch.scrollIntoViewIfNeeded().catch(() => undefined);
+
+      const switchMatchesRequestedModeBeforeClick =
+        await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode);
+      if (switchMatchesRequestedModeBeforeClick === true) {
+        break;
+      }
 
       try {
         await displayModeSwitch.click({ timeout: 5000 });
       } catch {
+        const switchMatchesRequestedModeAfterFailedClick =
+          await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode);
+        if (switchMatchesRequestedModeAfterFailedClick === true) {
+          break;
+        }
+
         if (attempt === 2) {
           await displayModeSwitch.click({ timeout: 5000 });
         }
@@ -2129,12 +2217,20 @@ export class TuneTreesPage {
       await this.page.waitForTimeout(150);
     }
 
+    if (this.page.isClosed()) {
+      throwPageClosedError();
+    }
+
     await expect
       .poll(() => this.getRenderedViewMode(tab), {
         timeout: 5000,
         intervals: [100, 250, 500],
       })
       .toBe(mode);
+
+    if (this.page.isClosed()) {
+      throwPageClosedError();
+    }
 
     await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
 
@@ -2157,6 +2253,58 @@ export class TuneTreesPage {
     await this.setViewMode(tab, "list");
   }
 
+  private async clickOverflowButton(overflowButton: Locator) {
+    await overflowButton
+      .click({ timeout: 2000 })
+      // Kobalte can detach/recreate the trigger while the mobile menu opens.
+      // Fall back to a direct event so CI retries can recover from that churn.
+      .catch(() => overflowButton.dispatchEvent("click"))
+      .catch(() => undefined);
+  }
+
+  /**
+   * Open a mobile overflow menu entry with bounded retries.
+   *
+   * The toolbar can briefly detach/recreate its Kobalte trigger while the menu
+   * is opening on CI Mobile Chrome, so we allow a few reopen attempts before
+   * failing the test. `overflowButton` is the trigger button, and `target` is
+   * the menu entry that should become visible once the menu is open.
+   */
+  private async openOverflowMenuEntry(
+    overflowButton: Locator,
+    target: Locator
+  ) {
+    for (
+      let retryAttempt = 0;
+      retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
+      retryAttempt += 1
+    ) {
+      const isTargetVisibleBeforeClick = await target
+        .isVisible({ timeout: 300 })
+        .catch(() => false);
+      if (isTargetVisibleBeforeClick) {
+        return;
+      }
+
+      await overflowButton.scrollIntoViewIfNeeded().catch(() => undefined);
+      await expect(overflowButton).toBeVisible({ timeout: 5000 });
+      await expect(overflowButton).toBeEnabled({ timeout: 5000 });
+
+      await this.clickOverflowButton(overflowButton);
+
+      const isTargetVisibleAfterClick = await target
+        .isVisible({ timeout: 1500 })
+        .catch(() => false);
+      if (isTargetVisibleAfterClick) {
+        return;
+      }
+
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+    }
+
+    await expect(target).toBeVisible({ timeout: 5000 });
+  }
+
   private async revealToolbarAction(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2169,9 +2317,7 @@ export class TuneTreesPage {
     }
 
     const overflowButton = this.getColumnsButtonForTab(tab);
-    await expect(overflowButton).toBeVisible({ timeout: 5000 });
-    await overflowButton.click();
-    await expect(action).toBeVisible({ timeout: 5000 });
+    await this.openOverflowMenuEntry(overflowButton, action);
     return true;
   }
 
@@ -2356,6 +2502,9 @@ export class TuneTreesPage {
 
     await columnsButton.click();
     await this.openDisplayOptionsEntryIfNeeded(columnsButton, targetMenu);
+    if (this.page.isClosed()) {
+      return;
+    }
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 
@@ -2372,35 +2521,19 @@ export class TuneTreesPage {
       return;
     }
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const displayOptionsButton = this.getDisplayOptionsButton();
+    const displayOptionsButton = this.getDisplayOptionsButton();
+    await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
+
+    for (
+      let retryAttempt = 0;
+      retryAttempt < OVERFLOW_MENU_MAX_RETRIES;
+      retryAttempt += 1
+    ) {
       const targetMenuVisible = await targetMenu
         .isVisible({ timeout: 250 })
         .catch(() => false);
       if (targetMenuVisible) {
         return;
-      }
-
-      const displayOptionsVisible = await displayOptionsButton
-        .isVisible({ timeout: 750 })
-        .catch(() => false);
-      if (!displayOptionsVisible) {
-        if (attempt > 0) {
-          await columnsButton.scrollIntoViewIfNeeded().catch(() => undefined);
-          await columnsButton.click().catch(() => undefined);
-        }
-
-        const displayOptionsVisibleAfterRetry = await displayOptionsButton
-          .isVisible({ timeout: 1000 })
-          .catch(() => false);
-        if (!displayOptionsVisibleAfterRetry) {
-          if (this.page.isClosed()) {
-            return;
-          }
-
-          await this.page.waitForTimeout(150);
-          continue;
-        }
       }
 
       await displayOptionsButton
@@ -2426,9 +2559,13 @@ export class TuneTreesPage {
         return;
       }
 
-      await this.page.waitForTimeout(150);
+      await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
     }
 
+    if (this.page.isClosed()) {
+      return;
+    }
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 

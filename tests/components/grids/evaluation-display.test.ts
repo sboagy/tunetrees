@@ -1,8 +1,8 @@
+import { describe, expect, it } from "vitest";
 import {
   getRecallEvalDisplay,
   getSubmittedEvaluationDisplay,
 } from "../../../src/components/grids/evaluation-display";
-import { describe, expect, it } from "vitest";
 
 describe("evaluation-display helpers", () => {
   it("maps fsrs completed quality values", () => {

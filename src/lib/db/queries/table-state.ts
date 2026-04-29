@@ -16,8 +16,10 @@
  */
 
 import { and, eq } from "drizzle-orm";
-import type { ITableStateExtended } from "@/components/grids/types";
-import type { TablePurpose } from "@/components/grids/types";
+import type {
+  ITableStateExtended,
+  TablePurpose,
+} from "@/components/grids/types";
 import type { SqliteDatabase } from "../client-sqlite";
 import { tableState } from "../schema";
 

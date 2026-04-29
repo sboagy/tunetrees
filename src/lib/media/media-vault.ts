@@ -34,13 +34,18 @@ function openDatabase(): Promise<IDBDatabase> {
 
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(MEDIA_VAULT_DB_NAME, MEDIA_VAULT_DB_VERSION);
+      const request = indexedDB.open(
+        MEDIA_VAULT_DB_NAME,
+        MEDIA_VAULT_DB_VERSION
+      );
 
       request.onupgradeneeded = () => {
         const db = request.result;
 
         if (!db.objectStoreNames.contains(MEDIA_VAULT_STORE)) {
-          const store = db.createObjectStore(MEDIA_VAULT_STORE, { keyPath: "key" });
+          const store = db.createObjectStore(MEDIA_VAULT_STORE, {
+            keyPath: "key",
+          });
           store.createIndex("kind", "kind", { unique: false });
         } else {
           const transaction = request.transaction;
@@ -65,7 +70,11 @@ function openDatabase(): Promise<IDBDatabase> {
         // A blocked open cannot make progress; clear the cache so callers
         // are not permanently stuck with this failed attempt.
         dbPromise = null;
-        reject(new Error("Failed to open media vault because the database is blocked."));
+        reject(
+          new Error(
+            "Failed to open media vault because the database is blocked."
+          )
+        );
       };
     });
   }
@@ -93,9 +102,13 @@ function runTransaction<T>(
           }
         };
         transaction.onerror = () =>
-          reject(transaction.error ?? new Error("IndexedDB transaction failed."));
+          reject(
+            transaction.error ?? new Error("IndexedDB transaction failed.")
+          );
         transaction.onabort = () =>
-          reject(transaction.error ?? new Error("IndexedDB transaction aborted."));
+          reject(
+            transaction.error ?? new Error("IndexedDB transaction aborted.")
+          );
 
         if (request) {
           request.onsuccess = () => {
@@ -180,7 +193,9 @@ export async function putMediaDraft(record: MediaDraftRecord): Promise<void> {
   );
 }
 
-export async function getMediaDraft(id: string): Promise<MediaDraftRecord | null> {
+export async function getMediaDraft(
+  id: string
+): Promise<MediaDraftRecord | null> {
   if (!isIndexedDbAvailable()) {
     return null;
   }
@@ -199,7 +214,9 @@ export async function deleteMediaDraft(id: string): Promise<void> {
     return;
   }
 
-  await runTransaction(MEDIA_DRAFT_STORE, "readwrite", (store) => store.delete(id));
+  await runTransaction(MEDIA_DRAFT_STORE, "readwrite", (store) =>
+    store.delete(id)
+  );
 }
 
 export async function listMediaDrafts(): Promise<MediaDraftRecord[]> {
@@ -231,7 +248,9 @@ export async function clearMediaVaultForTests(): Promise<void> {
     const request = indexedDB.deleteDatabase(MEDIA_VAULT_DB_NAME);
     request.onsuccess = () => resolve();
     request.onerror = () =>
-      reject(request.error ?? new Error("Failed to delete media vault database."));
+      reject(
+        request.error ?? new Error("Failed to delete media vault database.")
+      );
     request.onblocked = () => resolve();
   });
 }

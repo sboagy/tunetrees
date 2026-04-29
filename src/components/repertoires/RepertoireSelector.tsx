@@ -52,9 +52,13 @@ interface RepertoireSelectorProps {
  * />
  * ```
  */
-export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) => {
+export const RepertoireSelector: Component<RepertoireSelectorProps> = (
+  props
+) => {
   const { user, localDb } = useAuth();
-  const [repertoires, setRepertoires] = createSignal<RepertoireWithSummary[]>([]);
+  const [repertoires, setRepertoires] = createSignal<RepertoireWithSummary[]>(
+    []
+  );
   const [selectedRepertoireId, setSelectedRepertoireIdSignal] = createSignal<
     string | null
   >(null);
@@ -104,7 +108,9 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) =>
       }
     } catch (err) {
       console.error("Error loading repertoires:", err);
-      setError(err instanceof Error ? err.message : "Failed to load repertoires");
+      setError(
+        err instanceof Error ? err.message : "Failed to load repertoires"
+      );
     } finally {
       setLoading(false);
     }
@@ -214,7 +220,9 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (props) =>
                   </div>
 
                   {/* Selected Checkmark */}
-                  <Show when={repertoire.repertoireId === selectedRepertoireId()}>
+                  <Show
+                    when={repertoire.repertoireId === selectedRepertoireId()}
+                  >
                     <svg
                       class="w-5 h-5 text-blue-600 dark:text-blue-400"
                       fill="currentColor"

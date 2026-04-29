@@ -21,9 +21,9 @@ import { TuneEditor } from "../../../components/tunes";
 import { useAuth } from "../../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../../lib/context/CurrentTuneContext";
+import type { SqliteDatabase } from "../../../lib/db/client-sqlite";
 import {
   getOrCreateTuneOverride,
-  type TuneOverrideInput,
   updateTuneOverride,
 } from "../../../lib/db/queries/tune-overrides";
 import {
@@ -34,6 +34,69 @@ import {
   getTuneForUserById,
   updateTuneIfOwned,
 } from "../../../lib/db/queries/tunes";
+import {
+  buildBaseTuneUpdateInput,
+  buildChangedTuneOverrideInput,
+  buildRepertoireTuneUpdate,
+  hasRepertoireTuneChanges,
+} from "../edit-tune-save";
+
+async function saveBaseTuneChanges(
+  tuneData: Partial<TuneEditorData>,
+  currentTune: TuneEditorData,
+  db: SqliteDatabase,
+  tuneId: string,
+  userId: string
+): Promise<void> {
+  const isUserOwnedPrivateTune =
+    !!currentTune.privateFor && currentTune.privateFor === userId;
+
+  if (
+    isUserOwnedPrivateTune &&
+    (await updateTuneIfOwned(
+      db,
+      tuneId,
+      userId,
+      buildBaseTuneUpdateInput(tuneData)
+    ))
+  ) {
+    return;
+  }
+
+  const overrideInput = buildChangedTuneOverrideInput(tuneData, currentTune);
+  if (Object.keys(overrideInput).length === 0) {
+    return;
+  }
+
+  const override = await getOrCreateTuneOverride(
+    db,
+    tuneId,
+    userId,
+    overrideInput
+  );
+
+  if (!override.isNew) {
+    await updateTuneOverride(db, override.id, overrideInput);
+  }
+}
+
+async function saveRepertoireTuneChanges(
+  tuneData: Partial<TuneEditorData>,
+  db: SqliteDatabase,
+  repertoireId: string,
+  tuneId: string
+): Promise<void> {
+  if (!hasRepertoireTuneChanges(tuneData)) {
+    return;
+  }
+
+  await updateRepertoireTuneFields(
+    db,
+    repertoireId,
+    tuneId,
+    buildRepertoireTuneUpdate(tuneData)
+  );
+}
 
 /**
  * Edit Tune Page Component
@@ -130,83 +193,10 @@ const EditTunePage: Component = () => {
     }
 
     try {
-      // PART 1: Save base tune fields (title, type, mode, structure, incipit, genre)
-      // Guard: only allow direct tune updates if tune is explicitly owned by user (privateFor matches userId)
-      // Public tunes (privateFor null) or tunes owned by another user MUST go through tune_override path.
-      const isUserOwnedPrivateTune =
-        !!currentTune.privateFor && currentTune.privateFor === userId;
+      await saveBaseTuneChanges(tuneData, currentTune, db, tuneId, userId);
 
-      if (
-        isUserOwnedPrivateTune &&
-        (await updateTuneIfOwned(db, tuneId, userId, {
-          title: tuneData.title ?? undefined,
-          type: tuneData.type ?? undefined,
-          mode: tuneData.mode ?? undefined,
-          structure: tuneData.structure ?? undefined,
-          incipit: tuneData.incipit ?? undefined,
-          genre: tuneData.genre ?? undefined,
-          composer: tuneData.composer ?? undefined,
-          artist: tuneData.artist ?? undefined,
-          idForeign: tuneData.idForeign ?? undefined,
-          releaseYear: tuneData.releaseYear ?? undefined,
-        }))
-      ) {
-        // Updated base tune (owned by user)
-      } else {
-        // Public tune or another user's tune - use tune_override
-        // Build override input with only changed fields
-        const overrideInput: TuneOverrideInput = {};
-        if (tuneData.title !== currentTune.title)
-          overrideInput.title = tuneData.title ?? undefined;
-        if (tuneData.type !== currentTune.type)
-          overrideInput.type = tuneData.type ?? undefined;
-        if (tuneData.mode !== currentTune.mode)
-          overrideInput.mode = tuneData.mode ?? undefined;
-        if (tuneData.structure !== currentTune.structure)
-          overrideInput.structure = tuneData.structure ?? undefined;
-        if (tuneData.incipit !== currentTune.incipit)
-          overrideInput.incipit = tuneData.incipit ?? undefined;
-        if (tuneData.genre !== currentTune.genre)
-          overrideInput.genre = tuneData.genre ?? undefined;
-        if (tuneData.composer !== currentTune.composer)
-          overrideInput.composer = tuneData.composer ?? undefined;
-        if (tuneData.artist !== currentTune.artist)
-          overrideInput.artist = tuneData.artist ?? undefined;
-        if (tuneData.idForeign !== currentTune.idForeign)
-          overrideInput.idForeign = tuneData.idForeign ?? undefined;
-        if (tuneData.releaseYear !== currentTune.releaseYear)
-          overrideInput.releaseYear = tuneData.releaseYear ?? undefined;
-
-        // Only proceed if there are actual changes
-        if (Object.keys(overrideInput).length > 0) {
-          const override = await getOrCreateTuneOverride(
-            db,
-            tuneId,
-            userId,
-            overrideInput
-          );
-
-          // If override already existed, update it with the changes
-          if (!override.isNew) {
-            await updateTuneOverride(db, override.id, overrideInput);
-          }
-        }
-      }
-
-      // PART 2: Save user-specific fields if we have a repertoire context
       if (repertoireId) {
-        // Update repertoire_tune fields (learned, goal, scheduled)
-        if (
-          tuneData.learned !== undefined ||
-          tuneData.goal !== undefined ||
-          tuneData.scheduled !== undefined
-        ) {
-          await updateRepertoireTuneFields(db, repertoireId, tuneId, {
-            learned: tuneData.learned || null,
-            goal: tuneData.goal || null,
-            scheduled: tuneData.scheduled || null,
-          });
-        }
+        await saveRepertoireTuneChanges(tuneData, db, repertoireId, tuneId);
       }
 
       // Signal grids to refresh with updated data

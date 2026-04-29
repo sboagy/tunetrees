@@ -36,7 +36,9 @@ async function pastePngImageIntoEditor(page: Page, editor: Locator) {
   }, PASTED_IMAGE_BASE64);
 
   await editor.click();
-  await page.keyboard.press(process.platform === "darwin" ? "Meta+V" : "Control+V");
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+V" : "Control+V"
+  );
 }
 
 test.describe("NOTES-001: Notes CRUD Operations", () => {
@@ -177,7 +179,10 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
     const firstNoteContent = ttPage.getNoteContent(noteId);
     const renderedImage = firstNoteContent.locator("img");
     await expect(renderedImage).toBeVisible({ timeout: 10000 });
-    await expect(renderedImage).toHaveAttribute("src", /\/api\/media\/view\?key=/);
+    await expect(renderedImage).toHaveAttribute(
+      "src",
+      /\/api\/media\/view\?key=/
+    );
 
     const firstNoteEditButton = ttPage.getNoteEditButton(noteId);
     await expect(firstNoteEditButton).toBeVisible({ timeout: 5000 });
@@ -188,7 +193,9 @@ test.describe("NOTES-001: Notes CRUD Operations", () => {
 
     const editorTextarea = noteEditor.locator("textarea");
     await expect
-      .poll(async () => (await editorTextarea.inputValue().catch(() => "")).trim())
+      .poll(async () =>
+        (await editorTextarea.inputValue().catch(() => "")).trim()
+      )
       .toContain("/api/media/view?key=");
     await expect
       .poll(async () =>

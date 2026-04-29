@@ -162,18 +162,14 @@ async function verifyJwtLocally(
       return null;
     }
 
-    let result: Awaited<ReturnType<typeof jwtVerify>> | null = null;
-
-    if (algorithm.startsWith("HS")) {
-      if (env.SUPABASE_JWT_SECRET) {
-        result = await jwtVerify(
-          token,
-          new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
-        );
-      }
-    } else {
-      result = await jwtVerify(token, getJwks(env.SUPABASE_URL));
-    }
+    const result = algorithm.startsWith("HS")
+      ? env.SUPABASE_JWT_SECRET
+        ? await jwtVerify(
+            token,
+            new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
+          )
+        : null
+      : await jwtVerify(token, getJwks(env.SUPABASE_URL));
 
     if (!result) {
       return null;
@@ -437,19 +433,24 @@ async function handleMediaView(
     headers.set("Content-Type", "application/octet-stream");
   }
   const objectRange = "range" in object ? object.range : undefined;
+  const offsetRange =
+    objectRange && "offset" in objectRange && "length" in objectRange
+      ? objectRange
+      : null;
+  const rangeOffset = offsetRange?.offset;
+  const rangeLength = offsetRange?.length;
   const isPartialResponse =
     Boolean(requestedRange) &&
-    Boolean(objectRange) &&
-    typeof objectRange?.offset === "number" &&
-    typeof objectRange?.length === "number" &&
+    typeof rangeOffset === "number" &&
+    typeof rangeLength === "number" &&
     typeof object.size === "number";
 
-  if (isPartialResponse && objectRange) {
+  if (isPartialResponse) {
     headers.set(
       "Content-Range",
-      `bytes ${objectRange.offset}-${objectRange.offset + objectRange.length - 1}/${object.size}`
+      `bytes ${rangeOffset}-${rangeOffset + rangeLength - 1}/${object.size}`
     );
-    headers.set("Content-Length", String(objectRange.length));
+    headers.set("Content-Length", String(rangeLength));
   } else if (typeof object.size === "number") {
     headers.set("Content-Length", String(object.size));
   }
