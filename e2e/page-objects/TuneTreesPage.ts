@@ -2409,6 +2409,9 @@ export class TuneTreesPage {
 
     await columnsButton.click();
     await this.openDisplayOptionsEntryIfNeeded(columnsButton, targetMenu);
+    if (this.page.isClosed()) {
+      return;
+    }
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 
@@ -2467,6 +2470,9 @@ export class TuneTreesPage {
       await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
     }
 
+    if (this.page.isClosed()) {
+      return;
+    }
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 

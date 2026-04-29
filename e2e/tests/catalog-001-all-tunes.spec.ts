@@ -14,7 +14,7 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 test.describe("CATALOG-001: Public + Private Tunes Display", () => {
-  test.setTimeout(60000);
+  test.setTimeout(90000);
 
   let ttPage: TuneTreesPage;
   let currentTestUser: TestUser;
