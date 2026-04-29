@@ -43,7 +43,7 @@
     "db:remote:backup": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- node scripts/run-rhizome-db-remote-backup.mjs --schema public --schema auth",
     "db:remote:apply-top500": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- supabase db execute --linked --file supabase/seeds/rsTop500.sql",
     "test": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vitest run",
-    "test:unit": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vitest run tests/",
+    "test:unit": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vitest run tests/ src/",
     "test:e2e": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list",
     "test:e2e:both:ci": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --project=chromium-auth --project=chromium --project='Mobile Chrome'",
     "test:e2e:offline": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --project=chromium-pwa-offline --reporter=list",

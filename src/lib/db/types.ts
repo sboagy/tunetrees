@@ -33,6 +33,10 @@ export type PrefsSchedulingOptions = InferSelectModel<
 export type DailyPracticeQueue = InferSelectModel<
   typeof schema.dailyPracticeQueue
 >;
+export type UserGroup = InferSelectModel<typeof schema.userGroup>;
+export type GroupMember = InferSelectModel<typeof schema.groupMember>;
+export type TuneSet = InferSelectModel<typeof schema.tuneSet>;
+export type TuneSetItem = InferSelectModel<typeof schema.tuneSetItem>;
 export type TuneOverride = InferSelectModel<typeof schema.tuneOverride>;
 export type Genre = InferSelectModel<typeof schema.genre>;
 export type Instrument = InferSelectModel<typeof schema.instrument>;
@@ -61,6 +65,10 @@ export type NewPrefsSchedulingOptions = InferInsertModel<
 export type NewDailyPracticeQueue = InferInsertModel<
   typeof schema.dailyPracticeQueue
 >;
+export type NewUserGroup = InferInsertModel<typeof schema.userGroup>;
+export type NewGroupMember = InferInsertModel<typeof schema.groupMember>;
+export type NewTuneSet = InferInsertModel<typeof schema.tuneSet>;
+export type NewTuneSetItem = InferInsertModel<typeof schema.tuneSetItem>;
 export type NewTuneOverride = InferInsertModel<typeof schema.tuneOverride>;
 export type NewGenre = InferInsertModel<typeof schema.genre>;
 export type NewInstrument = InferInsertModel<typeof schema.instrument>;
@@ -112,6 +120,28 @@ export interface RepertoireWithSummary extends Repertoire {
   lastModified?: string;
   instrumentName?: string;
   genreName?: string;
+}
+
+export interface UserGroupWithSummary extends UserGroup {
+  memberCount: number;
+  tuneSetCount: number;
+  role: "owner" | "admin" | "member";
+}
+
+export interface GroupMemberWithProfile extends GroupMember {
+  effectiveRole: "owner" | "admin" | "member";
+  isOwner: boolean;
+  profileName?: string | null;
+  profileEmail?: string | null;
+}
+
+export interface TuneSetWithSummary extends TuneSet {
+  itemCount: number;
+  accessRole: "owner" | "admin" | "member";
+}
+
+export interface TuneSetItemWithTune extends TuneSetItem {
+  tune: Tune;
 }
 
 /**
