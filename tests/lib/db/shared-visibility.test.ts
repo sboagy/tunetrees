@@ -2,10 +2,7 @@ import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createNote,
-  updateNote,
-} from "../../../src/lib/db/queries/notes";
+import { createNote, updateNote } from "../../../src/lib/db/queries/notes";
 import {
   createReference,
   getReferencesByTune,

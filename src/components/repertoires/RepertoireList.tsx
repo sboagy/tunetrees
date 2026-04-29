@@ -260,7 +260,9 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
               class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors p-1"
               disabled={isDeleting}
               title={isDeleting ? "Deleting..." : "Delete repertoire"}
-              aria-label={isDeleting ? "Deleting repertoire" : "Delete repertoire"}
+              aria-label={
+                isDeleting ? "Deleting repertoire" : "Delete repertoire"
+              }
             >
               <Trash2 size={16} />
             </button>
@@ -319,8 +321,8 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
               when={!repertoires.loading}
               fallback={<span>Loading repertoires...</span>}
             >
-              Showing {filteredRepertoires().length} of {repertoires()?.length || 0}{" "}
-              repertoires
+              Showing {filteredRepertoires().length} of{" "}
+              {repertoires()?.length || 0} repertoires
             </Show>
           </div>
         </div>

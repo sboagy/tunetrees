@@ -24,9 +24,7 @@ async function readPersistedAudioState(page: Page, referenceId: string) {
     ).toString();
 
     const { getDb } = await import(clientSqliteUrl);
-    const { getMediaAssetByReferenceId } = await import(
-      mediaAssetsUrl
-    );
+    const { getMediaAssetByReferenceId } = await import(mediaAssetsUrl);
 
     const db = getDb();
     if (!db) {

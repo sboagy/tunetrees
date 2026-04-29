@@ -22,9 +22,9 @@ describe("note media auth helpers", () => {
     const hydratedHtml = attachMediaAuthToken(html, "runtime-token");
     const hydratedTemplate = document.createElement("template");
     hydratedTemplate.innerHTML = hydratedHtml;
-    expect(hydratedTemplate.content.querySelector("img")?.getAttribute("src")).toBe(
-      `${mediaUrl}&token=runtime-token`
-    );
+    expect(
+      hydratedTemplate.content.querySelector("img")?.getAttribute("src")
+    ).toBe(`${mediaUrl}&token=runtime-token`);
 
     expect(stripMediaAuthToken(hydratedHtml)).toBe(html);
   });

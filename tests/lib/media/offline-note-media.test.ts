@@ -115,9 +115,7 @@ describe("offline note media draft helpers", () => {
       )
     ).rejects.toThrow("IndexedDB blocked");
 
-    expect(revokeObjectUrlMock).toHaveBeenCalledWith(
-      "blob:rehydrated-draft-1"
-    );
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:rehydrated-draft-1");
   });
 
   it("persists note rewrites after replacing offline draft URLs with uploaded URLs", async () => {
@@ -148,21 +146,22 @@ describe("offline note media draft helpers", () => {
     vi.spyOn(mediaVault, "deleteMediaDraft").mockResolvedValue(undefined);
 
     const originalFetch = globalThis.fetch;
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            files: ["https://cdn.example.com/media/offline.png"],
-          },
-        }),
-        {
-          status: 200,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      )
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              files: ["https://cdn.example.com/media/offline.png"],
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
     );
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,

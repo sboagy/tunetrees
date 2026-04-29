@@ -242,7 +242,8 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
     () => selectedRepertoireIds().length > 0
   );
   const isLoading = createMemo(
-    () => tunes.loading || (isRepertoireFilterActive() && repertoireTunes.loading)
+    () =>
+      tunes.loading || (isRepertoireFilterActive() && repertoireTunes.loading)
   );
   const loadError = createMemo(() => tunes.error || repertoireTunes.error);
   const hasTunes = createMemo(() => filteredTunes().length > 0);

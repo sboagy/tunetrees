@@ -205,7 +205,9 @@ const compareTableWithSupabase = async (
     ? meta.primaryKey
     : [meta.primaryKey];
   const hasLastModified = meta.supportsIncremental;
-  const columns = hasLastModified ? [...pkCols, "last_modified_at"] : [...pkCols];
+  const columns = hasLastModified
+    ? [...pkCols, "last_modified_at"]
+    : [...pkCols];
 
   const localMap = await buildLocalRowMap(
     db,
@@ -284,7 +286,10 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       name: "Count Practice Records",
       sql: "SELECT COUNT(*) as count FROM practice_record;",
     },
-    { name: "Count Repertoires", sql: "SELECT COUNT(*) as count FROM repertoire;" },
+    {
+      name: "Count Repertoires",
+      sql: "SELECT COUNT(*) as count FROM repertoire;",
+    },
     {
       name: "Recent Practice Records",
       sql: "SELECT * FROM practice_record ORDER BY id DESC LIMIT 10;",
@@ -483,7 +488,12 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         if (tableFilter && tableName !== tableFilter) continue;
         if (!localTables.has(tableName)) continue;
 
-        const result = await compareTableWithSupabase(db, tableName, meta, mismatchRows);
+        const result = await compareTableWithSupabase(
+          db,
+          tableName,
+          meta,
+          mismatchRows
+        );
         if (result.truncated) {
           truncated = true;
           break;
@@ -530,7 +540,9 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     <div class="fixed inset-0 flex flex-col bg-white dark:bg-gray-950">
       {/* Header */}
       <div class="px-3 py-2 sm:p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
-        <h1 class="text-lg sm:text-3xl font-bold">SQLite WASM Database Browser</h1>
+        <h1 class="text-lg sm:text-3xl font-bold">
+          SQLite WASM Database Browser
+        </h1>
         <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">
           💡 <strong>Tip:</strong> Each browser tab has its own database copy.
           After making changes in another tab,{" "}
@@ -654,7 +666,9 @@ export default function DatabaseBrowser(): ReturnType<Component> {
         <div class="flex-1 p-3 sm:p-6 flex flex-col space-y-4 overflow-y-auto min-h-0">
           {/* Query Editor */}
           <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 flex-shrink-0">
-            <h2 class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">SQL Query</h2>
+            <h2 class="text-base sm:text-lg font-semibold mb-2 sm:mb-3">
+              SQL Query
+            </h2>
             <textarea
               value={query()}
               onInput={(e) => setQuery(e.currentTarget.value)}

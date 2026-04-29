@@ -69,12 +69,7 @@ export async function getTuneTags(
       tagText: schema.tag.tagText,
     })
     .from(schema.tag)
-    .where(
-      and(
-        eq(schema.tag.tuneRef, tuneId),
-        eq(schema.tag.userRef, userId)
-      )
-    )
+    .where(and(eq(schema.tag.tuneRef, tuneId), eq(schema.tag.userRef, userId)))
     .orderBy(schema.tag.tagText)
     .all();
 
@@ -188,12 +183,7 @@ export async function getTagUsageCount(
       count: count(schema.tag.tuneRef),
     })
     .from(schema.tag)
-    .where(
-      and(
-        eq(schema.tag.userRef, userId),
-        eq(schema.tag.tagText, tagText)
-      )
-    )
+    .where(and(eq(schema.tag.userRef, userId), eq(schema.tag.tagText, tagText)))
     .get();
 
   return result?.count ?? 0;
@@ -213,12 +203,7 @@ export async function deleteTagForUser(
 ): Promise<number> {
   const result = await db
     .delete(schema.tag)
-    .where(
-      and(
-        eq(schema.tag.userRef, userId),
-        eq(schema.tag.tagText, tagText)
-      )
-    )
+    .where(and(eq(schema.tag.userRef, userId), eq(schema.tag.tagText, tagText)))
     .returning()
     .all();
 
@@ -252,10 +237,7 @@ export async function renameTagForUser(
       deviceId: deviceId ?? null,
     })
     .where(
-      and(
-        eq(schema.tag.userRef, userId),
-        eq(schema.tag.tagText, oldTagText)
-      )
+      and(eq(schema.tag.userRef, userId), eq(schema.tag.tagText, oldTagText))
     )
     .returning()
     .all();
