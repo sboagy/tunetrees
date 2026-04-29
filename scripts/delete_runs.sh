@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# Script to delete cancelled, failed, and/or action-required (waiting approval) workflow runs
-# Usage: ./delete_runs.sh [--cancelled] [--failure] [--action_required] [--dry] [limit]
+# Script to delete cancelled, failed, action-required, CodeQL, and/or Lighthouse CI workflow runs
+# Usage: ./delete_runs.sh [--cancelled] [--failure] [--action_required] [--codeql] [--lighthouse] [--dry] [limit]
 # Flags:
 #   --cancelled        : Delete cancelled runs
 #   --failure          : Delete failed runs
 #   --action_required  : Delete runs requiring action/approval (status==waiting or conclusion==action_required)
+#   --codeql           : Delete CodeQL workflow runs (workflow name contains "CodeQL")
+#   --lighthouse       : Delete Lighthouse CI workflow runs (workflow name contains "Lighthouse CI")
 #   --dry              : Dry run; print runs that would be deleted without deleting
 #   (no flags)         : Delete cancelled and failed runs (default)
 # Optional limit parameter: number of most recent runs to skip (default: 0)
@@ -20,6 +22,8 @@ REPO="${GITHUB_REPO:-tunetrees}"
 DELETE_CANCELLED=false
 DELETE_FAILURE=false
 DELETE_ACTION_REQUIRED=false
+DELETE_CODEQL=false
+DELETE_LIGHTHOUSE=false
 DRY_RUN=false
 LIMIT=0
 
@@ -38,6 +42,14 @@ while [[ $# -gt 0 ]]; do
       DELETE_ACTION_REQUIRED=true
       shift
       ;;
+    --codeql)
+      DELETE_CODEQL=true
+      shift
+      ;;
+    --lighthouse)
+      DELETE_LIGHTHOUSE=true
+      shift
+      ;;
     --dry)
       DRY_RUN=true
       shift
@@ -51,7 +63,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # If no flags specified, delete both cancelled and failed (default behavior)
-if [ "$DELETE_CANCELLED" = false ] && [ "$DELETE_FAILURE" = false ] && [ "$DELETE_ACTION_REQUIRED" = false ]; then
+if [ "$DELETE_CANCELLED" = false ] && [ "$DELETE_FAILURE" = false ] && [ "$DELETE_ACTION_REQUIRED" = false ] && [ "$DELETE_CODEQL" = false ] && [ "$DELETE_LIGHTHOUSE" = false ]; then
   DELETE_CANCELLED=true
   DELETE_FAILURE=true
 fi
@@ -68,6 +80,12 @@ if [ "$DELETE_ACTION_REQUIRED" = true ]; then
   # Covers environment approval holds and action-required conclusions
   conditions+=(".status == \"waiting\" or .conclusion == \"action_required\"")
 fi
+if [ "$DELETE_CODEQL" = true ]; then
+  conditions+=("(((.name // \"\") | test(\"codeql\"; \"i\")) or ((.workflow_name // \"\") | test(\"codeql\"; \"i\")) or ((.path // \"\") | test(\"codeql\"; \"i\")))")
+fi
+if [ "$DELETE_LIGHTHOUSE" = true ]; then
+  conditions+=("(((.name // \"\") | test(\"lighthouse[[:space:]]*ci|lighthouse\"; \"i\")) or ((.workflow_name // \"\") | test(\"lighthouse[[:space:]]*ci|lighthouse\"; \"i\")) or ((.path // \"\") | test(\"lighthouse[[:space:]]*ci|lighthouse\"; \"i\")))")
+fi
 
 # Join conditions with OR
 JOINED_COND=$(printf " or %s" "${conditions[@]}")
@@ -80,7 +98,13 @@ desc_parts=()
 [ "$DELETE_CANCELLED" = true ] && desc_parts+=("cancelled")
 [ "$DELETE_FAILURE" = true ] && desc_parts+=("failed")
 [ "$DELETE_ACTION_REQUIRED" = true ] && desc_parts+=("action-required (waiting)")
-DESC=$(IFS=", "; echo "${desc_parts[*]}")
+[ "$DELETE_CODEQL" = true ] && desc_parts+=("CodeQL")
+[ "$DELETE_LIGHTHOUSE" = true ] && desc_parts+=("Lighthouse CI")
+DESC=""
+if [ ${#desc_parts[@]} -gt 0 ]; then
+  DESC=$(printf "%s, " "${desc_parts[@]}")
+  DESC=${DESC%, }
+fi
 if [ "$DRY_RUN" = true ]; then
   echo "Dry run: listing ${DESC} workflow runs for $OWNER/$REPO (skip first $LIMIT runs)"
 else
