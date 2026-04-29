@@ -74,6 +74,7 @@ Primary components:
 - Prefer deterministic tests: one input state, one expected output state; no branching logic.
 - Reset local Supabase + auth fixtures with `npm run db:local:reset`.
 - Copilot/agents should not start the dev server unless explicitly requested; ask if you need a restart.
+- Before handing off changes intended for commit or review, prefer repo-wide verification with `npm run format`, `npm run lint`, and `npm run typecheck` when the change touches broad TypeScript or shared surfaces. In CI, the corresponding gate is `npm run format:check`, `npm run lint`, and `npm run typecheck`.
 
 ## What To Read First For Changes
 
