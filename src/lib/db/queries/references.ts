@@ -60,9 +60,10 @@ export async function getReferencesByTune(
   tuneId: string, // UUID
   userId?: string
 ): Promise<Reference[]> {
-  // Visibility semantics (ignore `reference.public`):
+  // Visibility semantics:
+  // - owner-owned references: user_ref = userId
   // - system/legacy references: user_ref IS NULL
-  // - private references: user_ref = userId
+  // - shared/public references: public = 1
   const baseConditions = [
     eq(schema.reference.tuneRef, tuneId),
     eq(schema.reference.deleted, 0),
