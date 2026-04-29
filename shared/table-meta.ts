@@ -121,6 +121,13 @@ const TABLE_EXTRAS: Record<
       sync_version: "Sync version for conflict resolution.",
     },
   },
+  group_member: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the membership row.",
+      role: "Membership role within the group: owner, admin, or member.",
+    },
+  },
   instrument: {
     changeCategory: "catalog",
     columnDescriptions: {
@@ -400,6 +407,20 @@ const TABLE_EXTRAS: Record<
       user_ref: "User ID who owns this override.",
     },
   },
+  tune_set: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the tune set.",
+      set_kind:
+        "practice_set for personal grouping, group_setlist for collaborative performance ordering.",
+    },
+  },
+  tune_set_item: {
+    changeCategory: "group",
+    columnDescriptions: {
+      position: "Zero-based position of the tune within the set.",
+    },
+  },
   tune_type: {
     changeCategory: "catalog",
     columnDescriptions: {
@@ -411,6 +432,13 @@ const TABLE_EXTRAS: Record<
   },
   user_genre_selection: {
     changeCategory: "user",
+  },
+  user_group: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the group.",
+      owner_user_ref: "User who owns and administers the group.",
+    },
   },
   user_profile: {
     changeCategory: "user",
@@ -559,6 +587,7 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   genre: 1,
   genre_tune_type: 3,
   goal: 6,
+  group_member: 25,
   instrument: 7,
   media_asset: 18,
   note: 15,
@@ -575,8 +604,11 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   tag: 21,
   tune: 14,
   tune_override: 22,
+  tune_set: 26,
+  tune_set_item: 27,
   tune_type: 2,
   user_genre_selection: 23,
+  user_group: 24,
   user_profile: 4,
 };
 
@@ -585,6 +617,7 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   genre: "genre",
   genre_tune_type: "genreTuneType",
   goal: "goal",
+  group_member: "groupMember",
   instrument: "instrument",
   media_asset: "mediaAsset",
   note: "note",
@@ -601,7 +634,10 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   tag: "tag",
   tune: "tune",
   tune_override: "tuneOverride",
+  tune_set: "tuneSet",
+  tune_set_item: "tuneSetItem",
   tune_type: "tuneType",
   user_genre_selection: "userGenreSelection",
+  user_group: "userGroup",
   user_profile: "userProfile",
 };

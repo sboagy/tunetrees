@@ -20,6 +20,7 @@ export const SYNCABLE_TABLES = [
   "genre",
   "genre_tune_type",
   "goal",
+  "group_member",
   "instrument",
   "media_asset",
   "note",
@@ -36,8 +37,11 @@ export const SYNCABLE_TABLES = [
   "tag",
   "tune",
   "tune_override",
+  "tune_set",
+  "tune_set_item",
   "tune_type",
   "user_genre_selection",
+  "user_group",
   "user_profile",
 ] as const;
 
@@ -128,6 +132,18 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       private_for:
         "Owner user_profile.id; NULL = system goal visible to all users.",
       sync_version: "Sync version for conflict resolution.",
+    },
+  },
+  group_member: {
+    primaryKey: "id",
+    uniqueKeys: ["group_ref", "user_ref"],
+    timestamps: ["joined_at", "last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the membership row.",
+      role: "Membership role within the group: owner, admin, or member.",
     },
   },
   instrument: {
@@ -487,6 +503,30 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       user_ref: "User ID who owns this override.",
     },
   },
+  tune_set: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["created_at", "last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the tune set.",
+      set_kind:
+        "practice_set for personal grouping, group_setlist for collaborative performance ordering.",
+    },
+  },
+  tune_set_item: {
+    primaryKey: "id",
+    uniqueKeys: ["tune_set_ref", "position"],
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      position: "Zero-based position of the tune within the set.",
+    },
+  },
   tune_type: {
     primaryKey: "id",
     uniqueKeys: null,
@@ -508,6 +548,18 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     booleanColumns: [],
     supportsIncremental: true,
     hasDeletedFlag: false,
+  },
+  user_group: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["created_at", "last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the group.",
+      owner_user_ref: "User who owns and administers the group.",
+    },
   },
   user_profile: {
     primaryKey: "id",

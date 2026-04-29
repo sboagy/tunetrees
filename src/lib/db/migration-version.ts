@@ -8,7 +8,7 @@
  * @module lib/db/migration-version
  */
 
-const CURRENT_SCHEMA_VERSION = "2.0.5-add-goal-table"; // Bump this when schema changes
+const CURRENT_SCHEMA_VERSION = "2.0.7-add-groups-and-tune-sets"; // Bump this when schema changes
 
 /**
  * Get the locally stored schema version from localStorage
@@ -112,33 +112,41 @@ export async function clearLocalDatabaseForMigration(
     // Import schema tables
     const {
       dailyPracticeQueue,
+      groupMember,
       mediaAsset,
       practiceRecord,
       repertoireTune,
       note,
       reference,
+      tuneSet,
+      tuneSetItem,
       tag,
       tuneOverride,
       repertoire,
       tune,
       tableTransientData,
       tabGroupMainState,
+      userGroup,
     } = await import("./schema");
 
     // Clear all user data tables (preserve reference data: genre, tuneType, instrument)
     const tablesToClear = [
       dailyPracticeQueue,
+      groupMember,
       mediaAsset,
       practiceRecord,
       repertoireTune,
       note,
       reference,
+      tuneSet,
+      tuneSetItem,
       tag,
       tuneOverride,
       repertoire,
       tune, // Clear private tunes, will re-sync public catalog
       tableTransientData,
       tabGroupMainState,
+      userGroup,
     ];
 
     for (const table of tablesToClear) {

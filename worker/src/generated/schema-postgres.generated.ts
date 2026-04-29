@@ -77,6 +77,25 @@ export const goal = pgTable("goal", {
   deviceId: text("device_id"),
 });
 
+export const groupMember = pgTable("group_member", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  groupRef: uuid("group_ref").notNull(),
+  userRef: uuid("user_ref").notNull(),
+  role: text("role").notNull().default("member"),
+  deleted: boolean("deleted").notNull().default(false),
+  joinedAt: text("joined_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const instrument = pgTable("instrument", {
   id: uuid("id")
     .notNull()
@@ -407,6 +426,43 @@ export const tuneOverride = pgTable("tune_override", {
   idForeign: text("id_foreign"),
 });
 
+export const tuneSet = pgTable("tune_set", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  ownerUserRef: uuid("owner_user_ref"),
+  groupRef: uuid("group_ref"),
+  name: text("name").notNull(),
+  description: text("description"),
+  setKind: text("set_kind").notNull(),
+  deleted: boolean("deleted").notNull().default(false),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
+export const tuneSetItem = pgTable("tune_set_item", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tuneSetRef: uuid("tune_set_ref").notNull(),
+  tuneRef: uuid("tune_ref").notNull(),
+  position: integer("position").notNull(),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const tuneType = pgTable("tune_type", {
   id: text("id").notNull().primaryKey(),
   name: text("name"),
@@ -424,6 +480,25 @@ export const userGenreSelection = pgTable("user_genre_selection", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   syncVersion: integer("sync_version").notNull().default(1),
+  deviceId: text("device_id"),
+});
+
+export const userGroup = pgTable("user_group", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  ownerUserRef: uuid("owner_user_ref").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  deleted: boolean("deleted").notNull().default(false),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
 });
 
@@ -454,6 +529,7 @@ export const tables = {
   genre: genre,
   genre_tune_type: genreTuneType,
   goal: goal,
+  group_member: groupMember,
   instrument: instrument,
   media_asset: mediaAsset,
   note: note,
@@ -471,7 +547,10 @@ export const tables = {
   tag: tag,
   tune: tune,
   tune_override: tuneOverride,
+  tune_set: tuneSet,
+  tune_set_item: tuneSetItem,
   tune_type: tuneType,
   user_genre_selection: userGenreSelection,
+  user_group: userGroup,
   user_profile: userProfile,
 } as const;

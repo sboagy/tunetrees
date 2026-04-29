@@ -18,8 +18,8 @@
     "dbVersionKeyPrefix": "tunetrees-db-version",
     "outboxBackupKeyPrefix": "tunetrees-outbox-backup",
     "lastSyncTimestampKeyPrefix": "TT_LAST_SYNC_TIMESTAMP",
-    "schemaVersion": "2.0.6-add-media-assets",
-    "databaseVersion": 13,
+    "schemaVersion": "2.0.7-add-groups-and-tune-sets",
+    "databaseVersion": 14,
     "migrationDirectory": "drizzle/migrations/sqlite",
     "migrationFiles": [
       "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
@@ -36,7 +36,8 @@
       "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
       "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
       "/drizzle/migrations/sqlite/0013_add_goal_table.sql",
-      "/drizzle/migrations/sqlite/0014_add_media_assets.sql"
+      "/drizzle/migrations/sqlite/0014_add_media_assets.sql",
+      "/drizzle/migrations/sqlite/0015_add_groups_and_tune_sets.sql"
     ],
     "forceResetQueryParams": [
       { "key": "reset", "value": "true" },
@@ -57,10 +58,14 @@
       "prefs_scheduling_options": "user",
       "prefs_spaced_repetition": "user",
       "user_genre_selection": "user",
+      "user_group": "group",
+      "group_member": "group",
       "repertoire": "repertoire",
       "table_state": null,
       "tab_group_main_state": null,
       "tune": "catalog",
+      "tune_set": "group",
+      "tune_set_item": "group",
       "repertoire_tune": "repertoire",
       "practice_record": "practice",
       "daily_practice_queue": "practice",
@@ -103,6 +108,26 @@
       },
       "pull": {
         "tableRules": {
+          "user_group": {
+            "kind": "rpc",
+            "functionName": "sync_get_user_groups",
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
+          "group_member": {
+            "kind": "rpc",
+            "functionName": "sync_get_group_members",
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
           "plugin": {
             "kind": "orEqUserIdOrTrue",
             "column": "user_ref",
@@ -172,6 +197,30 @@
           "media_asset": {
             "kind": "rpc",
             "functionName": "sync_get_user_media_assets",
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_genre_ids": {
+                "source": "collection",
+                "collection": "selectedGenres"
+              },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
+          "tune_set": {
+            "kind": "rpc",
+            "functionName": "sync_get_tune_sets",
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
+          "tune_set_item": {
+            "kind": "rpc",
+            "functionName": "sync_get_tune_set_items",
             "paramMap": {
               "p_user_id": { "source": "authUserId" },
               "p_genre_ids": {

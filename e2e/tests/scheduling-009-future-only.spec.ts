@@ -210,8 +210,6 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
           await page.getByRole("button", { name: "Sign In" }).click();
         }
 
-        // Force sync down
-        await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
         await waitForSyncComplete(page, 45000);
         await page.waitForLoadState("networkidle", { timeout: 15000 });
       }

@@ -112,6 +112,33 @@ export const goal = sqliteTable(
   ]
 );
 
+export const groupMember = sqliteTable(
+  "group_member",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupRef: text("group_ref")
+      .notNull()
+      .references(() => userGroup.id),
+    userRef: text("user_ref")
+      .notNull()
+      .references(() => userProfile.id),
+    role: text("role").notNull().default("member"),
+    deleted: integer("deleted").notNull().default(0),
+    joinedAt: text("joined_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    uniqueIndex("group_member_group_user_unique").on(t.groupRef, t.userRef),
+    index("idx_group_member_group_ref").on(t.groupRef),
+    index("idx_group_member_user_ref").on(t.userRef),
+  ]
+);
+
 export const instrument = sqliteTable(
   "instrument",
   {
@@ -530,6 +557,59 @@ export const tuneOverride = sqliteTable("tune_override", {
   ...sqliteSyncColumns,
 });
 
+export const tuneSet = sqliteTable(
+  "tune_set",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    ownerUserRef: text("owner_user_ref").references(() => userProfile.id),
+    groupRef: text("group_ref").references(() => userGroup.id),
+    name: text("name").notNull(),
+    description: text("description"),
+    setKind: text("set_kind").notNull(),
+    deleted: integer("deleted").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    index("idx_tune_set_group_ref").on(t.groupRef),
+    index("idx_tune_set_owner_user_ref").on(t.ownerUserRef),
+    index("idx_tune_set_set_kind").on(t.setKind),
+  ]
+);
+
+export const tuneSetItem = sqliteTable(
+  "tune_set_item",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tuneSetRef: text("tune_set_ref")
+      .notNull()
+      .references(() => tuneSet.id),
+    tuneRef: text("tune_ref")
+      .notNull()
+      .references(() => tune.id),
+    position: integer("position").notNull(),
+    deleted: integer("deleted").notNull().default(0),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    uniqueIndex("tune_set_item_set_position_unique").on(
+      t.tuneSetRef,
+      t.position
+    ),
+    uniqueIndex("tune_set_item_set_tune_unique").on(t.tuneSetRef, t.tuneRef),
+    index("idx_tune_set_item_tune_ref").on(t.tuneRef),
+    index("idx_tune_set_item_tune_set_ref").on(t.tuneSetRef),
+  ]
+);
+
 export const tuneType = sqliteTable("tune_type", {
   id: text("id").notNull().primaryKey(),
   name: text("name"),
@@ -556,6 +636,27 @@ export const userGenreSelection = sqliteTable(
     index("idx_user_genre_selection_genre_id").on(t.genreId),
     index("idx_user_genre_selection_user_id").on(t.userId),
   ]
+);
+
+export const userGroup = sqliteTable(
+  "user_group",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    ownerUserRef: text("owner_user_ref")
+      .notNull()
+      .references(() => userProfile.id),
+    name: text("name").notNull(),
+    description: text("description"),
+    deleted: integer("deleted").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    ...sqliteSyncColumns,
+  },
+  (t) => [index("idx_user_group_owner_user_ref").on(t.ownerUserRef)]
 );
 
 export const userProfile = sqliteTable("user_profile", {
