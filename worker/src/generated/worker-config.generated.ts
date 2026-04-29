@@ -250,8 +250,26 @@ export const WORKER_SYNC_CONFIG = {
         column: "user_id",
       },
       user_profile: {
-        kind: "eqUserId",
-        column: "id",
+        kind: "rpc",
+        functionName: "sync_get_user_profiles",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
     },
   },

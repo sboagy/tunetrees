@@ -9,11 +9,13 @@ export interface CreateNoteData {
   noteText: string;
   userRef: string; // UUID (Supabase Auth ID, same as user_profile.id)
   repertoireRef?: string; // UUID
+  public?: boolean;
   favorite?: boolean;
 }
 
 export interface UpdateNoteData {
   noteText?: string;
+  public?: boolean;
   favorite?: boolean;
   displayOrder?: number;
 }
@@ -86,8 +88,7 @@ export async function createNote(
       userRef: data.userRef,
       repertoireRef: data.repertoireRef || null,
       createdDate: now,
-      // `public` is ignored for visibility; all user-created notes are private for now.
-      public: 0,
+      public: data.public ? 1 : 0,
       favorite: data.favorite ? 1 : 0,
       deleted: 0,
       lastModifiedAt: now,
@@ -122,6 +123,10 @@ export async function updateNote(
 
   if (data.noteText !== undefined) {
     updateData.noteText = data.noteText;
+  }
+
+  if (data.public !== undefined) {
+    updateData.public = data.public ? 1 : 0;
   }
 
   if (data.favorite !== undefined) {

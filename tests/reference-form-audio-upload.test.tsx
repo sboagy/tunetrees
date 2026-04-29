@@ -88,6 +88,28 @@ describe("ReferenceForm audio uploads", () => {
     expect(submitButton.disabled).toBe(false);
   });
 
+  it("includes the sharing checkbox state in submitted URL references", async () => {
+    const onSubmit = vi.fn();
+
+    render(() => (
+      <ReferenceForm onSubmit={onSubmit} onCancel={() => undefined} />
+    ));
+
+    await fireEvent.input(screen.getByTestId("reference-url-input"), {
+      target: { value: "https://example.com/shared-reference" },
+    });
+    await fireEvent.click(screen.getByTestId("reference-public-checkbox"));
+    await fireEvent.click(screen.getByTestId("reference-submit-button"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://example.com/shared-reference",
+        public: true,
+        sourceMode: "url",
+      })
+    );
+  });
+
   it("submits an uploaded audio file when audio upload mode is selected", async () => {
     const onSubmit = vi.fn();
 

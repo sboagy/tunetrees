@@ -43,6 +43,7 @@ export interface ReferenceFormData {
   refType: string;
   comment: string;
   favorite: boolean;
+  public: boolean;
   sourceMode: "url" | "upload";
   uploadFile: File | null;
 }
@@ -102,6 +103,9 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const [favorite, setFavorite] = createSignal(
     props.reference?.favorite === 1 || props.initialData?.favorite || false
   );
+  const [isPublic, setIsPublic] = createSignal(
+    props.reference?.public === 1 || props.initialData?.public || false
+  );
   const [sourceMode, setSourceMode] = createSignal<"url" | "upload">(
     getDefaultSourceMode(props.reference, props.initialData)
   );
@@ -149,6 +153,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
     setRefType(initialData.refType || "other");
     setComment(initialData.comment || "");
     setFavorite(initialData.favorite || false);
+    setIsPublic(initialData.public || false);
     setSourceMode(getDefaultSourceMode(props.reference, initialData));
     setSelectedFile(initialData.uploadFile || null);
     setUrlError(null);
@@ -297,6 +302,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         refType: "audio",
         comment: comment(),
         favorite: favorite(),
+        public: isPublic(),
         sourceMode: "upload",
         uploadFile: selectedFile(),
       });
@@ -321,6 +327,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       refType: refType(),
       comment: comment(),
       favorite: favorite(),
+      public: isPublic(),
       sourceMode: "url",
       uploadFile: null,
     });
@@ -647,22 +654,41 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         />
       </div>
 
-      {/* Favorite Checkbox */}
-      <div class="flex items-center gap-2">
-        <input
-          id="ref-favorite"
-          type="checkbox"
-          checked={favorite()}
-          onChange={(e) => setFavorite(e.currentTarget.checked)}
-          class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          data-testid="reference-favorite-checkbox"
-        />
-        <label
-          for="ref-favorite"
-          class="text-sm text-gray-700 dark:text-gray-300"
-        >
-          ⭐ Mark as favorite
-        </label>
+      <div class="space-y-2">
+        {/* Favorite Checkbox */}
+        <div class="flex items-center gap-2">
+          <input
+            id="ref-favorite"
+            type="checkbox"
+            checked={favorite()}
+            onChange={(e) => setFavorite(e.currentTarget.checked)}
+            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            data-testid="reference-favorite-checkbox"
+          />
+          <label
+            for="ref-favorite"
+            class="text-sm text-gray-700 dark:text-gray-300"
+          >
+            ⭐ Mark as favorite
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input
+            id="ref-public"
+            type="checkbox"
+            checked={isPublic()}
+            onChange={(e) => setIsPublic(e.currentTarget.checked)}
+            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            data-testid="reference-public-checkbox"
+          />
+          <label
+            for="ref-public"
+            class="text-sm text-gray-700 dark:text-gray-300"
+          >
+            Share with other users
+          </label>
+        </div>
       </div>
     </form>
   );

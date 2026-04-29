@@ -1,6 +1,7 @@
--- RPC for syncing reference table with genre filtering via tune JOIN
--- Returns references associated with tunes in selected genres OR user's private tunes
--- Supports incremental sync via p_after_timestamp parameter
+-- RPC for syncing reference table with genre filtering via tune JOIN.
+-- Returns references associated with tunes in selected genres OR user's private tunes.
+-- Visibility includes system references, the current user's references, and
+-- public references.
 
 CREATE OR REPLACE FUNCTION sync_get_user_references(
   p_user_id UUID,
@@ -22,8 +23,10 @@ AS $$
     OR t.private_for = p_user_id
   )
   AND (
-    -- References visible to user (public or user's own)
-    r.user_ref IS NULL OR r.user_ref = p_user_id
+    -- References visible to user (system, own, or public)
+    r.user_ref IS NULL
+    OR r.user_ref = p_user_id
+    OR COALESCE(r.public, false)
   )
   AND (
     -- Incremental sync: only rows updated after timestamp (if provided)

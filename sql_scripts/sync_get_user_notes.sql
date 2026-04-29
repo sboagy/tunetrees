@@ -1,6 +1,6 @@
--- RPC for syncing note table with genre filtering via tune JOIN
--- Returns notes associated with tunes in selected genres OR user's private tunes
--- Supports incremental sync via p_after_timestamp parameter
+-- RPC for syncing note table with genre filtering via tune JOIN.
+-- Returns notes associated with tunes in selected genres OR user's private tunes.
+-- Visibility includes system notes, the current user's notes, and public notes.
 
 CREATE OR REPLACE FUNCTION sync_get_user_notes(
   p_user_id UUID,
@@ -22,8 +22,10 @@ AS $$
     OR t.private_for = p_user_id
   )
   AND (
-    -- Notes visible to user (public or user's own)
-    n.user_ref IS NULL OR n.user_ref = p_user_id
+    -- Notes visible to user (system, own, or public)
+    n.user_ref IS NULL
+    OR n.user_ref = p_user_id
+    OR COALESCE(n.public, false)
   )
   AND (
     -- Incremental sync: only rows updated after timestamp (if provided)
