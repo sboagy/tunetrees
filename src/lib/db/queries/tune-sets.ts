@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
@@ -67,7 +67,7 @@ async function getTuneRow(
       and(
         eq(tune.id, tuneId),
         eq(tune.deleted, 0),
-        or(eq(tune.privateFor, userId), sql`${tune.privateFor} IS NULL`)
+        or(eq(tune.privateFor, userId), isNull(tune.privateFor))
       )
     )
     .limit(1);
@@ -302,27 +302,34 @@ export async function deleteTuneSet(
   }
 
   const now = nowIso();
+  const activeItems = await db
+    .select()
+    .from(tuneSetItem)
+    .where(
+      and(eq(tuneSetItem.tuneSetRef, tuneSetId), eq(tuneSetItem.deleted, 0))
+    );
+
   await db
     .update(tuneSet)
     .set({
       deleted: 1,
-      syncVersion: sql`${tuneSet.syncVersion} + 1`,
+      syncVersion: (access.set.syncVersion ?? 0) + 1,
       lastModifiedAt: now,
       deviceId: getLocalDeviceId(),
     })
     .where(eq(tuneSet.id, tuneSetId));
 
-  await db
-    .update(tuneSetItem)
-    .set({
-      deleted: 1,
-      syncVersion: sql`${tuneSetItem.syncVersion} + 1`,
-      lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
-    })
-    .where(
-      and(eq(tuneSetItem.tuneSetRef, tuneSetId), eq(tuneSetItem.deleted, 0))
-    );
+  for (const item of activeItems) {
+    await db
+      .update(tuneSetItem)
+      .set({
+        deleted: 1,
+        syncVersion: (item.syncVersion ?? 0) + 1,
+        lastModifiedAt: now,
+        deviceId: getLocalDeviceId(),
+      })
+      .where(eq(tuneSetItem.id, item.id));
+  }
 
   await persistDb();
   return true;
@@ -486,6 +493,32 @@ export async function addTunesToTuneSet(
   return { added, skipped, tuneIds: addedTuneIds };
 }
 
+export async function createTuneSetFromTunes(
+  db: AnyDatabase,
+  userId: string,
+  data: {
+    name: string;
+    tuneIds: string[];
+    description?: string | null;
+  }
+): Promise<TuneSet> {
+  if (data.tuneIds.length === 0) {
+    throw new Error("Select at least one tune to create a tune set");
+  }
+
+  const createdSet = await createTuneSet(db, userId, {
+    name: data.name,
+    description: data.description,
+    setKind: "practice_set",
+  });
+
+  for (const [index, tuneId] of data.tuneIds.entries()) {
+    await addTuneToTuneSet(db, createdSet.id, tuneId, userId, index);
+  }
+
+  return createdSet;
+}
+
 export async function removeTuneFromTuneSet(
   db: AnyDatabase,
   tuneSetId: string,
@@ -557,25 +590,33 @@ export async function reorderTuneSetItems(
 
   const offset = existing.length + 100;
   const now = nowIso();
+  const existingById = new Map(existing.map((item) => [item.id, item]));
 
-  await db
-    .update(tuneSetItem)
-    .set({
-      position: sql`${tuneSetItem.position} + ${offset}`,
-      syncVersion: sql`${tuneSetItem.syncVersion} + 1`,
-      lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
-    })
-    .where(
-      and(eq(tuneSetItem.tuneSetRef, tuneSetId), eq(tuneSetItem.deleted, 0))
-    );
+  for (const item of existing) {
+    await db
+      .update(tuneSetItem)
+      .set({
+        position: item.position + offset,
+        syncVersion: (item.syncVersion ?? 0) + 1,
+        lastModifiedAt: now,
+        deviceId: getLocalDeviceId(),
+      })
+      .where(eq(tuneSetItem.id, item.id));
+  }
 
   for (const [index, itemId] of itemIdsInOrder.entries()) {
+    const existingItem = existingById.get(itemId);
+    if (!existingItem) {
+      throw new Error(
+        "Reorder payload must contain every active tune set item exactly once"
+      );
+    }
+
     await db
       .update(tuneSetItem)
       .set({
         position: index,
-        syncVersion: sql`${tuneSetItem.syncVersion} + 1`,
+        syncVersion: (existingItem.syncVersion ?? 0) + 2,
         lastModifiedAt: now,
         deviceId: getLocalDeviceId(),
       })

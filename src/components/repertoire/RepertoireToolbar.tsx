@@ -11,14 +11,15 @@ import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
 import { ChevronRight, Columns, EllipsisVertical, Plus } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
+import { buildDefaultTuneSetName } from "@/lib/tune-sets/name";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
-import { addTunesToTuneSet } from "../../lib/db/queries/tune-sets";
+import { createTuneSetFromTunes } from "../../lib/db/queries/tune-sets";
 import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
@@ -40,7 +41,7 @@ import {
 import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
-import { TuneSetSelectorModal } from "../tune-sets/TuneSetSelectorModal";
+import { GroupAsSetPopover } from "../tune-sets/GroupAsSetPopover";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -81,10 +82,14 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     forceSyncUp,
     user,
   } = useAuth();
-  const { currentTuneSetId, incrementTuneSetListChanged } = useCurrentTuneSet();
+  const { incrementTuneSetListChanged } = useCurrentTuneSet();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
-  const [showTuneSetModal, setShowTuneSetModal] = createSignal(false);
+  const [showGroupAsSetPopover, setShowGroupAsSetPopover] = createSignal(false);
+  const [groupAsSetError, setGroupAsSetError] = createSignal<string | null>(
+    null
+  );
+  const [isSavingGroupAsSet, setIsSavingGroupAsSet] = createSignal(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
   const [isRemoving, setIsRemoving] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
@@ -92,6 +97,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
   let mobileOverflowButtonRef: HTMLButtonElement | undefined;
+  let groupAsSetButtonRef: HTMLButtonElement | undefined;
 
   createEffect(() => {
     if (!pendingDisplayOptionsOpen() || showOverflowMenu()) {
@@ -107,6 +113,22 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     Boolean(
       props.table && props.selectedRowsCount && props.selectedRowsCount > 0
     );
+
+  const selectedRows = createMemo(() =>
+    props.table ? props.table.getSelectedRowModel().rows : []
+  );
+
+  const selectedTuneIds = createMemo(() =>
+    selectedRows().map((row) => row.original.id)
+  );
+
+  const selectedTuneTitles = createMemo(() =>
+    selectedRows().map((row) => row.original.title ?? "")
+  );
+
+  const defaultTuneSetName = createMemo(() =>
+    buildDefaultTuneSetName(selectedTuneTitles())
+  );
 
   const handleAddToReview = async () => {
     try {
@@ -183,7 +205,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     setShowAddTuneDialog(true);
   };
 
-  const handleOpenAddToTuneSet = () => {
+  const handleOpenGroupAsSet = () => {
     if (!props.table) {
       alert("Table not initialized");
       return;
@@ -191,44 +213,41 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
     const selectedRows = props.table.getSelectedRowModel().rows;
     if (selectedRows.length === 0) {
-      alert("No tunes selected. Please select tunes to add to a tune set.");
+      alert("No tunes selected. Please select tunes to group as a tune set.");
       return;
     }
 
-    setShowTuneSetModal(true);
+    setGroupAsSetError(null);
+    setShowGroupAsSetPopover(true);
   };
 
-  const handleAddSelectedToTuneSet = async (tuneSetId: string) => {
+  const handleCreateGroupAsSet = async (name: string) => {
     if (!props.table) return;
 
     const currentUserId = user()?.id;
     if (!currentUserId) return;
 
-    const selectedRows = props.table.getSelectedRowModel().rows;
-    const tuneIds = selectedRows.map((row) => row.original.id);
-
     try {
-      const result = await addTunesToTuneSet(
-        getDb(),
-        tuneSetId,
-        tuneIds,
-        currentUserId
-      );
+      setIsSavingGroupAsSet(true);
+      setGroupAsSetError(null);
+
+      const createdSet = await createTuneSetFromTunes(getDb(), currentUserId, {
+        name,
+        tuneIds: selectedTuneIds(),
+      });
+
       incrementTuneSetListChanged();
-      setShowTuneSetModal(false);
+      setShowGroupAsSetPopover(false);
+      props.table.resetRowSelection();
       await forceSyncUp();
-      alert(
-        `Added ${result.added} ${result.added === 1 ? "tune" : "tunes"} to the selected tune set.${
-          result.skipped > 0
-            ? ` ${result.skipped} ${result.skipped === 1 ? "tune was" : "tunes were"} already included.`
-            : ""
-        }`
-      );
+      alert(`Created tune set "${createdSet.name}".`);
     } catch (error) {
-      console.error("Error adding tunes to tune set:", error);
-      alert(
-        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to tune set"}`
+      console.error("Error creating grouped tune set:", error);
+      setGroupAsSetError(
+        error instanceof Error ? error.message : "Failed to create tune set"
       );
+    } finally {
+      setIsSavingGroupAsSet(false);
     }
   };
 
@@ -374,10 +393,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 disabled={!hasSelectedRows()}
                 onClick={() => {
                   setShowOverflowMenu(false);
-                  handleOpenAddToTuneSet();
+                  handleOpenGroupAsSet();
                 }}
               >
-                <span>Add To Tune Set</span>
+                <span>Group as Set</span>
               </button>
 
               <button
@@ -503,30 +522,43 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 onExpandedChange={props.onFilterPanelExpandedChange}
               />
 
-              <button
-                type="button"
-                onClick={handleOpenAddToTuneSet}
-                title="Add selected tunes to a tune set"
-                data-testid="repertoire-add-to-tune-set-button"
-                disabled={!hasSelectedRows()}
-                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
-              >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
+              <div class="relative">
+                <button
+                  ref={groupAsSetButtonRef!}
+                  type="button"
+                  onClick={handleOpenGroupAsSet}
+                  title="Create a tune set from the selected tunes"
+                  data-testid="repertoire-group-as-set-button"
+                  disabled={!hasSelectedRows()}
+                  class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
                 >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                <span>Add To Tune Set</span>
-              </button>
+                  <svg
+                    class={TOOLBAR_ICON_SIZE}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 7h16M4 12h16M4 17h10"
+                    />
+                  </svg>
+                  <span>Group as Set</span>
+                </button>
+
+                <GroupAsSetPopover
+                  isOpen={showGroupAsSetPopover() && !isMobile()}
+                  tuneTitles={selectedTuneTitles()}
+                  initialName={defaultTuneSetName()}
+                  isSaving={isSavingGroupAsSet()}
+                  error={groupAsSetError()}
+                  onSave={(name) => void handleCreateGroupAsSet(name)}
+                  onClose={() => setShowGroupAsSetPopover(false)}
+                />
+              </div>
 
               <button
                 type="button"
@@ -663,12 +695,15 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <TuneSetSelectorModal
-        isOpen={showTuneSetModal()}
-        tuneCount={props.selectedRowsCount ?? 0}
-        initialTuneSetId={currentTuneSetId()}
-        onSelect={(tuneSetId) => void handleAddSelectedToTuneSet(tuneSetId)}
-        onCancel={() => setShowTuneSetModal(false)}
+      <GroupAsSetPopover
+        isOpen={showGroupAsSetPopover() && isMobile()}
+        isMobile={true}
+        tuneTitles={selectedTuneTitles()}
+        initialName={defaultTuneSetName()}
+        isSaving={isSavingGroupAsSet()}
+        error={groupAsSetError()}
+        onSave={(name) => void handleCreateGroupAsSet(name)}
+        onClose={() => setShowGroupAsSetPopover(false)}
       />
     </>
   );

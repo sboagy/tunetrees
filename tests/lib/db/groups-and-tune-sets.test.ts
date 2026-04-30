@@ -14,6 +14,7 @@ import {
   addTuneToTuneSet,
   cloneTuneSetToGroupSetlist,
   createTuneSet,
+  createTuneSetFromTunes,
   getTuneSetItems,
   getVisibleTuneSets,
   removeTuneFromTuneSet,
@@ -196,6 +197,24 @@ describe("tune set query helpers", () => {
     const remainingItems = await getTuneSetItems(db as never, set.id, OWNER_ID);
     expect(remainingItems).toHaveLength(1);
     expect(remainingItems[0].tuneRef).toBe(PRIVATE_TUNE_ID);
+  });
+
+  it("creates a personal tune set from an ordered tune selection", async () => {
+    const createdSet = await createTuneSetFromTunes(db as never, OWNER_ID, {
+      name: "Opening Set",
+      tuneIds: [PRIVATE_TUNE_ID, PUBLIC_TUNE_ID],
+    });
+
+    expect(createdSet.ownerUserRef).toBe(OWNER_ID);
+    expect(createdSet.groupRef).toBeNull();
+    expect(createdSet.name).toBe("Opening Set");
+
+    const items = await getTuneSetItems(db as never, createdSet.id, OWNER_ID);
+    expect(items.map((item) => item.tuneRef)).toEqual([
+      PRIVATE_TUNE_ID,
+      PUBLIC_TUNE_ID,
+    ]);
+    expect(items.map((item) => item.position)).toEqual([0, 1]);
   });
 
   it("allows owner/admin group setlist management while keeping members read-only", async () => {

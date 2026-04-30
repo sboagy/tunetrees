@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
@@ -321,54 +321,74 @@ export async function deleteGroup(
   }
 
   const now = nowIso();
+  const groupMemberships = await db
+    .select()
+    .from(groupMember)
+    .where(and(eq(groupMember.groupRef, groupId), eq(groupMember.deleted, 0)));
   const groupSets = await db
     .select()
     .from(tuneSet)
     .where(and(eq(tuneSet.groupRef, groupId), eq(tuneSet.deleted, 0)));
   const setIds = groupSets.map((setRecord) => setRecord.id);
+  const activeSetItems =
+    setIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(tuneSetItem)
+          .where(
+            and(
+              inArray(tuneSetItem.tuneSetRef, setIds),
+              eq(tuneSetItem.deleted, 0)
+            )
+          );
 
   await db
     .update(userGroup)
     .set({
       deleted: 1,
-      syncVersion: sql`${userGroup.syncVersion} + 1`,
+      syncVersion: (access.group.syncVersion ?? 0) + 1,
       lastModifiedAt: now,
       deviceId: getLocalDeviceId(),
     })
     .where(eq(userGroup.id, groupId));
 
-  await db
-    .update(groupMember)
-    .set({
-      deleted: 1,
-      syncVersion: sql`${groupMember.syncVersion} + 1`,
-      lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
-    })
-    .where(and(eq(groupMember.groupRef, groupId), eq(groupMember.deleted, 0)));
+  for (const membership of groupMemberships) {
+    await db
+      .update(groupMember)
+      .set({
+        deleted: 1,
+        syncVersion: (membership.syncVersion ?? 0) + 1,
+        lastModifiedAt: now,
+        deviceId: getLocalDeviceId(),
+      })
+      .where(eq(groupMember.id, membership.id));
+  }
 
   if (setIds.length > 0) {
-    await db
-      .update(tuneSet)
-      .set({
-        deleted: 1,
-        syncVersion: sql`${tuneSet.syncVersion} + 1`,
-        lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
-      })
-      .where(and(eq(tuneSet.groupRef, groupId), eq(tuneSet.deleted, 0)));
+    for (const setRecord of groupSets) {
+      await db
+        .update(tuneSet)
+        .set({
+          deleted: 1,
+          syncVersion: (setRecord.syncVersion ?? 0) + 1,
+          lastModifiedAt: now,
+          deviceId: getLocalDeviceId(),
+        })
+        .where(eq(tuneSet.id, setRecord.id));
+    }
 
-    await db
-      .update(tuneSetItem)
-      .set({
-        deleted: 1,
-        syncVersion: sql`${tuneSetItem.syncVersion} + 1`,
-        lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
-      })
-      .where(
-        and(inArray(tuneSetItem.tuneSetRef, setIds), eq(tuneSetItem.deleted, 0))
-      );
+    for (const setItem of activeSetItems) {
+      await db
+        .update(tuneSetItem)
+        .set({
+          deleted: 1,
+          syncVersion: (setItem.syncVersion ?? 0) + 1,
+          lastModifiedAt: now,
+          deviceId: getLocalDeviceId(),
+        })
+        .where(eq(tuneSetItem.id, setItem.id));
+    }
   }
 
   await persistDb();
