@@ -42,6 +42,7 @@ import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
 import { GroupAsSetPopover } from "../tune-sets/GroupAsSetPopover";
+import { TuneSetFilterDialog } from "../tune-sets/TuneSetFilterDialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -70,6 +71,8 @@ export interface RepertoireToolbarProps {
   selectedRowsCount?: number;
   table?: Table<ITuneOverview>;
   repertoireId?: string;
+  selectedTuneSetId: string | null;
+  onTuneSetFilterChange: (tuneSetId: string | null) => void;
   filterPanelExpanded?: boolean;
   onFilterPanelExpandedChange?: (expanded: boolean) => void;
 }
@@ -86,6 +89,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
   const [showGroupAsSetPopover, setShowGroupAsSetPopover] = createSignal(false);
+  const [showTuneSetFilterDialog, setShowTuneSetFilterDialog] =
+    createSignal(false);
   const [groupAsSetError, setGroupAsSetError] = createSignal<string | null>(
     null
   );
@@ -388,6 +393,18 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
               <button
                 type="button"
+                data-testid="repertoire-tune-set-filter-button"
+                class={mobileMenuItemClasses}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  setShowTuneSetFilterDialog(true);
+                }}
+              >
+                <span>Tune Set Filter</span>
+              </button>
+
+              <button
+                type="button"
                 data-testid="repertoire-add-to-tune-set-button"
                 class={mobileMenuItemClasses}
                 disabled={!hasSelectedRows()}
@@ -521,6 +538,36 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 isExpanded={props.filterPanelExpanded}
                 onExpandedChange={props.onFilterPanelExpandedChange}
               />
+
+              <button
+                type="button"
+                onClick={() => setShowTuneSetFilterDialog(true)}
+                title="Filter this grid by a tune set"
+                data-testid="repertoire-tune-set-filter-button"
+                class={`${TOOLBAR_BUTTON_BASE} ${
+                  props.selectedTuneSetId
+                    ? TOOLBAR_BUTTON_PRIMARY
+                    : TOOLBAR_BUTTON_NEUTRAL_ALT
+                }`}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 7h16M7 12h10M10 17h4"
+                  />
+                </svg>
+                <span>
+                  {props.selectedTuneSetId ? "Tune Set Filter On" : "Tune Set"}
+                </span>
+              </button>
 
               <div class="relative">
                 <button
@@ -704,6 +751,13 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         error={groupAsSetError()}
         onSave={(name) => void handleCreateGroupAsSet(name)}
         onClose={() => setShowGroupAsSetPopover(false)}
+      />
+
+      <TuneSetFilterDialog
+        isOpen={showTuneSetFilterDialog()}
+        selectedTuneSetId={props.selectedTuneSetId}
+        onSelect={(tuneSetId) => props.onTuneSetFilterChange(tuneSetId)}
+        onClose={() => setShowTuneSetFilterDialog(false)}
       />
     </>
   );

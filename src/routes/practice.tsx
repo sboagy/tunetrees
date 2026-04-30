@@ -64,7 +64,7 @@ const PracticePage: Component = () => {
     suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
-  const { currentTuneSetId, tuneSetListChanged } = useCurrentTuneSet();
+  const { tuneSetListChanged } = useCurrentTuneSet();
   const { isCreatingStarter, starterError, handleStarterChosen } =
     useStarterRepertoire();
   const { beginOnboardingAtGenreStep } = useOnboarding();
@@ -74,6 +74,9 @@ const PracticePage: Component = () => {
   const [openedFromOnboarding, setOpenedFromOnboarding] = createSignal(false);
   const [isChatOpen, setIsChatOpen] = createSignal(false);
   const [tableInstance, setTableInstance] = createSignal<any>(null);
+  const [selectedTuneSetId, setSelectedTuneSetId] = createSignal<string | null>(
+    null
+  );
   const repertoiresVersion = createMemo(() => `${repertoireListChanged()}`);
   const [repertoiresLoadedVersion, setRepertoiresLoadedVersion] = createSignal<
     string | null
@@ -197,7 +200,7 @@ const PracticePage: Component = () => {
     () => {
       const db = localDb();
       const userIdValue = userId();
-      const tuneSetId = currentTuneSetId();
+      const tuneSetId = selectedTuneSetId();
       const version = tuneSetListChanged();
       return db && userIdValue && tuneSetId
         ? { db, userId: userIdValue, tuneSetId, version }
@@ -223,7 +226,7 @@ const PracticePage: Component = () => {
     queueDate,
     showSubmitted,
     selectedTuneIds: () =>
-      currentTuneSetId()
+      selectedTuneSetId()
         ? (selectedTuneSetTuneIds.latest ?? selectedTuneSetTuneIds() ?? [])
         : undefined,
   });
@@ -384,6 +387,8 @@ const PracticePage: Component = () => {
         flashcardMode={flashcardMode()}
         onFlashcardModeChange={setFlashcardMode}
         table={tableInstance()}
+        selectedTuneSetId={selectedTuneSetId()}
+        onSelectedTuneSetChange={setSelectedTuneSetId}
         flashcardFieldVisibility={flashcardFieldVisibility()}
         onFlashcardFieldVisibilityChange={setFlashcardFieldVisibility}
         rolloverPending={rolloverStatus().showBanner}

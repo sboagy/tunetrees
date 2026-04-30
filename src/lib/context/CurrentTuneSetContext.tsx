@@ -6,8 +6,6 @@ import {
 } from "solid-js";
 
 interface CurrentTuneSetContextValue {
-  currentTuneSetId: () => string | null;
-  setCurrentTuneSetId: (id: string | null) => void;
   tuneSetListChanged: () => number;
   incrementTuneSetListChanged: () => void;
 }
@@ -15,14 +13,9 @@ interface CurrentTuneSetContextValue {
 const CurrentTuneSetContext = createContext<CurrentTuneSetContextValue>();
 
 export const CurrentTuneSetProvider: ParentComponent = (props) => {
-  const [currentTuneSetId, setCurrentTuneSetId] = createSignal<string | null>(
-    null
-  );
   const [tuneSetListChanged, setTuneSetListChanged] = createSignal(0);
 
   const value: CurrentTuneSetContextValue = {
-    currentTuneSetId,
-    setCurrentTuneSetId,
     tuneSetListChanged,
     incrementTuneSetListChanged: () =>
       setTuneSetListChanged((value) => value + 1),

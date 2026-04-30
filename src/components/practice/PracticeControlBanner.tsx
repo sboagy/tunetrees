@@ -43,6 +43,7 @@ import {
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
+import { TuneSetFilterDialog } from "../tune-sets/TuneSetFilterDialog";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import { AddTunesDialog } from "./AddTunesDialog";
 import { FlashcardFieldVisibilityMenu } from "./FlashcardFieldVisibilityMenu";
@@ -66,6 +67,10 @@ export interface PracticeControlBannerProps {
   onFlashcardModeChange?: (enabled: boolean) => void;
   /** Table instance for column visibility control (grid mode) */
   table?: Table<any>;
+  /** Local practice-grid tune-set filter */
+  selectedTuneSetId?: string | null;
+  /** Handler for local practice-grid tune-set filter changes */
+  onSelectedTuneSetChange?: (tuneSetId: string | null) => void;
   /** Flashcard field visibility (flashcard mode) */
   flashcardFieldVisibility?: FlashcardFieldVisibilityByFace;
   /** Handler for flashcard field visibility change */
@@ -107,6 +112,8 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showQueueSelector, setShowQueueSelector] = createSignal(false);
   const [showAddTunesDialog, setShowAddTunesDialog] = createSignal(false);
+  const [showTuneSetFilterDialog, setShowTuneSetFilterDialog] =
+    createSignal(false);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [isRefreshingQueue, setIsRefreshingQueue] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
@@ -372,6 +379,20 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               <button
                 type="button"
                 class={mobileMenuItemClasses}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  setShowTuneSetFilterDialog(true);
+                }}
+              >
+                <span>Tune Set Filter</span>
+                <span class={mobileMenuMetaClasses}>
+                  {props.selectedTuneSetId ? "On" : "Off"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                class={mobileMenuItemClasses}
                 onClick={handleQueueSelectorOpen}
               >
                 <span>Select Practice Queue</span>
@@ -531,6 +552,35 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
               {/* Queue control button */}
               <button
                 type="button"
+                onClick={() => setShowTuneSetFilterDialog(true)}
+                title="Filter this practice grid by a tune set"
+                class={`${TOOLBAR_BUTTON_BASE} ${
+                  props.selectedTuneSetId
+                    ? TOOLBAR_BUTTON_PRIMARY
+                    : TOOLBAR_BUTTON_NEUTRAL
+                }`}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 7h16M7 12h10M10 17h4"
+                  />
+                </svg>
+                <span>
+                  {props.selectedTuneSetId ? "Tune Set Filter On" : "Tune Set"}
+                </span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowQueueSelector(true)}
                 title="Select practice queue date"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
@@ -678,6 +728,13 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
         onLoadMoreRecentQueues={handleLoadMoreRecentQueues}
         onReset={handleQueueReset}
         onClose={() => setShowQueueSelector(false)}
+      />
+
+      <TuneSetFilterDialog
+        isOpen={showTuneSetFilterDialog()}
+        selectedTuneSetId={props.selectedTuneSetId ?? null}
+        onSelect={(tuneSetId) => props.onSelectedTuneSetChange?.(tuneSetId)}
+        onClose={() => setShowTuneSetFilterDialog(false)}
       />
     </>
   );
