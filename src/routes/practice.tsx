@@ -26,8 +26,10 @@ import { FlashcardView, PracticeControlBanner } from "../components/practice";
 import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
 import { useOnboarding } from "../lib/context/OnboardingContext";
 import { getUserRepertoires } from "../lib/db/queries/repertoires";
+import { getTuneIdsForTuneSet } from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import { type GoalRow, getGoals } from "../lib/db/queries/user-settings";
 import type { RepertoireWithSummary } from "../lib/db/types";
@@ -62,6 +64,7 @@ const PracticePage: Component = () => {
     suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
+  const { currentTuneSetId, tuneSetListChanged } = useCurrentTuneSet();
   const { isCreatingStarter, starterError, handleStarterChosen } =
     useStarterRepertoire();
   const { beginOnboardingAtGenreStep } = useOnboarding();
@@ -190,6 +193,22 @@ const PracticePage: Component = () => {
     setFlashcardFieldVisibility,
   } = useFlashcardPersistence();
 
+  const [selectedTuneSetTuneIds] = createResource(
+    () => {
+      const db = localDb();
+      const userIdValue = userId();
+      const tuneSetId = currentTuneSetId();
+      const version = tuneSetListChanged();
+      return db && userIdValue && tuneSetId
+        ? { db, userId: userIdValue, tuneSetId, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) return undefined;
+      return getTuneIdsForTuneSet(params.db, params.tuneSetId, params.userId);
+    }
+  );
+
   const {
     practiceRows,
     filteredPracticeList,
@@ -203,6 +222,10 @@ const PracticePage: Component = () => {
     queueReady,
     queueDate,
     showSubmitted,
+    selectedTuneIds: () =>
+      currentTuneSetId()
+        ? (selectedTuneSetTuneIds.latest ?? selectedTuneSetTuneIds() ?? [])
+        : undefined,
   });
 
   const {

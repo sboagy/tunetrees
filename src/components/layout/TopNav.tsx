@@ -24,8 +24,13 @@ import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
+import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getSqliteInstance } from "../../lib/db/client-sqlite";
 import { getUserRepertoires } from "../../lib/db/queries/repertoires";
+import {
+  getPersonalTuneSets,
+  type TuneSetWithSummary,
+} from "../../lib/db/queries/tune-sets";
 import type { RepertoireWithSummary } from "../../lib/db/types";
 import { useClickOutside } from "../../lib/hooks/useClickOutside";
 import { log } from "../../lib/logger";
@@ -33,7 +38,13 @@ import {
   getSelectedRepertoireId,
   setSelectedRepertoireId,
 } from "../../lib/services/repertoire-service";
+import {
+  clearSelectedTuneSetId,
+  getSelectedTuneSetId,
+  setSelectedTuneSetId,
+} from "../../lib/services/tune-set-service";
 import { RepertoireManagerDialog } from "../repertoires/RepertoireManagerDialog";
+import { TuneSetManagerDialog } from "../tune-sets/TuneSetManagerDialog";
 import {
   AlertDialog,
   AlertDialogCloseButton,
@@ -78,6 +89,14 @@ const getRepertoireDisplayName = (
   // Otherwise just use instrument name
   const instrument = repertoire.instrumentName || "Unknown Instrument";
   return instrument;
+};
+
+const getTuneSetDisplayName = (tuneSet: TuneSetWithSummary): string => {
+  if (tuneSet.name.trim()) {
+    return tuneSet.name.trim();
+  }
+
+  return "Untitled Tune Set";
 };
 
 type TopNavDbSnapshot = {
@@ -796,6 +815,209 @@ const RepertoireDropdown: Component<{
   );
 };
 
+const TuneSetDropdown: Component<{
+  onOpenTuneSetManager: () => void;
+}> = (props) => {
+  const { user, localDb } = useAuth();
+  const { currentTuneSetId, setCurrentTuneSetId, tuneSetListChanged } =
+    useCurrentTuneSet();
+  const [showDropdown, setShowDropdown] = createSignal(false);
+  let dropdownContainerRef: HTMLDivElement | undefined;
+
+  useClickOutside(
+    () => dropdownContainerRef,
+    () => {
+      if (showDropdown()) {
+        setShowDropdown(false);
+      }
+    }
+  );
+
+  const [tuneSets] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const version = `${tuneSetListChanged()}`;
+      return db && userId ? { db, userId, version } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getPersonalTuneSets(params.db, params.userId);
+    }
+  );
+
+  createEffect(() => {
+    const userId = user()?.id;
+    const tuneSetsList = tuneSets();
+    if (!userId || !tuneSetsList) return;
+
+    const storedId = getSelectedTuneSetId(userId);
+    if (!storedId) {
+      if (currentTuneSetId() !== null) {
+        setCurrentTuneSetId(null);
+      }
+      return;
+    }
+
+    const storedSet = tuneSetsList.find((tuneSet) => tuneSet.id === storedId);
+    if (!storedSet) {
+      clearSelectedTuneSetId(userId);
+      setCurrentTuneSetId(null);
+      return;
+    }
+
+    if (currentTuneSetId() !== storedId) {
+      setCurrentTuneSetId(storedId);
+    }
+  });
+
+  const handleTuneSetSelect = (tuneSetId: string | null) => {
+    const userId = user()?.id;
+    if (!userId) return;
+
+    setCurrentTuneSetId(tuneSetId);
+    setSelectedTuneSetId(userId, tuneSetId);
+    setShowDropdown(false);
+  };
+
+  const handleManageTuneSets = () => {
+    setShowDropdown(false);
+    props.onOpenTuneSetManager();
+  };
+
+  const selectedTuneSet = createMemo(() => {
+    const id = currentTuneSetId();
+    const tuneSetsList = tuneSets();
+    if (!id || !tuneSetsList) return null;
+    return tuneSetsList.find((tuneSet) => tuneSet.id === id) ?? null;
+  });
+
+  return (
+    <div
+      class="relative"
+      data-testid="tune-set-dropdown"
+      ref={dropdownContainerRef}
+    >
+      <button
+        type="button"
+        onClick={() => setShowDropdown(!showDropdown())}
+        class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+        aria-label="Select tune set"
+        aria-expanded={showDropdown()}
+        data-testid="tune-set-dropdown-button"
+      >
+        <span class="hidden md:inline font-medium">
+          {selectedTuneSet()
+            ? getTuneSetDisplayName(selectedTuneSet()!)
+            : "All Tunes"}
+        </span>
+        <span class="md:hidden inline-block max-w-[10ch] min-w-0 truncate font-medium">
+          {selectedTuneSet()
+            ? getTuneSetDisplayName(selectedTuneSet()!)
+            : "All Tunes"}
+        </span>
+        <svg
+          class="w-4 h-4 transition-transform"
+          classList={{ "rotate-180": showDropdown() }}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      <Show when={showDropdown()}>
+        <div class="absolute left-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+          <div class="py-2" data-testid="top-nav-manage-tune-sets-panel">
+            <button
+              type="button"
+              class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
+              classList={{
+                "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":
+                  currentTuneSetId() === null,
+              }}
+              onClick={() => handleTuneSetSelect(null)}
+            >
+              <div class="flex-1">
+                <div class="font-medium">All Tunes</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  Show the full current repertoire and practice queue
+                </div>
+              </div>
+            </button>
+
+            <Show
+              when={!tuneSets.loading}
+              fallback={
+                <div class="px-4 py-2 text-sm text-gray-500">
+                  Loading tune sets...
+                </div>
+              }
+            >
+              <For each={tuneSets() ?? []}>
+                {(tuneSet) => (
+                  <button
+                    type="button"
+                    class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between"
+                    classList={{
+                      "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300":
+                        currentTuneSetId() === tuneSet.id,
+                    }}
+                    onClick={() => handleTuneSetSelect(tuneSet.id)}
+                  >
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium truncate">
+                        {getTuneSetDisplayName(tuneSet)}
+                      </div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {tuneSet.tuneCount}{" "}
+                        {tuneSet.tuneCount === 1 ? "tune" : "tunes"}
+                        {tuneSet.description ? ` • ${tuneSet.description}` : ""}
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </For>
+            </Show>
+
+            <div class="border-t border-gray-200 dark:border-gray-700 my-2" />
+
+            <button
+              type="button"
+              class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              onClick={handleManageTuneSets}
+              data-testid="manage-tune-sets-button"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Manage Tune Sets...
+            </button>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
 export const TopNav: Component = () => {
   const location = useLocation();
   const { openUserSettings } = useUserSettingsDialog();
@@ -816,6 +1038,7 @@ export const TopNav: Component = () => {
   const [showUserMenu, setShowUserMenu] = createSignal(false);
   const [showDbMenu, setShowDbMenu] = createSignal(false);
   const [showRepertoireManager, setShowRepertoireManager] = createSignal(false);
+  const [showTuneSetManager, setShowTuneSetManager] = createSignal(false);
   const [showAboutDialog, setShowAboutDialog] = createSignal(false);
   const [showForceSyncUpConfirm, setShowForceSyncUpConfirm] =
     createSignal(false);
@@ -985,12 +1208,12 @@ export const TopNav: Component = () => {
   return (
     <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
       <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center gap-6">
+        <div class="flex justify-between items-center h-16 gap-2 sm:gap-4">
+          <div class="flex min-w-0 items-center gap-2 sm:gap-6">
             {/* App Logo Dropdown */}
             <LogoDropdown onOpenAbout={() => setShowAboutDialog(true)} />
             {/* Repertoire Selector */}
-            <div class="flex items-center gap--1">
+            <div class="flex min-w-0 items-center gap--1">
               <span class="hidden sm:inline text-sm font-medium text-gray-600 dark:text-gray-400">
                 Current Repertoire:
               </span>
@@ -998,10 +1221,18 @@ export const TopNav: Component = () => {
                 onOpenRepertoireManager={() => setShowRepertoireManager(true)}
               />
             </div>
+            <div class="hidden md:flex min-w-0 items-center gap--1">
+              <span class="hidden sm:inline text-sm font-medium text-gray-600 dark:text-gray-400">
+                Tune Set:
+              </span>
+              <TuneSetDropdown
+                onOpenTuneSetManager={() => setShowTuneSetManager(true)}
+              />
+            </div>
           </div>
 
           {/* User Info + Theme + Logout */}
-          <div class="flex items-center gap-4">
+          <div class="flex shrink-0 items-center gap-2 sm:gap-4">
             {/* User Menu Dropdown - show for both authenticated and anonymous users */}
             <Show when={user() || isAnonymous()}>
               <div
@@ -1012,7 +1243,7 @@ export const TopNav: Component = () => {
                 <button
                   type="button"
                   onClick={() => setShowUserMenu(!showUserMenu())}
-                  class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                  class="flex shrink-0 items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                   aria-label="User menu"
                   aria-expanded={showUserMenu()}
                   data-testid="user-menu-button"
@@ -1279,7 +1510,7 @@ export const TopNav: Component = () => {
               <button
                 type="button"
                 onClick={() => setShowDbMenu(!showDbMenu())}
-                class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                class="flex shrink-0 items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 aria-label="Database and sync status"
                 aria-expanded={showDbMenu()}
                 data-testid="database-status-button"
@@ -1667,6 +1898,11 @@ export const TopNav: Component = () => {
       <RepertoireManagerDialog
         isOpen={showRepertoireManager()}
         onClose={() => setShowRepertoireManager(false)}
+      />
+
+      <TuneSetManagerDialog
+        isOpen={showTuneSetManager()}
+        onClose={() => setShowTuneSetManager(false)}
       />
 
       {/* About Dialog */}

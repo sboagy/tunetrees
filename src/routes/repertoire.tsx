@@ -35,8 +35,10 @@ import {
 import { RepertoireEditorDialog } from "../components/repertoires/RepertoireEditorDialog";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
+import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
 import { persistDb } from "../lib/db/client-sqlite";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
+import { getTuneIdsForTuneSet } from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import * as schema from "../lib/db/schema";
 import { repertoireTune } from "../lib/db/schema";
@@ -73,6 +75,7 @@ const RepertoirePage: Component = () => {
     suppressNextViewRefresh,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
+  const { currentTuneSetId, tuneSetListChanged } = useCurrentTuneSet();
   const { isCreatingStarter, starterError, handleStarterChosen } =
     useStarterRepertoire();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -255,6 +258,22 @@ const RepertoirePage: Component = () => {
 
   const isInitialRepertoireLoading = createMemo(
     () => repertoireTunes.loading && repertoireTunes.latest == null
+  );
+
+  const [selectedTuneSetTuneIds] = createResource(
+    () => {
+      const db = localDb();
+      const resolvedUserId = user()?.id;
+      const tuneSetId = currentTuneSetId();
+      const version = tuneSetListChanged();
+      return db && resolvedUserId && tuneSetId
+        ? { db, userId: resolvedUserId, tuneSetId, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) return undefined;
+      return getTuneIdsForTuneSet(params.db, params.tuneSetId, params.userId);
+    }
   );
 
   const repertoireIsEmpty = createMemo(
@@ -474,6 +493,13 @@ const RepertoirePage: Component = () => {
                 selectedTypes={selectedTypes()}
                 selectedModes={selectedModes()}
                 selectedGenreNames={selectedGenres()}
+                selectedTuneIds={
+                  currentTuneSetId()
+                    ? (selectedTuneSetTuneIds.latest ??
+                      selectedTuneSetTuneIds() ??
+                      [])
+                    : undefined
+                }
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
                 onGoalChange={handleGoalChange}

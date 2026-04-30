@@ -14,9 +14,11 @@ import type { Component } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
+import { addTunesToTuneSet } from "../../lib/db/queries/tune-sets";
 import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
@@ -38,6 +40,7 @@ import {
 import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
+import { TuneSetSelectorModal } from "../tune-sets/TuneSetSelectorModal";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -78,8 +81,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     forceSyncUp,
     user,
   } = useAuth();
+  const { currentTuneSetId, incrementTuneSetListChanged } = useCurrentTuneSet();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
+  const [showTuneSetModal, setShowTuneSetModal] = createSignal(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
   const [isRemoving, setIsRemoving] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
@@ -176,6 +181,55 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
   const handleAddTune = () => {
     setShowAddTuneDialog(true);
+  };
+
+  const handleOpenAddToTuneSet = () => {
+    if (!props.table) {
+      alert("Table not initialized");
+      return;
+    }
+
+    const selectedRows = props.table.getSelectedRowModel().rows;
+    if (selectedRows.length === 0) {
+      alert("No tunes selected. Please select tunes to add to a tune set.");
+      return;
+    }
+
+    setShowTuneSetModal(true);
+  };
+
+  const handleAddSelectedToTuneSet = async (tuneSetId: string) => {
+    if (!props.table) return;
+
+    const currentUserId = user()?.id;
+    if (!currentUserId) return;
+
+    const selectedRows = props.table.getSelectedRowModel().rows;
+    const tuneIds = selectedRows.map((row) => row.original.id);
+
+    try {
+      const result = await addTunesToTuneSet(
+        getDb(),
+        tuneSetId,
+        tuneIds,
+        currentUserId
+      );
+      incrementTuneSetListChanged();
+      setShowTuneSetModal(false);
+      await forceSyncUp();
+      alert(
+        `Added ${result.added} ${result.added === 1 ? "tune" : "tunes"} to the selected tune set.${
+          result.skipped > 0
+            ? ` ${result.skipped} ${result.skipped === 1 ? "tune was" : "tunes were"} already included.`
+            : ""
+        }`
+      );
+    } catch (error) {
+      console.error("Error adding tunes to tune set:", error);
+      alert(
+        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to tune set"}`
+      );
+    }
   };
 
   const removeSelectedFromRepertoire = async (): Promise<void> => {
@@ -315,6 +369,19 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
               <button
                 type="button"
+                data-testid="repertoire-add-to-tune-set-button"
+                class={mobileMenuItemClasses}
+                disabled={!hasSelectedRows()}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  handleOpenAddToTuneSet();
+                }}
+              >
+                <span>Add To Tune Set</span>
+              </button>
+
+              <button
+                type="button"
                 data-testid="repertoire-add-tune-button"
                 class={mobileMenuItemClasses}
                 onClick={() => {
@@ -435,6 +502,31 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 isExpanded={props.filterPanelExpanded}
                 onExpandedChange={props.onFilterPanelExpandedChange}
               />
+
+              <button
+                type="button"
+                onClick={handleOpenAddToTuneSet}
+                title="Add selected tunes to a tune set"
+                data-testid="repertoire-add-to-tune-set-button"
+                disabled={!hasSelectedRows()}
+                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span>Add To Tune Set</span>
+              </button>
 
               <button
                 type="button"
@@ -570,6 +662,14 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <TuneSetSelectorModal
+        isOpen={showTuneSetModal()}
+        tuneCount={props.selectedRowsCount ?? 0}
+        initialTuneSetId={currentTuneSetId()}
+        onSelect={(tuneSetId) => void handleAddSelectedToTuneSet(tuneSetId)}
+        onCancel={() => setShowTuneSetModal(false)}
+      />
     </>
   );
 };

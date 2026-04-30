@@ -186,6 +186,21 @@ export async function getVisibleTuneSets(
   );
 }
 
+export async function getPersonalTuneSets(
+  db: AnyDatabase,
+  userId: string,
+  includeDeleted = false
+): Promise<TuneSetWithSummary[]> {
+  const visibleSets = await getVisibleTuneSets(db, userId, {
+    includeDeleted,
+    setKind: "practice_set",
+  });
+
+  return visibleSets.filter(
+    (set) => set.ownerUserRef === userId && set.groupRef == null
+  );
+}
+
 export async function getTuneSetById(
   db: AnyDatabase,
   tuneSetId: string,
@@ -349,6 +364,15 @@ export async function getTuneSetItems(
   }
 
   return result;
+}
+
+export async function getTuneIdsForTuneSet(
+  db: AnyDatabase,
+  tuneSetId: string,
+  userId: string
+): Promise<string[]> {
+  const items = await getTuneSetItems(db, tuneSetId, userId);
+  return items.map((item) => item.tuneRef);
 }
 
 export async function addTuneToTuneSet(

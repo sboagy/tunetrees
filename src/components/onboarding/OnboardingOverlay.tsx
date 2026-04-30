@@ -335,19 +335,21 @@ export const OnboardingOverlay: Component = () => {
           {/* Step 2: Choose Genres */}
           <Match when={onboardingStep() === "choose-genres"}>
             <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-                <div class="flex items-start justify-between mb-4">
-                  <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
-                      <Info class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="p-6 pb-0">
+                  <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                        <Info class="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <h2 class="text-xl font-bold text-gray-900 dark:text-white">
+                        Choose additional genres to download 🎵
+                      </h2>
                     </div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">
-                      Choose additional genres to download 🎵
-                    </h2>
                   </div>
                 </div>
 
-                <div class="space-y-4">
+                <div class="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
                   <p class="text-gray-600 dark:text-gray-300 text-sm">
                     Select the genres you want available offline. You can change
                     this later in Settings.
@@ -370,34 +372,11 @@ export const OnboardingOverlay: Component = () => {
                       disabled={isSavingGenres()}
                       autoScrollToSelected={true}
                       testIdPrefix="onboarding-genre"
+                      listContainerClass="max-h-[min(42vh,20rem)]"
                       lockedGenreIds={starterLockedGenreIds()}
                       lockedLabel="Required for starter"
                     />
                   </Show>
-
-                  <div class="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      disabled={isSavingGenres()}
-                      class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      data-testid="onboarding-genre-cancel"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveGenres}
-                      disabled={
-                        isSavingGenres() ||
-                        effectiveSelectedGenreIds().length === 0
-                      }
-                      class="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      data-testid="onboarding-genre-continue"
-                    >
-                      {isSavingGenres() ? "Saving..." : "Continue"}
-                    </button>
-                  </div>
 
                   {/* Repertoire creation error (non-fatal — shown if creation fails on Continue) */}
                   <Show when={creationError()}>
@@ -412,6 +391,32 @@ export const OnboardingOverlay: Component = () => {
                       {populationWarning()}
                     </output>
                   </Show>
+                </div>
+
+                <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800">
+                  <div class="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      disabled={isSavingGenres()}
+                      class="flex-1 min-h-11 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="onboarding-genre-cancel"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveGenres}
+                      disabled={
+                        isSavingGenres() ||
+                        effectiveSelectedGenreIds().length === 0
+                      }
+                      class="flex-1 min-h-11 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="onboarding-genre-continue"
+                    >
+                      {isSavingGenres() ? "Saving..." : "Continue"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
