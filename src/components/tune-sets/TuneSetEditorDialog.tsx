@@ -7,11 +7,15 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
+import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import {
   createTuneSet,
   getTuneSetById,
+  getTuneSetItems,
+  removeTuneFromTuneSet,
+  type TuneSetItemWithTune,
   updateTuneSet,
 } from "@/lib/db/queries/tune-sets";
 
@@ -26,11 +30,13 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
   props
 ) => {
   const { user, localDb } = useAuth();
-  const { incrementTuneSetListChanged } = useCurrentTuneSet();
+  const { incrementTuneSetListChanged, tuneSetListChanged } =
+    useCurrentTuneSet();
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
   const [error, setError] = createSignal<string | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
+  const [removingTuneId, setRemovingTuneId] = createSignal<string | null>(null);
 
   const [tuneSet] = createResource(
     () => {
@@ -43,6 +49,26 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
     async (params) => {
       if (!params) return null;
       return getTuneSetById(params.db, params.tuneSetId, params.userId);
+    }
+  );
+
+  const [tuneSetItems] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const version = tuneSetListChanged();
+      return db && userId && props.tuneSetId && props.isOpen
+        ? {
+            db,
+            userId,
+            tuneSetId: props.tuneSetId,
+            version,
+          }
+        : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getTuneSetItems(params.db, params.tuneSetId, params.userId);
     }
   );
 
@@ -113,6 +139,33 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRemoveTune = async (item: TuneSetItemWithTune) => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId || !props.tuneSetId) {
+      setError("Database is not ready yet.");
+      return;
+    }
+
+    try {
+      setRemovingTuneId(item.tuneRef);
+      setError(null);
+      await removeTuneFromTuneSet(db, props.tuneSetId, item.tuneRef, userId);
+      incrementTuneSetListChanged();
+      toast.success(`Removed "${item.tune.title}" from this set.`, {
+        duration: 2500,
+      });
+    } catch (removeError) {
+      setError(
+        removeError instanceof Error
+          ? removeError.message
+          : "Failed to remove tune from set"
+      );
+    } finally {
+      setRemovingTuneId(null);
     }
   };
 
@@ -218,6 +271,71 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                 data-testid="tune-set-description-input"
               />
             </div>
+
+            <Show when={props.tuneSetId}>
+              <div class="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <div>
+                  <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Tunes in This Set
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Remove tunes here. Add more tunes from Repertoire using the
+                    Add to Set action.
+                  </p>
+                </div>
+
+                <Show
+                  when={!tuneSetItems.loading}
+                  fallback={
+                    <div class="py-4 text-sm text-gray-500 dark:text-gray-400">
+                      Loading tunes...
+                    </div>
+                  }
+                >
+                  <Show
+                    when={(tuneSetItems() ?? []).length > 0}
+                    fallback={
+                      <div class="rounded-md border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                        This set is empty. Add tunes from Repertoire to populate
+                        it.
+                      </div>
+                    }
+                  >
+                    <div
+                      class="space-y-2"
+                      data-testid="tune-set-membership-list"
+                    >
+                      {(tuneSetItems() ?? []).map((item) => (
+                        <div class="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
+                          <div class="min-w-0">
+                            <div class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                              {item.tune.title}
+                            </div>
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              Position {item.position + 1}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
+                            disabled={removingTuneId() !== null}
+                            onClick={() => void handleRemoveTune(item)}
+                            data-testid="remove-tune-from-set-button"
+                          >
+                            <Show
+                              when={removingTuneId() === item.tuneRef}
+                              fallback="Remove"
+                            >
+                              Removing...
+                            </Show>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </Show>
+                </Show>
+              </div>
+            </Show>
 
             <Show when={!!error()}>
               <p class="text-sm text-red-600 dark:text-red-400">{error()}</p>

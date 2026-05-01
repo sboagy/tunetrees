@@ -384,7 +384,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                   setShowTuneSetFilterDialog(true);
                 }}
               >
-                <span>Tune Set Filter</span>
+                <span>Tune Set</span>
                 <span class={mobileMenuMetaClasses}>
                   {props.selectedTuneSetId ? "On" : "Off"}
                 </span>
@@ -574,9 +574,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                     d="M4 7h16M7 12h10M10 17h4"
                   />
                 </svg>
-                <span>
-                  {props.selectedTuneSetId ? "Tune Set Filter On" : "Tune Set"}
-                </span>
+                <span>Tune Set</span>
               </button>
 
               <button

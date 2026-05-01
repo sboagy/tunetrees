@@ -167,7 +167,10 @@ export const TuneSetFilterDialog: Component<TuneSetFilterDialogProps> = (
           <div class="flex items-center justify-between border-t border-gray-200 px-4 py-4 dark:border-gray-700 sm:px-6">
             <button
               type="button"
-              onClick={() => setShowManagerDialog(true)}
+              onClick={() => {
+                props.onClose();
+                setShowManagerDialog(true);
+              }}
               class="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               data-testid="open-tune-set-manager-button"
             >

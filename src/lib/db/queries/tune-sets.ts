@@ -382,6 +382,23 @@ export async function getTuneIdsForTuneSet(
   return items.map((item) => item.tuneRef);
 }
 
+export async function getTuneIdsForTuneSets(
+  db: AnyDatabase,
+  tuneSetIds: string[],
+  userId: string
+): Promise<string[]> {
+  const uniqueTuneIds = new Set<string>();
+
+  for (const tuneSetId of tuneSetIds) {
+    const tuneIds = await getTuneIdsForTuneSet(db, tuneSetId, userId);
+    for (const tuneId of tuneIds) {
+      uniqueTuneIds.add(tuneId);
+    }
+  }
+
+  return Array.from(uniqueTuneIds);
+}
+
 export async function addTuneToTuneSet(
   db: AnyDatabase,
   tuneSetId: string,

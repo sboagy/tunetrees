@@ -1,23 +1,31 @@
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import type { TuneSetWithSummary } from "@/lib/db/queries/tune-sets";
 
 interface GroupAsSetPopoverProps {
   isOpen: boolean;
-  isMobile?: boolean;
   tuneTitles: string[];
   initialName: string;
+  availableTuneSets: TuneSetWithSummary[];
+  loadingTuneSets?: boolean;
+  addingToSetId?: string | null;
   isSaving?: boolean;
   error?: string | null;
-  onSave: (name: string) => void;
+  onSave: (data: { name: string; description: string }) => void;
+  onAddToExistingSet: (tuneSetId: string) => void;
   onClose: () => void;
 }
 
 export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
   const [name, setName] = createSignal(props.initialName);
+  const [description, setDescription] = createSignal("");
+  const [mode, setMode] = createSignal<"create" | "existing">("create");
 
   createEffect(() => {
     if (!props.isOpen) return;
     setName(props.initialName);
+    setDescription("");
+    setMode("create");
   });
 
   createEffect(() => {
@@ -34,14 +42,14 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
   });
 
   const handleSave = () => {
-    props.onSave(name());
+    props.onSave({ name: name(), description: description() });
   };
 
   const content = (
     <div
       class="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
       role="dialog"
-      aria-modal={props.isMobile ? "true" : "false"}
+      aria-modal="true"
       aria-labelledby="group-as-set-title"
       data-testid="group-as-set-popover"
     >
@@ -51,12 +59,11 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
             id="group-as-set-title"
             class="text-base font-semibold text-gray-900 dark:text-white"
           >
-            Group as Set
+            Save Selection as Set
           </h3>
           <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Save {props.tuneTitles.length} selected
-            {props.tuneTitles.length === 1 ? " tune" : " tunes"} as a reusable
-            tune set.
+            Choose what to do with these {props.tuneTitles.length} selected
+            {props.tuneTitles.length === 1 ? " tune" : " tunes"}.
           </p>
         </div>
 
@@ -84,23 +91,148 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
         </button>
       </div>
 
-      <div class="mt-4 space-y-2">
-        <label
-          for="group-as-set-name"
-          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+      <div
+        class="mt-4 grid gap-3 sm:grid-cols-2"
+        data-testid="group-as-set-mode-switch"
+      >
+        <button
+          type="button"
+          class={`rounded-xl border px-4 py-3 text-left transition-colors ${
+            mode() === "create"
+              ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-100"
+              : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800"
+          }`}
+          onClick={() => setMode("create")}
+          data-testid="group-as-set-create-mode-button"
         >
-          Set Name
-        </label>
-        <input
-          id="group-as-set-name"
-          type="text"
-          value={name()}
-          onInput={(event) => setName(event.currentTarget.value)}
-          class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          data-testid="group-as-set-name-input"
-          placeholder="Ballydesmond 1 / Music in the Glen"
-        />
+          <div class="text-sm font-semibold">Create New Set</div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Name and save this selection as a new reusable set.
+          </div>
+        </button>
+
+        <button
+          type="button"
+          class={`rounded-xl border px-4 py-3 text-left transition-colors ${
+            mode() === "existing"
+              ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-100"
+              : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800"
+          }`}
+          onClick={() => setMode("existing")}
+          data-testid="group-as-set-existing-mode-button"
+        >
+          <div class="text-sm font-semibold">Add to Existing Set</div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Pick one of your current sets and add this selection there.
+          </div>
+        </button>
       </div>
+
+      <Show when={mode() === "create"}>
+        <div class="mt-4 space-y-2" data-testid="group-as-set-create-panel">
+          <label
+            for="group-as-set-name"
+            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Set Name
+          </label>
+          <input
+            id="group-as-set-name"
+            type="text"
+            value={name()}
+            onInput={(event) => setName(event.currentTarget.value)}
+            class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            data-testid="group-as-set-name-input"
+            placeholder="Ballydesmond 1 / Music in the Glen"
+          />
+
+          <label
+            for="group-as-set-description"
+            class="block pt-2 text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
+            Description
+          </label>
+          <textarea
+            id="group-as-set-description"
+            value={description()}
+            onInput={(event) => setDescription(event.currentTarget.value)}
+            class="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            data-testid="group-as-set-description-input"
+            placeholder="Optional notes about when or why you use this set"
+          />
+        </div>
+      </Show>
+
+      <Show when={mode() === "existing"}>
+        <div
+          class="mt-4 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+          data-testid="group-as-set-existing-panel"
+        >
+          <div class="mb-2">
+            <div class="text-sm font-medium text-gray-900 dark:text-white">
+              Choose Existing Set
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Reuse one of your personal sets instead of creating a new one.
+            </p>
+          </div>
+
+          <Show
+            when={!props.loadingTuneSets}
+            fallback={
+              <div class="py-3 text-sm text-gray-500 dark:text-gray-400">
+                Loading tune sets...
+              </div>
+            }
+          >
+            <Show
+              when={props.availableTuneSets.length > 0}
+              fallback={
+                <div class="rounded-md border border-dashed border-gray-300 px-3 py-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                  No personal tune sets yet. Switch to Create New Set instead.
+                </div>
+              }
+            >
+              <div
+                class="max-h-48 space-y-2 overflow-y-auto"
+                data-testid="group-as-set-existing-list"
+              >
+                <For each={props.availableTuneSets}>
+                  {(tuneSet) => (
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2 text-left transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                      disabled={Boolean(props.addingToSetId) || props.isSaving}
+                      onClick={() => props.onAddToExistingSet(tuneSet.id)}
+                      data-testid="add-selection-to-tune-set-option"
+                    >
+                      <div class="min-w-0">
+                        <div class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                          {tuneSet.name}
+                        </div>
+                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {tuneSet.tuneCount} tune
+                          {tuneSet.tuneCount === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <Show
+                        when={props.addingToSetId === tuneSet.id}
+                        fallback={
+                          <span class="text-xs font-medium text-blue-600 dark:text-blue-400">
+                            Add
+                          </span>
+                        }
+                      >
+                        <div class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-400" />
+                      </Show>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </Show>
+        </div>
+      </Show>
 
       <Show when={props.tuneTitles.length > 0}>
         <div class="mt-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/70">
@@ -131,7 +263,7 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           type="button"
           class="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           onClick={props.onClose}
-          disabled={props.isSaving}
+          disabled={props.isSaving || Boolean(props.addingToSetId)}
         >
           Cancel
         </button>
@@ -139,10 +271,14 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           type="button"
           class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
           onClick={handleSave}
-          disabled={props.isSaving}
+          disabled={
+            mode() !== "create" ||
+            props.isSaving ||
+            Boolean(props.addingToSetId)
+          }
           data-testid="save-group-as-set-button"
         >
-          <Show when={props.isSaving} fallback={<span>Save Set</span>}>
+          <Show when={props.isSaving} fallback={<span>Create New Set</span>}>
             <span>Saving...</span>
           </Show>
         </button>
@@ -152,24 +288,17 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
 
   return (
     <Show when={props.isOpen}>
-      <Show
-        when={props.isMobile}
-        fallback={
-          <div class="absolute left-0 top-full z-50 mt-2 w-[min(32rem,calc(100vw-2rem))]">
-            {content}
-          </div>
-        }
-      >
-        <div>
-          <button
-            type="button"
-            class="fixed inset-0 z-40 bg-black/20 dark:bg-black/40"
-            onClick={props.onClose}
-            aria-label="Close group as set backdrop"
-          />
-          <div class="fixed inset-x-3 bottom-3 z-50">{content}</div>
+      <div>
+        <button
+          type="button"
+          class="fixed inset-0 z-[60] bg-black/50 dark:bg-black/70"
+          onClick={props.onClose}
+          aria-label="Close group as set backdrop"
+        />
+        <div class="fixed left-1/2 top-1/2 z-[70] w-[95vw] max-w-2xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto">
+          <div class="p-1 md:p-0">{content}</div>
         </div>
-      </Show>
+      </div>
     </Show>
   );
 };
