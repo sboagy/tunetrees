@@ -14,8 +14,11 @@ import {
   addTuneSetToProgram,
   addTuneToProgram,
   createProgram,
+  getProgramById,
   getProgramItems,
   getVisiblePrograms,
+  removeProgramItem,
+  reorderProgramItems,
   updateProgram,
 } from "../../../src/lib/db/queries/programs";
 import {
@@ -323,6 +326,70 @@ describe("tune set query helpers", () => {
     expect(programItems[0].tune?.title).toBe("Public Tune");
     expect(programItems[1].tuneSet?.name).toBe("Personal Favorites");
     expect(programItems[2].tune?.title).toBe("Public Tune");
+  });
+
+  it("touches the parent Program when Program items change", async () => {
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Festival Set",
+    });
+    const createdProgram = await createProgram(db as never, OWNER_ID, {
+      groupRef: group.id,
+      name: "Festival Opening Program",
+    });
+
+    const originalProgram = await getProgramById(
+      db as never,
+      createdProgram.id,
+      OWNER_ID
+    );
+    expect(originalProgram).not.toBeNull();
+
+    await addTuneToProgram(
+      db as never,
+      createdProgram.id,
+      PUBLIC_TUNE_ID,
+      OWNER_ID
+    );
+
+    const afterAdd = await getProgramById(
+      db as never,
+      createdProgram.id,
+      OWNER_ID
+    );
+    expect(afterAdd?.syncVersion).toBeGreaterThan(originalProgram!.syncVersion);
+
+    const items = await getProgramItems(
+      db as never,
+      createdProgram.id,
+      OWNER_ID
+    );
+    await reorderProgramItems(
+      db as never,
+      createdProgram.id,
+      items.map((item) => item.id),
+      OWNER_ID
+    );
+
+    const afterReorder = await getProgramById(
+      db as never,
+      createdProgram.id,
+      OWNER_ID
+    );
+    expect(afterReorder?.syncVersion).toBeGreaterThan(afterAdd!.syncVersion);
+
+    await removeProgramItem(
+      db as never,
+      createdProgram.id,
+      items[0].id,
+      OWNER_ID
+    );
+
+    const afterRemove = await getProgramById(
+      db as never,
+      createdProgram.id,
+      OWNER_ID
+    );
+    expect(afterRemove?.syncVersion).toBeGreaterThan(afterReorder!.syncVersion);
   });
 
   it("blocks adding a Tune Set with private tunes to a Program", async () => {

@@ -58,6 +58,33 @@ function normalizeDescription(description?: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
+async function touchProgram(
+  db: AnyDatabase,
+  programId: string,
+  currentProgram?: Program | null,
+  at = nowIso()
+): Promise<void> {
+  const programRow =
+    currentProgram ??
+    (
+      await db.select().from(program).where(eq(program.id, programId)).limit(1)
+    )[0] ??
+    null;
+
+  if (!programRow || programRow.deleted === 1) {
+    throw new Error("Program is not available");
+  }
+
+  await db
+    .update(program)
+    .set({
+      syncVersion: (programRow.syncVersion ?? 0) + 1,
+      lastModifiedAt: at,
+      deviceId: getLocalDeviceId(),
+    })
+    .where(eq(program.id, programId));
+}
+
 async function getPublicTuneRow(
   db: AnyDatabase,
   tuneId: string
@@ -466,6 +493,7 @@ export async function addTuneToProgram(
   };
 
   const result = await db.insert(programItem).values(newItem).returning();
+  await touchProgram(db, programId, access.program, now);
   await persistDb();
   return result[0];
 }
@@ -499,6 +527,7 @@ export async function addTuneSetToProgram(
   };
 
   const result = await db.insert(programItem).values(newItem).returning();
+  await touchProgram(db, programId, access.program, now);
   await persistDb();
   return result[0];
 }
@@ -526,16 +555,19 @@ export async function removeProgramItem(
     return false;
   }
 
+  const now = nowIso();
+
   await db
     .update(programItem)
     .set({
       deleted: 1,
       syncVersion: (rows[0].syncVersion ?? 0) + 1,
-      lastModifiedAt: nowIso(),
+      lastModifiedAt: now,
       deviceId: getLocalDeviceId(),
     })
     .where(eq(programItem.id, rows[0].id));
 
+  await touchProgram(db, programId, access.program, now);
   await persistDb();
   return true;
 }
@@ -604,6 +636,7 @@ export async function reorderProgramItems(
       .where(eq(programItem.id, itemId));
   }
 
+  await touchProgram(db, programId, access.program, now);
   await persistDb();
 }
 

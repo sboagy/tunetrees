@@ -52,6 +52,10 @@ function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
   return next;
 }
 
+function normalizeMetadataValue(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
 export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
   props
 ) => {
@@ -207,6 +211,26 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     return canManage() ? "Edit Program" : "View Program";
   });
 
+  const hasPendingMetadataChanges = createMemo(() => {
+    const currentProgram = program();
+    if (!activeProgramId()) {
+      return (
+        normalizeMetadataValue(name()) !== "" || description().trim() !== ""
+      );
+    }
+
+    if (!currentProgram) {
+      return false;
+    }
+
+    return (
+      normalizeMetadataValue(name()) !==
+        normalizeMetadataValue(currentProgram.name) ||
+      normalizeMetadataValue(description()) !==
+        normalizeMetadataValue(currentProgram.description)
+    );
+  });
+
   const candidateItems = createMemo<CandidateItem[]>(() => {
     const normalizedQuery = query().trim().toLowerCase();
     const filter = candidateFilter();
@@ -237,7 +261,9 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       .sort((left, right) => left.title.localeCompare(right.title));
   });
 
-  const persistProgramMetadata = async () => {
+  const persistProgramMetadata = async (options?: {
+    showSuccessToast?: boolean;
+  }) => {
     const db = localDb();
     const userId = user()?.id;
     const groupRef = props.groupRef ?? program()?.groupRef ?? null;
@@ -248,6 +274,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
 
     try {
       setIsSaving(true);
+      const showSuccessToast = options?.showSuccessToast ?? true;
 
       if (activeProgramId()) {
         const updated = await updateProgram(db, activeProgramId()!, userId, {
@@ -256,9 +283,11 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
         });
         incrementTuneSetListChanged();
         props.onSaved?.();
-        toast.success(`Saved program "${updated?.name ?? name()}".`, {
-          duration: 2500,
-        });
+        if (showSuccessToast) {
+          toast.success(`Saved program "${updated?.name ?? name()}".`, {
+            duration: 2500,
+          });
+        }
         return updated ?? null;
       }
 
@@ -270,9 +299,11 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       setActiveProgramId(created.id);
       incrementTuneSetListChanged();
       props.onSaved?.();
-      toast.success(`Created program "${created.name}".`, {
-        duration: 2500,
-      });
+      if (showSuccessToast) {
+        toast.success(`Created program "${created.name}".`, {
+          duration: 2500,
+        });
+      }
       return created;
     } catch (error) {
       showDialogError(
@@ -291,6 +322,22 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
 
     const created = await persistProgramMetadata();
     return created?.id ?? null;
+  };
+
+  const handleDone = async () => {
+    if (!canManage()) {
+      props.onClose();
+      return;
+    }
+
+    if (activeProgramId() && hasPendingMetadataChanges()) {
+      const saved = await persistProgramMetadata({ showSuccessToast: false });
+      if (!saved) {
+        return;
+      }
+    }
+
+    props.onClose();
   };
 
   const handleAddCandidate = async (candidate: CandidateItem) => {
@@ -476,7 +523,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
 
             <button
               type="button"
-              onClick={props.onClose}
+              onClick={() => void handleDone()}
               disabled={isSaving() || isMutatingItems()}
               class="text-sm font-medium text-gray-700 hover:underline disabled:opacity-50 dark:text-gray-300"
               data-testid="close-program-builder-button"
@@ -487,7 +534,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
               </span>
             </button>
 
-            <Show when={canManage()}>
+            <Show when={canManage() && !activeProgramId()}>
               <button
                 type="button"
                 onClick={() => void persistProgramMetadata()}
@@ -499,9 +546,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                   when={isSaving()}
                   fallback={
                     <>
-                      <span>
-                        {activeProgramId() ? "Save Program" : "Create Program"}
-                      </span>
+                      <span>Create Program</span>
                       <Save size={16} />
                     </>
                   }
