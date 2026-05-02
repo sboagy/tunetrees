@@ -1,5 +1,6 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
@@ -50,6 +51,66 @@ export interface GroupMemberWithProfile {
   joinedAt: string;
   lastModifiedAt: string;
   profileName: string | null;
+  profileEmail: string | null;
+}
+
+export interface GroupMemberCandidate {
+  userRef: string;
+  profileName: string | null;
+  profileEmail: string | null;
+  membershipId: string | null;
+  effectiveRole: GroupRole;
+  isOwner: boolean;
+  canAdd: boolean;
+}
+
+interface GroupMemberSearchProfile {
+  userRef: string;
+  profileName: string | null;
+  profileEmail: string | null;
+}
+
+interface GroupMemberSearchContext {
+  ownerUserRef: string;
+  membershipsByUserRef: Map<string, GroupMemberRow>;
+}
+
+interface RemoteGroupMemberProfileRow {
+  id: string;
+  name: string | null;
+  email: string | null;
+}
+
+async function getRemoteGroupMemberProfileMap(
+  groupId: string
+): Promise<Map<string, GroupMemberSearchProfile>> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase.rpc("get_group_member_profiles", {
+    p_group_id: groupId,
+  });
+
+  if (error) {
+    console.warn("Failed to fetch remote group member profiles", error);
+    return new Map();
+  }
+
+  if (!Array.isArray(data)) {
+    return new Map();
+  }
+
+  return new Map(
+    data.filter(isRemoteGroupMemberProfileRow).map((profile) => [
+      profile.id,
+      {
+        userRef: profile.id,
+        profileName: profile.name,
+        profileEmail: profile.email,
+      },
+    ])
+  );
 }
 
 function nowIso(): string {
@@ -104,6 +165,197 @@ async function getUserName(
     .limit(1);
 
   return rows[0]?.name ?? null;
+}
+
+async function getUserProfileRecord(
+  db: AnyDatabase,
+  userId: string
+): Promise<{ name: string | null; email: string | null } | null> {
+  const rows = await db
+    .select()
+    .from(userProfile)
+    .where(eq(userProfile.id, userId))
+    .limit(1);
+
+  const row = rows[0];
+  return row
+    ? {
+        name: row.name ?? null,
+        email: row.email ?? null,
+      }
+    : null;
+}
+
+function isRemoteGroupMemberProfileRow(
+  value: unknown
+): value is RemoteGroupMemberProfileRow {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.id === "string" &&
+    (typeof row.name === "string" || row.name === null) &&
+    (typeof row.email === "string" || row.email === null)
+  );
+}
+
+function mergeGroupMemberSearchProfile(
+  existing: GroupMemberSearchProfile | undefined,
+  incoming: GroupMemberSearchProfile
+): GroupMemberSearchProfile {
+  if (!existing) {
+    return incoming;
+  }
+
+  return {
+    userRef: existing.userRef,
+    profileName: existing.profileName ?? incoming.profileName,
+    profileEmail: existing.profileEmail ?? incoming.profileEmail,
+  };
+}
+
+function toGroupMemberCandidate(
+  profile: GroupMemberSearchProfile,
+  context: GroupMemberSearchContext
+): GroupMemberCandidate {
+  const membership = context.membershipsByUserRef.get(profile.userRef);
+  const isOwner = profile.userRef === context.ownerUserRef;
+
+  return {
+    userRef: profile.userRef,
+    profileName: profile.profileName,
+    profileEmail: profile.profileEmail,
+    membershipId: membership?.id ?? null,
+    effectiveRole: isOwner
+      ? "owner"
+      : ((membership?.role as GroupRole | undefined) ?? "member"),
+    isOwner,
+    canAdd: !isOwner && !membership,
+  };
+}
+
+function filterAndSortGroupMemberCandidates(
+  profiles: GroupMemberSearchProfile[],
+  searchTerm: string,
+  context: GroupMemberSearchContext,
+  limit: number
+): GroupMemberCandidate[] {
+  const normalizedTerm = searchTerm.trim().toLowerCase();
+  if (normalizedTerm.length < 2) {
+    return [];
+  }
+
+  const mergedProfiles = new Map<string, GroupMemberSearchProfile>();
+  for (const profile of profiles) {
+    mergedProfiles.set(
+      profile.userRef,
+      mergeGroupMemberSearchProfile(
+        mergedProfiles.get(profile.userRef),
+        profile
+      )
+    );
+  }
+
+  return Array.from(mergedProfiles.values())
+    .filter((profile) => {
+      const haystack = [
+        profile.userRef,
+        profile.profileName ?? "",
+        profile.profileEmail ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(normalizedTerm);
+    })
+    .map((profile) => toGroupMemberCandidate(profile, context))
+    .sort((left, right) => {
+      if (left.canAdd !== right.canAdd) {
+        return left.canAdd ? -1 : 1;
+      }
+      const leftName = (
+        left.profileName ??
+        left.profileEmail ??
+        left.userRef
+      ).toLowerCase();
+      const rightName = (
+        right.profileName ??
+        right.profileEmail ??
+        right.userRef
+      ).toLowerCase();
+      return leftName.localeCompare(rightName);
+    })
+    .slice(0, limit);
+}
+
+async function getGroupMemberSearchContext(
+  db: AnyDatabase,
+  groupId: string,
+  actingUserId: string
+): Promise<GroupMemberSearchContext | null> {
+  const access = await getGroupAccessForUser(db, groupId, actingUserId);
+  if (!access.canManageMembership || !access.group) {
+    return null;
+  }
+
+  const memberships = await db
+    .select()
+    .from(groupMember)
+    .where(and(eq(groupMember.groupRef, groupId), eq(groupMember.deleted, 0)));
+
+  return {
+    ownerUserRef: access.group.ownerUserRef,
+    membershipsByUserRef: new Map(
+      memberships.map((membership) => [membership.userRef, membership])
+    ),
+  };
+}
+
+async function getLocalGroupMemberSearchProfiles(
+  db: AnyDatabase
+): Promise<GroupMemberSearchProfile[]> {
+  const profiles = await db
+    .select()
+    .from(userProfile)
+    .where(eq(userProfile.deleted, 0));
+
+  return profiles.map((profile) => ({
+    userRef: profile.id,
+    profileName: profile.name ?? null,
+    profileEmail: profile.email ?? null,
+  }));
+}
+
+async function searchRemoteGroupMemberProfiles(
+  groupId: string,
+  searchTerm: string,
+  limit: number
+): Promise<GroupMemberSearchProfile[]> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc("search_group_member_profiles", {
+    p_group_id: groupId,
+    p_search_term: searchTerm.trim(),
+    p_limit: limit,
+  });
+
+  if (error) {
+    console.warn("Failed to search remote group member profiles", error);
+    return [];
+  }
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.filter(isRemoteGroupMemberProfileRow).map((profile) => ({
+    userRef: profile.id,
+    profileName: profile.name,
+    profileEmail: profile.email,
+  }));
 }
 
 export async function getAccessibleGroupIds(
@@ -462,6 +714,50 @@ export async function getGroupMembers(
     .where(and(...filters))
     .orderBy(groupMember.joinedAt);
 
+  const localProfileRecords = new Map<
+    string,
+    { name: string | null; email: string | null } | null
+  >();
+  const getLocalProfile = async (targetUserId: string) => {
+    if (!localProfileRecords.has(targetUserId)) {
+      localProfileRecords.set(
+        targetUserId,
+        await getUserProfileRecord(db, targetUserId)
+      );
+    }
+    return localProfileRecords.get(targetUserId) ?? null;
+  };
+
+  const missingProfileUserRefs = new Set<string>();
+  const ownerLocalProfile = await getLocalProfile(access.group.ownerUserRef);
+  if (!ownerLocalProfile?.name && !ownerLocalProfile?.email) {
+    missingProfileUserRefs.add(access.group.ownerUserRef);
+  }
+
+  for (const membership of memberships) {
+    if (membership.userRef === access.group.ownerUserRef) {
+      continue;
+    }
+    const localProfile = await getLocalProfile(membership.userRef);
+    if (!localProfile?.name && !localProfile?.email) {
+      missingProfileUserRefs.add(membership.userRef);
+    }
+  }
+
+  const remoteProfileMap =
+    missingProfileUserRefs.size > 0
+      ? await getRemoteGroupMemberProfileMap(groupId)
+      : new Map<string, GroupMemberSearchProfile>();
+
+  const getMergedProfile = async (targetUserId: string) => {
+    const localProfile = await getLocalProfile(targetUserId);
+    const remoteProfile = remoteProfileMap.get(targetUserId);
+    return {
+      name: localProfile?.name ?? remoteProfile?.profileName ?? null,
+      email: localProfile?.email ?? remoteProfile?.profileEmail ?? null,
+    };
+  };
+
   const members: GroupMemberWithProfile[] = [
     {
       membershipId: null,
@@ -473,7 +769,8 @@ export async function getGroupMembers(
       deleted: 0,
       joinedAt: access.group.createdAt,
       lastModifiedAt: access.group.lastModifiedAt,
-      profileName: await getUserName(db, access.group.ownerUserRef),
+      profileName: (await getMergedProfile(access.group.ownerUserRef)).name,
+      profileEmail: (await getMergedProfile(access.group.ownerUserRef)).email,
     },
   ];
 
@@ -483,6 +780,7 @@ export async function getGroupMembers(
     }
 
     const role = membership.role as GroupRole;
+    const profile = await getMergedProfile(membership.userRef);
     members.push({
       membershipId: membership.id,
       groupRef: membership.groupRef,
@@ -493,11 +791,59 @@ export async function getGroupMembers(
       deleted: membership.deleted,
       joinedAt: membership.joinedAt,
       lastModifiedAt: membership.lastModifiedAt,
-      profileName: await getUserName(db, membership.userRef),
+      profileName: profile.name,
+      profileEmail: profile.email,
     });
   }
 
   return members;
+}
+
+export async function searchAvailableGroupMembers(
+  db: AnyDatabase,
+  groupId: string,
+  actingUserId: string,
+  searchTerm: string,
+  limit = 8
+): Promise<GroupMemberCandidate[]> {
+  const context = await getGroupMemberSearchContext(db, groupId, actingUserId);
+  if (!context) {
+    return [];
+  }
+  const localProfiles = await getLocalGroupMemberSearchProfiles(db);
+  return filterAndSortGroupMemberCandidates(
+    localProfiles,
+    searchTerm,
+    context,
+    limit
+  );
+}
+
+export async function searchGroupMemberCandidates(
+  db: AnyDatabase,
+  groupId: string,
+  actingUserId: string,
+  searchTerm: string,
+  limit = 8
+): Promise<GroupMemberCandidate[]> {
+  const context = await getGroupMemberSearchContext(db, groupId, actingUserId);
+  if (!context) {
+    return [];
+  }
+
+  const localProfiles = await getLocalGroupMemberSearchProfiles(db);
+  const remoteProfiles = await searchRemoteGroupMemberProfiles(
+    groupId,
+    searchTerm,
+    limit
+  );
+
+  return filterAndSortGroupMemberCandidates(
+    [...localProfiles, ...remoteProfiles],
+    searchTerm,
+    context,
+    limit
+  );
 }
 
 export async function addGroupMember(

@@ -9,6 +9,8 @@ import {
   getGroupMembers,
   getVisibleGroups,
   removeGroupMember,
+  searchAvailableGroupMembers,
+  searchGroupMemberCandidates,
   updateGroupMemberRole,
 } from "../../../src/lib/db/queries/groups";
 import {
@@ -34,6 +36,13 @@ import {
   updateTuneSet,
 } from "../../../src/lib/db/queries/tune-sets";
 import { applyMigrations } from "../../../src/lib/services/test-schema-loader";
+import { supabase } from "../../../src/lib/supabase/client";
+
+vi.mock("../../../src/lib/supabase/client", () => ({
+  supabase: {
+    rpc: vi.fn(),
+  },
+}));
 
 vi.mock("../../../src/lib/db/client-sqlite", () => ({
   persistDb: vi.fn(() => Promise.resolve()),
@@ -43,19 +52,24 @@ const OWNER_ID = "00000000-0000-0000-0000-000000000001";
 const ADMIN_ID = "00000000-0000-0000-0000-000000000002";
 const MEMBER_ID = "00000000-0000-0000-0000-000000000003";
 const OTHER_ID = "00000000-0000-0000-0000-000000000004";
+const REMOTE_ID = "00000000-0000-0000-0000-000000000005";
 const PUBLIC_TUNE_ID = "00000000-0000-0000-0000-000000000010";
 const PRIVATE_TUNE_ID = "00000000-0000-0000-0000-000000000011";
 
 let db: BetterSQLite3Database;
 let sqlite: InstanceType<typeof Database>;
 
-function seedUser(id: string, name: string) {
+function seedUser(
+  id: string,
+  name: string,
+  email = `${name.toLowerCase()}@example.com`
+) {
   sqlite
     .prepare(
-      `INSERT OR IGNORE INTO user_profile (id, name, deleted, sync_version, last_modified_at, device_id)
-       VALUES (?, ?, 0, 1, ?, 'test')`
+      `INSERT OR IGNORE INTO user_profile (id, name, email, deleted, sync_version, last_modified_at, device_id)
+       VALUES (?, ?, ?, 0, 1, ?, 'test')`
     )
-    .run(id, name, new Date().toISOString());
+    .run(id, name, email, new Date().toISOString());
 }
 
 function seedTune(id: string, title: string, privateFor: string | null = null) {
@@ -68,6 +82,11 @@ function seedTune(id: string, title: string, privateFor: string | null = null) {
 }
 
 beforeEach(() => {
+  vi.mocked(supabase.rpc).mockResolvedValue({
+    data: [],
+    error: null,
+  } as never);
+
   sqlite = new Database(":memory:");
   db = drizzle(sqlite) as BetterSQLite3Database;
   applyMigrations(db);
@@ -122,6 +141,7 @@ describe("group query helpers", () => {
     ]);
     expect(members[0].effectiveRole).toBe("owner");
     expect(members[1].effectiveRole).toBe("admin");
+    expect(members[1].profileEmail).toBe("admin@example.com");
 
     await expect(
       addGroupMember(db as never, group.id, MEMBER_ID, OTHER_ID, "member")
@@ -151,6 +171,226 @@ describe("group query helpers", () => {
     );
     expect(remainingMembers.map((member) => member.userRef)).toEqual([
       OWNER_ID,
+    ]);
+  });
+
+  it("rejects attempts to add the owner as a member and revives removed memberships on re-add", async () => {
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Revive Test",
+    });
+
+    await expect(
+      addGroupMember(db as never, group.id, OWNER_ID, OWNER_ID, "member")
+    ).rejects.toThrow(/group owner is already part of the group/i);
+
+    const membership = await addGroupMember(
+      db as never,
+      group.id,
+      OWNER_ID,
+      MEMBER_ID,
+      "member"
+    );
+
+    const removed = await removeGroupMember(
+      db as never,
+      group.id,
+      membership.id,
+      OWNER_ID
+    );
+    expect(removed).toBe(true);
+
+    const revived = await addGroupMember(
+      db as never,
+      group.id,
+      OWNER_ID,
+      MEMBER_ID,
+      "admin"
+    );
+    expect(revived.id).toBe(membership.id);
+    expect(revived.deleted).toBe(0);
+    expect(revived.role).toBe("admin");
+
+    const members = await getGroupMembers(db as never, group.id, OWNER_ID);
+    expect(members.map((member) => member.userRef)).toEqual([
+      OWNER_ID,
+      MEMBER_ID,
+    ]);
+    expect(members[1].effectiveRole).toBe("admin");
+  });
+
+  it("returns null or false for missing/deleted memberships and blocks owner removal", async () => {
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Edge Cases",
+    });
+
+    const membership = await addGroupMember(
+      db as never,
+      group.id,
+      OWNER_ID,
+      MEMBER_ID,
+      "member"
+    );
+
+    await expect(
+      removeGroupMember(db as never, group.id, membership.id, MEMBER_ID)
+    ).rejects.toThrow(/only the group owner/i);
+
+    const ownerMembership = await addGroupMember(
+      db as never,
+      group.id,
+      OWNER_ID,
+      OTHER_ID,
+      "member"
+    );
+    sqlite
+      .prepare("UPDATE group_member SET user_ref = ? WHERE id = ?")
+      .run(OWNER_ID, ownerMembership.id);
+
+    await expect(
+      removeGroupMember(db as never, group.id, ownerMembership.id, OWNER_ID)
+    ).rejects.toThrow(/cannot remove the group owner/i);
+
+    expect(
+      await updateGroupMemberRole(
+        db as never,
+        group.id,
+        "00000000-0000-0000-0000-00000000ffff",
+        OWNER_ID,
+        "admin"
+      )
+    ).toBeNull();
+
+    expect(
+      await removeGroupMember(
+        db as never,
+        group.id,
+        "00000000-0000-0000-0000-00000000ffff",
+        OWNER_ID
+      )
+    ).toBe(false);
+
+    await removeGroupMember(db as never, group.id, membership.id, OWNER_ID);
+
+    expect(
+      await updateGroupMemberRole(
+        db as never,
+        group.id,
+        membership.id,
+        OWNER_ID,
+        "admin"
+      )
+    ).toBeNull();
+
+    expect(
+      await removeGroupMember(db as never, group.id, membership.id, OWNER_ID)
+    ).toBe(false);
+  });
+
+  it("hydrates missing member profile fields from the secure remote member-profile lookup", async () => {
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Remote Names",
+    });
+
+    await addGroupMember(db as never, group.id, OWNER_ID, MEMBER_ID, "member");
+    sqlite
+      .prepare("UPDATE user_profile SET name = NULL, email = NULL WHERE id = ?")
+      .run(MEMBER_ID);
+
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [
+        {
+          id: MEMBER_ID,
+          name: "Member Remote",
+          email: "member.remote@example.com",
+        },
+      ],
+      error: null,
+    } as never);
+
+    const members = await getGroupMembers(db as never, group.id, OWNER_ID);
+    expect(supabase.rpc).toHaveBeenCalledWith("get_group_member_profiles", {
+      p_group_id: group.id,
+    });
+    expect(members[1].profileName).toBe("Member Remote");
+    expect(members[1].profileEmail).toBe("member.remote@example.com");
+  });
+
+  it("searches local profiles for membership management and marks existing members", async () => {
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Quintet",
+    });
+
+    await addGroupMember(db as never, group.id, OWNER_ID, MEMBER_ID, "member");
+
+    const candidates = await searchAvailableGroupMembers(
+      db as never,
+      group.id,
+      OWNER_ID,
+      "o"
+    );
+    expect(candidates).toEqual([]);
+
+    const broaderCandidates = await searchAvailableGroupMembers(
+      db as never,
+      group.id,
+      OWNER_ID,
+      "er"
+    );
+    expect(broaderCandidates.map((candidate) => candidate.userRef)).toEqual([
+      OTHER_ID,
+      MEMBER_ID,
+      OWNER_ID,
+    ]);
+    expect(broaderCandidates.map((candidate) => candidate.canAdd)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(
+      broaderCandidates.map((candidate) => candidate.effectiveRole)
+    ).toEqual(["member", "member", "owner"]);
+    expect(broaderCandidates[1].membershipId).not.toBeNull();
+    expect(broaderCandidates[0].profileEmail).toBe("other@example.com");
+  });
+
+  it("merges secure remote directory matches without widening local profile sync", async () => {
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Gig Band",
+    });
+
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: [
+        {
+          id: REMOTE_ID,
+          name: "Alice Remote",
+          email: "alice@example.com",
+        },
+      ],
+      error: null,
+    } as never);
+
+    const candidates = await searchGroupMemberCandidates(
+      db as never,
+      group.id,
+      OWNER_ID,
+      "alice"
+    );
+
+    expect(supabase.rpc).toHaveBeenCalledWith("search_group_member_profiles", {
+      p_group_id: group.id,
+      p_search_term: "alice",
+      p_limit: 8,
+    });
+    expect(candidates).toEqual([
+      expect.objectContaining({
+        userRef: REMOTE_ID,
+        profileName: "Alice Remote",
+        profileEmail: "alice@example.com",
+        membershipId: null,
+        effectiveRole: "member",
+        isOwner: false,
+        canAdd: true,
+      }),
     ]);
   });
 });

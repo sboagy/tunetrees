@@ -1,4 +1,4 @@
-import { Trash2, X } from "lucide-solid";
+import { Crown, Plus, Shield, Trash2, User, X } from "lucide-solid";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -15,10 +15,15 @@ import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import {
+  addGroupMember,
   createGroup,
+  type GroupMemberCandidate,
   type GroupMemberWithProfile,
   getGroupMembers,
   getVisibleGroups,
+  removeGroupMember,
+  searchGroupMemberCandidates,
+  updateGroupMemberRole,
 } from "@/lib/db/queries/groups";
 import {
   deleteProgram,
@@ -186,26 +191,153 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
   );
 };
 
-const GroupMemberRow: Component<{ member: GroupMemberWithProfile }> = (
-  props
-) => {
+const ManageableGroupMemberRow: Component<{
+  member: GroupMemberWithProfile;
+  canManage: boolean;
+  isBusy: boolean;
+  onRoleChange: (role: "admin" | "member") => void;
+  onRemove: () => void;
+}> = (props) => {
   return (
-    <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700">
-      <div class="min-w-0">
-        <div class="truncate text-sm font-medium text-gray-900 dark:text-white">
-          {props.member.profileName ?? props.member.userRef}
+    <div class="relative rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700">
+      <div class="min-w-0 pr-28">
+        <div class="text-base font-medium leading-tight text-gray-900 dark:text-white">
+          {props.member.profileName ??
+            props.member.profileEmail ??
+            "Unknown member"}
         </div>
-        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {props.member.isOwner
-            ? "Group owner"
-            : `Joined ${new Date(props.member.joinedAt).toLocaleDateString()}`}
+        <div class="mt-2 text-sm text-gray-400 dark:text-gray-400">
+          <Show
+            when={props.member.isOwner}
+            fallback={
+              <>
+                <Show when={props.member.profileEmail}>
+                  <div class="truncate">{props.member.profileEmail}</div>
+                </Show>
+                <div>
+                  Joined {new Date(props.member.joinedAt).toLocaleDateString()}
+                </div>
+              </>
+            }
+          >
+            Group owner
+          </Show>
         </div>
       </div>
-      <span
-        class={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize ${roleBadgeClass(props.member.effectiveRole)}`}
+
+      <Show
+        when={props.canManage && !props.member.isOwner}
+        fallback={
+          <div class="absolute right-4 top-4">
+            <span
+              class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize ${roleBadgeClass(props.member.effectiveRole)}`}
+            >
+              <Show
+                when={props.member.effectiveRole === "owner"}
+                fallback={null}
+              >
+                <Crown size={12} />
+              </Show>
+              {props.member.effectiveRole}
+            </span>
+          </div>
+        }
       >
-        {props.member.effectiveRole}
-      </span>
+        <div class="absolute right-4 top-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              props.onRoleChange(
+                props.member.role === "admin" ? "member" : "admin"
+              )
+            }
+            disabled={props.isBusy}
+            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            data-testid="group-member-role-select"
+            title={
+              props.member.role === "admin"
+                ? "Change to member"
+                : "Change to admin"
+            }
+            aria-label={
+              props.member.role === "admin"
+                ? "Change to member"
+                : "Change to admin"
+            }
+          >
+            <Show
+              when={props.member.role === "admin"}
+              fallback={<User size={16} />}
+            >
+              <Shield size={16} />
+            </Show>
+          </button>
+          <button
+            type="button"
+            onClick={props.onRemove}
+            disabled={props.isBusy}
+            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
+            data-testid="remove-group-member-button"
+            title="Remove member"
+            aria-label="Remove member"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
+const GroupMemberCandidateRow: Component<{
+  candidate: GroupMemberCandidate;
+  isAdding: boolean;
+  onAdd: (userRef: string) => void;
+}> = (props) => {
+  return (
+    <div class="relative rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700">
+      <div class="min-w-0 pr-16">
+        <div class="text-base font-medium leading-tight text-gray-900 dark:text-white">
+          {props.candidate.profileName ??
+            props.candidate.profileEmail ??
+            "Unknown member"}
+        </div>
+        <div class="mt-2 truncate text-sm text-gray-400 dark:text-gray-400">
+          {props.candidate.profileEmail ?? "No email available"}
+        </div>
+      </div>
+
+      <Show
+        when={props.candidate.canAdd}
+        fallback={
+          <div class="absolute right-4 top-4">
+            <span
+              class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize ${roleBadgeClass(props.candidate.effectiveRole)}`}
+            >
+              <Show when={props.candidate.isOwner} fallback={null}>
+                <Crown size={12} />
+              </Show>
+              {props.candidate.isOwner
+                ? "owner"
+                : `already ${props.candidate.effectiveRole}`}
+            </span>
+          </div>
+        }
+      >
+        <div class="absolute right-4 top-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => props.onAdd(props.candidate.userRef)}
+            disabled={props.isAdding}
+            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            data-testid="add-group-member-button"
+            title="Add member"
+            aria-label="Add member"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </Show>
     </div>
   );
 };
@@ -228,6 +360,11 @@ const GroupsManagerContent: Component = () => {
     string | undefined
   >(undefined);
   const [deletingProgramId, setDeletingProgramId] = createSignal<string | null>(
+    null
+  );
+  const [memberSearchTerm, setMemberSearchTerm] = createSignal("");
+  const [isAddingMember, setIsAddingMember] = createSignal(false);
+  const [busyMembershipId, setBusyMembershipId] = createSignal<string | null>(
     null
   );
 
@@ -308,6 +445,31 @@ const GroupsManagerContent: Component = () => {
     () => groupPrograms.latest ?? groupPrograms() ?? []
   );
 
+  const [memberCandidates] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const groupId = selectedGroupId();
+      const searchTerm = memberSearchTerm();
+      const version = groupListVersion();
+      return db && userId && groupId
+        ? { db, userId, groupId, searchTerm, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) {
+        return [];
+      }
+
+      return searchGroupMemberCandidates(
+        params.db,
+        params.groupId,
+        params.userId,
+        params.searchTerm
+      );
+    }
+  );
+
   const handleCreateGroup = async (data: {
     name: string;
     description: string;
@@ -375,6 +537,93 @@ const GroupsManagerContent: Component = () => {
       );
     } finally {
       setDeletingProgramId(null);
+    }
+  };
+
+  const handleAddMember = async (memberUserId: string) => {
+    const db = localDb();
+    const userId = user()?.id;
+    const groupId = selectedGroupId();
+    if (!db || !userId || !groupId) {
+      toast.error("Database is not ready yet.");
+      return;
+    }
+
+    try {
+      setIsAddingMember(true);
+      await addGroupMember(db, groupId, userId, memberUserId, "member");
+      setGroupListVersion((value) => value + 1);
+      setMemberSearchTerm("");
+      toast.success("Added group member.", { duration: 2500 });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to add group member"
+      );
+    } finally {
+      setIsAddingMember(false);
+    }
+  };
+
+  const handleUpdateMemberRole = async (
+    member: GroupMemberWithProfile,
+    role: "admin" | "member"
+  ) => {
+    const db = localDb();
+    const userId = user()?.id;
+    const groupId = selectedGroupId();
+    if (!db || !userId || !groupId || !member.membershipId) {
+      return;
+    }
+    if (member.role === role) {
+      return;
+    }
+
+    try {
+      setBusyMembershipId(member.membershipId);
+      await updateGroupMemberRole(
+        db,
+        groupId,
+        member.membershipId,
+        userId,
+        role
+      );
+      setGroupListVersion((value) => value + 1);
+      toast.success("Updated member role.", { duration: 2500 });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update member role"
+      );
+    } finally {
+      setBusyMembershipId(null);
+    }
+  };
+
+  const handleRemoveMember = async (member: GroupMemberWithProfile) => {
+    const db = localDb();
+    const userId = user()?.id;
+    const groupId = selectedGroupId();
+    if (!db || !userId || !groupId || !member.membershipId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove ${member.profileName ?? member.profileEmail ?? member.userRef} from this group?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setBusyMembershipId(member.membershipId);
+      await removeGroupMember(db, groupId, member.membershipId, userId);
+      setGroupListVersion((value) => value + 1);
+      toast.success("Removed group member.", { duration: 2500 });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to remove group member"
+      );
+    } finally {
+      setBusyMembershipId(null);
     }
   };
 
@@ -506,6 +755,85 @@ const GroupsManagerContent: Component = () => {
                               class="space-y-3 p-4"
                               data-testid="group-members-list"
                             >
+                              <Show when={group.canManageMembership}>
+                                <div class="rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700">
+                                  <div class="flex flex-col gap-3">
+                                    <div class="flex flex-col gap-2">
+                                      <input
+                                        type="text"
+                                        value={memberSearchTerm()}
+                                        onInput={(event) =>
+                                          setMemberSearchTerm(
+                                            event.currentTarget.value
+                                          )
+                                        }
+                                        placeholder="Search by name or email"
+                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                        data-testid="group-member-search-input"
+                                      />
+                                      <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        Search uses a secure directory lookup
+                                        when online. Offline, it falls back to
+                                        profiles already synced to this device.
+                                        Existing members stay visible here so
+                                        you can confirm who is already in the
+                                        group.
+                                      </div>
+                                    </div>
+
+                                    <Show
+                                      when={
+                                        memberSearchTerm().trim().length >= 2
+                                      }
+                                    >
+                                      <Show
+                                        when={!memberCandidates.loading}
+                                        fallback={
+                                          <div class="text-sm text-gray-500 dark:text-gray-400">
+                                            Searching members...
+                                          </div>
+                                        }
+                                      >
+                                        <Show
+                                          when={
+                                            (memberCandidates() ?? []).length >
+                                            0
+                                          }
+                                          fallback={
+                                            <div class="text-sm text-gray-500 dark:text-gray-400">
+                                              No matching users found. Offline
+                                              search only covers profiles
+                                              already synced to this device.
+                                            </div>
+                                          }
+                                        >
+                                          <div
+                                            class="space-y-2"
+                                            data-testid="group-member-candidate-list"
+                                          >
+                                            <For
+                                              each={memberCandidates() ?? []}
+                                            >
+                                              {(candidate) => (
+                                                <GroupMemberCandidateRow
+                                                  candidate={candidate}
+                                                  isAdding={isAddingMember()}
+                                                  onAdd={(userRef) =>
+                                                    void handleAddMember(
+                                                      userRef
+                                                    )
+                                                  }
+                                                />
+                                              )}
+                                            </For>
+                                          </div>
+                                        </Show>
+                                      </Show>
+                                    </Show>
+                                  </div>
+                                </div>
+                              </Show>
+
                               <Show
                                 when={!groupMembers.loading}
                                 fallback={
@@ -516,7 +844,23 @@ const GroupsManagerContent: Component = () => {
                               >
                                 <For each={groupMembers() ?? []}>
                                   {(member) => (
-                                    <GroupMemberRow member={member} />
+                                    <ManageableGroupMemberRow
+                                      member={member}
+                                      canManage={group.canManageMembership}
+                                      isBusy={
+                                        busyMembershipId() ===
+                                        member.membershipId
+                                      }
+                                      onRoleChange={(role) =>
+                                        void handleUpdateMemberRole(
+                                          member,
+                                          role
+                                        )
+                                      }
+                                      onRemove={() =>
+                                        void handleRemoveMember(member)
+                                      }
+                                    />
                                   )}
                                 </For>
                               </Show>
