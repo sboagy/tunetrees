@@ -1,5 +1,9 @@
--- RPC for syncing visible tune sets, including tune sets referenced by visible
--- programs.
+-- RPC for syncing personal (practice_set) tune sets visible to the current user,
+-- including practice_set rows referenced by visible programs.
+-- Group-owned tune sets (set_kind = 'group_program') are intentionally excluded:
+-- after the local SQLite migration 0016, those rows are migrated into the
+-- 'program' table and the local 'tune_set' CHECK constraint only permits
+-- 'practice_set'. Syncing group_program rows here would fail the constraint.
 
 CREATE OR REPLACE FUNCTION sync_get_tune_sets(
   p_user_id UUID,
@@ -57,7 +61,8 @@ AS $$
   )
   SELECT ts.*
   FROM tune_set ts
-  WHERE (
+  WHERE ts.set_kind = 'practice_set'
+    AND (
       ts.owner_user_ref = p_user_id
       OR ts.group_ref IN (SELECT id FROM accessible_group_ids)
       OR ts.id IN (SELECT id FROM visible_program_tune_set_ids)

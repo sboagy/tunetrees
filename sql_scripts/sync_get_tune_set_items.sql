@@ -1,5 +1,8 @@
--- RPC for syncing tune-set items whose parent set is visible directly or is
--- referenced by a visible program.
+-- RPC for syncing tune-set items whose parent set is a personal practice_set
+-- visible directly or referenced by a visible program.
+-- Items for group-owned tune sets (set_kind = 'group_program') are intentionally
+-- excluded: after local SQLite migration 0016, those items are migrated into
+-- 'program_item' and the parent tune_set no longer exists locally.
 
 CREATE OR REPLACE FUNCTION sync_get_tune_set_items(
   p_user_id UUID,
@@ -46,7 +49,8 @@ AS $$
   FROM tune_set_item tsi
   JOIN tune_set ts ON ts.id = tsi.tune_set_ref
   JOIN tune t ON t.id = tsi.tune_ref
-  WHERE (
+  WHERE ts.set_kind = 'practice_set'
+    AND (
       ts.owner_user_ref = p_user_id
       OR ts.group_ref IN (SELECT id FROM accessible_group_ids)
       OR ts.id IN (SELECT id FROM visible_program_tune_set_ids)

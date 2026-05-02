@@ -446,7 +446,8 @@ CREATE OR REPLACE FUNCTION public.sync_get_tune_sets(
   )
   SELECT ts.*
   FROM public.tune_set ts
-  WHERE (
+  WHERE ts.set_kind = 'practice_set'
+    AND (
       ts.owner_user_ref = p_user_id
       OR ts.group_ref IN (SELECT id FROM accessible_group_ids)
     )
@@ -495,7 +496,8 @@ CREATE OR REPLACE FUNCTION public.sync_get_tune_set_items(
   FROM public.tune_set_item tsi
   JOIN public.tune_set ts ON ts.id = tsi.tune_set_ref
   JOIN public.tune t ON t.id = tsi.tune_ref
-  WHERE (
+  WHERE ts.set_kind = 'practice_set'
+    AND (
       ts.owner_user_ref = p_user_id
       OR ts.group_ref IN (SELECT id FROM accessible_group_ids)
     )
