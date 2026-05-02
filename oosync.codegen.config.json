@@ -18,8 +18,8 @@
     "dbVersionKeyPrefix": "tunetrees-db-version",
     "outboxBackupKeyPrefix": "tunetrees-outbox-backup",
     "lastSyncTimestampKeyPrefix": "TT_LAST_SYNC_TIMESTAMP",
-    "schemaVersion": "2.0.7-add-groups-and-tune-sets",
-    "databaseVersion": 14,
+    "schemaVersion": "2.0.8-add-programs",
+    "databaseVersion": 16,
     "migrationDirectory": "drizzle/migrations/sqlite",
     "migrationFiles": [
       "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
@@ -37,7 +37,9 @@
       "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
       "/drizzle/migrations/sqlite/0013_add_goal_table.sql",
       "/drizzle/migrations/sqlite/0014_add_media_assets.sql",
-      "/drizzle/migrations/sqlite/0015_add_groups_and_tune_sets.sql"
+      "/drizzle/migrations/sqlite/0015_add_groups_and_tune_sets.sql",
+      "/drizzle/migrations/sqlite/0016_add_programs.sql",
+      "/drizzle/migrations/sqlite/0017_fix_ordered_item_conflict_targets.sql"
     ],
     "forceResetQueryParams": [
       { "key": "reset", "value": "true" },
@@ -60,6 +62,8 @@
       "user_genre_selection": "user",
       "user_group": "group",
       "group_member": "group",
+      "program": "group",
+      "program_item": "group",
       "repertoire": "repertoire",
       "table_state": null,
       "tab_group_main_state": null,
@@ -123,6 +127,30 @@
             "functionName": "sync_get_group_members",
             "paramMap": {
               "p_user_id": { "source": "authUserId" },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
+          "program": {
+            "kind": "rpc",
+            "functionName": "sync_get_programs",
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_after_timestamp": { "source": "lastSyncAt" },
+              "p_limit": { "source": "pageLimit" },
+              "p_offset": { "source": "pageOffset" }
+            }
+          },
+          "program_item": {
+            "kind": "rpc",
+            "functionName": "sync_get_program_items",
+            "paramMap": {
+              "p_user_id": { "source": "authUserId" },
+              "p_genre_ids": {
+                "source": "collection",
+                "collection": "selectedGenres"
+              },
               "p_after_timestamp": { "source": "lastSyncAt" },
               "p_limit": { "source": "pageLimit" },
               "p_offset": { "source": "pageOffset" }

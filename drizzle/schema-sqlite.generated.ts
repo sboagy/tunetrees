@@ -335,6 +335,52 @@ export const prefsSpacedRepetition = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.algType] })]
 );
 
+export const program = sqliteTable(
+  "program",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupRef: text("group_ref")
+      .notNull()
+      .references(() => userGroup.id),
+    name: text("name").notNull(),
+    description: text("description"),
+    deleted: integer("deleted").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    ...sqliteSyncColumns,
+  },
+  (t) => [index("idx_program_group_ref").on(t.groupRef)]
+);
+
+export const programItem = sqliteTable(
+  "program_item",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    programRef: text("program_ref")
+      .notNull()
+      .references(() => program.id),
+    itemKind: text("item_kind").notNull(),
+    tuneRef: text("tune_ref").references(() => tune.id),
+    tuneSetRef: text("tune_set_ref").references(() => tuneSet.id),
+    position: integer("position").notNull(),
+    deleted: integer("deleted").notNull().default(0),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    index("idx_program_item_program_position").on(t.programRef, t.position),
+    index("idx_program_item_program_ref").on(t.programRef),
+    index("idx_program_item_tune_ref").on(t.tuneRef),
+    index("idx_program_item_tune_set_ref").on(t.tuneSetRef),
+  ]
+);
+
 export const reference = sqliteTable(
   "reference",
   {
@@ -600,11 +646,8 @@ export const tuneSetItem = sqliteTable(
     ...sqliteSyncColumns,
   },
   (t) => [
-    uniqueIndex("tune_set_item_set_position_unique").on(
-      t.tuneSetRef,
-      t.position
-    ),
     uniqueIndex("tune_set_item_set_tune_unique").on(t.tuneSetRef, t.tuneRef),
+    index("idx_tune_set_item_set_position").on(t.tuneSetRef, t.position),
     index("idx_tune_set_item_tune_ref").on(t.tuneRef),
     index("idx_tune_set_item_tune_set_ref").on(t.tuneSetRef),
   ]

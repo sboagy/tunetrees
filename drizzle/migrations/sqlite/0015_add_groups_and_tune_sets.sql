@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS `tune_set` (
   `group_ref` text REFERENCES `user_group`(`id`) ON DELETE CASCADE,
   `name` text NOT NULL,
   `description` text,
-  `set_kind` text NOT NULL CHECK (`set_kind` IN ('practice_set', 'group_setlist')),
+  `set_kind` text NOT NULL CHECK (`set_kind` IN ('practice_set', 'group_program')),
   `deleted` integer DEFAULT 0 NOT NULL,
   `created_at` text NOT NULL,
   `sync_version` integer DEFAULT 1 NOT NULL,

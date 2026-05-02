@@ -28,6 +28,8 @@ export const SYNCABLE_TABLES = [
   "practice_record",
   "prefs_scheduling_options",
   "prefs_spaced_repetition",
+  "program",
+  "program_item",
   "reference",
   "repertoire",
   "repertoire_tune",
@@ -297,6 +299,31 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       user_id: "User ID who owns these preferences.",
     },
   },
+  program: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["created_at", "last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the program.",
+      group_ref: "Group that owns and manages this program.",
+    },
+  },
+  program_item: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      item_kind:
+        "Discriminator for whether the item references a tune or a tune set.",
+      position: "Zero-based position of the item within the program.",
+    },
+  },
   reference: {
     primaryKey: "id",
     uniqueKeys: null,
@@ -512,13 +539,12 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     hasDeletedFlag: true,
     columnDescriptions: {
       deleted: "Soft-delete flag for the tune set.",
-      set_kind:
-        "practice_set for personal grouping, group_setlist for collaborative performance ordering.",
+      set_kind: "practice_set for ordered tune-set groupings.",
     },
   },
   tune_set_item: {
     primaryKey: "id",
-    uniqueKeys: ["tune_set_ref", "position"],
+    uniqueKeys: ["tune_set_ref", "tune_ref"],
     timestamps: ["last_modified_at"],
     booleanColumns: ["deleted"],
     supportsIncremental: true,

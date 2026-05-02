@@ -173,8 +173,49 @@ function isUserAnonymous(user: User | null): boolean {
   return hasNoEmail && (hasNoIdentities || hasOnlyAnonymousIdentity);
 }
 
-// ---------------------------------------------------------------------------
-// TTInner - rendered inside RhizomeAuthProvider so it can call useRhizomeAuth()
+function formatSyncErrorToast(message: string): {
+  title: string;
+  description: string;
+} {
+  const attemptMatch = message.match(/Sync upload failed \(attempt (\d+)\)/i);
+  const title = attemptMatch?.[1]
+    ? `Sync upload failed (attempt ${attemptMatch[1]})`
+    : /Background sync error/i.test(message)
+      ? "Background sync error"
+      : "Sync error";
+
+  if (
+    /constraint=tune_set_kind_check/i.test(message) ||
+    /CHECK constraint failed: set_kind/i.test(message)
+  ) {
+    return {
+      title,
+      description:
+        "Your program is saved locally, but the sync server still has the older tune_set kind constraint. Apply the latest Supabase migration or reset the local Supabase DB, then retry sync.",
+    };
+  }
+
+  if (/Sync failed: 500/i.test(message)) {
+    return {
+      title,
+      description:
+        "Your changes are still saved locally, but the sync server rejected this upload. Check the console or worker logs for the detailed backend error.",
+    };
+  }
+
+  if (/Background sync error/i.test(message)) {
+    return {
+      title,
+      description: "Your local changes may not be uploaded yet.",
+    };
+  }
+
+  return {
+    title,
+    description: message,
+  };
+}
+
 // ---------------------------------------------------------------------------
 const TTInner: ParentComponent = (props) => {
   // Read user/session/loading/isAnonymous reactively from rhizome's AuthProvider.
@@ -653,7 +694,13 @@ const TTInner: ParentComponent = (props) => {
         !isAnonymousUser && import.meta.env.VITE_REALTIME_ENABLED === "true",
       syncIntervalMs: isAnonymousUser ? 30000 : 5000,
       notifyError: (message: string, _options?: { duration?: number }) => {
-        toast.error(message);
+        const toastContent = formatSyncErrorToast(message);
+        toast.error(toastContent.title, {
+          description: toastContent.description,
+          duration: Infinity,
+          closeButton: true,
+          id: "sync-error",
+        });
       },
       pullOnly: isAnonymousUser,
       requestOverridesProvider,

@@ -246,6 +246,21 @@ const TABLE_EXTRAS: Record<
       user_id: "User ID who owns these preferences.",
     },
   },
+  program: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the program.",
+      group_ref: "Group that owns and manages this program.",
+    },
+  },
+  program_item: {
+    changeCategory: "group",
+    columnDescriptions: {
+      item_kind:
+        "Discriminator for whether the item references a tune or a tune set.",
+      position: "Zero-based position of the item within the program.",
+    },
+  },
   reference: {
     changeCategory: "repertoire",
     columnDescriptions: {
@@ -411,8 +426,7 @@ const TABLE_EXTRAS: Record<
     changeCategory: "group",
     columnDescriptions: {
       deleted: "Soft-delete flag for the tune set.",
-      set_kind:
-        "practice_set for personal grouping, group_setlist for collaborative performance ordering.",
+      set_kind: "practice_set for ordered tune-set groupings.",
     },
   },
   tune_set_item: {
@@ -595,6 +609,8 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   practice_record: 16,
   prefs_scheduling_options: 9,
   prefs_spaced_repetition: 10,
+  program: 26,
+  program_item: 28,
   reference: 17,
   repertoire: 11,
   repertoire_tune: 19,
@@ -604,8 +620,8 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   tag: 21,
   tune: 14,
   tune_override: 22,
-  tune_set: 26,
-  tune_set_item: 27,
+  tune_set: 27,
+  tune_set_item: 29,
   tune_type: 2,
   user_genre_selection: 23,
   user_group: 24,
@@ -625,6 +641,8 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   practice_record: "practiceRecord",
   prefs_scheduling_options: "prefsSchedulingOptions",
   prefs_spaced_repetition: "prefsSpacedRepetition",
+  program: "program",
+  program_item: "programItem",
   reference: "reference",
   repertoire: "repertoire",
   repertoire_tune: "repertoireTune",

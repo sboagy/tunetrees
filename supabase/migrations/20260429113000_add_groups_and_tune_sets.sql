@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.user_group (
 
 CREATE INDEX IF NOT EXISTS idx_user_group_owner_user_ref ON public.user_group USING btree (owner_user_ref);
 
-COMMENT ON TABLE public.user_group IS 'Collaborative groups for shared tune sets and setlists.';
+COMMENT ON TABLE public.user_group IS 'Collaborative groups for shared tune sets and programs.';
 COMMENT ON COLUMN public.user_group.owner_user_ref IS 'User who owns and administers the group.';
 COMMENT ON COLUMN public.user_group.deleted IS 'Soft-delete flag for the group.';
 
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS public.tune_set (
   device_id text,
   CONSTRAINT tune_set_pkey PRIMARY KEY (id),
   CONSTRAINT tune_set_single_owner_scope CHECK ((owner_user_ref IS NULL) <> (group_ref IS NULL)),
-  CONSTRAINT tune_set_kind_check CHECK (set_kind = ANY (ARRAY['practice_set'::text, 'group_setlist'::text]))
+  CONSTRAINT tune_set_kind_check CHECK (set_kind = ANY (ARRAY['practice_set'::text, 'group_program'::text]))
 );
 
 CREATE INDEX IF NOT EXISTS idx_tune_set_owner_user_ref ON public.tune_set USING btree (owner_user_ref);
@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_tune_set_group_ref ON public.tune_set USING btree
 CREATE INDEX IF NOT EXISTS idx_tune_set_set_kind ON public.tune_set USING btree (set_kind);
 
 COMMENT ON TABLE public.tune_set IS 'Ordered tune collections owned by a user or shared with a group.';
-COMMENT ON COLUMN public.tune_set.set_kind IS 'practice_set for personal grouping, group_setlist for collaborative performance ordering.';
+COMMENT ON COLUMN public.tune_set.set_kind IS 'practice_set for personal grouping, group_program for collaborative program ordering.';
 COMMENT ON COLUMN public.tune_set.deleted IS 'Soft-delete flag for the tune set.';
 
 CREATE TABLE IF NOT EXISTS public.tune_set_item (
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS public.tune_set_item (
 CREATE INDEX IF NOT EXISTS idx_tune_set_item_tune_set_ref ON public.tune_set_item USING btree (tune_set_ref);
 CREATE INDEX IF NOT EXISTS idx_tune_set_item_tune_ref ON public.tune_set_item USING btree (tune_ref);
 
-COMMENT ON TABLE public.tune_set_item IS 'Ordered membership rows for tune sets and group setlists.';
+COMMENT ON TABLE public.tune_set_item IS 'Ordered membership rows for tune sets and group programs.';
 COMMENT ON COLUMN public.tune_set_item.position IS 'Zero-based position of the tune within the set.';
 
 CREATE OR REPLACE FUNCTION public.is_group_member(
@@ -190,7 +190,7 @@ CREATE POLICY "Users can view visible tune sets" ON public.tune_set
     OR (group_ref IS NOT NULL AND public.is_group_member(group_ref, auth.uid()))
   );
 
-CREATE POLICY "Users can insert personal or managed group tune sets" ON public.tune_set
+CREATE POLICY "Users can insert personal or managed group programs" ON public.tune_set
   FOR INSERT WITH CHECK (
     (owner_user_ref = auth.uid() AND group_ref IS NULL)
     OR (
@@ -200,7 +200,7 @@ CREATE POLICY "Users can insert personal or managed group tune sets" ON public.t
     )
   );
 
-CREATE POLICY "Users can update personal or managed group tune sets" ON public.tune_set
+CREATE POLICY "Users can update personal or managed group programs" ON public.tune_set
   FOR UPDATE USING (
     owner_user_ref = auth.uid()
     OR (group_ref IS NOT NULL AND public.can_manage_group_sets(group_ref, auth.uid()))
@@ -214,7 +214,7 @@ CREATE POLICY "Users can update personal or managed group tune sets" ON public.t
     )
   );
 
-CREATE POLICY "Users can delete personal or managed group tune sets" ON public.tune_set
+CREATE POLICY "Users can delete personal or managed group programs" ON public.tune_set
   FOR DELETE USING (
     owner_user_ref = auth.uid()
     OR (group_ref IS NOT NULL AND public.can_manage_group_sets(group_ref, auth.uid()))

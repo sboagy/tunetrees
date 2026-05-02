@@ -153,6 +153,31 @@ AS $$
     ) changed_group_profiles
     WHERE profile_id IS NOT NULL
   ),
+  visible_program_tune_set_owner_ids AS (
+    SELECT DISTINCT ts.owner_user_ref AS profile_id
+    FROM program_item pi
+    JOIN program p ON p.id = pi.program_ref
+    JOIN tune_set ts ON ts.id = pi.tune_set_ref
+    WHERE pi.item_kind = 'tune_set'
+      AND ts.owner_user_ref IS NOT NULL
+      AND p.group_ref IN (SELECT id FROM accessible_group_ids)
+  ),
+  changed_program_tune_set_owner_ids AS (
+    SELECT DISTINCT ts.owner_user_ref AS profile_id
+    FROM program_item pi
+    JOIN program p ON p.id = pi.program_ref
+    JOIN tune_set ts ON ts.id = pi.tune_set_ref
+    WHERE pi.item_kind = 'tune_set'
+      AND ts.owner_user_ref IS NOT NULL
+      AND p.group_ref IN (SELECT id FROM accessible_group_ids)
+      AND (
+        p_after_timestamp IS NULL
+        OR pi.last_modified_at > p_after_timestamp
+        OR p.last_modified_at > p_after_timestamp
+        OR ts.last_modified_at > p_after_timestamp
+        OR p.group_ref IN (SELECT group_ref FROM changed_membership_group_ids)
+      )
+  ),
   candidate_ids AS (
     SELECT p_user_id AS id
     WHERE p_after_timestamp IS NULL
@@ -167,6 +192,11 @@ AS $$
 
     SELECT profile_id AS id
     FROM visible_group_profile_ids
+
+    UNION
+
+    SELECT profile_id AS id
+    FROM visible_program_tune_set_owner_ids
     WHERE p_after_timestamp IS NULL
 
     UNION
@@ -194,6 +224,7 @@ AS $$
     OR up.last_modified_at > p_after_timestamp
     OR up.id IN (SELECT author_id FROM changed_visible_author_ids)
     OR up.id IN (SELECT profile_id FROM changed_visible_group_profile_ids)
+    OR up.id IN (SELECT profile_id FROM changed_program_tune_set_owner_ids)
   )
   ORDER BY up.last_modified_at ASC, up.id ASC
   LIMIT p_limit

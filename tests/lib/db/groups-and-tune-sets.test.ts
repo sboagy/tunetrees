@@ -11,8 +11,15 @@ import {
   updateGroupMemberRole,
 } from "../../../src/lib/db/queries/groups";
 import {
+  addTuneSetToProgram,
+  addTuneToProgram,
+  createProgram,
+  getProgramItems,
+  getVisiblePrograms,
+  updateProgram,
+} from "../../../src/lib/db/queries/programs";
+import {
   addTuneToTuneSet,
-  cloneTuneSetToGroupSetlist,
   createTuneSet,
   createTuneSetFromTunes,
   getTuneSetItems,
@@ -217,40 +224,54 @@ describe("tune set query helpers", () => {
     expect(items.map((item) => item.position)).toEqual([0, 1]);
   });
 
-  it("allows owner/admin group setlist management while keeping members read-only", async () => {
+  it("allows owner/admin Program management while keeping members read-only", async () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Ceili Band",
     });
     await addGroupMember(db as never, group.id, OWNER_ID, ADMIN_ID, "admin");
     await addGroupMember(db as never, group.id, OWNER_ID, MEMBER_ID, "member");
 
-    const set = await createTuneSet(db as never, OWNER_ID, {
-      name: "Set 1",
+    const createdProgram = await createProgram(db as never, OWNER_ID, {
+      name: "Program 1",
       groupRef: group.id,
-      setKind: "group_setlist",
     });
 
-    await addTuneToTuneSet(db as never, set.id, PUBLIC_TUNE_ID, ADMIN_ID);
-    const adminUpdated = await updateTuneSet(db as never, set.id, ADMIN_ID, {
-      name: "Set 1 Updated",
-    });
-    expect(adminUpdated?.name).toBe("Set 1 Updated");
+    await addTuneToProgram(
+      db as never,
+      createdProgram.id,
+      PUBLIC_TUNE_ID,
+      ADMIN_ID
+    );
+    const adminUpdated = await updateProgram(
+      db as never,
+      createdProgram.id,
+      ADMIN_ID,
+      {
+        name: "Program 1 Updated",
+      }
+    );
+    expect(adminUpdated?.name).toBe("Program 1 Updated");
 
-    const memberVisible = await getVisibleTuneSets(db as never, MEMBER_ID, {
-      setKind: "group_setlist",
+    const memberVisible = await getVisiblePrograms(db as never, MEMBER_ID, {
+      groupId: group.id,
     });
     expect(memberVisible).toHaveLength(1);
     expect(memberVisible[0].canManage).toBe(false);
 
     await expect(
-      updateTuneSet(db as never, set.id, MEMBER_ID, { name: "Nope" })
+      updateProgram(db as never, createdProgram.id, MEMBER_ID, { name: "Nope" })
     ).rejects.toThrow(/permission/i);
     await expect(
-      addTuneToTuneSet(db as never, set.id, PRIVATE_TUNE_ID, MEMBER_ID)
+      addTuneToProgram(
+        db as never,
+        createdProgram.id,
+        PRIVATE_TUNE_ID,
+        MEMBER_ID
+      )
     ).rejects.toThrow(/permission/i);
   });
 
-  it("can clone a visible personal tune set into a managed group setlist", async () => {
+  it("can build a Program from mixed Tune and Tune Set items", async () => {
     const personalSet = await createTuneSet(db as never, OWNER_ID, {
       name: "Personal Favorites",
       setKind: "practice_set",
@@ -261,6 +282,54 @@ describe("tune set query helpers", () => {
       PUBLIC_TUNE_ID,
       OWNER_ID
     );
+
+    const group = await createGroup(db as never, OWNER_ID, {
+      name: "Festival Set",
+    });
+    const createdProgram = await createProgram(db as never, OWNER_ID, {
+      groupRef: group.id,
+      name: "Festival Opening Program",
+    });
+
+    await addTuneToProgram(
+      db as never,
+      createdProgram.id,
+      PUBLIC_TUNE_ID,
+      OWNER_ID
+    );
+    await addTuneSetToProgram(
+      db as never,
+      createdProgram.id,
+      personalSet.id,
+      OWNER_ID
+    );
+    await addTuneToProgram(
+      db as never,
+      createdProgram.id,
+      PUBLIC_TUNE_ID,
+      OWNER_ID
+    );
+
+    const programItems = await getProgramItems(
+      db as never,
+      createdProgram.id,
+      OWNER_ID
+    );
+    expect(programItems.map((item) => item.itemKind)).toEqual([
+      "tune",
+      "tune_set",
+      "tune",
+    ]);
+    expect(programItems[0].tune?.title).toBe("Public Tune");
+    expect(programItems[1].tuneSet?.name).toBe("Personal Favorites");
+    expect(programItems[2].tune?.title).toBe("Public Tune");
+  });
+
+  it("blocks adding a Tune Set with private tunes to a Program", async () => {
+    const personalSet = await createTuneSet(db as never, OWNER_ID, {
+      name: "Private Favorites",
+      setKind: "practice_set",
+    });
     await addTuneToTuneSet(
       db as never,
       personalSet.id,
@@ -271,20 +340,20 @@ describe("tune set query helpers", () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Festival Set",
     });
-    const cloned = await cloneTuneSetToGroupSetlist(
-      db as never,
-      personalSet.id,
-      group.id,
-      OWNER_ID,
-      { name: "Festival Opening Set" }
-    );
+    const createdProgram = await createProgram(db as never, OWNER_ID, {
+      groupRef: group.id,
+      name: "Festival Opening Program",
+    });
 
-    const clonedItems = await getTuneSetItems(db as never, cloned.id, OWNER_ID);
-    expect(cloned.name).toBe("Festival Opening Set");
-    expect(cloned.groupRef).toBe(group.id);
-    expect(clonedItems.map((item) => item.tuneRef)).toEqual([
-      PUBLIC_TUNE_ID,
-      PRIVATE_TUNE_ID,
-    ]);
+    await expect(
+      addTuneSetToProgram(
+        db as never,
+        createdProgram.id,
+        personalSet.id,
+        OWNER_ID
+      )
+    ).rejects.toThrow(
+      /only tune sets containing public tunes can be added to a program/i
+    );
   });
 });

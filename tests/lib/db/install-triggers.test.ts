@@ -250,6 +250,31 @@ beforeEach(async () => {
   `);
 
   db.run(`
+    CREATE TABLE program (
+      id TEXT PRIMARY KEY NOT NULL,
+      group_ref TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      deleted INTEGER,
+      created_at TEXT,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE program_item (
+      id TEXT PRIMARY KEY NOT NULL,
+      program_ref TEXT NOT NULL,
+      item_kind TEXT NOT NULL,
+      tune_ref TEXT,
+      tune_set_ref TEXT,
+      position INTEGER NOT NULL,
+      deleted INTEGER,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
     CREATE TABLE prefs_scheduling_options (
       user_id TEXT PRIMARY KEY NOT NULL,
       settings TEXT,

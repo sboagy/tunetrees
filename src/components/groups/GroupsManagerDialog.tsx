@@ -1,0 +1,789 @@
+import { Trash2, X } from "lucide-solid";
+import type { Component } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+} from "solid-js";
+import { toast } from "solid-sonner";
+import { ProgramBuilderDialog } from "@/components/groups/ProgramBuilderDialog";
+import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
+import {
+  createGroup,
+  type GroupMemberWithProfile,
+  getGroupMembers,
+  getVisibleGroups,
+} from "@/lib/db/queries/groups";
+import {
+  deleteProgram,
+  getVisiblePrograms,
+  type ProgramWithSummary,
+} from "@/lib/db/queries/programs";
+
+interface GroupsManagerDialogProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  routeMode?: boolean;
+}
+
+interface GroupDialogProps {
+  isOpen: boolean;
+  isSaving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: (data: { name: string; description: string }) => void;
+}
+
+const roleBadgeClass = (role: string | null) => {
+  switch (role) {
+    case "owner":
+      return "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-200";
+    case "admin":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200";
+    default:
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  }
+};
+
+const GroupDialog: Component<GroupDialogProps> = (props) => {
+  const [name, setName] = createSignal("");
+  const [description, setDescription] = createSignal("");
+
+  createEffect(() => {
+    if (!props.isOpen) {
+      setName("");
+      setDescription("");
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !props.isSaving) {
+        props.onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
+
+  return (
+    <Show when={props.isOpen}>
+      <button
+        type="button"
+        class="fixed inset-0 z-[60] bg-black/50 dark:bg-black/70"
+        onClick={props.onClose}
+        aria-label="Close create group dialog backdrop"
+        data-testid="group-dialog-backdrop"
+      />
+
+      <div
+        class="fixed left-1/2 top-1/2 z-[70] w-[95vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="group-dialog-title"
+        data-testid="group-dialog"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2
+              id="group-dialog-title"
+              class="text-xl font-semibold text-gray-900 dark:text-white"
+            >
+              Create Group
+            </h2>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              Create a group space for shared membership and group-owned
+              programs.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={props.onClose}
+            class="rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            aria-label="Close create group dialog"
+            data-testid="close-group-dialog-button"
+          >
+            Close
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-4">
+          <div class="space-y-2">
+            <label
+              for="group-name"
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Group Name
+            </label>
+            <input
+              id="group-name"
+              type="text"
+              value={name()}
+              onInput={(event) => setName(event.currentTarget.value)}
+              class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              placeholder="Thursday session band"
+              data-testid="group-name-input"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <label
+              for="group-description"
+              class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
+              Description
+            </label>
+            <textarea
+              id="group-description"
+              value={description()}
+              onInput={(event) => setDescription(event.currentTarget.value)}
+              class="min-h-28 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              placeholder="Optional notes about who this group is for"
+              data-testid="group-description-input"
+            />
+          </div>
+
+          <Show when={props.error}>
+            <p class="text-sm text-red-600 dark:text-red-400">{props.error}</p>
+          </Show>
+
+          <div class="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={props.onClose}
+              disabled={props.isSaving}
+              class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              data-testid="cancel-group-button"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                props.onSubmit({
+                  name: name(),
+                  description: description(),
+                })
+              }
+              disabled={props.isSaving}
+              class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              data-testid="save-group-button"
+            >
+              <Show when={props.isSaving} fallback="Create Group">
+                Creating...
+              </Show>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+};
+
+const GroupMemberRow: Component<{ member: GroupMemberWithProfile }> = (
+  props
+) => {
+  return (
+    <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-gray-700">
+      <div class="min-w-0">
+        <div class="truncate text-sm font-medium text-gray-900 dark:text-white">
+          {props.member.profileName ?? props.member.userRef}
+        </div>
+        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {props.member.isOwner
+            ? "Group owner"
+            : `Joined ${new Date(props.member.joinedAt).toLocaleDateString()}`}
+        </div>
+      </div>
+      <span
+        class={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium capitalize ${roleBadgeClass(props.member.effectiveRole)}`}
+      >
+        {props.member.effectiveRole}
+      </span>
+    </div>
+  );
+};
+
+const GroupsManagerContent: Component = () => {
+  const { user, localDb } = useAuth();
+  const { tuneSetListChanged, incrementTuneSetListChanged } =
+    useCurrentTuneSet();
+  const [groupListVersion, setGroupListVersion] = createSignal(0);
+  const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(
+    null
+  );
+  const [showCreateGroupDialog, setShowCreateGroupDialog] = createSignal(false);
+  const [groupDialogError, setGroupDialogError] = createSignal<string | null>(
+    null
+  );
+  const [isCreatingGroup, setIsCreatingGroup] = createSignal(false);
+  const [showProgramEditor, setShowProgramEditor] = createSignal(false);
+  const [editingProgramId, setEditingProgramId] = createSignal<
+    string | undefined
+  >(undefined);
+  const [deletingProgramId, setDeletingProgramId] = createSignal<string | null>(
+    null
+  );
+
+  const [groups] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const version = groupListVersion();
+      return db && userId ? { db, userId, version } : null;
+    },
+    async (params) => {
+      if (!params) {
+        return [];
+      }
+
+      return getVisibleGroups(params.db, params.userId);
+    }
+  );
+
+  const selectedGroup = createMemo(() => {
+    const currentId = selectedGroupId();
+    return (groups() ?? []).find((group) => group.id === currentId) ?? null;
+  });
+
+  createEffect(() => {
+    const visibleGroups = groups() ?? [];
+    const currentId = selectedGroupId();
+
+    if (visibleGroups.length === 0) {
+      if (currentId !== null) {
+        setSelectedGroupId(null);
+      }
+      return;
+    }
+
+    if (!currentId || !visibleGroups.some((group) => group.id === currentId)) {
+      setSelectedGroupId(visibleGroups[0].id);
+    }
+  });
+
+  const [groupMembers] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const groupId = selectedGroupId();
+      const version = groupListVersion();
+      return db && userId && groupId ? { db, userId, groupId, version } : null;
+    },
+    async (params) => {
+      if (!params) {
+        return [];
+      }
+
+      return getGroupMembers(params.db, params.groupId, params.userId);
+    }
+  );
+
+  const [groupPrograms, { refetch: refetchGroupPrograms }] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const groupId = selectedGroupId();
+      const version = tuneSetListChanged();
+      return db && userId && groupId ? { db, userId, groupId, version } : null;
+    },
+    async (params) => {
+      if (!params) {
+        return [];
+      }
+
+      return getVisiblePrograms(params.db, params.userId, {
+        groupId: params.groupId,
+      });
+    }
+  );
+
+  const visibleGroupPrograms = createMemo(
+    () => groupPrograms.latest ?? groupPrograms() ?? []
+  );
+
+  const handleCreateGroup = async (data: {
+    name: string;
+    description: string;
+  }) => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) {
+      setGroupDialogError("Database is not ready yet.");
+      return;
+    }
+
+    try {
+      setIsCreatingGroup(true);
+      setGroupDialogError(null);
+      const created = await createGroup(db, userId, data);
+      setGroupListVersion((value) => value + 1);
+      setSelectedGroupId(created.id);
+      setShowCreateGroupDialog(false);
+      toast.success(`Created group "${created.name}".`, { duration: 2500 });
+    } catch (error) {
+      setGroupDialogError(
+        error instanceof Error ? error.message : "Failed to create group"
+      );
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
+
+  const handleOpenNewProgram = () => {
+    setEditingProgramId(undefined);
+    setShowProgramEditor(true);
+  };
+
+  const handleOpenExistingProgram = (program: ProgramWithSummary) => {
+    setEditingProgramId(program.id);
+    setShowProgramEditor(true);
+  };
+
+  const handleDeleteProgram = async (programRow: ProgramWithSummary) => {
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) {
+      toast.error("Database is not ready yet.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete the program "${programRow.name}"?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingProgramId(programRow.id);
+      await deleteProgram(db, programRow.id, userId);
+      incrementTuneSetListChanged();
+      void refetchGroupPrograms();
+      toast.success(`Deleted program "${programRow.name}".`, {
+        duration: 2500,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete program"
+      );
+    } finally {
+      setDeletingProgramId(null);
+    }
+  };
+
+  return (
+    <>
+      <div class="flex h-full flex-col bg-white dark:bg-gray-800">
+        <div class="flex-1 overflow-auto bg-gray-50 p-4 dark:bg-gray-900 sm:p-6">
+          <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                Create groups, review current membership, and manage shared
+                programs.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              onClick={() => setShowCreateGroupDialog(true)}
+              data-testid="open-create-group-button"
+            >
+              <span aria-hidden="true">+</span>
+              New Group
+            </button>
+          </div>
+
+          <Show
+            when={!groups.loading}
+            fallback={
+              <div class="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                Loading groups...
+              </div>
+            }
+          >
+            <Show
+              when={(groups() ?? []).length > 0}
+              fallback={
+                <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center dark:border-gray-700 dark:bg-gray-800">
+                  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                    <span aria-hidden="true">+</span>
+                  </div>
+                  <h3 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
+                    No groups yet
+                  </h3>
+                  <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Start by creating a group so you can attach shared programs
+                    to it.
+                  </p>
+                  <button
+                    type="button"
+                    class="mt-5 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                    onClick={() => setShowCreateGroupDialog(true)}
+                    data-testid="empty-create-group-button"
+                  >
+                    <span aria-hidden="true">+</span>
+                    Create Your First Group
+                  </button>
+                </div>
+              }
+            >
+              <div class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+                <section class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                  <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Your Groups
+                    </h3>
+                  </div>
+                  <div class="p-2" data-testid="groups-list">
+                    <For each={groups() ?? []}>
+                      {(group) => (
+                        <button
+                          type="button"
+                          class={`mb-2 flex w-full items-start justify-between rounded-lg border px-3 py-3 text-left last:mb-0 ${
+                            selectedGroupId() === group.id
+                              ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
+                              : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
+                          }`}
+                          onClick={() => setSelectedGroupId(group.id)}
+                          data-testid="group-list-item"
+                        >
+                          <div class="min-w-0">
+                            <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                              {group.name}
+                            </div>
+                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                              {group.memberCount} member
+                              {group.memberCount === 1 ? "" : "s"}
+                            </div>
+                          </div>
+                          <span
+                            class={`ml-3 inline-flex rounded-full px-2 py-1 text-[11px] font-medium capitalize ${roleBadgeClass(group.currentUserRole)}`}
+                          >
+                            {group.currentUserRole ?? "viewer"}
+                          </span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </section>
+
+                <Show when={selectedGroup()}>
+                  {(groupAccessor) => {
+                    const group = groupAccessor();
+                    return (
+                      <section class="space-y-6">
+                        <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+                                {group.name}
+                              </h3>
+                              <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                {group.description || "No description yet."}
+                              </p>
+                            </div>
+                            <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                              Owner: {group.ownerName ?? group.ownerUserRef}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="grid gap-6 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+                          <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                            <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                              <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                Members and Roles
+                              </h3>
+                            </div>
+                            <div
+                              class="space-y-3 p-4"
+                              data-testid="group-members-list"
+                            >
+                              <Show
+                                when={!groupMembers.loading}
+                                fallback={
+                                  <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    Loading members...
+                                  </div>
+                                }
+                              >
+                                <For each={groupMembers() ?? []}>
+                                  {(member) => (
+                                    <GroupMemberRow member={member} />
+                                  )}
+                                </For>
+                              </Show>
+                            </div>
+                          </div>
+
+                          <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                            <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  Programs
+                                </h3>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  Shared programs owned by this group.
+                                </p>
+                              </div>
+                              <Show when={group.canManageSets}>
+                                <div class="flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
+                                    onClick={handleOpenNewProgram}
+                                    data-testid="create-group-program-button"
+                                  >
+                                    <span aria-hidden="true">+</span>
+                                    New Program
+                                  </button>
+                                </div>
+                              </Show>
+                            </div>
+
+                            <div class="p-4">
+                              <Show when={groupPrograms.error}>
+                                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200">
+                                  Failed to load programs.
+                                </div>
+                              </Show>
+                              <Show
+                                when={
+                                  !groupPrograms.loading ||
+                                  visibleGroupPrograms().length > 0 ||
+                                  Boolean(groupPrograms.error)
+                                }
+                                fallback={
+                                  <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    Loading programs...
+                                  </div>
+                                }
+                              >
+                                <Show
+                                  when={visibleGroupPrograms().length > 0}
+                                  fallback={
+                                    <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                                      <Show
+                                        when={groupPrograms.loading}
+                                        fallback="No shared programs yet."
+                                      >
+                                        Refreshing programs...
+                                      </Show>
+                                    </div>
+                                  }
+                                >
+                                  <div
+                                    class="space-y-3"
+                                    data-testid="group-programs-list"
+                                  >
+                                    <For each={visibleGroupPrograms()}>
+                                      {(programRow) => (
+                                        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <button
+                                              type="button"
+                                              class="min-w-0 text-left"
+                                              onClick={() =>
+                                                handleOpenExistingProgram(
+                                                  programRow
+                                                )
+                                              }
+                                              data-testid="open-group-program-button"
+                                            >
+                                              <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                                                {programRow.name}
+                                              </div>
+                                              <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                                {programRow.description ||
+                                                  "No description yet."}
+                                              </div>
+                                              <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                {programRow.itemCount} item
+                                                {programRow.itemCount === 1
+                                                  ? ""
+                                                  : "s"}
+                                              </div>
+                                            </button>
+
+                                            <div class="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                onClick={() =>
+                                                  handleOpenExistingProgram(
+                                                    programRow
+                                                  )
+                                                }
+                                                data-testid="view-group-program-button"
+                                              >
+                                                {programRow.canManage
+                                                  ? "Edit"
+                                                  : "View"}
+                                              </button>
+                                              <Show when={programRow.canManage}>
+                                                <button
+                                                  type="button"
+                                                  class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
+                                                  disabled={
+                                                    deletingProgramId() ===
+                                                    programRow.id
+                                                  }
+                                                  onClick={() =>
+                                                    void handleDeleteProgram(
+                                                      programRow
+                                                    )
+                                                  }
+                                                  data-testid="delete-group-program-button"
+                                                >
+                                                  <Show
+                                                    when={
+                                                      deletingProgramId() ===
+                                                      programRow.id
+                                                    }
+                                                    fallback={
+                                                      <Trash2 size={14} />
+                                                    }
+                                                  >
+                                                    Deleting...
+                                                  </Show>
+                                                </button>
+                                              </Show>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </For>
+                                  </div>
+                                </Show>
+                              </Show>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  }}
+                </Show>
+              </div>
+            </Show>
+          </Show>
+        </div>
+      </div>
+
+      <GroupDialog
+        isOpen={showCreateGroupDialog()}
+        isSaving={isCreatingGroup()}
+        error={groupDialogError()}
+        onClose={() => {
+          if (!isCreatingGroup()) {
+            setShowCreateGroupDialog(false);
+            setGroupDialogError(null);
+          }
+        }}
+        onSubmit={(data) => void handleCreateGroup(data)}
+      />
+
+      <ProgramBuilderDialog
+        isOpen={showProgramEditor()}
+        onClose={() => {
+          setShowProgramEditor(false);
+          setEditingProgramId(undefined);
+        }}
+        programId={editingProgramId()}
+        onSaved={() => {
+          incrementTuneSetListChanged();
+          void refetchGroupPrograms();
+        }}
+        groupRef={selectedGroupId()}
+      />
+    </>
+  );
+};
+
+export const GroupsManagerDialog: Component<GroupsManagerDialogProps> = (
+  props
+) => {
+  const groupsDialog = useGroupsDialog();
+  const isOpen = () => props.isOpen ?? groupsDialog.isOpen();
+  const closeDialog = () =>
+    props.onClose?.() ?? groupsDialog.closeGroupsDialog();
+
+  createEffect(() => {
+    if (!isOpen()) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeDialog();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+  });
+
+  return (
+    <Show when={isOpen()}>
+      <button
+        type="button"
+        class="fixed inset-0 z-40 bg-black/50"
+        onClick={closeDialog}
+        aria-label="Close groups"
+        data-testid="groups-modal-backdrop"
+      />
+
+      <div
+        class="fixed inset-0 z-50 flex items-start justify-center pb-2 pt-2 md:pb-16 md:pt-8 pointer-events-none"
+        data-testid="groups-modal-wrapper"
+      >
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click only stops propagation inside modal shell */}
+        <div
+          class="mx-2 flex h-[calc(100vh-1rem)] w-full max-w-full flex-col rounded-lg border border-gray-200 bg-white shadow-2xl pointer-events-auto dark:border-gray-700 dark:bg-gray-800 md:max-h-[calc(100vh-8rem)] md:max-w-6xl"
+          role="dialog"
+          aria-labelledby="groups-dialog-title"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+          data-testid="groups-modal"
+        >
+          <div class="flex items-start justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700 md:px-6 md:py-4">
+            <div>
+              <h2
+                id="groups-dialog-title"
+                class="text-xl font-semibold text-gray-900 dark:text-gray-100 md:text-2xl"
+              >
+                Groups
+              </h2>
+              <p class="mt-1 hidden text-sm text-gray-500 dark:text-gray-400 md:block">
+                Manage group membership and shared programs without leaving your
+                current page.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeDialog}
+              class="relative z-10 flex h-10 w-10 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              aria-label="Close groups"
+              data-testid="groups-close-button"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div class="min-h-0 flex-1 overflow-hidden">
+            <GroupsManagerContent />
+          </div>
+        </div>
+      </div>
+    </Show>
+  );
+};
+
+export default GroupsManagerDialog;

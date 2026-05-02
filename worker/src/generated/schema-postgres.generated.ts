@@ -240,6 +240,43 @@ export const prefsSpacedRepetition = pgTable("prefs_spaced_repetition", {
   deviceId: text("device_id"),
 });
 
+export const program = pgTable("program", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  groupRef: uuid("group_ref").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  deleted: boolean("deleted").notNull().default(false),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
+export const programItem = pgTable("program_item", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  programRef: uuid("program_ref").notNull(),
+  itemKind: text("item_kind").notNull(),
+  tuneRef: uuid("tune_ref"),
+  tuneSetRef: uuid("tune_set_ref"),
+  position: integer("position").notNull(),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const reference = pgTable("reference", {
   id: uuid("id")
     .notNull()
@@ -537,6 +574,8 @@ export const tables = {
   practice_record: practiceRecord,
   prefs_scheduling_options: prefsSchedulingOptions,
   prefs_spaced_repetition: prefsSpacedRepetition,
+  program: program,
+  program_item: programItem,
   reference: reference,
   repertoire: repertoire,
   repertoire_tune: repertoireTune,

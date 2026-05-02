@@ -20,6 +20,7 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -799,6 +800,7 @@ const RepertoireDropdown: Component<{
 export const TopNav: Component = () => {
   const location = useLocation();
   const { openUserSettings } = useUserSettingsDialog();
+  const { openGroupsDialog } = useGroupsDialog();
   const {
     user,
     localDb,
@@ -1232,6 +1234,32 @@ export const TopNav: Component = () => {
                           />
                         </svg>
                         User Settings
+                      </button>
+
+                      <button
+                        type="button"
+                        class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          openGroupsDialog();
+                        }}
+                        data-testid="user-menu-groups-link"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M17 20h5V18a4 4 0 00-4-4h-1m-4 6H2v-2a4 4 0 014-4h7a4 4 0 014 4v2zM9.5 10a4 4 0 100-8 4 4 0 000 8zm8 1a3 3 0 100-6 3 3 0 000 6z"
+                          />
+                        </svg>
+                        Groups
                       </button>
 
                       {/* Theme Switcher */}

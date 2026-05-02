@@ -20,7 +20,7 @@ import {
 
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
-export type TuneSetKind = "practice_set" | "group_setlist";
+export type TuneSetKind = "practice_set";
 
 export interface TuneSetWithSummary extends TuneSet {
   ownerName: string | null;
@@ -222,12 +222,14 @@ export async function createTuneSet(
 ): Promise<TuneSet> {
   const now = nowIso();
   const groupRef = data.groupRef ?? null;
-  const setKind = data.setKind ?? (groupRef ? "group_setlist" : "practice_set");
+  const setKind = data.setKind ?? "practice_set";
 
   if (groupRef) {
     const groupAccess = await getGroupAccessForUser(db, groupRef, userId);
     if (!groupAccess.canManageSets) {
-      throw new Error("Only group owners or admins can manage group setlists");
+      throw new Error(
+        "Only group owners or admins can manage shared Tune Sets"
+      );
     }
   }
 
@@ -410,8 +412,12 @@ export async function addTuneToTuneSet(
   if (!access.canManage || !access.set) {
     throw new Error("You do not have permission to modify this tune set");
   }
-  if (!(await getTuneRow(db, tuneId, userId))) {
+  const tuneRow = await getTuneRow(db, tuneId, userId);
+  if (!tuneRow) {
     throw new Error("Tune is not visible to the current user");
+  }
+  if (access.set.groupRef && tuneRow.privateFor) {
+    throw new Error("Private tunes cannot be added to a shared Tune Set");
   }
 
   const existing = await db
@@ -641,38 +647,4 @@ export async function reorderTuneSetItems(
   }
 
   await persistDb();
-}
-
-export async function cloneTuneSetToGroupSetlist(
-  db: AnyDatabase,
-  sourceTuneSetId: string,
-  targetGroupId: string,
-  userId: string,
-  overrides?: { name?: string; description?: string | null }
-): Promise<TuneSet> {
-  const sourceAccess = await getTuneSetAccessForUser(
-    db,
-    sourceTuneSetId,
-    userId
-  );
-  if (!sourceAccess.canView || !sourceAccess.set) {
-    throw new Error("Source tune set is not visible to the current user");
-  }
-
-  const cloned = await createTuneSet(db, userId, {
-    groupRef: targetGroupId,
-    setKind: "group_setlist",
-    name: overrides?.name ?? sourceAccess.set.name,
-    description:
-      overrides?.description !== undefined
-        ? overrides.description
-        : sourceAccess.set.description,
-  });
-
-  const items = await getTuneSetItems(db, sourceTuneSetId, userId);
-  for (const item of items) {
-    await addTuneToTuneSet(db, cloned.id, item.tuneRef, userId, item.position);
-  }
-
-  return cloned;
 }

@@ -1,5 +1,5 @@
--- RPC for syncing tune-set items whose parent set is visible and whose tunes are
--- already visible under the existing tune sync rules.
+-- RPC for syncing tune-set items whose parent set is visible directly or is
+-- referenced by a visible program.
 
 CREATE OR REPLACE FUNCTION sync_get_tune_set_items(
   p_user_id UUID,
@@ -33,6 +33,14 @@ AS $$
         gm.deleted = FALSE
         OR (p_after_timestamp IS NOT NULL AND gm.last_modified_at > p_after_timestamp)
       )
+  ),
+  visible_program_tune_set_ids AS (
+    SELECT DISTINCT pi.tune_set_ref AS id
+    FROM program_item pi
+    JOIN program p ON p.id = pi.program_ref
+    WHERE pi.item_kind = 'tune_set'
+      AND pi.tune_set_ref IS NOT NULL
+      AND p.group_ref IN (SELECT id FROM accessible_group_ids)
   )
   SELECT tsi.*
   FROM tune_set_item tsi
@@ -41,6 +49,7 @@ AS $$
   WHERE (
       ts.owner_user_ref = p_user_id
       OR ts.group_ref IN (SELECT id FROM accessible_group_ids)
+      OR ts.id IN (SELECT id FROM visible_program_tune_set_ids)
     )
     AND (
       (t.genre = ANY(p_genre_ids) AND t.private_for IS NULL)

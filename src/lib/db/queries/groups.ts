@@ -5,6 +5,8 @@ import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
   groupMember,
+  program,
+  programItem,
   tuneSet,
   tuneSetItem,
   userGroup,
@@ -330,6 +332,11 @@ export async function deleteGroup(
     .from(tuneSet)
     .where(and(eq(tuneSet.groupRef, groupId), eq(tuneSet.deleted, 0)));
   const setIds = groupSets.map((setRecord) => setRecord.id);
+  const groupPrograms = await db
+    .select()
+    .from(program)
+    .where(and(eq(program.groupRef, groupId), eq(program.deleted, 0)));
+  const programIds = groupPrograms.map((programRecord) => programRecord.id);
   const activeSetItems =
     setIds.length === 0
       ? []
@@ -340,6 +347,18 @@ export async function deleteGroup(
             and(
               inArray(tuneSetItem.tuneSetRef, setIds),
               eq(tuneSetItem.deleted, 0)
+            )
+          );
+  const activeProgramItems =
+    programIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(programItem)
+          .where(
+            and(
+              inArray(programItem.programRef, programIds),
+              eq(programItem.deleted, 0)
             )
           );
 
@@ -388,6 +407,32 @@ export async function deleteGroup(
           deviceId: getLocalDeviceId(),
         })
         .where(eq(tuneSetItem.id, setItem.id));
+    }
+  }
+
+  if (programIds.length > 0) {
+    for (const programRecord of groupPrograms) {
+      await db
+        .update(program)
+        .set({
+          deleted: 1,
+          syncVersion: (programRecord.syncVersion ?? 0) + 1,
+          lastModifiedAt: now,
+          deviceId: getLocalDeviceId(),
+        })
+        .where(eq(program.id, programRecord.id));
+    }
+
+    for (const item of activeProgramItems) {
+      await db
+        .update(programItem)
+        .set({
+          deleted: 1,
+          syncVersion: (item.syncVersion ?? 0) + 1,
+          lastModifiedAt: now,
+          deviceId: getLocalDeviceId(),
+        })
+        .where(eq(programItem.id, item.id));
     }
   }
 
