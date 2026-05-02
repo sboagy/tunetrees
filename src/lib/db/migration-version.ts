@@ -8,7 +8,7 @@
  * @module lib/db/migration-version
  */
 
-const CURRENT_SCHEMA_VERSION = "2.0.7-add-groups-and-tune-sets"; // Bump this when schema changes
+const CURRENT_SCHEMA_VERSION = "2.0.8-add-programs"; // Bump this when schema changes
 
 /**
  * Get the locally stored schema version from localStorage
@@ -118,6 +118,8 @@ export async function clearLocalDatabaseForMigration(
       repertoireTune,
       note,
       reference,
+      program,
+      programItem,
       tuneSet,
       tuneSetItem,
       tag,
@@ -138,6 +140,10 @@ export async function clearLocalDatabaseForMigration(
       repertoireTune,
       note,
       reference,
+      // programItem before program (FK: program_item.program_ref → program)
+      // both before tuneSet and userGroup (FK references)
+      programItem,
+      program,
       tuneSet,
       tuneSetItem,
       tag,
