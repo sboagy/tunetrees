@@ -365,7 +365,26 @@ CREATE OR REPLACE FUNCTION public.sync_get_group_members(
 ) RETURNS SETOF public.group_member
     LANGUAGE sql STABLE
     AS $$
-  WITH accessible_group_ids AS (
+  WITH newly_accessible_group_ids AS (
+    -- Groups where this user's own access was established after the cursor timestamp.
+    -- For these groups all existing members must be returned regardless of their
+    -- last_modified_at so that incremental sync does not miss older roster entries.
+    SELECT ug.id
+    FROM public.user_group ug
+    WHERE ug.owner_user_ref = p_user_id
+      AND p_after_timestamp IS NOT NULL
+      AND ug.created_at > p_after_timestamp
+
+    UNION
+
+    SELECT gm.group_ref
+    FROM public.group_member gm
+    WHERE gm.user_ref = p_user_id
+      AND p_after_timestamp IS NOT NULL
+      AND gm.last_modified_at > p_after_timestamp
+      AND gm.deleted = FALSE
+  ),
+  accessible_group_ids AS (
     SELECT ug.id
     FROM public.user_group ug
     WHERE ug.owner_user_ref = p_user_id
@@ -386,6 +405,9 @@ CREATE OR REPLACE FUNCTION public.sync_get_group_members(
     AND (
       p_after_timestamp IS NULL
       OR gm.last_modified_at > p_after_timestamp
+      -- When the user gained access to this group after the cursor, return all
+      -- its members so the local roster is complete after incremental sync.
+      OR gm.group_ref IN (SELECT id FROM newly_accessible_group_ids)
     )
   ORDER BY gm.last_modified_at ASC, gm.id ASC
   LIMIT p_limit
