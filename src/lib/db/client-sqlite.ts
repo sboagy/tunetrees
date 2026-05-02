@@ -38,8 +38,8 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 13,
-  schemaVersion: "2.0.6-add-media-assets",
+  databaseVersion: 16,
+  schemaVersion: "2.0.8-add-programs",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -56,6 +56,9 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
     "/drizzle/migrations/sqlite/0013_add_goal_table.sql",
     "/drizzle/migrations/sqlite/0014_add_media_assets.sql",
+    "/drizzle/migrations/sqlite/0015_add_groups_and_tune_sets.sql",
+    "/drizzle/migrations/sqlite/0016_add_programs.sql",
+    "/drizzle/migrations/sqlite/0017_fix_ordered_item_conflict_targets.sql",
   ],
   forceResetQueryParams: [
     { key: "reset", value: "true" },

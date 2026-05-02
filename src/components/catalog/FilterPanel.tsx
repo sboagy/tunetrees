@@ -46,6 +46,12 @@ const isPointerEventInside = (
   return !!target && element.contains(target);
 };
 
+export interface TuneSetFilterOption {
+  id: string;
+  name: string;
+  tuneCount?: number;
+}
+
 // Filter chip component for selected items
 const FilterChip: Component<{
   label: string;
@@ -239,6 +245,130 @@ const FilterDropdown: Component<{
   );
 };
 
+const TuneSetFilterDropdown: Component<{
+  items: TuneSetFilterOption[];
+  selectedTuneSetIds: string[];
+  onSelectionChange: (tuneSetIds: string[]) => void;
+  loading?: boolean;
+}> = (props) => {
+  const [isOpen, setIsOpen] = createSignal(false);
+  let dropdownRef: HTMLDivElement | undefined;
+  let buttonRef: HTMLButtonElement | undefined;
+
+  const handlePointerDownOutside = (event: PointerEvent) => {
+    if (
+      isPointerEventInside(event, dropdownRef) ||
+      isPointerEventInside(event, buttonRef)
+    ) {
+      return;
+    }
+
+    setIsOpen(false);
+  };
+
+  createEffect(() => {
+    if (isOpen()) {
+      document.addEventListener("pointerdown", handlePointerDownOutside, true);
+      onCleanup(() => {
+        document.removeEventListener(
+          "pointerdown",
+          handlePointerDownOutside,
+          true
+        );
+      });
+    }
+  });
+
+  return (
+    <div class="relative" ref={dropdownRef}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        class="flex items-center gap-1.5 px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
+        aria-label="Filter by Tune Set"
+        aria-expanded={isOpen()}
+        aria-haspopup="listbox"
+        data-testid="filter-dropdown-tune-set"
+      >
+        <span>Tune Set</span>
+        <Show when={props.loading}>
+          <div class="animate-spin w-3 h-3 border border-gray-400 border-t-transparent rounded-full"></div>
+        </Show>
+        <Show when={props.selectedTuneSetIds.length > 0}>
+          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">
+            {props.selectedTuneSetIds.length}
+          </span>
+        </Show>
+        <svg
+          class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <title>Toggle dropdown</title>
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
+      </button>
+
+      <Show when={isOpen()}>
+        <div class="absolute left-0 top-full mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+          <div class="p-2" data-testid="filter-dropdown-menu-tune-set">
+            <Show
+              when={!props.loading && props.items.length > 0}
+              fallback={
+                <div class="text-xs text-gray-500 dark:text-gray-400 italic px-2 py-2">
+                  <Show when={props.loading} fallback="No tune sets available">
+                    Loading...
+                  </Show>
+                </div>
+              }
+            >
+              <For each={props.items}>
+                {(item) => (
+                  <button
+                    type="button"
+                    class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-gray-900 hover:bg-gray-50 dark:text-white dark:hover:bg-gray-700"
+                    onClick={() => {
+                      const nextSelectedIds = props.selectedTuneSetIds.includes(
+                        item.id
+                      )
+                        ? props.selectedTuneSetIds.filter(
+                            (id) => id !== item.id
+                          )
+                        : [...props.selectedTuneSetIds, item.id];
+                      props.onSelectionChange(nextSelectedIds);
+                    }}
+                    data-testid="filter-dropdown-tune-set-option"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={props.selectedTuneSetIds.includes(item.id)}
+                      readOnly
+                      class="w-4 h-4"
+                    />
+                    <span class="flex-1 truncate">{item.name}</span>
+                    <Show when={typeof item.tuneCount === "number"}>
+                      <span class="text-xs text-gray-500 dark:text-gray-400">
+                        {item.tuneCount}
+                      </span>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </Show>
+          </div>
+        </div>
+      </Show>
+    </div>
+  );
+};
+
 export interface FilterPanelProps {
   /** Available types */
   availableTypes: string[];
@@ -268,12 +398,19 @@ export interface FilterPanelProps {
   loading?: {
     genres?: boolean;
     repertoires?: boolean;
+    tuneSets?: boolean;
   };
   /** Hide repertoire filter */
   hideRepertoireFilter?: boolean;
   /** Controlled state for panel expansion */
   isExpanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
+  /** Optional personal tune sets for a tune-set filter */
+  availableTuneSets?: TuneSetFilterOption[];
+  /** Currently selected tune-set filters */
+  selectedTuneSetIds?: string[];
+  /** Tune-set filter change handler */
+  onTuneSetChange?: (tuneSetIds: string[]) => void;
 }
 
 export const FilterPanel: Component<FilterPanelProps> = (props) => {
@@ -292,6 +429,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
 
   const hideRepertoireFilter = () => props.hideRepertoireFilter ?? false;
   const repertoiresLoading = () => props.loading?.repertoires;
+  const hasTuneSetFilter = () => !!props.onTuneSetChange;
 
   // Calculate panel position based on trigger button
   const updatePosition = () => {
@@ -393,6 +531,12 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     );
   };
 
+  const removeTuneSetById = (tuneSetId: string) => {
+    props.onTuneSetChange?.(
+      (props.selectedTuneSetIds ?? []).filter((id) => id !== tuneSetId)
+    );
+  };
+
   // Get repertoire display name by ID
   const getRepertoireNameById = (repertoireId: string): string => {
     const repertoire = props.availableRepertoires.find(
@@ -403,6 +547,13 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
       : `Repertoire ${repertoireId}`;
   };
 
+  const getTuneSetNameById = (tuneSetId: string): string => {
+    const tuneSet = props.availableTuneSets?.find(
+      (set) => set.id === tuneSetId
+    );
+    return tuneSet?.name ?? "Tune Set";
+  };
+
   // Clear all selections
   const clearAll = () => {
     props.onTypesChange([]);
@@ -410,6 +561,9 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     props.onGenresChange([]);
     if (!hideRepertoireFilter()) {
       props.onRepertoireIdsChange([]);
+    }
+    if (hasTuneSetFilter()) {
+      props.onTuneSetChange?.([]);
     }
   };
 
@@ -422,7 +576,8 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
       props.selectedTypes.length +
       props.selectedModes.length +
       props.selectedGenres.length +
-      repertoireCount
+      repertoireCount +
+      (props.selectedTuneSetIds?.length ?? 0)
     );
   };
 
@@ -518,6 +673,17 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   loading={props.loading?.genres}
                 />
 
+                <Show when={hasTuneSetFilter()}>
+                  <TuneSetFilterDropdown
+                    items={props.availableTuneSets ?? []}
+                    selectedTuneSetIds={props.selectedTuneSetIds ?? []}
+                    onSelectionChange={(tuneSetIds) =>
+                      props.onTuneSetChange?.(tuneSetIds)
+                    }
+                    loading={props.loading?.tuneSets}
+                  />
+                </Show>
+
                 {/* Repertoire filter - only shown when not hidden */}
                 <Show when={!hideRepertoireFilter()}>
                   <FilterDropdown
@@ -573,6 +739,16 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                       <FilterChip
                         label={genre}
                         onRemove={() => removeGenre(genre)}
+                        type="genre"
+                      />
+                    )}
+                  </For>
+
+                  <For each={props.selectedTuneSetIds ?? []}>
+                    {(tuneSetId) => (
+                      <FilterChip
+                        label={getTuneSetNameById(tuneSetId)}
+                        onRemove={() => removeTuneSetById(tuneSetId)}
                         type="genre"
                       />
                     )}

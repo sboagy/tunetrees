@@ -22,6 +22,7 @@ import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
+import { filterRowsBySelectedTuneIds } from "../../lib/tune-sets/filter";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
@@ -102,7 +103,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
   // Client-side filter (search/type/mode/genre)
   const filteredTunes = createMemo<ITuneOverview[]>(() => {
-    const base = tunes();
+    const base = filterRowsBySelectedTuneIds(tunes(), props.selectedTuneIds);
     const query = props.searchQuery?.trim().toLowerCase() || "";
     const types = props.selectedTypes || [];
     const modes = props.selectedModes || [];

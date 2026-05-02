@@ -11,12 +11,26 @@ import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
 import { ChevronRight, Columns, EllipsisVertical, Plus } from "lucide-solid";
 import type { Component } from "solid-js";
-import { createEffect, createSignal, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+  Show,
+} from "solid-js";
+import { toast } from "solid-sonner";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
+import { buildDefaultTuneSetName } from "@/lib/tune-sets/name";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getDb, persistDb } from "../../lib/db/client-sqlite";
 import { addTunesToPracticeQueue } from "../../lib/db/queries/practice";
 import { removeTuneFromRepertoire } from "../../lib/db/queries/repertoires";
+import {
+  addTunesToTuneSet,
+  createTuneSetFromTunes,
+  getPersonalTuneSets,
+} from "../../lib/db/queries/tune-sets";
 import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
@@ -38,6 +52,8 @@ import {
 import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
+import { GroupAsSetPopover } from "../tune-sets/GroupAsSetPopover";
+import { TuneSetManagerDialog } from "../tune-sets/TuneSetManagerDialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -66,6 +82,8 @@ export interface RepertoireToolbarProps {
   selectedRowsCount?: number;
   table?: Table<ITuneOverview>;
   repertoireId?: string;
+  selectedTuneSetIds: string[];
+  onTuneSetFilterChange: (tuneSetIds: string[]) => void;
   filterPanelExpanded?: boolean;
   onFilterPanelExpandedChange?: (expanded: boolean) => void;
 }
@@ -76,10 +94,21 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     incrementPracticeListStagedChanged,
     incrementRepertoireListChanged,
     forceSyncUp,
+    localDb,
     user,
   } = useAuth();
+  const { incrementTuneSetListChanged, tuneSetListChanged } =
+    useCurrentTuneSet();
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
   const [showAddTuneDialog, setShowAddTuneDialog] = createSignal(false);
+  const [showGroupAsSetPopover, setShowGroupAsSetPopover] = createSignal(false);
+  const [showTuneSetManagerDialog, setShowTuneSetManagerDialog] =
+    createSignal(false);
+  const [groupAsSetError, setGroupAsSetError] = createSignal<string | null>(
+    null
+  );
+  const [addingToSetId, setAddingToSetId] = createSignal<string | null>(null);
+  const [isSavingGroupAsSet, setIsSavingGroupAsSet] = createSignal(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
   const [isRemoving, setIsRemoving] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
@@ -87,7 +116,6 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     createSignal(false);
   let columnsButtonRef: HTMLButtonElement | undefined;
   let mobileOverflowButtonRef: HTMLButtonElement | undefined;
-
   createEffect(() => {
     if (!pendingDisplayOptionsOpen() || showOverflowMenu()) {
       return;
@@ -102,6 +130,35 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     Boolean(
       props.table && props.selectedRowsCount && props.selectedRowsCount > 0
     );
+
+  const selectedRows = createMemo(() =>
+    props.table ? props.table.getSelectedRowModel().rows : []
+  );
+
+  const selectedTuneIds = createMemo(() =>
+    selectedRows().map((row) => row.original.id)
+  );
+
+  const selectedTuneTitles = createMemo(() =>
+    selectedRows().map((row) => row.original.title ?? "")
+  );
+
+  const defaultTuneSetName = createMemo(() =>
+    buildDefaultTuneSetName(selectedTuneTitles())
+  );
+
+  const [personalTuneSets] = createResource(
+    () => {
+      const db = localDb();
+      const userId = user()?.id;
+      const version = tuneSetListChanged();
+      return db && userId ? { db, userId, version } : null;
+    },
+    async (params) => {
+      if (!params) return [];
+      return getPersonalTuneSets(params.db, params.userId);
+    }
+  );
 
   const handleAddToReview = async () => {
     try {
@@ -176,6 +233,105 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
   const handleAddTune = () => {
     setShowAddTuneDialog(true);
+  };
+
+  const handleOpenGroupAsSet = () => {
+    if (!props.table) {
+      alert("Table not initialized");
+      return;
+    }
+
+    const selectedRows = props.table.getSelectedRowModel().rows;
+    if (selectedRows.length === 0) {
+      alert("No tunes selected. Please select tunes to group as a tune set.");
+      return;
+    }
+
+    setGroupAsSetError(null);
+    setShowGroupAsSetPopover(true);
+  };
+
+  const handleCreateGroupAsSet = async (data: {
+    name: string;
+    description: string;
+  }) => {
+    if (!props.table) return;
+
+    const currentUserId = user()?.id;
+    if (!currentUserId) return;
+
+    try {
+      setIsSavingGroupAsSet(true);
+      setGroupAsSetError(null);
+
+      const createdSet = await createTuneSetFromTunes(getDb(), currentUserId, {
+        name: data.name,
+        description: data.description,
+        tuneIds: selectedTuneIds(),
+      });
+
+      incrementTuneSetListChanged();
+      setShowGroupAsSetPopover(false);
+      props.table.resetRowSelection();
+      await forceSyncUp();
+      toast.success(`Created tune set "${createdSet.name}".`, {
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error creating grouped tune set:", error);
+      setGroupAsSetError(
+        error instanceof Error ? error.message : "Failed to create tune set"
+      );
+    } finally {
+      setIsSavingGroupAsSet(false);
+    }
+  };
+
+  const handleAddSelectionToTuneSet = async (tuneSetId: string) => {
+    const db = localDb();
+    const currentUserId = user()?.id;
+    if (!db || !currentUserId) return;
+
+    try {
+      setAddingToSetId(tuneSetId);
+      const result = await addTunesToTuneSet(
+        db,
+        tuneSetId,
+        selectedTuneIds(),
+        currentUserId
+      );
+
+      incrementTuneSetListChanged();
+      await forceSyncUp();
+      setShowGroupAsSetPopover(false);
+
+      if (result.added > 0 && result.skipped > 0) {
+        toast.success(
+          `Added ${result.added} tune${result.added === 1 ? "" : "s"}; ${result.skipped} already belonged to that set.`,
+          { duration: 3000 }
+        );
+        return;
+      }
+
+      if (result.added > 0) {
+        toast.success(
+          `Added ${result.added} tune${result.added === 1 ? "" : "s"} to the selected set.`,
+          { duration: 3000 }
+        );
+        return;
+      }
+
+      toast("Those tunes are already in that set.", { duration: 2500 });
+    } catch (error) {
+      console.error("Error adding tunes to existing tune set:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to add tunes to existing tune set"
+      );
+    } finally {
+      setAddingToSetId(null);
+    }
   };
 
   const removeSelectedFromRepertoire = async (): Promise<void> => {
@@ -277,7 +433,14 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           availableRepertoires={[]}
           selectedRepertoireIds={[]}
           onRepertoireIdsChange={() => {}}
-          loading={props.loading}
+          availableTuneSets={(personalTuneSets() ?? []).map((tuneSet) => ({
+            id: tuneSet.id,
+            name: tuneSet.name,
+            tuneCount: tuneSet.tuneCount,
+          }))}
+          selectedTuneSetIds={props.selectedTuneSetIds}
+          onTuneSetChange={props.onTuneSetFilterChange}
+          loading={{ ...props.loading, tuneSets: personalTuneSets.loading }}
           hideRepertoireFilter={true}
           isExpanded={props.filterPanelExpanded}
           onExpandedChange={props.onFilterPanelExpandedChange}
@@ -311,6 +474,31 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 }}
               >
                 <span>Add To Review</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="repertoire-add-to-tune-set-button"
+                class={mobileMenuItemClasses}
+                disabled={!hasSelectedRows()}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  handleOpenGroupAsSet();
+                }}
+              >
+                <span>Add to Set</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="open-tune-set-manager-from-toolbar"
+                class={mobileMenuItemClasses}
+                onClick={() => {
+                  setShowOverflowMenu(false);
+                  setShowTuneSetManagerDialog(true);
+                }}
+              >
+                <span>Manage Sets</span>
               </button>
 
               <button
@@ -430,11 +618,48 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 availableRepertoires={[]}
                 selectedRepertoireIds={[]}
                 onRepertoireIdsChange={() => {}}
-                loading={props.loading}
+                availableTuneSets={(personalTuneSets() ?? []).map(
+                  (tuneSet) => ({
+                    id: tuneSet.id,
+                    name: tuneSet.name,
+                    tuneCount: tuneSet.tuneCount,
+                  })
+                )}
+                selectedTuneSetIds={props.selectedTuneSetIds}
+                onTuneSetChange={props.onTuneSetFilterChange}
+                loading={{
+                  ...props.loading,
+                  tuneSets: personalTuneSets.loading,
+                }}
                 hideRepertoireFilter={true}
                 isExpanded={props.filterPanelExpanded}
                 onExpandedChange={props.onFilterPanelExpandedChange}
               />
+
+              <button
+                type="button"
+                onClick={handleOpenGroupAsSet}
+                title="Open set actions for the selected tunes"
+                data-testid="repertoire-group-as-set-button"
+                disabled={!hasSelectedRows()}
+                class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
+              >
+                <svg
+                  class={TOOLBAR_ICON_SIZE}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 7h16M4 12h16M4 17h10"
+                  />
+                </svg>
+                <span>Add to Set</span>
+              </button>
 
               <button
                 type="button"
@@ -490,33 +715,45 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
             <div class={TOOLBAR_SPACER} />
 
-            <div class="relative">
+            <div class="flex items-center gap-2">
               <button
-                ref={columnsButtonRef!}
                 type="button"
-                onClick={handleColumnsToggle}
-                title="Display options"
-                data-testid="repertoire-columns-button"
-                aria-expanded={showColumnsDropdown()}
+                onClick={() => setShowTuneSetManagerDialog(true)}
+                title="Manage personal tune sets"
+                data-testid="open-tune-set-manager-from-toolbar"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
               >
-                <Columns size={14} />
-                <span>Display Options</span>
-                <svg
-                  class="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+                <span>Manage Sets</span>
               </button>
+
+              <div class="relative">
+                <button
+                  ref={columnsButtonRef!}
+                  type="button"
+                  onClick={handleColumnsToggle}
+                  title="Display options"
+                  data-testid="repertoire-columns-button"
+                  aria-expanded={showColumnsDropdown()}
+                  class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
+                >
+                  <Columns size={14} />
+                  <span>Display Options</span>
+                  <svg
+                    class="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -570,6 +807,27 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <GroupAsSetPopover
+        isOpen={showGroupAsSetPopover()}
+        tuneTitles={selectedTuneTitles()}
+        initialName={defaultTuneSetName()}
+        isSaving={isSavingGroupAsSet()}
+        availableTuneSets={personalTuneSets() ?? []}
+        loadingTuneSets={personalTuneSets.loading}
+        addingToSetId={addingToSetId()}
+        error={groupAsSetError()}
+        onSave={(data) => void handleCreateGroupAsSet(data)}
+        onAddToExistingSet={(tuneSetId) =>
+          void handleAddSelectionToTuneSet(tuneSetId)
+        }
+        onClose={() => setShowGroupAsSetPopover(false)}
+      />
+
+      <TuneSetManagerDialog
+        isOpen={showTuneSetManagerDialog()}
+        onClose={() => setShowTuneSetManagerDialog(false)}
+      />
     </>
   );
 };

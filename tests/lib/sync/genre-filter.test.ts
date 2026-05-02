@@ -4,7 +4,10 @@ import {
   createSyncPushQueueTable,
   createSyncTriggerControlTable,
 } from "@/lib/db/install-triggers";
-import { repairPendingMediaAssetSyncStateInSqlite } from "@/lib/sync/genre-filter";
+import {
+  repairPendingMediaAssetSyncStateInSqlite,
+  repairPendingProgramSyncStateInSqlite,
+} from "@/lib/sync/genre-filter";
 import { getTestSqlJs } from "../db/sqljs-test-utils";
 
 let db: Database;
@@ -44,6 +47,38 @@ describe("repairPendingMediaAssetSyncStateInSqlite", () => {
       CREATE TABLE media_asset (
         id TEXT PRIMARY KEY NOT NULL,
         reference_ref TEXT NOT NULL,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE user_group (
+        id TEXT PRIMARY KEY NOT NULL,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE program (
+        id TEXT PRIMARY KEY NOT NULL,
+        group_ref TEXT NOT NULL,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE program_item (
+        id TEXT PRIMARY KEY NOT NULL,
+        program_ref TEXT NOT NULL,
+        tune_set_ref TEXT,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE tune_set (
+        id TEXT PRIMARY KEY NOT NULL,
+        group_ref TEXT,
         deleted INTEGER NOT NULL DEFAULT 0
       )
     `);
@@ -104,5 +139,115 @@ describe("repairPendingMediaAssetSyncStateInSqlite", () => {
         "SELECT COUNT(*) FROM sync_push_queue WHERE table_name = 'media_asset' AND row_id = 'asset-orphan'"
       )
     ).toBe(0);
+  });
+});
+
+describe("repairPendingProgramSyncStateInSqlite", () => {
+  beforeEach(async () => {
+    if (!SQL) {
+      SQL = await getTestSqlJs();
+    }
+
+    db = new SQL.Database();
+    createSyncTriggerControlTable(db);
+    createSyncPushQueueTable(db);
+
+    db.run(`
+      CREATE TABLE user_group (
+        id TEXT PRIMARY KEY NOT NULL,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE program (
+        id TEXT PRIMARY KEY NOT NULL,
+        group_ref TEXT NOT NULL,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE program_item (
+        id TEXT PRIMARY KEY NOT NULL,
+        program_ref TEXT NOT NULL,
+        tune_set_ref TEXT,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE tune_set (
+        id TEXT PRIMARY KEY NOT NULL,
+        group_ref TEXT,
+        deleted INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+  });
+
+  it("requeues the owning group beside a pending program row", () => {
+    db.run(`
+      INSERT INTO user_group (id, deleted) VALUES ('group-1', 0);
+      INSERT INTO program (id, group_ref, deleted) VALUES ('program-1', 'group-1', 0);
+      INSERT INTO sync_push_queue (
+        id, table_name, row_id, operation, status, changed_at, attempts
+      ) VALUES (
+        'queue-program-1', 'program', 'program-1', 'UPDATE', 'pending', '2026-05-02T10:00:00.000Z', 0
+      );
+    `);
+
+    const result = repairPendingProgramSyncStateInSqlite(db);
+
+    expect(result).toEqual({
+      requeuedProgramCount: 0,
+      requeuedTuneSetCount: 0,
+      requeuedGroupCount: 1,
+    });
+    expect(
+      db.exec(`
+        SELECT table_name, row_id, changed_at
+        FROM sync_push_queue
+        WHERE table_name = 'user_group'
+      `)[0]?.values ?? []
+    ).toEqual([["user_group", "group-1", "2026-05-02T10:00:00.000Z"]]);
+  });
+
+  it("pulls parent program and group into the same batch for pending program items", () => {
+    db.run(`
+      INSERT INTO user_group (id, deleted) VALUES ('group-2', 0);
+      INSERT INTO user_group (id, deleted) VALUES ('group-3', 0);
+      INSERT INTO program (id, group_ref, deleted) VALUES ('program-2', 'group-2', 0);
+      INSERT INTO tune_set (id, group_ref, deleted) VALUES ('set-2', 'group-3', 0);
+      INSERT INTO program_item (id, program_ref, tune_set_ref, deleted) VALUES ('item-2', 'program-2', 'set-2', 0);
+      INSERT INTO sync_push_queue (
+        id, table_name, row_id, operation, status, changed_at, attempts
+      ) VALUES
+        ('queue-item-2', 'program_item', 'item-2', 'UPDATE', 'pending', '2026-05-02T09:00:00.000Z', 0),
+        ('queue-program-2-late', 'program', 'program-2', 'UPDATE', 'pending', '2026-05-02T12:00:00.000Z', 0),
+        ('queue-set-2-late', 'tune_set', 'set-2', 'UPDATE', 'failed', '2026-05-02T12:00:00.500Z', 1),
+        ('queue-group-2-failed', 'user_group', 'group-2', 'UPDATE', 'failed', '2026-05-02T12:00:01.000Z', 2),
+        ('queue-group-3-late', 'user_group', 'group-3', 'UPDATE', 'pending', '2026-05-02T13:00:00.000Z', 0);
+    `);
+
+    const result = repairPendingProgramSyncStateInSqlite(db);
+
+    expect(result).toEqual({
+      requeuedProgramCount: 1,
+      requeuedTuneSetCount: 1,
+      requeuedGroupCount: 2,
+    });
+    expect(
+      db.exec(`
+        SELECT table_name, row_id, status, changed_at
+        FROM sync_push_queue
+        WHERE table_name IN ('program', 'tune_set', 'user_group')
+        ORDER BY table_name ASC, row_id ASC
+      `)[0]?.values ?? []
+    ).toEqual([
+      ["program", "program-2", "pending", "2026-05-02T09:00:00.000Z"],
+      ["tune_set", "set-2", "pending", "2026-05-02T09:00:00.000Z"],
+      ["user_group", "group-2", "pending", "2026-05-02T09:00:00.000Z"],
+      ["user_group", "group-3", "pending", "2026-05-02T09:00:00.000Z"],
+    ]);
   });
 });

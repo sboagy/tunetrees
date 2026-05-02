@@ -20,6 +20,7 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { getOutboxStats } from "@/lib/sync";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -799,6 +800,7 @@ const RepertoireDropdown: Component<{
 export const TopNav: Component = () => {
   const location = useLocation();
   const { openUserSettings } = useUserSettingsDialog();
+  const { openGroupsDialog } = useGroupsDialog();
   const {
     user,
     localDb,
@@ -985,12 +987,12 @@ export const TopNav: Component = () => {
   return (
     <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
       <div class="px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center gap-6">
+        <div class="flex justify-between items-center h-16 gap-2 sm:gap-4">
+          <div class="flex min-w-0 items-center gap-2 sm:gap-6">
             {/* App Logo Dropdown */}
             <LogoDropdown onOpenAbout={() => setShowAboutDialog(true)} />
             {/* Repertoire Selector */}
-            <div class="flex items-center gap--1">
+            <div class="flex min-w-0 items-center gap--1">
               <span class="hidden sm:inline text-sm font-medium text-gray-600 dark:text-gray-400">
                 Current Repertoire:
               </span>
@@ -1001,7 +1003,7 @@ export const TopNav: Component = () => {
           </div>
 
           {/* User Info + Theme + Logout */}
-          <div class="flex items-center gap-4">
+          <div class="flex shrink-0 items-center gap-2 sm:gap-4">
             {/* User Menu Dropdown - show for both authenticated and anonymous users */}
             <Show when={user() || isAnonymous()}>
               <div
@@ -1012,7 +1014,7 @@ export const TopNav: Component = () => {
                 <button
                   type="button"
                   onClick={() => setShowUserMenu(!showUserMenu())}
-                  class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                  class="flex shrink-0 items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                   aria-label="User menu"
                   aria-expanded={showUserMenu()}
                   data-testid="user-menu-button"
@@ -1234,6 +1236,32 @@ export const TopNav: Component = () => {
                         User Settings
                       </button>
 
+                      <button
+                        type="button"
+                        class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          openGroupsDialog();
+                        }}
+                        data-testid="user-menu-groups-link"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M17 20h5V18a4 4 0 00-4-4h-1m-4 6H2v-2a4 4 0 014-4h7a4 4 0 014 4v2zM9.5 10a4 4 0 100-8 4 4 0 000 8zm8 1a3 3 0 100-6 3 3 0 000 6z"
+                          />
+                        </svg>
+                        Groups
+                      </button>
+
                       {/* Theme Switcher */}
                       <div class="w-full">
                         <ThemeSwitcher showLabel={true} />
@@ -1279,7 +1307,7 @@ export const TopNav: Component = () => {
               <button
                 type="button"
                 onClick={() => setShowDbMenu(!showDbMenu())}
-                class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                class="flex shrink-0 items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 aria-label="Database and sync status"
                 aria-expanded={showDbMenu()}
                 data-testid="database-status-button"

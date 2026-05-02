@@ -154,7 +154,7 @@ export const RepertoireManagerDialog: Component<
             <button
               type="button"
               onClick={props.onClose}
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              class="relative z-10 flex h-10 w-10 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
               aria-label="Close dialog"
               data-testid="close-repertoire-manager"
             >

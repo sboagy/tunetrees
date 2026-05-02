@@ -1414,11 +1414,25 @@ export class TuneTreesPage {
         await tab.click({ timeout: 10_000 });
       }
 
-      // Wait for the tab to become active.
-      // Tabs may indicate this via `aria-selected="true"` or `aria-current="page"`.
+      // The URL is the authoritative source of tab state in Home.tsx.
+      // Some CI flakes leave aria-current stale briefly even after navigation succeeded.
       await expect
         .poll(
           async () => {
+            const urlMatches = (() => {
+              try {
+                const currentUrl = new URL(this.page.url());
+                return (
+                  (currentUrl.searchParams.get("tab") || "practice") === tabId
+                );
+              } catch {
+                return false;
+              }
+            })();
+            if (urlMatches) {
+              return true;
+            }
+
             const [selected, current] = await Promise.all([
               tab.getAttribute("aria-selected"),
               tab.getAttribute("aria-current"),
@@ -1976,12 +1990,20 @@ export class TuneTreesPage {
     const deadline = Date.now() + timeout;
 
     while (Date.now() < deadline) {
+      if (this.page.isClosed()) {
+        return null;
+      }
+
       const mode = await this.getRenderedViewMode(tab);
       if (mode) {
         return mode;
       }
 
-      await this.page.waitForTimeout(100);
+      await this.page.waitForTimeout(100).catch(() => undefined);
+    }
+
+    if (this.page.isClosed()) {
+      return null;
     }
 
     return this.getRenderedViewMode(tab);

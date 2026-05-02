@@ -112,6 +112,7 @@ export interface IGridBaseProps {
   selectedModes?: string[];
   selectedGenres?: string[];
   selectedGenreNames?: string[];
+  selectedTuneIds?: string[];
   allGenres?: Array<{
     id: string;
     name: string | null;
