@@ -39,8 +39,8 @@ describe("TABLE_REGISTRY completeness", () => {
 
   it("has the expected number of tables", () => {
     // Update this if adding/removing tables
-    expect(SYNCABLE_TABLES.length).toBe(27);
-    expect(Object.keys(TABLE_REGISTRY).length).toBe(27);
+    expect(SYNCABLE_TABLES.length).toBe(29);
+    expect(Object.keys(TABLE_REGISTRY).length).toBe(29);
   });
 });
 

@@ -3,7 +3,14 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
-import { program, programItem, tune, tuneSet, tuneSetItem } from "../schema";
+import {
+  program,
+  programItem,
+  tune,
+  tuneSet,
+  tuneSetItem,
+  userGroup,
+} from "../schema";
 import type {
   NewProgram,
   NewProgramItem,
@@ -11,6 +18,7 @@ import type {
   ProgramItem,
   Tune,
   TuneSet,
+  UserGroup,
 } from "../types";
 import {
   type GroupRole,
@@ -58,6 +66,37 @@ function normalizeDescription(description?: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
+async function touchGroup(
+  db: AnyDatabase,
+  groupId: string,
+  currentGroup?: UserGroup | null,
+  at = nowIso()
+): Promise<void> {
+  const groupRow =
+    currentGroup ??
+    (
+      await db
+        .select()
+        .from(userGroup)
+        .where(eq(userGroup.id, groupId))
+        .limit(1)
+    )[0] ??
+    null;
+
+  if (!groupRow || groupRow.deleted === 1) {
+    throw new Error("Group is not available");
+  }
+
+  await db
+    .update(userGroup)
+    .set({
+      syncVersion: (groupRow.syncVersion ?? 0) + 1,
+      lastModifiedAt: at,
+      deviceId: getLocalDeviceId(),
+    })
+    .where(eq(userGroup.id, groupId));
+}
+
 async function touchProgram(
   db: AnyDatabase,
   programId: string,
@@ -83,6 +122,8 @@ async function touchProgram(
       deviceId: getLocalDeviceId(),
     })
     .where(eq(program.id, programId));
+
+  await touchGroup(db, programRow.groupRef, undefined, at);
 }
 
 async function getPublicTuneRow(
@@ -111,6 +152,32 @@ async function getTuneSetRow(
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+async function touchTuneSet(
+  db: AnyDatabase,
+  tuneSetId: string,
+  currentTuneSet?: TuneSet | null,
+  at = nowIso()
+): Promise<void> {
+  const tuneSetRow = currentTuneSet ?? (await getTuneSetRow(db, tuneSetId));
+
+  if (!tuneSetRow || tuneSetRow.deleted === 1) {
+    throw new Error("Tune Set is not available");
+  }
+
+  await db
+    .update(tuneSet)
+    .set({
+      syncVersion: (tuneSetRow.syncVersion ?? 0) + 1,
+      lastModifiedAt: at,
+      deviceId: getLocalDeviceId(),
+    })
+    .where(eq(tuneSet.id, tuneSetId));
+
+  if (tuneSetRow.groupRef) {
+    await touchGroup(db, tuneSetRow.groupRef, undefined, at);
+  }
 }
 
 async function getTuneSetTuneCount(
@@ -298,6 +365,7 @@ export async function createProgram(
     throw new Error("Failed to create Program");
   }
 
+  await touchGroup(db, data.groupRef, groupAccess.group, now);
   await persistDb();
   return result[0];
 }
@@ -335,6 +403,12 @@ export async function updateProgram(
     .where(eq(program.id, programId))
     .returning();
 
+  await touchGroup(
+    db,
+    access.program.groupRef,
+    undefined,
+    updateData.lastModifiedAt
+  );
   await persistDb();
   return result[0] ?? null;
 }
@@ -366,6 +440,8 @@ export async function deleteProgram(
       deviceId: getLocalDeviceId(),
     })
     .where(eq(program.id, programId));
+
+  await touchGroup(db, access.program.groupRef, undefined, now);
 
   for (const item of activeItems) {
     await db
@@ -510,7 +586,11 @@ export async function addTuneSetToProgram(
     throw new Error("You do not have permission to modify this Program");
   }
 
-  await assertTuneSetEligibleForProgram(db, tuneSetId, userId);
+  const eligibleTuneSet = await assertTuneSetEligibleForProgram(
+    db,
+    tuneSetId,
+    userId
+  );
 
   const now = nowIso();
   const newItem: NewProgramItem = {
@@ -528,6 +608,7 @@ export async function addTuneSetToProgram(
 
   const result = await db.insert(programItem).values(newItem).returning();
   await touchProgram(db, programId, access.program, now);
+  await touchTuneSet(db, tuneSetId, eligibleTuneSet, now);
   await persistDb();
   return result[0];
 }
@@ -568,6 +649,9 @@ export async function removeProgramItem(
     .where(eq(programItem.id, rows[0].id));
 
   await touchProgram(db, programId, access.program, now);
+  if (rows[0].tuneSetRef) {
+    await touchTuneSet(db, rows[0].tuneSetRef, undefined, now);
+  }
   await persistDb();
   return true;
 }
@@ -637,6 +721,14 @@ export async function reorderProgramItems(
   }
 
   await touchProgram(db, programId, access.program, now);
+  const tuneSetIds = new Set(
+    existing
+      .map((item) => item.tuneSetRef)
+      .filter((tuneSetRef): tuneSetRef is string => Boolean(tuneSetRef))
+  );
+  for (const tuneSetId of tuneSetIds) {
+    await touchTuneSet(db, tuneSetId, undefined, now);
+  }
   await persistDb();
 }
 

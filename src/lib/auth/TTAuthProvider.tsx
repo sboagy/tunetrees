@@ -666,10 +666,12 @@ const TTInner: ParentComponent = (props) => {
     };
 
     try {
-      const { repairPendingMediaAssetSyncState } = await import(
-        "@/lib/sync/genre-filter"
-      );
+      const {
+        repairPendingMediaAssetSyncState,
+        repairPendingProgramSyncState,
+      } = await import("@/lib/sync/genre-filter");
       const repairResult = await repairPendingMediaAssetSyncState();
+      const programRepairResult = await repairPendingProgramSyncState();
       if (
         repairResult.requeuedReferenceCount > 0 ||
         repairResult.prunedMediaAssetCount > 0 ||
@@ -680,9 +682,19 @@ const TTInner: ParentComponent = (props) => {
           repairResult
         );
       }
+      if (
+        programRepairResult.requeuedProgramCount > 0 ||
+        programRepairResult.requeuedTuneSetCount > 0 ||
+        programRepairResult.requeuedGroupCount > 0
+      ) {
+        console.warn(
+          "[TTAuthProvider] Repaired pending program sync state before startup sync",
+          programRepairResult
+        );
+      }
     } catch (error) {
       console.warn(
-        "[TTAuthProvider] Failed to repair pending media_asset sync state before startup sync",
+        "[TTAuthProvider] Failed to repair pending sync state before startup sync",
         error
       );
     }

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addGroupMember,
   createGroup,
+  getGroupById,
   getGroupMembers,
   getVisibleGroups,
   removeGroupMember,
@@ -25,6 +26,7 @@ import {
   addTuneToTuneSet,
   createTuneSet,
   createTuneSetFromTunes,
+  getTuneSetById,
   getTuneSetItems,
   getVisibleTuneSets,
   removeTuneFromTuneSet,
@@ -332,6 +334,15 @@ describe("tune set query helpers", () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Festival Set",
     });
+    const personalSet = await createTuneSet(db as never, OWNER_ID, {
+      name: "Personal Favorites",
+      setKind: "practice_set",
+    });
+    const originalTuneSet = await getTuneSetById(
+      db as never,
+      personalSet.id,
+      OWNER_ID
+    );
     const createdProgram = await createProgram(db as never, OWNER_ID, {
       groupRef: group.id,
       name: "Festival Opening Program",
@@ -342,7 +353,10 @@ describe("tune set query helpers", () => {
       createdProgram.id,
       OWNER_ID
     );
+    const originalGroup = await getGroupById(db as never, group.id, OWNER_ID);
     expect(originalProgram).not.toBeNull();
+    expect(originalGroup).not.toBeNull();
+    expect(originalTuneSet).not.toBeNull();
 
     await addTuneToProgram(
       db as never,
@@ -356,7 +370,27 @@ describe("tune set query helpers", () => {
       createdProgram.id,
       OWNER_ID
     );
+    const afterAddGroup = await getGroupById(db as never, group.id, OWNER_ID);
     expect(afterAdd?.syncVersion).toBeGreaterThan(originalProgram!.syncVersion);
+    expect(afterAddGroup?.syncVersion).toBeGreaterThan(
+      originalGroup!.syncVersion
+    );
+
+    await addTuneSetToProgram(
+      db as never,
+      createdProgram.id,
+      personalSet.id,
+      OWNER_ID
+    );
+
+    const afterSetAdd = await getTuneSetById(
+      db as never,
+      personalSet.id,
+      OWNER_ID
+    );
+    expect(afterSetAdd?.syncVersion).toBeGreaterThan(
+      originalTuneSet!.syncVersion
+    );
 
     const items = await getProgramItems(
       db as never,
@@ -375,7 +409,15 @@ describe("tune set query helpers", () => {
       createdProgram.id,
       OWNER_ID
     );
+    const afterReorderGroup = await getGroupById(
+      db as never,
+      group.id,
+      OWNER_ID
+    );
     expect(afterReorder?.syncVersion).toBeGreaterThan(afterAdd!.syncVersion);
+    expect(afterReorderGroup?.syncVersion).toBeGreaterThan(
+      afterAddGroup!.syncVersion
+    );
 
     await removeProgramItem(
       db as never,
@@ -389,7 +431,15 @@ describe("tune set query helpers", () => {
       createdProgram.id,
       OWNER_ID
     );
+    const afterRemoveGroup = await getGroupById(
+      db as never,
+      group.id,
+      OWNER_ID
+    );
     expect(afterRemove?.syncVersion).toBeGreaterThan(afterReorder!.syncVersion);
+    expect(afterRemoveGroup?.syncVersion).toBeGreaterThan(
+      afterReorderGroup!.syncVersion
+    );
   });
 
   it("blocks adding a Tune Set with private tunes to a Program", async () => {
