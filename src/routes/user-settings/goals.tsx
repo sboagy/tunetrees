@@ -148,7 +148,7 @@ const GoalForm: Component<{
               fallback={
                 <>
                   <Save class="h-4 w-4" />
-                  Save
+                  {props.submitLabel}
                 </>
               }
             >

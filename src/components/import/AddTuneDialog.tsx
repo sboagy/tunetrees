@@ -510,7 +510,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
             <div class="flex flex-1 justify-end gap-2">
               <Button variant="outline" size="sm" onClick={handleNew}>
                 <Plus class="h-4 w-4" />
-                Create
+                New
               </Button>
               <Button
                 size="sm"
