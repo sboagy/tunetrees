@@ -19,7 +19,15 @@
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
-import { ChevronRight, Columns, EllipsisVertical, Plus } from "lucide-solid";
+import {
+  ChevronDown,
+  ChevronRight,
+  Columns,
+  EllipsisVertical,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
@@ -225,20 +233,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
     return (
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <div class="relative min-w-0 flex-1">
-          <svg
-            class={TOOLBAR_SEARCH_ICON}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+          <Search class={TOOLBAR_SEARCH_ICON} aria-hidden="true" />
           <input
             type="text"
             placeholder="Search tunes..."
@@ -362,39 +357,13 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
                 disabled={!canAddToRepertoire()}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
-                </svg>
+                <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Add To Repertoire</span>
               </button>
 
               {/* Search input - always visible across all screen sizes */}
               <div class={TOOLBAR_SEARCH_CONTAINER}>
-                <svg
-                  class={TOOLBAR_SEARCH_ICON}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                <Search class={TOOLBAR_SEARCH_ICON} aria-hidden="true" />
                 <input
                   type="text"
                   placeholder="Search tunes..."
@@ -433,20 +402,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 data-testid="catalog-add-tune-button"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+                <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Add Tune</span>
               </button>
 
@@ -461,20 +417,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 }
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_DANGER}`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1-1H9a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
+                <Trash2 class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Delete</span>
               </button>
             </div>
@@ -495,20 +438,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                 >
                   <Columns size={14} />
                   <span>Display Options</span>
-                  <svg
-                    class="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  <ChevronDown class="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>

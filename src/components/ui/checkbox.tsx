@@ -13,6 +13,7 @@ import type {
 } from "@kobalte/core/checkbox";
 import { Checkbox as CheckboxPrimitive } from "@kobalte/core/checkbox";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
+import { Check } from "lucide-solid";
 import type { ParentProps, ValidComponent } from "solid-js";
 import { splitProps } from "solid-js";
 import { cn } from "@/lib/utils";
@@ -78,19 +79,7 @@ export const CheckboxIndicator = <T extends ValidComponent = "div">(
       class={cn("flex items-center justify-center text-current", local.class)}
       {...rest}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="h-4 w-4"
-      >
-        <title>Checkmark</title>
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
+      <Check class="h-4 w-4" aria-hidden="true" />
     </CheckboxPrimitive.Indicator>
   );
 };

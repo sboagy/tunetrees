@@ -7,9 +7,10 @@
  * @module components/references/ReferenceForm
  */
 
-import { Save, X } from "lucide-solid";
+import { Save } from "lucide-solid";
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { toast } from "solid-sonner";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -339,31 +340,33 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       class="space-y-4"
       data-testid="reference-form"
     >
-      <div class="flex items-center justify-between mb-1">
+      <div class="mb-1 flex w-full items-center justify-between gap-3">
         <span
           class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300`}
         >
           {heading()}
         </span>
-        <div class="flex gap-1.5">
-          <button
+        <div class="ml-auto flex items-center gap-2">
+          <Button
             type="button"
             onClick={props.onCancel}
-            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2`}
+            variant="outline"
+            size="sm"
+            class={fontClasses().textSmall}
             data-testid="reference-cancel-button"
           >
             Cancel
-            <X class={fontClasses().iconSmall} />
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
             disabled={!canSubmit()}
-            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-700 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+            size="sm"
+            class={fontClasses().textSmall}
             data-testid="reference-submit-button"
           >
-            Save
             <Save class={fontClasses().iconSmall} />
-          </button>
+            Save
+          </Button>
         </div>
       </div>
 

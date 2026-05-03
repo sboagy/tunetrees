@@ -6,6 +6,7 @@ import type {
 } from "@kobalte/core/combobox";
 import { Combobox as ComboboxPrimitive } from "@kobalte/core/combobox";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
+import { Check, ChevronsUpDown } from "lucide-solid";
 import type { ParentProps, ValidComponent, VoidProps } from "solid-js";
 import { splitProps } from "solid-js";
 import { cn } from "@/lib/utils";
@@ -66,21 +67,7 @@ export const ComboboxTrigger = <T extends ValidComponent = "button">(
           aria-hidden="true"
           class="flex h-3.5 w-3.5 items-center justify-center"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            class="h-4 w-4 opacity-50"
-          >
-            <path
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="m8 9l4-4l4 4m0 6l-4 4l-4-4"
-            />
-          </svg>
+          <ChevronsUpDown class="h-4 w-4 opacity-50" aria-hidden="true" />
         </ComboboxPrimitive.Icon>
       </ComboboxPrimitive.Trigger>
     </ComboboxPrimitive.Control>
@@ -138,21 +125,7 @@ export const ComboboxItem = <T extends ValidComponent = "li">(
         aria-hidden="true"
         class="absolute right-2 flex h-3.5 w-3.5 items-center justify-center"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-          class="h-4 w-4"
-        >
-          <path
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="m5 12l5 5L20 7"
-          />
-        </svg>
+        <Check class="h-4 w-4" aria-hidden="true" />
       </ComboboxPrimitive.ItemIndicator>
       <ComboboxPrimitive.ItemLabel>
         {local.children}

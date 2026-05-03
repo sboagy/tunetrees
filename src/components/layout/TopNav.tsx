@@ -8,7 +8,25 @@
  */
 
 import { useLocation } from "@solidjs/router";
-import { MessageCircle } from "lucide-solid";
+import {
+  Bug,
+  Check,
+  ChevronDown,
+  Database,
+  Download,
+  FileText,
+  Home,
+  Info,
+  LogOut,
+  MessageCircle,
+  Settings,
+  Shield,
+  Tag,
+  Trash2,
+  Upload,
+  UserPlus,
+  Users,
+} from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -319,21 +337,11 @@ const LogoDropdown: Component<{
         <span class="hidden sm:inline ml-[0ch] text-lg dark:text-blue-400">
           TuneTrees
         </span>
-        <svg
+        <ChevronDown
           class="w-4 h-4 transition-transform"
           classList={{ "rotate-180": showDropdown() }}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
           aria-hidden="true"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        />
       </button>
 
       {/* Dropdown Menu */}
@@ -346,20 +354,7 @@ const LogoDropdown: Component<{
               class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
               onClick={() => setShowDropdown(false)}
             >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
+              <Home class="w-4 h-4" aria-hidden="true" />
               Home
             </a>
 
@@ -373,20 +368,7 @@ const LogoDropdown: Component<{
               onClick={handleAboutClick}
               data-testid="logo-dropdown-about-button"
             >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              <Info class="w-4 h-4" aria-hidden="true" />
               About TuneTrees...
             </button>
 
@@ -399,20 +381,7 @@ const LogoDropdown: Component<{
               onClick={() => setShowDropdown(false)}
               data-testid="logo-dropdown-whats-new-link"
             >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"
-                />
-              </svg>
+              <Tag class="w-4 h-4" aria-hidden="true" />
               What's New
             </a>
 
@@ -426,20 +395,7 @@ const LogoDropdown: Component<{
               onClick={() => setShowDropdown(false)}
               data-testid="logo-dropdown-privacy-link"
             >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 11c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm7 6a7 7 0 10-14 0v1h14v-1z"
-                />
-              </svg>
+              <Shield class="w-4 h-4" aria-hidden="true" />
               Privacy Policy
             </a>
 
@@ -450,20 +406,7 @@ const LogoDropdown: Component<{
               onClick={() => setShowDropdown(false)}
               data-testid="logo-dropdown-terms-link"
             >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12h6m-6 4h6m2 4H7a2 2 0 01-2-2V4a2 2 0 012-2h6l4 4v12a2 2 0 01-2 2z"
-                />
-              </svg>
+              <FileText class="w-4 h-4" aria-hidden="true" />
               Terms of Service
             </a>
           </div>
@@ -683,21 +626,11 @@ const RepertoireDropdown: Component<{
             ? getRepertoireDisplayName(selectedRepertoire()!)
             : "No Repertoire"}
         </span>
-        <svg
+        <ChevronDown
           class="w-4 h-4 transition-transform"
           classList={{ "rotate-180": showDropdown() }}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
           aria-hidden="true"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        />
       </button>
 
       {/* Dropdown Menu */}
@@ -740,18 +673,10 @@ const RepertoireDropdown: Component<{
                     <Show
                       when={currentRepertoireId() === repertoire.repertoireId}
                     >
-                      <svg
+                      <Check
                         class="w-4 h-4 text-blue-600 dark:text-blue-400"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
                         aria-hidden="true"
-                      >
-                        <path
-                          fill-rule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clip-rule="evenodd"
-                        />
-                      </svg>
+                      />
                     </Show>
                   </button>
                 )}
@@ -768,26 +693,7 @@ const RepertoireDropdown: Component<{
               onClick={handleManageRepertoires}
               data-testid="manage-repertoires-button"
             >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
+              <Settings class="w-4 h-4" aria-hidden="true" />
               Configure Repertoires...
             </button>
           </div>
@@ -1065,21 +971,11 @@ export const TopNav: Component = () => {
                       </>
                     )}
                   </Show>
-                  <svg
+                  <ChevronDown
                     class="w-4 h-4 transition-transform"
                     classList={{ "rotate-180": showUserMenu() }}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
                     aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  />
                 </button>
 
                 {/* Dropdown Menu */}
@@ -1185,20 +1081,7 @@ export const TopNav: Component = () => {
                           }}
                           data-testid="create-account-button"
                         >
-                          <svg
-                            class="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            aria-hidden="true"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                            />
-                          </svg>
+                          <UserPlus class="w-4 h-4" aria-hidden="true" />
                           Create Account
                         </button>
                       </Show>
@@ -1213,26 +1096,7 @@ export const TopNav: Component = () => {
                         }}
                         data-testid="user-settings-button"
                       >
-                        <svg
-                          class="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                          />
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
+                        <Settings class="w-4 h-4" aria-hidden="true" />
                         User Settings
                       </button>
 
@@ -1245,20 +1109,7 @@ export const TopNav: Component = () => {
                         }}
                         data-testid="user-menu-groups-link"
                       >
-                        <svg
-                          class="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M17 20h5V18a4 4 0 00-4-4h-1m-4 6H2v-2a4 4 0 014-4h7a4 4 0 014 4v2zM9.5 10a4 4 0 100-8 4 4 0 000 8zm8 1a3 3 0 100-6 3 3 0 000 6z"
-                          />
-                        </svg>
+                        <Users class="w-4 h-4" aria-hidden="true" />
                         Groups
                       </button>
 
@@ -1276,20 +1127,7 @@ export const TopNav: Component = () => {
                           window.location.href = "/login";
                         }}
                       >
-                        <svg
-                          class="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                          />
-                        </svg>
+                        <LogOut class="w-4 h-4" aria-hidden="true" />
                         Sign Out
                       </button>
                     </div>
@@ -1313,21 +1151,7 @@ export const TopNav: Component = () => {
                 data-testid="database-status-button"
               >
                 {/* Database Icon */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-5 h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <ellipse cx="12" cy="5" rx="9" ry="3" />
-                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                  <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
-                </svg>
+                <Database class="w-5 h-5" aria-hidden="true" />
 
                 {/* Status indicator badge */}
                 <Show
@@ -1474,21 +1298,7 @@ export const TopNav: Component = () => {
                             !isOnline() || forceSyncUpBusy(),
                         }}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                          <polyline points="17 8 12 3 7 8" />
-                          <line x1="12" y1="3" x2="12" y2="15" />
-                        </svg>
+                        <Upload class="w-4 h-4" aria-hidden="true" />
                         Force Sync Up
                         {!isOnline() && (
                           <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
@@ -1560,23 +1370,7 @@ export const TopNav: Component = () => {
                           }}
                           data-testid="force-clean-local-reset-button"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M3 6h18" />
-                            <path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2" />
-                            <path d="M19 6v13a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                            <path d="M10 11v6" />
-                            <path d="M14 11v6" />
-                          </svg>
+                          <Trash2 class="w-4 h-4" aria-hidden="true" />
                           Force Clean Local Reset
                           {!isOnline() && (
                             <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
@@ -1621,21 +1415,7 @@ export const TopNav: Component = () => {
                           "opacity-50 cursor-not-allowed": !isOnline(),
                         }}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                          <polyline points="7 10 12 15 17 10" />
-                          <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
+                        <Download class="w-4 h-4" aria-hidden="true" />
                         Force Full Sync Down
                         {!isOnline() && (
                           <span class="ml-auto text-xs text-gray-500 dark:text-gray-400">
@@ -1654,19 +1434,7 @@ export const TopNav: Component = () => {
                         class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                         onClick={() => setShowDbMenu(false)}
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
+                        <Bug class="w-4 h-4" aria-hidden="true" />
                         Database Browser (Dev)
                       </a>
                     </Show>

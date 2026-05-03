@@ -13,7 +13,7 @@
 import { A } from "@solidjs/router";
 import abcjs from "abcjs";
 import { eq } from "drizzle-orm";
-import { CircleX, History, Layers, Pencil, Save, Undo2 } from "lucide-solid";
+import { History, Layers, Save, SquarePen, Undo2 } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -36,6 +36,7 @@ import {
   removeTagFromTune,
 } from "@/lib/db/queries/tags";
 import type { Tune } from "../../lib/db/types";
+import { Button } from "../ui/button";
 import {
   Select,
   SelectContent,
@@ -509,58 +510,53 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
               <Show
                 when={props.readOnly}
                 fallback={
-                  <div class="flex items-center gap-3">
-                    <button
+                  <div class="flex items-center gap-2">
+                    <Button
                       type="button"
                       onClick={handleCancel}
                       disabled={isSaving()}
-                      class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      aria-label="Cancel"
+                      variant="outline"
+                      size="sm"
                       data-testid="tune-editor-cancel-button"
                     >
-                      <div class="flex items-center gap-2">
-                        <span>Cancel</span>
-                        <CircleX size={20} />
-                      </div>
-                    </button>
-                    <button
-                      type="submit"
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         void handleSave();
                       }}
                       disabled={isSaving() || !isDirty()}
                       data-testid="tune-editor-save-button"
-                      class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                      aria-label="Save"
+                      size="sm"
                     >
-                      Save <Save size={24} />
-                    </button>
+                      <Save size={16} />
+                      Save
+                    </Button>
                   </div>
                 }
               >
-                <div class="flex items-center gap-3">
-                  <button
+                <div class="flex items-center gap-2">
+                  <Button
                     type="button"
                     onClick={props.onCancel}
                     data-testid="tune-editor-cancel-button"
-                    class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium"
-                    aria-label="Cancel"
+                    variant="outline"
+                    size="sm"
                   >
-                    <div class="flex items-center gap-2">
-                      <span>Cancel</span>
-                      <CircleX size={20} />
-                    </div>
-                  </button>
-                  <button
+                    Cancel
+                  </Button>
+                  <Button
                     type="button"
                     onClick={props.onEdit}
                     data-testid="tune-editor-edit-button"
-                    class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium flex items-center gap-2"
-                    aria-label="Edit"
+                    variant="outline"
+                    size="sm"
                   >
-                    Edit <Pencil size={24} />
-                  </button>
+                    <SquarePen size={16} />
+                    Edit
+                  </Button>
                 </div>
               </Show>
             </div>

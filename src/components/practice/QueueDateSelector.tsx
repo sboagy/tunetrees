@@ -10,7 +10,7 @@
  * @module components/practice/QueueDateSelector
  */
 
-import { X } from "lucide-solid";
+import { Grip, X } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -534,20 +534,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
               aria-label="Resize dialog"
               title="Resize dialog"
             >
-              <svg
-                class="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 15l6-6M13 19l6-6"
-                />
-              </svg>
+              <Grip class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>

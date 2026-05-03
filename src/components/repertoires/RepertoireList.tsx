@@ -20,7 +20,7 @@ import {
   getSortedRowModel,
   type SortingState,
 } from "@tanstack/solid-table";
-import { Pencil, Trash2 } from "lucide-solid";
+import { SquarePen, Trash2 } from "lucide-solid";
 import {
   type Component,
   createMemo,
@@ -249,7 +249,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
               title="Edit repertoire"
               aria-label="Edit repertoire"
             >
-              <Pencil size={16} />
+              <SquarePen size={16} />
             </button>
             <button
               type="button"

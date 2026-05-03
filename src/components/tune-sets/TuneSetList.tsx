@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from "lucide-solid";
+import { SquarePen, Trash2 } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -115,7 +115,7 @@ export const TuneSetList: Component<TuneSetListProps> = (props) => {
                         aria-label="Edit tune set"
                         data-testid="edit-tune-set-button"
                       >
-                        <Pencil size={16} />
+                        <SquarePen size={16} />
                       </button>
                       <button
                         type="button"

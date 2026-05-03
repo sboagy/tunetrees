@@ -10,6 +10,7 @@
  * @module components/catalog/FilterPanel
  */
 
+import { ChevronDown, Filter, X } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -77,14 +78,7 @@ const FilterChip: Component<{
         class="hover:bg-opacity-20 hover:bg-gray-600 rounded-full p-0.5 transition-colors"
         aria-label={`Remove ${props.label} filter`}
       >
-        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-          <title>Remove filter</title>
-          <path
-            fill-rule="evenodd"
-            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-            clip-rule="evenodd"
-          />
-        </svg>
+        <X class="w-3 h-3" aria-hidden="true" />
       </button>
     </span>
   );
@@ -181,20 +175,10 @@ const FilterDropdown: Component<{
             {props.selectedItems.length}
           </span>
         </Show>
-        <svg
+        <ChevronDown
           class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <title>Toggle dropdown</title>
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+          aria-hidden="true"
+        />
       </button>
 
       <Show when={isOpen()}>
@@ -300,20 +284,10 @@ const TuneSetFilterDropdown: Component<{
             {props.selectedTuneSetIds.length}
           </span>
         </Show>
-        <svg
+        <ChevronDown
           class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <title>Toggle dropdown</title>
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+          aria-hidden="true"
+        />
       </button>
 
       <Show when={isOpen()}>
@@ -598,40 +572,17 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
         aria-haspopup="true"
         data-testid="filters-button"
       >
-        <svg
-          class="w-3.5 h-3.5 flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-          />
-        </svg>
+        <Filter class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
         <span class="hidden sm:inline">Filters</span>
         <Show when={totalSelected() > 0}>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">
             {totalSelected()}
           </span>
         </Show>
-        <svg
+        <ChevronDown
           class={`w-3.5 h-3.5 hidden sm:inline transition-transform ${isExpanded() ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <title>Toggle filters</title>
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+          aria-hidden="true"
+        />
       </button>
 
       {/* Collapsible filter panel */}

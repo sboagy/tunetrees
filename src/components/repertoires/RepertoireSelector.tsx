@@ -14,6 +14,7 @@
  * @module components/repertoires/RepertoireSelector
  */
 
+import { Check, ChevronDown } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -167,20 +168,10 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (
         </Show>
 
         {/* Dropdown Arrow */}
-        <svg
+        <ChevronDown
           class={`w-5 h-5 text-gray-400 transition-transform ${isOpen() ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
           aria-hidden="true"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        />
       </button>
 
       {/* Error Message */}
@@ -223,18 +214,10 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (
                   <Show
                     when={repertoire.repertoireId === selectedRepertoireId()}
                   >
-                    <svg
+                    <Check
                       class="w-5 h-5 text-blue-600 dark:text-blue-400"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
                       aria-hidden="true"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
+                    />
                   </Show>
                 </div>
               </button>

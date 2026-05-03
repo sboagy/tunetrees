@@ -7,6 +7,7 @@
  * @module components/auth/LogoutButton
  */
 
+import { Loader2, LogOut } from "lucide-solid";
 import { type Component, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 
@@ -70,45 +71,13 @@ export const LogoutButton: Component<LogoutButtonProps> = (props) => {
           when={!isLoggingOut() && !loading()}
           fallback={
             <span class="flex items-center gap-2">
-              <svg
-                class="animate-spin h-4 w-4"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                  fill="none"
-                />
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
+              <Loader2 class="animate-spin h-4 w-4" aria-hidden="true" />
               <Show when={!props.iconOnly}>Signing out...</Show>
             </span>
           }
         >
           <Show when={props.iconOnly} fallback={<span>Sign Out</span>}>
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
+            <LogOut class="w-5 h-5" aria-hidden="true" />
           </Show>
         </Show>
       </button>

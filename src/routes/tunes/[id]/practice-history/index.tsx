@@ -8,7 +8,7 @@
  */
 
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { CircleX, Plus, Save, Trash2, X } from "lucide-solid";
+import { Plus, Save, Trash2 } from "lucide-solid";
 import {
   type Component,
   createMemo,
@@ -293,7 +293,6 @@ const PracticeHistoryPage: Component = () => {
                   data-testid="practice-history-cancel-button"
                 >
                   <span>Cancel</span>
-                  <CircleX class="ml-0.5 h-4 w-4" />
                 </Button>
                 <Button
                   type="button"
@@ -302,8 +301,8 @@ const PracticeHistoryPage: Component = () => {
                   disabled={!canAddRecord()}
                   data-testid="practice-history-add-button"
                 >
+                  <Plus class="h-4 w-4" />
                   <span>Add</span>
-                  <Plus class="ml-0.5 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -395,7 +394,6 @@ const PracticeHistoryPage: Component = () => {
                         data-testid="practice-history-discard-button"
                       >
                         <span>Discard</span>
-                        <X class="h-4 w-4" />
                       </Button>
                       <Button
                         type="button"
@@ -404,8 +402,8 @@ const PracticeHistoryPage: Component = () => {
                         disabled={isSavingDraft()}
                         data-testid="practice-history-save-button"
                       >
-                        <span>Save</span>
                         <Save class="h-4 w-4" />
+                        <span>Save</span>
                       </Button>
                     </div>
                   </CardContent>

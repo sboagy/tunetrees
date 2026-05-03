@@ -1,3 +1,4 @@
+import { Check } from "lucide-solid";
 import {
   type Component,
   createResource,
@@ -158,20 +159,10 @@ export const RepertoireSelectorModal: Component<
                           selectedRepertoireId() === repertoireItem.repertoireId
                         }
                       >
-                        <svg
+                        <Check
                           class="h-5 w-5 text-blue-500 dark:text-blue-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <title>Selected</title>
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                          aria-hidden="true"
+                        />
                       </Show>
                     </div>
                   </button>

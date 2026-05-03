@@ -1,3 +1,4 @@
+import { X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import type { TuneSetWithSummary } from "@/lib/db/queries/tune-sets";
@@ -74,20 +75,7 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           aria-label="Close group as set popover"
           data-testid="close-group-as-set-popover-button"
         >
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <X class="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
