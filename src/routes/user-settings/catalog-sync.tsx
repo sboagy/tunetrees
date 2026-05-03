@@ -8,6 +8,7 @@
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
 import { type Genre, GenreMultiSelect } from "@/components/genre-selection";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   getGenresWithSelection,
@@ -229,15 +230,15 @@ const CatalogSyncPage: Component = () => {
         />
 
         {/* Save button */}
-        <button
+        <Button
           type="button"
           onClick={handleSave}
           disabled={!isDirty() || isSubmitting()}
-          class="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
+          class="w-full"
           data-testid="settings-genre-save"
         >
           {isSubmitting() ? "Saving..." : "Save Changes"}
-        </button>
+        </Button>
 
         {/* Info box */}
       </Show>

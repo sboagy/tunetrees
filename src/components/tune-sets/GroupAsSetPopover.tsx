@@ -1,6 +1,7 @@
 import { X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { Button } from "@/components/ui/button";
 import type { TuneSetWithSummary } from "@/lib/db/queries/tune-sets";
 
 interface GroupAsSetPopoverProps {
@@ -68,15 +69,16 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           </p>
         </div>
 
-        <button
+        <Button
           type="button"
-          class="flex h-10 w-10 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+          variant="ghost"
+          size="icon"
           onClick={props.onClose}
           aria-label="Close group as set popover"
           data-testid="close-group-as-set-popover-button"
         >
           <X class="h-5 w-5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
 
       <div
@@ -87,14 +89,14 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           type="button"
           class={`rounded-xl border px-4 py-3 text-left transition-colors ${
             mode() === "create"
-              ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-100"
-              : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800"
+              ? "border-primary bg-primary/5 text-foreground"
+              : "border-border bg-background text-foreground hover:bg-accent/30"
           }`}
           onClick={() => setMode("create")}
           data-testid="group-as-set-create-mode-button"
         >
           <div class="text-sm font-semibold">Create New Set</div>
-          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <div class="mt-1 text-xs text-muted-foreground">
             Name and save this selection as a new reusable set.
           </div>
         </button>
@@ -103,14 +105,14 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           type="button"
           class={`rounded-xl border px-4 py-3 text-left transition-colors ${
             mode() === "existing"
-              ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-100"
-              : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800"
+              ? "border-primary bg-primary/5 text-foreground"
+              : "border-border bg-background text-foreground hover:bg-accent/30"
           }`}
           onClick={() => setMode("existing")}
           data-testid="group-as-set-existing-mode-button"
         >
           <div class="text-sm font-semibold">Add to Existing Set</div>
-          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <div class="mt-1 text-xs text-muted-foreground">
             Pick one of your current sets and add this selection there.
           </div>
         </button>
@@ -206,12 +208,12 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
                       <Show
                         when={props.addingToSetId === tuneSet.id}
                         fallback={
-                          <span class="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          <span class="text-xs font-medium text-primary">
                             Add
                           </span>
                         }
                       >
-                        <div class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent dark:border-blue-400" />
+                        <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                       </Show>
                     </button>
                   )}
@@ -246,18 +248,18 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
         <p class="mt-3 text-sm text-red-600 dark:text-red-400">{props.error}</p>
       </Show>
 
-      <div class="mt-4 flex items-center justify-end gap-3">
-        <button
+      <div class="mt-4 flex w-full items-center justify-between gap-3">
+        <Button
           type="button"
-          class="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          variant="outline"
           onClick={props.onClose}
           disabled={props.isSaving || Boolean(props.addingToSetId)}
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+          variant="default"
           onClick={handleSave}
           disabled={
             mode() !== "create" ||
@@ -269,7 +271,7 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           <Show when={props.isSaving} fallback={<span>Create New Set</span>}>
             <span>Saving...</span>
           </Show>
-        </button>
+        </Button>
       </div>
     </div>
   );

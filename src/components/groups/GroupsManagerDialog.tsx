@@ -11,6 +11,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { ProgramBuilderDialog } from "@/components/groups/ProgramBuilderDialog";
+import { Button } from "@/components/ui/button";
 import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
@@ -107,15 +108,16 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
               programs.
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={props.onClose}
-            class="rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+            variant="ghost"
+            size="sm"
             aria-label="Close create group dialog"
             data-testid="close-group-dialog-button"
           >
             Close
-          </button>
+          </Button>
         </div>
 
         <div class="mt-4 space-y-4">
@@ -158,17 +160,17 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
             <p class="text-sm text-red-600 dark:text-red-400">{props.error}</p>
           </Show>
 
-          <div class="flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
-            <button
+          <div class="flex w-full justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <Button
               type="button"
               onClick={props.onClose}
               disabled={props.isSaving}
-              class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+              variant="outline"
               data-testid="cancel-group-button"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() =>
                 props.onSubmit({
@@ -177,13 +179,13 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
                 })
               }
               disabled={props.isSaving}
-              class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              variant="default"
               data-testid="save-group-button"
             >
               <Show when={props.isSaving} fallback="Create Group">
                 Creating...
               </Show>
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -244,7 +246,7 @@ const ManageableGroupMemberRow: Component<{
         }
       >
         <div class="absolute right-4 top-4 flex items-center gap-2">
-          <button
+          <Button
             type="button"
             onClick={() =>
               props.onRoleChange(
@@ -252,7 +254,9 @@ const ManageableGroupMemberRow: Component<{
               )
             }
             disabled={props.isBusy}
-            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            variant="outline"
+            size="icon"
+            class="h-9 w-9"
             data-testid="group-member-role-select"
             title={
               props.member.role === "admin"
@@ -271,18 +275,20 @@ const ManageableGroupMemberRow: Component<{
             >
               <Shield size={16} />
             </Show>
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={props.onRemove}
             disabled={props.isBusy}
-            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-200 text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
+            variant="ghost"
+            size="icon"
+            class="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
             data-testid="remove-group-member-button"
             title="Remove member"
             aria-label="Remove member"
           >
             <Trash2 size={16} />
-          </button>
+          </Button>
         </div>
       </Show>
     </div>
@@ -325,17 +331,19 @@ const GroupMemberCandidateRow: Component<{
         }
       >
         <div class="absolute right-4 top-4 flex items-center gap-2">
-          <button
+          <Button
             type="button"
             onClick={() => props.onAdd(props.candidate.userRef)}
             disabled={props.isAdding}
-            class="inline-flex h-9 w-9 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            variant="default"
+            size="icon"
+            class="h-9 w-9"
             data-testid="add-group-member-button"
             title="Add member"
             aria-label="Add member"
           >
             <Plus size={16} />
-          </button>
+          </Button>
         </div>
       </Show>
     </div>
@@ -638,15 +646,16 @@ const GroupsManagerContent: Component = () => {
                 programs.
               </p>
             </div>
-            <button
+            <Button
               type="button"
-              class="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              class="inline-flex items-center justify-center gap-2"
+              variant="default"
               onClick={() => setShowCreateGroupDialog(true)}
               data-testid="open-create-group-button"
             >
               <span aria-hidden="true">+</span>
               New Group
-            </button>
+            </Button>
           </div>
 
           <Show
@@ -660,26 +669,27 @@ const GroupsManagerContent: Component = () => {
             <Show
               when={(groups() ?? []).length > 0}
               fallback={
-                <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center dark:border-gray-700 dark:bg-gray-800">
-                  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                <div class="rounded-xl border border-dashed border-border bg-background p-10 text-center">
+                  <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <span aria-hidden="true">+</span>
                   </div>
-                  <h3 class="mt-4 text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3 class="mt-4 text-lg font-semibold text-foreground">
                     No groups yet
                   </h3>
-                  <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  <p class="mt-2 text-sm text-muted-foreground">
                     Start by creating a group so you can attach shared programs
                     to it.
                   </p>
-                  <button
+                  <Button
                     type="button"
-                    class="mt-5 inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                    class="mt-5 inline-flex items-center gap-2"
+                    variant="outline"
                     onClick={() => setShowCreateGroupDialog(true)}
                     data-testid="empty-create-group-button"
                   >
                     <span aria-hidden="true">+</span>
                     Create Your First Group
-                  </button>
+                  </Button>
                 </div>
               }
             >
@@ -697,8 +707,8 @@ const GroupsManagerContent: Component = () => {
                           type="button"
                           class={`mb-2 flex w-full items-start justify-between rounded-lg border px-3 py-3 text-left last:mb-0 ${
                             selectedGroupId() === group.id
-                              ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30"
-                              : "border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-accent/30"
                           }`}
                           onClick={() => setSelectedGroupId(group.id)}
                           data-testid="group-list-item"

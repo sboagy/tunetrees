@@ -10,6 +10,7 @@
 import { X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
+import { Button } from "@/components/ui/button";
 
 export interface AddTunesDialogProps {
   /** Whether dialog is open */
@@ -60,14 +61,15 @@ export const AddTunesDialog: Component<AddTunesDialogProps> = (props) => {
             <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
               Add More Tunes
             </h2>
-            <button
+            <Button
               type="button"
               onClick={props.onClose}
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              variant="ghost"
+              size="icon"
               aria-label="Close dialog"
             >
               <X size={20} />
-            </button>
+            </Button>
           </div>
 
           {/* Content */}
@@ -96,21 +98,13 @@ export const AddTunesDialog: Component<AddTunesDialogProps> = (props) => {
           </div>
 
           {/* Actions */}
-          <div class="flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={props.onClose}
-              class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
+          <div class="flex w-full items-center justify-between gap-3">
+            <Button type="button" onClick={props.onClose} variant="outline">
               Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirm}
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
-            >
+            </Button>
+            <Button type="button" onClick={handleConfirm} variant="default">
               Add
-            </button>
+            </Button>
           </div>
         </div>
       </div>

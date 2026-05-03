@@ -9,6 +9,7 @@
 
 import { GripVertical, SquarePen, Trash2 } from "lucide-solid";
 import { type Component, createSignal, For, Show } from "solid-js";
+import { Button } from "@/components/ui/button";
 import type { Reference } from "@/lib/db/queries/references";
 
 interface ReferenceListProps {
@@ -218,7 +219,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
             handleDragStart(e as unknown as DragEvent, itemProps.reference.id)
           }
           onDragEnd={handleDragEnd}
-          class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0 mt-0.5"
+          class="mt-0.5 flex-shrink-0 cursor-grab p-0.5 text-muted-foreground transition-colors hover:text-foreground active:cursor-grabbing"
           title="Drag to reorder"
           aria-label="Drag to reorder reference"
           data-testid={`reference-drag-handle-${itemProps.reference.id}`}
@@ -292,29 +293,33 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
       <Show when={showActions() && canEditReference(itemProps.reference)}>
         <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <Show when={props.onEdit}>
-            <button
+            <Button
               type="button"
               onClick={() => props.onEdit!(itemProps.reference)}
-              class="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded transition-colors"
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-primary"
               title="Edit reference"
               aria-label="Edit reference"
               data-testid={`reference-edit-button-${itemProps.reference.id}`}
             >
               <SquarePen class="w-4 h-4" />
-            </button>
+            </Button>
           </Show>
 
           <Show when={props.onDelete}>
-            <button
+            <Button
               type="button"
               onClick={() => props.onDelete!(itemProps.reference.id)}
-              class="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900 rounded transition-colors"
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
               title="Delete reference"
               aria-label="Delete reference"
               data-testid={`reference-delete-button-${itemProps.reference.id}`}
             >
               <Trash2 class="w-4 h-4" />
-            </button>
+            </Button>
           </Show>
         </div>
       </Show>
@@ -325,7 +330,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
     <ul class="space-y-3 list-none" data-testid="references-list">
       {/* Empty state */}
       <Show when={props.references.length === 0}>
-        <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+        <div class="py-8 text-center text-muted-foreground">
           <p class="text-sm italic">No references yet</p>
           <p class="text-xs mt-1">
             Add links to videos, sheet music, or articles
