@@ -1993,6 +1993,35 @@ export class TuneTreesPage {
       .first();
   }
 
+  private async waitForLocatorVisible(
+    locator: Locator,
+    timeout = 2000,
+    interval = 100
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+      if (this.page.isClosed()) {
+        return false;
+      }
+
+      const visible = await locator
+        .isVisible({ timeout: 200 })
+        .catch(() => false);
+      if (visible) {
+        return true;
+      }
+
+      await this.page.waitForTimeout(interval);
+    }
+
+    if (this.page.isClosed()) {
+      return false;
+    }
+
+    return locator.isVisible({ timeout: 200 }).catch(() => false);
+  }
+
   private async getDisplayModeSwitchChecked(
     displayModeSwitch: Locator
   ): Promise<boolean | null> {
@@ -2490,6 +2519,10 @@ export class TuneTreesPage {
   ): Promise<void> {
     await this.closeFilterPanelIfOpen();
 
+    if (this.page.isClosed()) {
+      return;
+    }
+
     await expect(columnsButton).toBeVisible({ timeout: 5000 });
     await expect(columnsButton).toBeEnabled({ timeout: 5000 });
 
@@ -2548,14 +2581,29 @@ export class TuneTreesPage {
         .catch(() => displayOptionsButton.dispatchEvent("click"))
         .catch(() => undefined);
 
-      const menuVisible = await targetMenu
-        .isVisible({ timeout: 3000 })
-        .catch(() => false);
+      // On mobile, clicking the overflow entry first closes the overflow menu
+      // and then queues the nested display-options panel open on the next turn.
+      // Give that handoff a chance to complete before reopening the overflow.
+      const menuVisible = await this.waitForLocatorVisible(
+        targetMenu,
+        3500,
+        125
+      );
       if (menuVisible) {
         return;
       }
 
       if (this.page.isClosed()) {
+        return;
+      }
+
+      await this.page.keyboard.press("Escape").catch(() => undefined);
+      const menuVisibleAfterEscape = await this.waitForLocatorVisible(
+        targetMenu,
+        750,
+        125
+      );
+      if (menuVisibleAfterEscape) {
         return;
       }
 
