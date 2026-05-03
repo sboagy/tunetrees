@@ -146,11 +146,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         .locator('input[type="checkbox"]')
         .first();
       await firstCheckbox.check();
-      await page.waitForTimeout(500);
-      // Verify tune is selected before adding to repertoire.
-      await expect(page.getByText(/1 tune selected/i)).toBeVisible({
-        timeout: 3000,
-      });
+      await expect(firstCheckbox).toBeChecked({ timeout: 10000 });
       await ttPage.clickCatalogAddToRepertoire();
       await page.waitForTimeout(2000); // Wait for sync
       // Add to review

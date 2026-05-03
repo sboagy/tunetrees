@@ -26,13 +26,17 @@ function isHookAvailabilityRace(
 async function waitForAuthRoot(page: Page, timeoutMs: number) {
   await page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
+  const authRoot = page.locator('[data-auth-initialized="true"]').first();
+
   await expect
     .poll(
       async () => {
         try {
-          return await page.evaluate(() => {
-            return Boolean(document.querySelector("[data-auth-initialized]"));
-          });
+          if (page.isClosed()) {
+            return false;
+          }
+
+          return await authRoot.isVisible({ timeout: 250 }).catch(() => false);
         } catch (error) {
           if (isTransientExecutionContextError(error)) {
             return false;

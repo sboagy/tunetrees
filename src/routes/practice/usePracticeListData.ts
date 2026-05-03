@@ -7,6 +7,7 @@ import {
   type Resource,
 } from "solid-js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import { filterRowsBySelectedTuneIds } from "@/lib/tune-sets/filter";
 import type { ITuneOverview } from "../../components/grids/types";
 import { formatAsWindowStart } from "../../lib/utils/practice-date";
 
@@ -18,6 +19,7 @@ export interface PracticeListDataProps {
   queueReady: Resource<true>;
   queueDate: Accessor<Date>;
   showSubmitted: Accessor<boolean>;
+  selectedTuneIds: Accessor<string[] | undefined>;
 }
 
 export interface PracticeListDataState {
@@ -92,7 +94,10 @@ export function usePracticeListData(
   });
 
   const filteredPracticeList = createMemo<ITuneOverview[]>(() => {
-    const data = practiceRows();
+    const data = filterRowsBySelectedTuneIds(
+      practiceRows(),
+      props.selectedTuneIds()
+    );
     const shouldShow = props.showSubmitted();
 
     console.log(

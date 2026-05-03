@@ -17,6 +17,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "private_for",
     },
+    groupMemberIds: {
+      table: "group_member",
+      idColumn: "id",
+      ownerColumn: "user_ref",
+    },
     instrumentIds: {
       table: "instrument",
       idColumn: "id",
@@ -103,6 +108,24 @@ export const WORKER_SYNC_CONFIG = {
           },
         ],
       },
+      group_member: {
+        kind: "rpc",
+        functionName: "sync_get_group_members",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
+      },
       instrument: {
         kind: "orNullEqUserId",
         column: "private_to_user",
@@ -168,6 +191,28 @@ export const WORKER_SYNC_CONFIG = {
       prefs_spaced_repetition: {
         kind: "eqUserId",
         column: "user_id",
+      },
+      program_item: {
+        kind: "rpc",
+        functionName: "sync_get_program_items",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       reference: {
         kind: "rpc",
@@ -245,9 +290,85 @@ export const WORKER_SYNC_CONFIG = {
         kind: "eqUserId",
         column: "user_ref",
       },
+      tune_set_item: {
+        kind: "rpc",
+        functionName: "sync_get_tune_set_items",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
+      },
       user_genre_selection: {
         kind: "eqUserId",
         column: "user_id",
+      },
+      user_group: {
+        kind: "rpc",
+        functionName: "sync_get_user_groups",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
+      },
+      program: {
+        kind: "rpc",
+        functionName: "sync_get_programs",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
+      },
+      tune_set: {
+        kind: "rpc",
+        functionName: "sync_get_tune_sets",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       user_profile: {
         kind: "rpc",
@@ -327,6 +448,16 @@ export const WORKER_SYNC_CONFIG = {
         },
         bindAuthUserIdProps: ["private_for"],
         denyDelete: false,
+      },
+      group_member: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
       },
       instrument: {
         sanitize: {
@@ -507,6 +638,30 @@ export const WORKER_SYNC_CONFIG = {
           ],
         },
       },
+      program: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      program_item: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "position",
+              kind: "int",
+            },
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
       reference: {
         sanitize: {
           coerceNumericProps: [
@@ -653,11 +808,45 @@ export const WORKER_SYNC_CONFIG = {
           ],
         },
       },
+      tune_set: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      tune_set_item: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "position",
+              kind: "int",
+            },
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
       tune_type: {
         denyDelete: true,
       },
       user_genre_selection: {
         denyDelete: false,
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      user_group: {
         sanitize: {
           coerceNumericProps: [
             {

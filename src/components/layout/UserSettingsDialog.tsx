@@ -183,7 +183,7 @@ export const UserSettingsDialog: Component = () => {
             <button
               type="button"
               onClick={closeUserSettings}
-              class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
+              class="relative z-10 flex h-10 w-10 items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 shrink-0"
               aria-label="Close settings"
               data-testid="settings-close-button"
             >
