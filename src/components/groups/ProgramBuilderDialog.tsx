@@ -1,4 +1,4 @@
-import { CircleX, GripVertical, Plus, Save, Trash2 } from "lucide-solid";
+import { GripVertical, Plus, Save, Trash2 } from "lucide-solid";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -10,13 +10,13 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import {
   addTuneSetToProgram,
   addTuneToProgram,
   createProgram,
-  deleteProgram,
   getEligibleTuneSetsForProgram,
   getProgramAccessForUser,
   getProgramById,
@@ -36,6 +36,7 @@ interface ProgramBuilderDialogProps {
   programId?: string;
   groupRef?: string | null;
   onSaved?: () => void;
+  forceViewMode?: boolean;
 }
 
 interface CandidateItem {
@@ -62,6 +63,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
   const { user, localDb } = useAuth();
   const { incrementTuneSetListChanged, tuneSetListChanged } =
     useCurrentTuneSet();
+  let programNameInputRef: HTMLInputElement | undefined;
   const [activeProgramId, setActiveProgramId] = createSignal<
     string | undefined
   >(props.programId);
@@ -198,6 +200,10 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
   });
 
   const canManage = createMemo(() => {
+    if (props.forceViewMode && activeProgramId()) {
+      return false;
+    }
+
     if (!activeProgramId()) {
       return true;
     }
@@ -208,7 +214,44 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     if (!activeProgramId()) {
       return "Create Program";
     }
+
+    if (props.forceViewMode) {
+      return "Program Details";
+    }
+
     return canManage() ? "Edit Program" : "View Program";
+  });
+
+  const hasValidProgramName = createMemo(
+    () => normalizeMetadataValue(name()) !== ""
+  );
+
+  const isCreatingProgram = createMemo(() => !activeProgramId());
+
+  createEffect(() => {
+    if (
+      !props.isOpen ||
+      props.forceViewMode ||
+      !isCreatingProgram() ||
+      !canManage()
+    ) {
+      return;
+    }
+
+    const focusInput = () => {
+      if (programNameInputRef) {
+        programNameInputRef.focus();
+        programNameInputRef.select();
+      }
+    };
+
+    const animationFrameId = requestAnimationFrame(focusInput);
+    const timeoutId = window.setTimeout(focusInput, 120);
+
+    onCleanup(() => {
+      cancelAnimationFrame(animationFrameId);
+      window.clearTimeout(timeoutId);
+    });
   });
 
   const hasPendingMetadataChanges = createMemo(() => {
@@ -318,6 +361,10 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
   const ensureProgramId = async (): Promise<string | null> => {
     if (activeProgramId()) {
       return activeProgramId()!;
+    }
+
+    if (!hasValidProgramName()) {
+      return null;
     }
 
     const created = await persistProgramMetadata();
@@ -442,41 +489,6 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     }
   };
 
-  const handleDeleteProgram = async () => {
-    const db = localDb();
-    const userId = user()?.id;
-    const programId = activeProgramId();
-    const currentProgram = program();
-    if (!db || !userId || !programId || !currentProgram) {
-      showDialogError("Database is not ready yet.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Delete the program "${currentProgram.name}"?`
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      await deleteProgram(db, programId, userId);
-      incrementTuneSetListChanged();
-      props.onSaved?.();
-      props.onClose();
-      toast.success(`Deleted program "${currentProgram.name}".`, {
-        duration: 2500,
-      });
-    } catch (error) {
-      showDialogError(
-        error instanceof Error ? error.message : "Failed to delete Program"
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
     <Show when={props.isOpen}>
       <button
@@ -494,91 +506,122 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
         aria-labelledby="program-builder-title"
         data-testid="program-builder-dialog"
       >
-        <div class="flex items-start justify-between gap-4 border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
-          <div>
-            <h2
-              id="program-builder-title"
-              class="text-xl font-semibold text-gray-900 dark:text-white"
-            >
-              {dialogTitle()}
-            </h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
+          <header class="flex justify-between items-center w-full mb-4">
+            <div class="flex flex-1 justify-start">
+              <Button
+                type="button"
+                onClick={() => void handleDone()}
+                disabled={isSaving() || isMutatingItems()}
+                variant={canManage() ? "outline" : "ghost"}
+                size="sm"
+                data-testid="close-program-builder-button"
+              >
+                {canManage() ? "Cancel" : "Back"}
+              </Button>
+            </div>
+            <div class="flex min-w-0 flex-1 justify-center px-3">
+              <h2
+                id="program-builder-title"
+                class="text-center text-xl font-semibold text-gray-900 dark:text-white"
+              >
+                {dialogTitle()}
+              </h2>
+            </div>
+            <div class="flex flex-1 justify-end">
+              <Show when={canManage()}>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    void (activeProgramId()
+                      ? handleDone()
+                      : persistProgramMetadata())
+                  }
+                  disabled={
+                    isSaving() || isMutatingItems() || !hasValidProgramName()
+                  }
+                  variant="default"
+                  size="sm"
+                  data-testid="save-program-button"
+                >
+                  <Show
+                    when={isSaving()}
+                    fallback={
+                      activeProgramId() ? (
+                        <>
+                          <Save size={16} />
+                          Save
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={16} />
+                          Create
+                        </>
+                      )
+                    }
+                  >
+                    Saving...
+                  </Show>
+                </Button>
+              </Show>
+            </div>
+          </header>
+
+          <div class="flex items-start gap-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
               Build a musical Program from individual Tunes and eligible Tune
               Sets.
             </p>
           </div>
-
-          <div class="flex items-center gap-3">
-            <Show when={canManage() && activeProgramId()}>
-              <button
-                type="button"
-                class="rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
-                onClick={() => void handleDeleteProgram()}
-                disabled={isSaving() || isMutatingItems()}
-                data-testid="delete-program-button"
-              >
-                Delete Program
-              </button>
-            </Show>
-
-            <button
-              type="button"
-              onClick={() => void handleDone()}
-              disabled={isSaving() || isMutatingItems()}
-              class="text-sm font-medium text-gray-700 hover:underline disabled:opacity-50 dark:text-gray-300"
-              data-testid="close-program-builder-button"
-            >
-              <span class="inline-flex items-center gap-2">
-                <span>{canManage() ? "Done" : "Close"}</span>
-                <CircleX size={18} />
-              </span>
-            </button>
-
-            <Show when={canManage() && !activeProgramId()}>
-              <button
-                type="button"
-                onClick={() => void persistProgramMetadata()}
-                disabled={isSaving() || isMutatingItems()}
-                class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                data-testid="save-program-button"
-              >
-                <Show
-                  when={isSaving()}
-                  fallback={
-                    <>
-                      <span>Create Program</span>
-                      <Save size={16} />
-                    </>
-                  }
-                >
-                  Saving...
-                </Show>
-              </button>
-            </Show>
-          </div>
         </div>
 
-        <div class="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <div
+          class={`grid min-h-0 flex-1 gap-0 ${props.forceViewMode ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]"}`}
+        >
           <section class="min-h-0 border-b border-gray-200 p-4 dark:border-gray-700 lg:border-b-0 lg:border-r sm:p-6">
             <div class="space-y-4">
-              <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div class="space-y-2">
-                  <label
-                    for="program-name"
-                    class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Program Name
-                  </label>
+              <div class="space-y-4">
+                <div
+                  class={`space-y-2 rounded-lg p-3 ${canManage() && !hasValidProgramName() ? "border border-red-200/70 bg-red-50/40 dark:border-red-900/60 dark:bg-red-950/10" : "border border-transparent bg-transparent"}`}
+                >
+                  <div class="flex items-center gap-2">
+                    <label
+                      for="program-name"
+                      class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Program Name
+                    </label>
+                    <Show when={canManage() && !hasValidProgramName()}>
+                      <span class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        Required
+                      </span>
+                    </Show>
+                  </div>
                   <input
                     id="program-name"
+                    ref={programNameInputRef}
+                    autofocus={
+                      props.isOpen && isCreatingProgram() && canManage()
+                    }
                     type="text"
                     value={name()}
                     onInput={(event) => setName(event.currentTarget.value)}
                     disabled={!canManage()}
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    required
+                    aria-required="true"
+                    aria-invalid={canManage() && !hasValidProgramName()}
+                    aria-describedby="program-name-help"
+                    class={`w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-blue-400/60 dark:focus:border-blue-400 ${canManage() && !hasValidProgramName() ? "border-red-400 ring-1 ring-red-400/40 dark:border-red-500 dark:ring-red-500/30" : "border-gray-300 dark:border-gray-700"}`}
                     placeholder="Festival opener"
                     data-testid="program-name-input"
                   />
+                  <p
+                    id="program-name-help"
+                    class={`text-xs ${canManage() && !hasValidProgramName() ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
+                  >
+                    Enter a program name to enable Create and add tunes or tune
+                    sets.
+                  </p>
                 </div>
 
                 <div class="space-y-2">
@@ -588,125 +631,134 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                   >
                     Notes
                   </label>
-                  <input
+                  <textarea
                     id="program-description"
-                    type="text"
                     value={description()}
                     onInput={(event) =>
                       setDescription(event.currentTarget.value)
                     }
                     disabled={!canManage()}
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    rows={3}
+                    class="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     placeholder="Optional set notes"
                     data-testid="program-description-input"
                   />
                 </div>
               </div>
 
-              <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
-                <div>
-                  <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Library
-                  </h3>
-                  <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Search the existing Tune and Tune Set grid, then add items
-                    to the Program.
-                  </p>
-                </div>
+              <Show when={!props.forceViewMode}>
+                <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
+                  <div>
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Library
+                    </h3>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      Search the existing Tune and Tune Set grid, then add items
+                      to the Program.
+                    </p>
+                  </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <input
-                    type="text"
-                    value={query()}
-                    onInput={(event) => setQuery(event.currentTarget.value)}
-                    placeholder="Search tunes and tune sets"
-                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    data-testid="program-candidate-search-input"
-                  />
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "all" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
-                      onClick={() => setCandidateFilter("all")}
-                      data-testid="program-candidate-filter-all"
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <input
+                      type="text"
+                      value={query()}
+                      onInput={(event) => setQuery(event.currentTarget.value)}
+                      placeholder="Search tunes and tune sets"
+                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                      data-testid="program-candidate-search-input"
+                    />
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "all" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
+                        onClick={() => setCandidateFilter("all")}
+                        data-testid="program-candidate-filter-all"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "tune" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
+                        onClick={() => setCandidateFilter("tune")}
+                        data-testid="program-candidate-filter-tunes"
+                      >
+                        Tunes
+                      </button>
+                      <button
+                        type="button"
+                        class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "tune_set" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
+                        onClick={() => setCandidateFilter("tune_set")}
+                        data-testid="program-candidate-filter-tune-sets"
+                      >
+                        Tune Sets
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    class="min-h-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                    data-testid="program-candidate-list"
+                  >
+                    <Show
+                      when={candidateItems().length > 0}
+                      fallback={
+                        <div class="px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
+                          No matching Tunes or Tune Sets.
+                        </div>
+                      }
                     >
-                      All
-                    </button>
-                    <button
-                      type="button"
-                      class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "tune" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
-                      onClick={() => setCandidateFilter("tune")}
-                      data-testid="program-candidate-filter-tunes"
-                    >
-                      Tunes
-                    </button>
-                    <button
-                      type="button"
-                      class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "tune_set" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
-                      onClick={() => setCandidateFilter("tune_set")}
-                      data-testid="program-candidate-filter-tune-sets"
-                    >
-                      Tune Sets
-                    </button>
+                      <div class="max-h-[48vh] overflow-y-auto">
+                        <For each={candidateItems()}>
+                          {(candidate) => (
+                            <div class="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3 last:border-b-0 dark:border-gray-700">
+                              <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                  <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                    {candidate.kind === "tune"
+                                      ? "Tune"
+                                      : "Tune Set"}
+                                  </span>
+                                  <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                                    {candidate.title}
+                                  </span>
+                                </div>
+                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  {candidate.subtitle}
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleAddCandidate(candidate)
+                                }
+                                disabled={
+                                  !hasValidProgramName() ||
+                                  !canManage() ||
+                                  isMutatingItems() ||
+                                  isSaving()
+                                }
+                                class="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
+                                data-testid="program-add-candidate-button"
+                              >
+                                <Plus size={14} />
+                                Add
+                              </button>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                   </div>
                 </div>
-
-                <div
-                  class="min-h-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                  data-testid="program-candidate-list"
-                >
-                  <Show
-                    when={candidateItems().length > 0}
-                    fallback={
-                      <div class="px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
-                        No matching Tunes or Tune Sets.
-                      </div>
-                    }
-                  >
-                    <div class="max-h-[48vh] overflow-y-auto">
-                      <For each={candidateItems()}>
-                        {(candidate) => (
-                          <div class="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3 last:border-b-0 dark:border-gray-700">
-                            <div class="min-w-0">
-                              <div class="flex items-center gap-2">
-                                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                  {candidate.kind === "tune"
-                                    ? "Tune"
-                                    : "Tune Set"}
-                                </span>
-                                <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                  {candidate.title}
-                                </span>
-                              </div>
-                              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                {candidate.subtitle}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => void handleAddCandidate(candidate)}
-                              disabled={
-                                !canManage() || isMutatingItems() || isSaving()
-                              }
-                              class="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
-                              data-testid="program-add-candidate-button"
-                            >
-                              <Plus size={14} />
-                              Add
-                            </button>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
-              </div>
+              </Show>
             </div>
           </section>
 
-          <section class="min-h-0 p-4 sm:p-6">
-            <div class="flex h-full min-h-0 flex-col rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
+          <section
+            class={`flex min-h-0 h-full flex-col p-4 sm:p-6 ${props.forceViewMode ? "lg:border-l border-gray-200 dark:border-gray-700" : ""}`}
+          >
+            <div class="flex h-full min-h-0 flex-1 flex-col rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
               <div class="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -724,13 +776,13 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
               </div>
 
               <div
-                class="min-h-0 flex-1 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                class="flex min-h-0 flex-1 flex-col rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
                 data-testid="program-items-list"
               >
                 <Show
                   when={activeProgramId()}
                   fallback={
-                    <div class="px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
+                    <div class="flex min-h-0 flex-1 px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
                       Save the Program name first, then add Tunes or Tune Sets
                       on the left.
                     </div>
@@ -739,9 +791,18 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                   <Show
                     when={(programItems() ?? []).length > 0}
                     fallback={
-                      <div class="px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
-                        This Program is empty. Add Tunes or Tune Sets from the
-                        left pane.
+                      <div class="flex min-h-0 flex-1 px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
+                        <Show
+                          when={props.forceViewMode}
+                          fallback={
+                            <>
+                              This Program is empty. Add Tunes or Tune Sets from
+                              the left pane.
+                            </>
+                          }
+                        >
+                          This Program is empty.
+                        </Show>
                       </div>
                     }
                   >

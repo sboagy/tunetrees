@@ -340,13 +340,8 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       class="space-y-4"
       data-testid="reference-form"
     >
-      <div class="mb-1 flex w-full items-center justify-between gap-3">
-        <span
-          class={`${fontClasses().text} font-semibold text-gray-700 dark:text-gray-300`}
-        >
-          {heading()}
-        </span>
-        <div class="ml-auto flex items-center gap-2">
+      <header class="flex justify-between items-center w-full mb-4">
+        <div class="flex flex-1 justify-start">
           <Button
             type="button"
             onClick={props.onCancel}
@@ -357,6 +352,15 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           >
             Cancel
           </Button>
+        </div>
+        <div class="flex min-w-0 flex-1 justify-center px-3">
+          <span
+            class={`${fontClasses().text} text-center font-semibold text-gray-700 dark:text-gray-300`}
+          >
+            {heading()}
+          </span>
+        </div>
+        <div class="flex flex-1 justify-end">
           <Button
             type="submit"
             disabled={!canSubmit()}
@@ -368,7 +372,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
             Save
           </Button>
         </div>
-      </div>
+      </header>
 
       {/* Type Dropdown */}
       <div>

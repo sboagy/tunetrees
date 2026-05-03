@@ -1,4 +1,4 @@
-import { X } from "lucide-solid";
+import { Plus } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button } from "@/components/ui/button";
@@ -55,31 +55,56 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
       aria-labelledby="group-as-set-title"
       data-testid="group-as-set-popover"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
+      <header class="flex justify-between items-center w-full mb-4">
+        <div class="flex flex-1 justify-start">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={props.onClose}
+            disabled={props.isSaving || Boolean(props.addingToSetId)}
+          >
+            Cancel
+          </Button>
+        </div>
+        <div class="flex min-w-0 flex-1 justify-center px-3">
           <h3
             id="group-as-set-title"
-            class="text-base font-semibold text-gray-900 dark:text-white"
+            class="text-center text-base font-semibold text-gray-900 dark:text-white"
           >
             Save Selection as Set
           </h3>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Choose what to do with these {props.tuneTitles.length} selected
-            {props.tuneTitles.length === 1 ? " tune" : " tunes"}.
-          </p>
         </div>
+        <div class="flex flex-1 justify-end">
+          <Button
+            type="button"
+            variant="default"
+            onClick={handleSave}
+            disabled={
+              mode() !== "create" ||
+              props.isSaving ||
+              Boolean(props.addingToSetId)
+            }
+            data-testid="save-group-as-set-button"
+          >
+            <Show
+              when={props.isSaving}
+              fallback={
+                <>
+                  <Plus class="h-4 w-4" />
+                  Create
+                </>
+              }
+            >
+              <span>Saving...</span>
+            </Show>
+          </Button>
+        </div>
+      </header>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={props.onClose}
-          aria-label="Close group as set popover"
-          data-testid="close-group-as-set-popover-button"
-        >
-          <X class="h-5 w-5" aria-hidden="true" />
-        </Button>
-      </div>
+      <p class="text-sm text-gray-600 dark:text-gray-400">
+        Choose what to do with these {props.tuneTitles.length} selected
+        {props.tuneTitles.length === 1 ? " tune" : " tunes"}.
+      </p>
 
       <div
         class="mt-4 grid gap-3 sm:grid-cols-2"
@@ -247,32 +272,6 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
       <Show when={props.error}>
         <p class="mt-3 text-sm text-red-600 dark:text-red-400">{props.error}</p>
       </Show>
-
-      <div class="mt-4 flex w-full items-center justify-between gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={props.onClose}
-          disabled={props.isSaving || Boolean(props.addingToSetId)}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="default"
-          onClick={handleSave}
-          disabled={
-            mode() !== "create" ||
-            props.isSaving ||
-            Boolean(props.addingToSetId)
-          }
-          data-testid="save-group-as-set-button"
-        >
-          <Show when={props.isSaving} fallback={<span>Create New Set</span>}>
-            <span>Saving...</span>
-          </Show>
-        </Button>
-      </div>
     </div>
   );
 

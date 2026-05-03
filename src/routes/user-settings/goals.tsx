@@ -14,6 +14,7 @@
  * @module routes/user-settings/goals
  */
 
+import { Save } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -125,9 +126,38 @@ const GoalForm: Component<{
 
   const set = <K extends keyof GoalFormState>(k: K, v: GoalFormState[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
+  const formTitle = () => (props.initial ? "Edit Goal" : "Add Goal");
 
   return (
     <form onSubmit={handleSubmit} class="space-y-4">
+      <header class="flex justify-between items-center w-full mb-4">
+        <div class="flex flex-1 justify-start">
+          <Button type="button" onClick={props.onCancel} variant="outline">
+            Cancel
+          </Button>
+        </div>
+        <div class="flex min-w-0 flex-1 justify-center px-3">
+          <h3 class="text-center text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {formTitle()}
+          </h3>
+        </div>
+        <div class="flex flex-1 justify-end">
+          <Button type="submit" disabled={saving()}>
+            <Show
+              when={saving()}
+              fallback={
+                <>
+                  <Save class="h-4 w-4" />
+                  Save
+                </>
+              }
+            >
+              Saving…
+            </Show>
+          </Button>
+        </div>
+      </header>
+
       {/* Name */}
       <div>
         <label
@@ -241,16 +271,6 @@ const GoalForm: Component<{
       <Show when={error()}>
         <p class="text-sm text-red-600 dark:text-red-400">{error()}</p>
       </Show>
-
-      {/* Actions */}
-      <div class="flex w-full items-center justify-between gap-2">
-        <Button type="button" onClick={props.onCancel} variant="outline">
-          Cancel
-        </Button>
-        <Button type="submit" disabled={saving()}>
-          {saving() ? "Saving…" : props.submitLabel}
-        </Button>
-      </div>
     </form>
   );
 };

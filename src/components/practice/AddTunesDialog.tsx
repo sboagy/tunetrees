@@ -7,7 +7,7 @@
  * @module components/practice/AddTunesDialog
  */
 
-import { X } from "lucide-solid";
+import { Plus } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, Show } from "solid-js";
 import { Button } from "@/components/ui/button";
@@ -57,20 +57,24 @@ export const AddTunesDialog: Component<AddTunesDialogProps> = (props) => {
           aria-modal="true"
         >
           {/* Header */}
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              Add More Tunes
-            </h2>
-            <Button
-              type="button"
-              onClick={props.onClose}
-              variant="ghost"
-              size="icon"
-              aria-label="Close dialog"
-            >
-              <X size={20} />
-            </Button>
-          </div>
+          <header class="flex justify-between items-center w-full mb-4">
+            <div class="flex flex-1 justify-start">
+              <Button type="button" onClick={props.onClose} variant="outline">
+                Cancel
+              </Button>
+            </div>
+            <div class="flex min-w-0 flex-1 justify-center px-3">
+              <h2 class="text-center text-xl font-semibold text-gray-900 dark:text-gray-100">
+                Add More Tunes
+              </h2>
+            </div>
+            <div class="flex flex-1 justify-end">
+              <Button type="button" onClick={handleConfirm} variant="default">
+                <Plus size={16} />
+                Add
+              </Button>
+            </div>
+          </header>
 
           {/* Content */}
           <div class="mb-6">
@@ -95,16 +99,6 @@ export const AddTunesDialog: Component<AddTunesDialogProps> = (props) => {
                 autofocus
               />
             </label>
-          </div>
-
-          {/* Actions */}
-          <div class="flex w-full items-center justify-between gap-3">
-            <Button type="button" onClick={props.onClose} variant="outline">
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleConfirm} variant="default">
-              Add
-            </Button>
           </div>
         </div>
       </div>

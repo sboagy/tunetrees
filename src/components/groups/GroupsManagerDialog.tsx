@@ -1,4 +1,13 @@
-import { Crown, Plus, Shield, Trash2, User, X } from "lucide-solid";
+import {
+  CalendarDays,
+  Crown,
+  Mail,
+  Plus,
+  Shield,
+  SquarePen,
+  Trash2,
+  User,
+} from "lucide-solid";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -11,6 +20,12 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { ProgramBuilderDialog } from "@/components/groups/ProgramBuilderDialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -84,7 +99,6 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
         type="button"
         class="fixed inset-0 z-[60] bg-black/50 dark:bg-black/70"
         onClick={props.onClose}
-        aria-label="Close create group dialog backdrop"
         data-testid="group-dialog-backdrop"
       />
 
@@ -95,32 +109,59 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
         aria-labelledby="group-dialog-title"
         data-testid="group-dialog"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div>
+        <header class="flex justify-between items-center w-full mb-4">
+          <div class="flex flex-1 justify-start">
+            <Button
+              type="button"
+              onClick={props.onClose}
+              disabled={props.isSaving}
+              variant="outline"
+              data-testid="cancel-group-button"
+            >
+              Cancel
+            </Button>
+          </div>
+          <div class="flex min-w-0 flex-1 justify-center px-3">
             <h2
               id="group-dialog-title"
-              class="text-xl font-semibold text-gray-900 dark:text-white"
+              class="text-center text-xl font-semibold text-gray-900 dark:text-white"
             >
               Create Group
             </h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Create a group space for shared membership and group-owned
-              programs.
-            </p>
           </div>
-          <Button
-            type="button"
-            onClick={props.onClose}
-            variant="ghost"
-            size="sm"
-            aria-label="Close create group dialog"
-            data-testid="close-group-dialog-button"
-          >
-            Close
-          </Button>
-        </div>
+          <div class="flex flex-1 justify-end">
+            <Button
+              type="button"
+              onClick={() =>
+                props.onSubmit({
+                  name: name(),
+                  description: description(),
+                })
+              }
+              disabled={props.isSaving}
+              variant="default"
+              data-testid="save-group-button"
+            >
+              <Show
+                when={props.isSaving}
+                fallback={
+                  <>
+                    <Plus class="h-4 w-4" />
+                    Create
+                  </>
+                }
+              >
+                Creating...
+              </Show>
+            </Button>
+          </div>
+        </header>
 
-        <div class="mt-4 space-y-4">
+        <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          Create a group space for shared membership and group-owned programs.
+        </p>
+
+        <div class="space-y-4">
           <div class="space-y-2">
             <label
               for="group-name"
@@ -159,37 +200,110 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
           <Show when={props.error}>
             <p class="text-sm text-red-600 dark:text-red-400">{props.error}</p>
           </Show>
-
-          <div class="flex w-full justify-between gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
-            <Button
-              type="button"
-              onClick={props.onClose}
-              disabled={props.isSaving}
-              variant="outline"
-              data-testid="cancel-group-button"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() =>
-                props.onSubmit({
-                  name: name(),
-                  description: description(),
-                })
-              }
-              disabled={props.isSaving}
-              variant="default"
-              data-testid="save-group-button"
-            >
-              <Show when={props.isSaving} fallback="Create Group">
-                Creating...
-              </Show>
-            </Button>
-          </div>
         </div>
       </div>
     </Show>
+  );
+};
+
+const formatMemberDate = (value: string) =>
+  new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+const getMemberDisplayName = (member: GroupMemberWithProfile) =>
+  member.profileName ?? member.profileEmail ?? "Unknown member";
+
+const MemberInfoDialog: Component<{
+  member: GroupMemberWithProfile | null;
+  isOpen: boolean;
+  onClose: () => void;
+}> = (props) => {
+  return (
+    <AlertDialog
+      open={props.isOpen}
+      onOpenChange={(open) => !open && props.onClose()}
+    >
+      <AlertDialogContent class="max-w-md bg-white dark:bg-gray-900">
+        <header class="flex justify-between items-center w-full mb-4">
+          <div class="flex flex-1 justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={props.onClose}
+            >
+              Back
+            </Button>
+          </div>
+          <div class="flex min-w-0 flex-1 justify-center px-3">
+            <AlertDialogTitle class="text-center">
+              Member Details
+            </AlertDialogTitle>
+          </div>
+          <div class="flex flex-1 justify-end" />
+        </header>
+
+        <Show when={props.member}>
+          {(member) => (
+            <div class="space-y-4">
+              <AlertDialogDescription>
+                Profile information currently available for this group member.
+              </AlertDialogDescription>
+
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
+                <div class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {getMemberDisplayName(member())}
+                </div>
+                <div class="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                  <Show
+                    when={member().effectiveRole === "owner"}
+                    fallback={null}
+                  >
+                    <Crown size={12} />
+                  </Show>
+                  {member().effectiveRole}
+                </div>
+              </div>
+
+              <div class="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                <div class="flex items-start gap-3">
+                  <Mail size={16} class="mt-0.5 text-gray-400" />
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Email
+                    </div>
+                    <div>{member().profileEmail ?? "No email available"}</div>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-3">
+                  <User size={16} class="mt-0.5 text-gray-400" />
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      User ID
+                    </div>
+                    <div class="break-all">{member().userRef}</div>
+                  </div>
+                </div>
+
+                <div class="flex items-start gap-3">
+                  <CalendarDays size={16} class="mt-0.5 text-gray-400" />
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Joined
+                    </div>
+                    <div>{formatMemberDate(member().joinedAt)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </Show>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
 
@@ -199,40 +313,25 @@ const ManageableGroupMemberRow: Component<{
   isBusy: boolean;
   onRoleChange: (role: "admin" | "member") => void;
   onRemove: () => void;
+  onShowInfo: () => void;
 }> = (props) => {
   return (
-    <div class="relative rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700">
-      <div class="min-w-0 pr-28">
-        <div class="text-base font-medium leading-tight text-gray-900 dark:text-white">
-          {props.member.profileName ??
-            props.member.profileEmail ??
-            "Unknown member"}
-        </div>
-        <div class="mt-2 text-sm text-gray-400 dark:text-gray-400">
-          <Show
-            when={props.member.isOwner}
-            fallback={
-              <>
-                <Show when={props.member.profileEmail}>
-                  <div class="truncate">{props.member.profileEmail}</div>
-                </Show>
-                <div>
-                  Joined {new Date(props.member.joinedAt).toLocaleDateString()}
-                </div>
-              </>
-            }
-          >
-            Group owner
-          </Show>
-        </div>
-      </div>
+    <div class="rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700">
+      <div class="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={props.onShowInfo}
+          class="min-w-0 truncate text-left text-base font-medium leading-tight text-gray-900 hover:underline dark:text-white"
+          data-testid="group-member-name-button"
+        >
+          {getMemberDisplayName(props.member)}
+        </button>
 
-      <Show
-        when={props.canManage && !props.member.isOwner}
-        fallback={
-          <div class="absolute right-4 top-4">
+        <Show
+          when={props.canManage && !props.member.isOwner}
+          fallback={
             <span
-              class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize ${roleBadgeClass(props.member.effectiveRole)}`}
+              class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize shrink-0 ${roleBadgeClass(props.member.effectiveRole)}`}
             >
               <Show
                 when={props.member.effectiveRole === "owner"}
@@ -242,55 +341,55 @@ const ManageableGroupMemberRow: Component<{
               </Show>
               {props.member.effectiveRole}
             </span>
-          </div>
-        }
-      >
-        <div class="absolute right-4 top-4 flex items-center gap-2">
-          <Button
-            type="button"
-            onClick={() =>
-              props.onRoleChange(
-                props.member.role === "admin" ? "member" : "admin"
-              )
-            }
-            disabled={props.isBusy}
-            variant="outline"
-            size="icon"
-            class="h-9 w-9"
-            data-testid="group-member-role-select"
-            title={
-              props.member.role === "admin"
-                ? "Change to member"
-                : "Change to admin"
-            }
-            aria-label={
-              props.member.role === "admin"
-                ? "Change to member"
-                : "Change to admin"
-            }
-          >
-            <Show
-              when={props.member.role === "admin"}
-              fallback={<User size={16} />}
+          }
+        >
+          <div class="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              onClick={() =>
+                props.onRoleChange(
+                  props.member.role === "admin" ? "member" : "admin"
+                )
+              }
+              disabled={props.isBusy}
+              variant="outline"
+              size="icon"
+              class="h-9 w-9"
+              data-testid="group-member-role-select"
+              title={
+                props.member.role === "admin"
+                  ? "Change to member"
+                  : "Change to admin"
+              }
+              aria-label={
+                props.member.role === "admin"
+                  ? "Change to member"
+                  : "Change to admin"
+              }
             >
-              <Shield size={16} />
-            </Show>
-          </Button>
-          <Button
-            type="button"
-            onClick={props.onRemove}
-            disabled={props.isBusy}
-            variant="ghost"
-            size="icon"
-            class="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            data-testid="remove-group-member-button"
-            title="Remove member"
-            aria-label="Remove member"
-          >
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      </Show>
+              <Show
+                when={props.member.role === "admin"}
+                fallback={<User size={16} />}
+              >
+                <Shield size={16} />
+              </Show>
+            </Button>
+            <Button
+              type="button"
+              onClick={props.onRemove}
+              disabled={props.isBusy}
+              variant="ghost"
+              size="icon"
+              class="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              data-testid="remove-group-member-button"
+              title="Remove member"
+              aria-label="Remove member"
+            >
+              <Trash2 size={16} />
+            </Button>
+          </div>
+        </Show>
+      </div>
     </div>
   );
 };
@@ -298,7 +397,7 @@ const ManageableGroupMemberRow: Component<{
 const GroupMemberCandidateRow: Component<{
   candidate: GroupMemberCandidate;
   isAdding: boolean;
-  onAdd: (userRef: string) => void;
+  onAdd: (candidate: GroupMemberCandidate) => void;
 }> = (props) => {
   return (
     <div class="relative rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700">
@@ -333,7 +432,7 @@ const GroupMemberCandidateRow: Component<{
         <div class="absolute right-4 top-4 flex items-center gap-2">
           <Button
             type="button"
-            onClick={() => props.onAdd(props.candidate.userRef)}
+            onClick={() => props.onAdd(props.candidate)}
             disabled={props.isAdding}
             variant="default"
             size="icon"
@@ -350,7 +449,7 @@ const GroupMemberCandidateRow: Component<{
   );
 };
 
-const GroupsManagerContent: Component = () => {
+const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
   const { user, localDb } = useAuth();
   const { tuneSetListChanged, incrementTuneSetListChanged } =
     useCurrentTuneSet();
@@ -367,6 +466,9 @@ const GroupsManagerContent: Component = () => {
   const [editingProgramId, setEditingProgramId] = createSignal<
     string | undefined
   >(undefined);
+  const [programDialogMode, setProgramDialogMode] = createSignal<
+    "view" | "edit"
+  >("edit");
   const [deletingProgramId, setDeletingProgramId] = createSignal<string | null>(
     null
   );
@@ -375,6 +477,8 @@ const GroupsManagerContent: Component = () => {
   const [busyMembershipId, setBusyMembershipId] = createSignal<string | null>(
     null
   );
+  const [selectedMemberInfo, setSelectedMemberInfo] =
+    createSignal<GroupMemberWithProfile | null>(null);
 
   const [groups] = createResource(
     () => {
@@ -507,11 +611,19 @@ const GroupsManagerContent: Component = () => {
   };
 
   const handleOpenNewProgram = () => {
+    setProgramDialogMode("edit");
     setEditingProgramId(undefined);
     setShowProgramEditor(true);
   };
 
   const handleOpenExistingProgram = (program: ProgramWithSummary) => {
+    setProgramDialogMode("edit");
+    setEditingProgramId(program.id);
+    setShowProgramEditor(true);
+  };
+
+  const handleOpenProgramDetails = (program: ProgramWithSummary) => {
+    setProgramDialogMode("view");
     setEditingProgramId(program.id);
     setShowProgramEditor(true);
   };
@@ -548,7 +660,7 @@ const GroupsManagerContent: Component = () => {
     }
   };
 
-  const handleAddMember = async (memberUserId: string) => {
+  const handleAddMember = async (candidate: GroupMemberCandidate) => {
     const db = localDb();
     const userId = user()?.id;
     const groupId = selectedGroupId();
@@ -559,9 +671,11 @@ const GroupsManagerContent: Component = () => {
 
     try {
       setIsAddingMember(true);
-      await addGroupMember(db, groupId, userId, memberUserId, "member");
+      await addGroupMember(db, groupId, userId, candidate.userRef, "member", {
+        profileName: candidate.profileName,
+        profileEmail: candidate.profileEmail,
+      });
       setGroupListVersion((value) => value + 1);
-      setMemberSearchTerm("");
       toast.success("Added group member.", { duration: 2500 });
     } catch (error) {
       toast.error(
@@ -637,26 +751,45 @@ const GroupsManagerContent: Component = () => {
 
   return (
     <>
-      <div class="flex h-full flex-col bg-white dark:bg-gray-800">
-        <div class="flex-1 overflow-auto bg-gray-50 p-4 dark:bg-gray-900 sm:p-6">
-          <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p class="max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-                Create groups, review current membership, and manage shared
-                programs.
-              </p>
+      <div class="flex h-full min-h-0 flex-col bg-white dark:bg-gray-800">
+        <div class="flex min-h-0 flex-1 flex-col bg-gray-50 p-4 dark:bg-gray-900 sm:p-6">
+          <header class="mb-6 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
+            <div class="flex items-center justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={props.onClose}
+                data-testid="groups-close-button"
+              >
+                Cancel
+              </Button>
             </div>
-            <Button
-              type="button"
-              class="inline-flex items-center justify-center gap-2"
-              variant="default"
-              onClick={() => setShowCreateGroupDialog(true)}
-              data-testid="open-create-group-button"
-            >
-              <span aria-hidden="true">+</span>
-              New Group
-            </Button>
-          </div>
+            <div class="flex min-w-0 items-center justify-center px-3">
+              <h2
+                id="groups-dialog-title"
+                class="text-center text-xl font-semibold text-gray-900 dark:text-gray-100 md:text-2xl"
+              >
+                Groups
+              </h2>
+            </div>
+            <div class="flex items-center justify-end">
+              <Button
+                type="button"
+                class="inline-flex items-center justify-center gap-2"
+                variant="default"
+                onClick={() => setShowCreateGroupDialog(true)}
+                data-testid="open-create-group-button"
+              >
+                <Plus size={16} />
+                New Group
+              </Button>
+            </div>
+          </header>
+
+          <p class="mb-6 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+            Create groups, review current membership, and manage shared
+            programs.
+          </p>
 
           <Show
             when={!groups.loading}
@@ -693,14 +826,17 @@ const GroupsManagerContent: Component = () => {
                 </div>
               }
             >
-              <div class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-                <section class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+              <div class="grid min-h-0 flex-1 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+                <section class="flex min-h-0 flex-col rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                   <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                     <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                       Your Groups
                     </h3>
                   </div>
-                  <div class="p-2" data-testid="groups-list">
+                  <div
+                    class="min-h-0 flex-1 overflow-y-auto p-2"
+                    data-testid="groups-list"
+                  >
                     <For each={groups() ?? []}>
                       {(group) => (
                         <button
@@ -737,7 +873,7 @@ const GroupsManagerContent: Component = () => {
                   {(groupAccessor) => {
                     const group = groupAccessor();
                     return (
-                      <section class="space-y-6">
+                      <section class="grid min-h-0 gap-6 grid-rows-[auto_minmax(0,1fr)]">
                         <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
                           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -754,19 +890,19 @@ const GroupsManagerContent: Component = () => {
                           </div>
                         </div>
 
-                        <div class="grid gap-6 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-                          <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                        <div class="grid min-h-0 gap-6 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+                          <div class="flex min-h-0 flex-col rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                             <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                               <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                 Members and Roles
                               </h3>
                             </div>
                             <div
-                              class="space-y-3 p-4"
+                              class="flex min-h-0 flex-1 flex-col gap-3 p-4"
                               data-testid="group-members-list"
                             >
                               <Show when={group.canManageMembership}>
-                                <div class="rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700">
+                                <div class="shrink-0 rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700">
                                   <div class="flex flex-col gap-3">
                                     <div class="flex flex-col gap-2">
                                       <input
@@ -818,24 +954,26 @@ const GroupsManagerContent: Component = () => {
                                           }
                                         >
                                           <div
-                                            class="space-y-2"
+                                            class="max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900"
                                             data-testid="group-member-candidate-list"
                                           >
-                                            <For
-                                              each={memberCandidates() ?? []}
-                                            >
-                                              {(candidate) => (
-                                                <GroupMemberCandidateRow
-                                                  candidate={candidate}
-                                                  isAdding={isAddingMember()}
-                                                  onAdd={(userRef) =>
-                                                    void handleAddMember(
-                                                      userRef
-                                                    )
-                                                  }
-                                                />
-                                              )}
-                                            </For>
+                                            <div class="space-y-2">
+                                              <For
+                                                each={memberCandidates() ?? []}
+                                              >
+                                                {(candidate) => (
+                                                  <GroupMemberCandidateRow
+                                                    candidate={candidate}
+                                                    isAdding={isAddingMember()}
+                                                    onAdd={(nextCandidate) =>
+                                                      void handleAddMember(
+                                                        nextCandidate
+                                                      )
+                                                    }
+                                                  />
+                                                )}
+                                              </For>
+                                            </div>
                                           </div>
                                         </Show>
                                       </Show>
@@ -844,40 +982,47 @@ const GroupsManagerContent: Component = () => {
                                 </div>
                               </Show>
 
-                              <Show
-                                when={!groupMembers.loading}
-                                fallback={
-                                  <div class="text-sm text-gray-500 dark:text-gray-400">
-                                    Loading members...
+                              <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                                <Show
+                                  when={!groupMembers.loading}
+                                  fallback={
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                                      Loading members...
+                                    </div>
+                                  }
+                                >
+                                  <div class="space-y-3">
+                                    <For each={groupMembers() ?? []}>
+                                      {(member) => (
+                                        <ManageableGroupMemberRow
+                                          member={member}
+                                          canManage={group.canManageMembership}
+                                          isBusy={
+                                            busyMembershipId() ===
+                                            member.membershipId
+                                          }
+                                          onRoleChange={(role) =>
+                                            void handleUpdateMemberRole(
+                                              member,
+                                              role
+                                            )
+                                          }
+                                          onRemove={() =>
+                                            void handleRemoveMember(member)
+                                          }
+                                          onShowInfo={() =>
+                                            setSelectedMemberInfo(member)
+                                          }
+                                        />
+                                      )}
+                                    </For>
                                   </div>
-                                }
-                              >
-                                <For each={groupMembers() ?? []}>
-                                  {(member) => (
-                                    <ManageableGroupMemberRow
-                                      member={member}
-                                      canManage={group.canManageMembership}
-                                      isBusy={
-                                        busyMembershipId() ===
-                                        member.membershipId
-                                      }
-                                      onRoleChange={(role) =>
-                                        void handleUpdateMemberRole(
-                                          member,
-                                          role
-                                        )
-                                      }
-                                      onRemove={() =>
-                                        void handleRemoveMember(member)
-                                      }
-                                    />
-                                  )}
-                                </For>
-                              </Show>
+                                </Show>
+                              </div>
                             </div>
                           </div>
 
-                          <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                          <div class="flex min-h-0 flex-col rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                             <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
                               <div>
                                 <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -902,59 +1047,116 @@ const GroupsManagerContent: Component = () => {
                               </Show>
                             </div>
 
-                            <div class="p-4">
+                            <div class="flex min-h-0 flex-1 flex-col p-4">
                               <Show when={groupPrograms.error}>
                                 <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200">
                                   Failed to load programs.
                                 </div>
                               </Show>
-                              <Show
-                                when={
-                                  !groupPrograms.loading ||
-                                  visibleGroupPrograms().length > 0 ||
-                                  Boolean(groupPrograms.error)
-                                }
-                                fallback={
-                                  <div class="text-sm text-gray-500 dark:text-gray-400">
-                                    Loading programs...
-                                  </div>
-                                }
-                              >
+
+                              <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
                                 <Show
-                                  when={visibleGroupPrograms().length > 0}
+                                  when={
+                                    !groupPrograms.loading ||
+                                    visibleGroupPrograms().length > 0 ||
+                                    Boolean(groupPrograms.error)
+                                  }
                                   fallback={
-                                    <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                                      <Show
-                                        when={groupPrograms.loading}
-                                        fallback="No shared programs yet."
-                                      >
-                                        Refreshing programs...
-                                      </Show>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                                      Loading programs...
                                     </div>
                                   }
                                 >
-                                  <div
-                                    class="space-y-3"
-                                    data-testid="group-programs-list"
+                                  <Show
+                                    when={visibleGroupPrograms().length > 0}
+                                    fallback={
+                                      <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                                        <Show
+                                          when={groupPrograms.loading}
+                                          fallback="No shared programs yet."
+                                        >
+                                          Refreshing programs...
+                                        </Show>
+                                      </div>
+                                    }
                                   >
-                                    <For each={visibleGroupPrograms()}>
-                                      {(programRow) => (
-                                        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                                          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                            <button
-                                              type="button"
-                                              class="min-w-0 text-left"
-                                              onClick={() =>
-                                                handleOpenExistingProgram(
-                                                  programRow
-                                                )
-                                              }
-                                              data-testid="open-group-program-button"
-                                            >
-                                              <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                                                {programRow.name}
+                                    <div
+                                      class="space-y-3"
+                                      data-testid="group-programs-list"
+                                    >
+                                      <For each={visibleGroupPrograms()}>
+                                        {(programRow) => (
+                                          <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                                            <div class="flex items-center justify-between gap-3">
+                                              <button
+                                                type="button"
+                                                class="min-w-0 flex-1 text-left"
+                                                onClick={() =>
+                                                  handleOpenProgramDetails(
+                                                    programRow
+                                                  )
+                                                }
+                                                data-testid="open-group-program-button"
+                                              >
+                                                <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                                                  {programRow.name}
+                                                </div>
+                                              </button>
+
+                                              <div class="flex shrink-0 items-center gap-2">
+                                                <button
+                                                  type="button"
+                                                  class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                  onClick={() =>
+                                                    handleOpenExistingProgram(
+                                                      programRow
+                                                    )
+                                                  }
+                                                  data-testid="view-group-program-button"
+                                                >
+                                                  <Show
+                                                    when={programRow.canManage}
+                                                    fallback="View"
+                                                  >
+                                                    <SquarePen size={14} />
+                                                    Edit
+                                                  </Show>
+                                                </button>
+                                                <Show
+                                                  when={programRow.canManage}
+                                                >
+                                                  <button
+                                                    type="button"
+                                                    class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
+                                                    disabled={
+                                                      deletingProgramId() ===
+                                                      programRow.id
+                                                    }
+                                                    onClick={() =>
+                                                      void handleDeleteProgram(
+                                                        programRow
+                                                      )
+                                                    }
+                                                    data-testid="delete-group-program-button"
+                                                  >
+                                                    <Show
+                                                      when={
+                                                        deletingProgramId() ===
+                                                        programRow.id
+                                                      }
+                                                      fallback={
+                                                        <Trash2 size={14} />
+                                                      }
+                                                    >
+                                                      Deleting...
+                                                    </Show>
+                                                  </button>
+                                                </Show>
                                               </div>
-                                              <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                            </div>
+
+                                            <div class="mt-3">
+                                              <div class="text-sm text-gray-600 dark:text-gray-400">
                                                 {programRow.description ||
                                                   "No description yet."}
                                               </div>
@@ -964,59 +1166,14 @@ const GroupsManagerContent: Component = () => {
                                                   ? ""
                                                   : "s"}
                                               </div>
-                                            </button>
-
-                                            <div class="flex items-center gap-2">
-                                              <button
-                                                type="button"
-                                                class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                onClick={() =>
-                                                  handleOpenExistingProgram(
-                                                    programRow
-                                                  )
-                                                }
-                                                data-testid="view-group-program-button"
-                                              >
-                                                {programRow.canManage
-                                                  ? "Edit"
-                                                  : "View"}
-                                              </button>
-                                              <Show when={programRow.canManage}>
-                                                <button
-                                                  type="button"
-                                                  class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
-                                                  disabled={
-                                                    deletingProgramId() ===
-                                                    programRow.id
-                                                  }
-                                                  onClick={() =>
-                                                    void handleDeleteProgram(
-                                                      programRow
-                                                    )
-                                                  }
-                                                  data-testid="delete-group-program-button"
-                                                >
-                                                  <Show
-                                                    when={
-                                                      deletingProgramId() ===
-                                                      programRow.id
-                                                    }
-                                                    fallback={
-                                                      <Trash2 size={14} />
-                                                    }
-                                                  >
-                                                    Deleting...
-                                                  </Show>
-                                                </button>
-                                              </Show>
                                             </div>
                                           </div>
-                                        </div>
-                                      )}
-                                    </For>
-                                  </div>
+                                        )}
+                                      </For>
+                                    </div>
+                                  </Show>
                                 </Show>
-                              </Show>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1048,13 +1205,21 @@ const GroupsManagerContent: Component = () => {
         onClose={() => {
           setShowProgramEditor(false);
           setEditingProgramId(undefined);
+          setProgramDialogMode("edit");
         }}
         programId={editingProgramId()}
+        forceViewMode={programDialogMode() === "view"}
         onSaved={() => {
           incrementTuneSetListChanged();
           void refetchGroupPrograms();
         }}
         groupRef={selectedGroupId()}
+      />
+
+      <MemberInfoDialog
+        member={selectedMemberInfo()}
+        isOpen={selectedMemberInfo() !== null}
+        onClose={() => setSelectedMemberInfo(null)}
       />
     </>
   );
@@ -1099,40 +1264,15 @@ export const GroupsManagerDialog: Component<GroupsManagerDialogProps> = (
       >
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click only stops propagation inside modal shell */}
         <div
-          class="mx-2 flex h-[calc(100vh-1rem)] w-full max-w-full flex-col rounded-lg border border-gray-200 bg-white shadow-2xl pointer-events-auto dark:border-gray-700 dark:bg-gray-800 md:max-h-[calc(100vh-8rem)] md:max-w-6xl"
+          class="mx-2 flex h-[calc(100vh-1rem)] w-full max-w-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl pointer-events-auto dark:border-gray-700 dark:bg-gray-800 md:h-[calc(100vh-4rem)] md:max-w-6xl"
           role="dialog"
           aria-labelledby="groups-dialog-title"
           aria-modal="true"
           onClick={(event) => event.stopPropagation()}
           data-testid="groups-modal"
         >
-          <div class="flex items-start justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700 md:px-6 md:py-4">
-            <div>
-              <h2
-                id="groups-dialog-title"
-                class="text-xl font-semibold text-gray-900 dark:text-gray-100 md:text-2xl"
-              >
-                Groups
-              </h2>
-              <p class="mt-1 hidden text-sm text-gray-500 dark:text-gray-400 md:block">
-                Manage group membership and shared programs without leaving your
-                current page.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={closeDialog}
-              class="relative z-10 flex h-10 w-10 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-              aria-label="Close groups"
-              data-testid="groups-close-button"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
           <div class="min-h-0 flex-1 overflow-hidden">
-            <GroupsManagerContent />
+            <GroupsManagerContent onClose={closeDialog} />
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@
 
 import { useLocation, useNavigate } from "@solidjs/router";
 import abcjs from "abcjs";
-import { Import } from "lucide-solid";
+import { Import, Plus, Search } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -38,11 +38,8 @@ import type {
 } from "../../lib/import/the-session-schemas";
 import {
   AlertDialog,
-  AlertDialogCloseButton,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
@@ -497,13 +494,49 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
           class="max-w-3xl bg-white dark:bg-gray-900"
           data-testid="add-tune-dialog"
         >
-          <AlertDialogCloseButton />
-          <AlertDialogHeader>
-            <AlertDialogTitle>Add Tune</AlertDialogTitle>
-            <AlertDialogDescription>
-              Add or Import a tune.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+          <header class="flex justify-between items-center w-full mb-4">
+            <div class="flex flex-1 justify-start">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMainDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+            <div class="flex min-w-0 flex-1 justify-center px-3">
+              <AlertDialogTitle class="text-center">Add Tune</AlertDialogTitle>
+            </div>
+            <div class="flex flex-1 justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={handleNew}>
+                <Plus class="h-4 w-4" />
+                Create
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSearchOrImport}
+                disabled={
+                  !urlOrTitle() || selectedGenre() !== "ITRAD" || isImporting()
+                }
+              >
+                {isImporting() ? (
+                  "Importing..."
+                ) : hasHttpProtocol(urlOrTitle()) ? (
+                  <>
+                    <Import class="h-4 w-4" />
+                    Import
+                  </>
+                ) : (
+                  <>
+                    <Search class="h-4 w-4" />
+                    Search
+                  </>
+                )}
+              </Button>
+            </div>
+          </header>
+
+          <AlertDialogDescription>Add or import a tune.</AlertDialogDescription>
 
           {/* Genre Selection */}
           <div class="grid grid-cols-4 items-center gap-4">
@@ -688,24 +721,6 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
               {importError()}
             </div>
           </Show>
-
-          <AlertDialogFooter>
-            <Button variant="outline" onClick={handleNew}>
-              New
-            </Button>
-            <Button
-              onClick={handleSearchOrImport}
-              disabled={
-                !urlOrTitle() || selectedGenre() !== "ITRAD" || isImporting()
-              }
-            >
-              {isImporting()
-                ? "Importing..."
-                : hasHttpProtocol(urlOrTitle())
-                  ? "Import"
-                  : "Search"}
-            </Button>
-          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

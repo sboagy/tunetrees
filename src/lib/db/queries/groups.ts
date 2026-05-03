@@ -64,6 +64,11 @@ export interface GroupMemberCandidate {
   canAdd: boolean;
 }
 
+interface GroupMemberProfileSeed {
+  profileName?: string | null;
+  profileEmail?: string | null;
+}
+
 interface GroupMemberSearchProfile {
   userRef: string;
   profileName: string | null;
@@ -214,6 +219,38 @@ function mergeGroupMemberSearchProfile(
     profileName: existing.profileName ?? incoming.profileName,
     profileEmail: existing.profileEmail ?? incoming.profileEmail,
   };
+}
+
+async function upsertLocalGroupMemberProfile(
+  db: AnyDatabase,
+  userId: string,
+  profile: GroupMemberProfileSeed
+): Promise<void> {
+  if (!profile.profileName && !profile.profileEmail) {
+    return;
+  }
+
+  const existing = await getUserProfileRecord(db, userId);
+  const now = nowIso();
+
+  if (existing) {
+    await db
+      .update(userProfile)
+      .set({
+        name: existing.name ?? profile.profileName ?? undefined,
+        email: existing.email ?? profile.profileEmail ?? undefined,
+        lastModifiedAt: now,
+      })
+      .where(eq(userProfile.id, userId));
+    return;
+  }
+
+  await db.insert(userProfile).values({
+    id: userId,
+    name: profile.profileName ?? undefined,
+    email: profile.profileEmail ?? undefined,
+    lastModifiedAt: now,
+  });
 }
 
 function toGroupMemberCandidate(
@@ -851,7 +888,8 @@ export async function addGroupMember(
   groupId: string,
   actingUserId: string,
   memberUserId: string,
-  role: Exclude<GroupRole, "owner"> = "member"
+  role: Exclude<GroupRole, "owner"> = "member",
+  profile?: GroupMemberProfileSeed
 ): Promise<GroupMemberRow> {
   const access = await getGroupAccessForUser(db, groupId, actingUserId);
   if (!access.canManageMembership || !access.group) {
@@ -886,6 +924,7 @@ export async function addGroupMember(
       })
       .where(eq(groupMember.id, current.id))
       .returning();
+    await upsertLocalGroupMemberProfile(db, memberUserId, profile ?? {});
     await persistDb();
     return result[0];
   }
@@ -903,6 +942,7 @@ export async function addGroupMember(
   };
 
   const result = await db.insert(groupMember).values(newMembership).returning();
+  await upsertLocalGroupMemberProfile(db, memberUserId, profile ?? {});
   await persistDb();
   return result[0];
 }

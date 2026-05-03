@@ -494,71 +494,61 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
           {/* Header with buttons inside constrained area (only when not hidden) */}
           <Show when={!props.hideButtons}>
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              {/* Left: Title */}
-              <div class="flex items-center gap-6">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {props.readOnly
-                    ? title()
-                    : props.tune
-                      ? "Edit Tune"
-                      : "New Tune"}
-                </h2>
-              </div>
-
-              {/* Right: Action buttons */}
-              <Show
-                when={props.readOnly}
-                fallback={
-                  <div class="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={handleCancel}
-                      disabled={isSaving()}
-                      variant="outline"
-                      size="sm"
-                      data-testid="tune-editor-cancel-button"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        void handleSave();
-                      }}
-                      disabled={isSaving() || !isDirty()}
-                      data-testid="tune-editor-save-button"
-                      size="sm"
-                    >
-                      <Save size={16} />
-                      Save
-                    </Button>
-                  </div>
-                }
-              >
-                <div class="flex items-center gap-2">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+              <header class="flex justify-between items-center w-full mb-4">
+                <div class="flex flex-1 justify-start">
                   <Button
                     type="button"
-                    onClick={props.onCancel}
-                    data-testid="tune-editor-cancel-button"
+                    onClick={handleCancel}
+                    disabled={isSaving()}
                     variant="outline"
                     size="sm"
+                    data-testid="tune-editor-cancel-button"
                   >
                     Cancel
                   </Button>
-                  <Button
-                    type="button"
-                    onClick={props.onEdit}
-                    data-testid="tune-editor-edit-button"
-                    variant="outline"
-                    size="sm"
-                  >
-                    <SquarePen size={16} />
-                    Edit
-                  </Button>
                 </div>
-              </Show>
+                <div class="flex min-w-0 flex-1 justify-center px-3">
+                  <h2 class="text-center text-lg font-semibold text-gray-900 dark:text-white">
+                    {props.readOnly
+                      ? title()
+                      : props.tune
+                        ? "Edit Tune"
+                        : "Create Tune"}
+                  </h2>
+                </div>
+                <div class="flex flex-1 justify-end">
+                  <Show
+                    when={props.readOnly}
+                    fallback={
+                      <Button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void handleSave();
+                        }}
+                        disabled={isSaving() || !isDirty()}
+                        data-testid="tune-editor-save-button"
+                        size="sm"
+                      >
+                        <Save size={16} />
+                        Save
+                      </Button>
+                    }
+                  >
+                    <Button
+                      type="button"
+                      onClick={props.onEdit}
+                      data-testid="tune-editor-edit-button"
+                      variant="outline"
+                      size="sm"
+                    >
+                      <SquarePen size={16} />
+                      Edit
+                    </Button>
+                  </Show>
+                </div>
+              </header>
             </div>
           </Show>
 
