@@ -288,6 +288,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
       <Portal>
         <div
           ref={menuRef}
+          data-testid="column-visibility-menu"
           class="fixed w-64 bg-white dark:bg-gray-800 border border-gray-200/30 dark:border-gray-700/30 rounded-md shadow-lg z-[100] overflow-y-auto"
           style={{
             ...dropdownStyle(),

@@ -2523,10 +2523,7 @@ export class TuneTreesPage {
   }
 
   private getColumnVisibilityMenu(): Locator {
-    return this.page
-      .locator("div.fixed.w-64:visible")
-      .filter({ hasText: /Show All|Hide All/i })
-      .last();
+    return this.page.getByTestId("column-visibility-menu").last();
   }
 
   private getDisplayOptionsButton(): Locator {
