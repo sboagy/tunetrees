@@ -1,8 +1,8 @@
 import {
-  Edit,
   GripVertical,
   Plus,
   Save,
+  SquarePen,
   StickyNote,
   Trash2,
   X,
@@ -16,6 +16,7 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import {
@@ -518,31 +519,35 @@ export const NotesPanel: Component = () => {
                     when={isEditing()}
                     fallback={
                       <Show when={canManageNote(note)}>
-                        <div class="flex gap-0.5">
-                          <button
+                        <div class="flex gap-1">
+                          <Button
                             type="button"
                             onClick={() => {
                               setEditingNoteId(note.id);
                               setEditingContent(note.noteText || "");
                             }}
-                            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/30 rounded-sm transition-colors`}
+                            variant="ghost"
+                            size="icon"
+                            class="h-8 w-8 text-primary/70"
                             title="Edit note"
+                            aria-label="Edit note"
                             data-testid={`note-edit-button-${note.id}`}
                           >
-                            Edit
-                            <Edit class={fontClasses().iconSmall} />
-                          </button>
+                            <SquarePen class="w-4 h-4" />
+                          </Button>
 
-                          <button
+                          <Button
                             type="button"
                             onClick={() => requestDeleteNote(note.id)}
-                            class={`inline-flex items-center gap-0.5 ${fontClasses().textSmall} px-1.5 py-0.5 text-red-600 dark:text-red-400 hover:bg-red-50/50 dark:hover:bg-red-900/30 rounded-sm transition-colors`}
+                            variant="ghost"
+                            size="icon"
+                            class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                             title="Delete note"
+                            aria-label="Delete note"
                             data-testid={`note-delete-button-${note.id}`}
                           >
-                            Delete
-                            <Trash2 class={fontClasses().iconSmall} />
-                          </button>
+                            <Trash2 class="w-4 h-4" />
+                          </Button>
                         </div>
                       </Show>
                     }

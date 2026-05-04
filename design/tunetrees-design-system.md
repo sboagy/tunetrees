@@ -64,6 +64,8 @@ This index dictates exactly how common actions are handled across TuneTrees.
 | **Navigate Back** | "Back" | `Ghost` | `ChevronLeft` (<) | Top left of a screen (especially on mobile). |
 | **Modify Data** | "Edit" | `Outline` or `Ghost` | `SquarePen` (📝) | Next to the entity title, or inside a `⋮` menu. *(Note: Do NOT use standard `Pencil` as this implies full form/record edits).* |
 | **Permanently Erase** | "Delete" | `Destructive` | `Trash2` (🗑️) | Inside an overflow menu, or far left/bottom of an edit form. **Always requires a confirmation dialog.** |
+
+> **Inline Row Exception:** In dense list rows (e.g., Notes, References panels) where a filled `Destructive` button would be visually overwhelming, use `variant="ghost"` with `class="text-destructive hover:bg-destructive/10 hover:text-destructive"` for the delete icon button. This is the only approved deviation from `variant="destructive"` and applies only to icon-only buttons inside list items.
 | **Remove Relation** | "Remove" | `Outline` or `Ghost` | `Minus` or `X` | Use when taking a tune out of a playlist (the tune still exists in the DB). |
 | **View Details** | "Info" or "Details" | `Ghost` | `Info` (ℹ️) | Next to complex terms or inside list rows. |
 | **Options/Overflow**| None (Icon only) | `Ghost` | `MoreVertical` (⋮) | Far right of a row, card, or mobile toolbar. |
