@@ -9,7 +9,15 @@
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
-import { ChevronRight, Columns, EllipsisVertical, Plus } from "lucide-solid";
+import {
+  ChevronDown,
+  ChevronRight,
+  Columns,
+  EllipsisVertical,
+  Minus,
+  Plus,
+  Search,
+} from "lucide-solid";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -396,20 +404,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     return (
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <div class="relative min-w-0 flex-1">
-          <svg
-            class={TOOLBAR_SEARCH_ICON}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+          <Search class={TOOLBAR_SEARCH_ICON} aria-hidden="true" />
           <input
             type="text"
             placeholder="Search tunes..."
@@ -563,38 +558,12 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 data-testid="add-to-review-button"
                 disabled={!hasSelectedRows()}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
-                </svg>
+                <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Add To Review</span>
               </button>
 
               <div class={TOOLBAR_SEARCH_CONTAINER}>
-                <svg
-                  class={TOOLBAR_SEARCH_ICON}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                <Search class={TOOLBAR_SEARCH_ICON} aria-hidden="true" />
                 <input
                   type="text"
                   placeholder="Search tunes..."
@@ -644,20 +613,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 disabled={!hasSelectedRows()}
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 7h16M4 12h16M4 17h10"
-                  />
-                </svg>
+                <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Add to Set</span>
               </button>
 
@@ -668,20 +624,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 data-testid="repertoire-add-tune-button"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_SUCCESS}`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+                <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Add Tune</span>
               </button>
 
@@ -695,20 +638,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 }
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_WARNING}`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                <Minus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Remove From Repertoire</span>
               </button>
             </div>
@@ -738,20 +668,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 >
                   <Columns size={14} />
                   <span>Display Options</span>
-                  <svg
-                    class="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  <ChevronDown class="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>

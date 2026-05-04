@@ -16,7 +16,7 @@
  * @module components/repertoires/RepertoireManagerDialog
  */
 
-import { X } from "lucide-solid";
+import { Plus, X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -134,20 +134,7 @@ export const RepertoireManagerDialog: Component<
               class="px-3 py-2 sm:px-4 text-xs sm:text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-1 sm:gap-2"
               data-testid="create-repertoire-button"
             >
-              <svg
-                class="w-4 h-4 sm:w-5 sm:h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
+              <Plus class="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
               <span class="hidden sm:inline">New Repertoire</span>
               <span class="sm:hidden">New</span>
             </button>

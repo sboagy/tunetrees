@@ -14,7 +14,7 @@
  * @module components/repertoires/RepertoireEditorDialog
  */
 
-import { CircleX, Save } from "lucide-solid";
+import { Save } from "lucide-solid";
 import type { Component } from "solid-js";
 import {
   createResource,
@@ -23,6 +23,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "../../lib/auth/AuthContext";
 import {
   createRepertoire,
@@ -167,48 +168,54 @@ export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
         data-testid="repertoire-editor-dialog"
       >
         {/* Header */}
-        <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2
-            id="repertoire-editor-title"
-            class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white"
-          >
-            {props.repertoireId ? "Edit Repertoire" : "Create New Repertoire"}
-          </h2>
-          <div class="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={props.onClose}
-              disabled={isSaving()}
-              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Cancel and close dialog"
-              data-testid="cancel-repertoire-button"
-            >
-              <div class="flex items-center gap-2">
-                <span>Cancel</span>
-                <CircleX size={20} />
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving()}
-              class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              aria-label="Save repertoire"
-              data-testid="save-repertoire-button"
-            >
-              <Show
-                when={isSaving()}
-                fallback={
-                  <>
-                    Save <Save size={24} />
-                  </>
-                }
+        <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
+          <header class="flex justify-between items-center w-full mb-4">
+            <div class="flex flex-1 justify-start">
+              <Button
+                type="button"
+                onClick={props.onClose}
+                disabled={isSaving()}
+                variant="outline"
+                size="sm"
+                aria-label="Cancel and close dialog"
+                data-testid="cancel-repertoire-button"
               >
-                <div class="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
-                Saving...
-              </Show>
-            </button>
-          </div>
+                Cancel
+              </Button>
+            </div>
+            <div class="flex min-w-0 flex-1 justify-center px-3">
+              <h2
+                id="repertoire-editor-title"
+                class="text-center text-xl font-bold text-gray-900 dark:text-white sm:text-2xl"
+              >
+                {props.repertoireId ? "Edit Repertoire" : "Create Repertoire"}
+              </h2>
+            </div>
+            <div class="flex flex-1 justify-end">
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving()}
+                variant="default"
+                size="sm"
+                aria-label="Save repertoire"
+                data-testid="save-repertoire-button"
+              >
+                <Show
+                  when={isSaving()}
+                  fallback={
+                    <>
+                      <Save size={16} />
+                      Save
+                    </>
+                  }
+                >
+                  <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Saving...
+                </Show>
+              </Button>
+            </div>
+          </header>
         </div>
 
         {/* Content - Scrollable */}

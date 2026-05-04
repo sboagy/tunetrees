@@ -14,6 +14,7 @@
  * @module routes/user-settings/goals
  */
 
+import { Save } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -21,6 +22,7 @@ import {
   For,
   Show,
 } from "solid-js";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   type GoalRow,
@@ -124,9 +126,38 @@ const GoalForm: Component<{
 
   const set = <K extends keyof GoalFormState>(k: K, v: GoalFormState[K]) =>
     setForm((prev) => ({ ...prev, [k]: v }));
+  const formTitle = () => (props.initial ? "Edit Goal" : "Add Goal");
 
   return (
     <form onSubmit={handleSubmit} class="space-y-4">
+      <header class="flex justify-between items-center w-full mb-4">
+        <div class="flex flex-1 justify-start">
+          <Button type="button" onClick={props.onCancel} variant="outline">
+            Cancel
+          </Button>
+        </div>
+        <div class="flex min-w-0 flex-1 justify-center px-3">
+          <h3 class="text-center text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {formTitle()}
+          </h3>
+        </div>
+        <div class="flex flex-1 justify-end">
+          <Button type="submit" disabled={saving()}>
+            <Show
+              when={saving()}
+              fallback={
+                <>
+                  <Save class="h-4 w-4" />
+                  {props.submitLabel}
+                </>
+              }
+            >
+              Saving…
+            </Show>
+          </Button>
+        </div>
+      </header>
+
       {/* Name */}
       <div>
         <label
@@ -240,24 +271,6 @@ const GoalForm: Component<{
       <Show when={error()}>
         <p class="text-sm text-red-600 dark:text-red-400">{error()}</p>
       </Show>
-
-      {/* Actions */}
-      <div class="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={saving()}
-          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
-        >
-          {saving() ? "Saving…" : props.submitLabel}
-        </button>
-        <button
-          type="button"
-          onClick={props.onCancel}
-          class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
     </form>
   );
 };

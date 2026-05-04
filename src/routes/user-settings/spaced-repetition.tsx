@@ -8,6 +8,7 @@
  */
 
 import { type Component, createEffect, createSignal, Show } from "solid-js";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import {
   getSpacedRepetitionPrefs,
@@ -294,17 +295,18 @@ const SpacedRepetitionPage: Component = () => {
 
                 {/* Auto-Optimize Button */}
                 <div class="flex items-center gap-2 pt-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={handleOptimizeParams}
                     disabled={isOptimizing()}
-                    class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:bg-gray-100 disabled:cursor-not-allowed rounded-md transition-colors"
+                    variant="outline"
+                    size="sm"
                     data-testid="optimize-params-inline-button"
                   >
                     {isOptimizing()
                       ? "Optimizing..."
                       : "Auto-Optimize Parameters"}
-                  </button>
+                  </Button>
                   <span class="text-xs text-gray-500 dark:text-gray-400">
                     Automatically optimize weights based on your practice
                     history
@@ -345,15 +347,16 @@ const SpacedRepetitionPage: Component = () => {
               </div>
 
               {/* Additional Optimize Button */}
-              <button
+              <Button
                 type="button"
                 onClick={handleOptimizeParams}
                 disabled={isOptimizing()}
-                class="w-full px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:bg-gray-100 disabled:cursor-not-allowed rounded-md transition-colors"
+                variant="outline"
+                class="w-full"
                 data-testid="optimize-params-main-button"
               >
                 {isOptimizing() ? "Optimizing..." : "Optimize FSRS Parameters"}
-              </button>
+              </Button>
             </Show>
 
             {/* Success/Error Messages */}
@@ -374,18 +377,18 @@ const SpacedRepetitionPage: Component = () => {
             </Show>
 
             {/* Submit Button */}
-            <button
+            <Button
               type="submit"
               disabled={
                 !isDirty() ||
                 isSubmitting() ||
                 Object.keys(validationErrors()).length > 0
               }
-              class="w-full px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
+              class="w-full"
               data-testid="spaced-rep-update-button"
             >
               {isSubmitting() ? "Saving..." : "Update"}
-            </button>
+            </Button>
           </form>
         </Show>
       </div>

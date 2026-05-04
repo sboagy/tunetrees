@@ -8,6 +8,7 @@
  * @module components/catalog/CompactFilterDropdown
  */
 
+import { ChevronDown } from "lucide-solid";
 import {
   type Component,
   createSignal,
@@ -91,20 +92,10 @@ export const CompactFilterDropdown: Component<CompactFilterDropdownProps> = (
         class="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors min-w-[140px] justify-between"
       >
         <span class="truncate">{displayText()}</span>
-        <svg
+        <ChevronDown
           class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <title>Dropdown arrow</title>
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+          aria-hidden="true"
+        />
       </button>
 
       {/* Dropdown menu */}

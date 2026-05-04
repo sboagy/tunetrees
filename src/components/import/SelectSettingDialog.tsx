@@ -8,15 +8,13 @@
  */
 
 import abcjs from "abcjs";
+import { Check } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
 import {
   AlertDialog,
-  AlertDialogCloseButton,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
@@ -176,14 +174,33 @@ export const SelectSettingDialog: Component<SelectSettingDialogProps> = (
   return (
     <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
       <AlertDialogContent class="max-w-3xl bg-gray-900 dark:bg-gray-900">
-        <AlertDialogCloseButton />
-        <AlertDialogHeader>
-          <AlertDialogTitle>Select a Setting</AlertDialogTitle>
-          <AlertDialogDescription>
-            Please select the setting incipit that you would like to use. You
-            may edit the incipit later.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+        <header class="flex justify-between items-center w-full mb-4">
+          <div class="flex flex-1 justify-start">
+            <Button variant="outline" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
+          </div>
+          <div class="flex min-w-0 flex-1 justify-center px-3">
+            <AlertDialogTitle class="text-center">
+              Select a Setting
+            </AlertDialogTitle>
+          </div>
+          <div class="flex flex-1 justify-end">
+            <Button
+              onClick={handleSelectSetting}
+              disabled={selectedIndex() === null}
+              size="sm"
+            >
+              <Check class="h-4 w-4" />
+              Select
+            </Button>
+          </div>
+        </header>
+
+        <AlertDialogDescription>
+          Please select the setting incipit that you would like to use. You may
+          edit the incipit later.
+        </AlertDialogDescription>
 
         {/* Settings List with ABC Previews */}
         <div class="max-h-96 overflow-y-auto space-y-2">
@@ -198,18 +215,6 @@ export const SelectSettingDialog: Component<SelectSettingDialogProps> = (
             )}
           </For>
         </div>
-
-        <AlertDialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSelectSetting}
-            disabled={selectedIndex() === null}
-          >
-            Select Setting
-          </Button>
-        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );

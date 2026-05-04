@@ -1,4 +1,5 @@
 import { type Component, For, Show } from "solid-js";
+import { Button } from "@/components/ui/button";
 import type { StarterRepertoireTemplate } from "../../lib/db/starter-repertoire-templates";
 
 interface IEmptyStateAction {
@@ -31,21 +32,17 @@ export const RepertoireEmptyState: Component<RepertoireEmptyStateProps> = (
   props
 ) => (
   <div class="flex-1 flex items-center justify-center py-10">
-    <div class="max-w-xl w-full text-center bg-gray-50 dark:bg-gray-800/50 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 shadow-sm">
+    <div class="max-w-xl w-full rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center shadow-sm">
       <div class="text-4xl mb-3" aria-hidden="true">
         🎵
       </div>
-      <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-        {props.title}
-      </h3>
-      <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-        {props.description}
-      </p>
+      <h3 class="text-xl font-semibold text-foreground">{props.title}</h3>
+      <p class="mt-2 text-sm text-muted-foreground">{props.description}</p>
 
       {/* Inline starter-repertoire picker (shown when starterTemplates prop is present) */}
       <Show when={props.starterTemplates && props.starterTemplates.length > 0}>
         <div class="mt-6 space-y-4 text-left">
-          <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide text-center">
+          <h4 class="text-center text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Starter Repertoires
           </h4>
 
@@ -57,7 +54,7 @@ export const RepertoireEmptyState: Component<RepertoireEmptyStateProps> = (
                   onClick={() => props.onStarterChosen?.(template.id)}
                   disabled={props.isCreatingStarter}
                   data-testid={`onboarding-starter-${template.id}`}
-                  class="w-full text-left border border-blue-200 dark:border-blue-700 rounded-lg p-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  class="w-full rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-primary/40 hover:bg-accent/30 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <div class="flex items-start gap-3">
                     <span
@@ -68,14 +65,14 @@ export const RepertoireEmptyState: Component<RepertoireEmptyStateProps> = (
                     </span>
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 flex-wrap">
-                        <span class="font-semibold text-gray-900 dark:text-white text-sm">
+                        <span class="text-sm font-semibold text-foreground">
                           {template.name}
                         </span>
-                        <span class="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        <span class="whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
                           ~{template.estimatedTuneCount} tunes
                         </span>
                       </div>
-                      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                      <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
                         {template.description}
                       </p>
                     </div>
@@ -95,15 +92,16 @@ export const RepertoireEmptyState: Component<RepertoireEmptyStateProps> = (
           </div>
 
           {/* Create Custom */}
-          <button
+          <Button
             type="button"
             onClick={() => props.onCreateCustom?.()}
             disabled={props.isCreatingStarter}
-            class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            variant="outline"
+            class="w-full text-sm"
             data-testid="onboarding-create-repertoire"
           >
             Create Custom Repertoire
-          </button>
+          </Button>
 
           {/* Starter creation error */}
           <Show when={props.starterError}>
@@ -124,23 +122,23 @@ export const RepertoireEmptyState: Component<RepertoireEmptyStateProps> = (
         <Show when={props.primaryAction || props.secondaryAction}>
           <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
             <Show when={props.primaryAction}>
-              <button
+              <Button
                 type="button"
-                class="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                variant="outline"
                 onClick={() => props.primaryAction?.onClick()}
               >
                 {props.primaryAction?.label}
-              </button>
+              </Button>
             </Show>
 
             <Show when={props.secondaryAction}>
-              <button
+              <Button
                 type="button"
-                class="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                variant="outline"
                 onClick={() => props.secondaryAction?.onClick()}
               >
                 {props.secondaryAction?.label}
-              </button>
+              </Button>
             </Show>
           </div>
         </Show>
