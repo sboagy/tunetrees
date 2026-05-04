@@ -261,7 +261,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
                   aria-label="Edit reference"
                   data-testid={`reference-edit-button-${itemProps.reference.id}`}
                 >
-                  <SquarePen class="h-4 w-4 !text-blue-600 dark:!text-blue-400" />
+                  <SquarePen class="h-4 w-4" />
                 </Button>
               </Show>
 
@@ -276,7 +276,7 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
                   aria-label="Delete reference"
                   data-testid={`reference-delete-button-${itemProps.reference.id}`}
                 >
-                  <Trash2 class="h-4 w-4 !text-red-600 dark:!text-red-400" />
+                  <Trash2 class="h-4 w-4" />
                 </Button>
               </Show>
             </div>

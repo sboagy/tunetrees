@@ -533,7 +533,7 @@ export const NotesPanel: Component = () => {
                             aria-label="Edit note"
                             data-testid={`note-edit-button-${note.id}`}
                           >
-                            <SquarePen class="h-4 w-4 !text-blue-600 dark:!text-blue-400" />
+                            <SquarePen class="h-4 w-4" />
                           </Button>
 
                           <Button
@@ -546,7 +546,7 @@ export const NotesPanel: Component = () => {
                             aria-label="Delete note"
                             data-testid={`note-delete-button-${note.id}`}
                           >
-                            <Trash2 class="h-4 w-4 !text-red-600 dark:!text-red-400" />
+                            <Trash2 class="h-4 w-4" />
                           </Button>
                         </div>
                       </Show>
