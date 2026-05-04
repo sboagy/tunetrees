@@ -8,6 +8,7 @@
  * @module components/catalog/CombinedFilterDropdown
  */
 
+import { ChevronDown } from "lucide-solid";
 import { type Component, createSignal, For, onCleanup, Show } from "solid-js";
 import type { RepertoireWithSummary } from "../../lib/db/queries/repertoires";
 
@@ -128,21 +129,10 @@ export const CombinedFilterDropdown: Component<CombinedFilterDropdownProps> = (
             {totalSelected()}
           </span>
         </Show>
-        {/* Upside-down caret */}
-        <svg
+        <ChevronDown
           class={`w-4 h-4 transition-transform ${isOpen() ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <title>Toggle filters dropdown</title>
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+          aria-hidden="true"
+        />
       </button>
 
       {/* Dropdown panel */}

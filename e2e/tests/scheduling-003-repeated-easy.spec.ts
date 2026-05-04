@@ -10,7 +10,10 @@ import {
   DEFAULT_DETERMINISTIC_FSRS_TEST_CONFIG,
 } from "../helpers/fsrs-test-config";
 import { setupForPracticeTestsParallel } from "../helpers/practice-scenarios";
-import { waitForPracticeViewSettled } from "../helpers/practice-view";
+import {
+  runTestHook,
+  waitForPracticeViewSettled,
+} from "../helpers/practice-view";
 import {
   queryLatestPracticeRecord,
   queryPracticeRecords,
@@ -330,7 +333,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
         });
 
         // After reload, ensure we pull any data that was flushed server-side
-        await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+        await runTestHook(page, "__forceSyncDownForTest");
         await page.waitForLoadState("networkidle", { timeout: 15000 });
         await diagAuth(page, `day-${day}-after-syncdown`);
         await ttPage.refreshDateRolloverIfVisible();

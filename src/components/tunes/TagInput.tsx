@@ -5,6 +5,7 @@
  * Displays selected tags as removable chips/badges.
  */
 
+import { X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -114,19 +115,7 @@ export const TagInput: Component<TagInputProps> = (props) => {
                 class="hover:text-blue-600 dark:hover:text-blue-300 focus:outline-none disabled:opacity-50"
                 aria-label={`Remove tag ${tag}`}
               >
-                <svg
-                  class="w-3 h-3"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <title>Remove</title>
-                  <path
-                    fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+                <X class="w-3 h-3" aria-hidden="true" />
               </button>
             </span>
           )}

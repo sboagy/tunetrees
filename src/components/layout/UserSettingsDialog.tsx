@@ -15,6 +15,7 @@
  * @module components/layout/UserSettingsDialog
  */
 
+import { Menu, X } from "lucide-solid";
 import {
   type Component,
   createSignal,
@@ -29,7 +30,6 @@ import {
   useUserSettingsDialog,
 } from "@/contexts/UserSettingsDialogContext";
 
-// Lazy-load each settings page to keep the initial bundle small.
 const AppearancePage = lazy(() => import("@/routes/user-settings/appearance"));
 const CatalogSyncPage = lazy(
   () => import("@/routes/user-settings/catalog-sync")
@@ -96,10 +96,6 @@ const TabContent: Component<{ tab: UserSettingsTab }> = (props) => (
   </Suspense>
 );
 
-/**
- * Renders the floating settings overlay.  Mount once in App.tsx outside the
- * Router so it overlays any route without unmounting the current page.
- */
 export const UserSettingsDialog: Component = () => {
   const { isOpen, currentTab, closeUserSettings, navigateToTab } =
     useUserSettingsDialog();
@@ -111,12 +107,11 @@ export const UserSettingsDialog: Component = () => {
 
   const handleTabClick = (tab: UserSettingsTab) => {
     navigateToTab(tab);
-    setIsSidebarOpen(false); // close mobile sidebar after selection
+    setIsSidebarOpen(false);
   };
 
   return (
     <Show when={isOpen()}>
-      {/* Modal Backdrop */}
       <button
         type="button"
         class="fixed inset-0 bg-black/50 z-40"
@@ -126,7 +121,6 @@ export const UserSettingsDialog: Component = () => {
         data-testid="settings-modal-backdrop"
       />
 
-      {/* Modal Dialog */}
       <div
         class="fixed inset-0 z-50 flex items-start justify-center pt-2 md:pt-8 pb-2 md:pb-16 pointer-events-none"
         data-testid="settings-modal-wrapper"
@@ -140,10 +134,8 @@ export const UserSettingsDialog: Component = () => {
           aria-modal="true"
           data-testid="settings-modal"
         >
-          {/* Header */}
           <div class="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between shrink-0">
             <div class="flex items-center gap-3">
-              {/* Mobile Menu Toggle */}
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen(!isSidebarOpen())}
@@ -151,20 +143,7 @@ export const UserSettingsDialog: Component = () => {
                 aria-label="Toggle menu"
                 data-testid="settings-menu-toggle"
               >
-                <svg
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <title>Menu</title>
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
+                <Menu class="w-5 h-5" aria-hidden="true" />
               </button>
 
               <div>
@@ -187,27 +166,11 @@ export const UserSettingsDialog: Component = () => {
               aria-label="Close settings"
               data-testid="settings-close-button"
             >
-              <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-label="Close icon"
-              >
-                <title>Close</title>
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <X class="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 
-          {/* Body */}
           <div class="flex-1 flex min-h-0 overflow-hidden relative">
-            {/* Mobile Sidebar Overlay */}
             <Show when={isSidebarOpen()}>
               <button
                 type="button"
@@ -217,7 +180,6 @@ export const UserSettingsDialog: Component = () => {
               />
             </Show>
 
-            {/* Sidebar */}
             <aside
               class="absolute md:relative z-20 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 h-full transition-transform md:transition-none"
               classList={{
@@ -247,7 +209,6 @@ export const UserSettingsDialog: Component = () => {
               </nav>
             </aside>
 
-            {/* Content Area */}
             <main
               class="flex-1 overflow-y-auto p-4 md:p-6 w-full"
               data-testid="settings-content"

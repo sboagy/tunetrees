@@ -19,6 +19,8 @@
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import type { Table } from "@tanstack/solid-table";
 import {
+  Calendar,
+  ChevronDown,
   ChevronRight,
   Columns,
   EllipsisVertical,
@@ -560,20 +562,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                     : TOOLBAR_BUTTON_NEUTRAL
                 }`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 7h16M7 12h10M10 17h4"
-                  />
-                </svg>
+                <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Tune Set</span>
               </button>
 
@@ -583,35 +572,9 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 title="Select practice queue date"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
               >
-                <svg
-                  class={TOOLBAR_ICON_SIZE}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
+                <Calendar class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>{formatQueueDate(props.queueDate || new Date())}</span>
-                <svg
-                  class="w-3 h-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+                <ChevronDown class="w-3 h-3" aria-hidden="true" />
               </button>
 
               {/* Flashcard Mode toggle - Switch component */}
@@ -653,20 +616,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 <span>
                   {props.flashcardMode ? "Fields" : "Display Options"}
                 </span>
-                <svg
-                  class="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
+                <ChevronDown class="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>

@@ -32,6 +32,7 @@ import {
 } from "../../lib/services/repertoire-service";
 import { getPracticeDate } from "../../lib/utils/practice-date";
 import { type Genre, GenreMultiSelect } from "../genre-selection";
+import { Button } from "../ui/button";
 
 /**
  * Onboarding Overlay Component
@@ -393,29 +394,31 @@ export const OnboardingOverlay: Component = () => {
                   </Show>
                 </div>
 
-                <div class="shrink-0 border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-800">
-                  <div class="flex gap-3">
-                    <button
+                <div class="shrink-0 border-t border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-gray-800">
+                  <div class="flex w-full justify-between gap-3">
+                    <Button
                       type="button"
                       onClick={handleCancel}
                       disabled={isSavingGenres()}
-                      class="flex-1 min-h-11 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="outline"
+                      class="min-h-11"
                       data-testid="onboarding-genre-cancel"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={handleSaveGenres}
                       disabled={
                         isSavingGenres() ||
                         effectiveSelectedGenreIds().length === 0
                       }
-                      class="flex-1 min-h-11 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="default"
+                      class="min-h-11"
                       data-testid="onboarding-genre-continue"
                     >
                       {isSavingGenres() ? "Saving..." : "Continue"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

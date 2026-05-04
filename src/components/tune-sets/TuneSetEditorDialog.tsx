@@ -1,4 +1,4 @@
-import { CircleX, Save } from "lucide-solid";
+import { Save } from "lucide-solid";
 import type { Component } from "solid-js";
 import {
   createEffect,
@@ -10,6 +10,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { TunePickerDialog } from "@/components/tune-sets/TunePickerDialog";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import {
@@ -324,48 +325,54 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
         aria-labelledby="tune-set-editor-title"
         data-testid="tune-set-editor-dialog"
       >
-        <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2
-            id="tune-set-editor-title"
-            class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white"
-          >
-            {dialogTitle()}
-          </h2>
-          <div class="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={props.onClose}
-              disabled={isSaving()}
-              class="text-gray-700 dark:text-gray-300 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="cancel-tune-set-button"
-            >
-              <div class="flex items-center gap-2">
-                <span>{canManage() ? "Cancel" : "Close"}</span>
-                <CircleX size={20} />
-              </div>
-            </button>
-            <Show when={canManage()}>
-              <button
+        <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
+          <header class="flex justify-between items-center w-full mb-4">
+            <div class="flex flex-1 justify-start">
+              <Button
                 type="button"
-                onClick={handleSave}
+                onClick={props.onClose}
                 disabled={isSaving()}
-                class="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                data-testid="save-tune-set-button"
+                variant={canManage() ? "outline" : "ghost"}
+                size="sm"
+                data-testid="cancel-tune-set-button"
               >
-                <Show
-                  when={isSaving()}
-                  fallback={
-                    <>
-                      Save <Save size={24} />
-                    </>
-                  }
+                {canManage() ? "Cancel" : "Back"}
+              </Button>
+            </div>
+            <div class="flex min-w-0 flex-1 justify-center px-3">
+              <h2
+                id="tune-set-editor-title"
+                class="text-center text-xl font-bold text-gray-900 dark:text-white sm:text-2xl"
+              >
+                {dialogTitle()}
+              </h2>
+            </div>
+            <div class="flex flex-1 justify-end">
+              <Show when={canManage()}>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving()}
+                  variant="default"
+                  size="sm"
+                  data-testid="save-tune-set-button"
                 >
-                  <div class="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
-                  Saving...
-                </Show>
-              </button>
-            </Show>
-          </div>
+                  <Show
+                    when={isSaving()}
+                    fallback={
+                      <>
+                        <Save size={16} />
+                        Save
+                      </>
+                    }
+                  >
+                    <div class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Saving...
+                  </Show>
+                </Button>
+              </Show>
+            </div>
+          </header>
         </div>
 
         <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">

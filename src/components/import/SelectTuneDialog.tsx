@@ -7,17 +7,14 @@
  * @module components/import/SelectTuneDialog
  */
 
-import { ExternalLink } from "lucide-solid";
+import { ExternalLink, Import } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createSignal, For } from "solid-js";
 import type { ITheSessionTuneSummary } from "../../lib/import/the-session-schemas";
 import {
   AlertDialog,
-  AlertDialogCloseButton,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
@@ -56,13 +53,28 @@ export const SelectTuneDialog: Component<SelectTuneDialogProps> = (props) => {
   return (
     <AlertDialog open={props.open} onOpenChange={props.onOpenChange}>
       <AlertDialogContent class="max-w-2xl bg-gray-900 dark:bg-gray-900">
-        <AlertDialogCloseButton />
-        <AlertDialogHeader>
-          <AlertDialogTitle>Select a Tune from thesession.org</AlertDialogTitle>
-          <AlertDialogDescription>
-            Please select the tune that best matches your search.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+        <header class="flex justify-between items-center w-full mb-4">
+          <div class="flex flex-1 justify-start">
+            <Button variant="outline" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
+          </div>
+          <div class="flex min-w-0 flex-1 justify-center px-3">
+            <AlertDialogTitle class="text-center">
+              Select a Tune from thesession.org
+            </AlertDialogTitle>
+          </div>
+          <div class="flex flex-1 justify-end">
+            <Button onClick={handleImport} disabled={!selectedUrl()} size="sm">
+              <Import class="h-4 w-4" />
+              Import
+            </Button>
+          </div>
+        </header>
+
+        <AlertDialogDescription>
+          Please select the tune that best matches your search.
+        </AlertDialogDescription>
 
         {/* Tune List with Radio Buttons */}
         <div class="max-h-96 overflow-y-auto space-y-2">
@@ -98,15 +110,6 @@ export const SelectTuneDialog: Component<SelectTuneDialogProps> = (props) => {
             )}
           </For>
         </div>
-
-        <AlertDialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
-            Cancel
-          </Button>
-          <Button onClick={handleImport} disabled={!selectedUrl()}>
-            Import
-          </Button>
-        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );

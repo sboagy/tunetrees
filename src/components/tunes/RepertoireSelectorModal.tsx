@@ -1,3 +1,4 @@
+import { Check } from "lucide-solid";
 import {
   type Component,
   createResource,
@@ -5,6 +6,7 @@ import {
   For,
   Show,
 } from "solid-js";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { getUserRepertoires } from "@/lib/db/queries/repertoires";
 import type { RepertoireWithSummary } from "@/lib/db/types";
@@ -134,10 +136,10 @@ export const RepertoireSelectorModal: Component<
                 {(repertoireItem: RepertoireWithSummary) => (
                   <button
                     type="button"
-                    class={`w-full rounded-lg border-2 p-3 text-left transition-colors ${
+                    class={`w-full rounded-lg border-2 bg-card p-3 text-left transition-colors ${
                       selectedRepertoireId() === repertoireItem.repertoireId
-                        ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20"
-                        : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-muted-foreground/40 hover:bg-accent/30"
                     }`}
                     onClick={() =>
                       setSelectedRepertoireId(repertoireItem.repertoireId)
@@ -145,10 +147,10 @@ export const RepertoireSelectorModal: Component<
                   >
                     <div class="flex items-center justify-between">
                       <div class="flex-1">
-                        <div class="font-medium text-gray-900 dark:text-white">
+                        <div class="font-medium text-foreground">
                           {repertoireItem.name}
                         </div>
-                        <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <div class="mt-1 text-sm text-muted-foreground">
                           {repertoireItem.tuneCount}{" "}
                           {repertoireItem.tuneCount === 1 ? "tune" : "tunes"}
                         </div>
@@ -158,20 +160,10 @@ export const RepertoireSelectorModal: Component<
                           selectedRepertoireId() === repertoireItem.repertoireId
                         }
                       >
-                        <svg
-                          class="h-5 w-5 text-blue-500 dark:text-blue-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <title>Selected</title>
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
+                        <Check
+                          class="h-5 w-5 text-primary"
+                          aria-hidden="true"
+                        />
                       </Show>
                     </div>
                   </button>
@@ -181,22 +173,18 @@ export const RepertoireSelectorModal: Component<
           </Show>
         </Show>
 
-        <div class="flex justify-end gap-3">
-          <button
-            type="button"
-            class="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            onClick={handleCancel}
-          >
+        <div class="flex w-full justify-between gap-3">
+          <Button type="button" onClick={handleCancel} variant="outline">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            class="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
             onClick={handleSelect}
             disabled={selectedRepertoireId() === null}
+            variant="default"
           >
             Add to Repertoire
-          </button>
+          </Button>
         </div>
       </div>
     </Show>

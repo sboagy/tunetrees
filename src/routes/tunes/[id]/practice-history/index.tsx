@@ -8,7 +8,7 @@
  */
 
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { CircleX, Plus, Save, Trash2, X } from "lucide-solid";
+import { Plus, Save, Trash2 } from "lucide-solid";
 import {
   type Component,
   createMemo,
@@ -293,7 +293,6 @@ const PracticeHistoryPage: Component = () => {
                   data-testid="practice-history-cancel-button"
                 >
                   <span>Cancel</span>
-                  <CircleX class="ml-0.5 h-4 w-4" />
                 </Button>
                 <Button
                   type="button"
@@ -302,8 +301,8 @@ const PracticeHistoryPage: Component = () => {
                   disabled={!canAddRecord()}
                   data-testid="practice-history-add-button"
                 >
+                  <Plus class="h-4 w-4" />
                   <span>Add</span>
-                  <Plus class="ml-0.5 h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -325,10 +324,38 @@ const PracticeHistoryPage: Component = () => {
                   class="border-dashed"
                   data-testid="practice-history-add-form"
                 >
-                  <CardHeader class="pb-3">
-                    <CardTitle class="text-base font-semibold">
-                      Add Practice Entry
-                    </CardTitle>
+                  <CardHeader class="space-y-3 pb-3">
+                    <header class="flex justify-between items-center w-full mb-4">
+                      <div class="flex flex-1 justify-start">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCancelDraft}
+                          disabled={isSavingDraft()}
+                          data-testid="practice-history-discard-button"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      <div class="flex min-w-0 flex-1 justify-center px-3">
+                        <CardTitle class="text-center text-base font-semibold">
+                          Add Practice Entry
+                        </CardTitle>
+                      </div>
+                      <div class="flex flex-1 justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSaveDraft}
+                          disabled={isSavingDraft()}
+                          data-testid="practice-history-save-button"
+                        >
+                          <Save class="h-4 w-4" />
+                          <span>Save</span>
+                        </Button>
+                      </div>
+                    </header>
                     <CardDescription>
                       Manual backfill uses FSRS ratings and calculates the next
                       due date automatically.
@@ -383,30 +410,6 @@ const PracticeHistoryPage: Component = () => {
                           <option value={FSRS_QUALITY_MAP.EASY}>Easy</option>
                         </select>
                       </label>
-                    </div>
-
-                    <div class="flex flex-wrap justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCancelDraft}
-                        disabled={isSavingDraft()}
-                        data-testid="practice-history-discard-button"
-                      >
-                        <span>Discard</span>
-                        <X class="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleSaveDraft}
-                        disabled={isSavingDraft()}
-                        data-testid="practice-history-save-button"
-                      >
-                        <span>Save</span>
-                        <Save class="h-4 w-4" />
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>

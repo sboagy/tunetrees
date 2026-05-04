@@ -2523,16 +2523,45 @@ export class TuneTreesPage {
   }
 
   private getColumnVisibilityMenu(): Locator {
-    return this.page
-      .locator("div.fixed.w-64:visible")
-      .filter({ hasText: /Show All|Hide All/i })
-      .last();
+    return this.page.getByTestId("column-visibility-menu").last();
   }
 
   private getDisplayOptionsButton(): Locator {
     return this.page
       .locator('[data-testid="display-options-entry-button"]:visible')
       .last();
+  }
+
+  private async waitForColumnVisibilityMenu(
+    targetMenu: Locator = this.getColumnVisibilityMenu(),
+    timeout = 5000
+  ): Promise<boolean> {
+    return expect
+      .poll(
+        async () => {
+          const menuVisible = await targetMenu
+            .isVisible({ timeout: 200 })
+            .catch(() => false);
+          if (menuVisible) {
+            return true;
+          }
+
+          const menuCount = await this.page
+            .getByTestId("column-visibility-menu")
+            .count()
+            .catch(() => 0);
+          return menuCount > 0
+            ? await targetMenu.isVisible({ timeout: 200 }).catch(() => false)
+            : false;
+        },
+        {
+          timeout,
+          intervals: [100, 250, 500],
+        }
+      )
+      .toBe(true)
+      .then(() => true)
+      .catch(() => false);
   }
 
   private async openColumnVisibilityMenu(
@@ -2560,6 +2589,14 @@ export class TuneTreesPage {
     if (this.page.isClosed()) {
       return;
     }
+
+    const menuOpened = await this.waitForColumnVisibilityMenu(targetMenu);
+    if (menuOpened) {
+      return;
+    }
+
+    await columnsButton.click().catch(() => undefined);
+    await this.openDisplayOptionsEntryIfNeeded(columnsButton, targetMenu);
     await expect(targetMenu).toBeVisible({ timeout: 5000 });
   }
 
@@ -2629,8 +2666,22 @@ export class TuneTreesPage {
         return;
       }
 
+      const displayOptionsVisible = await displayOptionsButton
+        .isVisible({ timeout: 250 })
+        .catch(() => false);
+      if (!displayOptionsVisible) {
+        await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
+      }
       await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
-      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+      await displayOptionsButton.click().catch(() => undefined);
+
+      const menuOpened = await this.waitForColumnVisibilityMenu(
+        targetMenu,
+        OVERFLOW_MENU_RETRY_DELAY_MS + 1500
+      );
+      if (menuOpened) {
+        return;
+      }
     }
 
     if (this.page.isClosed()) {

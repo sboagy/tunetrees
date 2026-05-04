@@ -8,6 +8,7 @@
  */
 
 import { A, useLocation, useNavigate } from "@solidjs/router";
+import { Menu, X } from "lucide-solid";
 import {
   type Component,
   createSignal,
@@ -159,20 +160,7 @@ const UserSettingsLayout: ParentComponent = (props) => {
                 aria-label="Toggle menu"
                 data-testid="settings-menu-toggle"
               >
-                <svg
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <title>Menu</title>
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
+                <Menu class="w-5 h-5" aria-hidden="true" />
               </button>
 
               <div>
@@ -195,21 +183,7 @@ const UserSettingsLayout: ParentComponent = (props) => {
               aria-label="Close settings"
               data-testid="settings-close-button"
             >
-              <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-label="Close icon"
-              >
-                <title>Close</title>
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              <X class="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 
