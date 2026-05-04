@@ -852,7 +852,7 @@ const PluginsPage: Component = () => {
                   value={current().script}
                   onChange={(value) => updateDraft({ script: value })}
                   readOnly={!isOwner()}
-                  data-testid="plugin-script-editor"
+                  dataTestId="plugin-script-editor"
                 />
               </div>
 

@@ -99,6 +99,7 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
         type="button"
         class="fixed inset-0 z-[60] bg-black/50 dark:bg-black/70"
         onClick={props.onClose}
+        aria-label="Close dialog"
         data-testid="group-dialog-backdrop"
       />
 
