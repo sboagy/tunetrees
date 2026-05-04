@@ -120,7 +120,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
           </div>
         </AlertDialogHeader>
 
-        <div class="py-4 pb-6">
+        <div class="flex-1 overflow-y-auto min-h-0 py-4 pb-6">
           <dl class="space-y-3 text-sm">
             <div class="flex justify-between">
               <dt class="font-medium text-gray-600 dark:text-gray-400">

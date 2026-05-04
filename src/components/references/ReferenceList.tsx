@@ -235,17 +235,53 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
 
       {/* Content */}
       <div class="flex-1 min-w-0">
-        {/* Title or URL */}
-        <button
-          type="button"
-          onClick={() => handleOpenReference(itemProps.reference)}
-          class="text-left w-full text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
-          title="Open reference"
-          aria-label="Open reference"
-          data-testid={`reference-link-${itemProps.reference.id}`}
-        >
-          {getReferencePrimaryLabel(itemProps.reference)}
-        </button>
+        {/* Title row with inline actions */}
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleOpenReference(itemProps.reference)}
+            class="flex-1 min-w-0 text-left text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
+            title="Open reference"
+            aria-label="Open reference"
+            data-testid={`reference-link-${itemProps.reference.id}`}
+          >
+            {getReferencePrimaryLabel(itemProps.reference)}
+          </button>
+
+          <Show when={showActions() && canEditReference(itemProps.reference)}>
+            <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
+              <Show when={props.onEdit}>
+                <Button
+                  type="button"
+                  onClick={() => props.onEdit!(itemProps.reference)}
+                  variant="ghost"
+                  size="icon"
+                  class="h-7 w-7 !text-blue-600 hover:!text-blue-700 dark:!text-blue-400 dark:hover:!text-blue-300"
+                  title="Edit reference"
+                  aria-label="Edit reference"
+                  data-testid={`reference-edit-button-${itemProps.reference.id}`}
+                >
+                  <SquarePen class="h-4 w-4" />
+                </Button>
+              </Show>
+
+              <Show when={props.onDelete}>
+                <Button
+                  type="button"
+                  onClick={() => props.onDelete!(itemProps.reference.id)}
+                  variant="ghost"
+                  size="icon"
+                  class="h-7 w-7 !text-red-600 hover:!text-red-700 hover:bg-destructive/10 dark:!text-red-400 dark:hover:!text-red-300"
+                  title="Delete reference"
+                  aria-label="Delete reference"
+                  data-testid={`reference-delete-button-${itemProps.reference.id}`}
+                >
+                  <Trash2 class="h-4 w-4" />
+                </Button>
+              </Show>
+            </div>
+          </Show>
+        </div>
 
         {/* Type label */}
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -288,41 +324,6 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
           </button>
         </Show>
       </div>
-
-      {/* Actions */}
-      <Show when={showActions() && canEditReference(itemProps.reference)}>
-        <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Show when={props.onEdit}>
-            <Button
-              type="button"
-              onClick={() => props.onEdit!(itemProps.reference)}
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 text-primary"
-              title="Edit reference"
-              aria-label="Edit reference"
-              data-testid={`reference-edit-button-${itemProps.reference.id}`}
-            >
-              <SquarePen class="w-4 h-4" />
-            </Button>
-          </Show>
-
-          <Show when={props.onDelete}>
-            <Button
-              type="button"
-              onClick={() => props.onDelete!(itemProps.reference.id)}
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              title="Delete reference"
-              aria-label="Delete reference"
-              data-testid={`reference-delete-button-${itemProps.reference.id}`}
-            >
-              <Trash2 class="w-4 h-4" />
-            </Button>
-          </Show>
-        </div>
-      </Show>
     </li>
   );
 
