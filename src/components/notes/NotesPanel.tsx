@@ -465,7 +465,7 @@ export const NotesPanel: Component = () => {
 
             return (
               <li
-                class={`p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all ${
+                class={`group p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all ${
                   draggedNoteId() === note.id
                     ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
                     : dragOverNoteId() === note.id
@@ -519,7 +519,7 @@ export const NotesPanel: Component = () => {
                     when={isEditing()}
                     fallback={
                       <Show when={canManageNote(note)}>
-                        <div class="flex gap-1">
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
                           <Button
                             type="button"
                             onClick={() => {
@@ -528,12 +528,12 @@ export const NotesPanel: Component = () => {
                             }}
                             variant="ghost"
                             size="icon"
-                            class="h-8 w-8 text-primary/70"
+                            class="h-8 w-8 !text-blue-600 hover:!text-blue-700 dark:!text-blue-400 dark:hover:!text-blue-300"
                             title="Edit note"
                             aria-label="Edit note"
                             data-testid={`note-edit-button-${note.id}`}
                           >
-                            <SquarePen class="w-4 h-4" />
+                            <SquarePen class="h-4 w-4 !text-blue-600 dark:!text-blue-400" />
                           </Button>
 
                           <Button
@@ -541,12 +541,12 @@ export const NotesPanel: Component = () => {
                             onClick={() => requestDeleteNote(note.id)}
                             variant="ghost"
                             size="icon"
-                            class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            class="h-8 w-8 !text-red-600 hover:!text-red-700 hover:bg-destructive/10 dark:!text-red-400 dark:hover:!text-red-300"
                             title="Delete note"
                             aria-label="Delete note"
                             data-testid={`note-delete-button-${note.id}`}
                           >
-                            <Trash2 class="w-4 h-4" />
+                            <Trash2 class="h-4 w-4 !text-red-600 dark:!text-red-400" />
                           </Button>
                         </div>
                       </Show>

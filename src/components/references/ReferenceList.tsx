@@ -256,12 +256,12 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
                   onClick={() => props.onEdit!(itemProps.reference)}
                   variant="ghost"
                   size="icon"
-                  class="h-7 w-7 text-primary/70"
+                  class="h-7 w-7 !text-blue-600 hover:!text-blue-700 dark:!text-blue-400 dark:hover:!text-blue-300"
                   title="Edit reference"
                   aria-label="Edit reference"
                   data-testid={`reference-edit-button-${itemProps.reference.id}`}
                 >
-                  <SquarePen class="w-4 h-4" />
+                  <SquarePen class="h-4 w-4 !text-blue-600 dark:!text-blue-400" />
                 </Button>
               </Show>
 
@@ -271,12 +271,12 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
                   onClick={() => props.onDelete!(itemProps.reference.id)}
                   variant="ghost"
                   size="icon"
-                  class="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  class="h-7 w-7 !text-red-600 hover:!text-red-700 hover:bg-destructive/10 dark:!text-red-400 dark:hover:!text-red-300"
                   title="Delete reference"
                   aria-label="Delete reference"
                   data-testid={`reference-delete-button-${itemProps.reference.id}`}
                 >
-                  <Trash2 class="w-4 h-4" />
+                  <Trash2 class="h-4 w-4 !text-red-600 dark:!text-red-400" />
                 </Button>
               </Show>
             </div>
