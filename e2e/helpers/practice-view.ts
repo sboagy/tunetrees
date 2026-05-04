@@ -209,13 +209,29 @@ export async function submitAndWaitForPracticeSettled(
 ): Promise<void> {
   await ttPage.submitEvaluations({ timeoutMs });
   await page.waitForLoadState("networkidle", { timeout: timeoutMs });
-  await expect(ttPage.submitEvaluationsButton).toBeDisabled({
-    timeout: timeoutMs,
-  });
-  await expect(ttPage.submitEvaluationsButton).toHaveAttribute(
-    "title",
-    /Submit 0 practice evaluations/i,
-    { timeout: timeoutMs }
-  );
+
+  await expect
+    .poll(
+      async () => {
+        const [disabled, title] = await Promise.all([
+          ttPage.submitEvaluationsButton.isDisabled().catch(() => false),
+          ttPage.submitEvaluationsButton.getAttribute("title"),
+        ]);
+
+        return {
+          disabled,
+          title: title ?? "",
+        };
+      },
+      {
+        timeout: timeoutMs,
+        intervals: [100, 250, 500, 1000],
+      }
+    )
+    .toEqual({
+      disabled: true,
+      title: expect.stringMatching(/Submit 0 practice evaluations/i),
+    });
+
   await waitForPracticeViewSettled(page, ttPage, { timeoutMs });
 }
