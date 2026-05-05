@@ -74,6 +74,7 @@ const ResetPassword = lazy(() => import("./routes/reset-password"));
  * - Repertoire tab - Repertoire with practice status
  * - Catalog tab - Full tune catalog with CRUD
  * - Analysis tab - Practice statistics and analytics
+ * - Programs tab - Group-scoped program creation and management
  *
  * Sub-routes (wrapped in MainLayout):
  * - /practice/history - Practice history table (protected)
@@ -178,6 +179,14 @@ function App() {
                             component={() => {
                               const navigate = useNavigate();
                               navigate("/?tab=analysis", { replace: true });
+                              return null;
+                            }}
+                          />
+                          <Route
+                            path="/programs"
+                            component={() => {
+                              const navigate = useNavigate();
+                              navigate("/?tab=programs", { replace: true });
                               return null;
                             }}
                           />

@@ -11,7 +11,12 @@ import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { tabGroupMainState } from "../schema";
 
-export type TabId = "practice" | "repertoire" | "catalog" | "analysis";
+export type TabId =
+  | "practice"
+  | "repertoire"
+  | "catalog"
+  | "analysis"
+  | "programs";
 
 export interface TabState {
   whichTab: TabId;
