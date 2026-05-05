@@ -6,6 +6,7 @@
  * - Repertoire (tune library with practice status)
  * - Catalog (all tunes database)
  * - Analysis (practice statistics and charts)
+ * - Programs (group-scoped program management)
  *
  * Active tab persists to tab_group_main_state table.
  * Port from: legacy/frontend/components/TabGroup.tsx
@@ -26,7 +27,12 @@ import { useMobileControlBar } from "./MobileControlBarContext";
 /**
  * Tab identifier
  */
-export type TabId = "practice" | "repertoire" | "catalog" | "analysis";
+export type TabId =
+  | "practice"
+  | "repertoire"
+  | "catalog"
+  | "analysis"
+  | "programs";
 
 /**
  * Tab configuration
@@ -51,6 +57,12 @@ const TABS: Tab[] = [
   },
   { id: "catalog", label: "Catalog", path: "#catalog", icon: "📖" },
   { id: "analysis", label: "Analysis", path: "#analysis", icon: "📊" },
+  {
+    id: "programs",
+    label: "Programs",
+    path: "#programs",
+    icon: "🗓️",
+  },
 ];
 
 interface TabBarProps {
@@ -62,7 +74,7 @@ interface TabBarProps {
  * Tab Bar Component
  *
  * Features:
- * - 4 main tabs (Practice, Repertoire, Catalog, Analysis)
+ * - 5 main tabs (Practice, Repertoire, Catalog, Analysis, Programs)
  * - Active tab highlights with blue underline
  * - Tab state controlled by parent (Home component)
  * - Persists active tab to database (TODO)
@@ -182,7 +194,7 @@ export const TabBar: Component<TabBarProps> = (props) => {
                   type="button"
                   data-testid={`tab-${tab.id}`}
                   onClick={() => handleTabClick(tab)}
-                  class={`px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  class={`inline-flex items-center px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     isActive()
                       ? "border-blue-500 text-blue-600 dark:text-blue-400"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"

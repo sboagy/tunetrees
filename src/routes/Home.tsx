@@ -24,6 +24,7 @@ import { useAuth } from "../lib/auth/AuthContext";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticePage from "./practice";
+import ProgramsPage from "./programs";
 import RepertoirePage from "./repertoire";
 
 /**
@@ -55,7 +56,9 @@ const Home: Component = () => {
     );
     if (
       tabFromUrl &&
-      ["practice", "repertoire", "catalog", "analysis"].includes(tabFromUrl)
+      ["practice", "repertoire", "catalog", "analysis", "programs"].includes(
+        tabFromUrl
+      )
     ) {
       setActiveTab(tabFromUrl);
     }
@@ -176,6 +179,9 @@ const Home: Component = () => {
             </Match>
             <Match when={activeTab() === "analysis"}>
               <AnalysisPage />
+            </Match>
+            <Match when={activeTab() === "programs"}>
+              <ProgramsPage />
             </Match>
           </Switch>
         </MainLayout>

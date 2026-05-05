@@ -4,7 +4,6 @@ import {
   Mail,
   Plus,
   Shield,
-  SquarePen,
   Trash2,
   User,
 } from "lucide-solid";
@@ -19,7 +18,6 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
-import { ProgramBuilderDialog } from "@/components/groups/ProgramBuilderDialog";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -29,7 +27,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import {
   addGroupMember,
   createGroup,
@@ -41,11 +38,6 @@ import {
   searchGroupMemberCandidates,
   updateGroupMemberRole,
 } from "@/lib/db/queries/groups";
-import {
-  deleteProgram,
-  getVisiblePrograms,
-  type ProgramWithSummary,
-} from "@/lib/db/queries/programs";
 
 interface GroupsManagerDialogProps {
   isOpen?: boolean;
@@ -452,8 +444,6 @@ const GroupMemberCandidateRow: Component<{
 
 const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
   const { user, localDb } = useAuth();
-  const { tuneSetListChanged, incrementTuneSetListChanged } =
-    useCurrentTuneSet();
   const [groupListVersion, setGroupListVersion] = createSignal(0);
   const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(
     null
@@ -463,16 +453,6 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
     null
   );
   const [isCreatingGroup, setIsCreatingGroup] = createSignal(false);
-  const [showProgramEditor, setShowProgramEditor] = createSignal(false);
-  const [editingProgramId, setEditingProgramId] = createSignal<
-    string | undefined
-  >(undefined);
-  const [programDialogMode, setProgramDialogMode] = createSignal<
-    "view" | "edit"
-  >("edit");
-  const [deletingProgramId, setDeletingProgramId] = createSignal<string | null>(
-    null
-  );
   const [memberSearchTerm, setMemberSearchTerm] = createSignal("");
   const [isAddingMember, setIsAddingMember] = createSignal(false);
   const [busyMembershipId, setBusyMembershipId] = createSignal<string | null>(
@@ -535,29 +515,6 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
     }
   );
 
-  const [groupPrograms, { refetch: refetchGroupPrograms }] = createResource(
-    () => {
-      const db = localDb();
-      const userId = user()?.id;
-      const groupId = selectedGroupId();
-      const version = tuneSetListChanged();
-      return db && userId && groupId ? { db, userId, groupId, version } : null;
-    },
-    async (params) => {
-      if (!params) {
-        return [];
-      }
-
-      return getVisiblePrograms(params.db, params.userId, {
-        groupId: params.groupId,
-      });
-    }
-  );
-
-  const visibleGroupPrograms = createMemo(
-    () => groupPrograms.latest ?? groupPrograms() ?? []
-  );
-
   const [memberCandidates] = createResource(
     () => {
       const db = localDb();
@@ -608,56 +565,6 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
       );
     } finally {
       setIsCreatingGroup(false);
-    }
-  };
-
-  const handleOpenNewProgram = () => {
-    setProgramDialogMode("edit");
-    setEditingProgramId(undefined);
-    setShowProgramEditor(true);
-  };
-
-  const handleOpenExistingProgram = (program: ProgramWithSummary) => {
-    setProgramDialogMode("edit");
-    setEditingProgramId(program.id);
-    setShowProgramEditor(true);
-  };
-
-  const handleOpenProgramDetails = (program: ProgramWithSummary) => {
-    setProgramDialogMode("view");
-    setEditingProgramId(program.id);
-    setShowProgramEditor(true);
-  };
-
-  const handleDeleteProgram = async (programRow: ProgramWithSummary) => {
-    const db = localDb();
-    const userId = user()?.id;
-    if (!db || !userId) {
-      toast.error("Database is not ready yet.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Delete the program "${programRow.name}"?`
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setDeletingProgramId(programRow.id);
-      await deleteProgram(db, programRow.id, userId);
-      incrementTuneSetListChanged();
-      void refetchGroupPrograms();
-      toast.success(`Deleted program "${programRow.name}".`, {
-        duration: 2500,
-      });
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete program"
-      );
-    } finally {
-      setDeletingProgramId(null);
     }
   };
 
@@ -788,8 +695,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
           </header>
 
           <p class="mb-6 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-            Create groups, review current membership, and manage shared
-            programs.
+            Create groups and manage membership.
           </p>
 
           <Show
@@ -811,8 +717,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
                     No groups yet
                   </h3>
                   <p class="mt-2 text-sm text-muted-foreground">
-                    Start by creating a group so you can attach shared programs
-                    to it.
+                    Start by creating a group so you can add members.
                   </p>
                   <Button
                     type="button"
@@ -874,7 +779,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
                   {(groupAccessor) => {
                     const group = groupAccessor();
                     return (
-                      <section class="grid min-h-0 gap-6 grid-rows-[auto_minmax(0,1fr)]">
+                      <section class="flex min-h-0 flex-col gap-6">
                         <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
                           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -891,290 +796,129 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
                           </div>
                         </div>
 
-                        <div class="grid min-h-0 gap-6 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-                          <div class="flex min-h-0 flex-col rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                            <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                              <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                Members and Roles
-                              </h3>
-                            </div>
-                            <div
-                              class="flex min-h-0 flex-1 flex-col gap-3 p-4"
-                              data-testid="group-members-list"
-                            >
-                              <Show when={group.canManageMembership}>
-                                <div class="shrink-0 rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700">
-                                  <div class="flex flex-col gap-3">
-                                    <div class="flex flex-col gap-2">
-                                      <input
-                                        type="text"
-                                        value={memberSearchTerm()}
-                                        onInput={(event) =>
-                                          setMemberSearchTerm(
-                                            event.currentTarget.value
-                                          )
-                                        }
-                                        placeholder="Search by name or email"
-                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                        data-testid="group-member-search-input"
-                                      />
-                                      <div class="text-xs text-gray-500 dark:text-gray-400">
-                                        Search uses a secure directory lookup
-                                        when online. Offline, it falls back to
-                                        profiles already synced to this device.
-                                        Existing members stay visible here so
-                                        you can confirm who is already in the
-                                        group.
-                                      </div>
+                        <div class="flex min-h-0 flex-1 flex-col rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                          <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                            <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              Members and Roles
+                            </h3>
+                          </div>
+                          <div
+                            class="flex min-h-0 flex-1 flex-col gap-3 p-4"
+                            data-testid="group-members-list"
+                          >
+                            <Show when={group.canManageMembership}>
+                              <div class="shrink-0 rounded-lg border border-dashed border-gray-300 p-3 dark:border-gray-700">
+                                <div class="flex flex-col gap-3">
+                                  <div class="flex flex-col gap-2">
+                                    <input
+                                      type="text"
+                                      value={memberSearchTerm()}
+                                      onInput={(event) =>
+                                        setMemberSearchTerm(
+                                          event.currentTarget.value
+                                        )
+                                      }
+                                      placeholder="Search by name or email"
+                                      class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                      data-testid="group-member-search-input"
+                                    />
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                      Search uses a secure directory lookup when
+                                      online. Offline, it falls back to profiles
+                                      already synced to this device. Existing
+                                      members stay visible here so you can
+                                      confirm who is already in the group.
                                     </div>
+                                  </div>
 
+                                  <Show
+                                    when={memberSearchTerm().trim().length >= 2}
+                                  >
                                     <Show
-                                      when={
-                                        memberSearchTerm().trim().length >= 2
+                                      when={!memberCandidates.loading}
+                                      fallback={
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">
+                                          Searching members...
+                                        </div>
                                       }
                                     >
                                       <Show
-                                        when={!memberCandidates.loading}
+                                        when={
+                                          (memberCandidates() ?? []).length > 0
+                                        }
                                         fallback={
                                           <div class="text-sm text-gray-500 dark:text-gray-400">
-                                            Searching members...
+                                            No matching users found. Offline
+                                            search only covers profiles already
+                                            synced to this device.
                                           </div>
                                         }
                                       >
-                                        <Show
-                                          when={
-                                            (memberCandidates() ?? []).length >
-                                            0
-                                          }
-                                          fallback={
-                                            <div class="text-sm text-gray-500 dark:text-gray-400">
-                                              No matching users found. Offline
-                                              search only covers profiles
-                                              already synced to this device.
-                                            </div>
-                                          }
+                                        <div
+                                          class="max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900"
+                                          data-testid="group-member-candidate-list"
                                         >
-                                          <div
-                                            class="max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-900"
-                                            data-testid="group-member-candidate-list"
-                                          >
-                                            <div class="space-y-2">
-                                              <For
-                                                each={memberCandidates() ?? []}
-                                              >
-                                                {(candidate) => (
-                                                  <GroupMemberCandidateRow
-                                                    candidate={candidate}
-                                                    isAdding={isAddingMember()}
-                                                    onAdd={(nextCandidate) =>
-                                                      void handleAddMember(
-                                                        nextCandidate
-                                                      )
-                                                    }
-                                                  />
-                                                )}
-                                              </For>
-                                            </div>
-                                          </div>
-                                        </Show>
-                                      </Show>
-                                    </Show>
-                                  </div>
-                                </div>
-                              </Show>
-
-                              <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
-                                <Show
-                                  when={!groupMembers.loading}
-                                  fallback={
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                      Loading members...
-                                    </div>
-                                  }
-                                >
-                                  <div class="space-y-3">
-                                    <For each={groupMembers() ?? []}>
-                                      {(member) => (
-                                        <ManageableGroupMemberRow
-                                          member={member}
-                                          canManage={group.canManageMembership}
-                                          isBusy={
-                                            busyMembershipId() ===
-                                            member.membershipId
-                                          }
-                                          onRoleChange={(role) =>
-                                            void handleUpdateMemberRole(
-                                              member,
-                                              role
-                                            )
-                                          }
-                                          onRemove={() =>
-                                            void handleRemoveMember(member)
-                                          }
-                                          onShowInfo={() =>
-                                            setSelectedMemberInfo(member)
-                                          }
-                                        />
-                                      )}
-                                    </For>
-                                  </div>
-                                </Show>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="flex min-h-0 flex-col rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                            <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Programs
-                                </h3>
-                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                  Shared programs owned by this group.
-                                </p>
-                              </div>
-                              <Show when={group.canManageSets}>
-                                <div class="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    class="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
-                                    onClick={handleOpenNewProgram}
-                                    data-testid="create-group-program-button"
-                                  >
-                                    <span aria-hidden="true">+</span>
-                                    New Program
-                                  </button>
-                                </div>
-                              </Show>
-                            </div>
-
-                            <div class="flex min-h-0 flex-1 flex-col p-4">
-                              <Show when={groupPrograms.error}>
-                                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200">
-                                  Failed to load programs.
-                                </div>
-                              </Show>
-
-                              <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
-                                <Show
-                                  when={
-                                    !groupPrograms.loading ||
-                                    visibleGroupPrograms().length > 0 ||
-                                    Boolean(groupPrograms.error)
-                                  }
-                                  fallback={
-                                    <div class="text-sm text-gray-500 dark:text-gray-400">
-                                      Loading programs...
-                                    </div>
-                                  }
-                                >
-                                  <Show
-                                    when={visibleGroupPrograms().length > 0}
-                                    fallback={
-                                      <div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                                        <Show
-                                          when={groupPrograms.loading}
-                                          fallback="No shared programs yet."
-                                        >
-                                          Refreshing programs...
-                                        </Show>
-                                      </div>
-                                    }
-                                  >
-                                    <div
-                                      class="space-y-3"
-                                      data-testid="group-programs-list"
-                                    >
-                                      <For each={visibleGroupPrograms()}>
-                                        {(programRow) => (
-                                          <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                                            <div class="flex items-center justify-between gap-3">
-                                              <button
-                                                type="button"
-                                                class="min-w-0 flex-1 text-left"
-                                                onClick={() =>
-                                                  handleOpenProgramDetails(
-                                                    programRow
-                                                  )
-                                                }
-                                                data-testid="open-group-program-button"
-                                              >
-                                                <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                                                  {programRow.name}
-                                                </div>
-                                              </button>
-
-                                              <div class="flex shrink-0 items-center gap-2">
-                                                <button
-                                                  type="button"
-                                                  class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                  onClick={() =>
-                                                    handleOpenExistingProgram(
-                                                      programRow
+                                          <div class="space-y-2">
+                                            <For
+                                              each={memberCandidates() ?? []}
+                                            >
+                                              {(candidate) => (
+                                                <GroupMemberCandidateRow
+                                                  candidate={candidate}
+                                                  isAdding={isAddingMember()}
+                                                  onAdd={(nextCandidate) =>
+                                                    void handleAddMember(
+                                                      nextCandidate
                                                     )
                                                   }
-                                                  data-testid="view-group-program-button"
-                                                >
-                                                  <Show
-                                                    when={programRow.canManage}
-                                                    fallback="View"
-                                                  >
-                                                    <SquarePen size={14} />
-                                                    Edit
-                                                  </Show>
-                                                </button>
-                                                <Show
-                                                  when={programRow.canManage}
-                                                >
-                                                  <button
-                                                    type="button"
-                                                    class="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
-                                                    disabled={
-                                                      deletingProgramId() ===
-                                                      programRow.id
-                                                    }
-                                                    onClick={() =>
-                                                      void handleDeleteProgram(
-                                                        programRow
-                                                      )
-                                                    }
-                                                    data-testid="delete-group-program-button"
-                                                  >
-                                                    <Show
-                                                      when={
-                                                        deletingProgramId() ===
-                                                        programRow.id
-                                                      }
-                                                      fallback={
-                                                        <Trash2 size={14} />
-                                                      }
-                                                    >
-                                                      Deleting...
-                                                    </Show>
-                                                  </button>
-                                                </Show>
-                                              </div>
-                                            </div>
-
-                                            <div class="mt-3">
-                                              <div class="text-sm text-gray-600 dark:text-gray-400">
-                                                {programRow.description ||
-                                                  "No description yet."}
-                                              </div>
-                                              <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                {programRow.itemCount} item
-                                                {programRow.itemCount === 1
-                                                  ? ""
-                                                  : "s"}
-                                              </div>
-                                            </div>
+                                                />
+                                              )}
+                                            </For>
                                           </div>
-                                        )}
-                                      </For>
-                                    </div>
+                                        </div>
+                                      </Show>
+                                    </Show>
                                   </Show>
-                                </Show>
+                                </div>
                               </div>
+                            </Show>
+
+                            <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                              <Show
+                                when={!groupMembers.loading}
+                                fallback={
+                                  <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    Loading members...
+                                  </div>
+                                }
+                              >
+                                <div class="space-y-3">
+                                  <For each={groupMembers() ?? []}>
+                                    {(member) => (
+                                      <ManageableGroupMemberRow
+                                        member={member}
+                                        canManage={group.canManageMembership}
+                                        isBusy={
+                                          busyMembershipId() ===
+                                          member.membershipId
+                                        }
+                                        onRoleChange={(role) =>
+                                          void handleUpdateMemberRole(
+                                            member,
+                                            role
+                                          )
+                                        }
+                                        onRemove={() =>
+                                          void handleRemoveMember(member)
+                                        }
+                                        onShowInfo={() =>
+                                          setSelectedMemberInfo(member)
+                                        }
+                                      />
+                                    )}
+                                  </For>
+                                </div>
+                              </Show>
                             </div>
                           </div>
                         </div>
@@ -1199,22 +943,6 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
           }
         }}
         onSubmit={(data) => void handleCreateGroup(data)}
-      />
-
-      <ProgramBuilderDialog
-        isOpen={showProgramEditor()}
-        onClose={() => {
-          setShowProgramEditor(false);
-          setEditingProgramId(undefined);
-          setProgramDialogMode("edit");
-        }}
-        programId={editingProgramId()}
-        forceViewMode={programDialogMode() === "view"}
-        onSaved={() => {
-          incrementTuneSetListChanged();
-          void refetchGroupPrograms();
-        }}
-        groupRef={selectedGroupId()}
       />
 
       <MemberInfoDialog
