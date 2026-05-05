@@ -72,6 +72,33 @@ export const dailyPracticeQueue = sqliteTable(
   ]
 );
 
+export const event = sqliteTable(
+  "event",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    eventDate: text("event_date"),
+    description: text("description"),
+    setlistRef: text("setlist_ref").references(() => setlist.id),
+    groupRef: text("group_ref").references(() => userGroup.id),
+    userRef: text("user_ref").references(() => userProfile.id),
+    deleted: integer("deleted").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    index("idx_event_event_date").on(t.eventDate),
+    index("idx_event_group_ref").on(t.groupRef),
+    index("idx_event_setlist_ref").on(t.setlistRef),
+    index("idx_event_user_ref").on(t.userRef),
+  ]
+);
+
 export const genre = sqliteTable("genre", {
   id: text("id").notNull().primaryKey(),
   name: text("name"),
@@ -335,52 +362,6 @@ export const prefsSpacedRepetition = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.algType] })]
 );
 
-export const program = sqliteTable(
-  "program",
-  {
-    id: text("id")
-      .notNull()
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    groupRef: text("group_ref")
-      .notNull()
-      .references(() => userGroup.id),
-    name: text("name").notNull(),
-    description: text("description"),
-    deleted: integer("deleted").notNull().default(0),
-    createdAt: text("created_at")
-      .notNull()
-      .$defaultFn(() => new Date().toISOString()),
-    ...sqliteSyncColumns,
-  },
-  (t) => [index("idx_program_group_ref").on(t.groupRef)]
-);
-
-export const programItem = sqliteTable(
-  "program_item",
-  {
-    id: text("id")
-      .notNull()
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    programRef: text("program_ref")
-      .notNull()
-      .references(() => program.id),
-    itemKind: text("item_kind").notNull(),
-    tuneRef: text("tune_ref").references(() => tune.id),
-    tuneSetRef: text("tune_set_ref").references(() => tuneSet.id),
-    position: integer("position").notNull(),
-    deleted: integer("deleted").notNull().default(0),
-    ...sqliteSyncColumns,
-  },
-  (t) => [
-    index("idx_program_item_program_position").on(t.programRef, t.position),
-    index("idx_program_item_program_ref").on(t.programRef),
-    index("idx_program_item_tune_ref").on(t.tuneRef),
-    index("idx_program_item_tune_set_ref").on(t.tuneSetRef),
-  ]
-);
-
 export const reference = sqliteTable(
   "reference",
   {
@@ -442,6 +423,54 @@ export const repertoireTune = sqliteTable(
     ...sqliteSyncColumns,
   },
   (t) => [primaryKey({ columns: [t.repertoireRef, t.tuneRef] })]
+);
+
+export const setlist = sqliteTable(
+  "setlist",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupRef: text("group_ref").references(() => userGroup.id),
+    name: text("name").notNull(),
+    description: text("description"),
+    deleted: integer("deleted").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    userRef: text("user_ref").references(() => userProfile.id),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    index("idx_setlist_group_ref").on(t.groupRef),
+    index("idx_setlist_user_ref").on(t.userRef),
+  ]
+);
+
+export const setlistItem = sqliteTable(
+  "setlist_item",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    setlistRef: text("setlist_ref")
+      .notNull()
+      .references(() => setlist.id),
+    itemKind: text("item_kind").notNull(),
+    tuneRef: text("tune_ref").references(() => tune.id),
+    tuneSetRef: text("tune_set_ref").references(() => tuneSet.id),
+    position: integer("position").notNull(),
+    deleted: integer("deleted").notNull().default(0),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    index("idx_setlist_item_setlist_position").on(t.setlistRef, t.position),
+    index("idx_setlist_item_setlist_ref").on(t.setlistRef),
+    index("idx_setlist_item_tune_ref").on(t.tuneRef),
+    index("idx_setlist_item_tune_set_ref").on(t.tuneSetRef),
+  ]
 );
 
 export const syncChangeLog = sqliteTable(

@@ -6,7 +6,7 @@
  * - Repertoire (tune library with practice status)
  * - Catalog (all tunes database)
  * - Analysis (practice statistics and charts)
- * - Programs (group-scoped program management)
+ * - Setlists (group-scoped setlist management)
  *
  * Active tab persists to tab_group_main_state table.
  * Port from: legacy/frontend/components/TabGroup.tsx
@@ -32,7 +32,7 @@ export type TabId =
   | "repertoire"
   | "catalog"
   | "analysis"
-  | "programs";
+  | "setlists";
 
 /**
  * Tab configuration
@@ -58,10 +58,10 @@ const TABS: Tab[] = [
   { id: "catalog", label: "Catalog", path: "#catalog", icon: "📖" },
   { id: "analysis", label: "Analysis", path: "#analysis", icon: "📊" },
   {
-    id: "programs",
-    label: "Programs",
-    path: "#programs",
-    icon: "🗓️",
+    id: "setlists",
+    label: "Setlists",
+    path: "#setlists",
+    icon: "📋",
   },
 ];
 
@@ -74,7 +74,7 @@ interface TabBarProps {
  * Tab Bar Component
  *
  * Features:
- * - 5 main tabs (Practice, Repertoire, Catalog, Analysis, Programs)
+ * - 5 main tabs (Practice, Repertoire, Catalog, Analysis, Setlists)
  * - Active tab highlights with blue underline
  * - Tab state controlled by parent (Home component)
  * - Persists active tab to database (TODO)

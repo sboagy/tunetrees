@@ -1,14 +1,14 @@
 /**
- * Programs Page
+ * Setlists Page
  *
- * First-class Programs tab with group-scoped program management.
+ * First-class Setlists tab with group-scoped setlist management.
  *
  * Layout follows the grid-tab pattern (toolbar + content area):
- * - Toolbar: Group dropdown, Program dropdown, Edit toggle, New Program button
- * - View mode: Program metadata + items list (read-only)
- * - Edit mode: Two-panel (Library | Program Build) for owners/admins
+ * - Toolbar: Group dropdown, Setlist dropdown, Edit toggle, New Setlist button
+ * - View mode: Setlist metadata + items list (read-only)
+ * - Edit mode: Two-panel (Library | Setlist Build) for owners/admins
  *
- * @module routes/programs
+ * @module routes/setlists
  */
 
 import { GripVertical, Plus, Search, SquarePen, Trash2 } from "lucide-solid";
@@ -27,20 +27,20 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import { getVisibleGroups } from "@/lib/db/queries/groups";
 import {
-  addTuneSetToProgram,
-  addTuneToProgram,
-  createProgram,
-  deleteProgram,
-  getEligibleTuneSetsForProgram,
-  getProgramAccessForUser,
-  getProgramItems,
-  getVisiblePrograms,
-  type ProgramItemKind,
-  type ProgramItemWithSummary,
-  removeProgramItem,
-  reorderProgramItems,
-  updateProgram,
-} from "@/lib/db/queries/programs";
+  addTuneSetToSetlist,
+  addTuneToSetlist,
+  createSetlist,
+  deleteSetlist,
+  getEligibleTuneSetsForSetlist,
+  getSetlistAccessForUser,
+  getSetlistItems,
+  getVisibleSetlists,
+  removeSetlistItem,
+  reorderSetlistItems,
+  type SetlistItemKind,
+  type SetlistItemWithSummary,
+  updateSetlist,
+} from "@/lib/db/queries/setlists";
 import { getTunesForUser } from "@/lib/db/queries/tunes";
 import type { Tune, TuneSet } from "@/lib/db/types";
 
@@ -58,7 +58,7 @@ function normalizeMetadataValue(value: string | null | undefined): string {
 }
 
 interface CandidateItem {
-  kind: ProgramItemKind;
+  kind: SetlistItemKind;
   id: string;
   title: string;
   subtitle: string;
@@ -80,7 +80,7 @@ const EmptyState: Component<{ message: string; detail?: string }> = (props) => (
 
 // ── Page Component ───────────────────────────────────────────────────────────
 
-const ProgramsPage: Component = () => {
+const SetlistsPage: Component = () => {
   const { user, localDb } = useAuth();
   const { incrementTuneSetListChanged, tuneSetListChanged } =
     useCurrentTuneSet();
@@ -92,24 +92,24 @@ const ProgramsPage: Component = () => {
   const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(
     null
   );
-  const [selectedProgramId, setSelectedProgramId] = createSignal<string | null>(
+  const [selectedSetlistId, setSelectedSetlistId] = createSignal<string | null>(
     null
   );
   const [isEditing, setIsEditing] = createSignal(false);
   const [isCreating, setIsCreating] = createSignal(false);
 
-  // ── Program editor state ─────────────────────────────────────────────────
+  // ── Setlist editor state ─────────────────────────────────────────────────
 
   const [editorName, setEditorName] = createSignal("");
   const [editorDescription, setEditorDescription] = createSignal("");
   const [libraryQuery, setLibraryQuery] = createSignal("");
   const [libraryFilter, setLibraryFilter] = createSignal<
-    "all" | ProgramItemKind
+    "all" | SetlistItemKind
   >("all");
   const [draggedItemId, setDraggedItemId] = createSignal<string | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
   const [isMutatingItems, setIsMutatingItems] = createSignal(false);
-  const [deletingProgramId, setDeletingProgramId] = createSignal<string | null>(
+  const [deletingSetlistId, setDeletingSetlistId] = createSignal<string | null>(
     null
   );
   const [libraryPanelOpen, setLibraryPanelOpen] = createSignal(true);
@@ -140,9 +140,9 @@ const ProgramsPage: Component = () => {
     }
   });
 
-  // ── Data: programs for selected group ────────────────────────────────────
+  // ── Data: setlists for selected group ────────────────────────────────────
 
-  const [groupPrograms, { refetch: refetchPrograms }] = createResource(
+  const [groupSetlists, { refetch: refetchSetlists }] = createResource(
     () => {
       const db = localDb();
       const uid = userId();
@@ -154,7 +154,7 @@ const ProgramsPage: Component = () => {
     },
     async (params) => {
       if (!params) return [];
-      return getVisiblePrograms(params.db, params.userId, {
+      return getVisibleSetlists(params.db, params.userId, {
         groupId: params.groupId,
       });
     }
@@ -164,68 +164,68 @@ const ProgramsPage: Component = () => {
     () => (groups() ?? []).find((g) => g.id === selectedGroupId()) ?? null
   );
 
-  const selectedProgram = createMemo(
+  const selectedSetlist = createMemo(
     () =>
-      (groupPrograms() ?? []).find((p) => p.id === selectedProgramId()) ?? null
+      (groupSetlists() ?? []).find((p) => p.id === selectedSetlistId()) ?? null
   );
 
-  // Auto-select first program when group changes
-  createResource(groupPrograms, (programs) => {
-    if (!programs || programs.length === 0) {
-      setSelectedProgramId(null);
+  // Auto-select first setlist when group changes
+  createResource(groupSetlists, (setlists) => {
+    if (!setlists || setlists.length === 0) {
+      setSelectedSetlistId(null);
       return;
     }
-    const current = selectedProgramId();
-    if (!current || !programs.some((p) => p.id === current)) {
-      setSelectedProgramId(programs[0].id);
+    const current = selectedSetlistId();
+    if (!current || !setlists.some((p) => p.id === current)) {
+      setSelectedSetlistId(setlists[0].id);
     }
   });
 
-  // ── Data: program access check ───────────────────────────────────────────
+  // ── Data: setlist access check ───────────────────────────────────────────
 
-  const [programAccess] = createResource(
+  const [setlistAccess] = createResource(
     () => {
       const db = localDb();
       const uid = userId();
-      const progId = selectedProgramId();
+      const progId = selectedSetlistId();
       return db && uid && progId
-        ? { db, userId: uid, programId: progId }
+        ? { db, userId: uid, setlistId: progId }
         : null;
     },
     async (params) => {
       if (!params) return null;
-      return getProgramAccessForUser(
+      return getSetlistAccessForUser(
         params.db,
-        params.programId,
+        params.setlistId,
         params.userId
       );
     }
   );
 
   const canManage = createMemo(() => {
-    // For creating a new program in a group, check group-level permissions
+    // For creating a new setlist in a group, check group-level permissions
     if (isCreating()) {
       const group = selectedGroup();
       return group?.canManageSets ?? false;
     }
-    return programAccess()?.canManage ?? false;
+    return setlistAccess()?.canManage ?? false;
   });
 
-  // ── Data: program items (for view mode display) ──────────────────────────
+  // ── Data: setlist items (for view mode display) ──────────────────────────
 
-  const [programItems] = createResource(
+  const [setlistItems] = createResource(
     () => {
       const db = localDb();
       const uid = userId();
-      const progId = selectedProgramId();
+      const progId = selectedSetlistId();
       const version = tuneSetListChanged();
       return db && uid && progId
-        ? { db, userId: uid, programId: progId, version }
+        ? { db, userId: uid, setlistId: progId, version }
         : null;
     },
     async (params) => {
       if (!params) return [];
-      return getProgramItems(params.db, params.programId, params.userId);
+      return getSetlistItems(params.db, params.setlistId, params.userId);
     }
   );
 
@@ -253,7 +253,7 @@ const ProgramsPage: Component = () => {
     },
     async (params): Promise<TuneSet[]> => {
       if (!params) return [];
-      return getEligibleTuneSetsForProgram(params.db, params.userId);
+      return getEligibleTuneSetsForSetlist(params.db, params.userId);
     }
   );
 
@@ -300,7 +300,7 @@ const ProgramsPage: Component = () => {
 
   const groupRef = () => selectedGroupId();
 
-  const persistProgramMetadata = async (options?: {
+  const persistSetlistMetadata = async (options?: {
     showSuccessToast?: boolean;
   }) => {
     const db = localDb();
@@ -316,42 +316,42 @@ const ProgramsPage: Component = () => {
       const showSuccessToast = options?.showSuccessToast ?? true;
 
       if (isCreating()) {
-        const created = await createProgram(db, uid, {
+        const created = await createSetlist(db, uid, {
           groupRef: grpRef,
           name: editorName(),
           description: editorDescription(),
         });
-        setSelectedProgramId(created.id);
+        setSelectedSetlistId(created.id);
         setIsCreating(false);
         incrementTuneSetListChanged();
-        void refetchPrograms();
+        void refetchSetlists();
         if (showSuccessToast) {
-          toast.success(`Created program "${created.name}".`, {
+          toast.success(`Created setlist "${created.name}".`, {
             duration: 2500,
           });
         }
         return created;
       }
 
-      // Updating existing program
-      const progId = selectedProgramId();
+      // Updating existing setlist
+      const progId = selectedSetlistId();
       if (!progId) return null;
 
-      const updated = await updateProgram(db, progId, uid, {
+      const updated = await updateSetlist(db, progId, uid, {
         name: editorName(),
         description: editorDescription(),
       });
       incrementTuneSetListChanged();
-      void refetchPrograms();
+      void refetchSetlists();
       if (showSuccessToast) {
-        toast.success(`Saved program "${updated?.name ?? editorName()}".`, {
+        toast.success(`Saved setlist "${updated?.name ?? editorName()}".`, {
           duration: 2500,
         });
       }
       return updated ?? null;
     } catch (error) {
       showError(
-        error instanceof Error ? error.message : "Failed to save Program"
+        error instanceof Error ? error.message : "Failed to save Setlist"
       );
       return null;
     } finally {
@@ -370,7 +370,7 @@ const ProgramsPage: Component = () => {
   };
 
   const handleStartEdit = () => {
-    const prog = selectedProgram();
+    const prog = selectedSetlist();
     if (!prog) return;
     setEditorName(prog.name);
     setEditorDescription(prog.description ?? "");
@@ -396,14 +396,14 @@ const ProgramsPage: Component = () => {
       handleCancelEdit();
       return;
     }
-    await persistProgramMetadata({ showSuccessToast: false });
+    await persistSetlistMetadata({ showSuccessToast: false });
     handleCancelEdit();
   };
 
-  const ensureProgramId = async (): Promise<string | null> => {
-    if (!isCreating()) return selectedProgramId();
+  const ensureSetlistId = async (): Promise<string | null> => {
+    if (!isCreating()) return selectedSetlistId();
     if (!normalizeMetadataValue(editorName())) return null;
-    const created = await persistProgramMetadata();
+    const created = await persistSetlistMetadata();
     return created?.id ?? null;
   };
 
@@ -415,34 +415,34 @@ const ProgramsPage: Component = () => {
       return;
     }
 
-    const progId = await ensureProgramId();
+    const progId = await ensureSetlistId();
     if (!progId) return;
 
     try {
       setIsMutatingItems(true);
       if (candidate.kind === "tune") {
-        await addTuneToProgram(db, progId, candidate.id, uid);
+        await addTuneToSetlist(db, progId, candidate.id, uid);
       } else {
-        await addTuneSetToProgram(db, progId, candidate.id, uid);
+        await addTuneSetToSetlist(db, progId, candidate.id, uid);
       }
       incrementTuneSetListChanged();
-      void refetchPrograms();
-      toast.success(`Added "${candidate.title}" to this Program.`, {
+      void refetchSetlists();
+      toast.success(`Added "${candidate.title}" to this Setlist.`, {
         duration: 2500,
       });
     } catch (error) {
       showError(
-        error instanceof Error ? error.message : "Failed to add item to Program"
+        error instanceof Error ? error.message : "Failed to add item to Setlist"
       );
     } finally {
       setIsMutatingItems(false);
     }
   };
 
-  const handleRemoveItem = async (item: ProgramItemWithSummary) => {
+  const handleRemoveItem = async (item: SetlistItemWithSummary) => {
     const db = localDb();
     const uid = userId();
-    const progId = selectedProgramId();
+    const progId = selectedSetlistId();
     if (!db || !uid || !progId) {
       showError("Database is not ready yet.");
       return;
@@ -450,12 +450,12 @@ const ProgramsPage: Component = () => {
 
     try {
       setIsMutatingItems(true);
-      await removeProgramItem(db, progId, item.id, uid);
+      await removeSetlistItem(db, progId, item.id, uid);
       incrementTuneSetListChanged();
-      void refetchPrograms();
+      void refetchSetlists();
     } catch (error) {
       showError(
-        error instanceof Error ? error.message : "Failed to remove Program item"
+        error instanceof Error ? error.message : "Failed to remove Setlist item"
       );
     } finally {
       setIsMutatingItems(false);
@@ -466,8 +466,8 @@ const ProgramsPage: Component = () => {
     const draggedId = draggedItemId();
     const db = localDb();
     const uid = userId();
-    const progId = selectedProgramId();
-    const items = programItems() ?? [];
+    const progId = selectedSetlistId();
+    const items = setlistItems() ?? [];
     if (!draggedId || !db || !uid || !progId || draggedId === targetItemId) {
       setDraggedItemId(null);
       return;
@@ -485,14 +485,14 @@ const ProgramsPage: Component = () => {
       const reordered = moveItem(items, fromIndex, toIndex).map(
         (item) => item.id
       );
-      await reorderProgramItems(db, progId, reordered, uid);
+      await reorderSetlistItems(db, progId, reordered, uid);
       incrementTuneSetListChanged();
-      void refetchPrograms();
+      void refetchSetlists();
     } catch (error) {
       showError(
         error instanceof Error
           ? error.message
-          : "Failed to reorder Program items"
+          : "Failed to reorder Setlist items"
       );
     } finally {
       setDraggedItemId(null);
@@ -500,8 +500,8 @@ const ProgramsPage: Component = () => {
     }
   };
 
-  const handleDeleteProgram = async () => {
-    const prog = selectedProgram();
+  const handleDeleteSetlist = async () => {
+    const prog = selectedSetlist();
     if (!prog) return;
     const db = localDb();
     const uid = userId();
@@ -510,28 +510,28 @@ const ProgramsPage: Component = () => {
       return;
     }
 
-    const confirmed = window.confirm(`Delete the program "${prog.name}"?`);
+    const confirmed = window.confirm(`Delete the setlist "${prog.name}"?`);
     if (!confirmed) return;
 
     try {
-      setDeletingProgramId(prog.id);
-      await deleteProgram(db, prog.id, uid);
-      setSelectedProgramId(null);
+      setDeletingSetlistId(prog.id);
+      await deleteSetlist(db, prog.id, uid);
+      setSelectedSetlistId(null);
       incrementTuneSetListChanged();
-      void refetchPrograms();
-      toast.success(`Deleted program "${prog.name}".`, { duration: 2500 });
+      void refetchSetlists();
+      toast.success(`Deleted setlist "${prog.name}".`, { duration: 2500 });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete program"
+        error instanceof Error ? error.message : "Failed to delete setlist"
       );
     } finally {
-      setDeletingProgramId(null);
+      setDeletingSetlistId(null);
     }
   };
 
   // ── Render helpers ───────────────────────────────────────────────────────
 
-  const hasValidProgramName = () => normalizeMetadataValue(editorName()) !== "";
+  const hasValidSetlistName = () => normalizeMetadataValue(editorName()) !== "";
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -546,19 +546,19 @@ const ProgramsPage: Component = () => {
               type="button"
               class="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
               onClick={() => openGroupsDialog()}
-              data-testid="programs-group-label-link"
+              data-testid="setlists-group-label-link"
             >
               Group
             </button>
             <select
-              id="programs-group-select"
+              id="setlists-group-select"
               value={selectedGroupId() ?? ""}
               onChange={(e) => {
                 setSelectedGroupId(e.currentTarget.value || null);
-                setSelectedProgramId(null);
+                setSelectedSetlistId(null);
               }}
               class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              data-testid="programs-group-select"
+              data-testid="setlists-group-select"
             >
               <Show when={(groups() ?? []).length === 0}>
                 <option value="">No groups</option>
@@ -569,28 +569,28 @@ const ProgramsPage: Component = () => {
             </select>
           </div>
 
-          {/* Program selector */}
+          {/* Setlist selector */}
           <div class="flex items-center gap-2">
             <label
-              for="programs-program-select"
+              for="setlists-setlist-select"
               class="text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Program
+              Setlist
             </label>
             <select
-              id="programs-program-select"
-              value={selectedProgramId() ?? ""}
+              id="setlists-setlist-select"
+              value={selectedSetlistId() ?? ""}
               onChange={(e) => {
-                setSelectedProgramId(e.currentTarget.value || null);
+                setSelectedSetlistId(e.currentTarget.value || null);
                 if (isEditing()) handleCancelEdit();
               }}
               class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              data-testid="programs-program-select"
+              data-testid="setlists-setlist-select"
             >
-              <Show when={(groupPrograms() ?? []).length === 0}>
-                <option value="">No programs</option>
+              <Show when={(groupSetlists() ?? []).length === 0}>
+                <option value="">No setlists</option>
               </Show>
-              <For each={groupPrograms() ?? []}>
+              <For each={groupSetlists() ?? []}>
                 {(prog) => <option value={prog.id}>{prog.name}</option>}
               </For>
             </select>
@@ -612,13 +612,13 @@ const ProgramsPage: Component = () => {
                   disabled={
                     isSaving() ||
                     isMutatingItems() ||
-                    (isCreating() && !hasValidProgramName())
+                    (isCreating() && !hasValidSetlistName())
                   }
-                  data-testid="programs-done-editing-button"
+                  data-testid="setlists-done-editing-button"
                 >
                   <Show
                     when={isSaving()}
-                    fallback={isCreating() ? "Create Program" : "Done Editing"}
+                    fallback={isCreating() ? "Create Setlist" : "Done Editing"}
                   >
                     Saving...
                   </Show>
@@ -634,8 +634,8 @@ const ProgramsPage: Component = () => {
                   size="sm"
                   class="border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/70 dark:text-blue-200 dark:hover:bg-blue-950/20"
                   onClick={handleStartEdit}
-                  disabled={!selectedProgramId()}
-                  data-testid="programs-edit-button"
+                  disabled={!selectedSetlistId()}
+                  data-testid="setlists-edit-button"
                 >
                   <SquarePen size={14} class="mr-1.5" />
                   Edit
@@ -647,17 +647,17 @@ const ProgramsPage: Component = () => {
                   class="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-200 dark:hover:bg-emerald-950/20"
                   onClick={handleStartCreate}
                   disabled={!selectedGroupId()}
-                  data-testid="programs-new-button"
+                  data-testid="setlists-new-button"
                 >
                   <Plus size={14} class="mr-1.5" />
-                  New Program
+                  New Setlist
                 </Button>
               </div>
             </Show>
             <Show
               when={
-                selectedProgram() &&
-                selectedProgram()!.canManage &&
+                selectedSetlist() &&
+                selectedSetlist()!.canManage &&
                 !isEditing()
               }
             >
@@ -666,12 +666,12 @@ const ProgramsPage: Component = () => {
                 variant="outline"
                 size="sm"
                 class="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/20"
-                onClick={() => void handleDeleteProgram()}
-                disabled={deletingProgramId() === selectedProgramId()}
-                data-testid="programs-delete-button"
+                onClick={() => void handleDeleteSetlist()}
+                disabled={deletingSetlistId() === selectedSetlistId()}
+                data-testid="setlists-delete-button"
               >
                 <Show
-                  when={deletingProgramId() === selectedProgramId()}
+                  when={deletingSetlistId() === selectedSetlistId()}
                   fallback={<Trash2 size={14} class="mr-1.5" />}
                 >
                   Deleting...
@@ -689,7 +689,7 @@ const ProgramsPage: Component = () => {
         <Show when={!selectedGroupId()}>
           <EmptyState
             message="No group selected"
-            detail="Select a group above to view and manage its programs."
+            detail="Select a group above to view and manage its setlists."
           />
         </Show>
 
@@ -697,17 +697,17 @@ const ProgramsPage: Component = () => {
           {/* ── View Mode ──────────────────────────────────────────────── */}
           <Show when={!isEditing()}>
             <Show
-              when={selectedProgram()}
+              when={selectedSetlist()}
               fallback={
                 <EmptyState
-                  message="No programs yet"
-                  detail="Create a program to get started, or select a different group."
+                  message="No setlists yet"
+                  detail="Create a setlist to get started, or select a different group."
                 />
               }
             >
               {(prog) => (
                 <div class="mx-auto max-w-3xl space-y-6">
-                  {/* Program header */}
+                  {/* Setlist header */}
                   <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
                     <div class="flex items-start justify-between gap-4">
                       <div class="min-w-0">
@@ -732,28 +732,28 @@ const ProgramsPage: Component = () => {
                     </Show>
                   </div>
 
-                  {/* Program items list */}
+                  {/* Setlist items list */}
                   <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                     <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                       <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Program Items
+                        Setlist Items
                       </h3>
                     </div>
                     <Show
-                      when={(programItems() ?? []).length > 0}
+                      when={(setlistItems() ?? []).length > 0}
                       fallback={
                         <div class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                          This program is empty. Add tunes or tune sets by
+                          This setlist is empty. Add tunes or tune sets by
                           editing.
                         </div>
                       }
                     >
                       <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                        <For each={programItems() ?? []}>
+                        <For each={setlistItems() ?? []}>
                           {(item, index) => (
                             <div
                               class="flex items-center gap-3 px-4 py-3"
-                              data-testid="program-item-row"
+                              data-testid="setlist-item-row"
                             >
                               <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-5 text-right">
                                 {index() + 1}
@@ -809,7 +809,7 @@ const ProgramsPage: Component = () => {
                         Library
                       </h3>
                       <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        Search tunes and tune sets to add to this program.
+                        Search tunes and tune sets to add to this setlist.
                       </p>
                     </div>
                     <Button
@@ -817,7 +817,7 @@ const ProgramsPage: Component = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => setLibraryPanelOpen(false)}
-                      data-testid="programs-collapse-library-button"
+                      data-testid="setlists-collapse-library-button"
                     >
                       Hide
                     </Button>
@@ -839,7 +839,7 @@ const ProgramsPage: Component = () => {
                           }
                           placeholder="Search tunes and tune sets"
                           class="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                          data-testid="programs-library-search"
+                          data-testid="setlists-library-search"
                         />
                       </div>
                       <div class="flex items-center gap-1">
@@ -853,7 +853,7 @@ const ProgramsPage: Component = () => {
                                   : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"
                               }`}
                               onClick={() => setLibraryFilter(filter)}
-                              data-testid={`programs-library-filter-${filter}`}
+                              data-testid={`setlists-library-filter-${filter}`}
                             >
                               {filter === "all"
                                 ? "All"
@@ -900,12 +900,12 @@ const ProgramsPage: Component = () => {
                                   void handleAddCandidate(candidate)
                                 }
                                 disabled={
-                                  !hasValidProgramName() ||
+                                  !hasValidSetlistName() ||
                                   isMutatingItems() ||
                                   isSaving()
                                 }
                                 class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
-                                data-testid="programs-add-candidate-button"
+                                data-testid="setlists-add-candidate-button"
                               >
                                 <Plus size={14} />
                                 Add
@@ -927,18 +927,18 @@ const ProgramsPage: Component = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setLibraryPanelOpen(true)}
-                    data-testid="programs-expand-library-button"
+                    data-testid="setlists-expand-library-button"
                   >
                     Show Library
                   </Button>
                 </div>
               </Show>
 
-              {/* Right Panel: Program Build */}
+              {/* Right Panel: Setlist Build */}
               <section class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                 <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Program Build
+                    Setlist Build
                   </h3>
                 </div>
 
@@ -947,42 +947,42 @@ const ProgramsPage: Component = () => {
                   <div class="space-y-3">
                     <div>
                       <label
-                        for="program-editor-name"
+                        for="setlist-editor-name"
                         class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                       >
-                        Program Name
+                        Setlist Name
                       </label>
                       <input
-                        id="program-editor-name"
+                        id="setlist-editor-name"
                         type="text"
                         value={editorName()}
                         onInput={(e) => setEditorName(e.currentTarget.value)}
                         class={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
-                          !hasValidProgramName() && isCreating()
+                          !hasValidSetlistName() && isCreating()
                             ? "border-red-400 ring-1 ring-red-400/40"
                             : "border-gray-300 dark:border-gray-600"
                         }`}
                         placeholder="Festival opener"
-                        data-testid="program-editor-name-input"
+                        data-testid="setlist-editor-name-input"
                       />
                     </div>
                     <div>
                       <label
-                        for="program-editor-description"
+                        for="setlist-editor-description"
                         class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                       >
                         Notes
                       </label>
                       <textarea
-                        id="program-editor-description"
+                        id="setlist-editor-description"
                         value={editorDescription()}
                         onInput={(e) =>
                           setEditorDescription(e.currentTarget.value)
                         }
                         rows={2}
                         class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                        placeholder="Optional program notes"
-                        data-testid="program-editor-description-input"
+                        placeholder="Optional setlist notes"
+                        data-testid="setlist-editor-description-input"
                       />
                     </div>
                   </div>
@@ -991,16 +991,16 @@ const ProgramsPage: Component = () => {
                   <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
                     <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-700">
                       <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        Program Items
+                        Setlist Items
                       </span>
                       <span class="text-xs text-gray-500 dark:text-gray-400">
-                        {(programItems() ?? []).length} item
-                        {(programItems() ?? []).length === 1 ? "" : "s"}
+                        {(setlistItems() ?? []).length} item
+                        {(setlistItems() ?? []).length === 1 ? "" : "s"}
                       </span>
                     </div>
 
                     <Show
-                      when={(programItems() ?? []).length > 0}
+                      when={(setlistItems() ?? []).length > 0}
                       fallback={
                         <div class="flex flex-1 items-center justify-center px-4 py-8 text-sm text-gray-500 dark:text-gray-400">
                           Add tunes or tune sets from the library panel.
@@ -1008,11 +1008,11 @@ const ProgramsPage: Component = () => {
                       }
                     >
                       <div class="min-h-0 flex-1 overflow-y-auto">
-                        <For each={programItems() ?? []}>
+                        <For each={setlistItems() ?? []}>
                           {(item, index) => (
                             <div
                               class="flex items-start gap-3 border-b border-gray-200 px-4 py-3 last:border-b-0 dark:border-gray-700"
-                              data-testid="program-editor-item-row"
+                              data-testid="setlist-editor-item-row"
                             >
                               <button
                                 type="button"
@@ -1063,11 +1063,11 @@ const ProgramsPage: Component = () => {
                                 class="rounded-md border border-red-200 p-1.5 text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
                                 onClick={() => void handleRemoveItem(item)}
                                 disabled={isMutatingItems() || isSaving()}
-                                data-testid="program-editor-remove-item-button"
+                                data-testid="setlist-editor-remove-item-button"
                               >
                                 <Trash2 size={14} />
                                 <span class="sr-only">
-                                  Remove item from Program
+                                  Remove item from Setlist
                                 </span>
                               </button>
                             </div>
@@ -1086,4 +1086,4 @@ const ProgramsPage: Component = () => {
   );
 };
 
-export default ProgramsPage;
+export default SetlistsPage;

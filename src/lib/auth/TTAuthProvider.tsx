@@ -191,7 +191,7 @@ function formatSyncErrorToast(message: string): {
     return {
       title,
       description:
-        "Your program is saved locally, but the sync server still has the older tune_set kind constraint. Apply the latest Supabase migration or reset the local Supabase DB, then retry sync.",
+        "Your setlist is saved locally, but the sync server still has the older tune_set kind constraint. Apply the latest Supabase migration or reset the local Supabase DB, then retry sync.",
     };
   }
 
@@ -668,10 +668,10 @@ const TTInner: ParentComponent = (props) => {
     try {
       const {
         repairPendingMediaAssetSyncState,
-        repairPendingProgramSyncState,
+        repairPendingSetlistSyncState,
       } = await import("@/lib/sync/genre-filter");
       const repairResult = await repairPendingMediaAssetSyncState();
-      const programRepairResult = await repairPendingProgramSyncState();
+      const setlistRepairResult = await repairPendingSetlistSyncState();
       if (
         repairResult.requeuedReferenceCount > 0 ||
         repairResult.prunedMediaAssetCount > 0 ||
@@ -683,13 +683,13 @@ const TTInner: ParentComponent = (props) => {
         );
       }
       if (
-        programRepairResult.requeuedProgramCount > 0 ||
-        programRepairResult.requeuedTuneSetCount > 0 ||
-        programRepairResult.requeuedGroupCount > 0
+        setlistRepairResult.requeuedSetlistCount > 0 ||
+        setlistRepairResult.requeuedTuneSetCount > 0 ||
+        setlistRepairResult.requeuedGroupCount > 0
       ) {
         console.warn(
-          "[TTAuthProvider] Repaired pending program sync state before startup sync",
-          programRepairResult
+          "[TTAuthProvider] Repaired pending setlist sync state before startup sync",
+          setlistRepairResult
         );
       }
     } catch (error) {

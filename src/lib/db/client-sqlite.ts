@@ -38,8 +38,8 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 16,
-  schemaVersion: "2.0.8-add-programs",
+  databaseVersion: 18,
+  schemaVersion: "2.0.9-rename-program-to-setlist",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -59,6 +59,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0015_add_groups_and_tune_sets.sql",
     "/drizzle/migrations/sqlite/0016_add_programs.sql",
     "/drizzle/migrations/sqlite/0017_fix_ordered_item_conflict_targets.sql",
+    "/drizzle/migrations/sqlite/0018_rename_program_to_setlist.sql",
   ],
   forceResetQueryParams: [
     { key: "reset", value: "true" },

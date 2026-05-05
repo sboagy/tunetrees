@@ -16,7 +16,7 @@ export type TabId =
   | "repertoire"
   | "catalog"
   | "analysis"
-  | "programs";
+  | "setlists";
 
 export interface TabState {
   whichTab: TabId;
