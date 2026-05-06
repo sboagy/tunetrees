@@ -1,0 +1,32 @@
+# Exclude log files from Copilot context
+*.log
+
+# Exclude generated reports and large data/test artifacts
+playwright-report/
+ingest/
+test-results/
+
+# Exclude common directories that are not relevant for Copilot context
+node_modules/
+.git/
+dist/
+build/
+
+# Exclude specific files and directories related to database and seeds
+e2e/**/*.sql
+supabase/seeds/
+
+# Exclude Cloudflare temp files
+.wrangler/
+
+# Exclude lockfiles
+package-lock.json
+
+# Exclude Binaries, Images, and Vectors
+*.wasm
+*.png
+*.jpg
+*.jpeg
+*.ico
+*.svg
+*.drawio.*
