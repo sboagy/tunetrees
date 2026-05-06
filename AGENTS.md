@@ -81,6 +81,7 @@ Primary components:
 ## UI Principles (Pointers)
 
 - UI is table-centric and performance-oriented; see `src/AGENTS.md`.
+- Visual grammar, action vocabulary, and button/icon semantics live in `docs/design/tunetrees-design-system.md`.
 - Do not introduce React patterns (no React hooks, no React-only libraries in app code paths).
 
 ## Testing & Local Dev Conventions
