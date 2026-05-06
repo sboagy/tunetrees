@@ -35,7 +35,7 @@ This document serves as the single source of truth for the TuneTrees UI grammar,
 | **2. Secondary Action** | `variant="outline"` (Border, no fill) | Safe, alternative actions. E.g., "Cancel", "Add More", "Filter". **Rule:** Place to the left of Primary actions. |
 | **3. Tertiary Action** | `variant="ghost"` (No border, gray hover) | Navigation, icon-only utility buttons (like the `⋮` menu), or very low-priority actions. |
 | **4. Accent Action** | `variant="accent"` (🟢 Green text, ghost background) | Creation / growth actions ("+ New Group", "+ New Setlist"). Colored foreground conveys intent; ghost background keeps the UI calm. |
-| **5. Destructive Action** | `variant="ghost"` + `class="text-destructive hover:bg-destructive/10 hover:text-destructive"` (🔴 Red text, ghost background) | Deleting data. Use a filled `variant="destructive"` only for the single most critical delete on a screen (e.g., "Delete Account"). Ghost + red text is preferred everywhere else. |
+| **5. Destructive Action** | `variant="destructive-ghost"` (🔴 Red text, ghost background) | Deleting data. This is the preferred implementation for routine destructive actions and should visually match the former `variant="ghost"` + `class="text-destructive hover:bg-destructive/10 hover:text-destructive"` pattern. Use a filled `variant="destructive"` only for the single most critical delete on a screen (e.g., "Delete Account"). |
 | **6. The FSRS Array** | *Custom App-Specific Pattern* | The "Again/Hard/Good/Easy" buttons are a special case. They should remain visually distinct from standard app navigation to keep the user in a "flow state" during practice. |
 
 ---
