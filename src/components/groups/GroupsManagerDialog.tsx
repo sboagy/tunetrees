@@ -151,7 +151,7 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
         </header>
 
         <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          Create a group space for shared membership and group-owned programs.
+          Create a group space for shared membership and group-owned setlists.
         </p>
 
         <div class="space-y-4">

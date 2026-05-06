@@ -48,6 +48,28 @@ export const dailyPracticeQueue = pgTable("daily_practice_queue", {
   deviceId: text("device_id"),
 });
 
+export const event = pgTable("event", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  eventDate: text("event_date"),
+  description: text("description"),
+  setlistRef: uuid("setlist_ref"),
+  groupRef: uuid("group_ref"),
+  userRef: uuid("user_ref"),
+  deleted: boolean("deleted").notNull().default(false),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
 export const genre = pgTable("genre", {
   id: text("id").notNull().primaryKey(),
   name: text("name"),
@@ -240,43 +262,6 @@ export const prefsSpacedRepetition = pgTable("prefs_spaced_repetition", {
   deviceId: text("device_id"),
 });
 
-export const program = pgTable("program", {
-  id: uuid("id")
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  groupRef: uuid("group_ref").notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  deleted: boolean("deleted").notNull().default(false),
-  createdAt: text("created_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-  syncVersion: integer("sync_version").notNull().default(1),
-  lastModifiedAt: text("last_modified_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-  deviceId: text("device_id"),
-});
-
-export const programItem = pgTable("program_item", {
-  id: uuid("id")
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  programRef: uuid("program_ref").notNull(),
-  itemKind: text("item_kind").notNull(),
-  tuneRef: uuid("tune_ref"),
-  tuneSetRef: uuid("tune_set_ref"),
-  position: integer("position").notNull(),
-  deleted: boolean("deleted").notNull().default(false),
-  syncVersion: integer("sync_version").notNull().default(1),
-  lastModifiedAt: text("last_modified_at")
-    .notNull()
-    .$defaultFn(() => new Date().toISOString()),
-  deviceId: text("device_id"),
-});
-
 export const reference = pgTable("reference", {
   id: uuid("id")
     .notNull()
@@ -324,6 +309,44 @@ export const repertoireTune = pgTable("repertoire_tune", {
   learned: text("learned"),
   scheduled: text("scheduled"),
   goal: text("goal").default("recall"),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+});
+
+export const setlist = pgTable("setlist", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  groupRef: uuid("group_ref"),
+  name: text("name").notNull(),
+  description: text("description"),
+  deleted: boolean("deleted").notNull().default(false),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
+  userRef: uuid("user_ref"),
+});
+
+export const setlistItem = pgTable("setlist_item", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  setlistRef: uuid("setlist_ref").notNull(),
+  itemKind: text("item_kind").notNull(),
+  tuneRef: uuid("tune_ref"),
+  tuneSetRef: uuid("tune_set_ref"),
+  position: integer("position").notNull(),
   deleted: boolean("deleted").notNull().default(false),
   syncVersion: integer("sync_version").notNull().default(1),
   lastModifiedAt: text("last_modified_at")
@@ -563,6 +586,7 @@ export const userProfile = pgTable("user_profile", {
 
 export const tables = {
   daily_practice_queue: dailyPracticeQueue,
+  event: event,
   genre: genre,
   genre_tune_type: genreTuneType,
   goal: goal,
@@ -574,11 +598,11 @@ export const tables = {
   practice_record: practiceRecord,
   prefs_scheduling_options: prefsSchedulingOptions,
   prefs_spaced_repetition: prefsSpacedRepetition,
-  program: program,
-  program_item: programItem,
   reference: reference,
   repertoire: repertoire,
   repertoire_tune: repertoireTune,
+  setlist: setlist,
+  setlist_item: setlistItem,
   sync_change_log: syncChangeLog,
   tab_group_main_state: tabGroupMainState,
   table_state: tableState,

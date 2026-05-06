@@ -250,9 +250,10 @@ beforeEach(async () => {
   `);
 
   db.run(`
-    CREATE TABLE program (
+    CREATE TABLE setlist (
       id TEXT PRIMARY KEY NOT NULL,
-      group_ref TEXT NOT NULL,
+      group_ref TEXT,
+      user_ref TEXT,
       name TEXT,
       description TEXT,
       deleted INTEGER,
@@ -262,14 +263,29 @@ beforeEach(async () => {
   `);
 
   db.run(`
-    CREATE TABLE program_item (
+    CREATE TABLE setlist_item (
       id TEXT PRIMARY KEY NOT NULL,
-      program_ref TEXT NOT NULL,
+      setlist_ref TEXT NOT NULL,
       item_kind TEXT NOT NULL,
       tune_ref TEXT,
       tune_set_ref TEXT,
       position INTEGER NOT NULL,
       deleted INTEGER,
+      last_modified_at TEXT
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE event (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      event_date TEXT,
+      description TEXT,
+      setlist_ref TEXT,
+      group_ref TEXT,
+      user_ref TEXT,
+      deleted INTEGER,
+      created_at TEXT,
       last_modified_at TEXT
     )
   `);

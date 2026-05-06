@@ -399,7 +399,7 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                 disabled={!canManage()}
                 class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
                 placeholder={
-                  entityLabel() === "Program"
+                  entityLabel() === "Setlist"
                     ? "Festival opener"
                     : "Warm-up set"
                 }
@@ -421,8 +421,8 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                 disabled={!canManage()}
                 class="w-full min-h-28 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white"
                 placeholder={
-                  entityLabel() === "Program"
-                    ? "Optional notes about when to use this program"
+                  entityLabel() === "Setlist"
+                    ? "Optional notes about when to use this setlist"
                     : "Optional notes about when to use this set"
                 }
                 data-testid="tune-set-description-input"
@@ -435,8 +435,8 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                   <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {entityLabel() === "Program"
-                          ? "Current Program Entries"
+                        {entityLabel() === "Setlist"
+                          ? "Current Setlist Entries"
                           : `Tunes in This ${entityLabel()}`}
                       </h3>
                       <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -470,7 +470,7 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                   when={!tuneSetItems.loading}
                   fallback={
                     <div class="py-4 text-sm text-gray-500 dark:text-gray-400">
-                      {entityLabel() === "Program"
+                      {entityLabel() === "Setlist"
                         ? "Loading entries..."
                         : "Loading tunes..."}
                     </div>
@@ -480,8 +480,8 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                     when={(tuneSetItems() ?? []).length > 0}
                     fallback={
                       <div class="rounded-md border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                        {entityLabel() === "Program"
-                          ? "This program is empty. Use Add Tunes to build it."
+                        {entityLabel() === "Setlist"
+                          ? "This setlist is empty. Use Add Tunes to build it."
                           : "This set is empty. Use Add Tunes or Add to Set from Repertoire to populate it."}
                       </div>
                     }

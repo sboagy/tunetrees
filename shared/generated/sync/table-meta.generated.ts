@@ -17,6 +17,7 @@ export interface TableMetaCore {
 
 export const SYNCABLE_TABLES = [
   "daily_practice_queue",
+  "event",
   "genre",
   "genre_tune_type",
   "goal",
@@ -28,11 +29,11 @@ export const SYNCABLE_TABLES = [
   "practice_record",
   "prefs_scheduling_options",
   "prefs_spaced_repetition",
-  "program",
-  "program_item",
   "reference",
   "repertoire",
   "repertoire_tune",
+  "setlist",
+  "setlist_item",
   "tab_group_main_state",
   "table_state",
   "table_transient_data",
@@ -90,6 +91,22 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       user_ref: "User ID who owns this queue entry.",
       window_end_utc: "End of practice window (UTC).",
       window_start_utc: "Start of practice window (UTC).",
+    },
+  },
+  event: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["event_date", "created_at", "last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the event.",
+      event_date: "Date and time of the event.",
+      group_ref: "Group that owns this event (if group-scoped).",
+      name: 'Display name for the event (e.g., "Saturday Pub Gig").',
+      setlist_ref: "Optional setlist associated with this event.",
+      user_ref: "User that owns this event (if personal).",
     },
   },
   genre: {
@@ -299,31 +316,6 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       user_id: "User ID who owns these preferences.",
     },
   },
-  program: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["created_at", "last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    columnDescriptions: {
-      deleted: "Soft-delete flag for the program.",
-      group_ref: "Group that owns and manages this program.",
-    },
-  },
-  program_item: {
-    primaryKey: "id",
-    uniqueKeys: null,
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    columnDescriptions: {
-      item_kind:
-        "Discriminator for whether the item references a tune or a tune set.",
-      position: "Zero-based position of the item within the program.",
-    },
-  },
   reference: {
     primaryKey: "id",
     uniqueKeys: null,
@@ -387,6 +379,33 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       scheduled: "Manual schedule override for next review.",
       sync_version: "Sync version for conflict resolution.",
       tune_ref: "Reference to the tune.",
+    },
+  },
+  setlist: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["created_at", "last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the setlist.",
+      group_ref: "Group that owns this setlist (nullable if user-owned).",
+      user_ref: "User that owns this setlist (nullable if group-owned).",
+    },
+  },
+  setlist_item: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      item_kind:
+        "Discriminator for whether the item references a tune or a tune set.",
+      position: "Zero-based position of the item within the setlist.",
+      setlist_ref: "Setlist that this item belongs to.",
     },
   },
   tab_group_main_state: {

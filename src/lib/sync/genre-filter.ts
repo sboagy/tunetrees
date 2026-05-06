@@ -253,12 +253,12 @@ export async function repairPendingMediaAssetSyncState(): Promise<{
   return result;
 }
 
-function collectPendingProgramDependencyRepairs(sqliteDb: SqlJsDatabase): {
-  programRequiredAt: Map<string, string>;
+function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
+  setlistRequiredAt: Map<string, string>;
   tuneSetRequiredAt: Map<string, string>;
   groupRequiredAt: Map<string, string>;
 } {
-  const programRequiredAt = new Map<string, string>();
+  const setlistRequiredAt = new Map<string, string>();
   const tuneSetRequiredAt = new Map<string, string>();
   const groupRequiredAt = new Map<string, string>();
 
@@ -273,12 +273,12 @@ function collectPendingProgramDependencyRepairs(sqliteDb: SqlJsDatabase): {
     }
   };
 
-  const pendingPrograms = sqliteDb.exec(`
+  const pendingSetlists = sqliteDb.exec(`
     SELECT q.row_id, p.group_ref, MIN(q.changed_at) AS required_changed_at
     FROM sync_push_queue q
-    INNER JOIN program p ON p.id = q.row_id
+    INNER JOIN setlist p ON p.id = q.row_id
     INNER JOIN user_group ug ON ug.id = p.group_ref
-    WHERE q.table_name = 'program'
+    WHERE q.table_name = 'setlist'
       AND q.status IN ('pending', 'in_progress', 'failed')
       AND lower(q.operation) != 'delete'
       AND COALESCE(p.deleted, 0) = 0
@@ -286,52 +286,52 @@ function collectPendingProgramDependencyRepairs(sqliteDb: SqlJsDatabase): {
     GROUP BY q.row_id, p.group_ref
   `);
 
-  for (const row of pendingPrograms[0]?.values ?? []) {
-    const programId = typeof row[0] === "string" ? row[0] : "";
+  for (const row of pendingSetlists[0]?.values ?? []) {
+    const setlistId = typeof row[0] === "string" ? row[0] : "";
     const groupId = typeof row[1] === "string" ? row[1] : "";
     const requiredChangedAt = typeof row[2] === "string" ? row[2] : "";
 
-    if (!programId || !groupId || !requiredChangedAt) {
+    if (!setlistId || !groupId || !requiredChangedAt) {
       continue;
     }
 
     rememberEarliest(groupRequiredAt, groupId, requiredChangedAt);
   }
 
-  const pendingProgramItems = sqliteDb.exec(`
+  const pendingSetlistItems = sqliteDb.exec(`
     SELECT
-      pi.program_ref,
+      pi.setlist_ref,
       p.group_ref,
       pi.tune_set_ref,
       ts.group_ref,
       MIN(q.changed_at) AS required_changed_at
     FROM sync_push_queue q
-    INNER JOIN program_item pi ON pi.id = q.row_id
-    INNER JOIN program p ON p.id = pi.program_ref
+    INNER JOIN setlist_item pi ON pi.id = q.row_id
+    INNER JOIN setlist p ON p.id = pi.setlist_ref
     INNER JOIN user_group ug ON ug.id = p.group_ref
     LEFT JOIN tune_set ts ON ts.id = pi.tune_set_ref
-    WHERE q.table_name = 'program_item'
+    WHERE q.table_name = 'setlist_item'
       AND q.status IN ('pending', 'in_progress', 'failed')
       AND lower(q.operation) != 'delete'
       AND COALESCE(pi.deleted, 0) = 0
       AND COALESCE(p.deleted, 0) = 0
       AND COALESCE(ug.deleted, 0) = 0
       AND (pi.tune_set_ref IS NULL OR COALESCE(ts.deleted, 0) = 0)
-    GROUP BY pi.program_ref, p.group_ref, pi.tune_set_ref, ts.group_ref
+    GROUP BY pi.setlist_ref, p.group_ref, pi.tune_set_ref, ts.group_ref
   `);
 
-  for (const row of pendingProgramItems[0]?.values ?? []) {
-    const programId = typeof row[0] === "string" ? row[0] : "";
+  for (const row of pendingSetlistItems[0]?.values ?? []) {
+    const setlistId = typeof row[0] === "string" ? row[0] : "";
     const groupId = typeof row[1] === "string" ? row[1] : "";
     const tuneSetId = typeof row[2] === "string" ? row[2] : "";
     const tuneSetGroupId = typeof row[3] === "string" ? row[3] : "";
     const requiredChangedAt = typeof row[4] === "string" ? row[4] : "";
 
-    if (!programId || !groupId || !requiredChangedAt) {
+    if (!setlistId || !groupId || !requiredChangedAt) {
       continue;
     }
 
-    rememberEarliest(programRequiredAt, programId, requiredChangedAt);
+    rememberEarliest(setlistRequiredAt, setlistId, requiredChangedAt);
     rememberEarliest(groupRequiredAt, groupId, requiredChangedAt);
 
     if (tuneSetId) {
@@ -342,12 +342,12 @@ function collectPendingProgramDependencyRepairs(sqliteDb: SqlJsDatabase): {
     }
   }
 
-  return { programRequiredAt, tuneSetRequiredAt, groupRequiredAt };
+  return { setlistRequiredAt, tuneSetRequiredAt, groupRequiredAt };
 }
 
 function ensurePendingOutboxEntry(
   sqliteDb: SqlJsDatabase,
-  tableName: "program" | "tune_set" | "user_group",
+  tableName: "setlist" | "tune_set" | "user_group",
   rowId: string,
   requiredChangedAt: string
 ): boolean {
@@ -403,30 +403,30 @@ function ensurePendingOutboxEntry(
   return true;
 }
 
-export function repairPendingProgramSyncStateInSqlite(
+export function repairPendingSetlistSyncStateInSqlite(
   sqliteDb: SqlJsDatabase
 ): {
-  requeuedProgramCount: number;
+  requeuedSetlistCount: number;
   requeuedTuneSetCount: number;
   requeuedGroupCount: number;
 } {
-  const { programRequiredAt, tuneSetRequiredAt, groupRequiredAt } =
-    collectPendingProgramDependencyRepairs(sqliteDb);
+  const { setlistRequiredAt, tuneSetRequiredAt, groupRequiredAt } =
+    collectPendingSetlistDependencyRepairs(sqliteDb);
 
-  let requeuedProgramCount = 0;
+  let requeuedSetlistCount = 0;
   let requeuedTuneSetCount = 0;
   let requeuedGroupCount = 0;
 
-  for (const [programId, requiredChangedAt] of programRequiredAt.entries()) {
+  for (const [setlistId, requiredChangedAt] of setlistRequiredAt.entries()) {
     if (
       ensurePendingOutboxEntry(
         sqliteDb,
-        "program",
-        programId,
+        "setlist",
+        setlistId,
         requiredChangedAt
       )
     ) {
-      requeuedProgramCount += 1;
+      requeuedSetlistCount += 1;
     }
   }
 
@@ -457,14 +457,14 @@ export function repairPendingProgramSyncStateInSqlite(
   }
 
   return {
-    requeuedProgramCount,
+    requeuedSetlistCount,
     requeuedTuneSetCount,
     requeuedGroupCount,
   };
 }
 
-export async function repairPendingProgramSyncState(): Promise<{
-  requeuedProgramCount: number;
+export async function repairPendingSetlistSyncState(): Promise<{
+  requeuedSetlistCount: number;
   requeuedTuneSetCount: number;
   requeuedGroupCount: number;
 }> {
@@ -476,9 +476,9 @@ export async function repairPendingProgramSyncState(): Promise<{
     throw new Error("SQLite instance not available");
   }
 
-  const result = repairPendingProgramSyncStateInSqlite(sqliteDb);
+  const result = repairPendingSetlistSyncStateInSqlite(sqliteDb);
   if (
-    result.requeuedProgramCount > 0 ||
+    result.requeuedSetlistCount > 0 ||
     result.requeuedTuneSetCount > 0 ||
     result.requeuedGroupCount > 0
   ) {
