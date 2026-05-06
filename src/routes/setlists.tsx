@@ -24,6 +24,7 @@ import { toast } from "solid-sonner";
 import { Button } from "@/components/ui/button";
 import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import { getVisibleGroups } from "@/lib/db/queries/groups";
 import {
@@ -82,9 +83,10 @@ const EmptyState: Component<{ message: string; detail?: string }> = (props) => (
 
 const SetlistsPage: Component = () => {
   const { user, localDb } = useAuth();
+  const { currentTuneId, setCurrentTuneId } = useCurrentTune();
   const { incrementTuneSetListChanged, tuneSetListChanged } =
     useCurrentTuneSet();
-  const { openGroupsDialog } = useGroupsDialog();
+  const { openGroupsDialog, groupListVersion } = useGroupsDialog();
   const userId = () => user()?.id;
 
   // ── Toolbar state ────────────────────────────────────────────────────────
@@ -120,7 +122,8 @@ const SetlistsPage: Component = () => {
     () => {
       const db = localDb();
       const uid = userId();
-      return db && uid ? { db, userId: uid } : null;
+      const version = groupListVersion();
+      return db && uid ? { db, userId: uid, version } : null;
     },
     async (params) => {
       if (!params) return [];
@@ -636,11 +639,11 @@ const SetlistsPage: Component = () => {
             <div class="flex items-center gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 class={
                   canManage()
-                    ? "border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/70 dark:text-blue-200 dark:hover:bg-blue-950/20"
+                    ? "text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-950/20"
                     : "opacity-50"
                 }
                 onClick={() => {
@@ -661,13 +664,9 @@ const SetlistsPage: Component = () => {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="accent"
                 size="sm"
-                class={
-                  canManage()
-                    ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-200 dark:hover:bg-emerald-950/20"
-                    : "opacity-50"
-                }
+                class={canManage() ? "" : "opacity-50"}
                 onClick={() => {
                   if (!canManage()) {
                     toast.error(
@@ -687,13 +686,9 @@ const SetlistsPage: Component = () => {
               <Show when={selectedSetlistId()}>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive-ghost"
                   size="sm"
-                  class={
-                    canManage()
-                      ? "border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/20"
-                      : "opacity-50"
-                  }
+                  class={canManage() ? "" : "opacity-50"}
                   onClick={() => {
                     if (!canManage()) {
                       toast.error(
@@ -788,44 +783,96 @@ const SetlistsPage: Component = () => {
                     >
                       <div class="divide-y divide-gray-200 dark:divide-gray-700">
                         <For each={setlistItems() ?? []}>
-                          {(item, index) => (
-                            <div
-                              class="flex items-center gap-3 px-4 py-3"
-                              data-testid="setlist-item-row"
-                            >
-                              <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-5 text-right">
-                                {index() + 1}
-                              </span>
-                              <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                  <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                    {item.itemKind === "tune"
-                                      ? "Tune"
-                                      : "Tune Set"}
-                                  </span>
-                                  <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                    {item.itemKind === "tune"
-                                      ? item.tune?.title
-                                      : item.tuneSet?.name}
-                                  </span>
+                          {(item, index) => {
+                            const isTuneRow = () =>
+                              item.itemKind === "tune" &&
+                              Boolean(item.tune?.id);
+                            const isSelected = () =>
+                              item.itemKind === "tune" &&
+                              item.tune?.id === currentTuneId();
+
+                            const content = (
+                              <>
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-5 text-right">
+                                  {index() + 1}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                  <div class="flex items-center gap-2">
+                                    <span
+                                      class={`rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${
+                                        isSelected()
+                                          ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
+                                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                                      }`}
+                                    >
+                                      {item.itemKind === "tune"
+                                        ? "Tune"
+                                        : "Tune Set"}
+                                    </span>
+                                    <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                                      {item.itemKind === "tune"
+                                        ? item.tune?.title
+                                        : item.tuneSet?.name}
+                                    </span>
+                                  </div>
+                                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <Show
+                                      when={item.itemKind === "tune"}
+                                      fallback={`${item.tuneSetTuneCount} tune${item.tuneSetTuneCount === 1 ? "" : "s"}`}
+                                    >
+                                      {[
+                                        item.tune?.type,
+                                        item.tune?.mode,
+                                        item.tune?.incipit,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" | ") || "Tune"}
+                                    </Show>
+                                  </div>
                                 </div>
-                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                  <Show
-                                    when={item.itemKind === "tune"}
-                                    fallback={`${item.tuneSetTuneCount} tune${item.tuneSetTuneCount === 1 ? "" : "s"}`}
+                              </>
+                            );
+
+                            return (
+                              <Show
+                                when={isTuneRow()}
+                                fallback={
+                                  <div
+                                    class="flex items-center gap-3 px-4 py-3"
+                                    data-testid="setlist-item-row"
                                   >
-                                    {[
-                                      item.tune?.type,
-                                      item.tune?.mode,
-                                      item.tune?.incipit,
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" | ") || "Tune"}
-                                  </Show>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                                    {content}
+                                  </div>
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  class={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                    isSelected()
+                                      ? "bg-primary/10 ring-1 ring-inset ring-primary/25 dark:bg-primary/15 dark:ring-primary/30"
+                                      : "hover:bg-muted/60"
+                                  }`}
+                                  onClick={() =>
+                                    setCurrentTuneId(item.tune?.id ?? null)
+                                  }
+                                  data-testid="setlist-item-row"
+                                  data-selected={
+                                    isSelected() ? "true" : undefined
+                                  }
+                                  aria-current={
+                                    isSelected() ? "true" : undefined
+                                  }
+                                  title={
+                                    isSelected()
+                                      ? "Current sidebar tune"
+                                      : "Show this tune in the sidebar"
+                                  }
+                                >
+                                  {content}
+                                </button>
+                              </Show>
+                            );
+                          }}
                         </For>
                       </div>
                     </Show>

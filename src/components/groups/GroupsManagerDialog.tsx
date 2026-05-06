@@ -30,6 +30,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import {
   addGroupMember,
   createGroup,
+  deleteGroup,
   type GroupMemberCandidate,
   type GroupMemberWithProfile,
   getGroupMembers,
@@ -206,14 +207,35 @@ const formatMemberDate = (value: string) =>
     day: "numeric",
   });
 
-const getMemberDisplayName = (member: GroupMemberWithProfile) =>
-  member.profileName ?? member.profileEmail ?? "Unknown member";
+const getMemberDisplayName = (
+  member: GroupMemberWithProfile,
+  currentUser?: {
+    id: string;
+    email?: string;
+    user_metadata?: { name?: string };
+  } | null
+) => {
+  // When the listed member IS the current auth user, prefer auth metadata
+  // over potentially stale local userProfile data (which can surface a
+  // different user's name after account switches / sync races).
+  if (currentUser && member.userRef === currentUser.id) {
+    return (
+      currentUser.user_metadata?.name ??
+      currentUser.email ??
+      member.profileName ??
+      member.profileEmail ??
+      "Unknown member"
+    );
+  }
+  return member.profileName ?? member.profileEmail ?? "Unknown member";
+};
 
 const MemberInfoDialog: Component<{
   member: GroupMemberWithProfile | null;
   isOpen: boolean;
   onClose: () => void;
 }> = (props) => {
+  const { user } = useAuth();
   return (
     <AlertDialog
       open={props.isOpen}
@@ -224,7 +246,7 @@ const MemberInfoDialog: Component<{
           <div class="flex flex-1 justify-start">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={props.onClose}
             >
@@ -248,7 +270,7 @@ const MemberInfoDialog: Component<{
 
               <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60">
                 <div class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {getMemberDisplayName(member())}
+                  {getMemberDisplayName(member(), user())}
                 </div>
                 <div class="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium capitalize bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
                   <Show
@@ -308,6 +330,7 @@ const ManageableGroupMemberRow: Component<{
   onRemove: () => void;
   onShowInfo: () => void;
 }> = (props) => {
+  const { user } = useAuth();
   return (
     <div class="rounded-lg border border-gray-200 px-4 py-4 dark:border-gray-700">
       <div class="flex items-center justify-between gap-3">
@@ -317,7 +340,7 @@ const ManageableGroupMemberRow: Component<{
           class="min-w-0 truncate text-left text-base font-medium leading-tight text-gray-900 hover:underline dark:text-white"
           data-testid="group-member-name-button"
         >
-          {getMemberDisplayName(props.member)}
+          {getMemberDisplayName(props.member, user())}
         </button>
 
         <Show
@@ -345,7 +368,7 @@ const ManageableGroupMemberRow: Component<{
                 )
               }
               disabled={props.isBusy}
-              variant="outline"
+              variant="ghost"
               size="icon"
               class="h-9 w-9"
               data-testid="group-member-role-select"
@@ -371,9 +394,9 @@ const ManageableGroupMemberRow: Component<{
               type="button"
               onClick={props.onRemove}
               disabled={props.isBusy}
-              variant="ghost"
+              variant="destructive-ghost"
               size="icon"
-              class="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              class="h-9 w-9"
               data-testid="remove-group-member-button"
               title="Remove member"
               aria-label="Remove member"
@@ -444,7 +467,7 @@ const GroupMemberCandidateRow: Component<{
 
 const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
   const { user, localDb } = useAuth();
-  const [groupListVersion, setGroupListVersion] = createSignal(0);
+  const { groupListVersion, refreshGroups } = useGroupsDialog();
   const [selectedGroupId, setSelectedGroupId] = createSignal<string | null>(
     null
   );
@@ -460,6 +483,12 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
   );
   const [selectedMemberInfo, setSelectedMemberInfo] =
     createSignal<GroupMemberWithProfile | null>(null);
+  const [isDeletingGroup, setIsDeletingGroup] = createSignal(false);
+  // Tracks a just-created group ID so the auto-select effect can
+  // prefer it over the first group once the refetched list arrives.
+  const [pendingCreatedGroupId, setPendingCreatedGroupId] = createSignal<
+    string | null
+  >(null);
 
   const [groups] = createResource(
     () => {
@@ -485,11 +514,20 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
   createEffect(() => {
     const visibleGroups = groups() ?? [];
     const currentId = selectedGroupId();
+    const pendingId = pendingCreatedGroupId();
 
     if (visibleGroups.length === 0) {
       if (currentId !== null) {
         setSelectedGroupId(null);
       }
+      return;
+    }
+
+    // A group was just created — prefer it over the first group
+    // once it appears in the refetched list.
+    if (pendingId && visibleGroups.some((group) => group.id === pendingId)) {
+      setSelectedGroupId(pendingId);
+      setPendingCreatedGroupId(null);
       return;
     }
 
@@ -555,8 +593,11 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
       setIsCreatingGroup(true);
       setGroupDialogError(null);
       const created = await createGroup(db, userId, data);
-      setGroupListVersion((value) => value + 1);
-      setSelectedGroupId(created.id);
+      // Signal the auto-select effect to pick this group once the
+      // refetched list arrives (avoiding a race where the effect
+      // reverts to the first group before the new entry appears).
+      setPendingCreatedGroupId(created.id);
+      refreshGroups();
       setShowCreateGroupDialog(false);
       toast.success(`Created group "${created.name}".`, { duration: 2500 });
     } catch (error) {
@@ -583,7 +624,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
         profileName: candidate.profileName,
         profileEmail: candidate.profileEmail,
       });
-      setGroupListVersion((value) => value + 1);
+      refreshGroups();
       toast.success("Added group member.", { duration: 2500 });
     } catch (error) {
       toast.error(
@@ -617,7 +658,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
         userId,
         role
       );
-      setGroupListVersion((value) => value + 1);
+      refreshGroups();
       toast.success("Updated member role.", { duration: 2500 });
     } catch (error) {
       toast.error(
@@ -646,7 +687,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
     try {
       setBusyMembershipId(member.membershipId);
       await removeGroupMember(db, groupId, member.membershipId, userId);
-      setGroupListVersion((value) => value + 1);
+      refreshGroups();
       toast.success("Removed group member.", { duration: 2500 });
     } catch (error) {
       toast.error(
@@ -654,6 +695,38 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
       );
     } finally {
       setBusyMembershipId(null);
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    const group = selectedGroup();
+    if (!group) return;
+    if (group.currentUserRole !== "owner") return;
+
+    const db = localDb();
+    const userId = user()?.id;
+    if (!db || !userId) {
+      toast.error("Database is not ready yet.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete the group "${group.name}"? This will also delete all setlists and tune sets owned by this group.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsDeletingGroup(true);
+      await deleteGroup(db, group.id, userId);
+      setSelectedGroupId(null);
+      refreshGroups();
+      toast.success(`Deleted group "${group.name}".`, { duration: 2500 });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete group"
+      );
+    } finally {
+      setIsDeletingGroup(false);
     }
   };
 
@@ -665,11 +738,11 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
             <div class="flex items-center justify-start">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={props.onClose}
                 data-testid="groups-close-button"
               >
-                Cancel
+                Done
               </Button>
             </div>
             <div class="flex min-w-0 items-center justify-center px-3">
@@ -683,8 +756,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
             <div class="flex items-center justify-end">
               <Button
                 type="button"
-                class="inline-flex items-center justify-center gap-2"
-                variant="default"
+                variant="accent"
                 onClick={() => setShowCreateGroupDialog(true)}
                 data-testid="open-create-group-button"
               >
@@ -749,7 +821,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
                           type="button"
                           class={`mb-2 flex w-full items-start justify-between rounded-lg border px-3 py-3 text-left last:mb-0 ${
                             selectedGroupId() === group.id
-                              ? "border-primary bg-primary/5"
+                              ? "border-primary bg-primary/10 ring-1 ring-primary/30"
                               : "border-border hover:bg-accent/30"
                           }`}
                           onClick={() => setSelectedGroupId(group.id)}
@@ -790,8 +862,33 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
                                 {group.description || "No description yet."}
                               </p>
                             </div>
-                            <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                              Owner: {group.ownerName ?? group.ownerUserRef}
+                            <div class="flex flex-col items-end gap-2">
+                              <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                                Owner:{" "}
+                                {group.ownerUserRef === user()?.id
+                                  ? (user()?.user_metadata?.name ??
+                                    user()?.email ??
+                                    group.ownerUserRef)
+                                  : (group.ownerName ?? group.ownerUserRef)}
+                              </div>
+                              <Show when={group.currentUserRole === "owner"}>
+                                <Button
+                                  type="button"
+                                  variant="destructive-ghost"
+                                  size="sm"
+                                  onClick={() => void handleDeleteGroup()}
+                                  disabled={isDeletingGroup()}
+                                  data-testid="delete-group-button"
+                                >
+                                  <Show
+                                    when={isDeletingGroup()}
+                                    fallback={<Trash2 size={14} class="mr-1" />}
+                                  >
+                                    <span class="mr-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  </Show>
+                                  Delete Group
+                                </Button>
+                              </Show>
                             </div>
                           </div>
                         </div>
