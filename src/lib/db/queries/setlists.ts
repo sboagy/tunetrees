@@ -1,21 +1,21 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
-  program,
-  programItem,
+  setlist,
+  setlistItem,
   tune,
   tuneSet,
   tuneSetItem,
   userGroup,
 } from "../schema";
 import type {
-  NewProgram,
-  NewProgramItem,
-  Program,
-  ProgramItem,
+  NewSetlist,
+  NewSetlistItem,
+  Setlist,
+  SetlistItem,
   Tune,
   TuneSet,
   UserGroup,
@@ -30,16 +30,16 @@ import { getTuneSetAccessForUser, getVisibleTuneSets } from "./tune-sets";
 
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
-export type ProgramItemKind = "tune" | "tune_set";
+export type SetlistItemKind = "tune" | "tune_set";
 
-export interface ProgramWithSummary extends Program {
+export interface SetlistWithSummary extends Setlist {
   groupName: string | null;
   currentUserRole: GroupRole | null;
   canManage: boolean;
   itemCount: number;
 }
 
-export interface ProgramItemWithSummary extends ProgramItem {
+export interface SetlistItemWithSummary extends SetlistItem {
   tune: Tune | null;
   tuneSet: TuneSet | null;
   tuneSetTuneCount: number;
@@ -56,7 +56,7 @@ function getLocalDeviceId(): string {
 function normalizeName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) {
-    throw new Error("Program name must not be empty");
+    throw new Error("Setlist name must not be empty");
   }
   return trimmed;
 }
@@ -97,33 +97,35 @@ async function touchGroup(
     .where(eq(userGroup.id, groupId));
 }
 
-async function touchProgram(
+async function touchSetlist(
   db: AnyDatabase,
-  programId: string,
-  currentProgram?: Program | null,
+  setlistId: string,
+  currentSetlist?: Setlist | null,
   at = nowIso()
 ): Promise<void> {
-  const programRow =
-    currentProgram ??
+  const setlistRow =
+    currentSetlist ??
     (
-      await db.select().from(program).where(eq(program.id, programId)).limit(1)
+      await db.select().from(setlist).where(eq(setlist.id, setlistId)).limit(1)
     )[0] ??
     null;
 
-  if (!programRow || programRow.deleted === 1) {
-    throw new Error("Program is not available");
+  if (!setlistRow || setlistRow.deleted === 1) {
+    throw new Error("Setlist is not available");
   }
 
   await db
-    .update(program)
+    .update(setlist)
     .set({
-      syncVersion: (programRow.syncVersion ?? 0) + 1,
+      syncVersion: (setlistRow.syncVersion ?? 0) + 1,
       lastModifiedAt: at,
       deviceId: getLocalDeviceId(),
     })
-    .where(eq(program.id, programId));
+    .where(eq(setlist.id, setlistId));
 
-  await touchGroup(db, programRow.groupRef, undefined, at);
+  if (setlistRow.groupRef) {
+    await touchGroup(db, setlistRow.groupRef, undefined, at);
+  }
 }
 
 async function getPublicTuneRow(
@@ -194,7 +196,7 @@ async function getTuneSetTuneCount(
   return items.length;
 }
 
-async function assertTuneSetEligibleForProgram(
+async function assertTuneSetEligibleForSetlist(
   db: AnyDatabase,
   tuneSetId: string,
   userId: string
@@ -215,7 +217,7 @@ async function assertTuneSetEligibleForProgram(
     const tuneRow = await getPublicTuneRow(db, item.tuneRef);
     if (!tuneRow) {
       throw new Error(
-        "Only Tune Sets containing public tunes can be added to a Program"
+        "Only Tune Sets containing public tunes can be added to a Setlist"
       );
     }
   }
@@ -223,99 +225,145 @@ async function assertTuneSetEligibleForProgram(
   return access.set;
 }
 
-export async function getProgramAccessForUser(
+export async function getSetlistAccessForUser(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   userId: string
 ): Promise<{
-  program: Program | null;
+  setlist: Setlist | null;
   currentUserRole: GroupRole | null;
   canView: boolean;
   canManage: boolean;
 }> {
-  const programs = await db
+  const setlists = await db
     .select()
-    .from(program)
-    .where(eq(program.id, programId))
+    .from(setlist)
+    .where(eq(setlist.id, setlistId))
     .limit(1);
 
-  const currentProgram = programs[0] ?? null;
-  if (!currentProgram || currentProgram.deleted === 1) {
+  const currentSetlist = setlists[0] ?? null;
+  if (!currentSetlist || currentSetlist.deleted === 1) {
     return {
-      program: currentProgram,
+      setlist: currentSetlist,
       currentUserRole: null,
       canView: false,
       canManage: false,
     };
   }
 
-  const groupAccess = await getGroupAccessForUser(
-    db,
-    currentProgram.groupRef,
-    userId
-  );
+  // User-owned setlist: the owning user can manage
+  if (currentSetlist.userRef === userId) {
+    return {
+      setlist: currentSetlist,
+      currentUserRole: "owner",
+      canView: true,
+      canManage: true,
+    };
+  }
+
+  // Group-owned setlist: check group membership
+  if (currentSetlist.groupRef) {
+    const groupAccess = await getGroupAccessForUser(
+      db,
+      currentSetlist.groupRef,
+      userId
+    );
+
+    return {
+      setlist: currentSetlist,
+      currentUserRole: groupAccess.role,
+      canView: groupAccess.canView,
+      canManage: groupAccess.canManageSets,
+    };
+  }
 
   return {
-    program: currentProgram,
-    currentUserRole: groupAccess.role,
-    canView: groupAccess.canView,
-    canManage: groupAccess.canManageSets,
+    setlist: currentSetlist,
+    currentUserRole: null,
+    canView: false,
+    canManage: false,
   };
 }
 
-export async function getVisiblePrograms(
+export async function getVisibleSetlists(
   db: AnyDatabase,
   userId: string,
   options?: {
     includeDeleted?: boolean;
     groupId?: string;
   }
-): Promise<ProgramWithSummary[]> {
+): Promise<SetlistWithSummary[]> {
   const includeDeleted = options?.includeDeleted ?? false;
   const accessibleGroupIds = await getAccessibleGroupIds(
     db,
     userId,
     includeDeleted
   );
-  if (accessibleGroupIds.length === 0) {
-    return [];
+
+  // Build WHERE clause: (group-accessible AND optionally filtered by groupId) OR user-owned
+  const orFilters = [];
+
+  if (accessibleGroupIds.length > 0) {
+    const groupFilters = [inArray(setlist.groupRef, accessibleGroupIds)];
+    if (options?.groupId) {
+      groupFilters.push(eq(setlist.groupRef, options.groupId));
+    }
+    if (!includeDeleted) {
+      groupFilters.push(eq(setlist.deleted, 0));
+    }
+    orFilters.push(and(...groupFilters));
   }
 
-  const filters = [inArray(program.groupRef, accessibleGroupIds)];
+  const userFilters = [eq(setlist.userRef, userId)];
   if (!includeDeleted) {
-    filters.push(eq(program.deleted, 0));
+    userFilters.push(eq(setlist.deleted, 0));
   }
-  if (options?.groupId) {
-    filters.push(eq(program.groupRef, options.groupId));
-  }
+  orFilters.push(and(...userFilters));
 
-  const programs = await db
+  const setlists = await db
     .select()
-    .from(program)
-    .where(and(...filters))
-    .orderBy(asc(program.name));
+    .from(setlist)
+    .where(or(...orFilters))
+    .orderBy(asc(setlist.name));
 
   return Promise.all(
-    programs.map(async (programRow) => {
-      const groupAccess = await getGroupAccessForUser(
-        db,
-        programRow.groupRef,
-        userId
-      );
+    setlists.map(async (setlistRow) => {
+      let groupAccess: {
+        role: GroupRole | null;
+        canView: boolean;
+        canManageSets: boolean;
+      } = {
+        role: null,
+        canView: false,
+        canManageSets: false,
+      };
+
+      if (setlistRow.userRef === userId) {
+        groupAccess = { role: "owner", canView: true, canManageSets: true };
+      } else if (setlistRow.groupRef) {
+        groupAccess = await getGroupAccessForUser(
+          db,
+          setlistRow.groupRef,
+          userId
+        );
+      }
+
       const items = await db
         .select()
-        .from(programItem)
+        .from(setlistItem)
         .where(
           and(
-            eq(programItem.programRef, programRow.id),
-            eq(programItem.deleted, 0)
+            eq(setlistItem.setlistRef, setlistRow.id),
+            eq(setlistItem.deleted, 0)
           )
         );
 
       return {
-        ...programRow,
-        groupName:
-          (await getGroupById(db, programRow.groupRef, userId))?.name ?? null,
+        ...setlistRow,
+        groupName: setlistRow.groupRef
+          ? ((await getGroupById(db, setlistRow.groupRef, userId))?.name ??
+            null)
+          : null,
         currentUserRole: groupAccess.role,
         canManage: groupAccess.canManageSets,
         itemCount: items.length,
@@ -324,33 +372,43 @@ export async function getVisiblePrograms(
   );
 }
 
-export async function getProgramById(
+export async function getSetlistById(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   userId: string
-): Promise<Program | null> {
-  const access = await getProgramAccessForUser(db, programId, userId);
-  return access.canView ? access.program : null;
+): Promise<Setlist | null> {
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
+  return access.canView ? access.setlist : null;
 }
 
-export async function createProgram(
+export async function createSetlist(
   db: AnyDatabase,
   userId: string,
   data: {
-    groupRef: string;
+    groupRef?: string | null;
+    userRef?: string | null;
     name: string;
     description?: string | null;
   }
-): Promise<Program> {
-  const groupAccess = await getGroupAccessForUser(db, data.groupRef, userId);
-  if (!groupAccess.canManageSets) {
-    throw new Error("Only group owners or admins can manage Programs");
+): Promise<Setlist> {
+  // Must have at least one owner
+  if (!data.groupRef && !data.userRef) {
+    throw new Error("Setlist must have either a group or user owner");
+  }
+
+  // If group-scoped, check permissions
+  if (data.groupRef) {
+    const groupAccess = await getGroupAccessForUser(db, data.groupRef, userId);
+    if (!groupAccess.canManageSets) {
+      throw new Error("Only group owners or admins can manage setlists");
+    }
   }
 
   const now = nowIso();
-  const newProgram: NewProgram = {
+  const newSetlist: NewSetlist = {
     id: generateId(),
-    groupRef: data.groupRef,
+    groupRef: data.groupRef ?? null,
+    userRef: data.userRef ?? null,
     name: normalizeName(data.name),
     description: normalizeDescription(data.description),
     deleted: 0,
@@ -360,32 +418,35 @@ export async function createProgram(
     deviceId: getLocalDeviceId(),
   };
 
-  const result = await db.insert(program).values(newProgram).returning();
+  const result = await db.insert(setlist).values(newSetlist).returning();
   if (result.length === 0) {
-    throw new Error("Failed to create Program");
+    throw new Error("Failed to create Setlist");
   }
 
-  await touchGroup(db, data.groupRef, groupAccess.group, now);
+  if (data.groupRef) {
+    const groupAccess = await getGroupAccessForUser(db, data.groupRef, userId);
+    await touchGroup(db, data.groupRef, groupAccess.group, now);
+  }
   await persistDb();
   return result[0];
 }
 
-export async function updateProgram(
+export async function updateSetlist(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   userId: string,
   data: {
     name?: string;
     description?: string | null;
   }
-): Promise<Program | null> {
-  const access = await getProgramAccessForUser(db, programId, userId);
-  if (!access.canManage || !access.program) {
-    throw new Error("You do not have permission to update this Program");
+): Promise<Setlist | null> {
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
+  if (!access.canManage || !access.setlist) {
+    throw new Error("You do not have permission to update this Setlist");
   }
 
-  const updateData: Partial<NewProgram> = {
-    syncVersion: (access.program.syncVersion ?? 0) + 1,
+  const updateData: Partial<NewSetlist> = {
+    syncVersion: (access.setlist.syncVersion ?? 0) + 1,
     lastModifiedAt: nowIso(),
     deviceId: getLocalDeviceId(),
   };
@@ -398,90 +459,94 @@ export async function updateProgram(
   }
 
   const result = await db
-    .update(program)
+    .update(setlist)
     .set(updateData)
-    .where(eq(program.id, programId))
+    .where(eq(setlist.id, setlistId))
     .returning();
 
-  await touchGroup(
-    db,
-    access.program.groupRef,
-    undefined,
-    updateData.lastModifiedAt
-  );
+  if (access.setlist.groupRef) {
+    await touchGroup(
+      db,
+      access.setlist.groupRef,
+      undefined,
+      updateData.lastModifiedAt
+    );
+  }
   await persistDb();
   return result[0] ?? null;
 }
 
-export async function deleteProgram(
+export async function deleteSetlist(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   userId: string
 ): Promise<boolean> {
-  const access = await getProgramAccessForUser(db, programId, userId);
-  if (!access.canManage || !access.program) {
-    throw new Error("You do not have permission to delete this Program");
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
+  if (!access.canManage || !access.setlist) {
+    throw new Error("You do not have permission to delete this Setlist");
   }
 
   const now = nowIso();
   const activeItems = await db
     .select()
-    .from(programItem)
+    .from(setlistItem)
     .where(
-      and(eq(programItem.programRef, programId), eq(programItem.deleted, 0))
+      and(eq(setlistItem.setlistRef, setlistId), eq(setlistItem.deleted, 0))
     );
 
   await db
-    .update(program)
+    .update(setlist)
     .set({
       deleted: 1,
-      syncVersion: (access.program.syncVersion ?? 0) + 1,
+      syncVersion: (access.setlist.syncVersion ?? 0) + 1,
       lastModifiedAt: now,
       deviceId: getLocalDeviceId(),
     })
-    .where(eq(program.id, programId));
+    .where(eq(setlist.id, setlistId));
 
-  await touchGroup(db, access.program.groupRef, undefined, now);
+  if (access.setlist.groupRef) {
+    await touchGroup(db, access.setlist.groupRef, undefined, now);
+  }
 
   for (const item of activeItems) {
     await db
-      .update(programItem)
+      .update(setlistItem)
       .set({
         deleted: 1,
         syncVersion: (item.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
         deviceId: getLocalDeviceId(),
       })
-      .where(eq(programItem.id, item.id));
+      .where(eq(setlistItem.id, item.id));
   }
 
   await persistDb();
   return true;
 }
 
-export async function getProgramItems(
+export async function getSetlistItems(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   userId: string,
   includeDeleted = false
-): Promise<ProgramItemWithSummary[]> {
-  const access = await getProgramAccessForUser(db, programId, userId);
+): Promise<SetlistItemWithSummary[]> {
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
   if (!access.canView) {
     return [];
   }
 
-  const filters = [eq(programItem.programRef, programId)];
+  const filters = [eq(setlistItem.setlistRef, setlistId)];
   if (!includeDeleted) {
-    filters.push(eq(programItem.deleted, 0));
+    filters.push(eq(setlistItem.deleted, 0));
   }
 
   const items = await db
     .select()
-    .from(programItem)
+    .from(setlistItem)
     .where(and(...filters))
-    .orderBy(asc(programItem.position));
+    .orderBy(asc(setlistItem.position));
 
-  const result: ProgramItemWithSummary[] = [];
+  const result: SetlistItemWithSummary[] = [];
   for (const item of items) {
     if (item.itemKind === "tune") {
       const tuneRow = item.tuneRef
@@ -518,15 +583,15 @@ export async function getProgramItems(
   return result;
 }
 
-async function getNextProgramPosition(
+async function getNextSetlistPosition(
   db: AnyDatabase,
-  programId: string
+  setlistId: string
 ): Promise<number> {
   const items = await db
     .select()
-    .from(programItem)
+    .from(setlistItem)
     .where(
-      and(eq(programItem.programRef, programId), eq(programItem.deleted, 0))
+      and(eq(setlistItem.setlistRef, setlistId), eq(setlistItem.deleted, 0))
     );
 
   return (
@@ -537,98 +602,98 @@ async function getNextProgramPosition(
   );
 }
 
-export async function addTuneToProgram(
+export async function addTuneToSetlist(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   tuneId: string,
   userId: string,
   position?: number
-): Promise<ProgramItem> {
-  const access = await getProgramAccessForUser(db, programId, userId);
-  if (!access.canManage || !access.program) {
-    throw new Error("You do not have permission to modify this Program");
+): Promise<SetlistItem> {
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
+  if (!access.canManage || !access.setlist) {
+    throw new Error("You do not have permission to modify this Setlist");
   }
 
   const tuneRow = await getPublicTuneRow(db, tuneId);
   if (!tuneRow) {
-    throw new Error("Only public Tunes can be added to a Program");
+    throw new Error("Only public Tunes can be added to a Setlist");
   }
 
   const now = nowIso();
-  const newItem: NewProgramItem = {
+  const newItem: NewSetlistItem = {
     id: generateId(),
-    programRef: programId,
+    setlistRef: setlistId,
     itemKind: "tune",
     tuneRef: tuneId,
     tuneSetRef: null,
-    position: position ?? (await getNextProgramPosition(db, programId)),
+    position: position ?? (await getNextSetlistPosition(db, setlistId)),
     deleted: 0,
     syncVersion: 1,
     lastModifiedAt: now,
     deviceId: getLocalDeviceId(),
   };
 
-  const result = await db.insert(programItem).values(newItem).returning();
-  await touchProgram(db, programId, access.program, now);
+  const result = await db.insert(setlistItem).values(newItem).returning();
+  await touchSetlist(db, setlistId, access.setlist, now);
   await persistDb();
   return result[0];
 }
 
-export async function addTuneSetToProgram(
+export async function addTuneSetToSetlist(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   tuneSetId: string,
   userId: string,
   position?: number
-): Promise<ProgramItem> {
-  const access = await getProgramAccessForUser(db, programId, userId);
-  if (!access.canManage || !access.program) {
-    throw new Error("You do not have permission to modify this Program");
+): Promise<SetlistItem> {
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
+  if (!access.canManage || !access.setlist) {
+    throw new Error("You do not have permission to modify this Setlist");
   }
 
-  const eligibleTuneSet = await assertTuneSetEligibleForProgram(
+  const eligibleTuneSet = await assertTuneSetEligibleForSetlist(
     db,
     tuneSetId,
     userId
   );
 
   const now = nowIso();
-  const newItem: NewProgramItem = {
+  const newItem: NewSetlistItem = {
     id: generateId(),
-    programRef: programId,
+    setlistRef: setlistId,
     itemKind: "tune_set",
     tuneRef: null,
     tuneSetRef: tuneSetId,
-    position: position ?? (await getNextProgramPosition(db, programId)),
+    position: position ?? (await getNextSetlistPosition(db, setlistId)),
     deleted: 0,
     syncVersion: 1,
     lastModifiedAt: now,
     deviceId: getLocalDeviceId(),
   };
 
-  const result = await db.insert(programItem).values(newItem).returning();
-  await touchProgram(db, programId, access.program, now);
+  const result = await db.insert(setlistItem).values(newItem).returning();
+  await touchSetlist(db, setlistId, access.setlist, now);
   await touchTuneSet(db, tuneSetId, eligibleTuneSet, now);
   await persistDb();
   return result[0];
 }
 
-export async function removeProgramItem(
+export async function removeSetlistItem(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   itemId: string,
   userId: string
 ): Promise<boolean> {
-  const access = await getProgramAccessForUser(db, programId, userId);
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
   if (!access.canManage) {
-    throw new Error("You do not have permission to modify this Program");
+    throw new Error("You do not have permission to modify this Setlist");
   }
 
   const rows = await db
     .select()
-    .from(programItem)
+    .from(setlistItem)
     .where(
-      and(eq(programItem.id, itemId), eq(programItem.programRef, programId))
+      and(eq(setlistItem.id, itemId), eq(setlistItem.setlistRef, setlistId))
     )
     .limit(1);
 
@@ -639,16 +704,16 @@ export async function removeProgramItem(
   const now = nowIso();
 
   await db
-    .update(programItem)
+    .update(setlistItem)
     .set({
       deleted: 1,
       syncVersion: (rows[0].syncVersion ?? 0) + 1,
       lastModifiedAt: now,
       deviceId: getLocalDeviceId(),
     })
-    .where(eq(programItem.id, rows[0].id));
+    .where(eq(setlistItem.id, rows[0].id));
 
-  await touchProgram(db, programId, access.program, now);
+  await touchSetlist(db, setlistId, access.setlist, now);
   if (rows[0].tuneSetRef) {
     await touchTuneSet(db, rows[0].tuneSetRef, undefined, now);
   }
@@ -656,22 +721,22 @@ export async function removeProgramItem(
   return true;
 }
 
-export async function reorderProgramItems(
+export async function reorderSetlistItems(
   db: AnyDatabase,
-  programId: string,
+  setlistId: string,
   itemIdsInOrder: string[],
   userId: string
 ): Promise<void> {
-  const access = await getProgramAccessForUser(db, programId, userId);
+  const access = await getSetlistAccessForUser(db, setlistId, userId);
   if (!access.canManage) {
-    throw new Error("You do not have permission to reorder this Program");
+    throw new Error("You do not have permission to reorder this Setlist");
   }
 
   const existing = await db
     .select()
-    .from(programItem)
+    .from(setlistItem)
     .where(
-      and(eq(programItem.programRef, programId), eq(programItem.deleted, 0))
+      and(eq(setlistItem.setlistRef, setlistId), eq(setlistItem.deleted, 0))
     );
 
   const existingIds = existing.map((row) => row.id).sort();
@@ -681,7 +746,7 @@ export async function reorderProgramItems(
     existingIds.some((id, index) => id !== requestedIds[index])
   ) {
     throw new Error(
-      "Reorder payload must contain every active Program item exactly once"
+      "Reorder payload must contain every active Setlist item exactly once"
     );
   }
 
@@ -691,36 +756,36 @@ export async function reorderProgramItems(
 
   for (const item of existing) {
     await db
-      .update(programItem)
+      .update(setlistItem)
       .set({
         position: item.position + offset,
         syncVersion: (item.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
         deviceId: getLocalDeviceId(),
       })
-      .where(eq(programItem.id, item.id));
+      .where(eq(setlistItem.id, item.id));
   }
 
   for (const [index, itemId] of itemIdsInOrder.entries()) {
     const existingItem = existingById.get(itemId);
     if (!existingItem) {
       throw new Error(
-        "Reorder payload must contain every active Program item exactly once"
+        "Reorder payload must contain every active Setlist item exactly once"
       );
     }
 
     await db
-      .update(programItem)
+      .update(setlistItem)
       .set({
         position: index,
         syncVersion: (existingItem.syncVersion ?? 0) + 2,
         lastModifiedAt: now,
         deviceId: getLocalDeviceId(),
       })
-      .where(eq(programItem.id, itemId));
+      .where(eq(setlistItem.id, itemId));
   }
 
-  await touchProgram(db, programId, access.program, now);
+  await touchSetlist(db, setlistId, access.setlist, now);
   const tuneSetIds = new Set(
     existing
       .map((item) => item.tuneSetRef)
@@ -732,7 +797,7 @@ export async function reorderProgramItems(
   await persistDb();
 }
 
-export async function getEligibleTuneSetsForProgram(
+export async function getEligibleTuneSetsForSetlist(
   db: AnyDatabase,
   userId: string
 ): Promise<TuneSet[]> {
@@ -744,7 +809,7 @@ export async function getEligibleTuneSetsForProgram(
   const eligible: TuneSet[] = [];
   for (const tuneSetSummary of visibleTuneSets) {
     try {
-      const tuneSetRow = await assertTuneSetEligibleForProgram(
+      const tuneSetRow = await assertTuneSetEligibleForSetlist(
         db,
         tuneSetSummary.id,
         userId

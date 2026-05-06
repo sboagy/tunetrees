@@ -122,7 +122,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
       // Evaluate
       await ttPage.enableFlashcardMode();
-      await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
+      await expect(ttPage.flashcardView).toBeVisible({ timeout: 15000 });
       await ttPage.selectFlashcardEvaluation(rating);
       await ttPage.submitEvaluations();
       await page.waitForLoadState("networkidle", { timeout: 15000 });

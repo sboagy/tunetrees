@@ -190,12 +190,19 @@ test.describe("Scroll Position Persistence", () => {
     }
 
     // Wait for debounce to persist scroll position (300ms + buffer)
-    await waitToSettle(page);;
+    await waitToSettle(page);
 
     // Check localStorage - key includes repertoireId suffix
-    const storedValue = await page.evaluate(({ userId, repertoireId }) => {
-      return localStorage.getItem(`TT_CATALOG_SCROLL_${userId}_${repertoireId}`);
-    }, { userId: currentTestUser.userId, repertoireId: currentTestUser.repertoireId });
+    // Poll until the debounced scroll save writes to localStorage
+    const storageKey = `TT_CATALOG_SCROLL_${currentTestUser.userId}_${currentTestUser.repertoireId}`;
+    const storedValue = await page.evaluate(async (key) => {
+      for (let i = 0; i < 20; i++) {
+        const val = localStorage.getItem(key);
+        if (val !== null) return val;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      return localStorage.getItem(key);
+    }, storageKey);
     console.log("[CATALOG TEST] localStorage value:", storedValue);
     await waitToSettle(page);
 

@@ -61,7 +61,21 @@ Primary components:
 ### Generated Contract / Codegen
 
 - `oosync` is an opinionated offline sync library with a code generator (`npm run codegen:schema`).
-- Generated outputs are write-only. If generated schema/metadata is wrong, fix the generator or inputs — do not hand-edit generated files.
+- **NEVER hand-edit generated files.** The following are generated and must only be modified by running codegen:
+  - `drizzle/schema-sqlite.generated.ts`
+  - `drizzle/schema-sqlite.ts` (wrapper, re-exports generated)
+  - `worker/src/generated/schema-postgres.generated.ts`
+  - `worker/src/generated/worker-config.generated.ts`
+  - `shared/generated/sync/table-meta.generated.ts`
+  - `shared/table-meta.ts`
+  - `src/lib/db/client-sqlite.ts`
+  - `src/lib/sync/runtime-config.ts`
+  - `worker/src/index.ts`
+- **Required workflow for schema changes:**
+  1. Apply Supabase migration to local Postgres (`npx supabase db push --local` or rhizome equivalent)
+  2. Run `npm run codegen:schema` to regenerate all outputs from the live Postgres schema
+  3. Verify: `npm run typecheck && npm run lint && npm run test:unit`
+- If generated output is wrong, fix the **source** (Supabase migration, `oosync.codegen.config.json`, or the codegen generator itself) — never patch generated files.
 - Boundary rules are enforced in the standalone `oosync` repo `AGENTS.md` (core must not import app `src/**`; worker must not import app `src/**`; shared/generated is contract-only).
 
 ## UI Principles (Pointers)

@@ -92,6 +92,17 @@ const TABLE_EXTRAS: Record<
       window_start_utc: "Start of practice window (UTC).",
     },
   },
+  event: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the event.",
+      event_date: "Date and time of the event.",
+      group_ref: "Group that owns this event (if group-scoped).",
+      name: 'Display name for the event (e.g., "Saturday Pub Gig").',
+      setlist_ref: "Optional setlist associated with this event.",
+      user_ref: "User that owns this event (if personal).",
+    },
+  },
   genre: {
     changeCategory: "catalog",
     columnDescriptions: {
@@ -246,21 +257,6 @@ const TABLE_EXTRAS: Record<
       user_id: "User ID who owns these preferences.",
     },
   },
-  program: {
-    changeCategory: "group",
-    columnDescriptions: {
-      deleted: "Soft-delete flag for the program.",
-      group_ref: "Group that owns and manages this program.",
-    },
-  },
-  program_item: {
-    changeCategory: "group",
-    columnDescriptions: {
-      item_kind:
-        "Discriminator for whether the item references a tune or a tune set.",
-      position: "Zero-based position of the item within the program.",
-    },
-  },
   reference: {
     changeCategory: "repertoire",
     columnDescriptions: {
@@ -309,6 +305,23 @@ const TABLE_EXTRAS: Record<
       scheduled: "Manual schedule override for next review.",
       sync_version: "Sync version for conflict resolution.",
       tune_ref: "Reference to the tune.",
+    },
+  },
+  setlist: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the setlist.",
+      group_ref: "Group that owns this setlist (nullable if user-owned).",
+      user_ref: "User that owns this setlist (nullable if group-owned).",
+    },
+  },
+  setlist_item: {
+    changeCategory: "group",
+    columnDescriptions: {
+      item_kind:
+        "Discriminator for whether the item references a tune or a tune set.",
+      position: "Zero-based position of the item within the setlist.",
+      setlist_ref: "Setlist that this item belongs to.",
     },
   },
   tab_group_main_state: {
@@ -598,6 +611,7 @@ export function parseOutboxRowId(
 
 export const TABLE_SYNC_ORDER: Record<string, number> = {
   daily_practice_queue: 5,
+  event: 27,
   genre: 1,
   genre_tune_type: 3,
   goal: 6,
@@ -609,19 +623,19 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
   practice_record: 16,
   prefs_scheduling_options: 9,
   prefs_spaced_repetition: 10,
-  program: 26,
-  program_item: 28,
   reference: 17,
   repertoire: 11,
   repertoire_tune: 19,
+  setlist: 26,
+  setlist_item: 29,
   tab_group_main_state: 12,
   table_state: 13,
   table_transient_data: 20,
   tag: 21,
   tune: 14,
   tune_override: 22,
-  tune_set: 27,
-  tune_set_item: 29,
+  tune_set: 28,
+  tune_set_item: 30,
   tune_type: 2,
   user_genre_selection: 23,
   user_group: 24,
@@ -630,6 +644,7 @@ export const TABLE_SYNC_ORDER: Record<string, number> = {
 
 export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   daily_practice_queue: "dailyPracticeQueue",
+  event: "event",
   genre: "genre",
   genre_tune_type: "genreTuneType",
   goal: "goal",
@@ -641,11 +656,11 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   practice_record: "practiceRecord",
   prefs_scheduling_options: "prefsSchedulingOptions",
   prefs_spaced_repetition: "prefsSpacedRepetition",
-  program: "program",
-  program_item: "programItem",
   reference: "reference",
   repertoire: "repertoire",
   repertoire_tune: "repertoireTune",
+  setlist: "setlist",
+  setlist_item: "setlistItem",
   tab_group_main_state: "tabGroupMainState",
   table_state: "tableState",
   table_transient_data: "tableTransientData",

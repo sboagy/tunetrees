@@ -12,6 +12,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "id",
       ownerColumn: "user_ref",
     },
+    eventIds: {
+      table: "event",
+      idColumn: "id",
+      ownerColumn: "user_ref",
+    },
     goalIds: {
       table: "goal",
       idColumn: "id",
@@ -57,6 +62,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "repertoire_id",
       ownerColumn: "user_ref",
     },
+    setlistIds: {
+      table: "setlist",
+      idColumn: "id",
+      ownerColumn: "user_ref",
+    },
     tabGroupMainStateIds: {
       table: "tab_group_main_state",
       idColumn: "id",
@@ -92,6 +102,10 @@ export const WORKER_SYNC_CONFIG = {
     tableRules: {
       daily_practice_queue: {
         kind: "eqUserId",
+        column: "user_ref",
+      },
+      event: {
+        kind: "orNullEqUserId",
         column: "user_ref",
       },
       goal: {
@@ -192,28 +206,6 @@ export const WORKER_SYNC_CONFIG = {
         kind: "eqUserId",
         column: "user_id",
       },
-      program_item: {
-        kind: "rpc",
-        functionName: "sync_get_program_items",
-        paramMap: {
-          p_user_id: {
-            source: "authUserId",
-          },
-          p_genre_ids: {
-            source: "collection",
-            collection: "selectedGenres",
-          },
-          p_after_timestamp: {
-            source: "lastSyncAt",
-          },
-          p_limit: {
-            source: "pageLimit",
-          },
-          p_offset: {
-            source: "pageOffset",
-          },
-        },
-      },
       reference: {
         kind: "rpc",
         functionName: "sync_get_user_references",
@@ -244,6 +236,46 @@ export const WORKER_SYNC_CONFIG = {
         kind: "inCollection",
         column: "repertoire_ref",
         collection: "repertoireIds",
+      },
+      setlist: {
+        kind: "rpc",
+        functionName: "sync_get_setlists",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
+      },
+      setlist_item: {
+        kind: "rpc",
+        functionName: "sync_get_setlist_items",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       tab_group_main_state: {
         kind: "eqUserId",
@@ -334,24 +366,6 @@ export const WORKER_SYNC_CONFIG = {
           },
         },
       },
-      program: {
-        kind: "rpc",
-        functionName: "sync_get_programs",
-        paramMap: {
-          p_user_id: {
-            source: "authUserId",
-          },
-          p_after_timestamp: {
-            source: "lastSyncAt",
-          },
-          p_limit: {
-            source: "pageLimit",
-          },
-          p_offset: {
-            source: "pageOffset",
-          },
-        },
-      },
       tune_set: {
         kind: "rpc",
         functionName: "sync_get_tune_sets",
@@ -426,6 +440,16 @@ export const WORKER_SYNC_CONFIG = {
             },
             {
               prop: "tzOffsetMinutesSnapshot",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      event: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
               kind: "int",
             },
           ],
@@ -638,30 +662,6 @@ export const WORKER_SYNC_CONFIG = {
           ],
         },
       },
-      program: {
-        sanitize: {
-          coerceNumericProps: [
-            {
-              prop: "syncVersion",
-              kind: "int",
-            },
-          ],
-        },
-      },
-      program_item: {
-        sanitize: {
-          coerceNumericProps: [
-            {
-              prop: "position",
-              kind: "int",
-            },
-            {
-              prop: "syncVersion",
-              kind: "int",
-            },
-          ],
-        },
-      },
       reference: {
         sanitize: {
           coerceNumericProps: [
@@ -689,6 +689,30 @@ export const WORKER_SYNC_CONFIG = {
       repertoire_tune: {
         sanitize: {
           coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      setlist: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+      },
+      setlist_item: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "position",
+              kind: "int",
+            },
             {
               prop: "syncVersion",
               kind: "int",

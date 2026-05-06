@@ -74,7 +74,7 @@ const ResetPassword = lazy(() => import("./routes/reset-password"));
  * - Repertoire tab - Repertoire with practice status
  * - Catalog tab - Full tune catalog with CRUD
  * - Analysis tab - Practice statistics and analytics
- * - Programs tab - Group-scoped program creation and management
+ * - Setlists tab - Group-scoped setlist creation and management
  *
  * Sub-routes (wrapped in MainLayout):
  * - /practice/history - Practice history table (protected)
@@ -183,10 +183,10 @@ function App() {
                             }}
                           />
                           <Route
-                            path="/programs"
+                            path="/setlists"
                             component={() => {
                               const navigate = useNavigate();
-                              navigate("/?tab=programs", { replace: true });
+                              navigate("/?tab=setlists", { replace: true });
                               return null;
                             }}
                           />

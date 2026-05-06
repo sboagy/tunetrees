@@ -14,16 +14,16 @@ import {
   updateGroupMemberRole,
 } from "../../../src/lib/db/queries/groups";
 import {
-  addTuneSetToProgram,
-  addTuneToProgram,
-  createProgram,
-  getProgramById,
-  getProgramItems,
-  getVisiblePrograms,
-  removeProgramItem,
-  reorderProgramItems,
-  updateProgram,
-} from "../../../src/lib/db/queries/programs";
+  addTuneSetToSetlist,
+  addTuneToSetlist,
+  createSetlist,
+  getSetlistById,
+  getSetlistItems,
+  getVisibleSetlists,
+  removeSetlistItem,
+  reorderSetlistItems,
+  updateSetlist,
+} from "../../../src/lib/db/queries/setlists";
 import {
   addTuneToTuneSet,
   createTuneSet,
@@ -469,54 +469,54 @@ describe("tune set query helpers", () => {
     expect(items.map((item) => item.position)).toEqual([0, 1]);
   });
 
-  it("allows owner/admin Program management while keeping members read-only", async () => {
+  it("allows owner/admin Setlist management while keeping members read-only", async () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Ceili Band",
     });
     await addGroupMember(db as never, group.id, OWNER_ID, ADMIN_ID, "admin");
     await addGroupMember(db as never, group.id, OWNER_ID, MEMBER_ID, "member");
 
-    const createdProgram = await createProgram(db as never, OWNER_ID, {
-      name: "Program 1",
+    const createdSetlist = await createSetlist(db as never, OWNER_ID, {
+      name: "Setlist 1",
       groupRef: group.id,
     });
 
-    await addTuneToProgram(
+    await addTuneToSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       PUBLIC_TUNE_ID,
       ADMIN_ID
     );
-    const adminUpdated = await updateProgram(
+    const adminUpdated = await updateSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       ADMIN_ID,
       {
-        name: "Program 1 Updated",
+        name: "Setlist 1 Updated",
       }
     );
-    expect(adminUpdated?.name).toBe("Program 1 Updated");
+    expect(adminUpdated?.name).toBe("Setlist 1 Updated");
 
-    const memberVisible = await getVisiblePrograms(db as never, MEMBER_ID, {
+    const memberVisible = await getVisibleSetlists(db as never, MEMBER_ID, {
       groupId: group.id,
     });
     expect(memberVisible).toHaveLength(1);
     expect(memberVisible[0].canManage).toBe(false);
 
     await expect(
-      updateProgram(db as never, createdProgram.id, MEMBER_ID, { name: "Nope" })
+      updateSetlist(db as never, createdSetlist.id, MEMBER_ID, { name: "Nope" })
     ).rejects.toThrow(/permission/i);
     await expect(
-      addTuneToProgram(
+      addTuneToSetlist(
         db as never,
-        createdProgram.id,
+        createdSetlist.id,
         PRIVATE_TUNE_ID,
         MEMBER_ID
       )
     ).rejects.toThrow(/permission/i);
   });
 
-  it("can build a Program from mixed Tune and Tune Set items", async () => {
+  it("can build a Setlist from mixed Tune and Tune Set items", async () => {
     const personalSet = await createTuneSet(db as never, OWNER_ID, {
       name: "Personal Favorites",
       setKind: "practice_set",
@@ -531,46 +531,46 @@ describe("tune set query helpers", () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Festival Set",
     });
-    const createdProgram = await createProgram(db as never, OWNER_ID, {
+    const createdSetlist = await createSetlist(db as never, OWNER_ID, {
       groupRef: group.id,
-      name: "Festival Opening Program",
+      name: "Festival Opening Setlist",
     });
 
-    await addTuneToProgram(
+    await addTuneToSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       PUBLIC_TUNE_ID,
       OWNER_ID
     );
-    await addTuneSetToProgram(
+    await addTuneSetToSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       personalSet.id,
       OWNER_ID
     );
-    await addTuneToProgram(
+    await addTuneToSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       PUBLIC_TUNE_ID,
       OWNER_ID
     );
 
-    const programItems = await getProgramItems(
+    const setlistItems = await getSetlistItems(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       OWNER_ID
     );
-    expect(programItems.map((item) => item.itemKind)).toEqual([
+    expect(setlistItems.map((item) => item.itemKind)).toEqual([
       "tune",
       "tune_set",
       "tune",
     ]);
-    expect(programItems[0].tune?.title).toBe("Public Tune");
-    expect(programItems[1].tuneSet?.name).toBe("Personal Favorites");
-    expect(programItems[2].tune?.title).toBe("Public Tune");
+    expect(setlistItems[0].tune?.title).toBe("Public Tune");
+    expect(setlistItems[1].tuneSet?.name).toBe("Personal Favorites");
+    expect(setlistItems[2].tune?.title).toBe("Public Tune");
   });
 
-  it("touches the parent Program when Program items change", async () => {
+  it("touches the parent Setlist when Setlist items change", async () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Festival Set",
     });
@@ -583,42 +583,42 @@ describe("tune set query helpers", () => {
       personalSet.id,
       OWNER_ID
     );
-    const createdProgram = await createProgram(db as never, OWNER_ID, {
+    const createdSetlist = await createSetlist(db as never, OWNER_ID, {
       groupRef: group.id,
-      name: "Festival Opening Program",
+      name: "Festival Opening Setlist",
     });
 
-    const originalProgram = await getProgramById(
+    const originalSetlist = await getSetlistById(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       OWNER_ID
     );
     const originalGroup = await getGroupById(db as never, group.id, OWNER_ID);
-    expect(originalProgram).not.toBeNull();
+    expect(originalSetlist).not.toBeNull();
     expect(originalGroup).not.toBeNull();
     expect(originalTuneSet).not.toBeNull();
 
-    await addTuneToProgram(
+    await addTuneToSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       PUBLIC_TUNE_ID,
       OWNER_ID
     );
 
-    const afterAdd = await getProgramById(
+    const afterAdd = await getSetlistById(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       OWNER_ID
     );
     const afterAddGroup = await getGroupById(db as never, group.id, OWNER_ID);
-    expect(afterAdd?.syncVersion).toBeGreaterThan(originalProgram!.syncVersion);
+    expect(afterAdd?.syncVersion).toBeGreaterThan(originalSetlist!.syncVersion);
     expect(afterAddGroup?.syncVersion).toBeGreaterThan(
       originalGroup!.syncVersion
     );
 
-    await addTuneSetToProgram(
+    await addTuneSetToSetlist(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       personalSet.id,
       OWNER_ID
     );
@@ -632,21 +632,21 @@ describe("tune set query helpers", () => {
       originalTuneSet!.syncVersion
     );
 
-    const items = await getProgramItems(
+    const items = await getSetlistItems(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       OWNER_ID
     );
-    await reorderProgramItems(
+    await reorderSetlistItems(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       items.map((item) => item.id),
       OWNER_ID
     );
 
-    const afterReorder = await getProgramById(
+    const afterReorder = await getSetlistById(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       OWNER_ID
     );
     const afterReorderGroup = await getGroupById(
@@ -659,16 +659,16 @@ describe("tune set query helpers", () => {
       afterAddGroup!.syncVersion
     );
 
-    await removeProgramItem(
+    await removeSetlistItem(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       items[0].id,
       OWNER_ID
     );
 
-    const afterRemove = await getProgramById(
+    const afterRemove = await getSetlistById(
       db as never,
-      createdProgram.id,
+      createdSetlist.id,
       OWNER_ID
     );
     const afterRemoveGroup = await getGroupById(
@@ -682,7 +682,7 @@ describe("tune set query helpers", () => {
     );
   });
 
-  it("blocks adding a Tune Set with private tunes to a Program", async () => {
+  it("blocks adding a Tune Set with private tunes to a Setlist", async () => {
     const personalSet = await createTuneSet(db as never, OWNER_ID, {
       name: "Private Favorites",
       setKind: "practice_set",
@@ -697,20 +697,20 @@ describe("tune set query helpers", () => {
     const group = await createGroup(db as never, OWNER_ID, {
       name: "Festival Set",
     });
-    const createdProgram = await createProgram(db as never, OWNER_ID, {
+    const createdSetlist = await createSetlist(db as never, OWNER_ID, {
       groupRef: group.id,
-      name: "Festival Opening Program",
+      name: "Festival Opening Setlist",
     });
 
     await expect(
-      addTuneSetToProgram(
+      addTuneSetToSetlist(
         db as never,
-        createdProgram.id,
+        createdSetlist.id,
         personalSet.id,
         OWNER_ID
       )
     ).rejects.toThrow(
-      /only tune sets containing public tunes can be added to a program/i
+      /only tune sets containing public tunes can be added to a setlist/i
     );
   });
 });

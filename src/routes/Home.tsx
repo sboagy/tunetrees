@@ -24,8 +24,8 @@ import { useAuth } from "../lib/auth/AuthContext";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticePage from "./practice";
-import ProgramsPage from "./programs";
 import RepertoirePage from "./repertoire";
+import SetlistsPage from "./setlists";
 
 /**
  * Home Page Component
@@ -56,7 +56,7 @@ const Home: Component = () => {
     );
     if (
       tabFromUrl &&
-      ["practice", "repertoire", "catalog", "analysis", "programs"].includes(
+      ["practice", "repertoire", "catalog", "analysis", "setlists"].includes(
         tabFromUrl
       )
     ) {
@@ -180,8 +180,8 @@ const Home: Component = () => {
             <Match when={activeTab() === "analysis"}>
               <AnalysisPage />
             </Match>
-            <Match when={activeTab() === "programs"}>
-              <ProgramsPage />
+            <Match when={activeTab() === "setlists"}>
+              <SetlistsPage />
             </Match>
           </Switch>
         </MainLayout>

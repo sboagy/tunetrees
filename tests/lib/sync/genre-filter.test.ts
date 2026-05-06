@@ -6,7 +6,7 @@ import {
 } from "@/lib/db/install-triggers";
 import {
   repairPendingMediaAssetSyncStateInSqlite,
-  repairPendingProgramSyncStateInSqlite,
+  repairPendingSetlistSyncStateInSqlite,
 } from "@/lib/sync/genre-filter";
 import { getTestSqlJs } from "../db/sqljs-test-utils";
 
@@ -59,7 +59,7 @@ describe("repairPendingMediaAssetSyncStateInSqlite", () => {
     `);
 
     db.run(`
-      CREATE TABLE program (
+      CREATE TABLE setlist (
         id TEXT PRIMARY KEY NOT NULL,
         group_ref TEXT NOT NULL,
         deleted INTEGER NOT NULL DEFAULT 0
@@ -67,9 +67,9 @@ describe("repairPendingMediaAssetSyncStateInSqlite", () => {
     `);
 
     db.run(`
-      CREATE TABLE program_item (
+      CREATE TABLE setlist_item (
         id TEXT PRIMARY KEY NOT NULL,
-        program_ref TEXT NOT NULL,
+        setlist_ref TEXT NOT NULL,
         tune_set_ref TEXT,
         deleted INTEGER NOT NULL DEFAULT 0
       )
@@ -142,7 +142,7 @@ describe("repairPendingMediaAssetSyncStateInSqlite", () => {
   });
 });
 
-describe("repairPendingProgramSyncStateInSqlite", () => {
+describe("repairPendingSetlistSyncStateInSqlite", () => {
   beforeEach(async () => {
     if (!SQL) {
       SQL = await getTestSqlJs();
@@ -160,7 +160,7 @@ describe("repairPendingProgramSyncStateInSqlite", () => {
     `);
 
     db.run(`
-      CREATE TABLE program (
+      CREATE TABLE setlist (
         id TEXT PRIMARY KEY NOT NULL,
         group_ref TEXT NOT NULL,
         deleted INTEGER NOT NULL DEFAULT 0
@@ -168,9 +168,9 @@ describe("repairPendingProgramSyncStateInSqlite", () => {
     `);
 
     db.run(`
-      CREATE TABLE program_item (
+      CREATE TABLE setlist_item (
         id TEXT PRIMARY KEY NOT NULL,
-        program_ref TEXT NOT NULL,
+        setlist_ref TEXT NOT NULL,
         tune_set_ref TEXT,
         deleted INTEGER NOT NULL DEFAULT 0
       )
@@ -185,21 +185,21 @@ describe("repairPendingProgramSyncStateInSqlite", () => {
     `);
   });
 
-  it("requeues the owning group beside a pending program row", () => {
+  it("requeues the owning group beside a pending setlist row", () => {
     db.run(`
       INSERT INTO user_group (id, deleted) VALUES ('group-1', 0);
-      INSERT INTO program (id, group_ref, deleted) VALUES ('program-1', 'group-1', 0);
+      INSERT INTO setlist (id, group_ref, deleted) VALUES ('setlist-1', 'group-1', 0);
       INSERT INTO sync_push_queue (
         id, table_name, row_id, operation, status, changed_at, attempts
       ) VALUES (
-        'queue-program-1', 'program', 'program-1', 'UPDATE', 'pending', '2026-05-02T10:00:00.000Z', 0
+        'queue-setlist-1', 'setlist', 'setlist-1', 'UPDATE', 'pending', '2026-05-02T10:00:00.000Z', 0
       );
     `);
 
-    const result = repairPendingProgramSyncStateInSqlite(db);
+    const result = repairPendingSetlistSyncStateInSqlite(db);
 
     expect(result).toEqual({
-      requeuedProgramCount: 0,
+      requeuedSetlistCount: 0,
       requeuedTuneSetCount: 0,
       requeuedGroupCount: 1,
     });
@@ -212,27 +212,27 @@ describe("repairPendingProgramSyncStateInSqlite", () => {
     ).toEqual([["user_group", "group-1", "2026-05-02T10:00:00.000Z"]]);
   });
 
-  it("pulls parent program and group into the same batch for pending program items", () => {
+  it("pulls parent setlist and group into the same batch for pending setlist items", () => {
     db.run(`
       INSERT INTO user_group (id, deleted) VALUES ('group-2', 0);
       INSERT INTO user_group (id, deleted) VALUES ('group-3', 0);
-      INSERT INTO program (id, group_ref, deleted) VALUES ('program-2', 'group-2', 0);
+      INSERT INTO setlist (id, group_ref, deleted) VALUES ('setlist-2', 'group-2', 0);
       INSERT INTO tune_set (id, group_ref, deleted) VALUES ('set-2', 'group-3', 0);
-      INSERT INTO program_item (id, program_ref, tune_set_ref, deleted) VALUES ('item-2', 'program-2', 'set-2', 0);
+      INSERT INTO setlist_item (id, setlist_ref, tune_set_ref, deleted) VALUES ('item-2', 'setlist-2', 'set-2', 0);
       INSERT INTO sync_push_queue (
         id, table_name, row_id, operation, status, changed_at, attempts
       ) VALUES
-        ('queue-item-2', 'program_item', 'item-2', 'UPDATE', 'pending', '2026-05-02T09:00:00.000Z', 0),
-        ('queue-program-2-late', 'program', 'program-2', 'UPDATE', 'pending', '2026-05-02T12:00:00.000Z', 0),
+        ('queue-item-2', 'setlist_item', 'item-2', 'UPDATE', 'pending', '2026-05-02T09:00:00.000Z', 0),
+        ('queue-setlist-2-late', 'setlist', 'setlist-2', 'UPDATE', 'pending', '2026-05-02T12:00:00.000Z', 0),
         ('queue-set-2-late', 'tune_set', 'set-2', 'UPDATE', 'failed', '2026-05-02T12:00:00.500Z', 1),
         ('queue-group-2-failed', 'user_group', 'group-2', 'UPDATE', 'failed', '2026-05-02T12:00:01.000Z', 2),
         ('queue-group-3-late', 'user_group', 'group-3', 'UPDATE', 'pending', '2026-05-02T13:00:00.000Z', 0);
     `);
 
-    const result = repairPendingProgramSyncStateInSqlite(db);
+    const result = repairPendingSetlistSyncStateInSqlite(db);
 
     expect(result).toEqual({
-      requeuedProgramCount: 1,
+      requeuedSetlistCount: 1,
       requeuedTuneSetCount: 1,
       requeuedGroupCount: 2,
     });
@@ -240,11 +240,11 @@ describe("repairPendingProgramSyncStateInSqlite", () => {
       db.exec(`
         SELECT table_name, row_id, status, changed_at
         FROM sync_push_queue
-        WHERE table_name IN ('program', 'tune_set', 'user_group')
+        WHERE table_name IN ('setlist', 'tune_set', 'user_group')
         ORDER BY table_name ASC, row_id ASC
       `)[0]?.values ?? []
     ).toEqual([
-      ["program", "program-2", "pending", "2026-05-02T09:00:00.000Z"],
+      ["setlist", "setlist-2", "pending", "2026-05-02T09:00:00.000Z"],
       ["tune_set", "set-2", "pending", "2026-05-02T09:00:00.000Z"],
       ["user_group", "group-2", "pending", "2026-05-02T09:00:00.000Z"],
       ["user_group", "group-3", "pending", "2026-05-02T09:00:00.000Z"],

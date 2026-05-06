@@ -14,33 +14,33 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useCurrentTuneSet } from "@/lib/context/CurrentTuneSetContext";
 import {
-  addTuneSetToProgram,
-  addTuneToProgram,
-  createProgram,
-  getEligibleTuneSetsForProgram,
-  getProgramAccessForUser,
-  getProgramById,
-  getProgramItems,
-  type ProgramItemKind,
-  type ProgramItemWithSummary,
-  removeProgramItem,
-  reorderProgramItems,
-  updateProgram,
-} from "@/lib/db/queries/programs";
+  addTuneSetToSetlist,
+  addTuneToSetlist,
+  createSetlist,
+  getEligibleTuneSetsForSetlist,
+  getSetlistAccessForUser,
+  getSetlistById,
+  getSetlistItems,
+  removeSetlistItem,
+  reorderSetlistItems,
+  type SetlistItemKind,
+  type SetlistItemWithSummary,
+  updateSetlist,
+} from "@/lib/db/queries/setlists";
 import { getTunesForUser } from "@/lib/db/queries/tunes";
 import type { Tune, TuneSet } from "@/lib/db/types";
 
-interface ProgramBuilderDialogProps {
+interface SetlistBuilderDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  programId?: string;
+  setlistId?: string;
   groupRef?: string | null;
   onSaved?: () => void;
   forceViewMode?: boolean;
 }
 
 interface CandidateItem {
-  kind: ProgramItemKind;
+  kind: SetlistItemKind;
   id: string;
   title: string;
   subtitle: string;
@@ -57,21 +57,21 @@ function normalizeMetadataValue(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
+export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
   props
 ) => {
   const { user, localDb } = useAuth();
   const { incrementTuneSetListChanged, tuneSetListChanged } =
     useCurrentTuneSet();
-  let programNameInputRef: HTMLInputElement | undefined;
-  const [activeProgramId, setActiveProgramId] = createSignal<
+  let setlistNameInputRef: HTMLInputElement | undefined;
+  const [activeSetlistId, setActiveSetlistId] = createSignal<
     string | undefined
-  >(props.programId);
+  >(props.setlistId);
   const [name, setName] = createSignal("");
   const [description, setDescription] = createSignal("");
   const [query, setQuery] = createSignal("");
   const [candidateFilter, setCandidateFilter] = createSignal<
-    "all" | ProgramItemKind
+    "all" | SetlistItemKind
   >("all");
   const [isSaving, setIsSaving] = createSignal(false);
   const [isMutatingItems, setIsMutatingItems] = createSignal(false);
@@ -86,7 +86,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
 
   createEffect(() => {
     if (!props.isOpen) {
-      setActiveProgramId(props.programId);
+      setActiveSetlistId(props.setlistId);
       setName("");
       setDescription("");
       setQuery("");
@@ -95,7 +95,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       return;
     }
 
-    setActiveProgramId(props.programId);
+    setActiveSetlistId(props.setlistId);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !isSaving() && !isMutatingItems()) {
@@ -107,53 +107,53 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
   });
 
-  const [programAccess] = createResource(
+  const [setlistAccess] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const programId = activeProgramId();
-      return db && userId && programId && props.isOpen
-        ? { db, userId, programId }
+      const setlistId = activeSetlistId();
+      return db && userId && setlistId && props.isOpen
+        ? { db, userId, setlistId }
         : null;
     },
     async (params) => {
       if (!params) return null;
-      return getProgramAccessForUser(
+      return getSetlistAccessForUser(
         params.db,
-        params.programId,
+        params.setlistId,
         params.userId
       );
     }
   );
 
-  const [program] = createResource(
+  const [setlist] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const programId = activeProgramId();
-      return db && userId && programId && props.isOpen
-        ? { db, userId, programId }
+      const setlistId = activeSetlistId();
+      return db && userId && setlistId && props.isOpen
+        ? { db, userId, setlistId }
         : null;
     },
     async (params) => {
       if (!params) return null;
-      return getProgramById(params.db, params.programId, params.userId);
+      return getSetlistById(params.db, params.setlistId, params.userId);
     }
   );
 
-  const [programItems] = createResource(
+  const [setlistItems] = createResource(
     () => {
       const db = localDb();
       const userId = user()?.id;
-      const programId = activeProgramId();
+      const setlistId = activeSetlistId();
       const version = tuneSetListChanged();
-      return db && userId && programId && props.isOpen
-        ? { db, userId, programId, version }
+      return db && userId && setlistId && props.isOpen
+        ? { db, userId, setlistId, version }
         : null;
     },
     async (params) => {
       if (!params) return [];
-      return getProgramItems(params.db, params.programId, params.userId);
+      return getSetlistItems(params.db, params.setlistId, params.userId);
     }
   );
 
@@ -179,7 +179,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     },
     async (params): Promise<TuneSet[]> => {
       if (!params) return [];
-      return getEligibleTuneSetsForProgram(params.db, params.userId);
+      return getEligibleTuneSetsForSetlist(params.db, params.userId);
     }
   );
 
@@ -188,10 +188,10 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       return;
     }
 
-    const currentProgram = program();
-    if (activeProgramId()) {
-      setName(currentProgram?.name ?? "");
-      setDescription(currentProgram?.description ?? "");
+    const currentSetlist = setlist();
+    if (activeSetlistId()) {
+      setName(currentSetlist?.name ?? "");
+      setDescription(currentSetlist?.description ?? "");
       return;
     }
 
@@ -200,48 +200,48 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
   });
 
   const canManage = createMemo(() => {
-    if (props.forceViewMode && activeProgramId()) {
+    if (props.forceViewMode && activeSetlistId()) {
       return false;
     }
 
-    if (!activeProgramId()) {
+    if (!activeSetlistId()) {
       return true;
     }
-    return programAccess()?.canManage ?? false;
+    return setlistAccess()?.canManage ?? false;
   });
 
   const dialogTitle = createMemo(() => {
-    if (!activeProgramId()) {
-      return "Create Program";
+    if (!activeSetlistId()) {
+      return "Create Setlist";
     }
 
     if (props.forceViewMode) {
-      return "Program Details";
+      return "Setlist Details";
     }
 
-    return canManage() ? "Edit Program" : "View Program";
+    return canManage() ? "Edit Setlist" : "View Setlist";
   });
 
-  const hasValidProgramName = createMemo(
+  const hasValidSetlistName = createMemo(
     () => normalizeMetadataValue(name()) !== ""
   );
 
-  const isCreatingProgram = createMemo(() => !activeProgramId());
+  const isCreatingSetlist = createMemo(() => !activeSetlistId());
 
   createEffect(() => {
     if (
       !props.isOpen ||
       props.forceViewMode ||
-      !isCreatingProgram() ||
+      !isCreatingSetlist() ||
       !canManage()
     ) {
       return;
     }
 
     const focusInput = () => {
-      if (programNameInputRef) {
-        programNameInputRef.focus();
-        programNameInputRef.select();
+      if (setlistNameInputRef) {
+        setlistNameInputRef.focus();
+        setlistNameInputRef.select();
       }
     };
 
@@ -255,22 +255,22 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
   });
 
   const hasPendingMetadataChanges = createMemo(() => {
-    const currentProgram = program();
-    if (!activeProgramId()) {
+    const currentSetlist = setlist();
+    if (!activeSetlistId()) {
       return (
         normalizeMetadataValue(name()) !== "" || description().trim() !== ""
       );
     }
 
-    if (!currentProgram) {
+    if (!currentSetlist) {
       return false;
     }
 
     return (
       normalizeMetadataValue(name()) !==
-        normalizeMetadataValue(currentProgram.name) ||
+        normalizeMetadataValue(currentSetlist.name) ||
       normalizeMetadataValue(description()) !==
-        normalizeMetadataValue(currentProgram.description)
+        normalizeMetadataValue(currentSetlist.description)
     );
   });
 
@@ -304,12 +304,12 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       .sort((left, right) => left.title.localeCompare(right.title));
   });
 
-  const persistProgramMetadata = async (options?: {
+  const persistSetlistMetadata = async (options?: {
     showSuccessToast?: boolean;
   }) => {
     const db = localDb();
     const userId = user()?.id;
-    const groupRef = props.groupRef ?? program()?.groupRef ?? null;
+    const groupRef = props.groupRef ?? setlist()?.groupRef ?? null;
     if (!db || !userId || !groupRef) {
       showDialogError("Database is not ready yet.");
       return null;
@@ -319,38 +319,38 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       setIsSaving(true);
       const showSuccessToast = options?.showSuccessToast ?? true;
 
-      if (activeProgramId()) {
-        const updated = await updateProgram(db, activeProgramId()!, userId, {
+      if (activeSetlistId()) {
+        const updated = await updateSetlist(db, activeSetlistId()!, userId, {
           name: name(),
           description: description(),
         });
         incrementTuneSetListChanged();
         props.onSaved?.();
         if (showSuccessToast) {
-          toast.success(`Saved program "${updated?.name ?? name()}".`, {
+          toast.success(`Saved setlist "${updated?.name ?? name()}".`, {
             duration: 2500,
           });
         }
         return updated ?? null;
       }
 
-      const created = await createProgram(db, userId, {
+      const created = await createSetlist(db, userId, {
         groupRef,
         name: name(),
         description: description(),
       });
-      setActiveProgramId(created.id);
+      setActiveSetlistId(created.id);
       incrementTuneSetListChanged();
       props.onSaved?.();
       if (showSuccessToast) {
-        toast.success(`Created program "${created.name}".`, {
+        toast.success(`Created setlist "${created.name}".`, {
           duration: 2500,
         });
       }
       return created;
     } catch (error) {
       showDialogError(
-        error instanceof Error ? error.message : "Failed to save Program"
+        error instanceof Error ? error.message : "Failed to save Setlist"
       );
       return null;
     } finally {
@@ -358,16 +358,16 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     }
   };
 
-  const ensureProgramId = async (): Promise<string | null> => {
-    if (activeProgramId()) {
-      return activeProgramId()!;
+  const ensureSetlistId = async (): Promise<string | null> => {
+    if (activeSetlistId()) {
+      return activeSetlistId()!;
     }
 
-    if (!hasValidProgramName()) {
+    if (!hasValidSetlistName()) {
       return null;
     }
 
-    const created = await persistProgramMetadata();
+    const created = await persistSetlistMetadata();
     return created?.id ?? null;
   };
 
@@ -377,8 +377,8 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       return;
     }
 
-    if (activeProgramId() && hasPendingMetadataChanges()) {
-      const saved = await persistProgramMetadata({ showSuccessToast: false });
+    if (activeSetlistId() && hasPendingMetadataChanges()) {
+      const saved = await persistSetlistMetadata({ showSuccessToast: false });
       if (!saved) {
         return;
       }
@@ -395,50 +395,50 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       return;
     }
 
-    const programId = await ensureProgramId();
-    if (!programId) {
+    const setlistId = await ensureSetlistId();
+    if (!setlistId) {
       return;
     }
 
     try {
       setIsMutatingItems(true);
       if (candidate.kind === "tune") {
-        await addTuneToProgram(db, programId, candidate.id, userId);
+        await addTuneToSetlist(db, setlistId, candidate.id, userId);
       } else {
-        await addTuneSetToProgram(db, programId, candidate.id, userId);
+        await addTuneSetToSetlist(db, setlistId, candidate.id, userId);
       }
 
       incrementTuneSetListChanged();
       props.onSaved?.();
-      toast.success(`Added "${candidate.title}" to this Program.`, {
+      toast.success(`Added "${candidate.title}" to this Setlist.`, {
         duration: 2500,
       });
     } catch (error) {
       showDialogError(
-        error instanceof Error ? error.message : "Failed to add item to Program"
+        error instanceof Error ? error.message : "Failed to add item to Setlist"
       );
     } finally {
       setIsMutatingItems(false);
     }
   };
 
-  const handleRemoveItem = async (item: ProgramItemWithSummary) => {
+  const handleRemoveItem = async (item: SetlistItemWithSummary) => {
     const db = localDb();
     const userId = user()?.id;
-    const programId = activeProgramId();
-    if (!db || !userId || !programId) {
+    const setlistId = activeSetlistId();
+    if (!db || !userId || !setlistId) {
       showDialogError("Database is not ready yet.");
       return;
     }
 
     try {
       setIsMutatingItems(true);
-      await removeProgramItem(db, programId, item.id, userId);
+      await removeSetlistItem(db, setlistId, item.id, userId);
       incrementTuneSetListChanged();
       props.onSaved?.();
     } catch (error) {
       showDialogError(
-        error instanceof Error ? error.message : "Failed to remove Program item"
+        error instanceof Error ? error.message : "Failed to remove Setlist item"
       );
     } finally {
       setIsMutatingItems(false);
@@ -449,13 +449,13 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
     const draggedId = draggedItemId();
     const db = localDb();
     const userId = user()?.id;
-    const programId = activeProgramId();
-    const items = programItems() ?? [];
+    const setlistId = activeSetlistId();
+    const items = setlistItems() ?? [];
     if (
       !draggedId ||
       !db ||
       !userId ||
-      !programId ||
+      !setlistId ||
       draggedId === targetItemId
     ) {
       setDraggedItemId(null);
@@ -474,14 +474,14 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
       const reordered = moveItem(items, fromIndex, toIndex).map(
         (item) => item.id
       );
-      await reorderProgramItems(db, programId, reordered, userId);
+      await reorderSetlistItems(db, setlistId, reordered, userId);
       incrementTuneSetListChanged();
       props.onSaved?.();
     } catch (error) {
       showDialogError(
         error instanceof Error
           ? error.message
-          : "Failed to reorder Program items"
+          : "Failed to reorder Setlist items"
       );
     } finally {
       setDraggedItemId(null);
@@ -495,16 +495,16 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
         type="button"
         class="fixed inset-0 z-[60] cursor-default bg-black/50 dark:bg-black/70"
         onClick={props.onClose}
-        aria-label="Close program builder backdrop"
-        data-testid="program-builder-backdrop"
+        aria-label="Close setlist builder backdrop"
+        data-testid="setlist-builder-backdrop"
       />
 
       <div
         class="fixed left-1/2 top-1/2 z-[70] flex h-[92vh] w-[96vw] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="program-builder-title"
-        data-testid="program-builder-dialog"
+        aria-labelledby="setlist-builder-title"
+        data-testid="setlist-builder-dialog"
       >
         <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
           <header class="flex justify-between items-center w-full mb-4">
@@ -515,14 +515,14 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                 disabled={isSaving() || isMutatingItems()}
                 variant={canManage() ? "outline" : "ghost"}
                 size="sm"
-                data-testid="close-program-builder-button"
+                data-testid="close-setlist-builder-button"
               >
                 {canManage() ? "Cancel" : "Back"}
               </Button>
             </div>
             <div class="flex min-w-0 flex-1 justify-center px-3">
               <h2
-                id="program-builder-title"
+                id="setlist-builder-title"
                 class="text-center text-xl font-semibold text-gray-900 dark:text-white"
               >
                 {dialogTitle()}
@@ -533,21 +533,21 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                 <Button
                   type="button"
                   onClick={() =>
-                    void (activeProgramId()
+                    void (activeSetlistId()
                       ? handleDone()
-                      : persistProgramMetadata())
+                      : persistSetlistMetadata())
                   }
                   disabled={
-                    isSaving() || isMutatingItems() || !hasValidProgramName()
+                    isSaving() || isMutatingItems() || !hasValidSetlistName()
                   }
                   variant="default"
                   size="sm"
-                  data-testid="save-program-button"
+                  data-testid="save-setlist-button"
                 >
                   <Show
                     when={isSaving()}
                     fallback={
-                      activeProgramId() ? (
+                      activeSetlistId() ? (
                         <>
                           <Save size={16} />
                           Save
@@ -569,7 +569,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
 
           <div class="flex items-start gap-4">
             <p class="text-sm text-gray-600 dark:text-gray-400">
-              Build a musical Program from individual Tunes and eligible Tune
+              Build a musical Setlist from individual Tunes and eligible Tune
               Sets.
             </p>
           </div>
@@ -582,26 +582,26 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
             <div class="space-y-4">
               <div class="space-y-4">
                 <div
-                  class={`space-y-2 rounded-lg p-3 ${canManage() && !hasValidProgramName() ? "border border-red-200/70 bg-red-50/40 dark:border-red-900/60 dark:bg-red-950/10" : "border border-transparent bg-transparent"}`}
+                  class={`space-y-2 rounded-lg p-3 ${canManage() && !hasValidSetlistName() ? "border border-red-200/70 bg-red-50/40 dark:border-red-900/60 dark:bg-red-950/10" : "border border-transparent bg-transparent"}`}
                 >
                   <div class="flex items-center gap-2">
                     <label
-                      for="program-name"
+                      for="setlist-name"
                       class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Program Name
+                      Setlist Name
                     </label>
-                    <Show when={canManage() && !hasValidProgramName()}>
+                    <Show when={canManage() && !hasValidSetlistName()}>
                       <span class="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-950/60 dark:text-red-300">
                         Required
                       </span>
                     </Show>
                   </div>
                   <input
-                    id="program-name"
-                    ref={programNameInputRef}
+                    id="setlist-name"
+                    ref={setlistNameInputRef}
                     autofocus={
-                      props.isOpen && isCreatingProgram() && canManage()
+                      props.isOpen && isCreatingSetlist() && canManage()
                     }
                     type="text"
                     value={name()}
@@ -609,30 +609,30 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                     disabled={!canManage()}
                     required
                     aria-required="true"
-                    aria-invalid={canManage() && !hasValidProgramName()}
-                    aria-describedby="program-name-help"
-                    class={`w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-blue-400/60 dark:focus:border-blue-400 ${canManage() && !hasValidProgramName() ? "border-red-400 ring-1 ring-red-400/40 dark:border-red-500 dark:ring-red-500/30" : "border-gray-300 dark:border-gray-700"}`}
+                    aria-invalid={canManage() && !hasValidSetlistName()}
+                    aria-describedby="setlist-name-help"
+                    class={`w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:border-blue-500 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400 dark:focus:ring-blue-400/60 dark:focus:border-blue-400 ${canManage() && !hasValidSetlistName() ? "border-red-400 ring-1 ring-red-400/40 dark:border-red-500 dark:ring-red-500/30" : "border-gray-300 dark:border-gray-700"}`}
                     placeholder="Festival opener"
-                    data-testid="program-name-input"
+                    data-testid="setlist-name-input"
                   />
                   <p
-                    id="program-name-help"
-                    class={`text-xs ${canManage() && !hasValidProgramName() ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
+                    id="setlist-name-help"
+                    class={`text-xs ${canManage() && !hasValidSetlistName() ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"}`}
                   >
-                    Enter a program name to enable Create and add tunes or tune
+                    Enter a setlist name to enable Create and add tunes or tune
                     sets.
                   </p>
                 </div>
 
                 <div class="space-y-2">
                   <label
-                    for="program-description"
+                    for="setlist-description"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     Notes
                   </label>
                   <textarea
-                    id="program-description"
+                    id="setlist-description"
                     value={description()}
                     onInput={(event) =>
                       setDescription(event.currentTarget.value)
@@ -641,7 +641,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                     rows={3}
                     class="min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                     placeholder="Optional set notes"
-                    data-testid="program-description-input"
+                    data-testid="setlist-description-input"
                   />
                 </div>
               </div>
@@ -654,7 +654,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                     </h3>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                       Search the existing Tune and Tune Set grid, then add items
-                      to the Program.
+                      to the Setlist.
                     </p>
                   </div>
 
@@ -665,14 +665,14 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                       onInput={(event) => setQuery(event.currentTarget.value)}
                       placeholder="Search tunes and tune sets"
                       class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                      data-testid="program-candidate-search-input"
+                      data-testid="setlist-candidate-search-input"
                     />
                     <div class="flex items-center gap-2">
                       <button
                         type="button"
                         class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "all" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
                         onClick={() => setCandidateFilter("all")}
-                        data-testid="program-candidate-filter-all"
+                        data-testid="setlist-candidate-filter-all"
                       >
                         All
                       </button>
@@ -680,7 +680,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                         type="button"
                         class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "tune" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
                         onClick={() => setCandidateFilter("tune")}
-                        data-testid="program-candidate-filter-tunes"
+                        data-testid="setlist-candidate-filter-tunes"
                       >
                         Tunes
                       </button>
@@ -688,7 +688,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                         type="button"
                         class={`rounded-md px-3 py-2 text-xs font-medium ${candidateFilter() === "tune_set" ? "bg-blue-600 text-white" : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"}`}
                         onClick={() => setCandidateFilter("tune_set")}
-                        data-testid="program-candidate-filter-tune-sets"
+                        data-testid="setlist-candidate-filter-tune-sets"
                       >
                         Tune Sets
                       </button>
@@ -697,7 +697,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
 
                   <div
                     class="min-h-0 rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                    data-testid="program-candidate-list"
+                    data-testid="setlist-candidate-list"
                   >
                     <Show
                       when={candidateItems().length > 0}
@@ -733,13 +733,13 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                                   void handleAddCandidate(candidate)
                                 }
                                 disabled={
-                                  !hasValidProgramName() ||
+                                  !hasValidSetlistName() ||
                                   !canManage() ||
                                   isMutatingItems() ||
                                   isSaving()
                                 }
                                 class="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
-                                data-testid="program-add-candidate-button"
+                                data-testid="setlist-add-candidate-button"
                               >
                                 <Plus size={14} />
                                 Add
@@ -762,7 +762,7 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
               <div class="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Program Build
+                    Setlist Build
                   </h3>
                   <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     Drag to reorder. Each row can be a single Tune or a full
@@ -770,48 +770,48 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                   </p>
                 </div>
                 <div class="rounded-md bg-white px-3 py-2 text-xs text-gray-500 shadow-sm dark:bg-gray-900 dark:text-gray-400">
-                  {programItems()?.length ?? 0} item
-                  {(programItems()?.length ?? 0) === 1 ? "" : "s"}
+                  {setlistItems()?.length ?? 0} item
+                  {(setlistItems()?.length ?? 0) === 1 ? "" : "s"}
                 </div>
               </div>
 
               <div
                 class="flex min-h-0 flex-1 flex-col rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-                data-testid="program-items-list"
+                data-testid="setlist-items-list"
               >
                 <Show
-                  when={activeProgramId()}
+                  when={activeSetlistId()}
                   fallback={
                     <div class="flex min-h-0 flex-1 px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
-                      Save the Program name first, then add Tunes or Tune Sets
+                      Save the Setlist name first, then add Tunes or Tune Sets
                       on the left.
                     </div>
                   }
                 >
                   <Show
-                    when={(programItems() ?? []).length > 0}
+                    when={(setlistItems() ?? []).length > 0}
                     fallback={
                       <div class="flex min-h-0 flex-1 px-4 py-10 text-sm text-gray-500 dark:text-gray-400">
                         <Show
                           when={props.forceViewMode}
                           fallback={
                             <>
-                              This Program is empty. Add Tunes or Tune Sets from
+                              This Setlist is empty. Add Tunes or Tune Sets from
                               the left pane.
                             </>
                           }
                         >
-                          This Program is empty.
+                          This Setlist is empty.
                         </Show>
                       </div>
                     }
                   >
                     <div class="max-h-[58vh] overflow-y-auto">
-                      <For each={programItems() ?? []}>
+                      <For each={setlistItems() ?? []}>
                         {(item, index) => (
                           <div
                             class="flex items-start gap-3 border-b border-gray-200 px-4 py-3 last:border-b-0 dark:border-gray-700"
-                            data-testid="program-item-row"
+                            data-testid="setlist-item-row"
                           >
                             <button
                               type="button"
@@ -870,11 +870,11 @@ export const ProgramBuilderDialog: Component<ProgramBuilderDialogProps> = (
                                 class="rounded-md border border-red-200 px-2 py-2 text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
                                 onClick={() => void handleRemoveItem(item)}
                                 disabled={isMutatingItems() || isSaving()}
-                                data-testid="remove-program-item-button"
+                                data-testid="remove-setlist-item-button"
                               >
                                 <Trash2 size={14} />
                                 <span class="sr-only">
-                                  Remove item from Program
+                                  Remove item from Setlist
                                 </span>
                               </button>
                             </Show>

@@ -21,7 +21,11 @@ export const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        "destructive-ghost":
+          "text-destructive-ghost hover:bg-destructive/10 hover:text-destructive-ghost-hover",
         link: "text-primary underline-offset-4 hover:underline",
+        accent:
+          "text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/30",
       },
       size: {
         default: "h-9 px-4 py-2",

@@ -35,8 +35,8 @@ export type DailyPracticeQueue = InferSelectModel<
 >;
 export type UserGroup = InferSelectModel<typeof schema.userGroup>;
 export type GroupMember = InferSelectModel<typeof schema.groupMember>;
-export type Program = InferSelectModel<typeof schema.program>;
-export type ProgramItem = InferSelectModel<typeof schema.programItem>;
+export type Setlist = InferSelectModel<typeof schema.setlist>;
+export type SetlistItem = InferSelectModel<typeof schema.setlistItem>;
 export type TuneSet = InferSelectModel<typeof schema.tuneSet>;
 export type TuneSetItem = InferSelectModel<typeof schema.tuneSetItem>;
 export type TuneOverride = InferSelectModel<typeof schema.tuneOverride>;
@@ -69,8 +69,8 @@ export type NewDailyPracticeQueue = InferInsertModel<
 >;
 export type NewUserGroup = InferInsertModel<typeof schema.userGroup>;
 export type NewGroupMember = InferInsertModel<typeof schema.groupMember>;
-export type NewProgram = InferInsertModel<typeof schema.program>;
-export type NewProgramItem = InferInsertModel<typeof schema.programItem>;
+export type NewSetlist = InferInsertModel<typeof schema.setlist>;
+export type NewSetlistItem = InferInsertModel<typeof schema.setlistItem>;
 export type NewTuneSet = InferInsertModel<typeof schema.tuneSet>;
 export type NewTuneSetItem = InferInsertModel<typeof schema.tuneSetItem>;
 export type NewTuneOverride = InferInsertModel<typeof schema.tuneOverride>;
