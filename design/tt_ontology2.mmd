@@ -1,0 +1,49 @@
+graph TD
+    %% Styling
+    classDef social fill:#e1bee7,stroke:#8e24aa,stroke-width:2px,color:#000;
+    classDef music fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef plan fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000;
+    classDef practice fill:#ffcc80,stroke:#f57c00,stroke-width:2px,color:#000;
+
+    subgraph Social ["User & Social Entities"]
+        U[User]:::social
+        G[Group]:::social
+        R[Repertoire]:::social
+        U -- Belongs To --> G
+        U -- Maintains --> R
+    end
+
+    subgraph Music ["Musical Entities"]
+        C[Catalog]:::music
+        T[Tune]:::music
+        TS[Tune Set]:::music
+        C -- Contains --> T
+        TS -- Contains 2-4 --> T
+    end
+
+    subgraph Planning ["Performance & Planning"]
+        S[Setlist]:::plan
+        E[Event]:::plan
+        S -- Tagged With --> E
+    end
+
+    subgraph Practice ["Practice & Scheduling"]
+        PQ[Practice Queue]:::practice
+        ES[Evaluation Staging]:::practice
+        PR[Practice Record]:::practice
+        PQ -- Stages --> ES
+        ES -- Commits To --> PR
+    end
+
+    %% Cross-Domain Relationships
+    R -- Populated From --> C
+    
+    G -- Owns --> S
+    U -- Owns --> S
+    
+    S -- Contains --> T
+    S -- Contains --> TS
+
+    U -- Generates Daily --> PQ
+    PQ -- Schedules from --> R
+    PR -- Immutable Log For --> T
