@@ -30,3 +30,6 @@ package-lock.json
 *.ico
 *.svg
 *.drawio.*
+
+scratch.*
+_notes/
