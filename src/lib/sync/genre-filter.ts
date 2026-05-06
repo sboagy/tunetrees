@@ -277,12 +277,12 @@ function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
     SELECT q.row_id, p.group_ref, MIN(q.changed_at) AS required_changed_at
     FROM sync_push_queue q
     INNER JOIN setlist p ON p.id = q.row_id
-    INNER JOIN user_group ug ON ug.id = p.group_ref
+    LEFT JOIN user_group ug ON ug.id = p.group_ref
     WHERE q.table_name = 'setlist'
       AND q.status IN ('pending', 'in_progress', 'failed')
       AND lower(q.operation) != 'delete'
       AND COALESCE(p.deleted, 0) = 0
-      AND COALESCE(ug.deleted, 0) = 0
+      AND (p.group_ref IS NULL OR COALESCE(ug.deleted, 0) = 0)
     GROUP BY q.row_id, p.group_ref
   `);
 
@@ -291,11 +291,14 @@ function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
     const groupId = typeof row[1] === "string" ? row[1] : "";
     const requiredChangedAt = typeof row[2] === "string" ? row[2] : "";
 
-    if (!setlistId || !groupId || !requiredChangedAt) {
+    if (!setlistId || !requiredChangedAt) {
       continue;
     }
 
-    rememberEarliest(groupRequiredAt, groupId, requiredChangedAt);
+    // Only requeue the parent group when this is a group-owned setlist
+    if (groupId) {
+      rememberEarliest(groupRequiredAt, groupId, requiredChangedAt);
+    }
   }
 
   const pendingSetlistItems = sqliteDb.exec(`
@@ -308,14 +311,14 @@ function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
     FROM sync_push_queue q
     INNER JOIN setlist_item pi ON pi.id = q.row_id
     INNER JOIN setlist p ON p.id = pi.setlist_ref
-    INNER JOIN user_group ug ON ug.id = p.group_ref
+    LEFT JOIN user_group ug ON ug.id = p.group_ref
     LEFT JOIN tune_set ts ON ts.id = pi.tune_set_ref
     WHERE q.table_name = 'setlist_item'
       AND q.status IN ('pending', 'in_progress', 'failed')
       AND lower(q.operation) != 'delete'
       AND COALESCE(pi.deleted, 0) = 0
       AND COALESCE(p.deleted, 0) = 0
-      AND COALESCE(ug.deleted, 0) = 0
+      AND (p.group_ref IS NULL OR COALESCE(ug.deleted, 0) = 0)
       AND (pi.tune_set_ref IS NULL OR COALESCE(ts.deleted, 0) = 0)
     GROUP BY pi.setlist_ref, p.group_ref, pi.tune_set_ref, ts.group_ref
   `);
@@ -327,12 +330,16 @@ function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
     const tuneSetGroupId = typeof row[3] === "string" ? row[3] : "";
     const requiredChangedAt = typeof row[4] === "string" ? row[4] : "";
 
-    if (!setlistId || !groupId || !requiredChangedAt) {
+    if (!setlistId || !requiredChangedAt) {
       continue;
     }
 
     rememberEarliest(setlistRequiredAt, setlistId, requiredChangedAt);
-    rememberEarliest(groupRequiredAt, groupId, requiredChangedAt);
+
+    // Only requeue the parent group when this is a group-owned setlist
+    if (groupId) {
+      rememberEarliest(groupRequiredAt, groupId, requiredChangedAt);
+    }
 
     if (tuneSetId) {
       rememberEarliest(tuneSetRequiredAt, tuneSetId, requiredChangedAt);
