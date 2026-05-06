@@ -203,12 +203,16 @@ const SetlistsPage: Component = () => {
   );
 
   const canManage = createMemo(() => {
-    // For creating a new setlist in a group, check group-level permissions
     if (isCreating()) {
       const group = selectedGroup();
       return group?.canManageSets ?? false;
     }
-    return setlistAccess()?.canManage ?? false;
+    const access = setlistAccess();
+    if (access) return access.canManage;
+    // No setlist selected yet — fall back to group-level permission so the
+    // "New Setlist" button is visible even when the group has no setlists.
+    const group = selectedGroup();
+    return group?.canManageSets ?? false;
   });
 
   // ── Data: setlist items (for view mode display) ──────────────────────────
@@ -626,59 +630,93 @@ const SetlistsPage: Component = () => {
               </div>
             }
           >
-            <Show when={canManage()}>
-              <div class="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  class="border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/70 dark:text-blue-200 dark:hover:bg-blue-950/20"
-                  onClick={handleStartEdit}
-                  disabled={!selectedSetlistId()}
-                  data-testid="setlists-edit-button"
-                >
-                  <SquarePen size={14} class="mr-1.5" />
-                  Edit
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  class="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-200 dark:hover:bg-emerald-950/20"
-                  onClick={handleStartCreate}
-                  disabled={!selectedGroupId()}
-                  data-testid="setlists-new-button"
-                >
-                  <Plus size={14} class="mr-1.5" />
-                  New Setlist
-                </Button>
-              </div>
-            </Show>
-            <Show
-              when={
-                selectedSetlist() &&
-                selectedSetlist()!.canManage &&
-                !isEditing()
-              }
-            >
+            {/* Always-visible view-mode toolbar buttons.
+                Buttons are always present to avoid layout shifts; permission
+                denials surface a toast instead of hiding the control. */}
+            <div class="flex items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                class="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/20"
-                onClick={() => void handleDeleteSetlist()}
-                disabled={deletingSetlistId() === selectedSetlistId()}
-                data-testid="setlists-delete-button"
+                class={
+                  canManage()
+                    ? "border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-900/70 dark:text-blue-200 dark:hover:bg-blue-950/20"
+                    : "opacity-50"
+                }
+                onClick={() => {
+                  if (!canManage()) {
+                    toast.error(
+                      "You need to be a manager (admin or owner) to edit this setlist.",
+                      { duration: 5000 }
+                    );
+                    return;
+                  }
+                  handleStartEdit();
+                }}
+                disabled={!selectedSetlistId()}
+                data-testid="setlists-edit-button"
               >
-                <Show
-                  when={deletingSetlistId() === selectedSetlistId()}
-                  fallback={<Trash2 size={14} class="mr-1.5" />}
-                >
-                  Deleting...
-                </Show>
-                Delete
+                <SquarePen size={14} class="mr-1.5" />
+                Edit
               </Button>
-            </Show>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                class={
+                  canManage()
+                    ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/70 dark:text-emerald-200 dark:hover:bg-emerald-950/20"
+                    : "opacity-50"
+                }
+                onClick={() => {
+                  if (!canManage()) {
+                    toast.error(
+                      "You need to be a manager (admin or owner) of this group to create setlists.",
+                      { duration: 5000 }
+                    );
+                    return;
+                  }
+                  handleStartCreate();
+                }}
+                disabled={!selectedGroupId()}
+                data-testid="setlists-new-button"
+              >
+                <Plus size={14} class="mr-1.5" />
+                New Setlist
+              </Button>
+              <Show when={selectedSetlistId()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class={
+                    canManage()
+                      ? "border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/20"
+                      : "opacity-50"
+                  }
+                  onClick={() => {
+                    if (!canManage()) {
+                      toast.error(
+                        "You need to be a manager (admin or owner) to delete this setlist.",
+                        { duration: 5000 }
+                      );
+                      return;
+                    }
+                    void handleDeleteSetlist();
+                  }}
+                  disabled={deletingSetlistId() === selectedSetlistId()}
+                  data-testid="setlists-delete-button"
+                >
+                  <Show
+                    when={deletingSetlistId() === selectedSetlistId()}
+                    fallback={<Trash2 size={14} class="mr-1.5" />}
+                  >
+                    Deleting...
+                  </Show>
+                  Delete
+                </Button>
+              </Show>
+            </div>
           </Show>
         </div>
       </div>
