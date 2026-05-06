@@ -34,7 +34,9 @@ This document serves as the single source of truth for the TuneTrees UI grammar,
 | **1. Primary Action** | `variant="default"` (Solid Blue) | The single most important action on the screen. **Rule:** Place on the bottom-right of desktop forms, or full-width at the bottom of mobile forms. |
 | **2. Secondary Action** | `variant="outline"` (Border, no fill) | Safe, alternative actions. E.g., "Cancel", "Add More", "Filter". **Rule:** Place to the left of Primary actions. |
 | **3. Tertiary Action** | `variant="ghost"` (No border, gray hover) | Navigation, icon-only utility buttons (like the `⋮` menu), or very low-priority actions. |
-| **4. The FSRS Array** | *Custom App-Specific Pattern* | The "Again/Hard/Good/Easy" buttons are a special case. They should remain visually distinct from standard app navigation to keep the user in a "flow state" during practice. |
+| **4. Accent Action** | `variant="accent"` (🟢 Green text, ghost background) | Creation / growth actions ("+ New Group", "+ New Setlist"). Colored foreground conveys intent; ghost background keeps the UI calm. |
+| **5. Destructive Action** | `variant="ghost"` + `class="text-destructive hover:bg-destructive/10 hover:text-destructive"` (🔴 Red text, ghost background) | Deleting data. Use a filled `variant="destructive"` only for the single most critical delete on a screen (e.g., "Delete Account"). Ghost + red text is preferred everywhere else. |
+| **6. The FSRS Array** | *Custom App-Specific Pattern* | The "Again/Hard/Good/Easy" buttons are a special case. They should remain visually distinct from standard app navigation to keep the user in a "flow state" during practice. |
 
 ---
 
@@ -55,17 +57,24 @@ This document serves as the single source of truth for the TuneTrees UI grammar,
 
 This index dictates exactly how common actions are handled across TuneTrees.
 
-| Intent / Action | UI Text Label | Button Variant | Standard Icon (`lucide-solid`) | Strict Placement Rule |
-| :--- | :--- | :--- | :--- | :--- |
-| **Commit Data** | "Save" or "Submit" | `Primary` | `Save` (💾) | Far right of action group. Final step in a flow. |
-| **Create New Entity** | "Add [Item]" | `Primary` or `Outline`* | `Plus` (➕) | Top right of lists, or bottom of empty states. *(Primary if main action, Outline if secondary).* |
-| **Revert / Escape** | "Cancel" | `Outline` or `Ghost` | None (Usually text-only) | Far left of action group, or top-left of a modal. |
-| **Dismiss View** | None (Icon only) | `Ghost` | `X` (✖️) | Top right corner of dialogs, modals, and slide-overs. |
-| **Navigate Back** | "Back" | `Ghost` | `ChevronLeft` (<) | Top left of a screen (especially on mobile). |
-| **Modify Data** | "Edit" | `Outline` or `Ghost` | `SquarePen` (📝) | Next to the entity title, or inside a `⋮` menu. *(Note: Do NOT use standard `Pencil` as this implies full form/record edits).* |
-| **Permanently Erase** | "Delete" | `Destructive` | `Trash2` (🗑️) | Inside an overflow menu, or far left/bottom of an edit form. **Always requires a confirmation dialog.** |
+**Color-coding rule:** Actions follow a consistent color language —
+🟢 **Green (Accent)** = creation / growth,
+🔵 **Blue (Primary)** = forward progress / editing,
+🔴 **Red (Destructive)** = permanent loss,
+⚪ **Neutral (Ghost / Outline)** = navigation / dismissal / escape.
+Never use a semantic color for mere decoration.
 
-> **Inline Row Exception:** In dense list rows (e.g., Notes, References panels) where a filled `Destructive` button would be visually overwhelming, use `variant="ghost"` with `class="text-destructive hover:bg-destructive/10 hover:text-destructive"` for the delete icon button. This is the only approved deviation from `variant="destructive"` and applies only to icon-only buttons inside list items.
+| Intent / Action | UI Text Label | Button Variant | Color Cue | Standard Icon (`lucide-solid`) | Strict Placement Rule |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Commit Data** | "Save" or "Submit" | `Primary` (`variant="default"`) | 🔵 Blue | `Save` (💾) | Far right of action group. Final step in a flow. |
+| **Create New Entity** | "Add [Item]" or "+ New …" | `Accent` (`variant="accent"` — 🟢 green text, ghost bg) | 🟢 Green | `Plus` (➕) | Top right of lists, or bottom of empty states. |
+| **Revert / Escape** | "Cancel" | `Outline` or `Ghost` | ⚪ Neutral | None (Usually text-only) | Far left of action group, or top-left of a modal. |
+| **Dismiss View** | None (Icon only) | `Ghost` | ⚪ Neutral | `X` (✖️) | Top right corner of dialogs, modals, and slide-overs. |
+| **Navigate Back** | "Back" | `Ghost` | ⚪ Neutral | `ChevronLeft` (<) | Top left of a screen (especially on mobile). |
+| **Modify Data** | "Edit" | `Outline` (blue-tinted)* | 🔵 Blue | `SquarePen` (📝) | Next to the entity title, or inside a `⋮` menu. *(Note: Do NOT use standard `Pencil` as this implies full form/record edits).* |
+| **Permanently Erase** | "Delete" | `Ghost` + `text-destructive` (`variant="ghost" class="text-destructive hover:bg-destructive/10 hover:text-destructive"`) | 🔴 Red | `Trash2` (🗑️) | Inside an overflow menu, or far left/bottom of an edit form. **Always requires a confirmation dialog.** |
+
+> **Filled Destructive Exception:** A filled `variant="destructive"` (solid red background) should be used sparingly — only for the single most critical, irreversible delete on a screen (e.g., "Delete Account"). In all other contexts the ghost + red text pattern above is preferred.
 | **Remove Relation** | "Remove" | `Outline` or `Ghost` | `Minus` or `X` | Use when taking a tune out of a playlist (the tune still exists in the DB). |
 | **View Details** | "Info" or "Details" | `Ghost` | `Info` (ℹ️) | Next to complex terms or inside list rows. |
 | **Options/Overflow**| None (Icon only) | `Ghost` | `MoreVertical` (⋮) | Far right of a row, card, or mobile toolbar. |
