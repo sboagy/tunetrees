@@ -98,7 +98,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
-    "jodit": "^4.9.6",
+    "jodit": "^4.12.2",
     "jose": "^6.1.3",
     "loglevel": "^1.9.2",
     "lucide-solid": "^1.14.0",
