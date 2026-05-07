@@ -139,13 +139,31 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       props.table && props.selectedRowsCount && props.selectedRowsCount > 0
     );
 
-  const selectedRows = createMemo(() =>
-    props.table ? props.table.getSelectedRowModel().rows : []
-  );
+  const getSelectedFlatRows = () =>
+    props.table ? props.table.getSelectedRowModel().flatRows : [];
 
-  const selectedTuneIds = createMemo(() =>
-    selectedRows().map((row) => row.original.id)
-  );
+  const getSelectedTuneIds = () => {
+    const seen = new Set<string>();
+    const tuneIds: string[] = [];
+
+    for (const row of getSelectedFlatRows()) {
+      const tuneId = String(
+        (row.original as { tune_id?: string | number; id?: string | number })
+          .tune_id ??
+          (row.original as { id?: string | number }).id ??
+          ""
+      );
+      if (!tuneId || seen.has(tuneId)) continue;
+      seen.add(tuneId);
+      tuneIds.push(tuneId);
+    }
+
+    return tuneIds;
+  };
+
+  const selectedRows = createMemo(() => getSelectedFlatRows());
+
+  const selectedTuneIds = createMemo(() => getSelectedTuneIds());
 
   const selectedTuneTitles = createMemo(() =>
     selectedRows().map((row) => row.original.title ?? "")
@@ -179,7 +197,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         return;
       }
 
-      const selectedRows = props.table.getSelectedRowModel().rows;
+      const selectedRows = getSelectedFlatRows();
       if (selectedRows.length === 0) {
         alert(
           "No tunes selected. Please select tunes to add to practice queue."
@@ -187,7 +205,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         return;
       }
 
-      const tuneIds = selectedRows.map((row) => row.original.id);
+      const tuneIds = getSelectedTuneIds();
       console.log(`Adding ${tuneIds.length} tunes to practice queue:`, tuneIds);
 
       const db = getDb();
@@ -249,7 +267,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       return;
     }
 
-    const selectedRows = props.table.getSelectedRowModel().rows;
+    const selectedRows = getSelectedFlatRows();
     if (selectedRows.length === 0) {
       alert("No tunes selected. Please select tunes to group as a tune set.");
       return;
@@ -348,10 +366,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     const currentUserId = user()?.id;
     if (!currentUserId) return;
 
-    const selectedRows = props.table.getSelectedRowModel().rows;
+    const selectedRows = getSelectedFlatRows();
     if (selectedRows.length === 0) return;
 
-    const tuneIds = selectedRows.map((row) => row.original.id);
+    const tuneIds = getSelectedTuneIds();
     const db = getDb();
 
     setIsRemoving(true);

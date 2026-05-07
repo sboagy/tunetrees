@@ -377,7 +377,7 @@ const RepertoirePage: Component = () => {
     if (!db || !repertoireId) return;
 
     const table = tableInstance();
-    const selectedRows = table?.getSelectedRowModel().rows ?? [];
+    const selectedRows = table?.getSelectedRowModel().flatRows ?? [];
 
     // If more than one row is selected AND the changed row is among the selected,
     // offer to apply to all selected rows; otherwise single-row update.
