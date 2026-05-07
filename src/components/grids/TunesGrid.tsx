@@ -581,13 +581,23 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   const currentRows = createMemo(() => table.getRowModel().rows);
   const stackedListData = createMemo<IStackedListRow[]>(() =>
-    currentRows().map((row) => ({
-      ...(row.original as unknown as IStackedListRow),
-      stacked_row_id: row.id,
-      stacked_depth: row.depth,
-      stacked_can_expand: row.getCanExpand(),
-      stacked_is_expanded: row.getIsExpanded(),
-    }))
+    currentRows().map((row) => {
+      const originalRow = row.original as IStackedListRow & {
+        rowKind?: IStackedListRow["stacked_kind"];
+      };
+
+      return {
+        ...originalRow,
+        // TuneStackedList keys off `stacked_kind` for row-type-specific styling.
+        // Repertoire mixed rows may only expose the discriminator as `rowKind`,
+        // so normalize it here while preserving any existing `stacked_kind`.
+        stacked_kind: originalRow.stacked_kind ?? originalRow.rowKind,
+        stacked_row_id: row.id,
+        stacked_depth: row.depth,
+        stacked_can_expand: row.getCanExpand(),
+        stacked_is_expanded: row.getIsExpanded(),
+      };
+    })
   );
 
   const renderCellContent = (cell: Cell<T, unknown>) => {
@@ -613,6 +623,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
             type="button"
             class="mr-1 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
             aria-label={isExpanded ? "Collapse row" : "Expand row"}
+            aria-expanded={isExpanded}
             onClick={(event) => {
               event.stopPropagation();
               cell.row.toggleExpanded();

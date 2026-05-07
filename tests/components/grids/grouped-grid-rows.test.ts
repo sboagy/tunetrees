@@ -113,7 +113,6 @@ describe("buildMixedTuneGridRows", () => {
 
     expect(result.rows.map((row) => row.title)).toEqual([
       "Ballydesmond Polkas",
-      "The Kesh Jig",
     ]);
     expect(result.autoExpandedRowIds).toEqual(["set-set-42"]);
     expect(

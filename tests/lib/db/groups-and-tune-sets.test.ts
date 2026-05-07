@@ -28,6 +28,7 @@ import {
   addTuneToTuneSet,
   createTuneSet,
   createTuneSetFromTunes,
+  getBatchedTuneSetItemRefs,
   getTuneSetById,
   getTuneSetItems,
   getVisibleTuneSets,
@@ -712,5 +713,58 @@ describe("tune set query helpers", () => {
     ).rejects.toThrow(
       /only tune sets containing public tunes can be added to a setlist/i
     );
+  });
+
+  it("getBatchedTuneSetItemRefs fetches items for multiple sets in one call", async () => {
+    // Empty input returns an empty array without hitting the DB.
+    expect(await getBatchedTuneSetItemRefs(db as never, [])).toEqual([]);
+
+    const setA = await createTuneSet(db as never, OWNER_ID, {
+      name: "Set A",
+      setKind: "practice_set",
+    });
+    const setB = await createTuneSet(db as never, OWNER_ID, {
+      name: "Set B",
+      setKind: "practice_set",
+    });
+
+    await addTuneToTuneSet(db as never, setA.id, PUBLIC_TUNE_ID, OWNER_ID);
+    await addTuneToTuneSet(db as never, setA.id, PRIVATE_TUNE_ID, OWNER_ID);
+    await addTuneToTuneSet(db as never, setB.id, PUBLIC_TUNE_ID, OWNER_ID);
+
+    const results = await getBatchedTuneSetItemRefs(db as never, [
+      setA.id,
+      setB.id,
+    ]);
+
+    // Only tuneSetRef, tuneRef, and position should be returned.
+    expect(results).toHaveLength(3);
+    for (const r of results) {
+      expect(Object.keys(r)).toEqual(
+        expect.arrayContaining(["tuneSetRef", "tuneRef", "position"])
+      );
+    }
+
+    // Verify per-set grouping and correct ordering by position.
+    const setAItems = results.filter((r) => r.tuneSetRef === setA.id);
+    const setBItems = results.filter((r) => r.tuneSetRef === setB.id);
+    expect(setAItems.map((r) => r.tuneRef)).toEqual([
+      PUBLIC_TUNE_ID,
+      PRIVATE_TUNE_ID,
+    ]);
+    expect(setAItems.map((r) => r.position)).toEqual([0, 1]);
+    expect(setBItems.map((r) => r.tuneRef)).toEqual([PUBLIC_TUNE_ID]);
+
+    // Deleted items must not appear.
+    await removeTuneFromTuneSet(
+      db as never,
+      setA.id,
+      PRIVATE_TUNE_ID,
+      OWNER_ID
+    );
+    const afterDelete = await getBatchedTuneSetItemRefs(db as never, [
+      setA.id,
+    ]);
+    expect(afterDelete.map((r) => r.tuneRef)).toEqual([PUBLIC_TUNE_ID]);
   });
 });

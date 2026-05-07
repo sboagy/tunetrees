@@ -20,7 +20,7 @@ import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getRepertoireTunesStaged } from "../../lib/db/queries/repertoires";
 import {
-  getTuneSetItems,
+  getBatchedTuneSetItemRefs,
   getVisibleTuneSets,
 } from "../../lib/db/queries/tune-sets";
 import { getGoals } from "../../lib/db/queries/user-settings";
@@ -126,20 +126,30 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
         setKind: "practice_set",
       });
 
-      return Promise.all(
-        visibleSets.map(async (set) => {
-          const items = await getTuneSetItems(params.db, set.id, params.userId);
-          return {
-            id: set.id,
-            name: set.name,
-            description: set.description,
-            items: items.map((item) => ({
-              tuneRef: item.tuneRef,
-              position: item.position,
-            })),
-          };
-        })
-      );
+      if (visibleSets.length === 0) return [];
+
+      // Fetch all items for visible sets in a single batched query (no per-set
+      // access checks or per-item tune hydration — this grid only needs
+      // tuneRef + position to build the hierarchy).
+      const setIds = visibleSets.map((set) => set.id);
+      const allItems = await getBatchedTuneSetItemRefs(params.db, setIds);
+
+      const itemsBySetId = new Map<
+        string,
+        { tuneRef: string; position: number }[]
+      >();
+      for (const item of allItems) {
+        const bucket = itemsBySetId.get(item.tuneSetRef) ?? [];
+        bucket.push({ tuneRef: item.tuneRef, position: item.position });
+        itemsBySetId.set(item.tuneSetRef, bucket);
+      }
+
+      return visibleSets.map((set) => ({
+        id: set.id,
+        name: set.name,
+        description: set.description,
+        items: itemsBySetId.get(set.id) ?? [],
+      }));
     }
   );
 
