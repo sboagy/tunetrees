@@ -137,7 +137,7 @@
     "postgres": "^3.4.8",
     "prettier": "^3.8.1",
     "shadcn-solid": "^0.7.7",
-    "supabase": "^2.84.7",
+    "supabase": "^2.98.2",
     "tsx": "^4.21.0",
     "typescript": "6.0.2",
     "vite": "8.0.5",
