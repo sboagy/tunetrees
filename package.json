@@ -110,7 +110,7 @@
     "sonner": "^2.0.7",
     "sql.js": "^1.14.0",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.0",
+    "tailwindcss": "^4.2.4",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "^5.2.3",
     "vitest": "^4.0.18",
