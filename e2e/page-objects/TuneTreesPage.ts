@@ -2221,6 +2221,12 @@ export class TuneTreesPage {
 
     await this.openColumnVisibilityMenu(columnsButton);
 
+    const renderedModeAfterMenuOpen = await this.getRenderedViewMode(tab);
+    if (renderedModeAfterMenuOpen === mode) {
+      await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
+      return;
+    }
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (this.page.isClosed()) {
         throwPageClosedError();
@@ -2237,6 +2243,11 @@ export class TuneTreesPage {
           .catch(() => false);
         if (!reopenedMenuVisible) {
           await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
+          const renderedModeAfterReopen = await this.getRenderedViewMode(tab);
+          if (renderedModeAfterReopen === mode) {
+            await this.closeColumnVisibilityMenu(reopenedMenu);
+            return;
+          }
         }
         await this.page.waitForTimeout(150);
         continue;
@@ -2275,6 +2286,11 @@ export class TuneTreesPage {
         .catch(() => false);
       if (!reopenedMenuVisible) {
         await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
+        const renderedModeAfterReopen = await this.getRenderedViewMode(tab);
+        if (renderedModeAfterReopen === mode) {
+          await this.closeColumnVisibilityMenu(reopenedMenu);
+          return;
+        }
       }
 
       await this.page.waitForTimeout(150);
