@@ -387,12 +387,8 @@ export async function getBatchedTuneSetItemRefs(
 ): Promise<{ tuneSetRef: string; tuneRef: string; position: number }[]> {
   if (tuneSetIds.length === 0) return [];
 
-  return db
-    .select({
-      tuneSetRef: tuneSetItem.tuneSetRef,
-      tuneRef: tuneSetItem.tuneRef,
-      position: tuneSetItem.position,
-    })
+  const rows = await db
+    .select()
     .from(tuneSetItem)
     .where(
       and(
@@ -401,6 +397,12 @@ export async function getBatchedTuneSetItemRefs(
       )
     )
     .orderBy(asc(tuneSetItem.position));
+
+  return rows.map((row) => ({
+    tuneSetRef: row.tuneSetRef,
+    tuneRef: row.tuneRef,
+    position: row.position,
+  }));
 }
 
 export async function getTuneIdsForTuneSet(

@@ -762,9 +762,7 @@ describe("tune set query helpers", () => {
       PRIVATE_TUNE_ID,
       OWNER_ID
     );
-    const afterDelete = await getBatchedTuneSetItemRefs(db as never, [
-      setA.id,
-    ]);
+    const afterDelete = await getBatchedTuneSetItemRefs(db as never, [setA.id]);
     expect(afterDelete.map((r) => r.tuneRef)).toEqual([PUBLIC_TUNE_ID]);
   });
 });
