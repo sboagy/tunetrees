@@ -47,3 +47,6 @@ enabled = true
 binding = "TUNETREES_VAULT"
 bucket_name = "tunetrees-vault"
 preview_bucket_name = "tunetrees-vault-preview"
+
+[limits]
+cpu_ms = 60000
