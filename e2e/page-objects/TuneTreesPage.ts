@@ -1371,6 +1371,18 @@ export class TuneTreesPage {
         new URL(currentUrl).searchParams.get("tab") || "practice";
 
       if (currentTab !== tabId) {
+        const toastCloser = this.page
+          .getByRole("button", { name: "Close toast" })
+          .first();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const isToastVisible = await toastCloser
+            .isVisible()
+            .catch(() => false);
+          if (!isToastVisible) break;
+          await toastCloser.click({ timeout: 5_000 });
+          await expect(toastCloser).toBeHidden({ timeout: 5_000 });
+        }
+
         await expect(selectTrigger).toBeEnabled({ timeout: 20_000 });
         await selectTrigger.click({ timeout: 10_000 });
 
