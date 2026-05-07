@@ -639,7 +639,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     row: IStackedListRow,
     checked: boolean
   ) => {
-    const rowId = String(row.id);
+    const rowId = String(row.stacked_row_id ?? row.id);
     setRowSelection((prev) => {
       const currentlySelected = prev[rowId] === true;
       if (currentlySelected === checked) return prev;

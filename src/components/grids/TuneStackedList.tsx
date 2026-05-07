@@ -295,6 +295,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
           {(item) => {
             const itemId = item.tune_id ?? item.id;
             const rowId = String(item.stacked_row_id ?? item.id);
+            const checkboxIdentifier = String(item.id);
             const rowDepth = item.stacked_depth ?? 0;
             const canExpand = item.stacked_can_expand === true;
             const isExpanded = item.stacked_is_expanded === true;
@@ -481,7 +482,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 ? [
                     renderLabeledValue(
                       "ID",
-                      item.id,
+                      checkboxIdentifier,
                       "font-mono text-gray-700 dark:text-gray-300"
                     ),
                   ]
@@ -532,7 +533,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           )
                         }
                         class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label={`Select row ${rowId}`}
+                        aria-label={`Select row ${checkboxIdentifier}`}
                         data-testid={`stacked-row-checkbox-${rowId}`}
                       />
                     </div>
