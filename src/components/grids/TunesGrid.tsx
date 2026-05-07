@@ -613,6 +613,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
             type="button"
             class="mr-1 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
             aria-label={isExpanded ? "Collapse row" : "Expand row"}
+            aria-expanded={isExpanded}
             onClick={(event) => {
               event.stopPropagation();
               cell.row.toggleExpanded();
