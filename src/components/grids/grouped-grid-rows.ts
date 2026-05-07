@@ -182,6 +182,7 @@ export function buildMixedTuneGridRows(
 
   const standaloneRows = tunes
     .filter((tune) => !groupedTuneIds.has(tune.id))
+    .filter((tune) => !query || matchesTuneQuery(tune, query))
     .map((tune) => createLeafRow(tune, `tune-${tune.id}`));
 
   return {
