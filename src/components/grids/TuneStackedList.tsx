@@ -560,6 +560,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                             aria-label={
                               isExpanded ? "Collapse row" : "Expand row"
                             }
+                            aria-expanded={isExpanded}
                             onClick={(e) => {
                               e.stopPropagation();
                               props.onRowToggleExpanded?.(item);
