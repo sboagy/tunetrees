@@ -47,7 +47,7 @@ const table = createSolidTable({
 
 UI Requirements:
 - Sticky headers: `sticky top-0` with theme background.
-- Hover row style: `hover:bg-gray-100 dark:hover:bg-gray-700`.
+- Hover row style: implement hover affordance using design-system-approved tokens/classes from `docs/design/tunetrees-design-system.md` (do not hardcode color values here).
 - Action column at right.
 - Horizontal scroll wrapper on small screens: `overflow-x-auto`.
 

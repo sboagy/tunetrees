@@ -1,6 +1,6 @@
 # TuneTrees: Core Ontology & Nomenclature
 
-**Purpose:** This document defines the core domain terminology and data architecture for TuneTrees. It serves as the single source of truth for UI labels, database schema design, and codebase variable naming.
+**Purpose:** This document defines the core domain terminology and conceptual data model for TuneTrees. It is the authoritative glossary for domain language and UI labels; executable schema and sync contracts live in `supabase/migrations/`, `drizzle/schema-sqlite.generated.ts`, and `shared/generated/sync/table-meta.generated.ts`.
 
 ## 1. Musical Entities
 These are the fundamental building blocks of the music managed within the app.
@@ -46,8 +46,8 @@ How a User interacts with their Repertoire to achieve mastery over time.
 * **Solo vs. Group Parity:** A User does not need to create a dummy "Group of One" to create a Setlist. 
 * **Immutability of Practice:** A **Practice Record** is a historical fact; it is never updated or deleted.
 
-
 ```mermaid
+%% Canonical diagram source: docs/design/tt_ontology.md (keep diagram edits here)
 graph TD
     %% Styling
     classDef social fill:#e1bee7,stroke:#8e24aa,stroke-width:2px,color:#000;
