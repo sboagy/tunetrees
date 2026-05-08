@@ -77,6 +77,9 @@ export class TuneTreesPage {
   readonly typeFilter: Locator;
   readonly modeFilter: Locator;
   readonly genreFilter: Locator;
+  readonly tuneSetFilter: Locator;
+  readonly tuneSetFilterMenu: Locator;
+  readonly tuneSetFilterAnyOption: Locator;
   readonly repertoireFilter: Locator;
   readonly clearFilters: Locator;
 
@@ -95,6 +98,7 @@ export class TuneTreesPage {
   readonly repertoireColumnsButton: Locator;
   readonly repertoireAddToReviewButton: Locator;
   readonly repertoireRemoveButton: Locator;
+  readonly repertoireGroupSetsSwitch: Locator;
 
   readonly practiceColumnsButton: Locator;
   // Practice-specific controls
@@ -303,6 +307,11 @@ export class TuneTreesPage {
     this.typeFilter = page.getByTestId("filter-dropdown-type");
     this.modeFilter = page.getByTestId("filter-dropdown-mode");
     this.genreFilter = page.getByTestId("filter-dropdown-genre");
+    this.tuneSetFilter = page.getByTestId("filter-dropdown-tune-set");
+    this.tuneSetFilterMenu = page.getByTestId("filter-dropdown-menu-tune-set");
+    this.tuneSetFilterAnyOption = page.getByTestId(
+      "filter-dropdown-tune-set-option-any"
+    );
     this.repertoireFilter = page.locator(
       '[data-testid="filter-dropdown-repertoire"], [data-testid="filter-dropdown-repertoire"]'
     );
@@ -330,6 +339,9 @@ export class TuneTreesPage {
     );
     this.repertoireAddToReviewButton = page.getByTestId("add-to-review-button");
     this.repertoireRemoveButton = page.getByTestId("repertoire-remove-button");
+    this.repertoireGroupSetsSwitch = page.getByTestId(
+      "repertoire-group-sets-switch"
+    );
 
     // Tab-specific Toolbar Buttons - Practice
     this.practiceColumnsButton = page.getByTestId("practice-columns-button");
@@ -1794,17 +1806,29 @@ export class TuneTreesPage {
    * Handles virtualized grids by searching within the grid context
    */
   async expectTuneVisible(tuneName: string, grid: Locator, timeout = 5000) {
-    // Desktop table: tune name lives in a <td> cell.
-    // Mobile stacked list: tune name lives inside an <li> stacked item.
-    const tuneItem = grid
-      .getByRole("cell", { name: tuneName })
-      .or(
-        grid
-          .locator("li[data-testid^='stacked-item-']")
-          .filter({ hasText: tuneName })
+    const escapedName = tuneName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    await expect
+      .poll(
+        async () => {
+          const linkVisible = await grid
+            .getByRole("link", { name: new RegExp(`^${escapedName}$`, "i") })
+            .first()
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (linkVisible) return true;
+
+          const rowVisible = await grid
+            .locator("tbody tr[data-index], li[data-testid^='stacked-item-']")
+            .filter({ hasText: tuneName })
+            .first()
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          return rowVisible;
+        },
+        { timeout, intervals: [100, 250, 500, 1000] }
       )
-      .first();
-    await expect(tuneItem).toBeVisible({ timeout });
+      .toBe(true);
   }
 
   /**
@@ -2195,6 +2219,82 @@ export class TuneTreesPage {
     await expect(filterPanel).toBeHidden({ timeout: 5000 });
   }
 
+  async ensureFilterPanelOpen() {
+    const panelVisible = await this.page
+      .locator('[data-filter-panel="true"]')
+      .last()
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+
+    if (panelVisible) {
+      return;
+    }
+
+    await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
+    await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
+    await this.filtersButton.click();
+    await expect(this.filtersButton).toHaveAttribute("aria-expanded", "true", {
+      timeout: 5000,
+    });
+    await expect(
+      this.page.locator('[data-filter-panel="true"]').last()
+    ).toBeVisible({
+      timeout: 5000,
+    });
+  }
+
+  async openTuneSetFilterDropdown() {
+    await this.ensureFilterPanelOpen();
+    await expect(this.tuneSetFilter).toBeVisible({ timeout: 5000 });
+
+    const menuVisible = await this.tuneSetFilterMenu
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await this.tuneSetFilter.click({ timeout: 5000 });
+    }
+
+    await expect(this.tuneSetFilterMenu).toBeVisible({ timeout: 5000 });
+  }
+
+  async isInTuneSetsFilterEnabled(): Promise<boolean> {
+    await this.openTuneSetFilterDropdown();
+    const checkbox = this.tuneSetFilterAnyOption
+      .locator('input[type="checkbox"]')
+      .first();
+    return checkbox.isChecked();
+  }
+
+  async setInTuneSetsFilter(enabled: boolean) {
+    await this.openTuneSetFilterDropdown();
+
+    if ((await this.isInTuneSetsFilterEnabled()) === enabled) {
+      return;
+    }
+
+    await this.tuneSetFilterAnyOption.click({ timeout: 5000 });
+    await expect
+      .poll(() => this.isInTuneSetsFilterEnabled(), {
+        timeout: 5000,
+        intervals: [100, 250, 500],
+      })
+      .toBe(enabled);
+  }
+
+  async selectTuneSetFilterByName(name: string) {
+    await this.openTuneSetFilterDropdown();
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const option = this.tuneSetFilterMenu
+      .getByRole("button", { name: new RegExp(escapedName, "i") })
+      .first();
+
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await option.click({ timeout: 5000 });
+
+    const checkbox = option.locator('input[type="checkbox"]').first();
+    await expect(checkbox).toBeChecked({ timeout: 5000 });
+  }
+
   async setViewMode(
     tab: "catalog" | "repertoire" | "practice",
     mode: "grid" | "list"
@@ -2506,6 +2606,22 @@ export class TuneTreesPage {
       !(await this.isShowSubmittedEnabled()),
       settleMs
     );
+  }
+
+  async setRepertoireShowSets(enabled: boolean, settleMs: number = 300) {
+    await this.setToolbarSwitchChecked(
+      "repertoire",
+      this.repertoireGroupSetsSwitch,
+      enabled,
+      settleMs
+    );
+  }
+
+  getRepertoireRowByText(text: string): Locator {
+    return this.repertoireGrid
+      .locator("tbody tr[data-index], li[data-testid^='stacked-item-']")
+      .filter({ hasText: text })
+      .first();
   }
 
   async clickCatalogAddToRepertoire() {
