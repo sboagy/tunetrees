@@ -93,6 +93,8 @@ export interface RepertoireToolbarProps {
   selectedRowsCount?: number;
   table?: Table<ITuneOverview>;
   repertoireId?: string;
+  filterAnyTuneSet: boolean;
+  onAnyTuneSetFilterChange: (enabled: boolean) => void;
   selectedTuneSetIds: string[];
   onTuneSetFilterChange: (tuneSetIds: string[]) => void;
   filterPanelExpanded?: boolean;
@@ -454,6 +456,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             name: tuneSet.name,
             tuneCount: tuneSet.tuneCount,
           }))}
+          filterAnyTuneSet={props.filterAnyTuneSet}
+          onAnyTuneSetChange={props.onAnyTuneSetFilterChange}
           selectedTuneSetIds={props.selectedTuneSetIds}
           onTuneSetChange={props.onTuneSetFilterChange}
           loading={{ ...props.loading, tuneSets: personalTuneSets.loading }}
@@ -631,6 +635,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                     tuneCount: tuneSet.tuneCount,
                   })
                 )}
+                filterAnyTuneSet={props.filterAnyTuneSet}
+                onAnyTuneSetChange={props.onAnyTuneSetFilterChange}
                 selectedTuneSetIds={props.selectedTuneSetIds}
                 onTuneSetChange={props.onTuneSetFilterChange}
                 loading={{

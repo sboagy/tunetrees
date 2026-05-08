@@ -38,7 +38,10 @@ import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
 import { persistDb } from "../lib/db/client-sqlite";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
-import { getTuneIdsForTuneSets } from "../lib/db/queries/tune-sets";
+import {
+  getTuneIdsForTuneSets,
+  getVisibleTuneSets,
+} from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import * as schema from "../lib/db/schema";
 import { repertoireTune } from "../lib/db/schema";
@@ -115,6 +118,7 @@ const RepertoirePage: Component = () => {
   const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
   const [groupTuneSets, setGroupTuneSets] = createSignal(true);
+  const [filterAnyTuneSet, setFilterAnyTuneSet] = createSignal(false);
   const [selectedTuneSetIds, setSelectedTuneSetIds] = createSignal<string[]>(
     []
   );
@@ -147,6 +151,7 @@ const RepertoirePage: Component = () => {
         searchParams.r_modes,
         searchParams.r_genres,
         searchParams.r_tune_set,
+        searchParams.r_in_tune_sets,
         searchParams.r_show_sets,
         searchParams.tab, // Crucial for re-hydration when switching tabs
       ],
@@ -157,6 +162,7 @@ const RepertoirePage: Component = () => {
         const modes = getParamArray(searchParams.r_modes);
         const genres = getParamArray(searchParams.r_genres);
         const tuneSetIds = getParamArray(searchParams.r_tune_set);
+        const inTuneSets = getBooleanParam(searchParams.r_in_tune_sets, false);
         const showSets = getBooleanParam(searchParams.r_show_sets, true);
 
         // 2. Write to signals only if different (essential to prevent infinite loops)
@@ -164,6 +170,7 @@ const RepertoirePage: Component = () => {
         if (!arraysEqual(types, selectedTypes())) setSelectedTypes(types);
         if (!arraysEqual(modes, selectedModes())) setSelectedModes(modes);
         if (!arraysEqual(genres, selectedGenres())) setSelectedGenres(genres);
+        if (inTuneSets !== filterAnyTuneSet()) setFilterAnyTuneSet(inTuneSets);
         if (showSets !== groupTuneSets()) setGroupTuneSets(showSets);
         if (!arraysEqual(tuneSetIds, selectedTuneSetIds())) {
           setSelectedTuneSetIds(tuneSetIds);
@@ -188,6 +195,7 @@ const RepertoirePage: Component = () => {
       types: getParamArray(searchParams.r_types),
       modes: getParamArray(searchParams.r_modes),
       genres: getParamArray(searchParams.r_genres),
+      inTuneSets: getBooleanParam(searchParams.r_in_tune_sets, false),
       showSets: getBooleanParam(searchParams.r_show_sets, true),
       tuneSetIds: getParamArray(searchParams.r_tune_set),
     };
@@ -197,6 +205,7 @@ const RepertoirePage: Component = () => {
       types: selectedTypes(),
       modes: selectedModes(),
       genres: selectedGenres(),
+      inTuneSets: filterAnyTuneSet(),
       showSets: groupTuneSets(),
       tuneSetIds: selectedTuneSetIds(),
     };
@@ -206,6 +215,7 @@ const RepertoirePage: Component = () => {
       !arraysEqual(desired.types, current.types) ||
       !arraysEqual(desired.modes, current.modes) ||
       !arraysEqual(desired.genres, current.genres) ||
+      desired.inTuneSets !== current.inTuneSets ||
       desired.showSets !== current.showSets ||
       !arraysEqual(desired.tuneSetIds, current.tuneSetIds);
 
@@ -217,6 +227,7 @@ const RepertoirePage: Component = () => {
       r_modes: desired.modes.length > 0 ? desired.modes.join(",") : undefined,
       r_genres:
         desired.genres.length > 0 ? desired.genres.join(",") : undefined,
+      r_in_tune_sets: desired.inTuneSets ? "1" : undefined,
       r_show_sets: desired.showSets ? undefined : "0",
       r_tune_set:
         desired.tuneSetIds.length > 0
@@ -315,6 +326,29 @@ const RepertoirePage: Component = () => {
     async (params) => {
       if (!params) return undefined;
       return getTuneIdsForTuneSets(params.db, params.tuneSetIds, params.userId);
+    }
+  );
+
+  const [anyTuneSetTuneIds] = createResource(
+    () => {
+      const db = localDb();
+      const resolvedUserId = user()?.id;
+      const version = tuneSetListChanged();
+      return db && resolvedUserId && filterAnyTuneSet()
+        ? { db, userId: resolvedUserId, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) return undefined;
+      const visibleSets = await getVisibleTuneSets(params.db, params.userId, {
+        setKind: "practice_set",
+      });
+      if (visibleSets.length === 0) return [];
+      return getTuneIdsForTuneSets(
+        params.db,
+        visibleSets.map((set) => set.id),
+        params.userId
+      );
     }
   );
 
@@ -502,8 +536,20 @@ const RepertoirePage: Component = () => {
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
           repertoireId={currentRepertoireId() || undefined}
+          filterAnyTuneSet={filterAnyTuneSet()}
+          onAnyTuneSetFilterChange={(enabled) => {
+            setFilterAnyTuneSet(enabled);
+            if (enabled) {
+              setSelectedTuneSetIds([]);
+            }
+          }}
           selectedTuneSetIds={selectedTuneSetIds()}
-          onTuneSetFilterChange={setSelectedTuneSetIds}
+          onTuneSetFilterChange={(tuneSetIds) => {
+            setSelectedTuneSetIds(tuneSetIds);
+            if (tuneSetIds.length > 0) {
+              setFilterAnyTuneSet(false);
+            }
+          }}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
@@ -541,11 +587,13 @@ const RepertoirePage: Component = () => {
                 selectedModes={selectedModes()}
                 selectedGenreNames={selectedGenres()}
                 selectedTuneIds={
-                  selectedTuneSetIds().length > 0
-                    ? (selectedTuneSetTuneIds.latest ??
-                      selectedTuneSetTuneIds() ??
-                      [])
-                    : undefined
+                  filterAnyTuneSet()
+                    ? (anyTuneSetTuneIds.latest ?? anyTuneSetTuneIds() ?? [])
+                    : selectedTuneSetIds().length > 0
+                      ? (selectedTuneSetTuneIds.latest ??
+                        selectedTuneSetTuneIds() ??
+                        [])
+                      : undefined
                 }
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
