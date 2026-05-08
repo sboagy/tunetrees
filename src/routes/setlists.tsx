@@ -286,9 +286,11 @@ const SetlistsPage: Component = () => {
     async (params) => {
       if (!params) return {};
 
-      const tuneSetIds = params.items
-        .filter((item) => item.itemKind === "tune_set" && item.tuneSet?.id)
-        .map((item) => item.tuneSet!.id);
+      const tuneSetIds = params.items.flatMap((item) =>
+        item.itemKind === "tune_set" && item.tuneSet?.id
+          ? [item.tuneSet.id]
+          : []
+      );
 
       const entries = await Promise.all(
         [...new Set(tuneSetIds)].map(async (tuneSetId) => [
