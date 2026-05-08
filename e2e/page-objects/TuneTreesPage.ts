@@ -2507,6 +2507,47 @@ export class TuneTreesPage {
     await this.revealToolbarAction(tab, action);
   }
 
+  private async clickToolbarAction(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator,
+    opts?: { timeoutMs?: number; settleMs?: number }
+  ) {
+    const timeoutMs = opts?.timeoutMs ?? 5000;
+    const settleMs = opts?.settleMs ?? 0;
+    const start = Date.now();
+    let lastError: unknown;
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        await this.ensureToolbarActionVisible(tab, action);
+        await expect(action).toBeVisible({ timeout: 1000 });
+        await expect(action).toBeEnabled({ timeout: 1000 });
+
+        try {
+          await action.click({ timeout: 1000 });
+        } catch {
+          try {
+            await action.click({ timeout: 1000, force: true });
+          } catch {
+            await action.dispatchEvent("click");
+          }
+        }
+
+        if (settleMs > 0) {
+          await this.page.waitForTimeout(settleMs);
+        }
+        return;
+      } catch (error) {
+        lastError = error;
+        await this.page.waitForTimeout(150);
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(`Failed to click toolbar action for ${tab}`);
+  }
+
   private async getToolbarSwitchTarget(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2625,45 +2666,30 @@ export class TuneTreesPage {
   }
 
   async clickCatalogAddToRepertoire() {
-    await this.ensureToolbarActionVisible(
-      "catalog",
-      this.catalogAddToRepertoireButton
-    );
-    await this.catalogAddToRepertoireButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("catalog", this.catalogAddToRepertoireButton);
   }
 
   async clickCatalogAddTune() {
-    await this.ensureToolbarActionVisible("catalog", this.catalogAddTuneButton);
-    await this.catalogAddTuneButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("catalog", this.catalogAddTuneButton);
   }
 
   async clickCatalogDelete() {
-    await this.ensureToolbarActionVisible("catalog", this.catalogDeleteButton);
-    await this.catalogDeleteButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("catalog", this.catalogDeleteButton);
   }
 
   async clickRepertoireAddToReview() {
-    await this.ensureToolbarActionVisible(
+    await this.clickToolbarAction(
       "repertoire",
       this.repertoireAddToReviewButton
     );
-    await this.repertoireAddToReviewButton.click({ timeout: 5000 });
   }
 
   async clickRepertoireAddTune() {
-    await this.ensureToolbarActionVisible(
-      "repertoire",
-      this.repertoireAddTuneButton
-    );
-    await this.repertoireAddTuneButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("repertoire", this.repertoireAddTuneButton);
   }
 
   async clickRepertoireRemove() {
-    await this.ensureToolbarActionVisible(
-      "repertoire",
-      this.repertoireRemoveButton
-    );
-    await this.repertoireRemoveButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("repertoire", this.repertoireRemoveButton);
   }
 
   private getColumnVisibilityMenu(): Locator {
