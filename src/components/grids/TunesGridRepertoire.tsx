@@ -40,7 +40,13 @@ import {
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
-export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
+interface ITunesGridRepertoireProps extends IGridBaseProps {
+  groupTuneSets?: boolean;
+}
+
+export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
+  props
+) => {
   const {
     localDb,
     repertoireListChanged,
@@ -51,6 +57,7 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const { currentRepertoireId } = useCurrentRepertoire();
   const { tuneSetListChanged } = useCurrentTuneSet();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const groupTuneSetsEnabled = createMemo(() => props.groupTuneSets !== false);
 
   // Column visibility shared with parent; TunesGrid also persists internally
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
@@ -112,6 +119,8 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
 
   const [tuneSetGroupsData] = createResource(
     () => {
+      if (!groupTuneSetsEnabled()) return null;
+
       const db = localDb();
       const userId = user()?.id;
       const version = tuneSetListChanged();
@@ -186,7 +195,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   const mixedRowsResult = createMemo(() =>
     buildMixedTuneGridRows(
       candidateTunes(),
-      tuneSetGroupsData.latest ?? tuneSetGroupsData() ?? [],
+      groupTuneSetsEnabled()
+        ? (tuneSetGroupsData.latest ?? tuneSetGroupsData() ?? [])
+        : [],
       { searchQuery: props.searchQuery }
     )
   );
@@ -236,7 +247,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
   });
 
   const loadError = createMemo(
-    () => repertoireTunesData.error ?? tuneSetGroupsData.error
+    () =>
+      repertoireTunesData.error ??
+      (groupTuneSetsEnabled() ? tuneSetGroupsData.error : undefined)
   );
   const isInitialLoading = createMemo(
     () =>
@@ -285,7 +298,10 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             tablePurpose="repertoire"
             userId={props.userId}
             repertoireId={currentRepertoireId() || undefined}
-            isLoading={repertoireTunesData.loading || tuneSetGroupsData.loading}
+            isLoading={
+              repertoireTunesData.loading ||
+              (groupTuneSetsEnabled() && tuneSetGroupsData.loading)
+            }
             data={gridRows()}
             columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}

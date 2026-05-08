@@ -71,10 +71,13 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 
 export interface RepertoireToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  groupTuneSets: boolean;
+  onGroupTuneSetsChange: (groupTuneSets: boolean) => void;
   selectedTypes: string[];
   onTypesChange: (types: string[]) => void;
   selectedModes: string[];
@@ -546,6 +549,22 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
               <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
 
+              <div class="rounded-md px-3 py-2">
+                <Switch
+                  checked={props.groupTuneSets}
+                  onChange={props.onGroupTuneSetsChange}
+                  data-testid="repertoire-group-sets-switch"
+                  class="flex w-full items-center gap-3 text-left text-sm text-gray-700 dark:text-gray-200"
+                >
+                  <SwitchLabel class="flex-1 cursor-pointer select-none">
+                    Show Sets
+                  </SwitchLabel>
+                  <SwitchControl class="ml-1">
+                    <SwitchThumb />
+                  </SwitchControl>
+                </Switch>
+              </div>
+
               <button
                 type="button"
                 data-testid="display-options-entry-button"
@@ -664,6 +683,20 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             <div class={TOOLBAR_SPACER} />
 
             <div class="flex items-center gap-2">
+              <Switch
+                checked={props.groupTuneSets}
+                onChange={props.onGroupTuneSetsChange}
+                data-testid="repertoire-group-sets-switch"
+                class="flex items-center gap-2 rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                <SwitchLabel class="cursor-pointer select-none">
+                  Show Sets
+                </SwitchLabel>
+                <SwitchControl>
+                  <SwitchThumb />
+                </SwitchControl>
+              </Switch>
+
               <button
                 type="button"
                 onClick={() => setShowTuneSetManagerDialog(true)}
