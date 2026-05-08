@@ -10,7 +10,7 @@ import type { ITuneOverview } from "../../lib/db/view-types";
 /**
  * Table purpose identifier - determines which grid variant to use
  */
-export type TablePurpose = "scheduled" | "repertoire" | "catalog";
+export type TablePurpose = "scheduled" | "repertoire" | "catalog" | "setlists";
 
 /**
  * Supported layout modes for tune collections

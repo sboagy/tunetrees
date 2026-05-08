@@ -24,6 +24,7 @@ import {
   createMemo,
   createSignal,
   For,
+  type JSX,
   onCleanup,
   onMount,
   Show,
@@ -91,6 +92,17 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   defaultExpandedRowIds?: string[];
   hierarchyColumnId?: string;
   disableListMode?: boolean;
+  getRowProps?: (row: T) =>
+    | {
+        class?: string;
+        draggable?: boolean;
+        "data-testid"?: string;
+        onDragStart?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+        onDragEnd?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+        onDragOver?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+        onDrop?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+      }
+    | undefined;
   // Optional map of column descriptions to show in header popovers
   columnDescriptions?: Partial<Record<string, string>>;
 }
@@ -1276,18 +1288,34 @@ export const TunesGrid = (<T extends { id: string | number }>(
                       {/* Read the current row through an accessor so filtering can swap
                             row content without requiring a full table remount. */}
                       <tr
-                        class={
+                        class={`${
                           props.currentRowId === (row()!.original as any).id
                             ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
                             : rowBelongsToSet(row()!.original)
                               ? "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60"
                               : ROW_CLASSES
-                        }
+                        } ${props.getRowProps?.(row()!.original)?.class ?? ""}`.trim()}
                         onClick={() => props.onRowClick?.(row()!.original)}
                         onDblClick={() =>
                           props.onRowDoubleClick?.(row()!.original)
                         }
                         data-index={virtualRow.index}
+                        draggable={
+                          props.getRowProps?.(row()!.original)?.draggable
+                        }
+                        data-testid={
+                          props.getRowProps?.(row()!.original)?.["data-testid"]
+                        }
+                        onDragStart={
+                          props.getRowProps?.(row()!.original)?.onDragStart
+                        }
+                        onDragEnd={
+                          props.getRowProps?.(row()!.original)?.onDragEnd
+                        }
+                        onDragOver={
+                          props.getRowProps?.(row()!.original)?.onDragOver
+                        }
+                        onDrop={props.getRowProps?.(row()!.original)?.onDrop}
                       >
                         <For each={row()!.getVisibleCells()}>
                           {(cell) => (

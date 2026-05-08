@@ -11,7 +11,8 @@
  * @module routes/setlists
  */
 
-import { GripVertical, Plus, Search, SquarePen, Trash2 } from "lucide-solid";
+import type { ColumnDef } from "@tanstack/solid-table";
+import { Plus, Search, SquarePen, Trash2 } from "lucide-solid";
 import {
   type Component,
   createMemo,
@@ -19,8 +20,17 @@ import {
   createSignal,
   For,
   Show,
+  type JSX,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import {
+  buildSetlistGridRows,
+  buildSetlistLibraryGridRows,
+  getSetlistGridRowId,
+  getSetlistGridSubRows,
+  type ISetlistGridRow,
+} from "@/components/grids/setlist-grid-rows";
+import { TunesGrid } from "@/components/grids/TunesGrid";
 import { Button } from "@/components/ui/button";
 import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -42,6 +52,7 @@ import {
   type SetlistItemWithSummary,
   updateSetlist,
 } from "@/lib/db/queries/setlists";
+import { getTuneSetItems } from "@/lib/db/queries/tune-sets";
 import { getTunesForUser } from "@/lib/db/queries/tunes";
 import type { Tune, TuneSet } from "@/lib/db/types";
 
@@ -264,37 +275,71 @@ const SetlistsPage: Component = () => {
     }
   );
 
-  // ── Derived: candidate items for library panel ───────────────────────────
+  const [setlistTuneSetMembers] = createResource(
+    () => {
+      const db = localDb();
+      const uid = userId();
+      const items = setlistItems();
+      const version = tuneSetListChanged();
+      return db && uid && items ? { db, userId: uid, items, version } : null;
+    },
+    async (params) => {
+      if (!params) return {};
 
-  const candidateItems = createMemo<CandidateItem[]>(() => {
-    const normalizedQuery = libraryQuery().trim().toLowerCase();
-    const filter = libraryFilter();
+      const tuneSetIds = params.items
+        .filter((item) => item.itemKind === "tune_set" && item.tuneSet?.id)
+        .map((item) => item.tuneSet!.id);
 
-    const tuneCandidates = (availableTunes() ?? []).map((tune) => ({
-      kind: "tune" as const,
-      id: tune.id,
-      title: tune.title ?? "Untitled Tune",
-      subtitle:
-        [tune.type, tune.mode, tune.incipit].filter(Boolean).join(" | ") ||
-        "Tune",
-    }));
-    const tuneSetCandidates = (availableTuneSets() ?? []).map((tuneSet) => ({
-      kind: "tune_set" as const,
-      id: tuneSet.id,
-      title: tuneSet.name,
-      subtitle: tuneSet.description || "Tune Set",
-    }));
+      const entries = await Promise.all(
+        [...new Set(tuneSetIds)].map(async (tuneSetId) => [
+          tuneSetId,
+          await getTuneSetItems(params.db, tuneSetId, params.userId),
+        ])
+      );
 
-    return [...tuneCandidates, ...tuneSetCandidates]
-      .filter((item) => filter === "all" || item.kind === filter)
-      .filter((item) => {
-        if (!normalizedQuery) return true;
-        return [item.title, item.subtitle].some((value) =>
-          value.toLowerCase().includes(normalizedQuery)
-        );
-      })
-      .sort((left, right) => left.title.localeCompare(right.title));
-  });
+      return Object.fromEntries(entries);
+    }
+  );
+
+  const [availableTuneSetMembers] = createResource(
+    () => {
+      const db = localDb();
+      const uid = userId();
+      const tuneSets = availableTuneSets();
+      return db && uid && tuneSets ? { db, userId: uid, tuneSets } : null;
+    },
+    async (params) => {
+      if (!params) return {};
+
+      const entries = await Promise.all(
+        params.tuneSets.map(async (tuneSet) => [
+          tuneSet.id,
+          await getTuneSetItems(params.db, tuneSet.id, params.userId),
+        ])
+      );
+
+      return Object.fromEntries(entries);
+    }
+  );
+
+  const setlistGridRows = createMemo(() =>
+    buildSetlistGridRows(
+      setlistItems.latest ?? setlistItems() ?? [],
+      setlistTuneSetMembers.latest ?? setlistTuneSetMembers() ?? {}
+    )
+  );
+
+  const libraryGridRows = createMemo(() =>
+    buildSetlistLibraryGridRows(
+      availableTunes.latest ?? availableTunes() ?? [],
+      availableTuneSets.latest ?? availableTuneSets() ?? [],
+      availableTuneSetMembers.latest ?? availableTuneSetMembers() ?? {},
+      {
+        filter: libraryFilter(),
+        searchQuery: libraryQuery(),
+      }
+    )
+  );
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -539,6 +584,169 @@ const SetlistsPage: Component = () => {
   // ── Render helpers ───────────────────────────────────────────────────────
 
   const hasValidSetlistName = () => normalizeMetadataValue(editorName()) !== "";
+  const setlistItemsById = createMemo(
+    () =>
+      new Map(
+        (setlistItems.latest ?? setlistItems() ?? []).map((item) => [
+          item.id,
+          item,
+        ])
+      )
+  );
+
+  const handleGridRowClick = (row: ISetlistGridRow) => {
+    if (row.rowKind !== "tune") return;
+    setCurrentTuneId(row.id);
+  };
+  const gridUserId = (scope: string) =>
+    `${userId() ?? "setlists-anon"}:${scope}`;
+
+  const defaultExpandedSetlistRowIds = createMemo(
+    () => setlistGridRows().autoExpandedRowIds
+  );
+  const defaultExpandedLibraryRowIds = createMemo(
+    () => libraryGridRows().autoExpandedRowIds
+  );
+
+  const createGridColumns = (options?: {
+    includeOrder?: boolean;
+    renderAction?: (row: ISetlistGridRow) => JSX.Element | null;
+  }): ColumnDef<ISetlistGridRow>[] => {
+    const columns: ColumnDef<ISetlistGridRow>[] = [];
+
+    if (options?.includeOrder) {
+      columns.push({
+        accessorKey: "setlistPosition",
+        id: "order",
+        header: "#",
+        cell: (info) =>
+          info.row.depth === 0 ? (info.getValue<number | null>() ?? "—") : "",
+        size: 56,
+        minSize: 56,
+        maxSize: 70,
+        enableSorting: false,
+        enableResizing: false,
+      });
+    }
+
+    columns.push(
+      {
+        accessorKey: "title",
+        id: "title",
+        header: "Title",
+        cell: (info) => (
+          <span class="block truncate" title={info.row.original.title}>
+            {info.row.original.title}
+          </span>
+        ),
+        size: 240,
+        minSize: 180,
+      },
+      {
+        accessorKey: "type",
+        id: "type",
+        header: "Type",
+        cell: (info) => info.getValue<string | null>() ?? "—",
+        size: 120,
+        minSize: 96,
+      },
+      {
+        accessorKey: "mode",
+        id: "mode",
+        header: "Mode",
+        cell: (info) => info.getValue<string | null>() ?? "—",
+        size: 120,
+        minSize: 96,
+      },
+      {
+        accessorKey: "details",
+        id: "details",
+        header: "Details",
+        cell: (info) => (
+          <span
+            class="block truncate text-xs text-muted-foreground"
+            title={info.row.original.details ?? ""}
+          >
+            {info.row.original.details ?? "—"}
+          </span>
+        ),
+        size: 260,
+        minSize: 180,
+      }
+    );
+
+    if (options?.renderAction) {
+      columns.push({
+        id: "actions",
+        header: "Actions",
+        cell: (info) => options.renderAction?.(info.row.original) ?? null,
+        size: 110,
+        minSize: 92,
+        maxSize: 140,
+        enableSorting: false,
+      });
+    }
+
+    return columns;
+  };
+
+  const setlistViewColumns = createMemo(() =>
+    createGridColumns({ includeOrder: true })
+  );
+  const setlistEditColumns = createMemo(() =>
+    createGridColumns({
+      includeOrder: true,
+      renderAction: (row) => {
+        if (!row.setlistItemId || row.setlistPosition == null) {
+          return null;
+        }
+
+        return (
+          <button
+            type="button"
+            class="inline-flex items-center rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
+            onClick={(event) => {
+              event.stopPropagation();
+              const item = setlistItemsById().get(row.setlistItemId ?? "");
+              if (item) {
+                void handleRemoveItem(item);
+              }
+            }}
+            disabled={isMutatingItems() || isSaving()}
+            data-testid="setlist-editor-remove-item-button"
+          >
+            Remove
+          </button>
+        );
+      },
+    })
+  );
+  const libraryColumns = createMemo(() =>
+    createGridColumns({
+      renderAction: (row) => (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleAddCandidate({
+              kind: row.itemKind,
+              id: row.sourceId,
+              title: row.title,
+              subtitle:
+                row.details ??
+                (row.itemKind === "tune_set" ? "Tune Set" : "Tune"),
+            });
+          }}
+          disabled={!hasValidSetlistName() || isMutatingItems() || isSaving()}
+          class="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
+          data-testid="setlists-add-candidate-button"
+        >
+          <Plus size={14} />
+          {row.itemKind === "tune_set" ? "Add Set" : "Add"}
+        </button>
+      ),
+    })
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -739,7 +947,7 @@ const SetlistsPage: Component = () => {
               }
             >
               {(prog) => (
-                <div class="mx-auto max-w-3xl space-y-6">
+                <div class="flex h-full min-h-0 flex-col space-y-6">
                   {/* Setlist header */}
                   <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
                     <div class="flex items-start justify-between gap-4">
@@ -781,99 +989,27 @@ const SetlistsPage: Component = () => {
                         </div>
                       }
                     >
-                      <div class="divide-y divide-gray-200 dark:divide-gray-700">
-                        <For each={setlistItems() ?? []}>
-                          {(item, index) => {
-                            const isTuneRow = () =>
-                              item.itemKind === "tune" &&
-                              Boolean(item.tune?.id);
-                            const isSelected = () =>
-                              item.itemKind === "tune" &&
-                              item.tune?.id === currentTuneId();
-
-                            const content = (
-                              <>
-                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-5 text-right">
-                                  {index() + 1}
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                  <div class="flex items-center gap-2">
-                                    <span
-                                      class={`rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${
-                                        isSelected()
-                                          ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
-                                          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                                      }`}
-                                    >
-                                      {item.itemKind === "tune"
-                                        ? "Tune"
-                                        : "Tune Set"}
-                                    </span>
-                                    <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                      {item.itemKind === "tune"
-                                        ? item.tune?.title
-                                        : item.tuneSet?.name}
-                                    </span>
-                                  </div>
-                                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    <Show
-                                      when={item.itemKind === "tune"}
-                                      fallback={`${item.tuneSetTuneCount} tune${item.tuneSetTuneCount === 1 ? "" : "s"}`}
-                                    >
-                                      {[
-                                        item.tune?.type,
-                                        item.tune?.mode,
-                                        item.tune?.incipit,
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" | ") || "Tune"}
-                                    </Show>
-                                  </div>
-                                </div>
-                              </>
-                            );
-
-                            return (
-                              <Show
-                                when={isTuneRow()}
-                                fallback={
-                                  <div
-                                    class="flex items-center gap-3 px-4 py-3"
-                                    data-testid="setlist-item-row"
-                                  >
-                                    {content}
-                                  </div>
-                                }
-                              >
-                                <button
-                                  type="button"
-                                  class={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
-                                    isSelected()
-                                      ? "bg-primary/10 ring-1 ring-inset ring-primary/25 dark:bg-primary/15 dark:ring-primary/30"
-                                      : "hover:bg-muted/60"
-                                  }`}
-                                  onClick={() =>
-                                    setCurrentTuneId(item.tune?.id ?? null)
-                                  }
-                                  data-testid="setlist-item-row"
-                                  data-selected={
-                                    isSelected() ? "true" : undefined
-                                  }
-                                  aria-current={
-                                    isSelected() ? "true" : undefined
-                                  }
-                                  title={
-                                    isSelected()
-                                      ? "Current sidebar tune"
-                                      : "Show this tune in the sidebar"
-                                  }
-                                >
-                                  {content}
-                                </button>
-                              </Show>
-                            );
-                          }}
-                        </For>
+                      <div class="h-[min(60vh,36rem)]">
+                        <TunesGrid
+                          tablePurpose="setlists"
+                          userId={gridUserId("view")}
+                          data={setlistGridRows().rows}
+                          columns={setlistViewColumns()}
+                          currentRowId={currentTuneId() ?? undefined}
+                          onRowClick={handleGridRowClick}
+                          enableColumnReorder={true}
+                          enableRowSelection={false}
+                          disableListMode={true}
+                          getRowId={getSetlistGridRowId}
+                          getSubRows={getSetlistGridSubRows}
+                          defaultExpandedRowIds={defaultExpandedSetlistRowIds()}
+                          hierarchyColumnId="title"
+                          getRowProps={(row) =>
+                            row.setlistPosition != null
+                              ? { "data-testid": "setlist-item-row" }
+                              : undefined
+                          }
+                        />
                       </div>
                     </Show>
                   </div>
@@ -951,53 +1087,33 @@ const SetlistsPage: Component = () => {
                       </div>
                     </div>
 
-                    {/* Candidate list */}
-                    <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
                       <Show
-                        when={candidateItems().length > 0}
+                        when={libraryGridRows().rows.length > 0}
                         fallback={
                           <div class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                             No matching tunes or tune sets.
                           </div>
                         }
                       >
-                        <For each={candidateItems()}>
-                          {(candidate) => (
-                            <div class="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3 last:border-b-0 dark:border-gray-700">
-                              <div class="min-w-0">
-                                <div class="flex items-center gap-2">
-                                  <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                    {candidate.kind === "tune"
-                                      ? "Tune"
-                                      : "Tune Set"}
-                                  </span>
-                                  <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                    {candidate.title}
-                                  </span>
-                                </div>
-                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                  {candidate.subtitle}
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void handleAddCandidate(candidate)
-                                }
-                                disabled={
-                                  !hasValidSetlistName() ||
-                                  isMutatingItems() ||
-                                  isSaving()
-                                }
-                                class="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
-                                data-testid="setlists-add-candidate-button"
-                              >
-                                <Plus size={14} />
-                                Add
-                              </button>
-                            </div>
-                          )}
-                        </For>
+                        <TunesGrid
+                          tablePurpose="setlists"
+                          userId={gridUserId("library")}
+                          data={libraryGridRows().rows}
+                          columns={libraryColumns()}
+                          currentRowId={currentTuneId() ?? undefined}
+                          onRowClick={handleGridRowClick}
+                          enableColumnReorder={true}
+                          enableRowSelection={false}
+                          disableListMode={true}
+                          getRowId={getSetlistGridRowId}
+                          getSubRows={getSetlistGridSubRows}
+                          defaultExpandedRowIds={defaultExpandedLibraryRowIds()}
+                          autoExpandedRowIds={
+                            libraryGridRows().autoExpandedRowIds
+                          }
+                          hierarchyColumnId="title"
+                        />
                       </Show>
                     </div>
                   </div>
@@ -1092,72 +1208,40 @@ const SetlistsPage: Component = () => {
                         </div>
                       }
                     >
-                      <div class="min-h-0 flex-1 overflow-y-auto">
-                        <For each={setlistItems() ?? []}>
-                          {(item, index) => (
-                            <div
-                              class="flex items-start gap-3 border-b border-gray-200 px-4 py-3 last:border-b-0 dark:border-gray-700"
-                              data-testid="setlist-editor-item-row"
-                            >
-                              <button
-                                type="button"
-                                class="flex min-w-0 flex-1 items-start gap-3 rounded-md text-left"
-                                draggable
-                                onDragStart={() => setDraggedItemId(item.id)}
-                                onDragEnd={() => setDraggedItemId(null)}
-                                onDragOver={(event) => event.preventDefault()}
-                                onDrop={() => void handleDropOnItem(item.id)}
-                              >
-                                <div class="flex items-center gap-2 pt-1 text-gray-400">
-                                  <span class="text-xs font-medium text-gray-500 dark:text-gray-400 w-5 text-right">
-                                    {index() + 1}
-                                  </span>
-                                  <GripVertical size={16} />
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                  <div class="flex items-center gap-2">
-                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                      {item.itemKind === "tune"
-                                        ? "Tune"
-                                        : "Tune Set"}
-                                    </span>
-                                    <span class="truncate text-sm font-medium text-gray-900 dark:text-white">
-                                      {item.itemKind === "tune"
-                                        ? item.tune?.title
-                                        : item.tuneSet?.name}
-                                    </span>
-                                  </div>
-                                  <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    <Show
-                                      when={item.itemKind === "tune"}
-                                      fallback={`${item.tuneSetTuneCount} tune${item.tuneSetTuneCount === 1 ? "" : "s"}`}
-                                    >
-                                      {[
-                                        item.tune?.type,
-                                        item.tune?.mode,
-                                        item.tune?.incipit,
-                                      ]
-                                        .filter(Boolean)
-                                        .join(" | ") || "Tune"}
-                                    </Show>
-                                  </div>
-                                </div>
-                              </button>
-                              <button
-                                type="button"
-                                class="rounded-md border border-red-200 p-1.5 text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
-                                onClick={() => void handleRemoveItem(item)}
-                                disabled={isMutatingItems() || isSaving()}
-                                data-testid="setlist-editor-remove-item-button"
-                              >
-                                <Trash2 size={14} />
-                                <span class="sr-only">
-                                  Remove item from Setlist
-                                </span>
-                              </button>
-                            </div>
-                          )}
-                        </For>
+                      <div class="min-h-0 flex-1">
+                        <TunesGrid
+                          tablePurpose="setlists"
+                          userId={gridUserId("editor")}
+                          data={setlistGridRows().rows}
+                          columns={setlistEditColumns()}
+                          currentRowId={currentTuneId() ?? undefined}
+                          onRowClick={handleGridRowClick}
+                          enableColumnReorder={true}
+                          enableRowSelection={false}
+                          disableListMode={true}
+                          getRowId={getSetlistGridRowId}
+                          getSubRows={getSetlistGridSubRows}
+                          defaultExpandedRowIds={defaultExpandedSetlistRowIds()}
+                          hierarchyColumnId="title"
+                          getRowProps={(row) =>
+                            row.setlistItemId && row.setlistPosition != null
+                              ? {
+                                  class:
+                                    draggedItemId() === row.setlistItemId
+                                      ? "opacity-60"
+                                      : "",
+                                  draggable: !isMutatingItems() && !isSaving(),
+                                  "data-testid": "setlist-editor-item-row",
+                                  onDragStart: () =>
+                                    setDraggedItemId(row.setlistItemId),
+                                  onDragEnd: () => setDraggedItemId(null),
+                                  onDragOver: (event) => event.preventDefault(),
+                                  onDrop: () =>
+                                    void handleDropOnItem(row.setlistItemId),
+                                }
+                              : undefined
+                          }
+                        />
                       </div>
                     </Show>
                   </div>
