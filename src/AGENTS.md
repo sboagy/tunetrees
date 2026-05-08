@@ -4,6 +4,8 @@ Scope: UI implementation under `src/**` for the SolidJS PWA.
 
 Inherits global execution guardrails from `.github/copilot-instructions.md` and repository domain context from root `AGENTS.md`.
 
+Visual system source of truth: `docs/design/tunetrees-design-system.md`. Keep visual grammar, button semantics, action vocabulary, and icon/text composition rules there. This file should only capture UI implementation constraints that affect code structure, behavior, accessibility, testability, or performance.
+
 ## Mission
 
 Deliver a productivity‑focused, table‑centric SolidJS PWA UI with equal desktop/mobile capability, offline‑first responsiveness, and user‑controlled theming. Preserve proven workflows visible in legacy screenshots (navigation tabs, tune tables, sidebars, settings modal, tune editor sections) without porting React/Next.js patterns.
@@ -45,8 +47,8 @@ const table = createSolidTable({
 
 UI Requirements:
 - Sticky headers: `sticky top-0` with theme background.
-- Hover row style: `hover:bg-gray-100 dark:hover:bg-gray-700`.
-- Action column at right (icons AFTER text if combined).
+- Hover row style: implement hover affordance using design-system-approved tokens/classes from `docs/design/tunetrees-design-system.md` (do not hardcode color values here).
+- Action column at right.
 - Horizontal scroll wrapper on small screens: `overflow-x-auto`.
 
 ## Theming
@@ -60,19 +62,6 @@ function applyTheme(pref: 'light' | 'dark' | 'system') {
 ```
 Settings page exposes explicit selector; never hardcode theme to system only.
 
-## Component Patterns
-
-Buttons (shadcn-solid variants):
-- `default`: primary commit actions (Save, Submit)
-- `outline`: neutral secondary (Cancel, Sign In)
-- `ghost`: low emphasis / icon
-- `destructive`: delete/remove
-- `link`: textual
-
-Dialog structure: header (title + close), content sections, footer (primary on right). Use consistent padding; avoid nesting scrollable areas.
-
-Icons (Lucide Solid): Place AFTER text for mixed buttons. Icon-only requires `size="icon"` + `sr-only` span.
-
 ## Forms & Validation
 
 Use Zod + light form handling. Each field: Label, Control, Description, Error. Avoid duplicate local state and signal state.
@@ -82,7 +71,7 @@ Use Zod + light form handling. Each field: Label, Control, Description, Error. A
 - Touch targets ≥ 44px.
 - Keep table, enable scroll; do not transform to cards.
 - Collapse sidebars by default.
-- Provide top‑level quick actions (Add Tune, Filter) as icon + tooltip or icon + short text.
+- Provide top‑level quick actions that follow the design system's action hierarchy and icon rules.
 
 ## Accessibility
 
@@ -103,10 +92,6 @@ All interactive controls used by E2E must include stable `data-testid` values (k
 - Memoize heavy derived cell content with `createMemo`.
 - Use virtualization for large tables.
 - Prefer context/signals over deep prop chains.
-
-## References
-
-Legacy screenshots: `legacy/frontend/components/`. Style guide: `frontend/UI_STYLE_GUIDE2.md`. Global rules: project root `AGENTS.md`.
 
 ---
 UI-specific; keep concise and current. Global invariants live in root AGENTS.

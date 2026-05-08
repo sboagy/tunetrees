@@ -2,6 +2,14 @@
 
 This document serves as the single source of truth for the TuneTrees UI grammar, action vocabulary, and visual hierarchy. It ensures a consistent, predictable, and professional user experience across the entire application.
 
+## 0. Ownership & Precedence
+
+Use this document for all visual decisions under `src/**`, including color semantics, button hierarchy, layout grammar, action labels, and icon/text composition.
+
+Use `src/AGENTS.md` for implementation constraints such as SolidJS patterns, local-first data flow, table behavior, accessibility requirements, testability, and performance.
+
+If these documents ever disagree about a visual rule, this design system wins and `src/AGENTS.md` should be updated to point here rather than restate the rule.
+
 ---
 
 ## 🛠️ 1. Core Dependencies
