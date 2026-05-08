@@ -88,6 +88,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   getSubRows?: (row: T) => T[] | undefined;
   getRowId?: (row: T, index: number, parent?: T) => string;
   autoExpandedRowIds?: string[];
+  defaultExpandedRowIds?: string[];
   hierarchyColumnId?: string;
   disableListMode?: boolean;
   // Optional map of column descriptions to show in header popovers
@@ -249,6 +250,8 @@ export const TunesGrid = (<T extends { id: string | number }>(
     initialState.rowSelection || {}
   );
   const [expanded, setExpanded] = createSignal<ExpandedState>({});
+  const [lastDefaultExpandedSignature, setLastDefaultExpandedSignature] =
+    createSignal<string | null>(null);
   const [columnSizing, setColumnSizing] = createSignal<ColumnSizingState>(
     initialState.columnSizing || {}
   );
@@ -350,6 +353,24 @@ export const TunesGrid = (<T extends { id: string | number }>(
       forcedIds.map((rowId) => [rowId, true])
     );
     setExpanded(nextExpanded);
+  });
+
+  createEffect(() => {
+    const defaultIds = props.defaultExpandedRowIds;
+    if (!defaultIds || defaultIds.length === 0) return;
+
+    const signature = defaultIds.join("|");
+    if (signature === lastDefaultExpandedSignature()) return;
+    setLastDefaultExpandedSignature(signature);
+
+    setExpanded((prev) => {
+      const nextExpanded: ExpandedState =
+        prev === true ? {} : { ...(prev ?? {}) };
+      for (const rowId of defaultIds) {
+        nextExpanded[rowId] = true;
+      }
+      return nextExpanded;
+    });
   });
 
   // Resolve columns: use provided columns or derive from shared factory

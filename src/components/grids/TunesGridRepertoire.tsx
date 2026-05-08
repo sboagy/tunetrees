@@ -206,6 +206,12 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
     () => mixedRowsResult().rows
   );
 
+  const defaultExpandedRowIds = createMemo(() =>
+    gridRows()
+      .filter((row) => isTuneSetGridRow(row))
+      .map((row) => row.rowId)
+  );
+
   const visibleTuneCount = createMemo(() => {
     const tuneIds = new Set<string>();
 
@@ -311,6 +317,7 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
             canSelectRow={canSelectMixedTuneGridRow}
             getRowId={getMixedTuneGridRowId}
             getSubRows={getMixedTuneGridSubRows}
+            defaultExpandedRowIds={defaultExpandedRowIds()}
             autoExpandedRowIds={
               props.searchQuery?.trim()
                 ? mixedRowsResult().autoExpandedRowIds
