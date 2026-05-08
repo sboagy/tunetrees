@@ -512,7 +512,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                   }
                 }}
                 onDblClick={() => props.onRowDoubleClick?.(item)}
-                data-testid={`stacked-item-${itemId}`}
+                data-testid={`stacked-item-${rowId}`}
                 data-selected={isSelected() ? "true" : undefined}
               >
                 <div class="flex items-start gap-2.5">

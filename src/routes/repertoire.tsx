@@ -39,7 +39,7 @@ import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
 import { persistDb } from "../lib/db/client-sqlite";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
 import {
-  getTuneIdsForTuneSets,
+  getBatchedTuneSetItemRefs,
   getVisibleTuneSets,
 } from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
@@ -325,7 +325,8 @@ const RepertoirePage: Component = () => {
     },
     async (params) => {
       if (!params) return undefined;
-      return getTuneIdsForTuneSets(params.db, params.tuneSetIds, params.userId);
+      const items = await getBatchedTuneSetItemRefs(params.db, params.tuneSetIds);
+      return [...new Set(items.map((item) => item.tuneRef))];
     }
   );
 
@@ -344,11 +345,9 @@ const RepertoirePage: Component = () => {
         setKind: "practice_set",
       });
       if (visibleSets.length === 0) return [];
-      return getTuneIdsForTuneSets(
-        params.db,
-        visibleSets.map((set) => set.id),
-        params.userId
-      );
+      const setIds = visibleSets.map((set) => set.id);
+      const items = await getBatchedTuneSetItemRefs(params.db, setIds);
+      return [...new Set(items.map((item) => item.tuneRef))];
     }
   );
 
