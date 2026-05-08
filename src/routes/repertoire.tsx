@@ -325,7 +325,10 @@ const RepertoirePage: Component = () => {
     },
     async (params) => {
       if (!params) return undefined;
-      const items = await getBatchedTuneSetItemRefs(params.db, params.tuneSetIds);
+      const items = await getBatchedTuneSetItemRefs(
+        params.db,
+        params.tuneSetIds
+      );
       return [...new Set(items.map((item) => item.tuneRef))];
     }
   );
