@@ -14,6 +14,7 @@
  * fitting narrow viewports without horizontal scrolling.
  */
 
+import { ChevronDown, ChevronRight } from "lucide-solid";
 import { For, type JSX, Show } from "solid-js";
 import {
   getRecallEvalDisplay,
@@ -173,6 +174,12 @@ const OwnershipBadge = (props: { value: string | null | undefined }) => {
  */
 export interface IStackedListRow {
   id: string | number;
+  stacked_row_id?: string;
+  stacked_depth?: number;
+  stacked_can_expand?: boolean;
+  stacked_is_expanded?: boolean;
+  stacked_kind?: "tune" | "tune_set";
+  tuneSetRef?: string | null;
   /** Aliased tune id used in scheduled rows (from daily_practice_queue join) */
   tune_id?: string | number;
   title?: string | null;
@@ -228,8 +235,10 @@ export interface ITuneStackedListProps {
   onRowClick?: (row: IStackedListRow) => void;
   onRowDoubleClick?: (row: IStackedListRow) => void;
   enableRowSelection?: boolean;
+  canSelectRow?: (row: IStackedListRow) => boolean;
   selectedRowIds?: Record<string, boolean>;
   onRowSelectionChange?: (row: IStackedListRow, checked: boolean) => void;
+  onRowToggleExpanded?: (row: IStackedListRow) => void;
   cellCallbacks?: ICellEditorCallbacks;
   /**
    * Column visibility state from the TanStack table instance.
@@ -285,12 +294,23 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
         <For each={props.data}>
           {(item) => {
             const itemId = item.tune_id ?? item.id;
-            const rowId = String(item.id);
+            const rowId = String(item.stacked_row_id ?? item.id);
+            const checkboxIdentifier = String(item.id);
+            const rowDepth = item.stacked_depth ?? 0;
+            const canExpand = item.stacked_can_expand === true;
+            const isExpanded = item.stacked_is_expanded === true;
+            const isTuneSet = item.stacked_kind === "tune_set";
+            const belongsToSet =
+              isTuneSet ||
+              (typeof item.tuneSetRef === "string" &&
+                item.tuneSetRef.length > 0);
             const isSelected = () =>
               props.currentRowId != null &&
               String(props.currentRowId) === String(itemId);
             const isRowChecked = () => props.selectedRowIds?.[rowId] === true;
-            const showsRowSelection = () => props.enableRowSelection === true;
+            const showsRowSelection = () =>
+              props.enableRowSelection === true &&
+              (props.canSelectRow?.(item) ?? true);
 
             const title = item.title ?? "(Untitled)";
             const favoriteUrl = item.favorite_url ?? item.favoriteUrl ?? null;
@@ -462,7 +482,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 ? [
                     renderLabeledValue(
                       "ID",
-                      item.id,
+                      checkboxIdentifier,
                       "font-mono text-gray-700 dark:text-gray-300"
                     ),
                   ]
@@ -480,7 +500,9 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                 class={`px-4 py-3 min-h-[44px] cursor-pointer transition-colors ${
                   isSelected()
                     ? "bg-blue-50 dark:bg-blue-900/25 border-l-2 border-blue-400 dark:border-blue-500"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    : belongsToSet
+                      ? "bg-emerald-100/80 hover:bg-emerald-100 border-l-2 border-emerald-300/80 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/80"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 }`}
                 onClick={() => props.onRowClick?.(item)}
                 onKeyDown={(e) => {
@@ -490,7 +512,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                   }
                 }}
                 onDblClick={() => props.onRowDoubleClick?.(item)}
-                data-testid={`stacked-item-${itemId}`}
+                data-testid={`stacked-item-${rowId}`}
                 data-selected={isSelected() ? "true" : undefined}
               >
                 <div class="flex items-start gap-2.5">
@@ -511,7 +533,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           )
                         }
                         class="h-4 w-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label={`Select row ${rowId}`}
+                        aria-label={`Select row ${checkboxIdentifier}`}
                         data-testid={`stacked-row-checkbox-${rowId}`}
                       />
                     </div>
@@ -520,36 +542,74 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                   <div class="min-w-0 flex-1">
                     {/* Row 1: Title + primary badge (always shown) */}
                     <div class="flex items-start justify-between gap-2 min-h-[24px]">
-                      <div class="font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0">
+                      <div
+                        class="flex items-start gap-1.5 flex-1 min-w-0"
+                        style={{ "padding-left": `${rowDepth * 1.25}rem` }}
+                      >
                         <Show
-                          when={titleVisible()}
+                          when={canExpand}
                           fallback={
-                            <Show
-                              when={idVisible()}
-                              fallback={
-                                <span class="text-gray-400 dark:text-gray-500 italic">
-                                  Title hidden
-                                </span>
-                              }
-                            >
-                              <span class="font-mono text-xs text-gray-600 dark:text-gray-400">
-                                {String(item.id)}
-                              </span>
-                            </Show>
+                            <span
+                              class="w-5 flex-shrink-0"
+                              aria-hidden="true"
+                            />
                           }
                         >
-                          <Show when={href} fallback={<span>{title}</span>}>
-                            <a
-                              href={href!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="text-blue-600 dark:text-blue-400 hover:underline"
-                              onClick={(e) => e.stopPropagation()}
+                          <button
+                            type="button"
+                            class="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                            aria-label={
+                              isExpanded ? "Collapse row" : "Expand row"
+                            }
+                            aria-expanded={isExpanded}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              props.onRowToggleExpanded?.(item);
+                            }}
+                          >
+                            <Show
+                              when={isExpanded}
+                              fallback={
+                                <ChevronRight size={14} aria-hidden="true" />
+                              }
                             >
-                              {title}
-                            </a>
-                          </Show>
+                              <ChevronDown size={14} aria-hidden="true" />
+                            </Show>
+                          </button>
                         </Show>
+                        <div
+                          class={`font-medium text-sm text-gray-900 dark:text-gray-100 leading-snug flex-1 min-w-0 ${isTuneSet ? "font-semibold" : ""}`}
+                        >
+                          <Show
+                            when={titleVisible()}
+                            fallback={
+                              <Show
+                                when={idVisible()}
+                                fallback={
+                                  <span class="text-gray-400 dark:text-gray-500 italic">
+                                    Title hidden
+                                  </span>
+                                }
+                              >
+                                <span class="font-mono text-xs text-gray-600 dark:text-gray-400">
+                                  {String(item.id)}
+                                </span>
+                              </Show>
+                            }
+                          >
+                            <Show when={href} fallback={<span>{title}</span>}>
+                              <a
+                                href={href!}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-blue-600 dark:text-blue-400 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {title}
+                              </a>
+                            </Show>
+                          </Show>
+                        </div>
                       </div>
                       {/* Purpose-specific right badge, controlled by column visibility */}
                       <Show

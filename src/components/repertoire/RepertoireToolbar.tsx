@@ -71,10 +71,13 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 
 export interface RepertoireToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  groupTuneSets: boolean;
+  onGroupTuneSetsChange: (groupTuneSets: boolean) => void;
   selectedTypes: string[];
   onTypesChange: (types: string[]) => void;
   selectedModes: string[];
@@ -90,6 +93,8 @@ export interface RepertoireToolbarProps {
   selectedRowsCount?: number;
   table?: Table<ITuneOverview>;
   repertoireId?: string;
+  filterAnyTuneSet: boolean;
+  onAnyTuneSetFilterChange: (enabled: boolean) => void;
   selectedTuneSetIds: string[];
   onTuneSetFilterChange: (tuneSetIds: string[]) => void;
   filterPanelExpanded?: boolean;
@@ -139,13 +144,31 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       props.table && props.selectedRowsCount && props.selectedRowsCount > 0
     );
 
-  const selectedRows = createMemo(() =>
-    props.table ? props.table.getSelectedRowModel().rows : []
-  );
+  const getSelectedFlatRows = () =>
+    props.table ? props.table.getSelectedRowModel().flatRows : [];
 
-  const selectedTuneIds = createMemo(() =>
-    selectedRows().map((row) => row.original.id)
-  );
+  const getSelectedTuneIds = () => {
+    const seen = new Set<string>();
+    const tuneIds: string[] = [];
+
+    for (const row of getSelectedFlatRows()) {
+      const tuneId = String(
+        (row.original as { tune_id?: string | number; id?: string | number })
+          .tune_id ??
+          (row.original as { id?: string | number }).id ??
+          ""
+      );
+      if (!tuneId || seen.has(tuneId)) continue;
+      seen.add(tuneId);
+      tuneIds.push(tuneId);
+    }
+
+    return tuneIds;
+  };
+
+  const selectedRows = createMemo(() => getSelectedFlatRows());
+
+  const selectedTuneIds = createMemo(() => getSelectedTuneIds());
 
   const selectedTuneTitles = createMemo(() =>
     selectedRows().map((row) => row.original.title ?? "")
@@ -179,7 +202,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         return;
       }
 
-      const selectedRows = props.table.getSelectedRowModel().rows;
+      const selectedRows = getSelectedFlatRows();
       if (selectedRows.length === 0) {
         alert(
           "No tunes selected. Please select tunes to add to practice queue."
@@ -187,7 +210,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
         return;
       }
 
-      const tuneIds = selectedRows.map((row) => row.original.id);
+      const tuneIds = getSelectedTuneIds();
       console.log(`Adding ${tuneIds.length} tunes to practice queue:`, tuneIds);
 
       const db = getDb();
@@ -249,7 +272,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
       return;
     }
 
-    const selectedRows = props.table.getSelectedRowModel().rows;
+    const selectedRows = getSelectedFlatRows();
     if (selectedRows.length === 0) {
       alert("No tunes selected. Please select tunes to group as a tune set.");
       return;
@@ -348,10 +371,10 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
     const currentUserId = user()?.id;
     if (!currentUserId) return;
 
-    const selectedRows = props.table.getSelectedRowModel().rows;
+    const selectedRows = getSelectedFlatRows();
     if (selectedRows.length === 0) return;
 
-    const tuneIds = selectedRows.map((row) => row.original.id);
+    const tuneIds = getSelectedTuneIds();
     const db = getDb();
 
     setIsRemoving(true);
@@ -433,6 +456,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             name: tuneSet.name,
             tuneCount: tuneSet.tuneCount,
           }))}
+          filterAnyTuneSet={props.filterAnyTuneSet}
+          onAnyTuneSetChange={props.onAnyTuneSetFilterChange}
           selectedTuneSetIds={props.selectedTuneSetIds}
           onTuneSetChange={props.onTuneSetFilterChange}
           loading={{ ...props.loading, tuneSets: personalTuneSets.loading }}
@@ -528,6 +553,22 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
               <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
 
+              <div class="rounded-md px-3 py-2">
+                <Switch
+                  checked={props.groupTuneSets}
+                  onChange={props.onGroupTuneSetsChange}
+                  data-testid="repertoire-group-sets-switch"
+                  class="flex w-full items-center gap-3 text-left text-sm text-gray-700 dark:text-gray-200"
+                >
+                  <SwitchLabel class="flex-1 cursor-pointer select-none">
+                    Show Sets
+                  </SwitchLabel>
+                  <SwitchControl class="ml-1">
+                    <SwitchThumb />
+                  </SwitchControl>
+                </Switch>
+              </div>
+
               <button
                 type="button"
                 data-testid="display-options-entry-button"
@@ -594,6 +635,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                     tuneCount: tuneSet.tuneCount,
                   })
                 )}
+                filterAnyTuneSet={props.filterAnyTuneSet}
+                onAnyTuneSetChange={props.onAnyTuneSetFilterChange}
                 selectedTuneSetIds={props.selectedTuneSetIds}
                 onTuneSetChange={props.onTuneSetFilterChange}
                 loading={{
@@ -646,6 +689,20 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
             <div class={TOOLBAR_SPACER} />
 
             <div class="flex items-center gap-2">
+              <Switch
+                checked={props.groupTuneSets}
+                onChange={props.onGroupTuneSetsChange}
+                data-testid="repertoire-group-sets-switch"
+                class="flex items-center gap-2 rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                <SwitchLabel class="cursor-pointer select-none">
+                  Show Sets
+                </SwitchLabel>
+                <SwitchControl>
+                  <SwitchThumb />
+                </SwitchControl>
+              </Switch>
+
               <button
                 type="button"
                 onClick={() => setShowTuneSetManagerDialog(true)}

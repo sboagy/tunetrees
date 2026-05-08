@@ -375,6 +375,36 @@ export async function getTuneSetItems(
   return result;
 }
 
+/**
+ * Fetches tuneRef + position for all active items across multiple tune sets in
+ * a single query. The caller is responsible for ensuring the provided set IDs
+ * are already access-checked (e.g. returned by getVisibleTuneSets). No per-set
+ * or per-item round trips; no tune-row hydration.
+ */
+export async function getBatchedTuneSetItemRefs(
+  db: AnyDatabase,
+  tuneSetIds: string[]
+): Promise<{ tuneSetRef: string; tuneRef: string; position: number }[]> {
+  if (tuneSetIds.length === 0) return [];
+
+  const rows = await db
+    .select()
+    .from(tuneSetItem)
+    .where(
+      and(
+        inArray(tuneSetItem.tuneSetRef, tuneSetIds),
+        eq(tuneSetItem.deleted, 0)
+      )
+    )
+    .orderBy(asc(tuneSetItem.position));
+
+  return rows.map((row) => ({
+    tuneSetRef: row.tuneSetRef,
+    tuneRef: row.tuneRef,
+    position: row.position,
+  }));
+}
+
 export async function getTuneIdsForTuneSet(
   db: AnyDatabase,
   tuneSetId: string,

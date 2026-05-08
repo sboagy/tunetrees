@@ -5,6 +5,7 @@
  * Uses direct Supabase calls to manipulate database state before tests run.
  */
 
+import { randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
 import postgres from "postgres";
@@ -782,6 +783,11 @@ async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
 type DeterministicSetupOptions = {
   clearRepertoire?: boolean;
   seedRepertoire?: string[];
+  seedTuneSets?: {
+    name: string;
+    tuneIds: string[];
+    description?: string | null;
+  }[];
   scheduleTunes?: { tuneIds: string[]; daysAgo: number };
   /** Optional list of title prefixes to purge (cascade delete) before setup */
   purgeTitlePrefixes?: string[];
@@ -955,6 +961,8 @@ function getDeterministicTablesToVerify(
     tables.push("repertoire_tune");
   }
 
+  tables.push("tune_set");
+
   return tables;
 }
 
@@ -965,6 +973,8 @@ async function clearDeterministicUserState(
   if (opts.clearRepertoire) {
     await clearUserTable(user, "repertoire_tune");
   }
+
+  await clearUserTable(user, "tune_set");
 
   await clearUserTable(user, "user_genre_selection");
 
@@ -1008,6 +1018,76 @@ async function scheduleDeterministicTunes(
       throw new Error(`Failed to schedule tune ${tuneId}: ${error.message}`);
     }
   }
+}
+
+export async function seedUserTuneSets(
+  user: TestUser,
+  tuneSets: {
+    name: string;
+    tuneIds: string[];
+    description?: string | null;
+  }[]
+) {
+  if (tuneSets.length === 0) {
+    return [];
+  }
+
+  const userKey = user.email.split(".")[0];
+  const { supabase } = await getTestUserClient(userKey);
+  const now = new Date().toISOString();
+  const createdSetIds: string[] = [];
+
+  for (const tuneSet of tuneSets) {
+    const tuneSetId = randomUUID();
+    const { error: tuneSetError } = await supabase.from("tune_set").insert({
+      id: tuneSetId,
+      owner_user_ref: user.userId,
+      group_ref: null,
+      name: tuneSet.name,
+      description: tuneSet.description ?? null,
+      set_kind: "practice_set",
+      deleted: false,
+      created_at: now,
+      sync_version: 1,
+      last_modified_at: now,
+      device_id: "test-seed",
+    });
+
+    if (tuneSetError) {
+      throw new Error(
+        `Failed to seed tune set '${tuneSet.name}' for ${user.name}: ${tuneSetError.message}`
+      );
+    }
+
+    createdSetIds.push(tuneSetId);
+
+    if (tuneSet.tuneIds.length === 0) {
+      continue;
+    }
+
+    const itemRows = tuneSet.tuneIds.map((tuneId, index) => ({
+      id: randomUUID(),
+      tune_set_ref: tuneSetId,
+      tune_ref: tuneId,
+      position: index,
+      deleted: false,
+      sync_version: 1,
+      last_modified_at: now,
+      device_id: "test-seed",
+    }));
+
+    const { error: tuneSetItemError } = await supabase
+      .from("tune_set_item")
+      .insert(itemRows);
+
+    if (tuneSetItemError) {
+      throw new Error(
+        `Failed to seed tune set items for '${tuneSet.name}' (${user.name}): ${tuneSetItemError.message}`
+      );
+    }
+  }
+
+  return createdSetIds;
 }
 
 async function ensureDeterministicSetupPageReady(
@@ -1191,6 +1271,8 @@ function applyTableQueryFilters<
   } else if (tableName === "repertoire_tune") {
     // repertoire_tune rows are keyed by repertoire_ref; no user_ref column
     query = query.eq("repertoire_ref", user.repertoireId);
+  } else if (tableName === "tune_set") {
+    query = query.eq("owner_user_ref", user.userId);
   } else if (tableName === "table_transient_data") {
     query = query.eq("user_id", user.userId);
   } else if (tableName === "prefs_scheduling_options") {
@@ -1692,6 +1774,11 @@ export async function setupForRepertoireTestsParallel(
   user: TestUser,
   opts: {
     repertoireTunes: string[];
+    tuneSets?: {
+      name: string;
+      tuneIds: string[];
+      description?: string | null;
+    }[];
     scheduleTunes?: boolean;
     scheduleDaysAgo?: number;
     /**
@@ -1703,6 +1790,7 @@ export async function setupForRepertoireTestsParallel(
 ) {
   const {
     repertoireTunes,
+    tuneSets = [],
     scheduleTunes = false,
     scheduleDaysAgo = 0,
     scheduleBaseDate,
@@ -1724,6 +1812,7 @@ export async function setupForRepertoireTestsParallel(
 
   // 2. Reset repertoire
   await clearUserTable(user, "repertoire_tune");
+  await clearUserTable(user, "tune_set");
   await clearUserTable(user, "user_genre_selection");
 
   await verifyTablesEmpty(user, [
@@ -1735,11 +1824,13 @@ export async function setupForRepertoireTestsParallel(
     "prefs_spaced_repetition",
     "plugin",
     "repertoire_tune",
+    "tune_set",
     "user_genre_selection",
   ]);
   await normalizeUserRepertoireRow(user);
 
   await seedUserRepertoire(user, repertoireTunes);
+  await seedUserTuneSets(user, tuneSets);
 
   // 3. Optionally schedule tunes
   if (scheduleTunes) {

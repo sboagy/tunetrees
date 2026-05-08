@@ -1,12 +1,15 @@
 import {
+  type Cell,
   type Column,
   type ColumnDef,
   type ColumnOrderState,
   type ColumnPinningState,
   type ColumnSizingState,
   createSolidTable,
+  type ExpandedState,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   getSortedRowModel,
   type RowSelectionState,
   type SortingState,
@@ -14,7 +17,7 @@ import {
   type VisibilityState,
 } from "@tanstack/solid-table";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { GripVertical } from "lucide-solid";
+import { ChevronDown, ChevronRight, GripVertical } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -79,6 +82,15 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   enableColumnReorder?: boolean;
   // Enable/disable row selection (default true)
   enableRowSelection?: boolean;
+  // Optional per-row selection control used for mixed hierarchy rows.
+  canSelectRow?: (row: T) => boolean;
+  // Optional nested rows support for mixed tune/set grids.
+  getSubRows?: (row: T) => T[] | undefined;
+  getRowId?: (row: T, index: number, parent?: T) => string;
+  autoExpandedRowIds?: string[];
+  defaultExpandedRowIds?: string[];
+  hierarchyColumnId?: string;
+  disableListMode?: boolean;
   // Optional map of column descriptions to show in header popovers
   columnDescriptions?: Partial<Record<string, string>>;
 }
@@ -237,6 +249,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
     initialState.rowSelection || {}
   );
+  const [expanded, setExpanded] = createSignal<ExpandedState>({});
+  const [lastDefaultExpandedSignature, setLastDefaultExpandedSignature] =
+    createSignal<string | null>(null);
   const [columnSizing, setColumnSizing] = createSignal<ColumnSizingState>(
     initialState.columnSizing || {}
   );
@@ -250,18 +265,25 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [columnPinning, setColumnPinning] = createSignal<ColumnPinningState>(
     initialState.columnPinning || { left: [], right: [] }
   );
+  const normalizeViewMode = (
+    mode: TableViewMode | undefined
+  ): TableViewMode | undefined => {
+    if (props.disableListMode) return "grid";
+    return mode;
+  };
   const [viewModeOverride, setViewModeOverride] = createSignal<
     TableViewMode | undefined
-  >(initialState.viewMode);
+  >(normalizeViewMode(initialState.viewMode));
   const defaultViewMode = createMemo<TableViewMode>(() =>
-    isMobile() ? "list" : "grid"
+    props.disableListMode ? "grid" : isMobile() ? "list" : "grid"
   );
   const effectiveViewMode = createMemo<TableViewMode>(() => {
     return viewModeOverride() ?? defaultViewMode();
   });
 
   const setPersistedViewMode = (mode: TableViewMode) => {
-    setViewModeOverride(mode === defaultViewMode() ? undefined : mode);
+    const nextMode = props.disableListMode ? "grid" : mode;
+    setViewModeOverride(nextMode === defaultViewMode() ? undefined : nextMode);
   };
 
   const [lastPersistedStateKey, setLastPersistedStateKey] = createSignal<
@@ -277,9 +299,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
     const loaded = loadTableState(key);
     setViewModeOverride(
-      loaded?.viewMode === "grid" || loaded?.viewMode === "list"
-        ? loaded.viewMode
-        : undefined
+      normalizeViewMode(
+        loaded?.viewMode === "grid" || loaded?.viewMode === "list"
+          ? loaded.viewMode
+          : undefined
+      )
     );
     if (loaded?.rowSelection) {
       if (Object.keys(loaded.rowSelection).length > 0) {
@@ -320,6 +344,33 @@ export const TunesGrid = (<T extends { id: string | number }>(
   // Sync column visibility changes to parent
   createEffect(() => {
     props.onColumnVisibilityChange?.(columnVisibility());
+  });
+
+  createEffect(() => {
+    const forcedIds = props.autoExpandedRowIds;
+    if (!forcedIds) return;
+    const nextExpanded: ExpandedState = Object.fromEntries(
+      forcedIds.map((rowId) => [rowId, true])
+    );
+    setExpanded(nextExpanded);
+  });
+
+  createEffect(() => {
+    const defaultIds = props.defaultExpandedRowIds;
+    if (!defaultIds || defaultIds.length === 0) return;
+
+    const signature = defaultIds.join("|");
+    if (signature === lastDefaultExpandedSignature()) return;
+    setLastDefaultExpandedSignature(signature);
+
+    setExpanded((prev) => {
+      const nextExpanded: ExpandedState =
+        prev === true ? {} : { ...(prev ?? {}) };
+      for (const rowId of defaultIds) {
+        nextExpanded[rowId] = true;
+      }
+      return nextExpanded;
+    });
   });
 
   // Resolve columns: use provided columns or derive from shared factory
@@ -384,6 +435,10 @@ export const TunesGrid = (<T extends { id: string | number }>(
     setViewMode: (mode) => setPersistedViewMode(mode),
   };
 
+  const hierarchyColumnId = createMemo(
+    () => props.hierarchyColumnId ?? "title"
+  );
+
   // Create table instance
   const table = createSolidTable<T>({
     get data() {
@@ -394,7 +449,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    enableRowSelection: props.enableRowSelection ?? true,
+    getExpandedRowModel: props.getSubRows ? getExpandedRowModel() : undefined,
+    getSubRows: props.getSubRows ? (row) => props.getSubRows?.(row) : undefined,
+    enableRowSelection: props.canSelectRow
+      ? (row) => props.canSelectRow?.(row.original) ?? false
+      : (props.enableRowSelection ?? true),
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     meta: tableDisplayOptionsMeta,
@@ -404,6 +463,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
       },
       get rowSelection() {
         return rowSelection();
+      },
+      get expanded() {
+        return expanded();
       },
       get columnSizing() {
         return columnSizing();
@@ -420,11 +482,13 @@ export const TunesGrid = (<T extends { id: string | number }>(
     },
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
+    onExpandedChange: setExpanded,
     onColumnSizingChange: setColumnSizing,
     onColumnOrderChange: setColumnOrder,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
-    getRowId: (row) => String((row as any).id),
+    getRowId: (row, index, parent) =>
+      props.getRowId?.(row, index, parent?.original) ?? String((row as any).id),
   });
 
   // Notify parent of table instance
@@ -476,7 +540,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       mergeWithDefaults(dbState, props.tablePurpose as any),
       allowedColumnIds
     );
-    setViewModeOverride(merged.viewMode);
+    setViewModeOverride(normalizeViewMode(merged.viewMode));
     if (merged.columnVisibility) setColumnVisibility(merged.columnVisibility);
     if (merged.columnOrder?.length) setColumnOrder(merged.columnOrder);
     if (merged.columnSizing && Object.keys(merged.columnSizing).length)
@@ -538,14 +602,76 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
   const currentRows = createMemo(() => table.getRowModel().rows);
   const stackedListData = createMemo<IStackedListRow[]>(() =>
-    currentRows().map((row) => row.original as unknown as IStackedListRow)
+    currentRows().map((row) => {
+      const originalRow = row.original as IStackedListRow & {
+        rowKind?: IStackedListRow["stacked_kind"];
+      };
+
+      return {
+        ...originalRow,
+        // TuneStackedList keys off `stacked_kind` for row-type-specific styling.
+        // Repertoire mixed rows may only expose the discriminator as `rowKind`,
+        // so normalize it here while preserving any existing `stacked_kind`.
+        stacked_kind: originalRow.stacked_kind ?? originalRow.rowKind,
+        stacked_row_id: row.id,
+        stacked_depth: row.depth,
+        stacked_can_expand: row.getCanExpand(),
+        stacked_is_expanded: row.getIsExpanded(),
+      };
+    })
   );
+
+  const renderCellContent = (cell: Cell<T, unknown>) => {
+    const content = flexRender(cell.column.columnDef.cell, cell.getContext());
+    if (!props.getSubRows || cell.column.id !== hierarchyColumnId()) {
+      return content;
+    }
+
+    const canExpand = cell.row.getCanExpand();
+    const isExpanded = cell.row.getIsExpanded();
+    const depthPadding = `${cell.row.depth * 1.25}rem`;
+
+    return (
+      <div
+        class="flex items-center min-w-0"
+        style={{ "padding-left": depthPadding }}
+      >
+        <Show
+          when={canExpand}
+          fallback={<span class="w-5 flex-shrink-0" aria-hidden="true" />}
+        >
+          <button
+            type="button"
+            class="mr-1 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+            aria-label={isExpanded ? "Collapse row" : "Expand row"}
+            aria-expanded={isExpanded}
+            onClick={(event) => {
+              event.stopPropagation();
+              cell.row.toggleExpanded();
+            }}
+          >
+            <Show
+              when={isExpanded}
+              fallback={<ChevronRight size={14} aria-hidden="true" />}
+            >
+              <ChevronDown size={14} aria-hidden="true" />
+            </Show>
+          </button>
+        </Show>
+        <div
+          class={`min-w-0 flex-1 ${canExpand ? "font-semibold text-gray-900 dark:text-gray-100" : ""}`}
+        >
+          {content}
+        </div>
+      </div>
+    );
+  };
 
   const handleStackedRowSelectionChange = (
     row: IStackedListRow,
     checked: boolean
   ) => {
-    const rowId = String(row.id);
+    const rowId = String(row.stacked_row_id ?? row.id);
     setRowSelection((prev) => {
       const currentlySelected = prev[rowId] === true;
       if (currentlySelected === checked) return prev;
@@ -871,6 +997,14 @@ export const TunesGrid = (<T extends { id: string | number }>(
     };
   };
 
+  const rowBelongsToSet = (row: T): boolean => {
+    const candidate = row as T & { tuneSetRef?: string | null };
+    return (
+      typeof candidate.tuneSetRef === "string" &&
+      candidate.tuneSetRef.length > 0
+    );
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* List mode: stacked list view, either by mobile default or explicit override. */}
@@ -882,8 +1016,17 @@ export const TunesGrid = (<T extends { id: string | number }>(
           onRowClick={(row) => props.onRowClick?.(row as T)}
           onRowDoubleClick={(row) => props.onRowDoubleClick?.(row as T)}
           enableRowSelection={props.enableRowSelection ?? true}
+          canSelectRow={
+            props.canSelectRow
+              ? (row) => props.canSelectRow?.(row as unknown as T) ?? false
+              : undefined
+          }
           selectedRowIds={rowSelection()}
           onRowSelectionChange={handleStackedRowSelectionChange}
+          onRowToggleExpanded={(row) => {
+            const rowModel = table.getRow(row.stacked_row_id ?? String(row.id));
+            rowModel?.toggleExpanded();
+          }}
           cellCallbacks={props.cellCallbacks}
           columnVisibility={columnVisibility()}
         />
@@ -1136,7 +1279,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         class={
                           props.currentRowId === (row()!.original as any).id
                             ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
-                            : ROW_CLASSES
+                            : rowBelongsToSet(row()!.original)
+                              ? "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60"
+                              : ROW_CLASSES
                         }
                         onClick={() => props.onRowClick?.(row()!.original)}
                         onDblClick={() =>
@@ -1147,16 +1292,19 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         <For each={row()!.getVisibleCells()}>
                           {(cell) => (
                             <td
-                              class={`${CELL_CLASSES}${cell.column.getIsPinned() ? " bg-white dark:bg-gray-900" : ""}${getPinnedBorderClass(cell.column)}`}
+                              class={`${CELL_CLASSES}${
+                                cell.column.getIsPinned()
+                                  ? rowBelongsToSet(row()!.original)
+                                    ? " bg-emerald-100/80 dark:bg-emerald-950/45"
+                                    : " bg-white dark:bg-gray-900"
+                                  : ""
+                              }${getPinnedBorderClass(cell.column)}`}
                               style={getPinnedCellStyle(
                                 cell.column,
                                 cell.column.getSize()
                               )}
                             >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext()
-                              )}
+                              {renderCellContent(cell)}
                             </td>
                           )}
                         </For>

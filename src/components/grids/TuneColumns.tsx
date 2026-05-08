@@ -6,6 +6,7 @@
  */
 
 import type { ColumnDef, Table } from "@tanstack/solid-table";
+import { ChevronDown, ChevronRight } from "lucide-solid";
 import { type Component, createEffect, Show } from "solid-js";
 import { getSubmittedEvaluationDisplay } from "./evaluation-display";
 import { GoalBadge } from "./GoalBadge";
@@ -159,17 +160,44 @@ export function getCatalogColumns(
     {
       id: "select",
       header: ({ table }) => <SelectAllCheckbox table={table} />,
-      cell: ({ row }) => (
-        <input
-          type="checkbox"
-          checked={row.getIsSelected()}
-          disabled={!row.getCanSelect()}
-          onChange={row.getToggleSelectedHandler()}
-          class="w-4 h-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Select row ${row.original?.id ?? row.id}`}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ),
+      cell: ({ row }) => {
+        if (!row.getCanSelect() && row.getCanExpand()) {
+          return (
+            <button
+              type="button"
+              class="inline-flex h-4 w-4 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+              aria-label={row.getIsExpanded() ? "Collapse row" : "Expand row"}
+              aria-expanded={row.getIsExpanded()}
+              onClick={(e) => {
+                e.stopPropagation();
+                row.toggleExpanded();
+              }}
+            >
+              <Show
+                when={row.getIsExpanded()}
+                fallback={<ChevronRight size={14} aria-hidden="true" />}
+              >
+                <ChevronDown size={14} aria-hidden="true" />
+              </Show>
+            </button>
+          );
+        }
+
+        if (!row.getCanSelect()) {
+          return <span class="inline-block h-4 w-4" aria-hidden="true" />;
+        }
+
+        return (
+          <input
+            type="checkbox"
+            checked={row.getIsSelected()}
+            onChange={row.getToggleSelectedHandler()}
+            class="w-4 h-4 cursor-pointer"
+            aria-label={`Select row ${row.original?.id ?? row.id}`}
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+      },
       size: 50,
       minSize: 50,
       maxSize: 50,

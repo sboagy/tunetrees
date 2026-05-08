@@ -17,17 +17,36 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext";
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
+import { useCurrentTuneSet } from "../../lib/context/CurrentTuneSetContext";
 import { getRepertoireTunesStaged } from "../../lib/db/queries/repertoires";
+import {
+  getBatchedTuneSetItemRefs,
+  getVisibleTuneSets,
+} from "../../lib/db/queries/tune-sets";
 import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
-import type { Tune } from "../../lib/db/types";
 import { filterRowsBySelectedTuneIds } from "../../lib/tune-sets/filter";
 import { GridStatusMessage } from "./GridStatusMessage";
+import {
+  buildMixedTuneGridRows,
+  canSelectMixedTuneGridRow,
+  getMixedTuneGridRowId,
+  getMixedTuneGridSubRows,
+  type IMixedTuneGridRow,
+  type ITuneSetGridSource,
+  isTuneSetGridRow,
+} from "./grouped-grid-rows";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
-export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
+interface ITunesGridRepertoireProps extends IGridBaseProps {
+  groupTuneSets?: boolean;
+}
+
+export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
+  props
+) => {
   const {
     localDb,
     repertoireListChanged,
@@ -36,7 +55,9 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     user,
   } = useAuth();
   const { currentRepertoireId } = useCurrentRepertoire();
+  const { tuneSetListChanged } = useCurrentTuneSet();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const groupTuneSetsEnabled = createMemo(() => props.groupTuneSets !== false);
 
   // Column visibility shared with parent; TunesGrid also persists internally
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
@@ -96,15 +117,60 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     }
   );
 
+  const [tuneSetGroupsData] = createResource(
+    () => {
+      if (!groupTuneSetsEnabled()) return null;
+
+      const db = localDb();
+      const userId = user()?.id;
+      const version = tuneSetListChanged();
+      const syncComplete = initialSyncComplete();
+      if (!syncComplete) return null;
+      return db && userId ? { db, userId, version } : null;
+    },
+    async (params): Promise<ITuneSetGridSource[]> => {
+      if (!params) return [];
+
+      const visibleSets = await getVisibleTuneSets(params.db, params.userId, {
+        setKind: "practice_set",
+      });
+
+      if (visibleSets.length === 0) return [];
+
+      // Fetch all items for visible sets in a single batched query (no per-set
+      // access checks or per-item tune hydration — this grid only needs
+      // tuneRef + position to build the hierarchy).
+      const setIds = visibleSets.map((set) => set.id);
+      const allItems = await getBatchedTuneSetItemRefs(params.db, setIds);
+
+      const itemsBySetId = new Map<
+        string,
+        { tuneRef: string; position: number }[]
+      >();
+      for (const item of allItems) {
+        const bucket = itemsBySetId.get(item.tuneSetRef) ?? [];
+        bucket.push({ tuneRef: item.tuneRef, position: item.position });
+        itemsBySetId.set(item.tuneSetRef, bucket);
+      }
+
+      return visibleSets.map((set) => ({
+        id: set.id,
+        name: set.name,
+        description: set.description,
+        items: itemsBySetId.get(set.id) ?? [],
+      }));
+    }
+  );
+
   // The view already returns ITuneOverview rows
   const tunes = createMemo<ITuneOverview[]>(
     () => repertoireTunesData.latest ?? repertoireTunesData() ?? []
   );
 
-  // Client-side filter (search/type/mode/genre)
-  const filteredTunes = createMemo<ITuneOverview[]>(() => {
+  // Client-side filter for leaf tunes. Search is applied after grouping so a
+  // matching child tune can keep its parent set visible and expanded.
+  const candidateTunes = createMemo<ITuneOverview[]>(() => {
     const base = filterRowsBySelectedTuneIds(tunes(), props.selectedTuneIds);
-    const query = props.searchQuery?.trim().toLowerCase() || "";
     const types = props.selectedTypes || [];
     const modes = props.selectedModes || [];
     const genreNames = props.selectedGenreNames || [];
@@ -116,14 +182,6 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     }
 
     return base.filter((t): boolean => {
-      if (query) {
-        const a = t.title?.toLowerCase().includes(query);
-        const b = t.incipit?.toLowerCase().includes(query);
-        const c = t.structure?.toLowerCase().includes(query);
-        const d = t.composer?.toLowerCase().includes(query);
-        const e = t.artist?.toLowerCase().includes(query);
-        if (!a && !b && !c && !d && !e) return false;
-      }
       if (types.length > 0 && t.type && !types.includes(t.type)) return false;
       if (modes.length > 0 && t.mode && !modes.includes(t.mode)) return false;
       if (genreNames.length > 0 && t.genre) {
@@ -134,14 +192,53 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     });
   });
 
+  const mixedRowsResult = createMemo(() =>
+    buildMixedTuneGridRows(
+      candidateTunes(),
+      groupTuneSetsEnabled()
+        ? (tuneSetGroupsData.latest ?? tuneSetGroupsData() ?? [])
+        : [],
+      { searchQuery: props.searchQuery }
+    )
+  );
+
+  const gridRows = createMemo<IMixedTuneGridRow[]>(
+    () => mixedRowsResult().rows
+  );
+
+  const defaultExpandedRowIds = createMemo(() =>
+    gridRows()
+      .filter((row) => isTuneSetGridRow(row))
+      .map((row) => row.rowId)
+  );
+
+  const visibleTuneCount = createMemo(() => {
+    const tuneIds = new Set<string>();
+
+    const collect = (rows: IMixedTuneGridRow[]) => {
+      for (const row of rows) {
+        if (isTuneSetGridRow(row)) {
+          collect(row.subRows ?? []);
+          continue;
+        }
+        tuneIds.add(String(row.id));
+      }
+    };
+
+    collect(gridRows());
+    return tuneIds.size;
+  });
+
   // Row click: single selects, double opens editor
-  const handleRowClick = (tune: Tune): void => {
-    setCurrentTuneId(tune.id);
+  const handleRowClick = (row: IMixedTuneGridRow): void => {
+    if (isTuneSetGridRow(row)) return;
+    setCurrentTuneId(String(row.id));
   };
 
-  const handleRowDoubleClick = (tune: Tune): void => {
+  const handleRowDoubleClick = (row: IMixedTuneGridRow): void => {
+    if (isTuneSetGridRow(row)) return;
     // Double click: open tune editor via callback
-    props.onTuneSelect?.(tune as unknown as ITuneOverview);
+    props.onTuneSelect?.(row as unknown as ITuneOverview);
   };
 
   // Selection summary from inner grid
@@ -155,11 +252,17 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
     );
   });
 
-  const loadError = createMemo(() => repertoireTunesData.error);
-  const isInitialLoading = createMemo(
-    () => repertoireTunesData.loading && repertoireTunesData.latest == null
+  const loadError = createMemo(
+    () =>
+      repertoireTunesData.error ??
+      (groupTuneSetsEnabled() ? tuneSetGroupsData.error : undefined)
   );
-  const hasTunes = createMemo(() => filteredTunes().length > 0);
+  const isInitialLoading = createMemo(
+    () =>
+      (repertoireTunesData.loading && repertoireTunesData.latest == null) ||
+      (tuneSetGroupsData.loading && tuneSetGroupsData.latest == null)
+  );
+  const hasTunes = createMemo(() => gridRows().length > 0);
 
   const [columnDescriptions] = createResource(
     () => {
@@ -201,13 +304,26 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
             tablePurpose="repertoire"
             userId={props.userId}
             repertoireId={currentRepertoireId() || undefined}
-            isLoading={repertoireTunesData.loading}
-            data={filteredTunes()}
+            isLoading={
+              repertoireTunesData.loading ||
+              (groupTuneSetsEnabled() && tuneSetGroupsData.loading)
+            }
+            data={gridRows()}
             columnDescriptions={columnDescriptions()}
             currentRowId={currentTuneId() || undefined}
             enableColumnReorder={true}
-            onRowClick={(row) => handleRowClick(row as Tune)}
-            onRowDoubleClick={(row) => handleRowDoubleClick(row as Tune)}
+            onRowClick={handleRowClick}
+            onRowDoubleClick={handleRowDoubleClick}
+            canSelectRow={canSelectMixedTuneGridRow}
+            getRowId={getMixedTuneGridRowId}
+            getSubRows={getMixedTuneGridSubRows}
+            defaultExpandedRowIds={defaultExpandedRowIds()}
+            autoExpandedRowIds={
+              props.searchQuery?.trim()
+                ? mixedRowsResult().autoExpandedRowIds
+                : undefined
+            }
+            hierarchyColumnId="title"
             columnVisibility={columnVisibility()}
             onColumnVisibilityChange={setColumnVisibility}
             cellCallbacks={{
@@ -248,8 +364,8 @@ export const TunesGridRepertoire: Component<IGridBaseProps> = (props) => {
       <div class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2 flex-shrink-0">
         <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>
-            {filteredTunes().length}{" "}
-            {filteredTunes().length === 1 ? "tune" : "tunes"} in repertoire
+            {visibleTuneCount()} {visibleTuneCount() === 1 ? "tune" : "tunes"}{" "}
+            in repertoire
           </span>
           <Show when={selectedCount() > 0}>
             <span class="text-blue-700 dark:text-blue-300">

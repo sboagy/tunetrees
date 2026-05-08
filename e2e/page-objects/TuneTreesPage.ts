@@ -77,6 +77,9 @@ export class TuneTreesPage {
   readonly typeFilter: Locator;
   readonly modeFilter: Locator;
   readonly genreFilter: Locator;
+  readonly tuneSetFilter: Locator;
+  readonly tuneSetFilterMenu: Locator;
+  readonly tuneSetFilterAnyOption: Locator;
   readonly repertoireFilter: Locator;
   readonly clearFilters: Locator;
 
@@ -95,6 +98,7 @@ export class TuneTreesPage {
   readonly repertoireColumnsButton: Locator;
   readonly repertoireAddToReviewButton: Locator;
   readonly repertoireRemoveButton: Locator;
+  readonly repertoireGroupSetsSwitch: Locator;
 
   readonly practiceColumnsButton: Locator;
   // Practice-specific controls
@@ -303,6 +307,11 @@ export class TuneTreesPage {
     this.typeFilter = page.getByTestId("filter-dropdown-type");
     this.modeFilter = page.getByTestId("filter-dropdown-mode");
     this.genreFilter = page.getByTestId("filter-dropdown-genre");
+    this.tuneSetFilter = page.getByTestId("filter-dropdown-tune-set");
+    this.tuneSetFilterMenu = page.getByTestId("filter-dropdown-menu-tune-set");
+    this.tuneSetFilterAnyOption = page.getByTestId(
+      "filter-dropdown-tune-set-option-any"
+    );
     this.repertoireFilter = page.locator(
       '[data-testid="filter-dropdown-repertoire"], [data-testid="filter-dropdown-repertoire"]'
     );
@@ -330,6 +339,9 @@ export class TuneTreesPage {
     );
     this.repertoireAddToReviewButton = page.getByTestId("add-to-review-button");
     this.repertoireRemoveButton = page.getByTestId("repertoire-remove-button");
+    this.repertoireGroupSetsSwitch = page.getByTestId(
+      "repertoire-group-sets-switch"
+    );
 
     // Tab-specific Toolbar Buttons - Practice
     this.practiceColumnsButton = page.getByTestId("practice-columns-button");
@@ -1371,6 +1383,18 @@ export class TuneTreesPage {
         new URL(currentUrl).searchParams.get("tab") || "practice";
 
       if (currentTab !== tabId) {
+        const toastCloser = this.page
+          .getByRole("button", { name: "Close toast" })
+          .first();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const isToastVisible = await toastCloser
+            .isVisible()
+            .catch(() => false);
+          if (!isToastVisible) break;
+          await toastCloser.click({ timeout: 5_000 });
+          await expect(toastCloser).toBeHidden({ timeout: 5_000 });
+        }
+
         await expect(selectTrigger).toBeEnabled({ timeout: 20_000 });
         await selectTrigger.click({ timeout: 10_000 });
 
@@ -1698,9 +1722,11 @@ export class TuneTreesPage {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
     // Table mode: find a table row containing the tune ID text, or by select-row checkbox.
-    // Stacked list mode: find the li by its data-testid="stacked-item-{tuneId}".
+    // Stacked list mode: find the li by its select-row checkbox. Grouped mobile
+    // rows use synthetic stacked row ids, so the raw tune id is only stable on
+    // the checkbox aria-label.
     return grid.locator(
-      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li[data-testid="stacked-item-${tuneId}"]`
+      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li:has(input[aria-label="Select row ${tuneId}"])`
     );
   }
 
@@ -1782,17 +1808,29 @@ export class TuneTreesPage {
    * Handles virtualized grids by searching within the grid context
    */
   async expectTuneVisible(tuneName: string, grid: Locator, timeout = 5000) {
-    // Desktop table: tune name lives in a <td> cell.
-    // Mobile stacked list: tune name lives inside an <li> stacked item.
-    const tuneItem = grid
-      .getByRole("cell", { name: tuneName })
-      .or(
-        grid
-          .locator("li[data-testid^='stacked-item-']")
-          .filter({ hasText: tuneName })
+    const escapedName = tuneName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    await expect
+      .poll(
+        async () => {
+          const linkVisible = await grid
+            .getByRole("link", { name: new RegExp(`^${escapedName}$`, "i") })
+            .first()
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (linkVisible) return true;
+
+          const rowVisible = await grid
+            .locator("tbody tr[data-index], li[data-testid^='stacked-item-']")
+            .filter({ hasText: tuneName })
+            .first()
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          return rowVisible;
+        },
+        { timeout, intervals: [100, 250, 500, 1000] }
       )
-      .first();
-    await expect(tuneItem).toBeVisible({ timeout });
+      .toBe(true);
   }
 
   /**
@@ -2183,6 +2221,82 @@ export class TuneTreesPage {
     await expect(filterPanel).toBeHidden({ timeout: 5000 });
   }
 
+  async ensureFilterPanelOpen() {
+    const panelVisible = await this.page
+      .locator('[data-filter-panel="true"]')
+      .last()
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+
+    if (panelVisible) {
+      return;
+    }
+
+    await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
+    await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
+    await this.filtersButton.click();
+    await expect(this.filtersButton).toHaveAttribute("aria-expanded", "true", {
+      timeout: 5000,
+    });
+    await expect(
+      this.page.locator('[data-filter-panel="true"]').last()
+    ).toBeVisible({
+      timeout: 5000,
+    });
+  }
+
+  async openTuneSetFilterDropdown() {
+    await this.ensureFilterPanelOpen();
+    await expect(this.tuneSetFilter).toBeVisible({ timeout: 5000 });
+
+    const menuVisible = await this.tuneSetFilterMenu
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (!menuVisible) {
+      await this.tuneSetFilter.click({ timeout: 5000 });
+    }
+
+    await expect(this.tuneSetFilterMenu).toBeVisible({ timeout: 5000 });
+  }
+
+  async isInTuneSetsFilterEnabled(): Promise<boolean> {
+    await this.openTuneSetFilterDropdown();
+    const checkbox = this.tuneSetFilterAnyOption
+      .locator('input[type="checkbox"]')
+      .first();
+    return checkbox.isChecked();
+  }
+
+  async setInTuneSetsFilter(enabled: boolean) {
+    await this.openTuneSetFilterDropdown();
+
+    if ((await this.isInTuneSetsFilterEnabled()) === enabled) {
+      return;
+    }
+
+    await this.tuneSetFilterAnyOption.click({ timeout: 5000 });
+    await expect
+      .poll(() => this.isInTuneSetsFilterEnabled(), {
+        timeout: 5000,
+        intervals: [100, 250, 500],
+      })
+      .toBe(enabled);
+  }
+
+  async selectTuneSetFilterByName(name: string) {
+    await this.openTuneSetFilterDropdown();
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const option = this.tuneSetFilterMenu
+      .getByRole("button", { name: new RegExp(escapedName, "i") })
+      .first();
+
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await option.click({ timeout: 5000 });
+
+    const checkbox = option.locator('input[type="checkbox"]').first();
+    await expect(checkbox).toBeChecked({ timeout: 5000 });
+  }
+
   async setViewMode(
     tab: "catalog" | "repertoire" | "practice",
     mode: "grid" | "list"
@@ -2209,6 +2323,12 @@ export class TuneTreesPage {
 
     await this.openColumnVisibilityMenu(columnsButton);
 
+    const renderedModeAfterMenuOpen = await this.getRenderedViewMode(tab);
+    if (renderedModeAfterMenuOpen === mode) {
+      await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
+      return;
+    }
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
       if (this.page.isClosed()) {
         throwPageClosedError();
@@ -2225,6 +2345,11 @@ export class TuneTreesPage {
           .catch(() => false);
         if (!reopenedMenuVisible) {
           await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
+          const renderedModeAfterReopen = await this.getRenderedViewMode(tab);
+          if (renderedModeAfterReopen === mode) {
+            await this.closeColumnVisibilityMenu(reopenedMenu);
+            return;
+          }
         }
         await this.page.waitForTimeout(150);
         continue;
@@ -2263,6 +2388,11 @@ export class TuneTreesPage {
         .catch(() => false);
       if (!reopenedMenuVisible) {
         await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
+        const renderedModeAfterReopen = await this.getRenderedViewMode(tab);
+        if (renderedModeAfterReopen === mode) {
+          await this.closeColumnVisibilityMenu(reopenedMenu);
+          return;
+        }
       }
 
       await this.page.waitForTimeout(150);
@@ -2308,8 +2438,22 @@ export class TuneTreesPage {
     await overflowButton
       .click({ timeout: 2000 })
       // Kobalte can detach/recreate the trigger while the mobile menu opens.
-      // Fall back to a direct event so CI retries can recover from that churn.
-      .catch(() => overflowButton.dispatchEvent("click"))
+      // Fall back to force-click so CI retries can recover from that churn.
+      .catch(() => overflowButton.click({ timeout: 2000, force: true }))
+      .catch(() => {
+        // Last resort: dispatch synthetic pointerdown + click so Kobalte's
+        // touch-aware onClick handler sees data-pointerType="touch" and opens
+        // the menu.  Without pointerdown the dataset attribute is never set,
+        // and the plain click event is silently ignored on touch devices.
+        return overflowButton.evaluate((el) => {
+          const pd = new PointerEvent("pointerdown", {
+            bubbles: true,
+            pointerType: "touch",
+          });
+          el.dispatchEvent(pd);
+          el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+      })
       .catch(() => undefined);
   }
 
@@ -2338,10 +2482,12 @@ export class TuneTreesPage {
       }
 
       await overflowButton.scrollIntoViewIfNeeded().catch(() => undefined);
-      await expect(overflowButton).toBeVisible({ timeout: 5000 });
-      await expect(overflowButton).toBeEnabled({ timeout: 5000 });
+      await expect(overflowButton).toBeVisible({ timeout: 2000 });
+      await expect(overflowButton).toBeEnabled({ timeout: 2000 });
 
       await this.clickOverflowButton(overflowButton);
+
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
 
       const isTargetVisibleAfterClick = await target
         .isVisible({ timeout: 1500 })
@@ -2379,6 +2525,47 @@ export class TuneTreesPage {
     await this.revealToolbarAction(tab, action);
   }
 
+  private async clickToolbarAction(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator,
+    opts?: { timeoutMs?: number; settleMs?: number }
+  ) {
+    const timeoutMs = opts?.timeoutMs ?? 5000;
+    const settleMs = opts?.settleMs ?? 0;
+    const start = Date.now();
+    let lastError: unknown;
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        await this.ensureToolbarActionVisible(tab, action);
+        await expect(action).toBeVisible({ timeout: 1000 });
+        await expect(action).toBeEnabled({ timeout: 1000 });
+
+        try {
+          await action.click({ timeout: 1000 });
+        } catch {
+          try {
+            await action.click({ timeout: 1000, force: true });
+          } catch {
+            await action.dispatchEvent("click");
+          }
+        }
+
+        if (settleMs > 0) {
+          await this.page.waitForTimeout(settleMs);
+        }
+        return;
+      } catch (error) {
+        lastError = error;
+        await this.page.waitForTimeout(150);
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(`Failed to click toolbar action for ${tab}`);
+  }
+
   private async getToolbarSwitchTarget(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2391,6 +2578,58 @@ export class TuneTreesPage {
     return nestedVisible ? nestedSwitch : action;
   }
 
+  private async getToolbarSwitchClickTarget(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ): Promise<Locator> {
+    await this.ensureToolbarActionVisible(tab, action);
+
+    const actionVisible = await action
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (actionVisible) {
+      return action;
+    }
+
+    const control = action.locator("[data-checked], [data-disabled]").first();
+    const controlVisible = await control
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (controlVisible) {
+      return control;
+    }
+
+    const label = action.locator("label").first();
+    const labelVisible = await label
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (labelVisible) {
+      return label;
+    }
+
+    return this.getToolbarSwitchTarget(tab, action);
+  }
+
+  private async readToolbarSwitchChecked(target: Locator): Promise<boolean> {
+    const input = target.locator('input[type="checkbox"]').first();
+    const hasInput = (await input.count().catch(() => 0)) > 0;
+    if (hasInput) {
+      return input.isChecked().catch(() => false);
+    }
+
+    const ariaChecked = await target
+      .getAttribute("aria-checked")
+      .catch(() => null);
+    if (ariaChecked != null) {
+      return ariaChecked === "true";
+    }
+
+    const dataChecked = await target
+      .getAttribute("data-checked")
+      .catch(() => null);
+    return dataChecked != null;
+  }
+
   private async getToolbarSwitchChecked(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2399,7 +2638,7 @@ export class TuneTreesPage {
 
     try {
       const target = await this.getToolbarSwitchTarget(tab, action);
-      return (await target.getAttribute("aria-checked")) === "true";
+      return await this.readToolbarSwitchChecked(target);
     } finally {
       if (openedOverflow) {
         await this.page.keyboard.press("Escape").catch(() => undefined);
@@ -2413,24 +2652,64 @@ export class TuneTreesPage {
     enabled: boolean,
     settleMs: number = 300
   ) {
+    // Fast path: already in the desired state.
     const current = await this.getToolbarSwitchChecked(tab, action);
     if (current === enabled) {
       return;
     }
 
-    await this.ensureToolbarActionVisible(tab, action);
-    await action.click();
+    // Outer retry loop: the Kobalte mobile overflow trigger can detach/recreate
+    // during reactive updates (especially on the practice page during queue
+    // generation).  Retrying the whole sequence is more robust than relying
+    // solely on openOverflowMenuEntry's internal retries.
+    const start = Date.now();
+    const maxRetryMs = 15_000;
+    let lastError: unknown;
 
-    await expect
-      .poll(() => this.getToolbarSwitchChecked(tab, action), {
-        timeout: 5000,
-        intervals: [100, 250, 500, 1000],
-      })
-      .toBe(enabled);
+    while (Date.now() - start < maxRetryMs) {
+      try {
+        const openedOverflow = await this.revealToolbarAction(tab, action);
 
-    if (settleMs > 0) {
-      await this.page.waitForTimeout(settleMs);
+        try {
+          const target = await this.getToolbarSwitchClickTarget(tab, action);
+
+          try {
+            await target.click({ timeout: 1000 });
+          } catch {
+            try {
+              await target.click({ timeout: 1000, force: true });
+            } catch {
+              await target.dispatchEvent("click");
+            }
+          }
+
+          await expect
+            .poll(() => this.getToolbarSwitchChecked(tab, action), {
+              timeout: 5000,
+              intervals: [100, 250, 500, 1000],
+            })
+            .toBe(enabled);
+
+          if (settleMs > 0) {
+            await this.page.waitForTimeout(settleMs);
+          }
+          return;
+        } finally {
+          if (openedOverflow) {
+            await this.page.keyboard.press("Escape").catch(() => undefined);
+          }
+        }
+      } catch (error) {
+        lastError = error;
+        await this.page.waitForTimeout(150);
+      }
     }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(
+          `Failed to set toolbar switch ${tab} to ${enabled} after ${maxRetryMs}ms`
+        );
   }
 
   async isShowSubmittedEnabled(): Promise<boolean> {
@@ -2480,46 +2759,47 @@ export class TuneTreesPage {
     );
   }
 
-  async clickCatalogAddToRepertoire() {
-    await this.ensureToolbarActionVisible(
-      "catalog",
-      this.catalogAddToRepertoireButton
+  async setRepertoireShowSets(enabled: boolean, settleMs: number = 300) {
+    await this.setToolbarSwitchChecked(
+      "repertoire",
+      this.repertoireGroupSetsSwitch,
+      enabled,
+      settleMs
     );
-    await this.catalogAddToRepertoireButton.click({ timeout: 5000 });
+  }
+
+  getRepertoireRowByText(text: string): Locator {
+    return this.repertoireGrid
+      .locator("tbody tr[data-index], li[data-testid^='stacked-item-']")
+      .filter({ hasText: text })
+      .first();
+  }
+
+  async clickCatalogAddToRepertoire() {
+    await this.clickToolbarAction("catalog", this.catalogAddToRepertoireButton);
   }
 
   async clickCatalogAddTune() {
-    await this.ensureToolbarActionVisible("catalog", this.catalogAddTuneButton);
-    await this.catalogAddTuneButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("catalog", this.catalogAddTuneButton);
   }
 
   async clickCatalogDelete() {
-    await this.ensureToolbarActionVisible("catalog", this.catalogDeleteButton);
-    await this.catalogDeleteButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("catalog", this.catalogDeleteButton);
   }
 
   async clickRepertoireAddToReview() {
-    await this.ensureToolbarActionVisible(
+    await this.clickToolbarAction(
       "repertoire",
       this.repertoireAddToReviewButton
     );
-    await this.repertoireAddToReviewButton.click({ timeout: 5000 });
   }
 
   async clickRepertoireAddTune() {
-    await this.ensureToolbarActionVisible(
-      "repertoire",
-      this.repertoireAddTuneButton
-    );
-    await this.repertoireAddTuneButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("repertoire", this.repertoireAddTuneButton);
   }
 
   async clickRepertoireRemove() {
-    await this.ensureToolbarActionVisible(
-      "repertoire",
-      this.repertoireRemoveButton
-    );
-    await this.repertoireRemoveButton.click({ timeout: 5000 });
+    await this.clickToolbarAction("repertoire", this.repertoireRemoveButton);
   }
 
   private getColumnVisibilityMenu(): Locator {

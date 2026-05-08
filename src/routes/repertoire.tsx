@@ -38,7 +38,10 @@ import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
 import { useCurrentTuneSet } from "../lib/context/CurrentTuneSetContext";
 import { persistDb } from "../lib/db/client-sqlite";
 import { getRepertoireTunes } from "../lib/db/queries/repertoires";
-import { getTuneIdsForTuneSets } from "../lib/db/queries/tune-sets";
+import {
+  getBatchedTuneSetItemRefs,
+  getVisibleTuneSets,
+} from "../lib/db/queries/tune-sets";
 import { updateRepertoireTuneFields } from "../lib/db/queries/tune-user-data";
 import * as schema from "../lib/db/schema";
 import { repertoireTune } from "../lib/db/schema";
@@ -69,6 +72,7 @@ const RepertoirePage: Component = () => {
   const {
     user,
     localDb,
+    initialSyncComplete,
     repertoireListChanged,
     catalogListChanged,
     incrementRepertoireListChanged,
@@ -97,11 +101,24 @@ const RepertoirePage: Component = () => {
     return str.split(",").filter(Boolean);
   };
 
+  const getBooleanParam = (
+    value: string | string[] | undefined,
+    defaultValue: boolean
+  ): boolean => {
+    const str = getParam(value).trim().toLowerCase();
+    if (!str) return defaultValue;
+    if (["0", "false", "off", "no"].includes(str)) return false;
+    if (["1", "true", "on", "yes"].includes(str)) return true;
+    return defaultValue;
+  };
+
   // --- Filter State Signals (Initialized to empty defaults) ---
   const [searchQuery, setSearchQuery] = createSignal("");
   const [selectedTypes, setSelectedTypes] = createSignal<string[]>([]);
   const [selectedModes, setSelectedModes] = createSignal<string[]>([]);
   const [selectedGenres, setSelectedGenres] = createSignal<string[]>([]);
+  const [groupTuneSets, setGroupTuneSets] = createSignal(true);
+  const [filterAnyTuneSet, setFilterAnyTuneSet] = createSignal(false);
   const [selectedTuneSetIds, setSelectedTuneSetIds] = createSignal<string[]>(
     []
   );
@@ -134,6 +151,8 @@ const RepertoirePage: Component = () => {
         searchParams.r_modes,
         searchParams.r_genres,
         searchParams.r_tune_set,
+        searchParams.r_in_tune_sets,
+        searchParams.r_show_sets,
         searchParams.tab, // Crucial for re-hydration when switching tabs
       ],
       () => {
@@ -143,12 +162,16 @@ const RepertoirePage: Component = () => {
         const modes = getParamArray(searchParams.r_modes);
         const genres = getParamArray(searchParams.r_genres);
         const tuneSetIds = getParamArray(searchParams.r_tune_set);
+        const inTuneSets = getBooleanParam(searchParams.r_in_tune_sets, false);
+        const showSets = getBooleanParam(searchParams.r_show_sets, true);
 
         // 2. Write to signals only if different (essential to prevent infinite loops)
         if (q !== searchQuery()) setSearchQuery(q);
         if (!arraysEqual(types, selectedTypes())) setSelectedTypes(types);
         if (!arraysEqual(modes, selectedModes())) setSelectedModes(modes);
         if (!arraysEqual(genres, selectedGenres())) setSelectedGenres(genres);
+        if (inTuneSets !== filterAnyTuneSet()) setFilterAnyTuneSet(inTuneSets);
+        if (showSets !== groupTuneSets()) setGroupTuneSets(showSets);
         if (!arraysEqual(tuneSetIds, selectedTuneSetIds())) {
           setSelectedTuneSetIds(tuneSetIds);
         }
@@ -172,6 +195,8 @@ const RepertoirePage: Component = () => {
       types: getParamArray(searchParams.r_types),
       modes: getParamArray(searchParams.r_modes),
       genres: getParamArray(searchParams.r_genres),
+      inTuneSets: getBooleanParam(searchParams.r_in_tune_sets, false),
+      showSets: getBooleanParam(searchParams.r_show_sets, true),
       tuneSetIds: getParamArray(searchParams.r_tune_set),
     };
 
@@ -180,6 +205,8 @@ const RepertoirePage: Component = () => {
       types: selectedTypes(),
       modes: selectedModes(),
       genres: selectedGenres(),
+      inTuneSets: filterAnyTuneSet(),
+      showSets: groupTuneSets(),
       tuneSetIds: selectedTuneSetIds(),
     };
 
@@ -188,6 +215,8 @@ const RepertoirePage: Component = () => {
       !arraysEqual(desired.types, current.types) ||
       !arraysEqual(desired.modes, current.modes) ||
       !arraysEqual(desired.genres, current.genres) ||
+      desired.inTuneSets !== current.inTuneSets ||
+      desired.showSets !== current.showSets ||
       !arraysEqual(desired.tuneSetIds, current.tuneSetIds);
 
     if (!needsUpdate) return;
@@ -198,6 +227,8 @@ const RepertoirePage: Component = () => {
       r_modes: desired.modes.length > 0 ? desired.modes.join(",") : undefined,
       r_genres:
         desired.genres.length > 0 ? desired.genres.join(",") : undefined,
+      r_in_tune_sets: desired.inTuneSets ? "1" : undefined,
+      r_show_sets: desired.showSets ? undefined : "0",
       r_tune_set:
         desired.tuneSetIds.length > 0
           ? desired.tuneSetIds.join(",")
@@ -241,12 +272,15 @@ const RepertoirePage: Component = () => {
       const userId = user()?.id;
       const repertoireId = currentRepertoireId();
       const version = repertoireListChanged(); // Refetch when repertoire changes
+      const syncComplete = initialSyncComplete();
       log.debug("REPERTOIRE repertoireTunes dependency:", {
         hasDb: !!db,
         userId,
         repertoireId,
         repertoireListChanged: version,
+        syncComplete,
       });
+      if (!syncComplete) return null;
       return db && userId && repertoireId
         ? { db, userId, repertoireId, version }
         : null;
@@ -272,7 +306,11 @@ const RepertoirePage: Component = () => {
   );
 
   const isInitialRepertoireLoading = createMemo(
-    () => repertoireTunes.loading && repertoireTunes.latest == null
+    () =>
+      !!userId() &&
+      !!currentRepertoireId() &&
+      (!initialSyncComplete() ||
+        (repertoireTunes.loading && repertoireTunes.latest == null))
   );
 
   const [selectedTuneSetTuneIds] = createResource(
@@ -287,7 +325,32 @@ const RepertoirePage: Component = () => {
     },
     async (params) => {
       if (!params) return undefined;
-      return getTuneIdsForTuneSets(params.db, params.tuneSetIds, params.userId);
+      const items = await getBatchedTuneSetItemRefs(
+        params.db,
+        params.tuneSetIds
+      );
+      return [...new Set(items.map((item) => item.tuneRef))];
+    }
+  );
+
+  const [anyTuneSetTuneIds] = createResource(
+    () => {
+      const db = localDb();
+      const resolvedUserId = user()?.id;
+      const version = tuneSetListChanged();
+      return db && resolvedUserId && filterAnyTuneSet()
+        ? { db, userId: resolvedUserId, version }
+        : null;
+    },
+    async (params) => {
+      if (!params) return undefined;
+      const visibleSets = await getVisibleTuneSets(params.db, params.userId, {
+        setKind: "practice_set",
+      });
+      if (visibleSets.length === 0) return [];
+      const setIds = visibleSets.map((set) => set.id);
+      const items = await getBatchedTuneSetItemRefs(params.db, setIds);
+      return [...new Set(items.map((item) => item.tuneRef))];
     }
   );
 
@@ -377,7 +440,7 @@ const RepertoirePage: Component = () => {
     if (!db || !repertoireId) return;
 
     const table = tableInstance();
-    const selectedRows = table?.getSelectedRowModel().rows ?? [];
+    const selectedRows = table?.getSelectedRowModel().flatRows ?? [];
 
     // If more than one row is selected AND the changed row is among the selected,
     // offer to apply to all selected rows; otherwise single-row update.
@@ -460,6 +523,8 @@ const RepertoirePage: Component = () => {
         <RepertoireToolbar
           searchQuery={searchQuery()}
           onSearchChange={setSearchQuery}
+          groupTuneSets={groupTuneSets()}
+          onGroupTuneSetsChange={setGroupTuneSets}
           selectedTypes={selectedTypes()}
           onTypesChange={setSelectedTypes}
           selectedModes={selectedModes()}
@@ -473,8 +538,20 @@ const RepertoirePage: Component = () => {
           selectedRowsCount={selectedRowsCount()}
           table={tableInstance() || undefined}
           repertoireId={currentRepertoireId() || undefined}
+          filterAnyTuneSet={filterAnyTuneSet()}
+          onAnyTuneSetFilterChange={(enabled) => {
+            setFilterAnyTuneSet(enabled);
+            if (enabled) {
+              setSelectedTuneSetIds([]);
+            }
+          }}
           selectedTuneSetIds={selectedTuneSetIds()}
-          onTuneSetFilterChange={setSelectedTuneSetIds}
+          onTuneSetFilterChange={(tuneSetIds) => {
+            setSelectedTuneSetIds(tuneSetIds);
+            if (tuneSetIds.length > 0) {
+              setFilterAnyTuneSet(false);
+            }
+          }}
           filterPanelExpanded={filterPanelExpanded()}
           onFilterPanelExpandedChange={setFilterPanelExpanded}
         />
@@ -506,16 +583,19 @@ const RepertoirePage: Component = () => {
                 userId={userId()!}
                 repertoireId={currentRepertoireId()!}
                 tablePurpose="repertoire"
+                groupTuneSets={groupTuneSets()}
                 searchQuery={searchQuery()}
                 selectedTypes={selectedTypes()}
                 selectedModes={selectedModes()}
                 selectedGenreNames={selectedGenres()}
                 selectedTuneIds={
-                  selectedTuneSetIds().length > 0
-                    ? (selectedTuneSetTuneIds.latest ??
-                      selectedTuneSetTuneIds() ??
-                      [])
-                    : undefined
+                  filterAnyTuneSet()
+                    ? (anyTuneSetTuneIds.latest ?? anyTuneSetTuneIds() ?? [])
+                    : selectedTuneSetIds().length > 0
+                      ? (selectedTuneSetTuneIds.latest ??
+                        selectedTuneSetTuneIds() ??
+                        [])
+                      : undefined
                 }
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
