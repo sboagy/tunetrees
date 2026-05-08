@@ -1722,9 +1722,11 @@ export class TuneTreesPage {
       return this.getRowInPracticeGridByTuneId(tuneId);
     }
     // Table mode: find a table row containing the tune ID text, or by select-row checkbox.
-    // Stacked list mode: find the li by its data-testid="stacked-item-{tuneId}".
+    // Stacked list mode: find the li by its select-row checkbox. Grouped mobile
+    // rows use synthetic stacked row ids, so the raw tune id is only stable on
+    // the checkbox aria-label.
     return grid.locator(
-      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li[data-testid="stacked-item-${tuneId}"]`
+      `tr:has-text("${tuneId}"), tr:has(input[aria-label="Select row ${tuneId}"]), li:has(input[aria-label="Select row ${tuneId}"])`
     );
   }
 
@@ -2436,8 +2438,22 @@ export class TuneTreesPage {
     await overflowButton
       .click({ timeout: 2000 })
       // Kobalte can detach/recreate the trigger while the mobile menu opens.
-      // Fall back to a direct event so CI retries can recover from that churn.
-      .catch(() => overflowButton.dispatchEvent("click"))
+      // Fall back to force-click so CI retries can recover from that churn.
+      .catch(() => overflowButton.click({ timeout: 2000, force: true }))
+      .catch(() => {
+        // Last resort: dispatch synthetic pointerdown + click so Kobalte's
+        // touch-aware onClick handler sees data-pointerType="touch" and opens
+        // the menu.  Without pointerdown the dataset attribute is never set,
+        // and the plain click event is silently ignored on touch devices.
+        return overflowButton.evaluate((el) => {
+          const pd = new PointerEvent("pointerdown", {
+            bubbles: true,
+            pointerType: "touch",
+          });
+          el.dispatchEvent(pd);
+          el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        });
+      })
       .catch(() => undefined);
   }
 
@@ -2466,10 +2482,12 @@ export class TuneTreesPage {
       }
 
       await overflowButton.scrollIntoViewIfNeeded().catch(() => undefined);
-      await expect(overflowButton).toBeVisible({ timeout: 5000 });
-      await expect(overflowButton).toBeEnabled({ timeout: 5000 });
+      await expect(overflowButton).toBeVisible({ timeout: 2000 });
+      await expect(overflowButton).toBeEnabled({ timeout: 2000 });
 
       await this.clickOverflowButton(overflowButton);
+
+      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
 
       const isTargetVisibleAfterClick = await target
         .isVisible({ timeout: 1500 })
@@ -2560,6 +2578,58 @@ export class TuneTreesPage {
     return nestedVisible ? nestedSwitch : action;
   }
 
+  private async getToolbarSwitchClickTarget(
+    tab: "catalog" | "repertoire" | "practice",
+    action: Locator
+  ): Promise<Locator> {
+    await this.ensureToolbarActionVisible(tab, action);
+
+    const actionVisible = await action
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (actionVisible) {
+      return action;
+    }
+
+    const control = action.locator("[data-checked], [data-disabled]").first();
+    const controlVisible = await control
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (controlVisible) {
+      return control;
+    }
+
+    const label = action.locator("label").first();
+    const labelVisible = await label
+      .isVisible({ timeout: 300 })
+      .catch(() => false);
+    if (labelVisible) {
+      return label;
+    }
+
+    return this.getToolbarSwitchTarget(tab, action);
+  }
+
+  private async readToolbarSwitchChecked(target: Locator): Promise<boolean> {
+    const input = target.locator('input[type="checkbox"]').first();
+    const hasInput = (await input.count().catch(() => 0)) > 0;
+    if (hasInput) {
+      return input.isChecked().catch(() => false);
+    }
+
+    const ariaChecked = await target
+      .getAttribute("aria-checked")
+      .catch(() => null);
+    if (ariaChecked != null) {
+      return ariaChecked === "true";
+    }
+
+    const dataChecked = await target
+      .getAttribute("data-checked")
+      .catch(() => null);
+    return dataChecked != null;
+  }
+
   private async getToolbarSwitchChecked(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator
@@ -2568,7 +2638,7 @@ export class TuneTreesPage {
 
     try {
       const target = await this.getToolbarSwitchTarget(tab, action);
-      return (await target.getAttribute("aria-checked")) === "true";
+      return await this.readToolbarSwitchChecked(target);
     } finally {
       if (openedOverflow) {
         await this.page.keyboard.press("Escape").catch(() => undefined);
@@ -2582,24 +2652,64 @@ export class TuneTreesPage {
     enabled: boolean,
     settleMs: number = 300
   ) {
+    // Fast path: already in the desired state.
     const current = await this.getToolbarSwitchChecked(tab, action);
     if (current === enabled) {
       return;
     }
 
-    await this.ensureToolbarActionVisible(tab, action);
-    await action.click();
+    // Outer retry loop: the Kobalte mobile overflow trigger can detach/recreate
+    // during reactive updates (especially on the practice page during queue
+    // generation).  Retrying the whole sequence is more robust than relying
+    // solely on openOverflowMenuEntry's internal retries.
+    const start = Date.now();
+    const maxRetryMs = 15_000;
+    let lastError: unknown;
 
-    await expect
-      .poll(() => this.getToolbarSwitchChecked(tab, action), {
-        timeout: 5000,
-        intervals: [100, 250, 500, 1000],
-      })
-      .toBe(enabled);
+    while (Date.now() - start < maxRetryMs) {
+      try {
+        const openedOverflow = await this.revealToolbarAction(tab, action);
 
-    if (settleMs > 0) {
-      await this.page.waitForTimeout(settleMs);
+        try {
+          const target = await this.getToolbarSwitchClickTarget(tab, action);
+
+          try {
+            await target.click({ timeout: 1000 });
+          } catch {
+            try {
+              await target.click({ timeout: 1000, force: true });
+            } catch {
+              await target.dispatchEvent("click");
+            }
+          }
+
+          await expect
+            .poll(() => this.getToolbarSwitchChecked(tab, action), {
+              timeout: 5000,
+              intervals: [100, 250, 500, 1000],
+            })
+            .toBe(enabled);
+
+          if (settleMs > 0) {
+            await this.page.waitForTimeout(settleMs);
+          }
+          return;
+        } finally {
+          if (openedOverflow) {
+            await this.page.keyboard.press("Escape").catch(() => undefined);
+          }
+        }
+      } catch (error) {
+        lastError = error;
+        await this.page.waitForTimeout(150);
+      }
     }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(
+          `Failed to set toolbar switch ${tab} to ${enabled} after ${maxRetryMs}ms`
+        );
   }
 
   async isShowSubmittedEnabled(): Promise<boolean> {
