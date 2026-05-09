@@ -13,6 +13,16 @@ export interface ISetlistGridRow {
   type: string | null;
   mode: string | null;
   details: string | null;
+  structure?: string | null;
+  incipit?: string | null;
+  genre?: string | null;
+  composer?: string | null;
+  artist?: string | null;
+  releaseYear?: number | null;
+  idForeign?: string | null;
+  privateFor?: string | null;
+  favoriteUrl?: string | null;
+  primaryOrigin?: string | null;
   setlistPosition: number | null;
   setlistItemId: string | null;
   sourceId: string;
@@ -77,6 +87,20 @@ function createTuneRow(
     type: tune.type,
     mode: tune.mode,
     details: buildTuneDetails(tune),
+    structure: tune.structure,
+    incipit: tune.incipit,
+    genre: (tune as Tune & { genre?: string | null }).genre ?? null,
+    composer: (tune as Tune & { composer?: string | null }).composer ?? null,
+    artist: (tune as Tune & { artist?: string | null }).artist ?? null,
+    releaseYear:
+      (tune as Tune & { releaseYear?: number | null }).releaseYear ?? null,
+    idForeign: (tune as Tune & { idForeign?: string | null }).idForeign ?? null,
+    privateFor:
+      (tune as Tune & { privateFor?: string | null }).privateFor ?? null,
+    favoriteUrl:
+      (tune as Tune & { favoriteUrl?: string | null }).favoriteUrl ?? null,
+    primaryOrigin:
+      (tune as Tune & { primaryOrigin?: string | null }).primaryOrigin ?? null,
     setlistPosition: options.setlistPosition ?? null,
     setlistItemId: options.setlistItemId ?? null,
     sourceId: tune.id,
@@ -103,6 +127,16 @@ function createTuneSetRow(
     type: "Tune Set",
     mode: null,
     details: buildTuneSetDetails(tuneSet, options.tuneCount),
+    structure: null,
+    incipit: null,
+    genre: null,
+    composer: null,
+    artist: null,
+    releaseYear: null,
+    idForeign: null,
+    privateFor: null,
+    favoriteUrl: null,
+    primaryOrigin: null,
     setlistPosition: options.setlistPosition ?? null,
     setlistItemId: options.setlistItemId ?? null,
     sourceId: tuneSet.id,
@@ -113,9 +147,17 @@ function createTuneSetRow(
 
 function matchesTuneQuery(tune: Tune, query: string): boolean {
   if (!query) return true;
-  return [tune.title, tune.type, tune.mode, tune.structure, tune.incipit].some(
-    (value) => normalize(value).includes(query)
-  );
+  return [
+    tune.title,
+    tune.type,
+    tune.mode,
+    tune.structure,
+    tune.incipit,
+    (tune as Tune & { genre?: string | null }).genre,
+    (tune as Tune & { composer?: string | null }).composer,
+    (tune as Tune & { artist?: string | null }).artist,
+    String((tune as Tune & { releaseYear?: number | null }).releaseYear ?? ""),
+  ].some((value) => normalize(value).includes(query));
 }
 
 function matchesTuneSetQuery(tuneSet: TuneSet, query: string): boolean {

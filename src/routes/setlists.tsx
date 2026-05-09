@@ -11,12 +11,14 @@
  * @module routes/setlists
  */
 
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { useSearchParams } from "@solidjs/router";
 import type { ColumnDef, Table } from "@tanstack/solid-table";
 import {
   ChevronDown,
   ChevronRight,
   Columns,
+  EllipsisVertical,
   GripVertical,
   Mail,
   Plus,
@@ -44,7 +46,9 @@ import {
   getSetlistGridSubRows,
   type ISetlistGridRow,
 } from "@/components/grids/setlist-grid-rows";
+import { getCatalogColumns } from "@/components/grids/TuneColumns";
 import { TunesGrid } from "@/components/grids/TunesGrid";
+import { useRegisterMobileControlBar } from "@/components/layout/MobileControlBarContext";
 import { Button } from "@/components/ui/button";
 import { useGroupsDialog } from "@/contexts/GroupsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
@@ -68,6 +72,7 @@ import {
 import { getTuneSetItems } from "@/lib/db/queries/tune-sets";
 import { getTunesForUser } from "@/lib/db/queries/tunes";
 import type { Tune, TuneSet } from "@/lib/db/types";
+import { createIsMobile } from "@/lib/hooks/useIsMobile";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,6 +166,7 @@ const EmptyState: Component<{ message: string; detail?: string }> = (props) => (
 // ── Page Component ───────────────────────────────────────────────────────────
 
 const SetlistsPage: Component = () => {
+  const isMobile = createIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, localDb } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
@@ -202,9 +208,22 @@ const SetlistsPage: Component = () => {
   const [librarySelectionCount, setLibrarySelectionCount] = createSignal(0);
   const [editorSelectionCount, setEditorSelectionCount] = createSignal(0);
   const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
+  const [showLibraryColumnsDropdown, setShowLibraryColumnsDropdown] =
+    createSignal(false);
+  const [showEditorColumnsDropdown, setShowEditorColumnsDropdown] =
+    createSignal(false);
+  const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
+  const [showLibraryPanelMenu, setShowLibraryPanelMenu] = createSignal(false);
+  const [showSetlistPanelMenu, setShowSetlistPanelMenu] = createSignal(false);
+  const [pendingDisplayOptionsOpen, setPendingDisplayOptionsOpen] =
+    createSignal(false);
   const [viewTable, setViewTable] = createSignal<Table<ISetlistGridRow> | null>(
     null
   );
+  const [libraryTable, setLibraryTable] =
+    createSignal<Table<ISetlistGridRow> | null>(null);
+  const [editorTable, setEditorTable] =
+    createSignal<Table<ISetlistGridRow> | null>(null);
   const [isRouteInitialized, setIsRouteInitialized] = createSignal(false);
   const [lastHydratedStorageKey, setLastHydratedStorageKey] = createSignal<
     string | null
@@ -212,6 +231,22 @@ const SetlistsPage: Component = () => {
   let libraryTableRef: Table<ISetlistGridRow> | null = null;
   let editorTableRef: Table<ISetlistGridRow> | null = null;
   let columnsButtonRef: HTMLButtonElement | undefined;
+  let libraryColumnsButtonRef: HTMLButtonElement | undefined;
+  let editorColumnsButtonRef: HTMLButtonElement | undefined;
+  let mobileOverflowButtonRef: HTMLButtonElement | undefined;
+  let mobileLibraryOverflowButtonRef: HTMLButtonElement | undefined;
+  let mobileSetlistOverflowButtonRef: HTMLButtonElement | undefined;
+
+  createEffect(() => {
+    if (!pendingDisplayOptionsOpen() || showOverflowMenu()) {
+      return;
+    }
+
+    setPendingDisplayOptionsOpen(false);
+    queueMicrotask(() => {
+      setShowColumnsDropdown(true);
+    });
+  });
 
   const getParam = (value: string | string[] | undefined): string => {
     if (Array.isArray(value)) return value[0] || "";
@@ -863,9 +898,6 @@ const SetlistsPage: Component = () => {
   const gridUserId = (scope: string) =>
     `${userId() ?? "setlists-anon"}:${scope}`;
 
-  const defaultExpandedSetlistRowIds = createMemo(
-    () => setlistGridRows().autoExpandedRowIds
-  );
   const defaultExpandedLibraryRowIds = createMemo(
     () => libraryGridRows().autoExpandedRowIds
   );
@@ -875,65 +907,16 @@ const SetlistsPage: Component = () => {
     showSelect?: boolean;
     showDragHandle?: boolean;
   }): ColumnDef<ISetlistGridRow>[] => {
+    const catalogColumns = getCatalogColumns() as ColumnDef<ISetlistGridRow>[];
     const columns: ColumnDef<ISetlistGridRow>[] = [];
 
-    // Selection checkbox column (for bulk Add/Remove via toolbar)
     if (options?.showSelect) {
-      columns.push({
-        id: "select",
-        header: ({ table }) => (
-          <input
-            type="checkbox"
-            checked={table.getIsAllRowsSelected()}
-            onChange={table.getToggleAllRowsSelectedHandler()}
-            class="h-4 w-4 cursor-pointer"
-            aria-label="Select all rows"
-          />
-        ),
-        cell: ({ row }) => {
-          if (!row.getCanSelect() && row.getCanExpand()) {
-            return (
-              <button
-                type="button"
-                class="inline-flex h-4 w-4 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                aria-label={row.getIsExpanded() ? "Collapse row" : "Expand row"}
-                aria-expanded={row.getIsExpanded()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  row.toggleExpanded();
-                }}
-              >
-                <Show
-                  when={row.getIsExpanded()}
-                  fallback={<ChevronRight size={14} aria-hidden="true" />}
-                >
-                  <ChevronDown size={14} aria-hidden="true" />
-                </Show>
-              </button>
-            );
-          }
-
-          if (!row.getCanSelect()) {
-            return <span class="inline-block h-4 w-4" aria-hidden="true" />;
-          }
-
-          return (
-            <input
-              type="checkbox"
-              checked={row.getIsSelected()}
-              onChange={row.getToggleSelectedHandler()}
-              class="h-4 w-4 cursor-pointer"
-              aria-label={`Select row ${row.original?.id ?? row.id}`}
-              onClick={(e) => e.stopPropagation()}
-            />
-          );
-        },
-        size: 50,
-        minSize: 50,
-        maxSize: 50,
-        enableSorting: false,
-        enableResizing: false,
-      });
+      const selectColumn = catalogColumns.find(
+        (column) => column.id === "select"
+      );
+      if (selectColumn) {
+        columns.push(selectColumn);
+      }
     }
 
     // Drag handle column (for reordering setlist items)
@@ -941,6 +924,7 @@ const SetlistsPage: Component = () => {
       columns.push({
         id: "drag",
         header: "",
+        enableHiding: false,
         cell: ({ row }) => {
           if (
             !row.original.setlistItemId ||
@@ -1012,6 +996,7 @@ const SetlistsPage: Component = () => {
       columns.push({
         accessorKey: "setlistPosition",
         id: "order",
+        meta: { headerLabel: "#" },
         header: "#",
         cell: (info) =>
           info.row.depth === 0 ? (info.getValue<number | null>() ?? "—") : "",
@@ -1023,51 +1008,28 @@ const SetlistsPage: Component = () => {
       });
     }
 
-    columns.push(
-      {
-        accessorKey: "title",
-        id: "title",
-        header: "Title",
-        cell: (info) => (
-          <span class="block truncate" title={info.row.original.title}>
-            {info.row.original.title}
-          </span>
-        ),
-        size: 240,
-        minSize: 180,
-      },
-      {
-        accessorKey: "type",
-        id: "type",
-        header: "Type",
-        cell: (info) => info.getValue<string | null>() ?? "—",
-        size: 120,
-        minSize: 96,
-      },
-      {
-        accessorKey: "mode",
-        id: "mode",
-        header: "Mode",
-        cell: (info) => info.getValue<string | null>() ?? "—",
-        size: 120,
-        minSize: 96,
-      },
-      {
-        accessorKey: "details",
-        id: "details",
-        header: "Details",
-        cell: (info) => (
-          <span
-            class="block truncate text-xs text-muted-foreground"
-            title={info.row.original.details ?? ""}
-          >
-            {info.row.original.details ?? "—"}
-          </span>
-        ),
-        size: 260,
-        minSize: 180,
-      }
+    const sharedColumns = catalogColumns.filter(
+      (column) => column.id !== "select"
     );
+
+    columns.push(...sharedColumns);
+
+    columns.push({
+      accessorKey: "details",
+      id: "details",
+      meta: { headerLabel: "Details" },
+      header: "Details",
+      cell: (info) => (
+        <span
+          class="block truncate text-xs text-muted-foreground"
+          title={info.row.original.details ?? ""}
+        >
+          {info.row.original.details ?? "—"}
+        </span>
+      ),
+      size: 260,
+      minSize: 180,
+    });
 
     return columns;
   };
@@ -1256,18 +1218,286 @@ const SetlistsPage: Component = () => {
     window.alert("Not yet implemented");
   };
 
+  const handleViewModeEdit = () => {
+    if (!canManage()) {
+      toast.error(
+        "You need to be a manager (admin or owner) to edit this setlist.",
+        { duration: 5000 }
+      );
+      return;
+    }
+    handleStartEdit();
+  };
+
+  const handleViewModeCreate = () => {
+    if (!canManage()) {
+      toast.error(
+        "You need to be a manager (admin or owner) of this group to create setlists.",
+        { duration: 5000 }
+      );
+      return;
+    }
+    handleStartCreate();
+  };
+
+  const handleColumnsToggle = () => {
+    if (!viewTable()) return;
+    setShowColumnsDropdown((open) => !open);
+  };
+
+  const handleLibraryColumnsToggle = () => {
+    if (!libraryTable()) return;
+    setShowLibraryColumnsDropdown((open) => !open);
+  };
+
+  const handleEditorColumnsToggle = () => {
+    if (!editorTable()) return;
+    setShowEditorColumnsDropdown((open) => !open);
+  };
+
+  const openDisplayOptions = () => {
+    if (!viewTable()) return;
+    setPendingDisplayOptionsOpen(true);
+    setShowOverflowMenu(false);
+  };
+
+  const openLibraryDisplayOptions = () => {
+    if (!libraryTable()) return;
+    setShowLibraryPanelMenu(false);
+    queueMicrotask(() => setShowLibraryColumnsDropdown(true));
+  };
+
+  const openEditorDisplayOptions = () => {
+    if (!editorTable()) return;
+    setShowSetlistPanelMenu(false);
+    queueMicrotask(() => setShowEditorColumnsDropdown(true));
+  };
+
+  const displayOptionsTriggerRef = () =>
+    isMobile() ? mobileOverflowButtonRef : columnsButtonRef;
+  const libraryDisplayOptionsTriggerRef = () =>
+    isMobile() ? mobileLibraryOverflowButtonRef : libraryColumnsButtonRef;
+  const editorDisplayOptionsTriggerRef = () =>
+    isMobile() ? mobileSetlistOverflowButtonRef : editorColumnsButtonRef;
+
+  const mobileMenuItemClasses =
+    "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-left text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-800";
+
+  useRegisterMobileControlBar(() => {
+    if (!isMobile()) return undefined;
+
+    return (
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <select
+          value={selectedGroupId() ?? ""}
+          onChange={(e) => {
+            setSelectedGroupId(e.currentTarget.value || null);
+            setSelectedSetlistId(null);
+          }}
+          class="h-10 min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          data-testid="setlists-group-select-mobile"
+          aria-label="Select group"
+        >
+          <Show when={(groups() ?? []).length === 0}>
+            <option value="">No groups</option>
+          </Show>
+          <For each={groups() ?? []}>
+            {(group) => <option value={group.id}>{group.name}</option>}
+          </For>
+        </select>
+
+        <select
+          value={selectedSetlistId() ?? ""}
+          onChange={(e) => {
+            setSelectedSetlistId(e.currentTarget.value || null);
+            if (isEditing()) handleCancelEdit();
+          }}
+          class="h-10 min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+          data-testid="setlists-setlist-select-mobile"
+          aria-label="Select setlist"
+        >
+          <Show when={(groupSetlists() ?? []).length === 0}>
+            <option value="">No setlists</option>
+          </Show>
+          <For each={groupSetlists() ?? []}>
+            {(prog) => <option value={prog.id}>{prog.name}</option>}
+          </For>
+        </select>
+
+        <DropdownMenu
+          open={showOverflowMenu()}
+          onOpenChange={setShowOverflowMenu}
+        >
+          <DropdownMenu.Trigger
+            ref={mobileOverflowButtonRef}
+            type="button"
+            data-testid="setlists-overflow-button"
+            aria-label="More options"
+            class="flex h-10 w-10 flex-none items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+          >
+            <EllipsisVertical class="h-4 w-4" />
+            <span class="sr-only">More options</span>
+          </DropdownMenu.Trigger>
+
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="z-50 min-w-[16rem] rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+              <Show
+                when={!isEditing()}
+                fallback={
+                  <>
+                    <button
+                      type="button"
+                      data-testid="setlists-overflow-done-button"
+                      class={mobileMenuItemClasses}
+                      disabled={
+                        isSaving() ||
+                        isMutatingItems() ||
+                        (isCreating() && !hasValidSetlistName())
+                      }
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        void handleSaveAndClose();
+                      }}
+                    >
+                      <span>
+                        {isSaving()
+                          ? "Saving..."
+                          : isCreating()
+                            ? "Create Setlist"
+                            : "Done Editing"}
+                      </span>
+                    </button>
+
+                    <Show when={!isCreating() && !!selectedSetlistId()}>
+                      <button
+                        type="button"
+                        data-testid="setlists-overflow-delete-button"
+                        class={mobileMenuItemClasses}
+                        disabled={
+                          isSaving() ||
+                          isMutatingItems() ||
+                          deletingSetlistId() === selectedSetlistId()
+                        }
+                        onClick={() => {
+                          setShowOverflowMenu(false);
+                          if (!canManage()) {
+                            toast.error(
+                              "You need to be a manager (admin or owner) to delete this setlist.",
+                              { duration: 5000 }
+                            );
+                            return;
+                          }
+                          void handleDeleteSetlist();
+                        }}
+                      >
+                        <span>
+                          {deletingSetlistId() === selectedSetlistId()
+                            ? "Deleting..."
+                            : "Delete"}
+                        </span>
+                      </button>
+                    </Show>
+
+                    <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+                    <button
+                      type="button"
+                      data-testid="setlists-overflow-library-toggle-button"
+                      class={mobileMenuItemClasses}
+                      onClick={() => {
+                        setShowOverflowMenu(false);
+                        setLibraryPanelOpen((open) => !open);
+                      }}
+                    >
+                      <span>
+                        {libraryPanelOpen() ? "Hide Library" : "Show Library"}
+                      </span>
+                    </button>
+                  </>
+                }
+              >
+                <button
+                  type="button"
+                  data-testid="setlists-overflow-edit-button"
+                  class={mobileMenuItemClasses}
+                  disabled={!selectedSetlistId()}
+                  onClick={() => {
+                    setShowOverflowMenu(false);
+                    handleViewModeEdit();
+                  }}
+                >
+                  <span>Edit</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="setlists-overflow-new-button"
+                  class={mobileMenuItemClasses}
+                  disabled={!selectedGroupId()}
+                  onClick={() => {
+                    setShowOverflowMenu(false);
+                    handleViewModeCreate();
+                  }}
+                >
+                  <span>New Setlist</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="setlists-overflow-print-button"
+                  class={mobileMenuItemClasses}
+                  onClick={() => {
+                    setShowOverflowMenu(false);
+                    handleNotYetImplemented();
+                  }}
+                >
+                  <span>Print</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="setlists-overflow-email-button"
+                  class={mobileMenuItemClasses}
+                  onClick={() => {
+                    setShowOverflowMenu(false);
+                    handleNotYetImplemented();
+                  }}
+                >
+                  <span>Email</span>
+                </button>
+
+                <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+                <button
+                  type="button"
+                  data-testid="display-options-entry-button"
+                  class={mobileMenuItemClasses}
+                  disabled={!viewTable()}
+                  onClick={openDisplayOptions}
+                >
+                  <span>Display Options</span>
+                  <ChevronRight class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                </button>
+              </Show>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu>
+      </div>
+    );
+  });
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div class="flex h-full flex-col bg-gray-50 dark:bg-gray-900">
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
-      <div class="shrink-0 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
-        <div class="flex flex-wrap items-center gap-3">
+      <div class="hidden shrink-0 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800 md:block">
+        <div class="flex items-center gap-3 overflow-x-auto md:flex-wrap md:overflow-visible">
           {/* Group selector */}
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              class="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+              class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300 md:text-sm"
               onClick={() => openGroupsDialog()}
               data-testid="setlists-group-label-link"
             >
@@ -1280,7 +1510,7 @@ const SetlistsPage: Component = () => {
                 setSelectedGroupId(e.currentTarget.value || null);
                 setSelectedSetlistId(null);
               }}
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              class="w-28 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white md:w-auto md:px-3 md:text-sm"
               data-testid="setlists-group-select"
             >
               <Show when={(groups() ?? []).length === 0}>
@@ -1293,10 +1523,10 @@ const SetlistsPage: Component = () => {
           </div>
 
           {/* Setlist selector */}
-          <div class="flex items-center gap-2">
+          <div class="flex shrink-0 items-center gap-2">
             <label
               for="setlists-setlist-select"
-              class="text-sm font-medium text-gray-700 dark:text-gray-300"
+              class="text-xs font-medium text-gray-700 dark:text-gray-300 md:text-sm"
             >
               Setlist
             </label>
@@ -1307,7 +1537,7 @@ const SetlistsPage: Component = () => {
                 setSelectedSetlistId(e.currentTarget.value || null);
                 if (isEditing()) handleCancelEdit();
               }}
-              class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              class="w-36 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white md:w-auto md:px-3 md:text-sm"
               data-testid="setlists-setlist-select"
             >
               <Show when={(groupSetlists() ?? []).length === 0}>
@@ -1319,14 +1549,14 @@ const SetlistsPage: Component = () => {
             </select>
           </div>
 
-          <div class="h-6 w-px bg-gray-200 dark:bg-gray-700" />
+          <div class="h-6 w-px shrink-0 bg-gray-200 dark:bg-gray-700" />
 
           {/* Edit toggle + actions */}
           <Show
             when={!isEditing()}
             fallback={
               /* Editing toolbar actions */
-              <div class="flex items-center gap-2">
+              <div class="flex shrink-0 items-center gap-2">
                 <Button
                   type="button"
                   variant={isCreating() ? "default" : "outline"}
@@ -1384,8 +1614,8 @@ const SetlistsPage: Component = () => {
             {/* Always-visible view-mode toolbar buttons.
                 Buttons are always present to avoid layout shifts; permission
                 denials surface a toast instead of hiding the control. */}
-            <div class="flex flex-1 flex-wrap items-center gap-2">
-              <div class="flex items-center gap-2">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+              <div class="hidden items-center gap-2 md:flex">
                 <Button
                   type="button"
                   variant="ghost"
@@ -1395,16 +1625,7 @@ const SetlistsPage: Component = () => {
                       ? "text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-950/20"
                       : "opacity-50"
                   }
-                  onClick={() => {
-                    if (!canManage()) {
-                      toast.error(
-                        "You need to be a manager (admin or owner) to edit this setlist.",
-                        { duration: 5000 }
-                      );
-                      return;
-                    }
-                    handleStartEdit();
-                  }}
+                  onClick={handleViewModeEdit}
                   disabled={!selectedSetlistId()}
                   data-testid="setlists-edit-button"
                 >
@@ -1416,16 +1637,7 @@ const SetlistsPage: Component = () => {
                   variant="accent"
                   size="sm"
                   class={canManage() ? "" : "opacity-50"}
-                  onClick={() => {
-                    if (!canManage()) {
-                      toast.error(
-                        "You need to be a manager (admin or owner) of this group to create setlists.",
-                        { duration: 5000 }
-                      );
-                      return;
-                    }
-                    handleStartCreate();
-                  }}
+                  onClick={handleViewModeCreate}
                   disabled={!selectedGroupId()}
                   data-testid="setlists-new-button"
                 >
@@ -1434,9 +1646,9 @@ const SetlistsPage: Component = () => {
                 </Button>
               </div>
 
-              <div class="flex-1" />
+              <div class="hidden flex-1 md:block" />
 
-              <div class="flex items-center gap-2">
+              <div class="hidden items-center gap-2 md:flex">
                 <button
                   type="button"
                   onClick={handleNotYetImplemented}
@@ -1460,9 +1672,10 @@ const SetlistsPage: Component = () => {
                 <button
                   ref={columnsButtonRef}
                   type="button"
-                  onClick={() => setShowColumnsDropdown((open) => !open)}
+                  onClick={handleColumnsToggle}
                   class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                   data-testid="setlists-columns-button"
+                  disabled={!viewTable()}
                   aria-expanded={showColumnsDropdown()}
                   title="Display options"
                 >
@@ -1481,13 +1694,44 @@ const SetlistsPage: Component = () => {
           table={viewTable()!}
           isOpen={showColumnsDropdown()}
           onClose={() => setShowColumnsDropdown(false)}
-          triggerRef={columnsButtonRef}
+          triggerRef={displayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
+          title="Display Options"
+        />
+      </Show>
+
+      <Show
+        when={isEditing() && showLibraryColumnsDropdown() && libraryTable()}
+      >
+        <ColumnVisibilityMenu
+          table={libraryTable()!}
+          isOpen={showLibraryColumnsDropdown()}
+          onClose={() => setShowLibraryColumnsDropdown(false)}
+          triggerRef={libraryDisplayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
+          title="Display Options"
+        />
+      </Show>
+
+      <Show when={isEditing() && showEditorColumnsDropdown() && editorTable()}>
+        <ColumnVisibilityMenu
+          table={editorTable()!}
+          isOpen={showEditorColumnsDropdown()}
+          onClose={() => setShowEditorColumnsDropdown(false)}
+          triggerRef={editorDisplayOptionsTriggerRef()}
+          closeGuardRef={isMobile() ? null : undefined}
           title="Display Options"
         />
       </Show>
 
       {/* ── Content Area ────────────────────────────────────────────────── */}
-      <div class="min-h-0 flex-1 overflow-hidden p-4 sm:p-6">
+      <div
+        class={`min-h-0 flex-1 overflow-hidden ${
+          selectedGroupId() && !isEditing() && selectedSetlist()
+            ? ""
+            : "p-4 sm:p-6"
+        }`}
+      >
         {/* No group selected */}
         <Show when={!selectedGroupId()}>
           <EmptyState
@@ -1509,49 +1753,56 @@ const SetlistsPage: Component = () => {
               }
             >
               {(prog) => (
-                <div class="flex h-full min-h-0 flex-col space-y-6">
-                  {/* Setlist header */}
-                  <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-                    <div class="flex items-start justify-between gap-4">
-                      <div class="min-w-0">
-                        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                          {prog().name}
-                        </h2>
-                        <Show when={prog().description}>
-                          <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                            {prog().description}
-                          </p>
-                        </Show>
-                      </div>
-                      <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                        {prog().itemCount} item
-                        {prog().itemCount === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                    <Show when={prog().groupName}>
-                      <div class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                        Group: {prog().groupName}
-                      </div>
-                    </Show>
-                  </div>
-
+                <div class="flex h-full min-h-0 flex-col">
                   {/* Setlist items list */}
-                  <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                    <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                      <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Setlist Items
-                      </h3>
+                  <div class="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-800">
+                    {/* Setlist title and metadata, hidden for now, remove the div to show */}
+                    <div class="hidden items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                      <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                        <div class="flex items-center justify-between gap-3">
+                          <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                              <h3 class="shrink-0 text-sm font-semibold text-gray-900 dark:text-white">
+                                {prog().name}
+                              </h3>
+                              <Show when={prog().groupName}>
+                                <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                                  •
+                                </span>
+                                <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                                  Group: {prog().groupName}
+                                </span>
+                              </Show>
+                              <Show when={prog().description}>
+                                <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                                  •
+                                </span>
+                                <span
+                                  class="min-w-0 truncate text-xs text-gray-500 dark:text-gray-400"
+                                  title={prog().description ?? undefined}
+                                >
+                                  {prog().description}
+                                </span>
+                              </Show>
+                            </div>
+                          </div>
+                        </div>
+                        <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                          {prog().itemCount} item
+                          {prog().itemCount === 1 ? "" : "s"}
+                        </span>
+                      </div>
                     </div>
                     <Show
                       when={(setlistItems() ?? []).length > 0}
                       fallback={
-                        <div class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-1 items-center justify-center px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
                           This setlist is empty. Add tunes or tune sets by
                           editing.
                         </div>
                       }
                     >
-                      <div class="h-[min(60vh,36rem)]">
+                      <div class="min-h-0 flex-1 overflow-hidden">
                         <TunesGrid
                           tablePurpose="setlists"
                           userId={gridUserId("view")}
@@ -1561,10 +1812,8 @@ const SetlistsPage: Component = () => {
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
                           enableRowSelection={false}
-                          disableListMode={true}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
-                          defaultExpandedRowIds={defaultExpandedSetlistRowIds()}
                           hierarchyColumnId="title"
                           onTableReady={(table) => {
                             setViewTable(table);
@@ -1577,6 +1826,21 @@ const SetlistsPage: Component = () => {
                         />
                       </div>
                     </Show>
+
+                    <div class="border-t border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-800 flex-shrink-0">
+                      <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                        <span>
+                          {prog().itemCount}{" "}
+                          {prog().itemCount === 1 ? "item" : "items"} in setlist
+                        </span>
+                        <span>
+                          {setlistGridRows().rows.length}{" "}
+                          {setlistGridRows().rows.length === 1
+                            ? "top-level item"
+                            : "top-level items"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1589,20 +1853,37 @@ const SetlistsPage: Component = () => {
               {/* Left Panel: Library */}
               <Show when={libraryPanelOpen()}>
                 <section class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                  <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                    <div>
-                      <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <div class="flex flex-wrap items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700 md:gap-y-3 md:px-4 md:py-3">
+                    <div class="hidden min-w-0 flex-1 md:block">
+                      <h3 class="truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 md:text-sm">
                         Group Catalog
                       </h3>
                       <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                         Search tunes and tune sets to add to this setlist.
                       </p>
                     </div>
-                    <div class="flex items-center gap-2">
+
+                    <div class="order-1 relative min-w-0 flex-1 md:order-3 md:basis-0">
+                      <Search
+                        size={14}
+                        class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      />
+                      <input
+                        type="text"
+                        value={libraryQuery()}
+                        onInput={(e) => setLibraryQuery(e.currentTarget.value)}
+                        placeholder="Search tunes and tune sets"
+                        class="h-8 w-full rounded-md border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white md:h-9 md:text-sm"
+                        data-testid="setlists-library-search"
+                      />
+                    </div>
+
+                    <div class="order-2 flex shrink-0 items-center gap-2 md:order-2">
                       <Button
                         type="button"
                         variant="accent"
                         size="sm"
+                        class="h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm"
                         onClick={() => void handleAddSelected()}
                         disabled={
                           librarySelectionCount() === 0 ||
@@ -1612,40 +1893,101 @@ const SetlistsPage: Component = () => {
                         }
                         data-testid="setlists-add-selected-button"
                       >
-                        <Plus size={14} class="mr-1.5" />
+                        <Plus size={14} class="mr-1 sm:mr-1.5" />
                         Add
                         <Show when={librarySelectionCount() > 0}>
                           <span class="ml-1">({librarySelectionCount()})</span>
                         </Show>
                       </Button>
+
+                      <DropdownMenu
+                        open={showLibraryPanelMenu()}
+                        onOpenChange={setShowLibraryPanelMenu}
+                      >
+                        <DropdownMenu.Trigger
+                          ref={mobileLibraryOverflowButtonRef}
+                          type="button"
+                          aria-label="Group catalog options"
+                          data-testid="setlists-library-panel-overflow-button"
+                          class="flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 md:hidden"
+                        >
+                          <EllipsisVertical class="h-4 w-4" />
+                          <span class="sr-only">Group catalog options</span>
+                        </DropdownMenu.Trigger>
+
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content class="z-50 min-w-[14rem] rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                            <div class="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              Filter Library
+                            </div>
+                            {(["all", "tune", "tune_set"] as const).map(
+                              (filter) => (
+                                <button
+                                  type="button"
+                                  class={mobileMenuItemClasses}
+                                  onClick={() => {
+                                    setLibraryFilter(filter);
+                                    setShowLibraryPanelMenu(false);
+                                  }}
+                                  data-testid={`setlists-library-filter-menu-${filter}`}
+                                >
+                                  <span>
+                                    {filter === "all"
+                                      ? "All"
+                                      : filter === "tune"
+                                        ? "Tunes"
+                                        : "Sets"}
+                                  </span>
+                                  <Show when={libraryFilter() === filter}>
+                                    <span class="text-blue-600 dark:text-blue-400">
+                                      Selected
+                                    </span>
+                                  </Show>
+                                </button>
+                              )
+                            )}
+
+                            <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+                            <button
+                              type="button"
+                              class={mobileMenuItemClasses}
+                              disabled={!libraryTable()}
+                              onClick={openLibraryDisplayOptions}
+                              data-testid="setlists-library-display-options-menu-button"
+                            >
+                              <span>Display Options</span>
+                              <ChevronRight class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            </button>
+
+                            <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+                            <button
+                              type="button"
+                              class={mobileMenuItemClasses}
+                              onClick={() => {
+                                setLibraryPanelOpen(false);
+                                setShowLibraryPanelMenu(false);
+                              }}
+                              data-testid="setlists-library-hide-button"
+                            >
+                              <span>Hide Library</span>
+                            </button>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu>
                     </div>
                   </div>
 
                   <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
                     {/* Search + filter */}
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                      <div class="relative flex-1">
-                        <Search
-                          size={14}
-                          class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                        />
-                        <input
-                          type="text"
-                          value={libraryQuery()}
-                          onInput={(e) =>
-                            setLibraryQuery(e.currentTarget.value)
-                          }
-                          placeholder="Search tunes and tune sets"
-                          class="w-full rounded-md border border-gray-300 bg-white py-1.5 pl-9 pr-3 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                          data-testid="setlists-library-search"
-                        />
-                      </div>
-                      <div class="flex items-center gap-1">
+                    <div class="hidden min-w-0 items-center justify-between gap-2 overflow-x-auto md:flex">
+                      <div class="flex shrink-0 items-center gap-1 whitespace-nowrap">
                         {(["all", "tune", "tune_set"] as const).map(
                           (filter) => (
                             <button
                               type="button"
-                              class={`rounded-md px-2.5 py-1.5 text-xs font-medium ${
+                              class={`rounded-md px-2 py-1 text-[11px] font-medium md:px-2.5 md:py-1.5 md:text-xs ${
                                 libraryFilter() === filter
                                   ? "bg-blue-600 text-white"
                                   : "border border-gray-300 text-gray-700 dark:border-gray-600 dark:text-gray-200"
@@ -1662,6 +2004,20 @@ const SetlistsPage: Component = () => {
                           )
                         )}
                       </div>
+                      <button
+                        ref={libraryColumnsButtonRef}
+                        type="button"
+                        onClick={handleLibraryColumnsToggle}
+                        class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        data-testid="setlists-library-columns-button"
+                        disabled={!libraryTable()}
+                        aria-expanded={showLibraryColumnsDropdown()}
+                        title="Display options"
+                      >
+                        <Columns size={14} aria-hidden="true" />
+                        <span>Display Options</span>
+                        <ChevronDown size={14} aria-hidden="true" />
+                      </button>
                     </div>
 
                     <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
@@ -1694,8 +2050,8 @@ const SetlistsPage: Component = () => {
                           onSelectionChange={setLibrarySelectionCount}
                           onTableReady={(table) => {
                             libraryTableRef = table;
+                            setLibraryTable(table);
                           }}
-                          disableListMode={true}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
                           defaultExpandedRowIds={defaultExpandedLibraryRowIds()}
@@ -1731,7 +2087,7 @@ const SetlistsPage: Component = () => {
                   <Show
                     when={metadataExpanded()}
                     fallback={
-                      <div class="flex flex-wrap items-center gap-3">
+                      <div class="flex min-w-0 items-center gap-2 md:gap-3">
                         <button
                           type="button"
                           class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
@@ -1743,7 +2099,7 @@ const SetlistsPage: Component = () => {
                         </button>
                         <label
                           for="setlist-editor-name-collapsed"
-                          class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                          class="hidden text-sm font-medium text-gray-700 dark:text-gray-300 md:block"
                         >
                           Setlist Name:
                         </label>
@@ -1752,7 +2108,7 @@ const SetlistsPage: Component = () => {
                           type="text"
                           value={editorName()}
                           onInput={(e) => setEditorName(e.currentTarget.value)}
-                          class={`min-w-[14rem] flex-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
+                          class={`min-w-0 flex-1 rounded-md border bg-white px-3 py-1.5 text-xs text-gray-900 dark:bg-gray-800 dark:text-white md:min-w-[14rem] md:py-2 md:text-sm ${
                             !hasValidSetlistName()
                               ? "border-red-400 ring-1 ring-red-400/40"
                               : "border-gray-300 dark:border-gray-600"
@@ -1760,8 +2116,66 @@ const SetlistsPage: Component = () => {
                           placeholder="Festival opener"
                           data-testid="setlist-editor-name-input-collapsed"
                         />
+                        <DropdownMenu
+                          open={showSetlistPanelMenu()}
+                          onOpenChange={setShowSetlistPanelMenu}
+                        >
+                          <DropdownMenu.Trigger
+                            ref={mobileSetlistOverflowButtonRef}
+                            type="button"
+                            aria-label="Setlist panel options"
+                            data-testid="setlists-setlist-panel-overflow-button"
+                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 md:hidden"
+                          >
+                            <EllipsisVertical class="h-4 w-4" />
+                            <span class="sr-only">Setlist panel options</span>
+                          </DropdownMenu.Trigger>
+
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content class="z-50 min-w-[14rem] rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                              <div class="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                {(setlistItems() ?? []).length} item
+                                {(setlistItems() ?? []).length === 1 ? "" : "s"}
+                              </div>
+
+                              <button
+                                type="button"
+                                class={mobileMenuItemClasses}
+                                disabled={
+                                  !hasValidSetlistName() ||
+                                  editorSelectionCount() === 0 ||
+                                  isMutatingItems() ||
+                                  isSaving()
+                                }
+                                onClick={() => {
+                                  setShowSetlistPanelMenu(false);
+                                  void handleRemoveSelected();
+                                }}
+                                data-testid="setlists-remove-selected-menu-button"
+                              >
+                                <span>Remove Selected</span>
+                                <Show when={editorSelectionCount() > 0}>
+                                  <span>({editorSelectionCount()})</span>
+                                </Show>
+                              </button>
+
+                              <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+                              <button
+                                type="button"
+                                class={mobileMenuItemClasses}
+                                disabled={!editorTable()}
+                                onClick={openEditorDisplayOptions}
+                                data-testid="setlists-editor-display-options-menu-button"
+                              >
+                                <span>Display Options</span>
+                                <ChevronRight class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                              </button>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu>
                         <Show when={!hasValidSetlistName()}>
-                          <span class="text-xs font-medium text-red-600 dark:text-red-400">
+                          <span class="hidden text-xs font-medium text-red-600 dark:text-red-400 md:block">
                             Required before adding, removing, or reordering
                             items.
                           </span>
@@ -1779,7 +2193,7 @@ const SetlistsPage: Component = () => {
                       >
                         <ChevronDown size={16} aria-hidden="true" />
                       </button>
-                      <div>
+                      <div class="min-w-0 flex-1">
                         <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                           Setlist Build
                         </h3>
@@ -1790,6 +2204,64 @@ const SetlistsPage: Component = () => {
                           </p>
                         </Show>
                       </div>
+                      <DropdownMenu
+                        open={showSetlistPanelMenu()}
+                        onOpenChange={setShowSetlistPanelMenu}
+                      >
+                        <DropdownMenu.Trigger
+                          ref={mobileSetlistOverflowButtonRef}
+                          type="button"
+                          aria-label="Setlist panel options"
+                          data-testid="setlists-setlist-panel-overflow-button"
+                          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 md:hidden"
+                        >
+                          <EllipsisVertical class="h-4 w-4" />
+                          <span class="sr-only">Setlist panel options</span>
+                        </DropdownMenu.Trigger>
+
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content class="z-50 min-w-[14rem] rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                            <div class="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              {(setlistItems() ?? []).length} item
+                              {(setlistItems() ?? []).length === 1 ? "" : "s"}
+                            </div>
+
+                            <button
+                              type="button"
+                              class={mobileMenuItemClasses}
+                              disabled={
+                                !hasValidSetlistName() ||
+                                editorSelectionCount() === 0 ||
+                                isMutatingItems() ||
+                                isSaving()
+                              }
+                              onClick={() => {
+                                setShowSetlistPanelMenu(false);
+                                void handleRemoveSelected();
+                              }}
+                              data-testid="setlists-remove-selected-menu-button"
+                            >
+                              <span>Remove Selected</span>
+                              <Show when={editorSelectionCount() > 0}>
+                                <span>({editorSelectionCount()})</span>
+                              </Show>
+                            </button>
+
+                            <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
+
+                            <button
+                              type="button"
+                              class={mobileMenuItemClasses}
+                              disabled={!editorTable()}
+                              onClick={openEditorDisplayOptions}
+                              data-testid="setlists-editor-display-options-menu-button"
+                            >
+                              <span>Display Options</span>
+                              <ChevronRight class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            </button>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu>
                     </div>
                   </Show>
                 </div>
@@ -1847,35 +2319,52 @@ const SetlistsPage: Component = () => {
 
                   {/* Items list */}
                   <div class="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 dark:bg-gray-900/50">
-                    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-700">
-                      <div class="flex items-center gap-2">
-                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <div class="hidden items-center justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700 md:flex md:px-4">
+                      <div class="flex min-w-0 items-center gap-1.5">
+                        <span class="truncate text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 md:text-xs">
                           Setlist Items
                         </span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                        <span class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400 md:text-xs">
                           {(setlistItems() ?? []).length} item
                           {(setlistItems() ?? []).length === 1 ? "" : "s"}
                         </span>
                       </div>
-                      <Button
-                        type="button"
-                        variant="destructive-ghost"
-                        size="sm"
-                        onClick={() => void handleRemoveSelected()}
-                        disabled={
-                          !hasValidSetlistName() ||
-                          editorSelectionCount() === 0 ||
-                          isMutatingItems() ||
-                          isSaving()
-                        }
-                        data-testid="setlists-remove-selected-button"
-                      >
-                        <Trash2 size={14} class="mr-1.5" />
-                        Remove
-                        <Show when={editorSelectionCount() > 0}>
-                          <span class="ml-1">({editorSelectionCount()})</span>
-                        </Show>
-                      </Button>
+                      <div class="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="destructive-ghost"
+                          size="sm"
+                          class="h-8 px-2 text-xs md:h-9 md:px-3 md:text-sm"
+                          onClick={() => void handleRemoveSelected()}
+                          disabled={
+                            !hasValidSetlistName() ||
+                            editorSelectionCount() === 0 ||
+                            isMutatingItems() ||
+                            isSaving()
+                          }
+                          data-testid="setlists-remove-selected-button"
+                        >
+                          <Trash2 size={14} class="mr-1 md:mr-1.5" />
+                          Remove
+                          <Show when={editorSelectionCount() > 0}>
+                            <span class="ml-1">({editorSelectionCount()})</span>
+                          </Show>
+                        </Button>
+                        <button
+                          ref={editorColumnsButtonRef}
+                          type="button"
+                          onClick={handleEditorColumnsToggle}
+                          class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                          data-testid="setlists-editor-columns-button"
+                          disabled={!editorTable()}
+                          aria-expanded={showEditorColumnsDropdown()}
+                          title="Display options"
+                        >
+                          <Columns size={14} aria-hidden="true" />
+                          <span>Display Options</span>
+                          <ChevronDown size={14} aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
 
                     <Show
@@ -1902,8 +2391,8 @@ const SetlistsPage: Component = () => {
                           onSelectionChange={setEditorSelectionCount}
                           onTableReady={(table) => {
                             editorTableRef = table;
+                            setEditorTable(table);
                           }}
-                          disableListMode={true}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
                           hierarchyColumnId="title"
