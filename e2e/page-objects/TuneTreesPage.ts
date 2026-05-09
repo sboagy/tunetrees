@@ -3450,13 +3450,32 @@ export class TuneTreesPage {
   // ===== Flashcard helpers =====
 
   async enableFlashcardMode(timeoutAfter: number = 800) {
+    const practiceLoadingMessage = this.page.getByText(
+      "Loading practice queue..."
+    );
+
     await this.setToolbarSwitchChecked(
       "practice",
       this.flashcardModeSwitch,
       true,
       0
     );
-    await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(
+        async () => {
+          const [flashcardVisible, loadingVisible] = await Promise.all([
+            this.flashcardView.isVisible().catch(() => false),
+            practiceLoadingMessage.isVisible().catch(() => false),
+          ]);
+
+          return flashcardVisible && !loadingVisible;
+        },
+        {
+          timeout: 15_000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
 
     if (typeof timeoutAfter === "number") {
       await this.page.waitForTimeout(timeoutAfter);
@@ -3465,6 +3484,9 @@ export class TuneTreesPage {
 
   async enableFlashcardModeAllowingEmptyState(timeoutAfter: number = 800) {
     const flashcardEmptyState = this.page.getByTestId("flashcard-empty-state");
+    const practiceLoadingMessage = this.page.getByText(
+      "Loading practice queue..."
+    );
 
     await this.setToolbarSwitchChecked(
       "practice",
@@ -3476,10 +3498,16 @@ export class TuneTreesPage {
     await expect
       .poll(
         async () => {
-          const [flashcardVisible, emptyVisible] = await Promise.all([
-            this.flashcardView.isVisible().catch(() => false),
-            flashcardEmptyState.isVisible().catch(() => false),
-          ]);
+          const [flashcardVisible, emptyVisible, loadingVisible] =
+            await Promise.all([
+              this.flashcardView.isVisible().catch(() => false),
+              flashcardEmptyState.isVisible().catch(() => false),
+              practiceLoadingMessage.isVisible().catch(() => false),
+            ]);
+
+          if (loadingVisible) {
+            return "pending";
+          }
 
           if (flashcardVisible) {
             return "flashcard";

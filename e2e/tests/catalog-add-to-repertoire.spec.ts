@@ -59,7 +59,16 @@ test.describe
         addToRepertoire: true,
         tab: "catalog",
       });
-      await expect(ttPage.catalogAddToRepertoireButton).toBeDisabled();
+      await expect
+        .poll(
+          () =>
+            ttPage.catalogAddToRepertoireButton.isDisabled().catch(() => false),
+          {
+            timeout: 5000,
+            intervals: [100, 250, 500, 1000],
+          }
+        )
+        .toBe(true);
 
       await page.keyboard.press("Escape").catch(() => undefined);
 
@@ -74,8 +83,15 @@ test.describe
       });
       await expect
         .poll(
-          () =>
-            ttPage.catalogAddToRepertoireButton.isEnabled().catch(() => false),
+          async () => {
+            await ttPage.expectToolbarVisible({
+              addToRepertoire: true,
+              tab: "catalog",
+            });
+            return ttPage.catalogAddToRepertoireButton
+              .isEnabled()
+              .catch(() => false);
+          },
           {
             timeout: 5000,
             intervals: [100, 250, 500, 1000],
