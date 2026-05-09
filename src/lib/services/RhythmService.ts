@@ -53,7 +53,7 @@ export interface RhythmService {
   play: () => Promise<void>;
   pause: () => void;
   togglePlayback: () => Promise<void>;
-  setTempoQpm: (nextQpm: number) => void;
+  setTempoQpm: (nextQpm: number) => Promise<void>;
 }
 
 export interface CreateRhythmServiceOptions {
@@ -92,7 +92,7 @@ async function tableExists(
   const rows = await db.all<{ name: string }>(sql`
     SELECT name
     FROM sqlite_master
-    WHERE type = 'table' AND name = ${sanitizeSqliteIdentifier(tableName)}
+    WHERE type = 'table' AND name = ${tableName}
     LIMIT 1
   `);
 
@@ -320,10 +320,9 @@ async function decodeSample(
 function getPitchPlaybackGain(event: NoteTimingEvent): number {
   const hasAccent = event.elements?.some((group) =>
     group.some((element) =>
-      (typeof element.className === "string"
-        ? element.className
-        : element.getAttribute("class") || ""
-      ).includes("abcjs-accent")
+      (element.getAttribute("class") ?? element.className).includes(
+        "abcjs-accent"
+      )
     )
   );
 
@@ -535,7 +534,7 @@ export function createRhythmService(
     await play();
   }
 
-  function setTempoQpm(nextQpm: number) {
+  async function setTempoQpm(nextQpm: number) {
     const clamped = clampTempo(nextQpm);
     setTempoQpmSignal(clamped);
     if (!metadata() || !isPlaying()) {
@@ -544,12 +543,14 @@ export function createRhythmService(
 
     lastKnownPositionMs =
       timingCallbacks?.currentMillisecond() ?? lastKnownPositionMs;
-    void startPlayback(lastKnownPositionMs).catch((cause: unknown) => {
+    try {
+      await startPlayback(lastKnownPositionMs);
+    } catch (cause: unknown) {
       setError(
         cause instanceof Error ? cause.message : "Failed to change tempo."
       );
       stopPlayback();
-    });
+    }
   }
 
   onCleanup(() => {

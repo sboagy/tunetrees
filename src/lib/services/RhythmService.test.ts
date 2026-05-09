@@ -237,9 +237,7 @@ describe("createRhythmService", () => {
     expect(FakeTimingCallbacks.instances[0]?.options.qpm).toBe(112);
 
     FakeTimingCallbacks.instances[0]!.currentPositionMs = 1500;
-    service.setTempoQpm(132);
-    await Promise.resolve();
-    await Promise.resolve();
+    await service.setTempoQpm(132);
 
     expect(service.tempoQpm()).toBe(132);
     expect(FakeTimingCallbacks.instances).toHaveLength(2);
