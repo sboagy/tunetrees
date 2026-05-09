@@ -83,8 +83,16 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   enableColumnReorder?: boolean;
   // Enable/disable row selection (default true)
   enableRowSelection?: boolean;
+  enableSubRowSelection?: boolean;
   // Optional per-row selection control used for mixed hierarchy rows.
   canSelectRow?: (row: T) => boolean;
+  normalizeRowSelection?: (
+    next: RowSelectionState,
+    prev: RowSelectionState,
+    helpers: {
+      getRow: (rowId: string) => T | undefined;
+    }
+  ) => RowSelectionState;
   // Optional nested rows support for mixed tune/set grids.
   getSubRows?: (row: T) => T[] | undefined;
   getRowId?: (row: T, index: number, parent?: T) => string;
@@ -262,6 +270,62 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
     initialState.rowSelection || {}
   );
+
+  const rowLookup = createMemo(() => {
+    const rowsById: Record<string, T> = {};
+
+    const visitRows = (rows: T[], parent?: T) => {
+      rows.forEach((row, index) => {
+        const rowId =
+          props.getRowId?.(row, index, parent) ?? String((row as any).id);
+        rowsById[rowId] = row;
+
+        const subRows = props.getSubRows?.(row) ?? [];
+        if (subRows.length > 0) {
+          visitRows(subRows, row);
+        }
+      });
+    };
+
+    visitRows(props.data);
+    return rowsById;
+  });
+
+  const compactRowSelection = (
+    selection: RowSelectionState
+  ): RowSelectionState => {
+    const next: RowSelectionState = {};
+    for (const [rowId, selected] of Object.entries(selection)) {
+      if (selected) next[rowId] = true;
+    }
+    return next;
+  };
+
+  const resolveRowSelectionUpdate = (
+    updater:
+      | RowSelectionState
+      | ((prev: RowSelectionState) => RowSelectionState),
+    prev: RowSelectionState
+  ): RowSelectionState => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+
+    const compacted = compactRowSelection(next);
+    if (!props.normalizeRowSelection) return compacted;
+
+    return compactRowSelection(
+      props.normalizeRowSelection(compacted, prev, {
+        getRow: (rowId) => rowLookup()[rowId],
+      })
+    );
+  };
+
+  const applyRowSelectionChange = (
+    updater:
+      | RowSelectionState
+      | ((prev: RowSelectionState) => RowSelectionState)
+  ) => {
+    setRowSelection((prev) => resolveRowSelectionUpdate(updater, prev));
+  };
   const [expanded, setExpanded] = createSignal<ExpandedState>({});
   const [lastDefaultExpandedSignature, setLastDefaultExpandedSignature] =
     createSignal<string | null>(null);
@@ -467,6 +531,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     enableRowSelection: props.canSelectRow
       ? (row) => props.canSelectRow?.(row.original) ?? false
       : (props.enableRowSelection ?? true),
+    enableSubRowSelection: props.enableSubRowSelection ?? true,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     meta: tableDisplayOptionsMeta,
@@ -494,7 +559,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       },
     },
     onSortingChange: setSorting,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: applyRowSelectionChange,
     onExpandedChange: setExpanded,
     onColumnSizingChange: setColumnSizing,
     onColumnOrderChange: setColumnOrder,
@@ -685,7 +750,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     checked: boolean
   ) => {
     const rowId = String(row.stacked_row_id ?? row.id);
-    setRowSelection((prev) => {
+    applyRowSelectionChange((prev) => {
       const currentlySelected = prev[rowId] === true;
       if (currentlySelected === checked) return prev;
 

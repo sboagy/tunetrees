@@ -85,6 +85,61 @@ interface CandidateItem {
   subtitle: string;
 }
 
+function normalizeExclusiveLibrarySelection(
+  next: Record<string, boolean>,
+  prev: Record<string, boolean>,
+  getRow: (rowId: string) => ISetlistGridRow | undefined
+): Record<string, boolean> {
+  const normalized: Record<string, boolean> = { ...next };
+  const nextIds = Object.keys(next);
+  const prevIds = new Set(Object.keys(prev));
+  const addedIds = nextIds.filter((rowId) => !prevIds.has(rowId));
+
+  for (const rowId of addedIds) {
+    const row = getRow(rowId);
+    if (!row) continue;
+
+    if (row.rowKind === "tune" && row.tuneSetRef) {
+      for (const selectedId of Object.keys(normalized)) {
+        if (selectedId === rowId) continue;
+        const selectedRow = getRow(selectedId);
+        if (
+          selectedRow?.rowKind === "tune_set" &&
+          selectedRow.sourceId === row.tuneSetRef
+        ) {
+          delete normalized[selectedId];
+        }
+      }
+      continue;
+    }
+
+    if (row.rowKind === "tune_set") {
+      for (const selectedId of Object.keys(normalized)) {
+        if (selectedId === rowId) continue;
+        const selectedRow = getRow(selectedId);
+        if (selectedRow?.tuneSetRef === row.sourceId) {
+          delete normalized[selectedId];
+        }
+      }
+    }
+  }
+
+  for (const selectedId of Object.keys(normalized)) {
+    const selectedRow = getRow(selectedId);
+    if (selectedRow?.rowKind !== "tune_set") continue;
+
+    for (const childId of Object.keys(normalized)) {
+      if (childId === selectedId) continue;
+      const childRow = getRow(childId);
+      if (childRow?.tuneSetRef === selectedRow.sourceId) {
+        delete normalized[childId];
+      }
+    }
+  }
+
+  return normalized;
+}
+
 // ── Empty State ──────────────────────────────────────────────────────────────
 
 const EmptyState: Component<{ message: string; detail?: string }> = (props) => (
@@ -137,7 +192,7 @@ const SetlistsPage: Component = () => {
     null
   );
   const [libraryPanelOpen, setLibraryPanelOpen] = createSignal(true);
-  const [metadataExpanded, setMetadataExpanded] = createSignal(true);
+  const [metadataExpanded, setMetadataExpanded] = createSignal(false);
 
   // Selection state for checkbox-based bulk actions
   const [librarySelectionCount, setLibrarySelectionCount] = createSignal(0);
@@ -326,6 +381,18 @@ const SetlistsPage: Component = () => {
     () =>
       (groupSetlists() ?? []).find((p) => p.id === selectedSetlistId()) ?? null
   );
+
+  createEffect(() => {
+    const prog = selectedSetlist();
+    if (!prog || !isEditing() || isCreating()) return;
+
+    // When edit mode is restored from persisted state, hydrate the editor
+    // fields once from the selected setlist without overwriting active edits.
+    if (editorName() === "" && editorDescription() === "") {
+      setEditorName(prog.name);
+      setEditorDescription(prog.description ?? "");
+    }
+  });
 
   // Auto-select first setlist when group changes
   createResource(groupSetlists, (setlists) => {
@@ -565,6 +632,7 @@ const SetlistsPage: Component = () => {
     setLibraryQuery("");
     setLibraryFilter("all");
     setLibraryPanelOpen(true);
+    setMetadataExpanded(false);
   };
 
   const handleStartEdit = () => {
@@ -577,6 +645,7 @@ const SetlistsPage: Component = () => {
     setLibraryQuery("");
     setLibraryFilter("all");
     setLibraryPanelOpen(true);
+    setMetadataExpanded(false);
   };
 
   const handleCancelEdit = () => {
@@ -679,6 +748,8 @@ const SetlistsPage: Component = () => {
   // ── Render helpers ───────────────────────────────────────────────────────
 
   const hasValidSetlistName = () => normalizeMetadataValue(editorName()) !== "";
+  const canMutateSetlistItems = () =>
+    hasValidSetlistName() && !isSaving() && !isMutatingItems();
 
   const handleGridRowClick = (row: ISetlistGridRow) => {
     if (row.rowKind !== "tune") return;
@@ -774,9 +845,13 @@ const SetlistsPage: Component = () => {
           }
           return (
             <span
-              class="inline-flex cursor-grab items-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              class={`inline-flex items-center ${
+                canMutateSetlistItems()
+                  ? "cursor-grab text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  : "cursor-not-allowed text-gray-300 dark:text-gray-600"
+              }`}
               onPointerDown={(event) => {
-                if (isMutatingItems() || isSaving()) return;
+                if (!canMutateSetlistItems()) return;
                 event.preventDefault();
 
                 const handle = event.currentTarget as HTMLElement;
@@ -914,7 +989,7 @@ const SetlistsPage: Component = () => {
     const table = libraryTableRef;
     if (!table) return;
 
-    const selectedRows = table.getSelectedRowModel().rows;
+    const selectedRows = table.getSelectedRowModel().flatRows;
     if (selectedRows.length === 0) {
       toast.info("No items selected in the library.", { duration: 2500 });
       return;
@@ -1000,7 +1075,7 @@ const SetlistsPage: Component = () => {
     const table = editorTableRef;
     if (!table) return;
 
-    const selectedRows = table.getSelectedRowModel().rows;
+    const selectedRows = table.getSelectedRowModel().flatRows;
     if (selectedRows.length === 0) {
       toast.info("No items selected in the setlist.", { duration: 2500 });
       return;
@@ -1162,6 +1237,38 @@ const SetlistsPage: Component = () => {
                     Saving...
                   </Show>
                 </Button>
+                <Show when={!isCreating() && !!selectedSetlistId()}>
+                  <Button
+                    type="button"
+                    variant="destructive-ghost"
+                    size="sm"
+                    class={canManage() ? "" : "opacity-50"}
+                    onClick={() => {
+                      if (!canManage()) {
+                        toast.error(
+                          "You need to be a manager (admin or owner) to delete this setlist.",
+                          { duration: 5000 }
+                        );
+                        return;
+                      }
+                      void handleDeleteSetlist();
+                    }}
+                    disabled={
+                      isSaving() ||
+                      isMutatingItems() ||
+                      deletingSetlistId() === selectedSetlistId()
+                    }
+                    data-testid="setlists-delete-button"
+                  >
+                    <Show
+                      when={deletingSetlistId() === selectedSetlistId()}
+                      fallback={<Trash2 size={14} class="mr-1.5" />}
+                    >
+                      Deleting...
+                    </Show>
+                    Delete
+                  </Button>
+                </Show>
               </div>
             }
           >
@@ -1215,34 +1322,6 @@ const SetlistsPage: Component = () => {
                 <Plus size={14} class="mr-1.5" />
                 New Setlist
               </Button>
-              <Show when={selectedSetlistId()}>
-                <Button
-                  type="button"
-                  variant="destructive-ghost"
-                  size="sm"
-                  class={canManage() ? "" : "opacity-50"}
-                  onClick={() => {
-                    if (!canManage()) {
-                      toast.error(
-                        "You need to be a manager (admin or owner) to delete this setlist.",
-                        { duration: 5000 }
-                      );
-                      return;
-                    }
-                    void handleDeleteSetlist();
-                  }}
-                  disabled={deletingSetlistId() === selectedSetlistId()}
-                  data-testid="setlists-delete-button"
-                >
-                  <Show
-                    when={deletingSetlistId() === selectedSetlistId()}
-                    fallback={<Trash2 size={14} class="mr-1.5" />}
-                  >
-                    Deleting...
-                  </Show>
-                  Delete
-                </Button>
-              </Show>
             </div>
           </Show>
         </div>
@@ -1351,7 +1430,7 @@ const SetlistsPage: Component = () => {
                   <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                     <div>
                       <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Library
+                        Group Catalog
                       </h3>
                       <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                         Search tunes and tune sets to add to this setlist.
@@ -1376,15 +1455,6 @@ const SetlistsPage: Component = () => {
                         <Show when={librarySelectionCount() > 0}>
                           <span class="ml-1">({librarySelectionCount()})</span>
                         </Show>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setLibraryPanelOpen(false)}
-                        data-testid="setlists-collapse-library-button"
-                      >
-                        Hide
                       </Button>
                     </div>
                   </div>
@@ -1450,7 +1520,15 @@ const SetlistsPage: Component = () => {
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
                           enableRowSelection={true}
+                          enableSubRowSelection={false}
                           canSelectRow={(row) => !!row.sourceId}
+                          normalizeRowSelection={(next, prev, helpers) =>
+                            normalizeExclusiveLibrarySelection(
+                              next,
+                              prev,
+                              helpers.getRow
+                            )
+                          }
                           onSelectionChange={setLibrarySelectionCount}
                           onTableReady={(table) => {
                             libraryTableRef = table;
@@ -1487,33 +1565,72 @@ const SetlistsPage: Component = () => {
 
               {/* Right Panel: Setlist Build */}
               <section class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                {/* Collapsible header banner */}
-                <button
-                  type="button"
-                  class="flex w-full items-center justify-between border-b border-gray-200 px-4 py-3 text-left dark:border-gray-700"
-                  onClick={() => setMetadataExpanded((v) => !v)}
-                  data-testid="setlist-build-header-toggle"
-                >
-                  <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Setlist Build
-                  </h3>
+                <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <Show
                     when={metadataExpanded()}
                     fallback={
-                      <ChevronRight
-                        size={16}
-                        class="text-gray-400"
-                        aria-hidden="true"
-                      />
+                      <div class="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                          onClick={() => setMetadataExpanded(true)}
+                          aria-label="Expand setlist details"
+                          data-testid="setlist-build-header-toggle"
+                        >
+                          <ChevronRight size={16} aria-hidden="true" />
+                        </button>
+                        <label
+                          for="setlist-editor-name-collapsed"
+                          class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          Setlist Name:
+                        </label>
+                        <input
+                          id="setlist-editor-name-collapsed"
+                          type="text"
+                          value={editorName()}
+                          onInput={(e) => setEditorName(e.currentTarget.value)}
+                          class={`min-w-[14rem] flex-1 rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
+                            !hasValidSetlistName()
+                              ? "border-red-400 ring-1 ring-red-400/40"
+                              : "border-gray-300 dark:border-gray-600"
+                          }`}
+                          placeholder="Festival opener"
+                          data-testid="setlist-editor-name-input-collapsed"
+                        />
+                        <Show when={!hasValidSetlistName()}>
+                          <span class="text-xs font-medium text-red-600 dark:text-red-400">
+                            Required before adding, removing, or reordering
+                            items.
+                          </span>
+                        </Show>
+                      </div>
                     }
                   >
-                    <ChevronDown
-                      size={16}
-                      class="text-gray-400"
-                      aria-hidden="true"
-                    />
+                    <div class="flex items-center gap-3">
+                      <button
+                        type="button"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                        onClick={() => setMetadataExpanded(false)}
+                        aria-label="Collapse setlist details"
+                        data-testid="setlist-build-header-toggle"
+                      >
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </button>
+                      <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          Setlist Build
+                        </h3>
+                        <Show when={!hasValidSetlistName()}>
+                          <p class="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                            Setlist name is required before adding, removing, or
+                            reordering items.
+                          </p>
+                        </Show>
+                      </div>
+                    </div>
                   </Show>
-                </button>
+                </div>
 
                 <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                   {/* Collapsible metadata section */}
@@ -1532,13 +1649,17 @@ const SetlistsPage: Component = () => {
                           value={editorName()}
                           onInput={(e) => setEditorName(e.currentTarget.value)}
                           class={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
-                            !hasValidSetlistName() && isCreating()
+                            !hasValidSetlistName()
                               ? "border-red-400 ring-1 ring-red-400/40"
                               : "border-gray-300 dark:border-gray-600"
                           }`}
                           placeholder="Festival opener"
                           data-testid="setlist-editor-name-input"
                         />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Required before adding, removing, or reordering items
+                          in the setlist.
+                        </p>
                       </div>
                       <div>
                         <label
@@ -1580,6 +1701,7 @@ const SetlistsPage: Component = () => {
                         size="sm"
                         onClick={() => void handleRemoveSelected()}
                         disabled={
+                          !hasValidSetlistName() ||
                           editorSelectionCount() === 0 ||
                           isMutatingItems() ||
                           isSaving()
@@ -1622,7 +1744,6 @@ const SetlistsPage: Component = () => {
                           disableListMode={true}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
-                          defaultExpandedRowIds={defaultExpandedSetlistRowIds()}
                           hierarchyColumnId="title"
                           getRowProps={(row) =>
                             row.setlistItemId && row.setlistPosition != null
