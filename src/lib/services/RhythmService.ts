@@ -74,11 +74,8 @@ function normalizeTuneTypeName(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function sanitizeSqliteIdentifier(identifier: string): string {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
-    throw new Error(`Invalid SQLite identifier: ${identifier}`);
-  }
-  return identifier;
+function sanitizeAbcTitle(value: string): string {
+  return value.replace(/[\r\n:|[\]]+/g, " ").trim() || "Rhythm";
 }
 
 async function tableExists(
@@ -99,15 +96,18 @@ async function getTableColumns(
   db: SqliteDatabase,
   tableName: string
 ): Promise<Set<string>> {
-  const safeTableName = sanitizeSqliteIdentifier(tableName);
   const rows = await db.all<{ name: string }>(
-    sql.raw(`PRAGMA table_info("${safeTableName}")`)
+    sql.raw(`PRAGMA table_info("${tableName}")`)
   );
   return new Set(rows.map((row) => row.name));
 }
 
 function getDefaultTempoForTuneType(tuneTypeName: string): number {
   return DEFAULT_TEMPO_BY_TYPE[normalizeTuneTypeName(tuneTypeName)] ?? 100;
+}
+
+function msToSeconds(value: number): number {
+  return value / 1000;
 }
 
 function buildFallbackRhythmAbc(
@@ -142,7 +142,7 @@ function buildFallbackRhythmAbc(
 
   return [
     "X:1",
-    `T:${tuneTypeName} Rhythm`,
+    `T:${sanitizeAbcTitle(tuneTypeName)} Rhythm`,
     `M:${meter}`,
     `L:${fallback.noteLength}`,
     "Q:1/4=100",
@@ -316,9 +316,7 @@ async function decodeSample(
 function getPitchPlaybackGain(event: NoteTimingEvent): number {
   const hasAccent = event.elements?.some((group) =>
     group.some((element) =>
-      (element.getAttribute("class") ?? element.className).includes(
-        "abcjs-accent"
-      )
+      (element.getAttribute("class") ?? "").includes("abcjs-accent")
     )
   );
 
@@ -478,7 +476,7 @@ export function createRhythmService(
       audioContext
     );
     timingCallbacks.start(
-      positionMs == null ? undefined : positionMs / 1000,
+      positionMs == null ? undefined : msToSeconds(positionMs),
       "seconds"
     );
     setIsPlaying(true);

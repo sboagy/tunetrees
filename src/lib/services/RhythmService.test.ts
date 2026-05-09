@@ -108,9 +108,12 @@ describe("createRhythmService", () => {
       resume = vi.fn(async () => {
         this.state = "running";
       });
-      decodeAudioData = vi.fn(
-        async (buffer: ArrayBuffer) => buffer as unknown as AudioBuffer
-      );
+      decodeAudioData = vi.fn(async () => ({
+        duration: 0.25,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
       createBufferSource = vi.fn(() => {
         const source = {
           buffer: null as AudioBuffer | null,
