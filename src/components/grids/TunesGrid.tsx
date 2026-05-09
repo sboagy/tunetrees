@@ -97,6 +97,7 @@ export interface ITunesGridProps<T extends { id: string | number }> {
         class?: string;
         draggable?: boolean;
         "data-testid"?: string;
+        "data-setlist-item-id"?: string;
         onDragStart?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
         onDragEnd?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
         onDragOver?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
@@ -1305,6 +1306,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
                         }
                         data-testid={
                           props.getRowProps?.(row()!.original)?.["data-testid"]
+                        }
+                        data-setlist-item-id={
+                          props.getRowProps?.(row()!.original)?.[
+                            "data-setlist-item-id"
+                          ]
                         }
                         onDragStart={
                           props.getRowProps?.(row()!.original)?.onDragStart

@@ -11,15 +11,25 @@
  * @module routes/setlists
  */
 
-import type { ColumnDef } from "@tanstack/solid-table";
-import { Plus, Search, SquarePen, Trash2 } from "lucide-solid";
+import { useSearchParams } from "@solidjs/router";
+import type { ColumnDef, Table } from "@tanstack/solid-table";
+import {
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Plus,
+  Search,
+  SquarePen,
+  Trash2,
+} from "lucide-solid";
 import {
   type Component,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
   For,
-  type JSX,
+  on,
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
@@ -49,7 +59,6 @@ import {
   removeSetlistItem,
   reorderSetlistItems,
   type SetlistItemKind,
-  type SetlistItemWithSummary,
   updateSetlist,
 } from "@/lib/db/queries/setlists";
 import { getTuneSetItems } from "@/lib/db/queries/tune-sets";
@@ -93,6 +102,7 @@ const EmptyState: Component<{ message: string; detail?: string }> = (props) => (
 // ── Page Component ───────────────────────────────────────────────────────────
 
 const SetlistsPage: Component = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, localDb } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
   const { incrementTuneSetListChanged, tuneSetListChanged } =
@@ -120,12 +130,146 @@ const SetlistsPage: Component = () => {
     "all" | SetlistItemKind
   >("all");
   const [draggedItemId, setDraggedItemId] = createSignal<string | null>(null);
+  const [dropTargetId, setDropTargetId] = createSignal<string | null>(null);
   const [isSaving, setIsSaving] = createSignal(false);
   const [isMutatingItems, setIsMutatingItems] = createSignal(false);
   const [deletingSetlistId, setDeletingSetlistId] = createSignal<string | null>(
     null
   );
   const [libraryPanelOpen, setLibraryPanelOpen] = createSignal(true);
+  const [metadataExpanded, setMetadataExpanded] = createSignal(true);
+
+  // Selection state for checkbox-based bulk actions
+  const [librarySelectionCount, setLibrarySelectionCount] = createSignal(0);
+  const [editorSelectionCount, setEditorSelectionCount] = createSignal(0);
+  const [isRouteInitialized, setIsRouteInitialized] = createSignal(false);
+  const [lastHydratedStorageKey, setLastHydratedStorageKey] = createSignal<
+    string | null
+  >(null);
+  let libraryTableRef: Table<ISetlistGridRow> | null = null;
+  let editorTableRef: Table<ISetlistGridRow> | null = null;
+
+  const getParam = (value: string | string[] | undefined): string => {
+    if (Array.isArray(value)) return value[0] || "";
+    return value || "";
+  };
+
+  const setlistsStateStorageKey = createMemo(
+    () => `tt:setlists:state:${userId() ?? "anon"}`
+  );
+
+  const readStoredSetlistsState = () => {
+    try {
+      const raw = localStorage.getItem(setlistsStateStorageKey());
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as {
+        groupId?: string;
+        setlistId?: string;
+        mode?: string;
+        create?: string;
+      };
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  createEffect(
+    on(
+      () => [
+        setlistsStateStorageKey(),
+        searchParams.s_group,
+        searchParams.s_setlist,
+        searchParams.s_mode,
+        searchParams.s_create,
+        searchParams.tab,
+      ],
+      () => {
+        const storageKey = setlistsStateStorageKey();
+        const urlState = {
+          groupId: getParam(searchParams.s_group),
+          setlistId: getParam(searchParams.s_setlist),
+          mode: getParam(searchParams.s_mode),
+          create: getParam(searchParams.s_create),
+        };
+        const hasUrlOverride =
+          urlState.groupId !== "" ||
+          urlState.setlistId !== "" ||
+          urlState.mode !== "" ||
+          urlState.create !== "";
+
+        if (!hasUrlOverride && lastHydratedStorageKey() === storageKey) {
+          if (!isRouteInitialized()) setIsRouteInitialized(true);
+          return;
+        }
+
+        const storedState = hasUrlOverride ? null : readStoredSetlistsState();
+        const groupId = hasUrlOverride
+          ? urlState.groupId
+          : (storedState?.groupId ?? "");
+        const setlistId = hasUrlOverride
+          ? urlState.setlistId
+          : (storedState?.setlistId ?? "");
+        const mode = hasUrlOverride ? urlState.mode : (storedState?.mode ?? "");
+        const create = hasUrlOverride
+          ? urlState.create
+          : (storedState?.create ?? "");
+
+        const nextGroupId = groupId || null;
+        const nextSetlistId = setlistId || null;
+        const nextIsCreating = create === "1";
+        const nextIsEditing = nextIsCreating || mode === "edit";
+
+        if (selectedGroupId() !== nextGroupId) {
+          setSelectedGroupId(nextGroupId);
+        }
+        if (selectedSetlistId() !== nextSetlistId) {
+          setSelectedSetlistId(nextSetlistId);
+        }
+        if (isCreating() !== nextIsCreating) {
+          setIsCreating(nextIsCreating);
+        }
+        if (isEditing() !== nextIsEditing) {
+          setIsEditing(nextIsEditing);
+        }
+
+        setLastHydratedStorageKey(storageKey);
+        if (hasUrlOverride) {
+          setSearchParams(
+            {
+              s_group: undefined,
+              s_setlist: undefined,
+              s_mode: undefined,
+              s_create: undefined,
+            } as unknown as Record<string, string>,
+            { replace: true }
+          );
+        }
+
+        if (!isRouteInitialized()) setIsRouteInitialized(true);
+      }
+    )
+  );
+
+  createEffect(() => {
+    if (!isRouteInitialized()) return;
+
+    const nextState = {
+      groupId: selectedGroupId() ?? "",
+      setlistId: selectedSetlistId() ?? "",
+      mode: isEditing() ? "edit" : "",
+      create: isCreating() ? "1" : "",
+    };
+
+    try {
+      localStorage.setItem(
+        setlistsStateStorageKey(),
+        JSON.stringify(nextState)
+      );
+    } catch {
+      // non-fatal: localStorage may be unavailable
+    }
+  });
 
   // ── Data: user's groups ──────────────────────────────────────────────────
 
@@ -443,6 +587,7 @@ const SetlistsPage: Component = () => {
     setLibraryQuery("");
     setLibraryFilter("all");
     setDraggedItemId(null);
+    setDropTargetId(null);
   };
 
   const handleSaveAndClose = async () => {
@@ -461,63 +606,11 @@ const SetlistsPage: Component = () => {
     return created?.id ?? null;
   };
 
-  const handleAddCandidate = async (candidate: CandidateItem) => {
-    const db = localDb();
-    const uid = userId();
-    if (!db || !uid) {
-      showError("Database is not ready yet.");
-      return;
-    }
-
-    const progId = await ensureSetlistId();
-    if (!progId) return;
-
-    try {
-      setIsMutatingItems(true);
-      if (candidate.kind === "tune") {
-        await addTuneToSetlist(db, progId, candidate.id, uid);
-      } else {
-        await addTuneSetToSetlist(db, progId, candidate.id, uid);
-      }
-      incrementTuneSetListChanged();
-      void refetchSetlists();
-      toast.success(`Added "${candidate.title}" to this Setlist.`, {
-        duration: 2500,
-      });
-    } catch (error) {
-      showError(
-        error instanceof Error ? error.message : "Failed to add item to Setlist"
-      );
-    } finally {
-      setIsMutatingItems(false);
-    }
-  };
-
-  const handleRemoveItem = async (item: SetlistItemWithSummary) => {
-    const db = localDb();
-    const uid = userId();
-    const progId = selectedSetlistId();
-    if (!db || !uid || !progId) {
-      showError("Database is not ready yet.");
-      return;
-    }
-
-    try {
-      setIsMutatingItems(true);
-      await removeSetlistItem(db, progId, item.id, uid);
-      incrementTuneSetListChanged();
-      void refetchSetlists();
-    } catch (error) {
-      showError(
-        error instanceof Error ? error.message : "Failed to remove Setlist item"
-      );
-    } finally {
-      setIsMutatingItems(false);
-    }
-  };
-
-  const handleDropOnItem = async (targetItemId: string) => {
-    const draggedId = draggedItemId();
+  const handleDropOnItem = async (
+    targetItemId: string,
+    sourceItemId?: string
+  ) => {
+    const draggedId = sourceItemId ?? draggedItemId();
     const db = localDb();
     const uid = userId();
     const progId = selectedSetlistId();
@@ -586,15 +679,6 @@ const SetlistsPage: Component = () => {
   // ── Render helpers ───────────────────────────────────────────────────────
 
   const hasValidSetlistName = () => normalizeMetadataValue(editorName()) !== "";
-  const setlistItemsById = createMemo(
-    () =>
-      new Map(
-        (setlistItems.latest ?? setlistItems() ?? []).map((item) => [
-          item.id,
-          item,
-        ])
-      )
-  );
 
   const handleGridRowClick = (row: ISetlistGridRow) => {
     if (row.rowKind !== "tune") return;
@@ -612,9 +696,137 @@ const SetlistsPage: Component = () => {
 
   const createGridColumns = (options?: {
     includeOrder?: boolean;
-    renderAction?: (row: ISetlistGridRow) => JSX.Element | null;
+    showSelect?: boolean;
+    showDragHandle?: boolean;
   }): ColumnDef<ISetlistGridRow>[] => {
     const columns: ColumnDef<ISetlistGridRow>[] = [];
+
+    // Selection checkbox column (for bulk Add/Remove via toolbar)
+    if (options?.showSelect) {
+      columns.push({
+        id: "select",
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            checked={table.getIsAllRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+            class="h-4 w-4 cursor-pointer"
+            aria-label="Select all rows"
+          />
+        ),
+        cell: ({ row }) => {
+          if (!row.getCanSelect() && row.getCanExpand()) {
+            return (
+              <button
+                type="button"
+                class="inline-flex h-4 w-4 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                aria-label={row.getIsExpanded() ? "Collapse row" : "Expand row"}
+                aria-expanded={row.getIsExpanded()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  row.toggleExpanded();
+                }}
+              >
+                <Show
+                  when={row.getIsExpanded()}
+                  fallback={<ChevronRight size={14} aria-hidden="true" />}
+                >
+                  <ChevronDown size={14} aria-hidden="true" />
+                </Show>
+              </button>
+            );
+          }
+
+          if (!row.getCanSelect()) {
+            return <span class="inline-block h-4 w-4" aria-hidden="true" />;
+          }
+
+          return (
+            <input
+              type="checkbox"
+              checked={row.getIsSelected()}
+              onChange={row.getToggleSelectedHandler()}
+              class="h-4 w-4 cursor-pointer"
+              aria-label={`Select row ${row.original?.id ?? row.id}`}
+              onClick={(e) => e.stopPropagation()}
+            />
+          );
+        },
+        size: 50,
+        minSize: 50,
+        maxSize: 50,
+        enableSorting: false,
+        enableResizing: false,
+      });
+    }
+
+    // Drag handle column (for reordering setlist items)
+    if (options?.showDragHandle) {
+      columns.push({
+        id: "drag",
+        header: "",
+        cell: ({ row }) => {
+          if (
+            !row.original.setlistItemId ||
+            row.original.setlistPosition == null
+          ) {
+            return <span class="inline-block w-5" aria-hidden="true" />;
+          }
+          return (
+            <span
+              class="inline-flex cursor-grab items-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              onPointerDown={(event) => {
+                if (isMutatingItems() || isSaving()) return;
+                event.preventDefault();
+
+                const handle = event.currentTarget as HTMLElement;
+                handle.classList.add("cursor-grabbing");
+                handle.classList.remove("cursor-grab");
+                const setlistItemId = row.original.setlistItemId!;
+                setDraggedItemId(setlistItemId);
+
+                const onMove = (e: PointerEvent) => {
+                  const el = document.elementFromPoint(e.clientX, e.clientY);
+                  const tr = el?.closest<HTMLTableRowElement>(
+                    '[data-testid="setlist-editor-item-row"]'
+                  );
+                  const targetId = tr
+                    ? ((tr as HTMLElement).dataset.setlistItemId ?? null)
+                    : null;
+                  setDropTargetId(
+                    targetId && targetId !== setlistItemId ? targetId : null
+                  );
+                };
+
+                const onUp = () => {
+                  window.removeEventListener("pointermove", onMove);
+                  window.removeEventListener("pointerup", onUp);
+                  handle.classList.remove("cursor-grabbing");
+                  handle.classList.add("cursor-grab");
+
+                  const target = dropTargetId();
+                  setDraggedItemId(null);
+                  setDropTargetId(null);
+                  if (target) {
+                    void handleDropOnItem(target, setlistItemId);
+                  }
+                };
+
+                window.addEventListener("pointermove", onMove);
+                window.addEventListener("pointerup", onUp);
+              }}
+            >
+              <GripVertical size={16} />
+            </span>
+          );
+        },
+        size: 36,
+        minSize: 36,
+        maxSize: 36,
+        enableSorting: false,
+        enableResizing: false,
+      });
+    }
 
     if (options?.includeOrder) {
       columns.push({
@@ -677,18 +889,6 @@ const SetlistsPage: Component = () => {
       }
     );
 
-    if (options?.renderAction) {
-      columns.push({
-        id: "actions",
-        header: "Actions",
-        cell: (info) => options.renderAction?.(info.row.original) ?? null,
-        size: 110,
-        minSize: 92,
-        maxSize: 140,
-        enableSorting: false,
-      });
-    }
-
     return columns;
   };
 
@@ -698,57 +898,179 @@ const SetlistsPage: Component = () => {
   const setlistEditColumns = createMemo(() =>
     createGridColumns({
       includeOrder: true,
-      renderAction: (row) => {
-        if (!row.setlistItemId || row.setlistPosition == null) {
-          return null;
-        }
-
-        return (
-          <button
-            type="button"
-            class="inline-flex items-center rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
-            onClick={(event) => {
-              event.stopPropagation();
-              const item = setlistItemsById().get(row.setlistItemId ?? "");
-              if (item) {
-                void handleRemoveItem(item);
-              }
-            }}
-            disabled={isMutatingItems() || isSaving()}
-            data-testid="setlist-editor-remove-item-button"
-          >
-            Remove
-          </button>
-        );
-      },
+      showSelect: true,
+      showDragHandle: true,
     })
   );
   const libraryColumns = createMemo(() =>
     createGridColumns({
-      renderAction: (row) => (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            void handleAddCandidate({
-              kind: row.itemKind,
-              id: row.sourceId,
-              title: row.title,
-              subtitle:
-                row.details ??
-                (row.itemKind === "tune_set" ? "Tune Set" : "Tune"),
-            });
-          }}
-          disabled={!hasValidSetlistName() || isMutatingItems() || isSaving()}
-          class="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-200"
-          data-testid="setlists-add-candidate-button"
-        >
-          <Plus size={14} />
-          {row.itemKind === "tune_set" ? "Add Set" : "Add"}
-        </button>
-      ),
+      showSelect: true,
     })
   );
+
+  // ── Bulk selection actions ─────────────────────────────────────────────
+
+  const handleAddSelected = async () => {
+    const table = libraryTableRef;
+    if (!table) return;
+
+    const selectedRows = table.getSelectedRowModel().rows;
+    if (selectedRows.length === 0) {
+      toast.info("No items selected in the library.", { duration: 2500 });
+      return;
+    }
+
+    const candidates: CandidateItem[] = [];
+    const seen = new Set<string>();
+    for (const row of selectedRows) {
+      const original = row.original;
+      // Deduplicate: skip if we already have this sourceId+kind combo
+      const key = `${original.itemKind}:${original.sourceId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      candidates.push({
+        kind: original.itemKind,
+        id: original.sourceId,
+        title: original.title,
+        subtitle:
+          original.details ??
+          (original.itemKind === "tune_set" ? "Tune Set" : "Tune"),
+      });
+    }
+
+    if (candidates.length === 0) {
+      toast.info("No valid items selected.", { duration: 2500 });
+      return;
+    }
+
+    const db = localDb();
+    const uid = userId();
+    if (!db || !uid) {
+      showError("Database is not ready yet.");
+      return;
+    }
+
+    const progId = await ensureSetlistId();
+    if (!progId) return;
+
+    try {
+      setIsMutatingItems(true);
+      let addedCount = 0;
+
+      for (const candidate of candidates) {
+        try {
+          if (candidate.kind === "tune") {
+            await addTuneToSetlist(db, progId, candidate.id, uid);
+          } else {
+            await addTuneSetToSetlist(db, progId, candidate.id, uid);
+          }
+          addedCount++;
+        } catch {
+          // Individual item failures are surfaced but don't block the batch
+          toast.error(`Failed to add "${candidate.title}".`);
+        }
+      }
+
+      if (addedCount > 0) {
+        incrementTuneSetListChanged();
+        void refetchSetlists();
+        toast.success(
+          `Added ${addedCount} item${addedCount === 1 ? "" : "s"} to this Setlist.`,
+          {
+            duration: 2500,
+          }
+        );
+      }
+
+      // Clear selection after bulk add
+      table.resetRowSelection();
+    } catch (error) {
+      showError(
+        error instanceof Error
+          ? error.message
+          : "Failed to add items to Setlist"
+      );
+    } finally {
+      setIsMutatingItems(false);
+    }
+  };
+
+  const handleRemoveSelected = async () => {
+    const table = editorTableRef;
+    if (!table) return;
+
+    const selectedRows = table.getSelectedRowModel().rows;
+    if (selectedRows.length === 0) {
+      toast.info("No items selected in the setlist.", { duration: 2500 });
+      return;
+    }
+
+    const db = localDb();
+    const uid = userId();
+    const progId = selectedSetlistId();
+    if (!db || !uid || !progId) {
+      showError("Database is not ready yet.");
+      return;
+    }
+
+    // Collect unique setlist item IDs from selected rows
+    const itemIds: string[] = [];
+    const seen = new Set<string>();
+    for (const row of selectedRows) {
+      const itemId = row.original.setlistItemId;
+      if (itemId && !seen.has(itemId)) {
+        seen.add(itemId);
+        itemIds.push(itemId);
+      }
+    }
+
+    if (itemIds.length === 0) {
+      toast.info("No valid items selected.", { duration: 2500 });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove ${itemIds.length} item${itemIds.length === 1 ? "" : "s"} from this setlist?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsMutatingItems(true);
+      let removedCount = 0;
+
+      for (const itemId of itemIds) {
+        try {
+          await removeSetlistItem(db, progId, itemId, uid);
+          removedCount++;
+        } catch {
+          toast.error(`Failed to remove an item.`);
+        }
+      }
+
+      if (removedCount > 0) {
+        incrementTuneSetListChanged();
+        void refetchSetlists();
+        toast.success(
+          `Removed ${removedCount} item${removedCount === 1 ? "" : "s"} from this Setlist.`,
+          {
+            duration: 2500,
+          }
+        );
+      }
+
+      // Clear selection after bulk remove
+      table.resetRowSelection();
+    } catch (error) {
+      showError(
+        error instanceof Error
+          ? error.message
+          : "Failed to remove Setlist items"
+      );
+    } finally {
+      setIsMutatingItems(false);
+    }
+  };
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -1035,15 +1357,36 @@ const SetlistsPage: Component = () => {
                         Search tunes and tune sets to add to this setlist.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setLibraryPanelOpen(false)}
-                      data-testid="setlists-collapse-library-button"
-                    >
-                      Hide
-                    </Button>
+                    <div class="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="accent"
+                        size="sm"
+                        onClick={() => void handleAddSelected()}
+                        disabled={
+                          librarySelectionCount() === 0 ||
+                          !hasValidSetlistName() ||
+                          isMutatingItems() ||
+                          isSaving()
+                        }
+                        data-testid="setlists-add-selected-button"
+                      >
+                        <Plus size={14} class="mr-1.5" />
+                        Add
+                        <Show when={librarySelectionCount() > 0}>
+                          <span class="ml-1">({librarySelectionCount()})</span>
+                        </Show>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLibraryPanelOpen(false)}
+                        data-testid="setlists-collapse-library-button"
+                      >
+                        Hide
+                      </Button>
+                    </div>
                   </div>
 
                   <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
@@ -1106,7 +1449,12 @@ const SetlistsPage: Component = () => {
                           currentRowId={currentTuneId() ?? undefined}
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
-                          enableRowSelection={false}
+                          enableRowSelection={true}
+                          canSelectRow={(row) => !!row.sourceId}
+                          onSelectionChange={setLibrarySelectionCount}
+                          onTableReady={(table) => {
+                            libraryTableRef = table;
+                          }}
                           disableListMode={true}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
@@ -1139,67 +1487,111 @@ const SetlistsPage: Component = () => {
 
               {/* Right Panel: Setlist Build */}
               <section class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-                <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                {/* Collapsible header banner */}
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between border-b border-gray-200 px-4 py-3 text-left dark:border-gray-700"
+                  onClick={() => setMetadataExpanded((v) => !v)}
+                  data-testid="setlist-build-header-toggle"
+                >
                   <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     Setlist Build
                   </h3>
-                </div>
+                  <Show
+                    when={metadataExpanded()}
+                    fallback={
+                      <ChevronRight
+                        size={16}
+                        class="text-gray-400"
+                        aria-hidden="true"
+                      />
+                    }
+                  >
+                    <ChevronDown
+                      size={16}
+                      class="text-gray-400"
+                      aria-hidden="true"
+                    />
+                  </Show>
+                </button>
 
-                <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
-                  {/* Metadata */}
-                  <div class="space-y-3">
-                    <div>
-                      <label
-                        for="setlist-editor-name"
-                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        Setlist Name
-                      </label>
-                      <input
-                        id="setlist-editor-name"
-                        type="text"
-                        value={editorName()}
-                        onInput={(e) => setEditorName(e.currentTarget.value)}
-                        class={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
-                          !hasValidSetlistName() && isCreating()
-                            ? "border-red-400 ring-1 ring-red-400/40"
-                            : "border-gray-300 dark:border-gray-600"
-                        }`}
-                        placeholder="Festival opener"
-                        data-testid="setlist-editor-name-input"
-                      />
+                <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {/* Collapsible metadata section */}
+                  <Show when={metadataExpanded()}>
+                    <div class="space-y-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                      <div>
+                        <label
+                          for="setlist-editor-name"
+                          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          Setlist Name
+                        </label>
+                        <input
+                          id="setlist-editor-name"
+                          type="text"
+                          value={editorName()}
+                          onInput={(e) => setEditorName(e.currentTarget.value)}
+                          class={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
+                            !hasValidSetlistName() && isCreating()
+                              ? "border-red-400 ring-1 ring-red-400/40"
+                              : "border-gray-300 dark:border-gray-600"
+                          }`}
+                          placeholder="Festival opener"
+                          data-testid="setlist-editor-name-input"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          for="setlist-editor-description"
+                          class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          Notes
+                        </label>
+                        <textarea
+                          id="setlist-editor-description"
+                          value={editorDescription()}
+                          onInput={(e) =>
+                            setEditorDescription(e.currentTarget.value)
+                          }
+                          rows={2}
+                          class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                          placeholder="Optional setlist notes"
+                          data-testid="setlist-editor-description-input"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label
-                        for="setlist-editor-description"
-                        class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        Notes
-                      </label>
-                      <textarea
-                        id="setlist-editor-description"
-                        value={editorDescription()}
-                        onInput={(e) =>
-                          setEditorDescription(e.currentTarget.value)
-                        }
-                        rows={2}
-                        class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                        placeholder="Optional setlist notes"
-                        data-testid="setlist-editor-description-input"
-                      />
-                    </div>
-                  </div>
+                  </Show>
 
                   {/* Items list */}
-                  <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50">
+                  <div class="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-50 dark:bg-gray-900/50">
                     <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2 dark:border-gray-700">
-                      <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
-                        Setlist Items
-                      </span>
-                      <span class="text-xs text-gray-500 dark:text-gray-400">
-                        {(setlistItems() ?? []).length} item
-                        {(setlistItems() ?? []).length === 1 ? "" : "s"}
-                      </span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          Setlist Items
+                        </span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                          {(setlistItems() ?? []).length} item
+                          {(setlistItems() ?? []).length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="destructive-ghost"
+                        size="sm"
+                        onClick={() => void handleRemoveSelected()}
+                        disabled={
+                          editorSelectionCount() === 0 ||
+                          isMutatingItems() ||
+                          isSaving()
+                        }
+                        data-testid="setlists-remove-selected-button"
+                      >
+                        <Trash2 size={14} class="mr-1.5" />
+                        Remove
+                        <Show when={editorSelectionCount() > 0}>
+                          <span class="ml-1">({editorSelectionCount()})</span>
+                        </Show>
+                      </Button>
                     </div>
 
                     <Show
@@ -1219,7 +1611,14 @@ const SetlistsPage: Component = () => {
                           currentRowId={currentTuneId() ?? undefined}
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
-                          enableRowSelection={false}
+                          enableRowSelection={true}
+                          canSelectRow={(row) =>
+                            !!row.setlistItemId && row.setlistPosition != null
+                          }
+                          onSelectionChange={setEditorSelectionCount}
+                          onTableReady={(table) => {
+                            editorTableRef = table;
+                          }}
                           disableListMode={true}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
@@ -1228,18 +1627,20 @@ const SetlistsPage: Component = () => {
                           getRowProps={(row) =>
                             row.setlistItemId && row.setlistPosition != null
                               ? {
-                                  class:
+                                  class: [
                                     draggedItemId() === row.setlistItemId
                                       ? "opacity-60"
                                       : "",
-                                  draggable: !isMutatingItems() && !isSaving(),
+                                    dropTargetId() === row.setlistItemId &&
+                                    draggedItemId() !== row.setlistItemId
+                                      ? "border-t-2 border-t-blue-400 dark:border-t-blue-500"
+                                      : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" "),
                                   "data-testid": "setlist-editor-item-row",
-                                  onDragStart: () =>
-                                    setDraggedItemId(row.setlistItemId),
-                                  onDragEnd: () => setDraggedItemId(null),
-                                  onDragOver: (event) => event.preventDefault(),
-                                  onDrop: () =>
-                                    void handleDropOnItem(row.setlistItemId),
+                                  "data-setlist-item-id":
+                                    row.setlistItemId ?? undefined,
                                 }
                               : undefined
                           }
