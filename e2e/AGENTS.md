@@ -51,6 +51,8 @@ test.describe('FEATURE-XXX: Suite Name', () => {
 - After mutations: `await page.waitForLoadState('networkidle', { timeout: 15000 })` before success assertions.
 - Selectors priority: `data-testid` > role+name > text (assertions) > CSS (last resort).
 - Provide stable `data-testid` from UI (see `src/AGENTS.md`).
+- Explanatory Comments MUST be added for all polling loops, or anything done out of the ordinary to get a test to pass, especially if it is fixing a problem discovered at runtime.
+- Tests will be for ongoing regression tests going into the future, so they must be well structured, readable, human comprehensible, and maintainable.
 
 ## File Conventions
 
