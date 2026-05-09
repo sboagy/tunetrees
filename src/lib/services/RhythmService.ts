@@ -2,7 +2,6 @@ import abcjs, {
   type AnimationOptions,
   type BeatCallback,
   type NoteTimingEvent,
-  type TimingCallbacks,
   type TuneObject,
 } from "abcjs";
 import { sql } from "drizzle-orm";
@@ -64,15 +63,12 @@ export interface CreateRhythmServiceOptions {
   sampleBaseUrl?: string;
 }
 
-interface TimingCallbacksLike {
-  start(position?: number, units?: "seconds" | "beats" | "percent"): void;
-  pause(): void;
-  reset(): void;
-  stop(): void;
-  currentMillisecond(): number;
-}
-
-type AbcjsModule = NonNullable<CreateRhythmServiceOptions["abcjsModule"]>;
+type ResolvedAbcjsModule = NonNullable<
+  CreateRhythmServiceOptions["abcjsModule"]
+>;
+type TimingCallbacksInstance = InstanceType<
+  ResolvedAbcjsModule["TimingCallbacks"]
+>;
 
 function normalizeTuneTypeName(value: string): string {
   return value.trim().toLowerCase();
@@ -314,7 +310,7 @@ async function decodeSample(
   }
 
   const buffer = await response.arrayBuffer();
-  return await audioContext.decodeAudioData(buffer.slice(0));
+  return await audioContext.decodeAudioData(buffer);
 }
 
 function getPitchPlaybackGain(event: NoteTimingEvent): number {
@@ -332,7 +328,7 @@ function getPitchPlaybackGain(event: NoteTimingEvent): number {
 export function createRhythmService(
   options: CreateRhythmServiceOptions
 ): RhythmService {
-  const abcjsModule: AbcjsModule = options.abcjsModule ?? abcjs;
+  const resolvedAbcjs: ResolvedAbcjsModule = options.abcjsModule ?? abcjs;
   const fetchImpl = options.fetchImpl ?? fetch;
   const sampleBaseUrl = options.sampleBaseUrl ?? DEFAULT_SAMPLE_BASE_URL;
 
@@ -346,7 +342,7 @@ export function createRhythmService(
   const [currentMeasure, setCurrentMeasure] = createSignal(0);
   const [error, setError] = createSignal<string | null>(null);
 
-  let timingCallbacks: TimingCallbacksLike | null = null;
+  let timingCallbacks: TimingCallbacksInstance | null = null;
   let lastKnownPositionMs = 0;
   let ownedAudioContext: AudioContext | null = null;
   let sampleBuffers = new Map<number, AudioBuffer>();
@@ -427,13 +423,13 @@ export function createRhythmService(
   function buildTimingCallbacks(
     rhythmAbc: string,
     audioContext: AudioContext
-  ): TimingCallbacksLike {
+  ): TimingCallbacksInstance {
     if (typeof document === "undefined") {
       throw new Error("ABC rhythm playback requires a browser document.");
     }
 
     renderTarget ??= document.createElement("div");
-    const rendered = abcjsModule.renderAbc(renderTarget, rhythmAbc, {
+    const rendered = resolvedAbcjs.renderAbc(renderTarget, rhythmAbc, {
       add_classes: true,
       staffwidth: 1,
     });
@@ -461,10 +457,7 @@ export function createRhythmService(
       },
     };
 
-    return new abcjsModule.TimingCallbacks(
-      visualObj,
-      animationOptions
-    ) as unknown as TimingCallbacks;
+    return new resolvedAbcjs.TimingCallbacks(visualObj, animationOptions);
   }
 
   async function startPlayback(positionMs?: number) {
