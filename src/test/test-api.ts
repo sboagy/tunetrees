@@ -13,6 +13,13 @@ import {
   initializeDb,
   type SqliteDatabase,
 } from "@/lib/db/client-sqlite";
+import { createGroup } from "@/lib/db/queries/groups";
+import {
+  addTuneSetToSetlist,
+  addTuneToSetlist,
+  createSetlist,
+} from "@/lib/db/queries/setlists";
+import { addTuneToTuneSet, createTuneSet } from "@/lib/db/queries/tune-sets";
 import {
   dailyPracticeQueue,
   note,
@@ -20,6 +27,7 @@ import {
   practiceRecord,
   reference,
   repertoireTune,
+  userProfile,
 } from "@/lib/db/schema";
 import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
@@ -42,6 +50,33 @@ type SeedSchedulingPluginInput = {
   description?: string | null;
   enabled?: boolean;
   isPublic?: boolean;
+};
+
+type SeedSetlistsScenarioInput = {
+  userId?: string;
+  group: {
+    name: string;
+    description?: string | null;
+  };
+  sharedTuneSets?: Array<{
+    name: string;
+    description?: string | null;
+    tuneIds: string[];
+  }>;
+  setlists?: Array<{
+    name: string;
+    description?: string | null;
+    items?: Array<
+      | {
+          kind: "tune";
+          tuneId: string;
+        }
+      | {
+          kind: "tune_set";
+          tuneSetIndex: number;
+        }
+    >;
+  }>;
 };
 
 const DEFAULT_SCHEDULING_PLUGIN_SCRIPT = `function createScheduler() {
@@ -966,6 +1001,94 @@ async function getTuneIdByGenre(genre: string): Promise<string | null> {
   return rows.length > 0 ? (rows[0] as { id: string }).id : null;
 }
 
+async function seedSetlistsScenario(input: SeedSetlistsScenarioInput) {
+  const db = await ensureDb();
+  const userId = input.userId ?? (await resolveUserId(db));
+  const sharedTuneSets = input.sharedTuneSets ?? [];
+  const setlists = input.setlists ?? [];
+  const now = new Date().toISOString();
+
+  const existingProfile = await db
+    .select({ id: userProfile.id })
+    .from(userProfile)
+    .where(eq(userProfile.id, userId))
+    .limit(1);
+
+  if (existingProfile.length === 0) {
+    await db.insert(userProfile).values({
+      id: userId,
+      name: "E2E Test User",
+      email: null,
+      srAlgType: "fsrs",
+      deleted: 0,
+      syncVersion: 1,
+      lastModifiedAt: now,
+      deviceId: "local",
+    });
+  }
+
+  const group = await createGroup(db, userId, {
+    name: input.group.name,
+    description: input.group.description,
+  });
+
+  const createdTuneSets: Array<{ id: string; name: string }> = [];
+  for (const tuneSetInput of sharedTuneSets) {
+    const createdTuneSet = await createTuneSet(db, userId, {
+      name: tuneSetInput.name,
+      description: tuneSetInput.description,
+      groupRef: group.id,
+      setKind: "practice_set",
+    });
+
+    for (const [index, tuneId] of tuneSetInput.tuneIds.entries()) {
+      await addTuneToTuneSet(db, createdTuneSet.id, tuneId, userId, index);
+    }
+
+    createdTuneSets.push({
+      id: createdTuneSet.id,
+      name: createdTuneSet.name,
+    });
+  }
+
+  const createdSetlists: Array<{ id: string; name: string }> = [];
+  for (const setlistInput of setlists) {
+    const createdSetlist = await createSetlist(db, userId, {
+      groupRef: group.id,
+      name: setlistInput.name,
+      description: setlistInput.description,
+    });
+
+    for (const item of setlistInput.items ?? []) {
+      if (item.kind === "tune") {
+        await addTuneToSetlist(db, createdSetlist.id, item.tuneId, userId);
+        continue;
+      }
+
+      const tuneSet = createdTuneSets[item.tuneSetIndex];
+      if (!tuneSet) {
+        throw new Error(
+          `Invalid tuneSetIndex ${item.tuneSetIndex} for setlist ${setlistInput.name}`
+        );
+      }
+
+      await addTuneSetToSetlist(db, createdSetlist.id, tuneSet.id, userId);
+    }
+
+    createdSetlists.push({
+      id: createdSetlist.id,
+      name: createdSetlist.name,
+    });
+  }
+
+  return {
+    groupId: group.id,
+    groupName: group.name,
+    tuneSets: createdTuneSets,
+    setlists: createdSetlists,
+  };
+}
+
 // Attach to window
 declare global {
   interface Window {
@@ -979,6 +1102,15 @@ declare global {
         genre: string,
         userId: string
       ) => Promise<string>;
+      findOrCreateNamedPrivateTune: (input: {
+        title: string;
+        userId: string;
+        genreId?: string | null;
+      }) => Promise<string>;
+      findOrCreateNamedPublicTune: (input: {
+        title: string;
+        genreId?: string | null;
+      }) => Promise<string>;
       seedAddToReview: (input: SeedAddToReviewInput) => Promise<{
         updated: number;
         queueCount: number;
@@ -1175,6 +1307,12 @@ declare global {
       }>;
       getSelectedGenres: () => Promise<string[]>;
       getTuneIdByGenre: (genre: string) => Promise<string | null>;
+      seedSetlistsScenario: (input: SeedSetlistsScenarioInput) => Promise<{
+        groupId: string;
+        groupName: string;
+        tuneSets: Array<{ id: string; name: string }>;
+        setlists: Array<{ id: string; name: string }>;
+      }>;
       getAnnotationCounts: (options?: {
         tuneId?: string;
       }) => Promise<{ notes: number; references: number }>;
@@ -1212,6 +1350,26 @@ if (typeof window !== "undefined") {
       },
       findOrCreatePrivateTune: async (genre: string, userId: string) => {
         const db = await ensureDb();
+        const now = new Date().toISOString();
+
+        const existingProfile = await db
+          .select({ id: userProfile.id })
+          .from(userProfile)
+          .where(eq(userProfile.id, userId))
+          .limit(1);
+
+        if (existingProfile.length === 0) {
+          await db.insert(userProfile).values({
+            id: userId,
+            name: "E2E Test User",
+            email: null,
+            srAlgType: "fsrs",
+            deleted: 0,
+            syncVersion: 1,
+            lastModifiedAt: now,
+            deviceId: "local",
+          });
+        }
 
         // Try to find existing private tune
         const existing = await db.all<{ id: string }>(
@@ -1224,7 +1382,6 @@ if (typeof window !== "undefined") {
 
         // Create a private tune using raw SQL
         const tuneId = generateId();
-        const now = new Date().toISOString();
 
         await db.run(
           sql.raw(`INSERT INTO tune (
@@ -1235,6 +1392,100 @@ if (typeof window !== "undefined") {
             '${genre}', 
             '${userId}', 
             0, 
+            1,
+            '${now}'
+          )`)
+        );
+
+        return tuneId;
+      },
+      findOrCreateNamedPrivateTune: async (input: {
+        title: string;
+        userId: string;
+        genreId?: string | null;
+      }) => {
+        const db = await ensureDb();
+        const now = new Date().toISOString();
+
+        const existingProfile = await db
+          .select({ id: userProfile.id })
+          .from(userProfile)
+          .where(eq(userProfile.id, input.userId))
+          .limit(1);
+
+        if (existingProfile.length === 0) {
+          await db.insert(userProfile).values({
+            id: input.userId,
+            name: "E2E Test User",
+            email: null,
+            srAlgType: "fsrs",
+            deleted: 0,
+            syncVersion: 1,
+            lastModifiedAt: now,
+            deviceId: "local",
+          });
+        }
+
+        const existing = await db.all<{ id: string }>(sql`
+          SELECT id
+          FROM tune
+          WHERE title = ${input.title}
+            AND private_for = ${input.userId}
+            AND deleted = 0
+          LIMIT 1
+        `);
+
+        if (existing.length > 0 && existing[0]?.id) {
+          return existing[0].id;
+        }
+
+        const tuneId = generateId();
+        await db.run(
+          sql.raw(`INSERT INTO tune (
+            id, title, genre, private_for, deleted, sync_version, last_modified_at
+          ) VALUES (
+            '${tuneId}',
+            '${input.title.replace(/'/g, "''")}',
+            ${input.genreId ? `'${input.genreId.replace(/'/g, "''")}'` : "NULL"},
+            '${input.userId}',
+            0,
+            1,
+            '${now}'
+          )`)
+        );
+
+        return tuneId;
+      },
+      findOrCreateNamedPublicTune: async (input: {
+        title: string;
+        genreId?: string | null;
+      }) => {
+        const db = await ensureDb();
+        const now = new Date().toISOString();
+
+        const existing = await db.all<{ id: string }>(sql`
+          SELECT id
+          FROM tune
+          WHERE title = ${input.title}
+            AND private_for IS NULL
+            AND deleted = 0
+          LIMIT 1
+        `);
+
+        if (existing.length > 0 && existing[0]?.id) {
+          return existing[0].id;
+        }
+
+        const tuneId = generateId();
+        await db.run(
+          sql.raw(`INSERT INTO tune (
+            id, title, genre, private_for, deleted, sync_version, last_modified_at
+          ) VALUES (
+            '${tuneId}',
+            '${input.title.replace(/'/g, "''")}',
+            ${input.genreId ? `'${input.genreId.replace(/'/g, "''")}'` : "NULL"},
+            NULL,
+            0,
             1,
             '${now}'
           )`)
@@ -1490,6 +1741,7 @@ if (typeof window !== "undefined") {
       },
       getSelectedGenres,
       getTuneIdByGenre,
+      seedSetlistsScenario,
       getQueueInfo,
       getOrphanedAnnotationCounts: async () => {
         const db = await ensureDb();

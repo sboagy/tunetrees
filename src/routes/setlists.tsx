@@ -151,8 +151,15 @@ function normalizeExclusiveLibrarySelection(
 
 // ── Empty State ──────────────────────────────────────────────────────────────
 
-const EmptyState: Component<{ message: string; detail?: string }> = (props) => (
-  <div class="flex min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background p-10 text-center">
+const EmptyState: Component<{
+  message: string;
+  detail?: string;
+  testId?: string;
+}> = (props) => (
+  <div
+    class="flex min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background p-10 text-center"
+    data-testid={props.testId}
+  >
     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
       <span aria-hidden="true">+</span>
     </div>
@@ -256,6 +263,9 @@ const SetlistsPage: Component = () => {
   const setlistsStateStorageKey = createMemo(
     () => `tt:setlists:state:${userId() ?? "anon"}`
   );
+  const hasHydratedCurrentSetlistsState = createMemo(
+    () => lastHydratedStorageKey() === setlistsStateStorageKey()
+  );
 
   const readStoredSetlistsState = () => {
     try {
@@ -351,104 +361,7 @@ const SetlistsPage: Component = () => {
   );
 
   createEffect(() => {
-    if (!isRouteInitialized()) return;
-
-    const nextState = {
-      groupId: selectedGroupId() ?? "",
-      setlistId: selectedSetlistId() ?? "",
-      mode: isEditing() ? "edit" : "",
-      create: isCreating() ? "1" : "",
-    };
-
-    try {
-      localStorage.setItem(
-        setlistsStateStorageKey(),
-        JSON.stringify(nextState)
-      );
-    } catch {
-      // non-fatal: localStorage may be unavailable
-    }
-  });
-
-  createEffect(
-    on(
-      () => [
-        setlistsStateStorageKey(),
-        searchParams.s_group,
-        searchParams.s_setlist,
-        searchParams.s_mode,
-        searchParams.s_create,
-        searchParams.tab,
-      ],
-      () => {
-        const storageKey = setlistsStateStorageKey();
-        const urlState = {
-          groupId: getParam(searchParams.s_group),
-          setlistId: getParam(searchParams.s_setlist),
-          mode: getParam(searchParams.s_mode),
-          create: getParam(searchParams.s_create),
-        };
-        const hasUrlOverride =
-          urlState.groupId !== "" ||
-          urlState.setlistId !== "" ||
-          urlState.mode !== "" ||
-          urlState.create !== "";
-
-        if (!hasUrlOverride && lastHydratedStorageKey() === storageKey) {
-          if (!isRouteInitialized()) setIsRouteInitialized(true);
-          return;
-        }
-
-        const storedState = hasUrlOverride ? null : readStoredSetlistsState();
-        const groupId = hasUrlOverride
-          ? urlState.groupId
-          : (storedState?.groupId ?? "");
-        const setlistId = hasUrlOverride
-          ? urlState.setlistId
-          : (storedState?.setlistId ?? "");
-        const mode = hasUrlOverride ? urlState.mode : (storedState?.mode ?? "");
-        const create = hasUrlOverride
-          ? urlState.create
-          : (storedState?.create ?? "");
-
-        const nextGroupId = groupId || null;
-        const nextSetlistId = setlistId || null;
-        const nextIsCreating = create === "1";
-        const nextIsEditing = nextIsCreating || mode === "edit";
-
-        if (selectedGroupId() !== nextGroupId) {
-          setSelectedGroupId(nextGroupId);
-        }
-        if (selectedSetlistId() !== nextSetlistId) {
-          setSelectedSetlistId(nextSetlistId);
-        }
-        if (isCreating() !== nextIsCreating) {
-          setIsCreating(nextIsCreating);
-        }
-        if (isEditing() !== nextIsEditing) {
-          setIsEditing(nextIsEditing);
-        }
-
-        setLastHydratedStorageKey(storageKey);
-        if (hasUrlOverride) {
-          setSearchParams(
-            {
-              s_group: undefined,
-              s_setlist: undefined,
-              s_mode: undefined,
-              s_create: undefined,
-            } as unknown as Record<string, string>,
-            { replace: true }
-          );
-        }
-
-        if (!isRouteInitialized()) setIsRouteInitialized(true);
-      }
-    )
-  );
-
-  createEffect(() => {
-    if (!isRouteInitialized()) return;
+    if (!isRouteInitialized() || !hasHydratedCurrentSetlistsState()) return;
 
     const nextState = {
       groupId: selectedGroupId() ?? "",
@@ -483,6 +396,7 @@ const SetlistsPage: Component = () => {
   );
 
   createResource(groups, (visibleGroups) => {
+    if (!hasHydratedCurrentSetlistsState()) return;
     if (!visibleGroups || visibleGroups.length === 0) {
       setSelectedGroupId(null);
       return;
@@ -536,6 +450,7 @@ const SetlistsPage: Component = () => {
 
   // Auto-select first setlist when group changes
   createResource(groupSetlists, (setlists) => {
+    if (!hasHydratedCurrentSetlistsState()) return;
     if (!setlists || setlists.length === 0) {
       setSelectedSetlistId(null);
       return;
@@ -934,6 +849,7 @@ const SetlistsPage: Component = () => {
           }
           return (
             <span
+              data-testid="setlist-editor-drag-handle"
               class={`inline-flex items-center ${
                 canMutateSetlistItems()
                   ? "cursor-grab text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
@@ -1737,6 +1653,7 @@ const SetlistsPage: Component = () => {
           <EmptyState
             message="No group selected"
             detail="Select a group above to view and manage its setlists."
+            testId="setlists-empty-state-no-group"
           />
         </Show>
 
@@ -1749,6 +1666,7 @@ const SetlistsPage: Component = () => {
                 <EmptyState
                   message="No setlists yet"
                   detail="Create a setlist to get started, or select a different group."
+                  testId="setlists-empty-state-no-setlists"
                 />
               }
             >
@@ -1796,13 +1714,19 @@ const SetlistsPage: Component = () => {
                     <Show
                       when={(setlistItems() ?? []).length > 0}
                       fallback={
-                        <div class="flex flex-1 items-center justify-center px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <div
+                          class="flex flex-1 items-center justify-center px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
+                          data-testid="setlists-empty-state-view-empty"
+                        >
                           This setlist is empty. Add tunes or tune sets by
                           editing.
                         </div>
                       }
                     >
-                      <div class="min-h-0 flex-1 overflow-hidden">
+                      <div
+                        class="min-h-0 flex-1 overflow-hidden"
+                        data-testid="setlists-view-grid"
+                      >
                         <TunesGrid
                           tablePurpose="setlists"
                           userId={gridUserId("view")}
@@ -2018,13 +1942,29 @@ const SetlistsPage: Component = () => {
                         <span>Display Options</span>
                         <ChevronDown size={14} aria-hidden="true" />
                       </button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="hidden h-8 px-2 text-xs md:inline-flex md:h-9 md:px-3 md:text-sm"
+                        onClick={() => setLibraryPanelOpen(false)}
+                        data-testid="setlists-library-hide-button-desktop"
+                      >
+                        Hide Library
+                      </Button>
                     </div>
 
-                    <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div
+                      class="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+                      data-testid="setlists-library-grid"
+                    >
                       <Show
                         when={libraryGridRows().rows.length > 0}
                         fallback={
-                          <div class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                          <div
+                            class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                            data-testid="setlists-library-empty-state"
+                          >
                             No matching tunes or tune sets.
                           </div>
                         }
@@ -2059,6 +1999,12 @@ const SetlistsPage: Component = () => {
                             libraryGridRows().autoExpandedRowIds
                           }
                           hierarchyColumnId="title"
+                          getRowProps={(row) => ({
+                            "data-testid":
+                              row.rowKind === "tune_set"
+                                ? "setlists-library-set-row"
+                                : "setlists-library-row",
+                          })}
                         />
                       </Show>
                     </div>
@@ -2370,12 +2316,18 @@ const SetlistsPage: Component = () => {
                     <Show
                       when={(setlistItems() ?? []).length > 0}
                       fallback={
-                        <div class="flex flex-1 items-center justify-center px-4 py-8 text-sm text-gray-500 dark:text-gray-400">
+                        <div
+                          class="flex flex-1 items-center justify-center px-4 py-8 text-sm text-gray-500 dark:text-gray-400"
+                          data-testid="setlists-editor-empty-state"
+                        >
                           Add tunes or tune sets from the library panel.
                         </div>
                       }
                     >
-                      <div class="min-h-0 flex-1">
+                      <div
+                        class="min-h-0 flex-1"
+                        data-testid="setlists-editor-grid"
+                      >
                         <TunesGrid
                           tablePurpose="setlists"
                           userId={gridUserId("editor")}

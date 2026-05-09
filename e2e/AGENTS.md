@@ -81,6 +81,7 @@ npm run test:e2e:report     # HTML report
 - Branching in tests; split scenarios instead.
 - Using fragile text selectors for actions.
 - Fixed `waitForTimeout` instead of auto-wait (allowed only for animations).
+- Make sure to double check that async calls properly use `await`.
 
 ## References
 
