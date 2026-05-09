@@ -16,8 +16,11 @@ import type { ColumnDef, Table } from "@tanstack/solid-table";
 import {
   ChevronDown,
   ChevronRight,
+  Columns,
   GripVertical,
+  Mail,
   Plus,
+  Printer,
   Search,
   SquarePen,
   Trash2,
@@ -33,6 +36,7 @@ import {
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { ColumnVisibilityMenu } from "@/components/catalog/ColumnVisibilityMenu";
 import {
   buildSetlistGridRows,
   buildSetlistLibraryGridRows,
@@ -197,12 +201,17 @@ const SetlistsPage: Component = () => {
   // Selection state for checkbox-based bulk actions
   const [librarySelectionCount, setLibrarySelectionCount] = createSignal(0);
   const [editorSelectionCount, setEditorSelectionCount] = createSignal(0);
+  const [showColumnsDropdown, setShowColumnsDropdown] = createSignal(false);
+  const [viewTable, setViewTable] = createSignal<Table<ISetlistGridRow> | null>(
+    null
+  );
   const [isRouteInitialized, setIsRouteInitialized] = createSignal(false);
   const [lastHydratedStorageKey, setLastHydratedStorageKey] = createSignal<
     string | null
   >(null);
   let libraryTableRef: Table<ISetlistGridRow> | null = null;
   let editorTableRef: Table<ISetlistGridRow> | null = null;
+  let columnsButtonRef: HTMLButtonElement | undefined;
 
   const getParam = (value: string | string[] | undefined): string => {
     if (Array.isArray(value)) return value[0] || "";
@@ -326,6 +335,103 @@ const SetlistsPage: Component = () => {
     }
   });
 
+  createEffect(
+    on(
+      () => [
+        setlistsStateStorageKey(),
+        searchParams.s_group,
+        searchParams.s_setlist,
+        searchParams.s_mode,
+        searchParams.s_create,
+        searchParams.tab,
+      ],
+      () => {
+        const storageKey = setlistsStateStorageKey();
+        const urlState = {
+          groupId: getParam(searchParams.s_group),
+          setlistId: getParam(searchParams.s_setlist),
+          mode: getParam(searchParams.s_mode),
+          create: getParam(searchParams.s_create),
+        };
+        const hasUrlOverride =
+          urlState.groupId !== "" ||
+          urlState.setlistId !== "" ||
+          urlState.mode !== "" ||
+          urlState.create !== "";
+
+        if (!hasUrlOverride && lastHydratedStorageKey() === storageKey) {
+          if (!isRouteInitialized()) setIsRouteInitialized(true);
+          return;
+        }
+
+        const storedState = hasUrlOverride ? null : readStoredSetlistsState();
+        const groupId = hasUrlOverride
+          ? urlState.groupId
+          : (storedState?.groupId ?? "");
+        const setlistId = hasUrlOverride
+          ? urlState.setlistId
+          : (storedState?.setlistId ?? "");
+        const mode = hasUrlOverride ? urlState.mode : (storedState?.mode ?? "");
+        const create = hasUrlOverride
+          ? urlState.create
+          : (storedState?.create ?? "");
+
+        const nextGroupId = groupId || null;
+        const nextSetlistId = setlistId || null;
+        const nextIsCreating = create === "1";
+        const nextIsEditing = nextIsCreating || mode === "edit";
+
+        if (selectedGroupId() !== nextGroupId) {
+          setSelectedGroupId(nextGroupId);
+        }
+        if (selectedSetlistId() !== nextSetlistId) {
+          setSelectedSetlistId(nextSetlistId);
+        }
+        if (isCreating() !== nextIsCreating) {
+          setIsCreating(nextIsCreating);
+        }
+        if (isEditing() !== nextIsEditing) {
+          setIsEditing(nextIsEditing);
+        }
+
+        setLastHydratedStorageKey(storageKey);
+        if (hasUrlOverride) {
+          setSearchParams(
+            {
+              s_group: undefined,
+              s_setlist: undefined,
+              s_mode: undefined,
+              s_create: undefined,
+            } as unknown as Record<string, string>,
+            { replace: true }
+          );
+        }
+
+        if (!isRouteInitialized()) setIsRouteInitialized(true);
+      }
+    )
+  );
+
+  createEffect(() => {
+    if (!isRouteInitialized()) return;
+
+    const nextState = {
+      groupId: selectedGroupId() ?? "",
+      setlistId: selectedSetlistId() ?? "",
+      mode: isEditing() ? "edit" : "",
+      create: isCreating() ? "1" : "",
+    };
+
+    try {
+      localStorage.setItem(
+        setlistsStateStorageKey(),
+        JSON.stringify(nextState)
+      );
+    } catch {
+      // non-fatal: localStorage may be unavailable
+    }
+  });
+
   // ── Data: user's groups ──────────────────────────────────────────────────
 
   const [groups] = createResource(
@@ -341,7 +447,6 @@ const SetlistsPage: Component = () => {
     }
   );
 
-  // Auto-select first group
   createResource(groups, (visibleGroups) => {
     if (!visibleGroups || visibleGroups.length === 0) {
       setSelectedGroupId(null);
@@ -1147,6 +1252,10 @@ const SetlistsPage: Component = () => {
     }
   };
 
+  const handleNotYetImplemented = () => {
+    window.alert("Not yet implemented");
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -1275,57 +1384,107 @@ const SetlistsPage: Component = () => {
             {/* Always-visible view-mode toolbar buttons.
                 Buttons are always present to avoid layout shifts; permission
                 denials surface a toast instead of hiding the control. */}
-            <div class="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                class={
-                  canManage()
-                    ? "text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-950/20"
-                    : "opacity-50"
-                }
-                onClick={() => {
-                  if (!canManage()) {
-                    toast.error(
-                      "You need to be a manager (admin or owner) to edit this setlist.",
-                      { duration: 5000 }
-                    );
-                    return;
+            <div class="flex flex-1 flex-wrap items-center gap-2">
+              <div class="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class={
+                    canManage()
+                      ? "text-blue-700 hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-950/20"
+                      : "opacity-50"
                   }
-                  handleStartEdit();
-                }}
-                disabled={!selectedSetlistId()}
-                data-testid="setlists-edit-button"
-              >
-                <SquarePen size={14} class="mr-1.5" />
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="accent"
-                size="sm"
-                class={canManage() ? "" : "opacity-50"}
-                onClick={() => {
-                  if (!canManage()) {
-                    toast.error(
-                      "You need to be a manager (admin or owner) of this group to create setlists.",
-                      { duration: 5000 }
-                    );
-                    return;
-                  }
-                  handleStartCreate();
-                }}
-                disabled={!selectedGroupId()}
-                data-testid="setlists-new-button"
-              >
-                <Plus size={14} class="mr-1.5" />
-                New Setlist
-              </Button>
+                  onClick={() => {
+                    if (!canManage()) {
+                      toast.error(
+                        "You need to be a manager (admin or owner) to edit this setlist.",
+                        { duration: 5000 }
+                      );
+                      return;
+                    }
+                    handleStartEdit();
+                  }}
+                  disabled={!selectedSetlistId()}
+                  data-testid="setlists-edit-button"
+                >
+                  <SquarePen size={14} class="mr-1.5" />
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="accent"
+                  size="sm"
+                  class={canManage() ? "" : "opacity-50"}
+                  onClick={() => {
+                    if (!canManage()) {
+                      toast.error(
+                        "You need to be a manager (admin or owner) of this group to create setlists.",
+                        { duration: 5000 }
+                      );
+                      return;
+                    }
+                    handleStartCreate();
+                  }}
+                  disabled={!selectedGroupId()}
+                  data-testid="setlists-new-button"
+                >
+                  <Plus size={14} class="mr-1.5" />
+                  New Setlist
+                </Button>
+              </div>
+
+              <div class="flex-1" />
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleNotYetImplemented}
+                  class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                  data-testid="setlists-print-button"
+                  title="Print setlist"
+                >
+                  <Printer size={14} aria-hidden="true" />
+                  <span>Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNotYetImplemented}
+                  class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                  data-testid="setlists-email-button"
+                  title="Email setlist"
+                >
+                  <Mail size={14} aria-hidden="true" />
+                  <span>Email</span>
+                </button>
+                <button
+                  ref={columnsButtonRef}
+                  type="button"
+                  onClick={() => setShowColumnsDropdown((open) => !open)}
+                  class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                  data-testid="setlists-columns-button"
+                  aria-expanded={showColumnsDropdown()}
+                  title="Display options"
+                >
+                  <Columns size={14} aria-hidden="true" />
+                  <span>Display Options</span>
+                  <ChevronDown size={14} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </Show>
         </div>
       </div>
+
+      <Show when={!isEditing() && showColumnsDropdown() && viewTable()}>
+        <ColumnVisibilityMenu
+          table={viewTable()!}
+          isOpen={showColumnsDropdown()}
+          onClose={() => setShowColumnsDropdown(false)}
+          triggerRef={columnsButtonRef}
+          title="Display Options"
+        />
+      </Show>
 
       {/* ── Content Area ────────────────────────────────────────────────── */}
       <div class="min-h-0 flex-1 overflow-hidden p-4 sm:p-6">
@@ -1407,6 +1566,9 @@ const SetlistsPage: Component = () => {
                           getSubRows={getSetlistGridSubRows}
                           defaultExpandedRowIds={defaultExpandedSetlistRowIds()}
                           hierarchyColumnId="title"
+                          onTableReady={(table) => {
+                            setViewTable(table);
+                          }}
                           getRowProps={(row) =>
                             row.setlistPosition != null
                               ? { "data-testid": "setlist-item-row" }
