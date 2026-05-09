@@ -5,7 +5,7 @@
  * reload.
  */
 
-import { expect } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import {
   enterSetlistsEditMode,
   SETLIST_TITLES,
@@ -15,6 +15,34 @@ import {
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
+type PersistedSetlistsState = {
+  groupId?: string;
+  setlistId?: string;
+  mode?: string;
+  create?: string;
+};
+
+async function readPersistedSetlistsState(page: Page, userId: string) {
+  return await page.evaluate((nextUserId) => {
+    const raw = localStorage.getItem(`tt:setlists:state:${nextUserId}`);
+    return raw ? (JSON.parse(raw) as PersistedSetlistsState) : null;
+  }, userId);
+}
+
+async function expectPersistedSetlistsSelection(
+  page: Page,
+  userId: string,
+  expected: { groupId: string; setlistId: string }
+) {
+  // This check intentionally validates persisted route state separately from
+  // the visible <select> controls. It lets the test distinguish between
+  // "reload lost the saved selection" and "reload kept the saved selection,
+  // but the async dropdown options are not showing it yet".
+  await expect
+    .poll(() => readPersistedSetlistsState(page, userId))
+    .toMatchObject(expected);
+}
+
 test.describe
   .serial("SETLIST-009: State Persistence", () => {
     test.setTimeout(60000);
@@ -23,11 +51,6 @@ test.describe
       page,
       testUser,
     }) => {
-      test.skip(
-        true,
-        "Setlists group/setlist selection does not currently restore reliably after reload."
-      );
-
       const ttPage = new TuneTreesPage(page);
       const scenario = await setupDefaultSetlistsScenario(page, testUser);
       const expectedSetlistId =
@@ -39,21 +62,22 @@ test.describe
       await ttPage.navigateToSetlistsTab();
       await ttPage.selectSetlistsGroup(scenario.groupName);
       await ttPage.selectSetlist(SETLIST_TITLES.secondarySetlist);
-      await expect
-        .poll(async () => {
-          return await page.evaluate((userId) => {
-            const raw = localStorage.getItem(`tt:setlists:state:${userId}`);
-            return raw ? JSON.parse(raw) : null;
-          }, testUser.userId);
-        })
-        .toMatchObject({
-          groupId: scenario.groupId,
-          setlistId: expectedSetlistId,
-        });
+
+      await expectPersistedSetlistsSelection(page, testUser.userId, {
+        groupId: scenario.groupId,
+        setlistId: expectedSetlistId,
+      });
 
       await page.reload({ waitUntil: "domcontentloaded" });
       await waitForSetlistsViewReady(page);
 
+      await expectPersistedSetlistsSelection(page, testUser.userId, {
+        groupId: scenario.groupId,
+        setlistId: expectedSetlistId,
+      });
+
+      // Once persisted route state has settled after reload, these polls verify
+      // the visible group/setlist controls have caught up to the restored state.
       await expect
         .poll(() => ttPage.getSelectedSetlistsGroupValue())
         .toBe(scenario.groupId);
@@ -66,11 +90,6 @@ test.describe
       page,
       testUser,
     }) => {
-      test.skip(
-        true,
-        "Setlists edit-mode restore depends on the same selection-restore defect as I1."
-      );
-
       const ttPage = new TuneTreesPage(page);
       const scenario = await setupDefaultSetlistsScenario(page, testUser);
 

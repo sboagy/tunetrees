@@ -175,12 +175,15 @@ const EmptyState: Component<{
 const SetlistsPage: Component = () => {
   const isMobile = createIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, localDb } = useAuth();
+  const { user, userIdInt, localDb } = useAuth();
   const { currentTuneId, setCurrentTuneId } = useCurrentTune();
   const { incrementTuneSetListChanged, tuneSetListChanged } =
     useCurrentTuneSet();
   const { openGroupsDialog, groupListVersion } = useGroupsDialog();
-  const userId = () => user()?.id;
+  // Keep route-local persisted state keyed to the same stable user identity
+  // the local DB uses. In anonymous/local-test flows userIdInt can be ready
+  // before or instead of the raw auth user id.
+  const userId = createMemo(() => userIdInt() ?? user()?.id ?? null);
 
   // ── Toolbar state ────────────────────────────────────────────────────────
 
@@ -243,6 +246,10 @@ const SetlistsPage: Component = () => {
   let mobileOverflowButtonRef: HTMLButtonElement | undefined;
   let mobileLibraryOverflowButtonRef: HTMLButtonElement | undefined;
   let mobileSetlistOverflowButtonRef: HTMLButtonElement | undefined;
+  let desktopGroupSelectRef: HTMLSelectElement | undefined;
+  let desktopSetlistSelectRef: HTMLSelectElement | undefined;
+  let mobileGroupSelectRef: HTMLSelectElement | undefined;
+  let mobileSetlistSelectRef: HTMLSelectElement | undefined;
 
   createEffect(() => {
     if (!pendingDisplayOptionsOpen() || showOverflowMenu()) {
@@ -253,6 +260,46 @@ const SetlistsPage: Component = () => {
     queueMicrotask(() => {
       setShowColumnsDropdown(true);
     });
+  });
+
+  createEffect(() => {
+    const nextValue = selectedGroupId() ?? "";
+    groups();
+
+    // On reload we hydrate selectedGroupId from persisted route state before the
+    // async groups resource has populated this <select>'s <option> elements.
+    // If the browser receives a select value before the matching option exists,
+    // it can visually fall back to the first option and keep showing that even
+    // after the matching option is later inserted. Re-applying the value when
+    // the option list changes keeps the visible control aligned with the
+    // already-restored route state for normal users after reload.
+    if (desktopGroupSelectRef && desktopGroupSelectRef.value !== nextValue) {
+      desktopGroupSelectRef.value = nextValue;
+    }
+
+    if (mobileGroupSelectRef && mobileGroupSelectRef.value !== nextValue) {
+      mobileGroupSelectRef.value = nextValue;
+    }
+  });
+
+  createEffect(() => {
+    const nextValue = selectedSetlistId() ?? "";
+    groupSetlists();
+
+    // Same issue as the group select above, but for the setlists that load only
+    // after the selected group is known. Re-apply the restored setlist value
+    // once its async option list is available so the control does not display
+    // the first setlist by default after reload.
+    if (
+      desktopSetlistSelectRef &&
+      desktopSetlistSelectRef.value !== nextValue
+    ) {
+      desktopSetlistSelectRef.value = nextValue;
+    }
+
+    if (mobileSetlistSelectRef && mobileSetlistSelectRef.value !== nextValue) {
+      mobileSetlistSelectRef.value = nextValue;
+    }
   });
 
   const getParam = (value: string | string[] | undefined): string => {
@@ -396,7 +443,14 @@ const SetlistsPage: Component = () => {
   );
 
   createResource(groups, (visibleGroups) => {
-    if (!hasHydratedCurrentSetlistsState()) return;
+    if (
+      !hasHydratedCurrentSetlistsState() ||
+      groups.loading ||
+      visibleGroups === undefined
+    ) {
+      return;
+    }
+
     if (!visibleGroups || visibleGroups.length === 0) {
       setSelectedGroupId(null);
       return;
@@ -450,7 +504,14 @@ const SetlistsPage: Component = () => {
 
   // Auto-select first setlist when group changes
   createResource(groupSetlists, (setlists) => {
-    if (!hasHydratedCurrentSetlistsState()) return;
+    if (
+      !hasHydratedCurrentSetlistsState() ||
+      groupSetlists.loading ||
+      setlists === undefined
+    ) {
+      return;
+    }
+
     if (!setlists || setlists.length === 0) {
       setSelectedSetlistId(null);
       return;
@@ -734,13 +795,38 @@ const SetlistsPage: Component = () => {
     targetItemId: string,
     sourceItemId?: string
   ) => {
-    const draggedId = sourceItemId ?? draggedItemId();
     const db = localDb();
     const uid = userId();
     const progId = selectedSetlistId();
+    const draggedId = sourceItemId ?? draggedItemId();
     const items = setlistItems() ?? [];
-    if (!draggedId || !db || !uid || !progId || draggedId === targetItemId) {
+    if (!db || !uid || !progId) {
       setDraggedItemId(null);
+      return;
+    }
+
+    const persistReorderedItems = async (reorderedIds: string[]) => {
+      try {
+        setIsMutatingItems(true);
+        await reorderSetlistItems(db, progId, reorderedIds, uid);
+        incrementTuneSetListChanged();
+        void refetchSetlists();
+      } catch (error) {
+        showError(
+          error instanceof Error
+            ? error.message
+            : "Failed to reorder Setlist items"
+        );
+      } finally {
+        setDraggedItemId(null);
+        setDropTargetId(null);
+        setIsMutatingItems(false);
+      }
+    };
+
+    if (!draggedId || draggedId === targetItemId) {
+      setDraggedItemId(null);
+      setDropTargetId(null);
       return;
     }
 
@@ -748,15 +834,37 @@ const SetlistsPage: Component = () => {
     const toIndex = items.findIndex((item) => item.id === targetItemId);
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
       setDraggedItemId(null);
+      setDropTargetId(null);
+      return;
+    }
+
+    await persistReorderedItems(
+      moveItem(items, fromIndex, toIndex).map((item) => item.id)
+    );
+  };
+
+  const handleMoveItemByDelta = async (sourceItemId: string, delta: -1 | 1) => {
+    const db = localDb();
+    const uid = userId();
+    const progId = selectedSetlistId();
+    const items = setlistItems() ?? [];
+
+    if (!db || !uid || !progId) return;
+
+    const fromIndex = items.findIndex((item) => item.id === sourceItemId);
+    const toIndex = fromIndex + delta;
+    if (fromIndex < 0 || toIndex < 0 || toIndex >= items.length) {
       return;
     }
 
     try {
       setIsMutatingItems(true);
-      const reordered = moveItem(items, fromIndex, toIndex).map(
-        (item) => item.id
+      await reorderSetlistItems(
+        db,
+        progId,
+        moveItem(items, fromIndex, toIndex).map((item) => item.id),
+        uid
       );
-      await reorderSetlistItems(db, progId, reordered, uid);
       incrementTuneSetListChanged();
       void refetchSetlists();
     } catch (error) {
@@ -767,6 +875,7 @@ const SetlistsPage: Component = () => {
       );
     } finally {
       setDraggedItemId(null);
+      setDropTargetId(null);
       setIsMutatingItems(false);
     }
   };
@@ -848,8 +957,10 @@ const SetlistsPage: Component = () => {
             return <span class="inline-block w-5" aria-hidden="true" />;
           }
           return (
-            <span
+            <button
+              type="button"
               data-testid="setlist-editor-drag-handle"
+              aria-label="Reorder setlist item with arrow keys or drag"
               class={`inline-flex items-center ${
                 canMutateSetlistItems()
                   ? "cursor-grab text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
@@ -895,9 +1006,23 @@ const SetlistsPage: Component = () => {
                 window.addEventListener("pointermove", onMove);
                 window.addEventListener("pointerup", onUp);
               }}
+              onKeyDown={(event) => {
+                if (!canMutateSetlistItems()) return;
+
+                const setlistItemId = row.original.setlistItemId!;
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  void handleMoveItemByDelta(setlistItemId, -1);
+                }
+
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  void handleMoveItemByDelta(setlistItemId, 1);
+                }
+              }}
             >
               <GripVertical size={16} />
-            </span>
+            </button>
           );
         },
         size: 36,
@@ -1205,6 +1330,7 @@ const SetlistsPage: Component = () => {
     return (
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <select
+          ref={mobileGroupSelectRef}
           value={selectedGroupId() ?? ""}
           onChange={(e) => {
             setSelectedGroupId(e.currentTarget.value || null);
@@ -1223,6 +1349,7 @@ const SetlistsPage: Component = () => {
         </select>
 
         <select
+          ref={mobileSetlistSelectRef}
           value={selectedSetlistId() ?? ""}
           onChange={(e) => {
             setSelectedSetlistId(e.currentTarget.value || null);
@@ -1420,6 +1547,7 @@ const SetlistsPage: Component = () => {
               Group
             </button>
             <select
+              ref={desktopGroupSelectRef}
               id="setlists-group-select"
               value={selectedGroupId() ?? ""}
               onChange={(e) => {
@@ -1447,6 +1575,7 @@ const SetlistsPage: Component = () => {
               Setlist
             </label>
             <select
+              ref={desktopSetlistSelectRef}
               id="setlists-setlist-select"
               value={selectedSetlistId() ?? ""}
               onChange={(e) => {

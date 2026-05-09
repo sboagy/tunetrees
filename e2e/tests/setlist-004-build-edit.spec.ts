@@ -38,7 +38,7 @@ test.describe
     }, testInfo) => {
       test.skip(
         /Mobile Chrome/i.test(testInfo.project.name),
-        "Drag handles only render in the desktop grid layout."
+        "Drag handles only render in the desktop grid layout. See issue #604."
       );
 
       for (const title of [
@@ -55,19 +55,18 @@ test.describe
       }
     });
 
-    test("D2. should reorder items via drag and drop", async ({
+    test("D2. should reorder items from the drag handle", async ({
       page: _page,
-    }) => {
+    }, testInfo) => {
       test.skip(
-        true,
-        "Pointer-driven reorder persistence is still too flaky under automation; drag coverage stays in D1 and D3."
+        /Mobile Chrome/i.test(testInfo.project.name),
+        "Reorder handles only render in the desktop grid layout. See issue #604."
       );
 
-      await ttPage.dragSetlistEditorRowTo(
-        SETLIST_TITLES.alpha,
-        SETLIST_TITLES.delta
-      );
+      await ttPage.moveSetlistEditorRowDown(SETLIST_TITLES.alpha);
 
+      // D2 covers reorder persistence through the focused handle control. D3
+      // still covers pointer-drag visual feedback separately.
       await expect
         .poll(
           async () => {
@@ -76,6 +75,9 @@ test.describe
                 "[data-testid='setlist-editor-item-row'], [data-testid^='stacked-item-']"
               )
               .allTextContents();
+            const tuneSetIndex = rowTexts.findIndex((text) =>
+              text.includes(SETLIST_TITLES.defaultTuneSet)
+            );
             const alphaIndex = rowTexts.findIndex((text) =>
               text.includes(SETLIST_TITLES.alpha)
             );
@@ -83,7 +85,7 @@ test.describe
               text.includes(SETLIST_TITLES.delta)
             );
 
-            return alphaIndex > deltaIndex;
+            return tuneSetIndex < alphaIndex && alphaIndex < deltaIndex;
           },
           {
             timeout: 10000,
@@ -98,7 +100,7 @@ test.describe
     }, testInfo) => {
       test.skip(
         /Mobile Chrome/i.test(testInfo.project.name),
-        "Drag feedback is only rendered in the desktop grid layout."
+        "Drag feedback is only rendered in the desktop grid layout. See issue #604."
       );
 
       const sourceRow = ttPage.getSetlistsEditorRow(SETLIST_TITLES.alpha);

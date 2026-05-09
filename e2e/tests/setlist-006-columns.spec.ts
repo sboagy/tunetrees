@@ -80,7 +80,7 @@ test.describe
     }) => {
       test.skip(
         /Mobile Chrome/i.test(test.info().project.name),
-        "The mobile stacked-list layout does not currently reflect view-grid column visibility changes."
+        "The mobile stacked-list layout does not currently reflect view-grid column visibility changes. See issue #604."
       );
 
       await ttPage.setSetlistsColumnVisibility("view", "Mode", false);

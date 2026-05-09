@@ -2018,41 +2018,17 @@ export class TuneTreesPage {
     }
   }
 
-  async dragSetlistEditorRowTo(sourceTitle: string, targetTitle: string) {
-    const sourceRow = this.getSetlistsEditorRow(sourceTitle);
-    const targetRow = this.getSetlistsEditorRow(targetTitle);
-    const dragHandle = sourceRow
+  async moveSetlistEditorRowDown(title: string) {
+    const row = this.getSetlistsEditorRow(title);
+    const dragHandle = row
       .locator("[data-testid='setlist-editor-drag-handle']")
       .first();
 
-    await expect(sourceRow).toBeVisible({ timeout: 10000 });
-    await expect(targetRow).toBeVisible({ timeout: 10000 });
+    await expect(row).toBeVisible({ timeout: 10000 });
     await expect(dragHandle).toBeVisible({ timeout: 10000 });
 
-    const sourceBox = await dragHandle.boundingBox();
-    const targetBox = await targetRow.boundingBox();
-    if (!sourceBox || !targetBox) {
-      throw new Error(
-        "Unable to resolve drag/drop coordinates for setlist row reorder"
-      );
-    }
-
-    await this.page.mouse.move(
-      sourceBox.x + sourceBox.width / 2,
-      sourceBox.y + sourceBox.height / 2
-    );
-    await this.page.mouse.down();
-    await this.page.mouse.move(
-      sourceBox.x + sourceBox.width / 2,
-      sourceBox.y + sourceBox.height / 2 + 8,
-      { steps: 4 }
-    );
-    await this.page.mouse.move(
-      targetBox.x + targetBox.width / 2,
-      targetBox.y + Math.min(targetBox.height / 4, 12),
-      { steps: 12 }
-    );
-    await this.page.mouse.up();
+    await dragHandle.focus();
+    await dragHandle.press("ArrowDown");
   }
 
   /**
@@ -2988,6 +2964,54 @@ export class TuneTreesPage {
       .catch(() => undefined);
   }
 
+  private async pressOverflowButtonKey(
+    overflowButton: Locator,
+    key: "Enter" | "Space"
+  ) {
+    // Mobile Chrome can leave the Kobalte trigger focused but unopened after a
+    // nominally successful click. Try the trigger's keyboard activation path
+    // before escalating to synthetic touch events so the page object still uses
+    // normal user-level inputs whenever they work.
+    await overflowButton.focus().catch(() => undefined);
+    await overflowButton.press(key, { timeout: 2000 }).catch(() => undefined);
+  }
+
+  private async dispatchTouchOverflowButton(overflowButton: Locator) {
+    await overflowButton
+      .evaluate((el) => {
+        // Some Mobile Chrome flakes leave the trigger visible and enabled but do
+        // not open the Kobalte menu unless it sees a full touch-style pointer
+        // sequence. Dispatch the same event shape the component expects so the
+        // target menu item can actually enter the DOM before we assert on it.
+        const pointerDown = new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "touch",
+        });
+        const pointerUp = new PointerEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "touch",
+        });
+        const click = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+        });
+
+        el.dispatchEvent(pointerDown);
+        el.dispatchEvent(pointerUp);
+        el.dispatchEvent(click);
+      })
+      .catch(() => undefined);
+  }
+
   /**
    * Open a mobile overflow menu entry with bounded retries.
    *
@@ -3016,14 +3040,40 @@ export class TuneTreesPage {
       await expect(overflowButton).toBeVisible({ timeout: 2000 });
       await expect(overflowButton).toBeEnabled({ timeout: 2000 });
 
-      await this.clickOverflowButton(overflowButton);
+      const revealAttempt = async (strategy: () => Promise<void>) => {
+        // This retry loop is deliberate: under worker contention the trigger can
+        // accept an input event without opening the menu. We only consider a
+        // strategy successful once the requested menu entry is actually visible.
+        await strategy();
+        await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+        return await target.isVisible({ timeout: 1500 }).catch(() => false);
+      };
 
-      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+      if (await revealAttempt(() => this.clickOverflowButton(overflowButton))) {
+        return;
+      }
 
-      const isTargetVisibleAfterClick = await target
-        .isVisible({ timeout: 1500 })
-        .catch(() => false);
-      if (isTargetVisibleAfterClick) {
+      if (
+        await revealAttempt(() =>
+          this.pressOverflowButtonKey(overflowButton, "Enter")
+        )
+      ) {
+        return;
+      }
+
+      if (
+        await revealAttempt(() =>
+          this.pressOverflowButtonKey(overflowButton, "Space")
+        )
+      ) {
+        return;
+      }
+
+      if (
+        await revealAttempt(() =>
+          this.dispatchTouchOverflowButton(overflowButton)
+        )
+      ) {
         return;
       }
 
