@@ -179,6 +179,18 @@ export function getDefaultTableState(
       };
       baseState.sorting = [{ id: "title", desc: false }]; // Sort by title
       break;
+
+    case "setlists":
+      baseState.columnVisibility = {
+        order: true,
+        title: true,
+        type: true,
+        mode: true,
+        details: true,
+        actions: true,
+      };
+      baseState.sorting = [];
+      break;
   }
 
   return baseState;

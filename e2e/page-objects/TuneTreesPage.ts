@@ -34,6 +34,7 @@ export class TuneTreesPage {
   readonly repertoireTab: Locator;
   readonly catalogTab: Locator;
   readonly analysisTab: Locator;
+  readonly setlistsTab: Locator;
 
   // TopNav Elements
   readonly logoDropdown: Locator;
@@ -69,6 +70,44 @@ export class TuneTreesPage {
   readonly practiceGrid: Locator;
   readonly repertoireGrid: Locator;
   readonly catalogGrid: Locator;
+  readonly setlistsViewGrid: Locator;
+  readonly setlistsLibraryGrid: Locator;
+  readonly setlistsEditorGrid: Locator;
+
+  // Setlists
+  readonly setlistsGroupSelect: Locator;
+  readonly setlistsGroupSelectMobile: Locator;
+  readonly setlistsSetlistSelect: Locator;
+  readonly setlistsSetlistSelectMobile: Locator;
+  readonly setlistsOverflowButton: Locator;
+  readonly setlistsEditButton: Locator;
+  readonly setlistsNewButton: Locator;
+  readonly setlistsDoneEditingButton: Locator;
+  readonly setlistsDeleteButton: Locator;
+  readonly setlistsPrintButton: Locator;
+  readonly setlistsEmailButton: Locator;
+  readonly setlistsColumnsButton: Locator;
+  readonly setlistsLibrarySearch: Locator;
+  readonly setlistsAddSelectedButton: Locator;
+  readonly setlistsRemoveSelectedButton: Locator;
+  readonly setlistsExpandLibraryButton: Locator;
+  readonly setlistBuildHeaderToggle: Locator;
+  readonly setlistEditorNameInput: Locator;
+  readonly setlistEditorNameInputCollapsed: Locator;
+  readonly setlistEditorDescriptionInput: Locator;
+  readonly setlistsLibraryColumnsButton: Locator;
+  readonly setlistsEditorColumnsButton: Locator;
+  readonly setlistsLibraryPanelOverflowButton: Locator;
+  readonly setlistsSetlistPanelOverflowButton: Locator;
+  readonly setlistsLibraryDisplayOptionsMenuButton: Locator;
+  readonly setlistsEditorDisplayOptionsMenuButton: Locator;
+  readonly setlistsLibraryHideDesktopButton: Locator;
+  readonly setlistsLibraryHideButton: Locator;
+  readonly setlistsLibraryEmptyState: Locator;
+  readonly setlistsEditorEmptyState: Locator;
+  readonly setlistsNoGroupEmptyState: Locator;
+  readonly setlistsNoSetlistsEmptyState: Locator;
+  readonly setlistsEmptyViewState: Locator;
 
   // Search & Filters
   readonly searchBox: Locator;
@@ -253,6 +292,7 @@ export class TuneTreesPage {
     this.repertoireTab = page.getByTestId("tab-repertoire");
     this.catalogTab = page.getByTestId("tab-catalog");
     this.analysisTab = page.getByTestId("tab-analysis");
+    this.setlistsTab = page.getByTestId("tab-setlists");
 
     // TopNav
     this.logoDropdown = page.getByTestId("logo-dropdown");
@@ -297,6 +337,87 @@ export class TuneTreesPage {
     this.practiceGrid = page.getByTestId("tunes-grid-scheduled");
     this.repertoireGrid = page.getByTestId("tunes-grid-repertoire");
     this.catalogGrid = page.getByTestId("tunes-grid-catalog");
+    this.setlistsViewGrid = page.getByTestId("setlists-view-grid");
+    this.setlistsLibraryGrid = page.getByTestId("setlists-library-grid");
+    this.setlistsEditorGrid = page.getByTestId("setlists-editor-grid");
+
+    this.setlistsGroupSelect = page.getByTestId("setlists-group-select");
+    this.setlistsGroupSelectMobile = page.getByTestId(
+      "setlists-group-select-mobile"
+    );
+    this.setlistsSetlistSelect = page.getByTestId("setlists-setlist-select");
+    this.setlistsSetlistSelectMobile = page.getByTestId(
+      "setlists-setlist-select-mobile"
+    );
+    this.setlistsOverflowButton = page.getByTestId("setlists-overflow-button");
+    this.setlistsEditButton = page.getByTestId("setlists-edit-button");
+    this.setlistsNewButton = page.getByTestId("setlists-new-button");
+    this.setlistsDoneEditingButton = page.getByTestId(
+      "setlists-done-editing-button"
+    );
+    this.setlistsDeleteButton = page.getByTestId("setlists-delete-button");
+    this.setlistsPrintButton = page.getByTestId("setlists-print-button");
+    this.setlistsEmailButton = page.getByTestId("setlists-email-button");
+    this.setlistsColumnsButton = page.getByTestId("setlists-columns-button");
+    this.setlistsLibrarySearch = page.getByTestId("setlists-library-search");
+    this.setlistsAddSelectedButton = page.getByTestId(
+      "setlists-add-selected-button"
+    );
+    this.setlistsRemoveSelectedButton = page.getByTestId(
+      "setlists-remove-selected-button"
+    );
+    this.setlistsExpandLibraryButton = page.getByTestId(
+      "setlists-expand-library-button"
+    );
+    this.setlistBuildHeaderToggle = page.getByTestId(
+      "setlist-build-header-toggle"
+    );
+    this.setlistEditorNameInput = page.getByTestId("setlist-editor-name-input");
+    this.setlistEditorNameInputCollapsed = page.getByTestId(
+      "setlist-editor-name-input-collapsed"
+    );
+    this.setlistEditorDescriptionInput = page.getByTestId(
+      "setlist-editor-description-input"
+    );
+    this.setlistsLibraryColumnsButton = page.getByTestId(
+      "setlists-library-columns-button"
+    );
+    this.setlistsEditorColumnsButton = page.getByTestId(
+      "setlists-editor-columns-button"
+    );
+    this.setlistsLibraryPanelOverflowButton = page.getByTestId(
+      "setlists-library-panel-overflow-button"
+    );
+    this.setlistsSetlistPanelOverflowButton = page.getByTestId(
+      "setlists-setlist-panel-overflow-button"
+    );
+    this.setlistsLibraryDisplayOptionsMenuButton = page.getByTestId(
+      "setlists-library-display-options-menu-button"
+    );
+    this.setlistsEditorDisplayOptionsMenuButton = page.getByTestId(
+      "setlists-editor-display-options-menu-button"
+    );
+    this.setlistsLibraryHideDesktopButton = page.getByTestId(
+      "setlists-library-hide-button-desktop"
+    );
+    this.setlistsLibraryHideButton = page.getByTestId(
+      "setlists-library-hide-button"
+    );
+    this.setlistsLibraryEmptyState = page.getByTestId(
+      "setlists-library-empty-state"
+    );
+    this.setlistsEditorEmptyState = page.getByTestId(
+      "setlists-editor-empty-state"
+    );
+    this.setlistsNoGroupEmptyState = page.getByTestId(
+      "setlists-empty-state-no-group"
+    );
+    this.setlistsNoSetlistsEmptyState = page.getByTestId(
+      "setlists-empty-state-no-setlists"
+    );
+    this.setlistsEmptyViewState = page.getByTestId(
+      "setlists-empty-state-view-empty"
+    );
 
     // Search & Filters
     this.searchBox = page.getByPlaceholder(/Search/i);
@@ -1365,7 +1486,7 @@ export class TuneTreesPage {
    * Navigate to a specific tab by ID
    */
   async navigateToTab(
-    tabId: "practice" | "repertoire" | "catalog" | "analysis",
+    tabId: "practice" | "repertoire" | "catalog" | "analysis" | "setlists",
     options?: { waitForContent?: boolean }
   ) {
     const waitForContent = options?.waitForContent ?? true;
@@ -1405,6 +1526,7 @@ export class TuneTreesPage {
           repertoire: "Repertoire",
           catalog: "Catalog",
           analysis: "Analysis",
+          setlists: "Setlists",
         };
         const option = this.page.getByRole("option", {
           name: new RegExp(tabLabels[tabId], "i"),
@@ -1481,7 +1603,9 @@ export class TuneTreesPage {
           ? this.repertoireColumnsButton
           : tabId === "catalog"
             ? this.catalogColumnsButton
-            : undefined;
+            : tabId === "setlists"
+              ? this.setlistsColumnsButton
+              : undefined;
     if (sentinel) {
       await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
       // Best-effort: anonymous users and empty states may not have a columns button.
@@ -1500,7 +1624,9 @@ export class TuneTreesPage {
           ? this.repertoireGrid
           : tabId === "catalog"
             ? this.catalogGrid
-            : undefined;
+            : tabId === "setlists"
+              ? this.setlistsViewGrid
+              : undefined;
     if (grid) {
       // Best-effort: if the grid is mounted, wait for it; otherwise allow
       // callers to assert on loading/empty states as needed.
@@ -1522,6 +1648,387 @@ export class TuneTreesPage {
           .catch(() => undefined);
       }
     }
+  }
+
+  async navigateToSetlistsTab(options?: { waitForContent?: boolean }) {
+    await this.navigateToTab("setlists", {
+      waitForContent: options?.waitForContent ?? false,
+    });
+
+    const visibleGroupSelect = await this.getVisibleSetlistsGroupSelect();
+    await expect(visibleGroupSelect).toBeVisible({ timeout: 15000 });
+  }
+
+  private async getVisibleSetlistsGroupSelect(): Promise<Locator> {
+    const desktopVisible = await this.setlistsGroupSelect
+      .isVisible()
+      .catch(() => false);
+    return desktopVisible
+      ? this.setlistsGroupSelect
+      : this.setlistsGroupSelectMobile;
+  }
+
+  private async getVisibleSetlistsSetlistSelect(): Promise<Locator> {
+    const desktopVisible = await this.setlistsSetlistSelect
+      .isVisible()
+      .catch(() => false);
+    return desktopVisible
+      ? this.setlistsSetlistSelect
+      : this.setlistsSetlistSelectMobile;
+  }
+
+  async selectSetlistsGroup(valueOrLabel: string) {
+    const select = await this.getVisibleSetlistsGroupSelect();
+    await expect(select).toBeVisible({ timeout: 15000 });
+    await select.selectOption({ label: valueOrLabel }).catch(async () => {
+      await select.selectOption(valueOrLabel);
+    });
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 15000 })
+      .catch(() => undefined);
+  }
+
+  async selectSetlist(valueOrLabel: string) {
+    const select = await this.getVisibleSetlistsSetlistSelect();
+    await expect(select).toBeVisible({ timeout: 15000 });
+    await select.selectOption({ label: valueOrLabel }).catch(async () => {
+      await select.selectOption(valueOrLabel);
+    });
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 15000 })
+      .catch(() => undefined);
+  }
+
+  async getSelectedSetlistsGroupLabel() {
+    const select = await this.getVisibleSetlistsGroupSelect();
+    return (await select.locator("option:checked").textContent())?.trim() ?? "";
+  }
+
+  async getSelectedSetlistsGroupValue() {
+    const select = await this.getVisibleSetlistsGroupSelect();
+    return (await select.inputValue().catch(() => "")) ?? "";
+  }
+
+  async getSelectedSetlistLabel() {
+    const select = await this.getVisibleSetlistsSetlistSelect();
+    return (await select.locator("option:checked").textContent())?.trim() ?? "";
+  }
+
+  async getSelectedSetlistValue() {
+    const select = await this.getVisibleSetlistsSetlistSelect();
+    return (await select.inputValue().catch(() => "")) ?? "";
+  }
+
+  async clickSetlistsEdit() {
+    const desktopVisible = await this.setlistsEditButton
+      .isVisible()
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.setlistsEditButton.click();
+      return;
+    }
+
+    await this.openOverflowMenuEntry(
+      this.setlistsOverflowButton,
+      this.page.getByTestId("setlists-overflow-edit-button")
+    );
+    await this.page.getByTestId("setlists-overflow-edit-button").click();
+  }
+
+  async clickSetlistsNew() {
+    const desktopVisible = await this.setlistsNewButton
+      .isVisible()
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.setlistsNewButton.click();
+      return;
+    }
+
+    await this.openOverflowMenuEntry(
+      this.setlistsOverflowButton,
+      this.page.getByTestId("setlists-overflow-new-button")
+    );
+    await this.page.getByTestId("setlists-overflow-new-button").click();
+  }
+
+  async clickSetlistsDoneEditing() {
+    const desktopVisible = await this.setlistsDoneEditingButton
+      .isVisible()
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.setlistsDoneEditingButton.click();
+      return;
+    }
+
+    await this.openOverflowMenuEntry(
+      this.setlistsOverflowButton,
+      this.page.getByTestId("setlists-overflow-done-button")
+    );
+    await this.page.getByTestId("setlists-overflow-done-button").click();
+  }
+
+  async clickSetlistsDelete() {
+    const desktopVisible = await this.setlistsDeleteButton
+      .isVisible()
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.setlistsDeleteButton.click();
+      return;
+    }
+
+    await this.openOverflowMenuEntry(
+      this.setlistsOverflowButton,
+      this.page.getByTestId("setlists-overflow-delete-button")
+    );
+    await this.page.getByTestId("setlists-overflow-delete-button").click();
+  }
+
+  async setSetlistName(name: string) {
+    const expandedVisible = await this.setlistEditorNameInput
+      .isVisible()
+      .catch(() => false);
+    const input = expandedVisible
+      ? this.setlistEditorNameInput
+      : this.setlistEditorNameInputCollapsed;
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill(name);
+  }
+
+  async setSetlistNotes(notes: string) {
+    const visible = await this.setlistEditorDescriptionInput
+      .isVisible()
+      .catch(() => false);
+    if (!visible) {
+      await this.setlistBuildHeaderToggle.click();
+    }
+    await expect(this.setlistEditorDescriptionInput).toBeVisible({
+      timeout: 5000,
+    });
+    await this.setlistEditorDescriptionInput.fill(notes);
+  }
+
+  async searchSetlistsLibrary(query: string) {
+    await expect(this.setlistsLibrarySearch).toBeVisible({ timeout: 5000 });
+    await this.setlistsLibrarySearch.fill(query);
+  }
+
+  async waitForSetlistsEditReady() {
+    await expect(this.setlistsLibraryGrid).toBeVisible({ timeout: 15000 });
+    await expect(this.setlistsEditorGrid).toBeVisible({ timeout: 15000 });
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 15000 })
+      .catch(() => undefined);
+  }
+
+  async setSetlistsLibraryFilter(filter: "all" | "tune" | "tune_set") {
+    const desktopButton = this.page.getByTestId(
+      `setlists-library-filter-${filter}`
+    );
+    const desktopVisible = await desktopButton.isVisible().catch(() => false);
+    if (desktopVisible) {
+      await desktopButton.click();
+      return;
+    }
+
+    const menuButton = this.page.getByTestId(
+      `setlists-library-filter-menu-${filter}`
+    );
+    await this.openOverflowMenuEntry(
+      this.setlistsLibraryPanelOverflowButton,
+      menuButton
+    );
+    await menuButton.click();
+  }
+
+  getSetlistsViewRow(title: string): Locator {
+    return this.setlistsViewGrid
+      .locator(
+        "[data-testid='setlist-item-row'], [data-testid^='stacked-item-']"
+      )
+      .filter({ hasText: title })
+      .first();
+  }
+
+  getSetlistsLibraryRow(title: string): Locator {
+    return this.setlistsLibraryGrid
+      .locator(
+        "[data-testid='setlists-library-row'], [data-testid^='stacked-item-']"
+      )
+      .filter({ hasText: title })
+      .first();
+  }
+
+  getSetlistsLibrarySetRow(title: string): Locator {
+    return this.setlistsLibraryGrid
+      .locator(
+        "[data-testid='setlists-library-set-row'], [data-testid^='stacked-item-']"
+      )
+      .filter({ hasText: title })
+      .first();
+  }
+
+  getSetlistsEditorRow(title: string): Locator {
+    return this.setlistsEditorGrid
+      .locator(
+        "[data-testid='setlist-editor-item-row'], [data-testid^='stacked-item-']"
+      )
+      .filter({ hasText: title })
+      .first();
+  }
+
+  async setRowSelected(row: Locator, selected: boolean) {
+    const checkbox = row.locator('input[type="checkbox"]').first();
+    await expect(checkbox).toBeVisible({ timeout: 5000 });
+    if ((await checkbox.isChecked().catch(() => false)) !== selected) {
+      await checkbox.click();
+    }
+  }
+
+  async clickAddSelectedSetlistItems() {
+    await expect(this.setlistsAddSelectedButton).toBeVisible({ timeout: 5000 });
+    await this.setlistsAddSelectedButton.click();
+  }
+
+  async clickRemoveSelectedSetlistItems() {
+    const desktopVisible = await this.setlistsRemoveSelectedButton
+      .isVisible()
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.setlistsRemoveSelectedButton.click();
+      return;
+    }
+
+    await this.openOverflowMenuEntry(
+      this.setlistsSetlistPanelOverflowButton,
+      this.page.getByTestId("setlists-remove-selected-menu-button")
+    );
+    await this.page.getByTestId("setlists-remove-selected-menu-button").click();
+  }
+
+  async toggleSetlistsMetadata() {
+    await expect(this.setlistBuildHeaderToggle.first()).toBeVisible({
+      timeout: 5000,
+    });
+    await this.setlistBuildHeaderToggle.first().click();
+  }
+
+  async hideSetlistsLibraryPanel() {
+    const desktopVisible = await this.setlistsLibraryHideDesktopButton
+      .isVisible()
+      .catch(() => false);
+    if (desktopVisible) {
+      await this.setlistsLibraryHideDesktopButton.click();
+      return;
+    }
+
+    await this.openOverflowMenuEntry(
+      this.setlistsLibraryPanelOverflowButton,
+      this.setlistsLibraryHideButton
+    );
+    await this.setlistsLibraryHideButton.click();
+  }
+
+  async showSetlistsLibraryPanel() {
+    await expect(this.setlistsExpandLibraryButton).toBeVisible({
+      timeout: 5000,
+    });
+    await this.setlistsExpandLibraryButton.click();
+  }
+
+  async setSetlistsColumnVisibility(
+    scope: "view" | "library" | "editor",
+    columnLabel: string,
+    visible: boolean
+  ) {
+    await this.openSetlistsColumnVisibilityMenu(scope);
+
+    const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const menu = this.getColumnVisibilityMenu();
+    const label = menu
+      .locator("button span")
+      .filter({ hasText: new RegExp(`^\\s*${escapedLabel}\\s*$`, "i") })
+      .first();
+    const option = label.locator("xpath=ancestor::button[1]");
+    const checkbox = option.locator('input[type="checkbox"]').first();
+
+    await expect(option).toBeVisible({ timeout: 5000 });
+    const isChecked = await checkbox.isChecked().catch(() => false);
+    if (isChecked !== visible) {
+      await option.click();
+    }
+
+    if (visible) {
+      await expect(checkbox).toBeChecked({ timeout: 5000 });
+    } else {
+      await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+    }
+
+    await this.closeColumnVisibilityMenu(menu);
+  }
+
+  async openSetlistsColumnVisibilityMenu(scope: "view" | "library" | "editor") {
+    if (scope === "view") {
+      const viewButtonVisible = await this.setlistsColumnsButton
+        .isVisible()
+        .catch(() => false);
+      await this.openColumnVisibilityMenu(
+        viewButtonVisible
+          ? this.setlistsColumnsButton
+          : this.setlistsOverflowButton
+      );
+      return;
+    }
+
+    if (scope === "library") {
+      const desktopVisible = await this.setlistsLibraryColumnsButton
+        .isVisible()
+        .catch(() => false);
+
+      if (desktopVisible) {
+        await this.openColumnVisibilityMenu(this.setlistsLibraryColumnsButton);
+      } else {
+        await this.openOverflowMenuEntry(
+          this.setlistsLibraryPanelOverflowButton,
+          this.setlistsLibraryDisplayOptionsMenuButton
+        );
+        await this.setlistsLibraryDisplayOptionsMenuButton.click();
+        await expect(this.getColumnVisibilityMenu()).toBeVisible({
+          timeout: 5000,
+        });
+      }
+      return;
+    }
+
+    const desktopVisible = await this.setlistsEditorColumnsButton
+      .isVisible()
+      .catch(() => false);
+
+    if (desktopVisible) {
+      await this.openColumnVisibilityMenu(this.setlistsEditorColumnsButton);
+    } else {
+      await this.openOverflowMenuEntry(
+        this.setlistsSetlistPanelOverflowButton,
+        this.setlistsEditorDisplayOptionsMenuButton
+      );
+      await this.setlistsEditorDisplayOptionsMenuButton.click();
+      await expect(this.getColumnVisibilityMenu()).toBeVisible({
+        timeout: 5000,
+      });
+    }
+  }
+
+  async moveSetlistEditorRowDown(title: string) {
+    const row = this.getSetlistsEditorRow(title);
+    const dragHandle = row
+      .locator("[data-testid='setlist-editor-drag-handle']")
+      .first();
+
+    await expect(row).toBeVisible({ timeout: 10000 });
+    await expect(dragHandle).toBeVisible({ timeout: 10000 });
+
+    await dragHandle.focus();
+    await dragHandle.press("ArrowDown");
   }
 
   /**
@@ -2457,6 +2964,54 @@ export class TuneTreesPage {
       .catch(() => undefined);
   }
 
+  private async pressOverflowButtonKey(
+    overflowButton: Locator,
+    key: "Enter" | "Space"
+  ) {
+    // Mobile Chrome can leave the Kobalte trigger focused but unopened after a
+    // nominally successful click. Try the trigger's keyboard activation path
+    // before escalating to synthetic touch events so the page object still uses
+    // normal user-level inputs whenever they work.
+    await overflowButton.focus().catch(() => undefined);
+    await overflowButton.press(key, { timeout: 2000 }).catch(() => undefined);
+  }
+
+  private async dispatchTouchOverflowButton(overflowButton: Locator) {
+    await overflowButton
+      .evaluate((el) => {
+        // Some Mobile Chrome flakes leave the trigger visible and enabled but do
+        // not open the Kobalte menu unless it sees a full touch-style pointer
+        // sequence. Dispatch the same event shape the component expects so the
+        // target menu item can actually enter the DOM before we assert on it.
+        const pointerDown = new PointerEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "touch",
+        });
+        const pointerUp = new PointerEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "touch",
+        });
+        const click = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+        });
+
+        el.dispatchEvent(pointerDown);
+        el.dispatchEvent(pointerUp);
+        el.dispatchEvent(click);
+      })
+      .catch(() => undefined);
+  }
+
   /**
    * Open a mobile overflow menu entry with bounded retries.
    *
@@ -2485,14 +3040,40 @@ export class TuneTreesPage {
       await expect(overflowButton).toBeVisible({ timeout: 2000 });
       await expect(overflowButton).toBeEnabled({ timeout: 2000 });
 
-      await this.clickOverflowButton(overflowButton);
+      const revealAttempt = async (strategy: () => Promise<void>) => {
+        // This retry loop is deliberate: under worker contention the trigger can
+        // accept an input event without opening the menu. We only consider a
+        // strategy successful once the requested menu entry is actually visible.
+        await strategy();
+        await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+        return await target.isVisible({ timeout: 1500 }).catch(() => false);
+      };
 
-      await this.page.waitForTimeout(OVERFLOW_MENU_RETRY_DELAY_MS);
+      if (await revealAttempt(() => this.clickOverflowButton(overflowButton))) {
+        return;
+      }
 
-      const isTargetVisibleAfterClick = await target
-        .isVisible({ timeout: 1500 })
-        .catch(() => false);
-      if (isTargetVisibleAfterClick) {
+      if (
+        await revealAttempt(() =>
+          this.pressOverflowButtonKey(overflowButton, "Enter")
+        )
+      ) {
+        return;
+      }
+
+      if (
+        await revealAttempt(() =>
+          this.pressOverflowButtonKey(overflowButton, "Space")
+        )
+      ) {
+        return;
+      }
+
+      if (
+        await revealAttempt(() =>
+          this.dispatchTouchOverflowButton(overflowButton)
+        )
+      ) {
         return;
       }
 
@@ -3450,13 +4031,32 @@ export class TuneTreesPage {
   // ===== Flashcard helpers =====
 
   async enableFlashcardMode(timeoutAfter: number = 800) {
+    const practiceLoadingMessage = this.page.getByText(
+      "Loading practice queue..."
+    );
+
     await this.setToolbarSwitchChecked(
       "practice",
       this.flashcardModeSwitch,
       true,
       0
     );
-    await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
+    await expect
+      .poll(
+        async () => {
+          const [flashcardVisible, loadingVisible] = await Promise.all([
+            this.flashcardView.isVisible().catch(() => false),
+            practiceLoadingMessage.isVisible().catch(() => false),
+          ]);
+
+          return flashcardVisible && !loadingVisible;
+        },
+        {
+          timeout: 15_000,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
 
     if (typeof timeoutAfter === "number") {
       await this.page.waitForTimeout(timeoutAfter);
@@ -3465,6 +4065,9 @@ export class TuneTreesPage {
 
   async enableFlashcardModeAllowingEmptyState(timeoutAfter: number = 800) {
     const flashcardEmptyState = this.page.getByTestId("flashcard-empty-state");
+    const practiceLoadingMessage = this.page.getByText(
+      "Loading practice queue..."
+    );
 
     await this.setToolbarSwitchChecked(
       "practice",
@@ -3476,10 +4079,16 @@ export class TuneTreesPage {
     await expect
       .poll(
         async () => {
-          const [flashcardVisible, emptyVisible] = await Promise.all([
-            this.flashcardView.isVisible().catch(() => false),
-            flashcardEmptyState.isVisible().catch(() => false),
-          ]);
+          const [flashcardVisible, emptyVisible, loadingVisible] =
+            await Promise.all([
+              this.flashcardView.isVisible().catch(() => false),
+              flashcardEmptyState.isVisible().catch(() => false),
+              practiceLoadingMessage.isVisible().catch(() => false),
+            ]);
+
+          if (loadingVisible) {
+            return "pending";
+          }
 
           if (flashcardVisible) {
             return "flashcard";
