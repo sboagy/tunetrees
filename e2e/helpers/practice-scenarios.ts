@@ -27,13 +27,14 @@ log.setLevel("info");
  */
 export async function navigateToTabForTest(
   page: Page,
-  tabId: "practice" | "repertoire" | "catalog" | "analysis"
+  tabId: "practice" | "repertoire" | "catalog" | "analysis" | "setlists"
 ): Promise<void> {
   const tabLabels: Record<string, string> = {
     practice: "Practice",
     repertoire: "Repertoire",
     catalog: "Catalog",
     analysis: "Analysis",
+    setlists: "Setlists",
   };
 
   // Check for mobile Select trigger (visible only when viewport < 768px)
@@ -911,6 +912,43 @@ async function deleteDependentTuneRows(
       );
     }
   }
+}
+
+export async function seedSetlistsScenarioLocally(
+  page: Page,
+  input: {
+    userId?: string;
+    group: {
+      name: string;
+      description?: string | null;
+    };
+    sharedTuneSets?: Array<{
+      name: string;
+      description?: string | null;
+      tuneIds: string[];
+    }>;
+    setlists?: Array<{
+      name: string;
+      description?: string | null;
+      items?: Array<
+        | {
+            kind: "tune";
+            tuneId: string;
+          }
+        | {
+            kind: "tune_set";
+            tuneSetIndex: number;
+          }
+      >;
+    }>;
+  }
+) {
+  return await page.evaluate(async (payload) => {
+    if (!(window as any).__ttTestApi) {
+      throw new Error("__ttTestApi not attached on window");
+    }
+    return await (window as any).__ttTestApi.seedSetlistsScenario(payload);
+  }, input);
 }
 
 async function purgeTunesByTitlePrefixes(user: TestUser, prefixes: string[]) {
@@ -2101,4 +2139,183 @@ export async function setupForCatalogTestsParallel(
   await page.waitForTimeout(500);
 
   log.debug(`✅ [${user.name}] setupForCatalogTests Ready on ${startTab} tab`);
+}
+
+export async function setupForSetlistTestsParallel(
+  page: Page,
+  user: TestUser,
+  opts: {
+    repertoireTunes: string[];
+    publicTunes?: Array<{
+      title: string;
+      genreId?: string | null;
+    }>;
+    sharedTuneSets?: Array<{
+      name: string;
+      tuneIds?: string[];
+      tuneIndexes?: number[];
+      description?: string | null;
+    }>;
+    setlists?: Array<{
+      name: string;
+      description?: string | null;
+      items?: Array<
+        | {
+            kind: "tune";
+            tuneId?: string;
+            tuneIndex?: number;
+          }
+        | {
+            kind: "tune_set";
+            tuneSetIndex: number;
+          }
+      >;
+    }>;
+    groupName?: string;
+    groupDescription?: string | null;
+  }
+) {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Boolean((window as unknown as { __ttTestApi?: unknown }).__ttTestApi)
+        ),
+      {
+        timeout: 15000,
+        intervals: [100, 250, 500, 1000],
+      }
+    )
+    .toBe(true);
+
+  await page.evaluate((userId) => {
+    window.__ttTestApi?.setTestUserId(userId);
+  }, user.userId);
+
+  const seededPublicTunes = opts.publicTunes?.length
+    ? await page.evaluate(
+        async ({ tunes }) => {
+          const api = window.__ttTestApi;
+          if (!api) {
+            throw new Error("__ttTestApi is not available");
+          }
+
+          const selectedGenres = await api.getSelectedGenres();
+          const defaultGenreId = selectedGenres[0] ?? null;
+          const created: Array<{ id: string; title: string }> = [];
+
+          for (const tune of tunes) {
+            const id = await api.findOrCreateNamedPublicTune({
+              title: tune.title,
+              genreId: tune.genreId ?? defaultGenreId,
+            });
+            created.push({ id, title: tune.title });
+          }
+
+          return created;
+        },
+        { tunes: opts.publicTunes }
+      )
+    : [];
+
+  const resolveTuneId = (
+    tuneId: string | undefined,
+    tuneIndex: number | undefined,
+    context: string
+  ) => {
+    if (tuneId) return tuneId;
+    if (typeof tuneIndex === "number") {
+      const seededTune = seededPublicTunes[tuneIndex];
+      if (seededTune) {
+        return seededTune.id;
+      }
+    }
+
+    throw new Error(`Unable to resolve tune for ${context}`);
+  };
+
+  const resolvedSharedTuneSets = (opts.sharedTuneSets ?? []).map(
+    (tuneSet, tuneSetIndex) => ({
+      name: tuneSet.name,
+      description: tuneSet.description,
+      tuneIds:
+        tuneSet.tuneIds ??
+        (tuneSet.tuneIndexes ?? []).map((index, memberIndex) =>
+          resolveTuneId(
+            undefined,
+            index,
+            `sharedTuneSets[${tuneSetIndex}].tuneIndexes[${memberIndex}]`
+          )
+        ),
+    })
+  );
+
+  const resolvedSetlists = (opts.setlists ?? []).map(
+    (setlist, setlistIndex) => ({
+      name: setlist.name,
+      description: setlist.description,
+      items: (setlist.items ?? []).map((item, itemIndex) => {
+        if (item.kind === "tune") {
+          return {
+            kind: "tune" as const,
+            tuneId: resolveTuneId(
+              item.tuneId,
+              item.tuneIndex,
+              `setlists[${setlistIndex}].items[${itemIndex}]`
+            ),
+          };
+        }
+
+        return item;
+      }),
+    })
+  );
+
+  const uniqueSuffix = randomUUID().slice(0, 8);
+  const scenario = await seedSetlistsScenarioLocally(page, {
+    userId: user.userId,
+    group: {
+      name: opts.groupName ?? `E2E Setlists ${user.name} ${uniqueSuffix}`,
+      description: opts.groupDescription ?? null,
+    },
+    sharedTuneSets: resolvedSharedTuneSets,
+    setlists: resolvedSetlists,
+  });
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page
+    .waitForLoadState("networkidle", { timeout: 15000 })
+    .catch(() => undefined);
+
+  await navigateToTabForTest(page, "setlists");
+
+  const desktopGroupSelect = page.getByTestId("setlists-group-select");
+  const mobileGroupSelect = page.getByTestId("setlists-group-select-mobile");
+  const groupSelect = (await desktopGroupSelect.isVisible().catch(() => false))
+    ? desktopGroupSelect
+    : mobileGroupSelect;
+  await expect(groupSelect).toBeVisible({ timeout: 15000 });
+  await groupSelect.selectOption(scenario.groupId);
+
+  if (scenario.setlists.length > 0) {
+    const desktopSetlistSelect = page.getByTestId("setlists-setlist-select");
+    const mobileSetlistSelect = page.getByTestId(
+      "setlists-setlist-select-mobile"
+    );
+    const setlistSelect = (await desktopSetlistSelect
+      .isVisible()
+      .catch(() => false))
+      ? desktopSetlistSelect
+      : mobileSetlistSelect;
+    await expect(setlistSelect).toBeVisible({ timeout: 15000 });
+    await setlistSelect.selectOption(scenario.setlists[0]!.id);
+  }
+
+  await page
+    .waitForLoadState("networkidle", { timeout: 15000 })
+    .catch(() => undefined);
+
+  return scenario;
 }

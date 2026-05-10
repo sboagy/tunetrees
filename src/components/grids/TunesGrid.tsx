@@ -24,6 +24,7 @@ import {
   createMemo,
   createSignal,
   For,
+  type JSX,
   onCleanup,
   onMount,
   Show,
@@ -82,8 +83,16 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   enableColumnReorder?: boolean;
   // Enable/disable row selection (default true)
   enableRowSelection?: boolean;
+  enableSubRowSelection?: boolean;
   // Optional per-row selection control used for mixed hierarchy rows.
   canSelectRow?: (row: T) => boolean;
+  normalizeRowSelection?: (
+    next: RowSelectionState,
+    prev: RowSelectionState,
+    helpers: {
+      getRow: (rowId: string) => T | undefined;
+    }
+  ) => RowSelectionState;
   // Optional nested rows support for mixed tune/set grids.
   getSubRows?: (row: T) => T[] | undefined;
   getRowId?: (row: T, index: number, parent?: T) => string;
@@ -91,6 +100,18 @@ export interface ITunesGridProps<T extends { id: string | number }> {
   defaultExpandedRowIds?: string[];
   hierarchyColumnId?: string;
   disableListMode?: boolean;
+  getRowProps?: (row: T) =>
+    | {
+        class?: string;
+        draggable?: boolean;
+        "data-testid"?: string;
+        "data-setlist-item-id"?: string;
+        onDragStart?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+        onDragEnd?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+        onDragOver?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+        onDrop?: JSX.EventHandlerUnion<HTMLTableRowElement, DragEvent>;
+      }
+    | undefined;
   // Optional map of column descriptions to show in header popovers
   columnDescriptions?: Partial<Record<string, string>>;
 }
@@ -249,6 +270,61 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
     initialState.rowSelection || {}
   );
+
+  const rowLookup = createMemo(() => {
+    const rowsById: Record<string, T> = {};
+
+    const visitRows = (rows: T[], parent?: T) => {
+      rows.forEach((row, index) => {
+        const rowId = props.getRowId?.(row, index, parent) ?? String(row.id);
+        rowsById[rowId] = row;
+
+        const subRows = props.getSubRows?.(row) ?? [];
+        if (subRows.length > 0) {
+          visitRows(subRows, row);
+        }
+      });
+    };
+
+    visitRows(props.data);
+    return rowsById;
+  });
+
+  const compactRowSelection = (
+    selection: RowSelectionState
+  ): RowSelectionState => {
+    const next: RowSelectionState = {};
+    for (const [rowId, selected] of Object.entries(selection)) {
+      if (selected) next[rowId] = true;
+    }
+    return next;
+  };
+
+  const resolveRowSelectionUpdate = (
+    updater:
+      | RowSelectionState
+      | ((prev: RowSelectionState) => RowSelectionState),
+    prev: RowSelectionState
+  ): RowSelectionState => {
+    const next = typeof updater === "function" ? updater(prev) : updater;
+
+    const compacted = compactRowSelection(next);
+    if (!props.normalizeRowSelection) return compacted;
+
+    return compactRowSelection(
+      props.normalizeRowSelection(compacted, prev, {
+        getRow: (rowId) => rowLookup()[rowId],
+      })
+    );
+  };
+
+  const applyRowSelectionChange = (
+    updater:
+      | RowSelectionState
+      | ((prev: RowSelectionState) => RowSelectionState)
+  ) => {
+    setRowSelection((prev) => resolveRowSelectionUpdate(updater, prev));
+  };
   const [expanded, setExpanded] = createSignal<ExpandedState>({});
   const [lastDefaultExpandedSignature, setLastDefaultExpandedSignature] =
     createSignal<string | null>(null);
@@ -454,6 +530,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     enableRowSelection: props.canSelectRow
       ? (row) => props.canSelectRow?.(row.original) ?? false
       : (props.enableRowSelection ?? true),
+    enableSubRowSelection: props.enableSubRowSelection ?? true,
     enableColumnResizing: true,
     columnResizeMode: "onChange",
     meta: tableDisplayOptionsMeta,
@@ -481,14 +558,14 @@ export const TunesGrid = (<T extends { id: string | number }>(
       },
     },
     onSortingChange: setSorting,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: applyRowSelectionChange,
     onExpandedChange: setExpanded,
     onColumnSizingChange: setColumnSizing,
     onColumnOrderChange: setColumnOrder,
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
     getRowId: (row, index, parent) =>
-      props.getRowId?.(row, index, parent?.original) ?? String((row as any).id),
+      props.getRowId?.(row, index, parent?.original) ?? String(row.id),
   });
 
   // Notify parent of table instance
@@ -672,7 +749,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     checked: boolean
   ) => {
     const rowId = String(row.stacked_row_id ?? row.id);
-    setRowSelection((prev) => {
+    applyRowSelectionChange((prev) => {
       const currentlySelected = prev[rowId] === true;
       if (currentlySelected === checked) return prev;
 
@@ -1270,24 +1347,34 @@ export const TunesGrid = (<T extends { id: string | number }>(
               <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualRow) => {
                   const row = () => currentRows()[virtualRow.index];
+                  const rowProps = () => props.getRowProps?.(row()!.original);
 
                   return (
                     <Show when={row()}>
                       {/* Read the current row through an accessor so filtering can swap
                             row content without requiring a full table remount. */}
                       <tr
-                        class={
-                          props.currentRowId === (row()!.original as any).id
+                        class={`${
+                          props.currentRowId === row()!.original.id
                             ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
                             : rowBelongsToSet(row()!.original)
                               ? "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60"
                               : ROW_CLASSES
-                        }
+                        } ${rowProps()?.class ?? ""}`.trim()}
                         onClick={() => props.onRowClick?.(row()!.original)}
                         onDblClick={() =>
                           props.onRowDoubleClick?.(row()!.original)
                         }
                         data-index={virtualRow.index}
+                        draggable={rowProps()?.draggable}
+                        data-testid={rowProps()?.["data-testid"]}
+                        data-setlist-item-id={
+                          rowProps()?.["data-setlist-item-id"]
+                        }
+                        onDragStart={rowProps()?.onDragStart}
+                        onDragEnd={rowProps()?.onDragEnd}
+                        onDragOver={rowProps()?.onDragOver}
+                        onDrop={rowProps()?.onDrop}
                       >
                         <For each={row()!.getVisibleCells()}>
                           {(cell) => (

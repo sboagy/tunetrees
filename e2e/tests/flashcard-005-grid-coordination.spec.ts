@@ -160,13 +160,13 @@ test.describe
       await app.submitEvaluationsButton.click();
       await page.waitForTimeout(1500);
 
-      expect(app.flashcardView).toBeVisible();
+      await expect(app.flashcardView).toBeVisible();
 
       await app.disableFlashcardMode();
       await page.waitForTimeout(1000);
 
       // If grid is not visible (e.g., empty state shown), accept empty-state as valid update
-      expect(grid).toBeVisible();
+      await expect(grid).toBeVisible();
       await page.waitForTimeout(500);
 
       // Otherwise verify grid row count decreased

@@ -55,14 +55,14 @@ const TABS: Tab[] = [
     path: "#repertoire",
     icon: "📚",
   },
-  { id: "catalog", label: "Catalog", path: "#catalog", icon: "📖" },
-  { id: "analysis", label: "Analysis", path: "#analysis", icon: "📊" },
   {
     id: "setlists",
     label: "Setlists",
     path: "#setlists",
     icon: "📋",
   },
+  { id: "catalog", label: "Catalog", path: "#catalog", icon: "📖" },
+  { id: "analysis", label: "Analysis", path: "#analysis", icon: "📊" },
 ];
 
 interface TabBarProps {
