@@ -1380,22 +1380,27 @@ if (typeof window !== "undefined") {
           return existing[0].id;
         }
 
-        // Create a private tune using raw SQL
         const tuneId = generateId();
 
-        await db.run(
-          sql.raw(`INSERT INTO tune (
-            id, title, genre, private_for, deleted, sync_version, last_modified_at
+        await db.run(sql`
+          INSERT INTO tune (
+            id,
+            title,
+            genre,
+            private_for,
+            deleted,
+            sync_version,
+            last_modified_at
           ) VALUES (
-            '${tuneId}', 
-            'E2E Private Tune ${genre}', 
-            '${genre}', 
-            '${userId}', 
-            0, 
+            ${tuneId},
+            ${`E2E Private Tune ${genre}`},
+            ${genre},
+            ${userId},
+            0,
             1,
-            '${now}'
-          )`)
-        );
+            ${now}
+          )
+        `);
 
         return tuneId;
       },
@@ -1440,19 +1445,25 @@ if (typeof window !== "undefined") {
         }
 
         const tuneId = generateId();
-        await db.run(
-          sql.raw(`INSERT INTO tune (
-            id, title, genre, private_for, deleted, sync_version, last_modified_at
+        await db.run(sql`
+          INSERT INTO tune (
+            id,
+            title,
+            genre,
+            private_for,
+            deleted,
+            sync_version,
+            last_modified_at
           ) VALUES (
-            '${tuneId}',
-            '${input.title.replace(/'/g, "''")}',
-            ${input.genreId ? `'${input.genreId.replace(/'/g, "''")}'` : "NULL"},
-            '${input.userId}',
+            ${tuneId},
+            ${input.title},
+            ${input.genreId ?? null},
+            ${input.userId},
             0,
             1,
-            '${now}'
-          )`)
-        );
+            ${now}
+          )
+        `);
 
         return tuneId;
       },
@@ -1477,19 +1488,25 @@ if (typeof window !== "undefined") {
         }
 
         const tuneId = generateId();
-        await db.run(
-          sql.raw(`INSERT INTO tune (
-            id, title, genre, private_for, deleted, sync_version, last_modified_at
+        await db.run(sql`
+          INSERT INTO tune (
+            id,
+            title,
+            genre,
+            private_for,
+            deleted,
+            sync_version,
+            last_modified_at
           ) VALUES (
-            '${tuneId}',
-            '${input.title.replace(/'/g, "''")}',
-            ${input.genreId ? `'${input.genreId.replace(/'/g, "''")}'` : "NULL"},
+            ${tuneId},
+            ${input.title},
+            ${input.genreId ?? null},
             NULL,
             0,
             1,
-            '${now}'
-          )`)
-        );
+            ${now}
+          )
+        `);
 
         return tuneId;
       },

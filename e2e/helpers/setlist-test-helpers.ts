@@ -4,17 +4,17 @@ import { setupForSetlistTestsParallel } from "./practice-scenarios";
 import type { TestUser } from "./test-users";
 
 export const SETLIST_TITLES = {
-  alpha: "E2E Private Tune Setlist Alpha",
-  beta: "E2E Private Tune Setlist Beta",
-  gamma: "E2E Private Tune Setlist Gamma",
-  delta: "E2E Private Tune Setlist Delta",
+  alpha: "E2E Public Tune Setlist Alpha",
+  beta: "E2E Public Tune Setlist Beta",
+  gamma: "E2E Public Tune Setlist Gamma",
+  delta: "E2E Public Tune Setlist Delta",
   defaultTuneSet: "Opening Pair",
   defaultSetlist: "Festival Warmup",
   secondarySetlist: "Encore Slots",
   emptySetlist: "Empty Finale",
 } as const;
 
-const PRIVATE_TUNE_TITLES = [
+const PUBLIC_TUNE_TITLES = [
   SETLIST_TITLES.alpha,
   SETLIST_TITLES.beta,
   SETLIST_TITLES.gamma,
@@ -27,7 +27,7 @@ export async function setupDefaultSetlistsScenario(
 ) {
   return setupForSetlistTestsParallel(page, testUser, {
     repertoireTunes: [],
-    publicTunes: PRIVATE_TUNE_TITLES.map((title) => ({ title })),
+    publicTunes: PUBLIC_TUNE_TITLES.map((title) => ({ title })),
     sharedTuneSets: [
       {
         name: SETLIST_TITLES.defaultTuneSet,
@@ -70,7 +70,7 @@ export async function setupLibraryOnlySetlistsScenario(
 ) {
   return setupForSetlistTestsParallel(page, testUser, {
     repertoireTunes: [],
-    publicTunes: PRIVATE_TUNE_TITLES.map((title) => ({ title })),
+    publicTunes: PUBLIC_TUNE_TITLES.map((title) => ({ title })),
     sharedTuneSets: [
       {
         name: SETLIST_TITLES.defaultTuneSet,

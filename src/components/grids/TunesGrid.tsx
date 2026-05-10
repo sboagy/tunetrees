@@ -276,8 +276,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
 
     const visitRows = (rows: T[], parent?: T) => {
       rows.forEach((row, index) => {
-        const rowId =
-          props.getRowId?.(row, index, parent) ?? String((row as any).id);
+        const rowId = props.getRowId?.(row, index, parent) ?? String(row.id);
         rowsById[rowId] = row;
 
         const subRows = props.getSubRows?.(row) ?? [];
@@ -566,7 +565,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     onColumnVisibilityChange: setColumnVisibility,
     onColumnPinningChange: setColumnPinning,
     getRowId: (row, index, parent) =>
-      props.getRowId?.(row, index, parent?.original) ?? String((row as any).id),
+      props.getRowId?.(row, index, parent?.original) ?? String(row.id),
   });
 
   // Notify parent of table instance
@@ -1348,6 +1347,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
               <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualRow) => {
                   const row = () => currentRows()[virtualRow.index];
+                  const rowProps = () => props.getRowProps?.(row()!.original);
 
                   return (
                     <Show when={row()}>
@@ -1355,38 +1355,26 @@ export const TunesGrid = (<T extends { id: string | number }>(
                             row content without requiring a full table remount. */}
                       <tr
                         class={`${
-                          props.currentRowId === (row()!.original as any).id
+                          props.currentRowId === row()!.original.id
                             ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
                             : rowBelongsToSet(row()!.original)
                               ? "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60"
                               : ROW_CLASSES
-                        } ${props.getRowProps?.(row()!.original)?.class ?? ""}`.trim()}
+                        } ${rowProps()?.class ?? ""}`.trim()}
                         onClick={() => props.onRowClick?.(row()!.original)}
                         onDblClick={() =>
                           props.onRowDoubleClick?.(row()!.original)
                         }
                         data-index={virtualRow.index}
-                        draggable={
-                          props.getRowProps?.(row()!.original)?.draggable
-                        }
-                        data-testid={
-                          props.getRowProps?.(row()!.original)?.["data-testid"]
-                        }
+                        draggable={rowProps()?.draggable}
+                        data-testid={rowProps()?.["data-testid"]}
                         data-setlist-item-id={
-                          props.getRowProps?.(row()!.original)?.[
-                            "data-setlist-item-id"
-                          ]
+                          rowProps()?.["data-setlist-item-id"]
                         }
-                        onDragStart={
-                          props.getRowProps?.(row()!.original)?.onDragStart
-                        }
-                        onDragEnd={
-                          props.getRowProps?.(row()!.original)?.onDragEnd
-                        }
-                        onDragOver={
-                          props.getRowProps?.(row()!.original)?.onDragOver
-                        }
-                        onDrop={props.getRowProps?.(row()!.original)?.onDrop}
+                        onDragStart={rowProps()?.onDragStart}
+                        onDragEnd={rowProps()?.onDragEnd}
+                        onDragOver={rowProps()?.onDragOver}
+                        onDrop={rowProps()?.onDrop}
                       >
                         <For each={row()!.getVisibleCells()}>
                           {(cell) => (

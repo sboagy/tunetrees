@@ -1803,43 +1803,6 @@ const SetlistsPage: Component = () => {
                 <div class="flex h-full min-h-0 flex-col">
                   {/* Setlist items list */}
                   <div class="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-800">
-                    {/* Setlist title and metadata, hidden for now, remove the div to show */}
-                    <div class="hidden items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                      <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                        <div class="flex items-center justify-between gap-3">
-                          <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                              <h3 class="shrink-0 text-sm font-semibold text-gray-900 dark:text-white">
-                                {prog().name}
-                              </h3>
-                              <Show when={prog().groupName}>
-                                <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                                  •
-                                </span>
-                                <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-                                  Group: {prog().groupName}
-                                </span>
-                              </Show>
-                              <Show when={prog().description}>
-                                <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                                  •
-                                </span>
-                                <span
-                                  class="min-w-0 truncate text-xs text-gray-500 dark:text-gray-400"
-                                  title={prog().description ?? undefined}
-                                >
-                                  {prog().description}
-                                </span>
-                              </Show>
-                            </div>
-                          </div>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                          {prog().itemCount} item
-                          {prog().itemCount === 1 ? "" : "s"}
-                        </span>
-                      </div>
-                    </div>
                     <Show
                       when={(setlistItems() ?? []).length > 0}
                       fallback={
