@@ -1,5 +1,4 @@
-import { cleanup, render } from "@solidjs/testing-library";
-import { fireEvent, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import type { JSX } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getRepertoireColumns } from "../../../src/components/grids/TuneColumns";
