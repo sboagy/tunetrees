@@ -32,6 +32,7 @@ export const SYNCABLE_TABLES = [
   "reference",
   "repertoire",
   "repertoire_tune",
+  "rhythm_patterns",
   "setlist",
   "setlist_item",
   "tab_group_main_state",
@@ -131,6 +132,8 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     supportsIncremental: false,
     hasDeletedFlag: false,
     columnDescriptions: {
+      default_bpm:
+        "The baseline tempo (Beats/Quarter-notes Per Minute) for this specific genre and tune type combination (e.g., 115 for an ITRAD JigD).",
       genre_id: "Reference to the genre.",
       tune_type_id: "Reference to the tune type.",
     },
@@ -379,6 +382,29 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       scheduled: "Manual schedule override for next review.",
       sync_version: "Sync version for conflict resolution.",
       tune_ref: "Reference to the tune.",
+    },
+  },
+  rhythm_patterns: {
+    primaryKey: "id",
+    uniqueKeys: null,
+    timestamps: [],
+    booleanColumns: ["is_default"],
+    supportsIncremental: false,
+    hasDeletedFlag: false,
+    columnDescriptions: {
+      abc_string:
+        "The 2-bar or 4-bar ABC notation string used by the abcjs TimingCallbacks engine to generate the metronome loop (e.g., |: C2 c C c c :|).",
+      genre_id: "Foreign key component referencing the genre (e.g., ITRAD).",
+      id: "Unique identifier for the rhythm pattern variation.",
+      is_default:
+        "If true, this is the baseline Smart Metronome pattern that loads automatically when the user selects this genre/tune-type combination.",
+      name: 'A human-readable description for the UI dropdown (e.g., "Basic Rolling", "Driving Backbeat").',
+      part_target:
+        'Specifies which structural part this pattern targets. "*" or NULL applies to the whole tune, "A" applies only to the A part, "B" to the B part, allowing the groove to change mid-tune.',
+      premium_audio_url:
+        "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
+      tune_type_id:
+        "Foreign key component referencing the tune type (e.g., JigD).",
     },
   },
   setlist: {

@@ -83,6 +83,19 @@ beforeEach(async () => {
   `);
 
   db.run(`
+    CREATE TABLE rhythm_patterns (
+      id TEXT PRIMARY KEY NOT NULL,
+      genre_id TEXT NOT NULL,
+      tune_type_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      part_target TEXT,
+      abc_string TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      premium_audio_url TEXT
+    )
+  `);
+
+  db.run(`
     CREATE TABLE note (
       id TEXT PRIMARY KEY NOT NULL,
       content TEXT,

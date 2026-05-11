@@ -460,6 +460,14 @@ export const WORKER_SYNC_CONFIG = {
       },
       genre_tune_type: {
         denyDelete: true,
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "defaultBpm",
+              kind: "int",
+            },
+          ],
+        },
       },
       goal: {
         sanitize: {
@@ -695,6 +703,9 @@ export const WORKER_SYNC_CONFIG = {
             },
           ],
         },
+      },
+      rhythm_patterns: {
+        denyDelete: true,
       },
       setlist: {
         sanitize: {
