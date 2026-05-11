@@ -10,9 +10,6 @@ export interface MediaWorkerEnv {
 const MEDIA_UPLOAD_PATH = "/api/media/upload";
 const MEDIA_VIEW_PATH = "/api/media/view";
 const USER_ROOT_PREFIX = "users";
-const RHYTHM_SAMPLE_VIEW_PATH = "/api/rhythm-samples/view";
-const RHYTHM_SAMPLE_ROOT_PREFIX = "rhythm-samples";
-const LEGACY_RHYTHM_SAMPLE_ROOT_PREFIX = "samples";
 const MEDIA_KIND_FORM_FIELD = "mediaKind";
 const NOTES_MEDIA_KIND = "notes";
 const AUDIO_MEDIA_KIND = "audio";
@@ -142,62 +139,6 @@ function buildMediaViewUrl(request: Request, key: string) {
   const url = new URL(MEDIA_VIEW_PATH, request.url);
   url.searchParams.set("key", key);
   return url.toString();
-}
-
-function getRhythmSampleObjectKeyCandidates(
-  sampleKit: string,
-  fileName: string
-) {
-  const normalizedKit = sanitizeFilename(sampleKit);
-  const normalizedFileName = sanitizeFilename(fileName);
-  const candidates = [
-    `${RHYTHM_SAMPLE_ROOT_PREFIX}/${normalizedKit}/${normalizedFileName}`,
-    `${LEGACY_RHYTHM_SAMPLE_ROOT_PREFIX}/${normalizedKit}/${normalizedFileName}`,
-  ];
-
-  if (normalizedKit === "bodhran_bosone") {
-    candidates.push(
-      `${LEGACY_RHYTHM_SAMPLE_ROOT_PREFIX}/bodhran/${normalizedFileName}`
-    );
-  }
-
-  return [...new Set(candidates)];
-}
-
-function inferContentTypeFromFilename(fileName: string): string | null {
-  const normalizedFileName = fileName.trim().toLowerCase();
-  if (normalizedFileName.endsWith(".mp3")) {
-    return "audio/mpeg";
-  }
-  if (normalizedFileName.endsWith(".wav")) {
-    return "audio/wav";
-  }
-  if (normalizedFileName.endsWith(".ogg")) {
-    return "audio/ogg";
-  }
-  if (normalizedFileName.endsWith(".m4a")) {
-    return "audio/mp4";
-  }
-  return null;
-}
-
-function normalizeRhythmSampleContentType(headers: Headers, fileName: string) {
-  const currentType = headers.get("Content-Type")?.toLowerCase() ?? "";
-  if (currentType.startsWith("audio/")) {
-    return;
-  }
-
-  const inferredType = inferContentTypeFromFilename(fileName);
-  if (!inferredType) {
-    if (!currentType) {
-      headers.set("Content-Type", "application/octet-stream");
-    }
-    return;
-  }
-
-  if (!currentType || currentType === "application/octet-stream") {
-    headers.set("Content-Type", inferredType);
-  }
 }
 
 function isSupportedJwtAlgorithm(algorithm: string) {
@@ -523,103 +464,6 @@ async function handleMediaView(
   });
 }
 
-async function handleRhythmSampleView(
-  request: Request,
-  env: MediaWorkerEnv,
-  corsHeaders: Record<string, string>
-) {
-  if (!env.TUNETREES_VAULT) {
-    return errorResponse("Media storage is not configured", 500, corsHeaders);
-  }
-
-  const url = new URL(request.url);
-  const sampleKit = url.searchParams.get("kit")?.trim();
-  const fileName = url.searchParams.get("file")?.trim();
-  if (!sampleKit || !fileName) {
-    return errorResponse("Missing rhythm sample kit or file", 400, corsHeaders);
-  }
-
-  const keyCandidates = getRhythmSampleObjectKeyCandidates(sampleKit, fileName);
-
-  if (request.method === "HEAD") {
-    let objectHead: R2Object | null = null;
-    for (const candidateKey of keyCandidates) {
-      objectHead = await env.TUNETREES_VAULT.head(candidateKey);
-      if (objectHead) {
-        break;
-      }
-    }
-    if (!objectHead) {
-      return errorResponse("Rhythm sample not found", 404, corsHeaders);
-    }
-
-    const headers = new Headers(corsHeaders);
-    objectHead.writeHttpMetadata(headers);
-    headers.set("Accept-Ranges", "bytes");
-    headers.set("Cache-Control", "public, max-age=3600");
-    normalizeRhythmSampleContentType(headers, fileName);
-    if (typeof objectHead.size === "number") {
-      headers.set("Content-Length", String(objectHead.size));
-    }
-    if (objectHead.etag) {
-      headers.set("ETag", objectHead.etag);
-    }
-    return new Response(null, { status: 200, headers });
-  }
-
-  const requestedRange = request.headers.get("Range");
-  let object: R2ObjectBody | null = null;
-  for (const candidateKey of keyCandidates) {
-    object = requestedRange
-      ? await env.TUNETREES_VAULT.get(candidateKey, { range: request.headers })
-      : await env.TUNETREES_VAULT.get(candidateKey);
-    if (object?.body) {
-      break;
-    }
-  }
-
-  if (!object?.body) {
-    return errorResponse("Rhythm sample not found", 404, corsHeaders);
-  }
-
-  const headers = new Headers(corsHeaders);
-  object.writeHttpMetadata(headers);
-  headers.set("Accept-Ranges", "bytes");
-  headers.set("Cache-Control", "public, max-age=3600");
-  normalizeRhythmSampleContentType(headers, fileName);
-
-  const objectRange = "range" in object ? object.range : undefined;
-  const offsetRange =
-    objectRange && "offset" in objectRange && "length" in objectRange
-      ? objectRange
-      : null;
-  const rangeOffset = offsetRange?.offset;
-  const rangeLength = offsetRange?.length;
-  const isPartialResponse =
-    Boolean(requestedRange) &&
-    typeof rangeOffset === "number" &&
-    typeof rangeLength === "number" &&
-    typeof object.size === "number";
-
-  if (isPartialResponse) {
-    headers.set(
-      "Content-Range",
-      `bytes ${rangeOffset}-${rangeOffset + rangeLength - 1}/${object.size}`
-    );
-    headers.set("Content-Length", String(rangeLength));
-  } else if (typeof object.size === "number") {
-    headers.set("Content-Length", String(object.size));
-  }
-  if (object.etag) {
-    headers.set("ETag", object.etag);
-  }
-
-  return new Response(object.body, {
-    status: isPartialResponse ? 206 : 200,
-    headers,
-  });
-}
-
 export async function handleMediaRequest(
   request: Request,
   env: MediaWorkerEnv
@@ -629,13 +473,6 @@ export async function handleMediaRequest(
 
   if (request.method === "POST" && url.pathname === MEDIA_UPLOAD_PATH) {
     return handleMediaUpload(request, env, corsHeaders);
-  }
-
-  if (
-    (request.method === "GET" || request.method === "HEAD") &&
-    url.pathname === RHYTHM_SAMPLE_VIEW_PATH
-  ) {
-    return handleRhythmSampleView(request, env, corsHeaders);
   }
 
   if (

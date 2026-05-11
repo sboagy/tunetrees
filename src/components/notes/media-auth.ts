@@ -2,7 +2,6 @@ const DEFAULT_WORKER_URL =
   import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
 
 const MEDIA_VIEW_PATH = "/api/media/view";
-const RHYTHM_SAMPLE_VIEW_PATH = "/api/rhythm-samples/view";
 const MEDIA_TOKEN_PARAM = "token";
 
 const applyAuthTokenToMediaUrl = (
@@ -67,17 +66,6 @@ export const buildMediaViewUrl = (
 ) => {
   const url = new URL(MEDIA_VIEW_PATH, workerUrl);
   url.searchParams.set("key", key);
-  return url.toString();
-};
-
-export const buildRhythmSampleUrl = (
-  sampleKit: string,
-  fileName: string,
-  workerUrl = DEFAULT_WORKER_URL
-) => {
-  const url = new URL(RHYTHM_SAMPLE_VIEW_PATH, workerUrl);
-  url.searchParams.set("kit", sampleKit);
-  url.searchParams.set("file", fileName);
   return url.toString();
 };
 

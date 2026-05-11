@@ -1,5 +1,4 @@
 import { cleanup, render } from "@solidjs/testing-library";
-import { fireEvent, screen } from "@solidjs/testing-library";
 import type { JSX } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getRepertoireColumns } from "../../../src/components/grids/TuneColumns";
@@ -16,9 +15,6 @@ type MockScheduledOverridePickerProps = {
 type ScheduledRow = {
   id: string;
   tune_id?: string | number | null;
-  type?: string | null;
-  structure?: string | null;
-  genre?: string | null;
   scheduled?: string | null;
   latest_due?: string | null;
   recall_eval?: string | null;
@@ -63,19 +59,6 @@ function getScheduledCellRenderer(callbacks?: ICellEditorCallbacks) {
   return scheduledColumn.cell;
 }
 
-function getTypeCellRenderer(callbacks?: ICellEditorCallbacks) {
-  const typeColumn = getRepertoireColumns(callbacks).find(
-    (column) =>
-      "accessorKey" in column && (column.accessorKey as string) === "type"
-  ) as { cell?: (info: ScheduledCellInfo) => JSX.Element } | undefined;
-
-  if (!typeColumn?.cell) {
-    throw new Error("Type column cell renderer was not found");
-  }
-
-  return typeColumn.cell;
-}
-
 function renderScheduledCell(
   row: ScheduledRow,
   callbacks?: ICellEditorCallbacks
@@ -96,24 +79,6 @@ function renderScheduledCell(
 
         return null;
       },
-    },
-    cell: {
-      row: {
-        original: row,
-      },
-    },
-  };
-
-  return render(() => renderCell(info));
-}
-
-function renderTypeCell(row: ScheduledRow, callbacks?: ICellEditorCallbacks) {
-  const renderCell = getTypeCellRenderer(callbacks);
-  const info: ScheduledCellInfo = {
-    getValue: () => row.type || null,
-    row: {
-      original: row,
-      getValue: () => null,
     },
     cell: {
       row: {
@@ -183,33 +148,5 @@ describe("getRepertoireColumns scheduled column", () => {
     expect(pickerProps.value).toBe("2026-04-25T12:00:00.000Z");
     expect(pickerProps.triggerTextClass).toContain("text-green-600");
     expect(pickerProps.triggerLabel).toMatch(/In \d+d/);
-  });
-
-  it("opens rhythm practice from the type badge when a callback is provided", async () => {
-    const onRhythmPracticeOpen = vi.fn();
-
-    renderTypeCell(
-      {
-        id: "tune-3",
-        tune_id: "tune-3",
-        type: "Jig",
-        structure: "AABB",
-        genre: "Irish Traditional",
-      },
-      {
-        onRhythmPracticeOpen,
-      }
-    );
-
-    await fireEvent.click(
-      screen.getByRole("button", { name: "Open rhythm player for Jig" })
-    );
-
-    expect(onRhythmPracticeOpen).toHaveBeenCalledWith({
-      tuneId: "tune-3",
-      tuneTypeName: "Jig",
-      structure: "AABB",
-      genreName: "Irish Traditional",
-    });
   });
 });

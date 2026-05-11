@@ -153,7 +153,7 @@ const SelectAllCheckbox: Component<{ table: Table<any> }> = (props) => {
  * Get column definitions for Catalog grid
  */
 export function getCatalogColumns(
-  callbacks?: ICellEditorCallbacks
+  _callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
   return [
     // Selection checkbox
@@ -282,47 +282,11 @@ export function getCatalogColumns(
       header: ({ column }) => <SortableHeader column={column} title="Type" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
-        const row = info.row.original as {
-          id?: string | number | null;
-          tune_id?: string | number | null;
-          structure?: string | null;
-          genre?: string | null;
-        };
-
-        const rhythmTarget =
-          value && callbacks?.onRhythmPracticeOpen
-            ? {
-                tuneId: String(row.tune_id ?? row.id ?? ""),
-                tuneTypeName: value,
-                structure: row.structure ?? null,
-                genreName: row.genre ?? null,
-              }
-            : null;
-
         return (
           <Show when={value} fallback={<span class="text-gray-400">—</span>}>
-            <Show
-              when={rhythmTarget}
-              fallback={
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                  {value}
-                </span>
-              }
-            >
-              <button
-                type="button"
-                class="inline-flex cursor-pointer items-center rounded px-2 py-0.5 text-xs bg-blue-100 text-blue-800 transition-colors hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  callbacks?.onRhythmPracticeOpen?.(rhythmTarget!);
-                }}
-                title="Open rhythm player"
-                aria-label={`Open rhythm player for ${value}`}
-                data-testid="tune-type-rhythm-trigger"
-              >
-                {value}
-              </button>
-            </Show>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+              {value}
+            </span>
           </Show>
         );
       },
