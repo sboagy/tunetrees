@@ -1,14 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 type RhythmMetadata = {
   rhythmAbc: string;
@@ -59,9 +51,7 @@ let RhythmPlayer: typeof import("../../../src/components/rhythm/RhythmPlayer").R
 let setBeatIndex: (value: number) => number;
 
 beforeAll(async () => {
-  ({ RhythmPlayer } = await import(
-    "../../../src/components/rhythm/RhythmPlayer"
-  ));
+  ({ RhythmPlayer } = await import("../../../src/components/rhythm/RhythmPlayer"));
 });
 
 beforeEach(() => {

@@ -22,8 +22,8 @@ import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
-import { useSidebarResize } from "../layout/SidebarResizeContext";
 import RhythmPlayer from "../rhythm/RhythmPlayer";
+import { useSidebarResize } from "../layout/SidebarResizeContext";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type {
