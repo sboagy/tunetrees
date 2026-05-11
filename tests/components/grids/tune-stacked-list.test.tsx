@@ -406,4 +406,38 @@ describe("TuneStackedList column visibility", () => {
       "2026-04-12T15:30:00.000Z"
     );
   });
+
+  it("opens rhythm practice from the stacked-list type badge without firing row click", async () => {
+    const onRhythmPracticeOpen = vi.fn();
+    const onRowClick = vi.fn();
+
+    render(() => (
+      <TuneStackedList
+        data={[baseRow]}
+        tablePurpose="scheduled"
+        columnVisibility={buildVisibility(scheduledColumns, false, {
+          type: true,
+        })}
+        onRowClick={onRowClick}
+        cellCallbacks={{
+          onRhythmPracticeOpen,
+          goals: () => [{ id: "goal-1", name: "perform" }],
+        }}
+      />
+    ));
+
+    await fireEvent.click(
+      screen.getByRole("button", {
+        name: "Open rhythm player for Slip Jig",
+      })
+    );
+
+    expect(onRhythmPracticeOpen).toHaveBeenCalledWith({
+      tuneId: "tune-row-1",
+      tuneTypeName: "Slip Jig",
+      structure: "AABBCC",
+      genreName: "Irish Traditional",
+    });
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
 });

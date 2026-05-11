@@ -161,6 +161,13 @@ export interface IGoalOption {
   name: string;
 }
 
+export interface IRhythmPracticeTarget {
+  tuneId: string;
+  tuneTypeName: string | null;
+  structure: string | null;
+  genreName: string | null;
+}
+
 /**
  * Cell editor callback signatures
  */
@@ -168,6 +175,7 @@ export interface ICellEditorCallbacks {
   onRecallEvalChange?: (tuneId: string, newValue: string) => void;
   getRecallEvalOpen?: (tuneId: string) => boolean;
   setRecallEvalOpen?: (tuneId: string, open: boolean) => void;
+  onRhythmPracticeOpen?: (target: IRhythmPracticeTarget) => void;
   onGoalChange?: (tuneId: string, newValue: string | null) => void;
   onNotePrivateChange?: (tuneId: string, newValue: string) => void;
   onNotePublicChange?: (tuneId: string, newValue: string) => void;

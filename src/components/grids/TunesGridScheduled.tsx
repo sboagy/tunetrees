@@ -14,6 +14,7 @@ import {
   createMemo,
   createResource,
   createSignal,
+  onCleanup,
   Show,
 } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -21,10 +22,15 @@ import { useCurrentRepertoire } from "../../lib/context/CurrentRepertoireContext
 import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
+import RhythmPlayer from "../rhythm/RhythmPlayer";
 import { useSidebarResize } from "../layout/SidebarResizeContext";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
-import type { IGridBaseProps, ITuneOverview } from "./types";
+import type {
+  IGridBaseProps,
+  IRhythmPracticeTarget,
+  ITuneOverview,
+} from "./types";
 
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // No direct staging here; parent handles DB side-effects.
@@ -102,9 +108,34 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   // Preserve recall-eval menu open state across reactive grid refreshes.
   const [openMenus, setOpenMenus] = createSignal<Record<string, boolean>>({});
+  const [activeRhythmTune, setActiveRhythmTune] =
+    createSignal<IRhythmPracticeTarget | null>(null);
   const getRecallEvalOpen = (tuneId: string) => !!openMenus()[tuneId];
   const setRecallEvalOpen = (tuneId: string, isOpen: boolean) =>
     setOpenMenus((prev) => ({ ...prev, [tuneId]: isOpen }));
+
+  const closeRhythmPlayer = () => {
+    setActiveRhythmTune(null);
+  };
+
+  const handleRhythmPlayerKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      closeRhythmPlayer();
+    }
+  };
+
+  createEffect(() => {
+    if (!activeRhythmTune()) {
+      document.removeEventListener("keydown", handleRhythmPlayerKeyDown);
+      return;
+    }
+
+    document.addEventListener("keydown", handleRhythmPlayerKeyDown);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener("keydown", handleRhythmPlayerKeyDown);
+  });
 
   // Notify parent when tunes change (for flashcard view)
   createEffect(() => {
@@ -198,6 +229,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
             onRecallEvalChange: handleRecallEvalChange,
             getRecallEvalOpen,
             setRecallEvalOpen,
+            onRhythmPracticeOpen: setActiveRhythmTune,
             onGoalChange: props.onGoalChange,
             onScheduledChange: props.onScheduledChange,
             goals: () => goalsData() ?? [],
@@ -207,6 +239,57 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
             props.onTableInstanceChange?.(tbl as any);
           }}
         />
+      </Show>
+
+      <Show keyed when={activeRhythmTune()}>
+        {(target) => (
+          <div
+            class="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/35 p-4 backdrop-blur-[2px] md:items-start md:p-6"
+            data-testid="rhythm-player-overlay"
+          >
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Close rhythm player overlay"
+              onClick={closeRhythmPlayer}
+              class="absolute inset-0 h-full w-full bg-transparent"
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Rhythm player"
+              class="relative z-10 flex h-[min(42rem,calc(100dvh-2rem))] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                    Practice Queue Rhythm
+                  </p>
+                  <h3 class="truncate text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    {target.tuneTypeName || "Rhythm Player"}
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeRhythmPlayer}
+                  class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  data-testid="rhythm-player-close-button"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div class="min-h-0 flex-1 overflow-auto p-4">
+                <RhythmPlayer
+                  tuneTypeName={target.tuneTypeName}
+                  structure={target.structure}
+                  genreName={target.genreName}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </Show>
 
       {/* Sticky Footer with Stats.

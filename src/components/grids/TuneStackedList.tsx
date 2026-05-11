@@ -23,7 +23,11 @@ import {
 import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
-import type { ICellEditorCallbacks, TablePurpose } from "./types";
+import type {
+  ICellEditorCallbacks,
+  IRhythmPracticeTarget,
+  TablePurpose,
+} from "./types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,11 +81,34 @@ function getRelativeLabel(value: string | null | undefined): {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const TypeBadge = (props: { value: string | null | undefined }) => (
+const TypeBadge = (props: {
+  value: string | null | undefined;
+  rhythmTarget?: IRhythmPracticeTarget;
+  onRhythmPracticeOpen?: (target: IRhythmPracticeTarget) => void;
+}) => (
   <Show when={props.value}>
-    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-      {props.value}
-    </span>
+    <Show
+      when={props.rhythmTarget && props.onRhythmPracticeOpen}
+      fallback={
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+          {props.value}
+        </span>
+      }
+    >
+      <button
+        type="button"
+        class="inline-flex cursor-pointer items-center rounded px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 transition-colors hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
+        onClick={(event) => {
+          event.stopPropagation();
+          props.onRhythmPracticeOpen?.(props.rhythmTarget!);
+        }}
+        title="Open rhythm player"
+        aria-label={`Open rhythm player for ${props.value}`}
+        data-testid="tune-type-rhythm-trigger"
+      >
+        {props.value}
+      </button>
+    </Show>
   </Show>
 );
 
@@ -335,6 +362,14 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
             const scheduledDisplay = displayedScheduled
               ? getRelativeLabel(displayedScheduled)
               : null;
+            const rhythmTarget: IRhythmPracticeTarget | undefined = item.type
+              ? {
+                  tuneId: String(item.tune_id ?? item.id),
+                  tuneTypeName: item.type,
+                  structure: item.structure ?? null,
+                  genreName: item.genre ?? null,
+                }
+              : undefined;
 
             const tuneMetadata = (): JSX.Element[] => [
               ...(isColVisible("structure") && item.structure
@@ -633,7 +668,13 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                     {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
                     <div class="mt-1 flex flex-wrap items-center gap-1.5">
                       <Show when={isColVisible("type")}>
-                        <TypeBadge value={item.type} />
+                        <TypeBadge
+                          value={item.type}
+                          rhythmTarget={rhythmTarget}
+                          onRhythmPracticeOpen={
+                            props.cellCallbacks?.onRhythmPracticeOpen
+                          }
+                        />
                       </Show>
                       <Show when={isColVisible("mode")}>
                         <ModeBadge value={item.mode} />
