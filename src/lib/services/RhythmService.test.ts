@@ -58,6 +58,18 @@ function createRhythmDbWithoutPatternRow() {
   ]);
 }
 
+function createRhythmDbWithLegacyPatternColumns() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, tune_type_id TEXT NOT NULL, abc_string TEXT NOT NULL)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
+  ]);
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -81,7 +93,7 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata?.rhythmAbc).toContain("Reel Groove");
   });
 
-  it("does not synthesize fallback ABC when rhythm_patterns exists but has no matching row", async () => {
+  it("falls back to generated ABC when rhythm_patterns has no matching row", async () => {
     const db = createRhythmDbWithoutPatternRow();
 
     const metadata = await loadRhythmPatternMetadata(db, {
@@ -89,7 +101,32 @@ describe("loadRhythmPatternMetadata", () => {
       tuneTypeName: "Reel",
     });
 
-    expect(metadata).toBeNull();
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      tempoQpm: 112,
+      sampleKit: "bodhran_bosone",
+      source: "tune_type_fallback",
+    });
+    expect(metadata?.rhythmAbc).toContain("M:4/4");
+  });
+
+  it("falls back when rhythm_patterns exists with an older partial schema", async () => {
+    const db = createRhythmDbWithLegacyPatternColumns();
+
+    const metadata = await loadRhythmPatternMetadata(db, {
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+    });
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      tempoQpm: 112,
+      sampleKit: "bodhran_bosone",
+      source: "tune_type_fallback",
+    });
+    expect(metadata?.rhythmAbc).toContain("M:4/4");
   });
 
   it("falls back to generated percussion ABC and default tempo when new tables are absent", async () => {

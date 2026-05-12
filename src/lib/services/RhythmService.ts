@@ -10,6 +10,14 @@ import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 
 const DEFAULT_SAMPLE_BASE_URL = "/samples/bodhran";
 const DEFAULT_SAMPLE_KIT = "bodhran_bosone";
+const REQUIRED_RHYTHM_PATTERN_COLUMNS = [
+  "abc_string",
+  "genre_id",
+  "is_default",
+  "name",
+  "part_target",
+  "tune_type_id",
+] as const;
 const SAMPLE_FILE_BY_PITCH: Record<number, string> = {
   60: "bass.mp3",
   69: "rim.mp3",
@@ -175,8 +183,9 @@ export async function loadRhythmPatternMetadata(
 
   const canUseRhythmPatterns =
     hasRhythmPatternsTable &&
-    rhythmPatternColumns.has("abc_string") &&
-    rhythmPatternColumns.has("tune_type_id");
+    REQUIRED_RHYTHM_PATTERN_COLUMNS.every((column) =>
+      rhythmPatternColumns.has(column)
+    );
 
   const genreFilter = request.genreName?.trim() || null;
 
@@ -256,8 +265,6 @@ export async function loadRhythmPatternMetadata(
         source: "rhythm_patterns",
       };
     }
-
-    return null;
   }
 
   if (hasGenreDefaultBpmColumn) {

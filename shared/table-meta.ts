@@ -310,7 +310,7 @@ const TABLE_EXTRAS: Record<
     },
   },
   rhythm_patterns: {
-    changeCategory: null,
+    changeCategory: "catalog",
     columnDescriptions: {
       abc_string:
         "The 2-bar or 4-bar ABC notation string used by the abcjs TimingCallbacks engine to generate the metronome loop (e.g., |: C2 c C c c :|).",
