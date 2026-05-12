@@ -332,6 +332,10 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
           timeout: 20000,
         });
 
+        // After time-travel reloads and re-login redirects, land back on the
+        // Practice route before refreshing queue state or toggling flashcards.
+        await ttPage.navigateToTab("practice");
+
         // After reload, ensure we pull any data that was flushed server-side
         await runTestHook(page, "__forceSyncDownForTest");
         await page.waitForLoadState("networkidle", { timeout: 15000 });

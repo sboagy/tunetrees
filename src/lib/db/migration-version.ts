@@ -8,7 +8,7 @@
  * @module lib/db/migration-version
  */
 
-const CURRENT_SCHEMA_VERSION = "2.0.9-rename-program-to-setlist"; // Bump this when schema changes
+const CURRENT_SCHEMA_VERSION = "2.0.10-add-rhythm-patterns"; // Bump this when schema changes
 
 /**
  * Get the locally stored schema version from localStorage

@@ -115,6 +115,7 @@ export const genreTuneType = sqliteTable(
     tuneTypeId: text("tune_type_id")
       .notNull()
       .references(() => tuneType.id),
+    defaultBpm: integer("default_bpm"),
   },
   (t) => [primaryKey({ columns: [t.genreId, t.tuneTypeId] })]
 );
@@ -424,6 +425,24 @@ export const repertoireTune = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.repertoireRef, t.tuneRef] })]
 );
+
+export const rhythmPatterns = sqliteTable("rhythm_patterns", {
+  id: text("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  genreId: text("genre_id")
+    .notNull()
+    .references(() => genre.id),
+  tuneTypeId: text("tune_type_id")
+    .notNull()
+    .references(() => tuneType.id),
+  name: text("name").notNull(),
+  partTarget: text("part_target").default("*"),
+  abcString: text("abc_string").notNull(),
+  isDefault: integer("is_default").notNull().default(0),
+  premiumAudioUrl: text("premium_audio_url"),
+});
 
 export const setlist = sqliteTable(
   "setlist",

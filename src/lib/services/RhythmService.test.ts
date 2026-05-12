@@ -24,18 +24,18 @@ function createReferenceRhythmDb() {
   return createDb([
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
-    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, tempo INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, rhythm_abc TEXT, sample_kit TEXT, tune_structure TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT)",
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
-    "INSERT INTO genre_tune_type (genre_id, tune_type_id, tempo) VALUES ('ITRAD', 'Reel', 112)",
-    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, rhythm_abc, sample_kit, tune_structure)
-      VALUES ('rp-1', 'ITRAD', 'Reel', 'X:1
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url)
+      VALUES ('rp-1', 'ITRAD', 'Reel', 'Basic Rolling', '*', 'X:1
 T:Reel Groove
 M:4/4
 L:1/8
 K:clef=perc
-|: C2 A2 C2 A2 :|', 'bodhran_bosone', 'AABB')`,
+|: C2 A2 C2 A2 :|', 1, NULL)`,
   ]);
 }
 
@@ -46,12 +46,36 @@ function createFallbackRhythmDb() {
   ]);
 }
 
+function createRhythmDbWithoutPatternRow() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
+  ]);
+}
+
+function createRhythmDbWithLegacyPatternColumns() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, tune_type_id TEXT NOT NULL, abc_string TEXT NOT NULL)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
+  ]);
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe("loadRhythmPatternMetadata", () => {
-  it("prefers rhythm_patterns and genre_tune_type.tempo when available", async () => {
+  it("prefers rhythm_patterns and genre_tune_type.default_bpm when available", async () => {
     const db = createReferenceRhythmDb();
 
     const metadata = await loadRhythmPatternMetadata(db, {
@@ -67,6 +91,42 @@ describe("loadRhythmPatternMetadata", () => {
       source: "rhythm_patterns",
     });
     expect(metadata?.rhythmAbc).toContain("Reel Groove");
+  });
+
+  it("falls back to generated ABC when rhythm_patterns has no matching row", async () => {
+    const db = createRhythmDbWithoutPatternRow();
+
+    const metadata = await loadRhythmPatternMetadata(db, {
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+    });
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      tempoQpm: 112,
+      sampleKit: "bodhran_bosone",
+      source: "tune_type_fallback",
+    });
+    expect(metadata?.rhythmAbc).toContain("M:4/4");
+  });
+
+  it("falls back when rhythm_patterns exists with an older partial schema", async () => {
+    const db = createRhythmDbWithLegacyPatternColumns();
+
+    const metadata = await loadRhythmPatternMetadata(db, {
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+    });
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      tempoQpm: 112,
+      sampleKit: "bodhran_bosone",
+      source: "tune_type_fallback",
+    });
+    expect(metadata?.rhythmAbc).toContain("M:4/4");
   });
 
   it("falls back to generated percussion ABC and default tempo when new tables are absent", async () => {

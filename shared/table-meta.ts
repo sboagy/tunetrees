@@ -115,6 +115,8 @@ const TABLE_EXTRAS: Record<
   genre_tune_type: {
     changeCategory: "catalog",
     columnDescriptions: {
+      default_bpm:
+        "The baseline tempo (Beats/Quarter-notes Per Minute) for this specific genre and tune type combination (e.g., 115 for an ITRAD JigD).",
       genre_id: "Reference to the genre.",
       tune_type_id: "Reference to the tune type.",
     },
@@ -305,6 +307,24 @@ const TABLE_EXTRAS: Record<
       scheduled: "Manual schedule override for next review.",
       sync_version: "Sync version for conflict resolution.",
       tune_ref: "Reference to the tune.",
+    },
+  },
+  rhythm_patterns: {
+    changeCategory: "catalog",
+    columnDescriptions: {
+      abc_string:
+        "The 2-bar or 4-bar ABC notation string used by the abcjs TimingCallbacks engine to generate the metronome loop (e.g., |: C2 c C c c :|).",
+      genre_id: "Foreign key component referencing the genre (e.g., ITRAD).",
+      id: "Unique identifier for the rhythm pattern variation.",
+      is_default:
+        "If true, this is the baseline Smart Metronome pattern that loads automatically when the user selects this genre/tune-type combination.",
+      name: 'A human-readable description for the UI dropdown (e.g., "Basic Rolling", "Driving Backbeat").',
+      part_target:
+        'Specifies which structural part this pattern targets. "*" or NULL applies to the whole tune, "A" applies only to the A part, "B" to the B part, allowing the groove to change mid-tune.',
+      premium_audio_url:
+        "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
+      tune_type_id:
+        "Foreign key component referencing the tune type (e.g., JigD).",
     },
   },
   setlist: {
@@ -610,36 +630,37 @@ export function parseOutboxRowId(
 }
 
 export const TABLE_SYNC_ORDER: Record<string, number> = {
-  daily_practice_queue: 5,
-  event: 27,
+  daily_practice_queue: 6,
+  event: 28,
   genre: 1,
   genre_tune_type: 3,
-  goal: 6,
-  group_member: 25,
-  instrument: 7,
-  media_asset: 18,
-  note: 15,
-  plugin: 8,
-  practice_record: 16,
-  prefs_scheduling_options: 9,
-  prefs_spaced_repetition: 10,
-  reference: 17,
-  repertoire: 11,
-  repertoire_tune: 19,
-  setlist: 26,
-  setlist_item: 29,
-  tab_group_main_state: 12,
-  table_state: 13,
-  table_transient_data: 20,
-  tag: 21,
-  tune: 14,
-  tune_override: 22,
-  tune_set: 28,
-  tune_set_item: 30,
+  goal: 7,
+  group_member: 26,
+  instrument: 8,
+  media_asset: 19,
+  note: 16,
+  plugin: 9,
+  practice_record: 17,
+  prefs_scheduling_options: 10,
+  prefs_spaced_repetition: 11,
+  reference: 18,
+  repertoire: 12,
+  repertoire_tune: 20,
+  rhythm_patterns: 4,
+  setlist: 27,
+  setlist_item: 30,
+  tab_group_main_state: 13,
+  table_state: 14,
+  table_transient_data: 21,
+  tag: 22,
+  tune: 15,
+  tune_override: 23,
+  tune_set: 29,
+  tune_set_item: 31,
   tune_type: 2,
-  user_genre_selection: 23,
-  user_group: 24,
-  user_profile: 4,
+  user_genre_selection: 24,
+  user_group: 25,
+  user_profile: 5,
 };
 
 export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
@@ -659,6 +680,7 @@ export const TABLE_TO_SCHEMA_KEY: Record<string, string> = {
   reference: "reference",
   repertoire: "repertoire",
   repertoire_tune: "repertoireTune",
+  rhythm_patterns: "rhythmPatterns",
   setlist: "setlist",
   setlist_item: "setlistItem",
   tab_group_main_state: "tabGroupMainState",

@@ -80,6 +80,7 @@ export const genre = pgTable("genre", {
 export const genreTuneType = pgTable("genre_tune_type", {
   genreId: text("genre_id").notNull(),
   tuneTypeId: text("tune_type_id").notNull(),
+  defaultBpm: integer("default_bpm"),
 });
 
 export const goal = pgTable("goal", {
@@ -315,6 +316,20 @@ export const repertoireTune = pgTable("repertoire_tune", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+});
+
+export const rhythmPatterns = pgTable("rhythm_patterns", {
+  id: uuid("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  genreId: text("genre_id").notNull(),
+  tuneTypeId: text("tune_type_id").notNull(),
+  name: text("name").notNull(),
+  partTarget: text("part_target").default("*"),
+  abcString: text("abc_string").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  premiumAudioUrl: text("premium_audio_url"),
 });
 
 export const setlist = pgTable("setlist", {
@@ -601,6 +616,7 @@ export const tables = {
   reference: reference,
   repertoire: repertoire,
   repertoire_tune: repertoireTune,
+  rhythm_patterns: rhythmPatterns,
   setlist: setlist,
   setlist_item: setlistItem,
   sync_change_log: syncChangeLog,

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import type { TuneTreesPage } from "../page-objects/TuneTreesPage";
 import { setupForSetlistTestsParallel } from "./practice-scenarios";
@@ -68,18 +69,25 @@ export async function setupLibraryOnlySetlistsScenario(
   page: Page,
   testUser: TestUser
 ) {
-  return setupForSetlistTestsParallel(page, testUser, {
+  const libraryTuneSetName = `${SETLIST_TITLES.defaultTuneSet} ${randomUUID().slice(0, 8)}`;
+
+  const scenario = await setupForSetlistTestsParallel(page, testUser, {
     repertoireTunes: [],
     publicTunes: PUBLIC_TUNE_TITLES.map((title) => ({ title })),
     sharedTuneSets: [
       {
-        name: SETLIST_TITLES.defaultTuneSet,
+        name: libraryTuneSetName,
         description: "Opening set for regression coverage",
         tuneIndexes: [1, 2],
       },
     ],
     setlists: [],
   });
+
+  return {
+    ...scenario,
+    libraryTuneSetName,
+  };
 }
 
 export async function setupNamedEmptySetlistScenario(

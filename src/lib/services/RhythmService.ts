@@ -10,6 +10,14 @@ import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 
 const DEFAULT_SAMPLE_BASE_URL = "/samples/bodhran";
 const DEFAULT_SAMPLE_KIT = "bodhran_bosone";
+const REQUIRED_RHYTHM_PATTERN_COLUMNS = [
+  "abc_string",
+  "genre_id",
+  "is_default",
+  "name",
+  "part_target",
+  "tune_type_id",
+] as const;
 const SAMPLE_FILE_BY_PITCH: Record<number, string> = {
   60: "bass.mp3",
   69: "rim.mp3",
@@ -33,6 +41,7 @@ export interface RhythmPatternMetadata {
   tuneTypeName: string;
   rhythmAbc: string;
   rhythmSignature: string | null;
+  tuneStructure?: string | null;
   tempoQpm: number;
   sampleKit: string;
   source: "rhythm_patterns" | "tune_type_fallback";
@@ -51,8 +60,10 @@ export interface RhythmService {
   ) => Promise<RhythmPatternMetadata | null>;
   play: () => Promise<void>;
   pause: () => void;
+  restart: () => Promise<void>;
   togglePlayback: () => Promise<void>;
   setTempoQpm: (nextQpm: number) => Promise<void>;
+  updateRhythmAbc: (nextRhythmAbc: string) => void;
 }
 
 export interface CreateRhythmServiceOptions {
@@ -61,6 +72,7 @@ export interface CreateRhythmServiceOptions {
   audioContext?: AudioContext;
   fetchImpl?: typeof fetch;
   sampleBaseUrl?: string;
+  sampleUrlBuilder?: (sampleKit: string, fileName: string) => string;
 }
 
 type ResolvedAbcjsModule = NonNullable<
@@ -160,8 +172,8 @@ export async function loadRhythmPatternMetadata(
     return null;
   }
 
-  const hasGenreTempoColumn = (await tableExists(db, "genre_tune_type"))
-    ? (await getTableColumns(db, "genre_tune_type")).has("tempo")
+  const hasGenreDefaultBpmColumn = (await tableExists(db, "genre_tune_type"))
+    ? (await getTableColumns(db, "genre_tune_type")).has("default_bpm")
     : false;
   const hasRhythmPatternsTable = await tableExists(db, "rhythm_patterns");
 
@@ -171,20 +183,96 @@ export async function loadRhythmPatternMetadata(
 
   const canUseRhythmPatterns =
     hasRhythmPatternsTable &&
-    rhythmPatternColumns.has("rhythm_abc") &&
-    rhythmPatternColumns.has("sample_kit") &&
-    rhythmPatternColumns.has("tune_type_id");
+    REQUIRED_RHYTHM_PATTERN_COLUMNS.every((column) =>
+      rhythmPatternColumns.has(column)
+    );
 
   const genreFilter = request.genreName?.trim() || null;
 
-  if (hasGenreTempoColumn || canUseRhythmPatterns) {
+  if (canUseRhythmPatterns) {
     const rows = await db.all<{
       genre_name: string | null;
       tune_type_name: string | null;
       rhythm_signature: string | null;
       tempo_qpm: number | null;
-      rhythm_abc: string | null;
-      sample_kit: string | null;
+      abc_string: string | null;
+    }>(sql`
+      WITH tune_type_match AS (
+        SELECT id, name, rhythm
+        FROM tune_type
+        WHERE lower(name) = lower(${tuneTypeName})
+        LIMIT 1
+      ),
+      genre_match AS (
+        SELECT id, name
+        FROM genre
+        WHERE ${genreFilter} IS NOT NULL
+          AND lower(name) = lower(${genreFilter})
+        LIMIT 1
+      ),
+      selected_pattern AS (
+        SELECT
+          rp.genre_id,
+          rp.tune_type_id,
+          rp.abc_string,
+          rp.is_default,
+          rp.part_target,
+          ROW_NUMBER() OVER (
+            ORDER BY
+              CASE WHEN rp.is_default THEN 0 ELSE 1 END,
+              CASE
+                WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0
+                ELSE 1
+              END,
+              rp.name
+          ) AS row_num
+        FROM rhythm_patterns rp
+        JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
+        LEFT JOIN genre_match gm ON 1 = 1
+        WHERE (gm.id IS NULL OR rp.genre_id = gm.id)
+      )
+      SELECT
+        gm.name AS genre_name,
+        ttm.name AS tune_type_name,
+        ttm.rhythm AS rhythm_signature,
+        ${
+          hasGenreDefaultBpmColumn
+            ? sql`gtt.default_bpm`
+            : sql`CAST(NULL AS INTEGER)`
+        } AS tempo_qpm,
+        sp.abc_string AS abc_string
+      FROM tune_type_match ttm
+      LEFT JOIN genre_match gm ON 1 = 1
+      LEFT JOIN genre_tune_type gtt
+        ON gtt.tune_type_id = ttm.id
+       AND (gm.id IS NULL OR gtt.genre_id = gm.id)
+      LEFT JOIN selected_pattern sp ON sp.row_num = 1
+      LIMIT 1
+    `);
+
+    const row = rows[0];
+    if (row?.tune_type_name && row.abc_string?.trim()) {
+      return {
+        genreName: row.genre_name ?? genreFilter,
+        tuneTypeName: row.tune_type_name,
+        rhythmSignature: row.rhythm_signature ?? null,
+        rhythmAbc: row.abc_string.trim(),
+        tempoQpm:
+          typeof row.tempo_qpm === "number" && Number.isFinite(row.tempo_qpm)
+            ? row.tempo_qpm
+            : getDefaultTempoForTuneType(row.tune_type_name),
+        sampleKit: DEFAULT_SAMPLE_KIT,
+        source: "rhythm_patterns",
+      };
+    }
+  }
+
+  if (hasGenreDefaultBpmColumn) {
+    const rows = await db.all<{
+      genre_name: string | null;
+      tune_type_name: string | null;
+      rhythm_signature: string | null;
+      tempo_qpm: number | null;
     }>(sql`
       WITH tune_type_match AS (
         SELECT id, name, rhythm
@@ -203,48 +291,31 @@ export async function loadRhythmPatternMetadata(
         gm.name AS genre_name,
         ttm.name AS tune_type_name,
         ttm.rhythm AS rhythm_signature,
-        ${
-          hasGenreTempoColumn ? sql`gtt.tempo` : sql`CAST(NULL AS INTEGER)`
-        } AS tempo_qpm,
-        ${
-          canUseRhythmPatterns ? sql`rp.rhythm_abc` : sql`CAST(NULL AS TEXT)`
-        } AS rhythm_abc,
-        ${
-          canUseRhythmPatterns ? sql`rp.sample_kit` : sql`CAST(NULL AS TEXT)`
-        } AS sample_kit
+        gtt.default_bpm AS tempo_qpm
       FROM tune_type_match ttm
       LEFT JOIN genre_match gm ON 1 = 1
       LEFT JOIN genre_tune_type gtt
         ON gtt.tune_type_id = ttm.id
        AND (gm.id IS NULL OR gtt.genre_id = gm.id)
-      ${
-        canUseRhythmPatterns
-          ? sql`LEFT JOIN rhythm_patterns rp
-              ON rp.tune_type_id = ttm.id
-             AND (gm.id IS NULL OR rp.genre_id = gm.id)`
-          : sql``
-      }
       LIMIT 1
     `);
 
     const row = rows[0];
     if (row?.tune_type_name) {
-      const rhythmSignature = row.rhythm_signature ?? null;
       return {
         genreName: row.genre_name ?? genreFilter,
         tuneTypeName: row.tune_type_name,
-        rhythmSignature,
-        rhythmAbc:
-          row.rhythm_abc?.trim() ||
-          buildFallbackRhythmAbc(row.tune_type_name, rhythmSignature),
+        rhythmSignature: row.rhythm_signature ?? null,
+        rhythmAbc: buildFallbackRhythmAbc(
+          row.tune_type_name,
+          row.rhythm_signature ?? null
+        ),
         tempoQpm:
           typeof row.tempo_qpm === "number" && Number.isFinite(row.tempo_qpm)
             ? row.tempo_qpm
             : getDefaultTempoForTuneType(row.tune_type_name),
-        sampleKit: row.sample_kit?.trim() || DEFAULT_SAMPLE_KIT,
-        source: row.rhythm_abc?.trim()
-          ? "rhythm_patterns"
-          : "tune_type_fallback",
+        sampleKit: DEFAULT_SAMPLE_KIT,
+        source: "tune_type_fallback",
       };
     }
   }
@@ -383,7 +454,9 @@ export function createRhythmService(
         const buffer = await decodeSample(
           audioContext,
           fetchImpl,
-          `${sampleBaseUrl}/${fileName}`
+          options.sampleUrlBuilder
+            ? options.sampleUrlBuilder(DEFAULT_SAMPLE_KIT, fileName)
+            : `${sampleBaseUrl}/${fileName}`
         );
         return [Number(pitch), buffer] as const;
       })
@@ -525,6 +598,38 @@ export function createRhythmService(
     await play();
   }
 
+  async function restart(): Promise<void> {
+    lastKnownPositionMs = 0;
+    setCurrentBeatIndex(0);
+    setCurrentMeasure(0);
+
+    if (!metadata()) {
+      return;
+    }
+
+    if (isPlaying()) {
+      await startPlayback(0);
+    }
+  }
+
+  function updateRhythmAbc(nextRhythmAbc: string): void {
+    const currentMetadata = metadata();
+    const trimmedRhythmAbc = nextRhythmAbc.trim();
+
+    if (!currentMetadata || !trimmedRhythmAbc) {
+      return;
+    }
+
+    if (currentMetadata.rhythmAbc === trimmedRhythmAbc) {
+      return;
+    }
+
+    setMetadata({
+      ...currentMetadata,
+      rhythmAbc: trimmedRhythmAbc,
+    });
+  }
+
   async function setTempoQpm(nextQpm: number) {
     const clamped = clampTempo(nextQpm);
     setTempoQpmSignal(clamped);
@@ -586,6 +691,16 @@ export function createRhythmService(
       }
     },
     pause,
+    restart: async () => {
+      try {
+        await restart();
+      } catch (cause: unknown) {
+        const message =
+          cause instanceof Error ? cause.message : "Failed to restart rhythm.";
+        setError(message);
+        stopPlayback();
+      }
+    },
     togglePlayback: async () => {
       try {
         await togglePlayback();
@@ -599,5 +714,6 @@ export function createRhythmService(
       }
     },
     setTempoQpm,
+    updateRhythmAbc,
   };
 }

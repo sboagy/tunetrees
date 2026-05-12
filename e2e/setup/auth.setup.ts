@@ -603,6 +603,80 @@ async function resetTunetreesUserData(): Promise<void> {
   }
 }
 
+/**
+ * Recreate any missing named test auth users in the local Supabase auth store.
+ *
+ * A full `supabase db reset --local` wipes auth.users, but our Playwright auth
+ * bootstrap logs in by password and assumes those shared users already exist.
+ * Recreating them here keeps `db:local:reset` self-healing even after a full
+ * local reset, without depending on an external shell script being present.
+ */
+async function ensureNamedTestAuthUsers(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: ReturnType<typeof createClient<any>>
+): Promise<void> {
+  const existingUserIds = new Set<string>();
+  const existingEmails = new Set<string>();
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const { data, error } = await adminClient.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      throw new Error(
+        `[auth.setup] Failed to list auth users while ensuring named test users: ${error.message}`
+      );
+    }
+
+    const users = data?.users ?? [];
+    for (const user of users) {
+      if (user.id) {
+        existingUserIds.add(user.id);
+      }
+      if (user.email) {
+        existingEmails.add(user.email.toLowerCase());
+      }
+    }
+
+    if (users.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  const password = getRequiredTestPassword();
+
+  for (const testUser of Object.values(TEST_USERS)) {
+    if (
+      existingUserIds.has(testUser.userId) ||
+      existingEmails.has(testUser.email.toLowerCase())
+    ) {
+      continue;
+    }
+
+    const { error } = await adminClient.auth.admin.createUser({
+      id: testUser.userId,
+      email: testUser.email,
+      password,
+      email_confirm: true,
+      user_metadata: { name: testUser.name },
+    });
+
+    if (error) {
+      throw new Error(
+        `[auth.setup] Failed to recreate auth user ${testUser.email}: ${error.message}`
+      );
+    }
+
+    console.log(`  ✅ Recreated auth user ${testUser.email}`);
+  }
+}
+
 // -- main setup test ----------------------------------------------------------
 
 /**
@@ -626,6 +700,21 @@ setup("authenticate all test users", async ({ browser }) => {
     console.log("🗑️  RESET_DB=true — clearing TuneTrees user data in Supabase…");
     await resetTunetreesUserData();
     console.log("✅ TuneTrees user data cleared");
+
+    const resetSupabaseUrl = process.env.VITE_SUPABASE_URL;
+    const resetServiceRoleKey = resolveResetServiceRoleKey();
+
+    if (!resetSupabaseUrl) {
+      throw new Error(
+        "[auth.setup] RESET_DB=true requires VITE_SUPABASE_URL to be set."
+      );
+    }
+
+    const adminClient = createClient(resetSupabaseUrl, resetServiceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    await ensureNamedTestAuthUsers(adminClient);
   } else {
     console.log("ℹ️  Skipping DB reset (set RESET_DB=true to clear test data)");
   }
