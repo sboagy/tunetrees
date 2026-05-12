@@ -57,6 +57,7 @@
       "genre": "catalog",
       "tune_type": "catalog",
       "genre_tune_type": "catalog",
+      "rhythm_patterns": "catalog",
       "user_profile": "user",
       "instrument": "catalog",
       "prefs_scheduling_options": "user",
