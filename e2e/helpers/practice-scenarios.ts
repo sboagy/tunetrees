@@ -2194,6 +2194,11 @@ export async function setupForSetlistTestsParallel(
     window.__ttTestApi?.setTestUserId(userId);
   }, user.userId);
 
+  // __ttTestApi can attach before the app's local DB bootstrap and initial
+  // sync have fully settled. Wait for the existing sync-ready signal before
+  // using test API helpers that call into ensureDb()/initializeDb().
+  await waitForSyncComplete(page);
+
   const seededPublicTunes = opts.publicTunes?.length
     ? await page.evaluate(
         async ({ tunes }) => {
