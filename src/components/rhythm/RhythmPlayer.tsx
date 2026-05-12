@@ -15,12 +15,19 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { createRhythmService } from "@/lib/services/RhythmService";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import "./rhythm-player.css";
 
 export interface RhythmPlayerProps {
   tuneTypeName: string | null;
   structure?: string | null;
   genreName?: string | null;
   class?: string;
+}
+
+interface ActiveBeatTarget {
+  element: SVGElement;
+  previousFill: string;
+  previousStroke: string;
 }
 
 interface StructurePart {
@@ -36,6 +43,7 @@ interface StructureBarProps {
 
 const DEFAULT_BARS_PER_PART = 8;
 const STRUCTURE_TOKEN = /([^\d\s])(\d*)/g;
+const ACTIVE_NOTE_COLOR = "#60a5fa";
 
 function normalizeStructure(structure?: string | null): string | null {
   const trimmed = structure?.trim();
@@ -205,7 +213,7 @@ function convertRhythmAbcForDisplay(abc: string): string {
 
 export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const { localDb } = useAuth();
-  let activeBeatTargets: SVGElement[] = [];
+  let activeBeatTargets: ActiveBeatTarget[] = [];
   let lastToastError: string | null = null;
 
   const [isPatternLoading, setIsPatternLoading] = createSignal(false);
@@ -269,8 +277,20 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   });
 
   const clearActiveBeatTargets = () => {
-    for (const element of activeBeatTargets) {
-      element.classList.remove("tnt-active-note");
+    for (const target of activeBeatTargets) {
+      target.element.classList.remove("tnt-active-note");
+
+      if (target.previousFill) {
+        target.element.style.setProperty("fill", target.previousFill);
+      } else {
+        target.element.style.removeProperty("fill");
+      }
+
+      if (target.previousStroke) {
+        target.element.style.setProperty("stroke", target.previousStroke);
+      } else {
+        target.element.style.removeProperty("stroke");
+      }
     }
     activeBeatTargets = [];
   };
@@ -372,7 +392,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     const isSameTargetSet =
       nextTargets.length === activeBeatTargets.length &&
       nextTargets.every(
-        (element, index) => element === activeBeatTargets[index]
+        (element, index) => element === activeBeatTargets[index]?.element
       );
 
     if (isSameTargetSet) {
@@ -380,10 +400,20 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     }
 
     clearActiveBeatTargets();
-    for (const element of nextTargets) {
+    activeBeatTargets = nextTargets.map((element) => {
+      const previousFill = element.style.getPropertyValue("fill");
+      const previousStroke = element.style.getPropertyValue("stroke");
+
       element.classList.add("tnt-active-note");
-    }
-    activeBeatTargets = nextTargets;
+      element.style.setProperty("fill", ACTIVE_NOTE_COLOR);
+      element.style.setProperty("stroke", ACTIVE_NOTE_COLOR);
+
+      return {
+        element,
+        previousFill,
+        previousStroke,
+      };
+    });
   });
 
   onCleanup(() => {
@@ -395,221 +425,166 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   });
 
   return (
-    <>
-      <style>{`
-        .rhythm-player-notation .abcjs-notehead,
-        .rhythm-player-notation .abcjs-note,
-        .rhythm-player-notation .abcjs-stem,
-        .rhythm-player-notation .abcjs-rest,
-        .rhythm-player-notation .abcjs-decoration,
-        .rhythm-player-notation .abcjs-dynamic,
-        .rhythm-player-notation .abcjs-annotation,
-        .rhythm-player-notation .abcjs-slur,
-        .rhythm-player-notation .abcjs-tie {
-          transition:
-            fill 100ms ease,
-            transform 100ms ease;
-          transform-box: fill-box;
-          transform-origin: center;
-          fill: rgb(15 23 42);
-          stroke: rgb(15 23 42);
-          opacity: 1;
-        }
-
-        .rhythm-player-notation .tnt-active-note {
-          fill: #60a5fa !important;
-          stroke: #60a5fa !important;
-          filter: drop-shadow(0 0 8px rgb(96 165 250 / 0.5));
-          transform: scale(1.15);
-        }
-
-        .rhythm-player-notation .abcjs-staff,
-        .rhythm-player-notation .abcjs-bar,
-        .rhythm-player-notation .abcjs-ledger,
-        .rhythm-player-notation .abcjs-clef {
-          stroke: rgb(100 116 139);
-        }
-
-        .dark .rhythm-player-notation .abcjs-notehead,
-        .dark .rhythm-player-notation .abcjs-note,
-        .dark .rhythm-player-notation .abcjs-stem,
-        .dark .rhythm-player-notation .abcjs-rest,
-        .dark .rhythm-player-notation .abcjs-decoration,
-        .dark .rhythm-player-notation .abcjs-dynamic,
-        .dark .rhythm-player-notation .abcjs-annotation,
-        .dark .rhythm-player-notation .abcjs-slur,
-        .dark .rhythm-player-notation .abcjs-tie {
-          fill: rgb(226 232 240);
-          stroke: rgb(226 232 240);
-        }
-
-        .rhythm-player-notation svg {
-          min-width: 100%;
-          height: auto;
-        }
-      `}</style>
-
-      <Card class={cn("border-slate-200 dark:border-slate-800", props.class)}>
-        <CardHeader class="space-y-3">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                Rhythm Practice
-              </p>
-              <CardTitle class="text-xl text-slate-900 dark:text-slate-50">
-                {props.tuneTypeName?.trim() || "Rhythm Player"}
-              </CardTitle>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const currentService = service();
-                if (currentService) {
-                  void currentService.togglePlayback();
-                }
-              }}
-              disabled={!service() || !metadata() || isPatternLoading()}
-              class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-              data-testid="rhythm-player-play-toggle"
-            >
-              <Show
-                when={!isPatternLoading()}
-                fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
-              >
-                {isPlaying() ? (
-                  <Pause class="h-4 w-4" />
-                ) : (
-                  <Play class="h-4 w-4" />
-                )}
-              </Show>
-              {isPatternLoading() ? "Loading" : isPlaying() ? "Pause" : "Play"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                const currentService = service();
-                if (currentService) {
-                  void currentService.restart();
-                }
-              }}
-              disabled={!service() || !metadata() || isPatternLoading()}
-              class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              data-testid="rhythm-player-restart-button"
-            >
-              <RotateCcw class="h-4 w-4" />
-              Restart
-            </button>
+    <Card class={cn("border-slate-200 dark:border-slate-800", props.class)}>
+      <CardHeader class="space-y-3">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+              Rhythm Practice
+            </p>
+            <CardTitle class="text-xl text-slate-900 dark:text-slate-50">
+              {props.tuneTypeName?.trim() || "Rhythm Player"}
+            </CardTitle>
           </div>
 
-          <Show when={metadata()}>
-            {(currentMetadata) => (
-              <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                <div class="space-y-1 text-sm text-slate-600 dark:text-slate-300">
-                  <p>
-                    <span class="font-medium text-slate-900 dark:text-slate-100">
-                      Meter:
-                    </span>{" "}
-                    {currentMetadata().rhythmSignature || "Unknown"}
-                  </p>
-                  <p>
-                    <span class="font-medium text-slate-900 dark:text-slate-100">
-                      Bar:
-                    </span>{" "}
-                    {currentBar() || 0}
-                    <Show when={totalBars() > 0}>
-                      <span class="px-1 text-slate-400">/</span>
-                      {totalBars()}
-                    </Show>
-                  </p>
-                  <Show when={currentPulse() > 0}>
-                    <p>
-                      <span class="font-medium text-slate-900 dark:text-slate-100">
-                        Pulse:
-                      </span>{" "}
-                      {currentPulse()}
-                      <span class="px-1 text-slate-400">/</span>
-                      {pulsesPerBar()}
-                    </p>
-                  </Show>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {isReady()
-                      ? "Samples loaded and ready."
-                      : "Samples load on first playback."}
-                  </p>
-                </div>
+          <button
+            type="button"
+            onClick={() => {
+              const currentService = service();
+              if (currentService) {
+                void currentService.togglePlayback();
+              }
+            }}
+            disabled={!service() || !metadata() || isPatternLoading()}
+            class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            data-testid="rhythm-player-play-toggle"
+          >
+            <Show
+              when={!isPatternLoading()}
+              fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
+            >
+              {isPlaying() ? (
+                <Pause class="h-4 w-4" />
+              ) : (
+                <Play class="h-4 w-4" />
+              )}
+            </Show>
+            {isPatternLoading() ? "Loading" : isPlaying() ? "Pause" : "Play"}
+          </button>
 
-                <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <button
+            type="button"
+            onClick={() => {
+              const currentService = service();
+              if (currentService) {
+                void currentService.restart();
+              }
+            }}
+            disabled={!service() || !metadata() || isPatternLoading()}
+            class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            data-testid="rhythm-player-restart-button"
+          >
+            <RotateCcw class="h-4 w-4" />
+            Restart
+          </button>
+        </div>
+
+        <Show when={metadata()}>
+          {(currentMetadata) => (
+            <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div class="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                <p>
                   <span class="font-medium text-slate-900 dark:text-slate-100">
-                    Tempo {tempoQpm()} QPM
-                  </span>
-                  <input
-                    type="range"
-                    min="30"
-                    max="240"
-                    step="1"
-                    value={tempoQpm()}
-                    onInput={(event) => {
-                      const currentService = service();
-                      if (currentService) {
-                        void currentService.setTempoQpm(
-                          Number.parseInt(event.currentTarget.value, 10)
-                        );
-                      }
-                    }}
-                    class="w-full accent-blue-600 md:w-56"
-                    data-testid="rhythm-player-tempo-slider"
-                  />
-                </label>
+                    Meter:
+                  </span>{" "}
+                  {currentMetadata().rhythmSignature || "Unknown"}
+                </p>
+                <p>
+                  <span class="font-medium text-slate-900 dark:text-slate-100">
+                    Bar:
+                  </span>{" "}
+                  {currentBar() || 0}
+                  <Show when={totalBars() > 0}>
+                    <span class="px-1 text-slate-400">/</span>
+                    {totalBars()}
+                  </Show>
+                </p>
+                <Show when={currentPulse() > 0}>
+                  <p>
+                    <span class="font-medium text-slate-900 dark:text-slate-100">
+                      Pulse:
+                    </span>{" "}
+                    {currentPulse()}
+                    <span class="px-1 text-slate-400">/</span>
+                    {pulsesPerBar()}
+                  </p>
+                </Show>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {isReady()
+                    ? "Samples loaded and ready."
+                    : "Samples load on first playback."}
+                </p>
               </div>
-            )}
-          </Show>
-        </CardHeader>
 
-        <CardContent class="space-y-4">
+              <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span class="font-medium text-slate-900 dark:text-slate-100">
+                  Tempo {tempoQpm()} QPM
+                </span>
+                <input
+                  type="range"
+                  min="30"
+                  max="240"
+                  step="1"
+                  value={tempoQpm()}
+                  onInput={(event) => {
+                    const currentService = service();
+                    if (currentService) {
+                      void currentService.setTempoQpm(
+                        Number.parseInt(event.currentTarget.value, 10)
+                      );
+                    }
+                  }}
+                  class="w-full accent-blue-600 md:w-56"
+                  data-testid="rhythm-player-tempo-slider"
+                />
+              </label>
+            </div>
+          )}
+        </Show>
+      </CardHeader>
+
+      <CardContent class="space-y-4">
+        <Show
+          when={localDb()}
+          fallback={
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Local database is still loading.
+            </p>
+          }
+        >
           <Show
-            when={localDb()}
+            when={props.tuneTypeName?.trim()}
             fallback={
               <p class="text-sm text-slate-500 dark:text-slate-400">
-                Local database is still loading.
+                Select a tune type to load a rhythm pattern.
               </p>
             }
           >
-            <Show
-              when={props.tuneTypeName?.trim()}
-              fallback={
-                <p class="text-sm text-slate-500 dark:text-slate-400">
-                  Select a tune type to load a rhythm pattern.
-                </p>
-              }
-            >
-              <div class="space-y-4">
-                <StructureBar
-                  structure={effectiveStructure()}
-                  currentMeasure={currentMeasure()}
-                  class="mb-2"
-                />
+            <div class="space-y-4">
+              <StructureBar
+                structure={effectiveStructure()}
+                currentMeasure={currentMeasure()}
+                class="mb-2"
+              />
 
-                <Show when={error() || notationError()}>
-                  <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                    {error() || notationError()}
-                  </div>
-                </Show>
-
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-                  <div
-                    ref={setSvgContainerRef}
-                    class="rhythm-player-notation flex w-full items-center justify-center overflow-x-auto"
-                    data-testid="rhythm-player-notation"
-                  />
+              <Show when={error() || notationError()}>
+                <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                  {error() || notationError()}
                 </div>
+              </Show>
+
+              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                <div
+                  ref={setSvgContainerRef}
+                  class="rhythm-player-notation flex w-full items-center justify-center overflow-x-auto"
+                  data-testid="rhythm-player-notation"
+                />
               </div>
-            </Show>
+            </div>
           </Show>
-        </CardContent>
-      </Card>
-    </>
+        </Show>
+      </CardContent>
+    </Card>
   );
 };
 

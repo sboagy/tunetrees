@@ -1,0 +1,48 @@
+.rhythm-player-notation .abcjs-notehead,
+.rhythm-player-notation .abcjs-note,
+.rhythm-player-notation .abcjs-stem,
+.rhythm-player-notation .abcjs-rest,
+.rhythm-player-notation .abcjs-decoration,
+.rhythm-player-notation .abcjs-dynamic,
+.rhythm-player-notation .abcjs-annotation,
+.rhythm-player-notation .abcjs-slur,
+.rhythm-player-notation .abcjs-tie {
+  transition:
+    fill 100ms ease,
+    transform 100ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+  fill: rgb(15 23 42);
+  stroke: rgb(15 23 42);
+  opacity: 1;
+}
+
+.rhythm-player-notation .tnt-active-note {
+  filter: drop-shadow(0 0 8px rgb(96 165 250 / 0.5));
+  transform: scale(1.15);
+}
+
+.rhythm-player-notation .abcjs-staff,
+.rhythm-player-notation .abcjs-bar,
+.rhythm-player-notation .abcjs-ledger,
+.rhythm-player-notation .abcjs-clef {
+  stroke: rgb(100 116 139);
+}
+
+.dark .rhythm-player-notation .abcjs-notehead,
+.dark .rhythm-player-notation .abcjs-note,
+.dark .rhythm-player-notation .abcjs-stem,
+.dark .rhythm-player-notation .abcjs-rest,
+.dark .rhythm-player-notation .abcjs-decoration,
+.dark .rhythm-player-notation .abcjs-dynamic,
+.dark .rhythm-player-notation .abcjs-annotation,
+.dark .rhythm-player-notation .abcjs-slur,
+.dark .rhythm-player-notation .abcjs-tie {
+  fill: rgb(226 232 240);
+  stroke: rgb(226 232 240);
+}
+
+.rhythm-player-notation svg {
+  min-width: 100%;
+  height: auto;
+}
