@@ -3106,6 +3106,26 @@ export class TuneTreesPage {
     await this.revealToolbarAction(tab, action);
   }
 
+  private async clickVisibleToolbarAction(action: Locator): Promise<void> {
+    await action.evaluateAll((elements) => {
+      const visibleEnabledElement = elements.find((element) => {
+        const htmlElement = element as HTMLElement;
+        const buttonElement = element as HTMLButtonElement;
+        return (
+          htmlElement.getClientRects().length > 0 &&
+          !buttonElement.disabled &&
+          element.getAttribute("aria-disabled") !== "true"
+        );
+      }) as HTMLElement | undefined;
+
+      if (!visibleEnabledElement) {
+        throw new Error("No visible enabled toolbar action found");
+      }
+
+      visibleEnabledElement.click();
+    });
+  }
+
   private async clickToolbarAction(
     tab: "catalog" | "repertoire" | "practice",
     action: Locator,
@@ -3128,7 +3148,7 @@ export class TuneTreesPage {
           try {
             await action.click({ timeout: 1000, force: true });
           } catch {
-            await action.dispatchEvent("click");
+            await this.clickVisibleToolbarAction(action);
           }
         }
 
@@ -3138,6 +3158,13 @@ export class TuneTreesPage {
         return;
       } catch (error) {
         lastError = error;
+
+        // If the page has already been torn down, the original failure is the
+        // useful signal. Retrying via waitForTimeout only masks it.
+        if (this.page.isClosed()) {
+          break;
+        }
+
         await this.page.waitForTimeout(150);
       }
     }

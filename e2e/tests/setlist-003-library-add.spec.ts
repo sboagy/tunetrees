@@ -21,12 +21,14 @@ test.describe
     test.setTimeout(60000);
 
     let ttPage: TuneTreesPage;
+    let libraryTuneSetName = SETLIST_TITLES.defaultTuneSet;
 
     test.beforeEach(async ({ page, testUser }, testInfo) => {
       test.setTimeout(Math.max(testInfo.timeout, 60000));
       ttPage = new TuneTreesPage(page);
 
       const scenario = await setupLibraryOnlySetlistsScenario(page, testUser);
+      libraryTuneSetName = scenario.libraryTuneSetName;
       await ttPage.navigateToSetlistsTab();
       await ttPage.selectSetlistsGroup(scenario.groupName);
       await enterSetlistsCreateMode(ttPage, page);
@@ -43,9 +45,9 @@ test.describe
           )
           .first()
       ).toBeVisible({ timeout: 10000 });
-      await ttPage.searchSetlistsLibrary(SETLIST_TITLES.defaultTuneSet);
+      await ttPage.searchSetlistsLibrary(libraryTuneSetName);
       await expect(
-        ttPage.getSetlistsLibrarySetRow(SETLIST_TITLES.defaultTuneSet)
+        ttPage.getSetlistsLibrarySetRow(libraryTuneSetName)
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -59,13 +61,13 @@ test.describe
           .first()
       ).toBeVisible({ timeout: 10000 });
       await expect(
-        ttPage.getSetlistsLibrarySetRow(SETLIST_TITLES.defaultTuneSet)
+        ttPage.getSetlistsLibrarySetRow(libraryTuneSetName)
       ).toHaveCount(0);
 
-      await ttPage.searchSetlistsLibrary(SETLIST_TITLES.defaultTuneSet);
+      await ttPage.searchSetlistsLibrary(libraryTuneSetName);
       await ttPage.setSetlistsLibraryFilter("tune_set");
       await expect(
-        ttPage.getSetlistsLibrarySetRow(SETLIST_TITLES.defaultTuneSet)
+        ttPage.getSetlistsLibrarySetRow(libraryTuneSetName)
       ).toBeVisible({ timeout: 10000 });
       await expect(
         ttPage.getSetlistsLibraryRow(SETLIST_TITLES.alpha)
@@ -111,9 +113,9 @@ test.describe
         )
         .first();
       await ttPage.setRowSelected(firstLibraryRow, true);
-      await ttPage.searchSetlistsLibrary(SETLIST_TITLES.defaultTuneSet);
+      await ttPage.searchSetlistsLibrary(libraryTuneSetName);
       await ttPage.setRowSelected(
-        ttPage.getSetlistsLibrarySetRow(SETLIST_TITLES.defaultTuneSet),
+        ttPage.getSetlistsLibrarySetRow(libraryTuneSetName),
         true
       );
 
@@ -127,9 +129,9 @@ test.describe
         )
         .first();
       await ttPage.setRowSelected(firstLibraryRow, true);
-      await ttPage.searchSetlistsLibrary(SETLIST_TITLES.defaultTuneSet);
+      await ttPage.searchSetlistsLibrary(libraryTuneSetName);
       await ttPage.setRowSelected(
-        ttPage.getSetlistsLibrarySetRow(SETLIST_TITLES.defaultTuneSet),
+        ttPage.getSetlistsLibrarySetRow(libraryTuneSetName),
         true
       );
 
@@ -138,9 +140,9 @@ test.describe
         .waitForLoadState("networkidle", { timeout: 15000 })
         .catch(() => undefined);
 
-      await expect(
-        ttPage.getSetlistsEditorRow(SETLIST_TITLES.defaultTuneSet)
-      ).toBeVisible({ timeout: 10000 });
+      await expect(ttPage.getSetlistsEditorRow(libraryTuneSetName)).toBeVisible(
+        { timeout: 10000 }
+      );
       await expect(ttPage.setlistsAddSelectedButton).not.toContainText("(2)");
     });
 
@@ -159,7 +161,7 @@ test.describe
 
     test("C7. should not show duplicate tunes in the All filter", async () => {
       await ttPage.setSetlistsLibraryFilter("all");
-      await ttPage.searchSetlistsLibrary(SETLIST_TITLES.defaultTuneSet);
+      await ttPage.searchSetlistsLibrary(libraryTuneSetName);
 
       await expect(
         ttPage.setlistsLibraryGrid.locator(

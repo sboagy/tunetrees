@@ -52,6 +52,10 @@ test.describe
     test("should keep Add To Repertoire disabled until rows are selected", async ({
       page,
     }) => {
+      const visibleAddToRepertoireButton = page
+        .locator('[data-testid="catalog-add-to-repertoire-button"]:visible')
+        .first();
+
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 10000,
       });
@@ -61,8 +65,7 @@ test.describe
       });
       await expect
         .poll(
-          () =>
-            ttPage.catalogAddToRepertoireButton.isDisabled().catch(() => false),
+          () => visibleAddToRepertoireButton.isDisabled().catch(() => false),
           {
             timeout: 5000,
             intervals: [100, 250, 500, 1000],
@@ -88,9 +91,7 @@ test.describe
               addToRepertoire: true,
               tab: "catalog",
             });
-            return ttPage.catalogAddToRepertoireButton
-              .isEnabled()
-              .catch(() => false);
+            return visibleAddToRepertoireButton.isEnabled().catch(() => false);
           },
           {
             timeout: 5000,
