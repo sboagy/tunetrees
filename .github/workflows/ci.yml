@@ -362,12 +362,9 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright Browsers
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        # A cache hit does not guarantee every required browser binary is
+        # present for the current Playwright package, so always verify/install.
         run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright System Dependencies
-        if: steps.cache-playwright.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
 
       - name: Setup Cloudflare Worker
         run: |
@@ -660,12 +657,9 @@ jobs:
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
       - name: Install Playwright Browsers
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        # A cache hit does not guarantee every required browser binary is
+        # present for the current Playwright package, so always verify/install.
         run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright System Dependencies
-        if: steps.cache-playwright.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
 
       - name: Build PWA
         run: |
