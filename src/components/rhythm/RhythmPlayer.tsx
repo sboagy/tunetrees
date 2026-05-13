@@ -275,6 +275,17 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
     return ((beatIndex - 1) % beatCountPerBar) + 1;
   });
+  const playbackReadyLabel = createMemo(() => {
+    if (metadata()?.premiumAudioUrl) {
+      return isReady()
+        ? "Premium loop loaded and ready."
+        : "Premium loop loads on first playback.";
+    }
+
+    return isReady()
+      ? "Samples loaded and ready."
+      : "Samples load on first playback.";
+  });
 
   const clearActiveBeatTargets = () => {
     for (const target of activeBeatTargets) {
@@ -510,9 +521,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   </p>
                 </Show>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {isReady()
-                    ? "Samples loaded and ready."
-                    : "Samples load on first playback."}
+                  {playbackReadyLabel()}
                 </p>
               </div>
 

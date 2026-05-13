@@ -442,6 +442,7 @@ export const rhythmPatterns = sqliteTable("rhythm_patterns", {
   abcString: text("abc_string").notNull(),
   isDefault: integer("is_default").notNull().default(0),
   premiumAudioUrl: text("premium_audio_url"),
+  sampleKit: text("sample_kit").notNull().default("bodhran"),
 });
 
 export const setlist = sqliteTable(
