@@ -101,5 +101,9 @@
                 "copilot/claude-opus-4.5"
             ]
         }
+    },
+    "[sql]": {
+        "editor.formatOnSave": false,
+        "editor.defaultFormatter": "inferrinizzard.prettier-sql-vscode"
     }
 }
