@@ -443,6 +443,9 @@ export const rhythmPatterns = sqliteTable("rhythm_patterns", {
   isDefault: integer("is_default").notNull().default(0),
   premiumAudioUrl: text("premium_audio_url"),
   sampleKit: text("sample_kit").notNull().default("bodhran"),
+  tuneId: text("tune_id"),
+  userId: text("user_id"),
+  patternType: text("pattern_type").notNull().default("seed"),
 });
 
 export const setlist = sqliteTable(

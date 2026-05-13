@@ -12,6 +12,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
+import type { RhythmPatternType } from "@/lib/services/RhythmService";
 import { createRhythmService } from "@/lib/services/RhythmService";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -19,6 +20,7 @@ import "./rhythm-player.css";
 
 export interface RhythmPlayerProps {
   tuneTypeName: string | null;
+  tuneId?: string | null;
   structure?: string | null;
   genreName?: string | null;
   class?: string;
@@ -151,13 +153,51 @@ function beatsPerMeasureFromSignature(rhythmSignature?: string | null): number {
   return Number.isFinite(numerator) && numerator > 0 ? numerator : 4;
 }
 
-function expandRhythmAbc(
+function normalizeAbcBodyBars(abcBody: string): string[] {
+  return abcBody
+    .replace(/^\s*\|:/, "")
+    .replace(/:\|\s*$/, "")
+    .split("|")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function expandSeedRhythmAbc(abc: string, structuredBarCount: number): string {
+  if (structuredBarCount <= 0) {
+    return abc;
+  }
+
+  const lines = abc
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+  const headerLines = lines.filter((line) => /^[A-Z]:/.test(line));
+  const bodyLines = lines.filter((line) => !/^[A-Z]:/.test(line));
+  const bodyBars = normalizeAbcBodyBars(bodyLines.join(" "));
+
+  if (bodyBars.length === 0 || structuredBarCount <= bodyBars.length) {
+    return abc;
+  }
+
+  const expandedBars = Array.from(
+    { length: structuredBarCount },
+    (_value, index) => bodyBars[index % bodyBars.length]
+  );
+
+  return [...headerLines, `| ${expandedBars.join(" | ")} |`].join("\n");
+}
+
+function expandRhythmAbcByPatternType(
   abc: string,
-  _structuredBarCount: number,
-  _defaultBarsPerPattern = 4,
-  _structure?: string | null
+  patternType: RhythmPatternType,
+  structuredBarCount: number,
+  structure?: string | null
 ): string {
-  return abc;
+  if (patternType === "full_track" || !normalizeStructure(structure)) {
+    return abc;
+  }
+
+  return expandSeedRhythmAbc(abc, structuredBarCount);
 }
 
 function getBeatNoteTargets(container: HTMLDivElement): SVGElement[] {
@@ -212,7 +252,7 @@ function convertRhythmAbcForDisplay(abc: string): string {
 }
 
 export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
-  const { localDb } = useAuth();
+  const { localDb, user } = useAuth();
   let activeBeatTargets: ActiveBeatTarget[] = [];
   let lastToastError: string | null = null;
 
@@ -249,13 +289,20 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
    */
   const expandedAbc = createMemo(() => {
     const abc = metadata()?.rhythmAbc;
+    const patternType = metadata()?.patternType ?? "seed";
     const structure = effectiveStructure();
     if (!abc) return null;
+    if (!structure) return abc;
 
     const structuredBarCount = parseStructureTotalBars(structure);
     if (structuredBarCount <= 0) return abc;
 
-    return expandRhythmAbc(abc, structuredBarCount, 4, structure);
+    return expandRhythmAbcByPatternType(
+      abc,
+      patternType,
+      structuredBarCount,
+      structure
+    );
   });
 
   const displayAbc = createMemo(() => {
@@ -337,6 +384,8 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       .loadPattern({
         genreName: props.genreName?.trim() || null,
         tuneTypeName,
+        tuneId: props.tuneId?.trim() || null,
+        userId: user()?.id ?? null,
       })
       .finally(() => {
         setIsPatternLoading(false);

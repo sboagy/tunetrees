@@ -331,6 +331,9 @@ export const rhythmPatterns = pgTable("rhythm_patterns", {
   isDefault: boolean("is_default").notNull().default(false),
   premiumAudioUrl: text("premium_audio_url"),
   sampleKit: text("sample_kit").notNull().default("bodhran"),
+  tuneId: uuid("tune_id"),
+  userId: uuid("user_id"),
+  patternType: text("pattern_type").notNull().default("seed"),
 });
 
 export const setlist = pgTable("setlist", {

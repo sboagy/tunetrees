@@ -149,7 +149,11 @@ const DEFAULT_TEMPO_BY_TYPE: Record<string, number> = {
 export interface RhythmPatternRequest {
   genreName?: string | null;
   tuneTypeName?: string | null;
+  tuneId?: string | null;
+  userId?: string | null;
 }
+
+export type RhythmPatternType = "seed" | "full_track";
 
 export interface RhythmPatternMetadata {
   genreName: string | null;
@@ -157,6 +161,7 @@ export interface RhythmPatternMetadata {
   rhythmAbc: string;
   rhythmSignature: string | null;
   tuneStructure?: string | null;
+  patternType: RhythmPatternType;
   tempoQpm: number;
   sampleKit: string;
   premiumAudioUrl: string | null;
@@ -244,6 +249,10 @@ function getDefaultTempoForTuneType(tuneTypeName: string): number {
 
 function normalizeSampleKit(sampleKit?: string | null): string {
   return sampleKit?.trim() || DEFAULT_SAMPLE_KIT;
+}
+
+function normalizePatternType(patternType?: string | null): RhythmPatternType {
+  return patternType === "full_track" ? "full_track" : "seed";
 }
 
 function getSampleKitMapping(
@@ -420,9 +429,15 @@ export async function loadRhythmPatternMetadata(
   const hasSampleKitColumn = rhythmPatternColumns.has("sample_kit");
   const hasPremiumAudioUrlColumn =
     rhythmPatternColumns.has("premium_audio_url");
+  const hasTuneIdColumn = rhythmPatternColumns.has("tune_id");
+  const hasUserIdColumn = rhythmPatternColumns.has("user_id");
+  const hasPatternTypeColumn = rhythmPatternColumns.has("pattern_type");
+  const canUseHierarchicalOverrides = hasTuneIdColumn && hasUserIdColumn;
   const sampleBaseUrl = options?.sampleBaseUrl ?? DEFAULT_SAMPLE_BASE_URL;
 
   const genreFilter = request.genreName?.trim() || null;
+  const tuneIdFilter = request.tuneId?.trim() || null;
+  const userIdFilter = request.userId?.trim() || null;
 
   if (canUseRhythmPatterns) {
     const rows = await db.all<{
@@ -433,6 +448,7 @@ export async function loadRhythmPatternMetadata(
       abc_string: string | null;
       sample_kit: string | null;
       premium_audio_url: string | null;
+      pattern_type: string | null;
     }>(sql`
       WITH tune_type_match AS (
         SELECT id, name, rhythm
@@ -460,10 +476,39 @@ export async function loadRhythmPatternMetadata(
               ? sql`rp.premium_audio_url`
               : sql`CAST(NULL AS TEXT)`
           } AS premium_audio_url,
+          ${
+            hasPatternTypeColumn
+              ? sql`rp.pattern_type`
+              : sql`CAST('seed' AS TEXT)`
+          } AS pattern_type,
           rp.is_default,
           rp.part_target,
           ROW_NUMBER() OVER (
             ORDER BY
+              ${
+                canUseHierarchicalOverrides
+                  ? sql`
+                    CASE
+                      WHEN ${userIdFilter} IS NOT NULL
+                       AND ${tuneIdFilter} IS NOT NULL
+                       AND rp.user_id = ${userIdFilter}
+                       AND rp.tune_id = ${tuneIdFilter} THEN 0
+                      WHEN ${tuneIdFilter} IS NOT NULL
+                       AND rp.user_id IS NULL
+                       AND rp.tune_id = ${tuneIdFilter} THEN 1
+                      WHEN ${userIdFilter} IS NOT NULL
+                       AND rp.user_id = ${userIdFilter}
+                       AND rp.tune_id IS NULL THEN 2
+                      WHEN rp.user_id IS NULL
+                       AND rp.tune_id IS NULL
+                       AND rp.is_default THEN 3
+                      WHEN rp.user_id IS NULL
+                       AND rp.tune_id IS NULL THEN 4
+                      ELSE 5
+                    END,
+                  `
+                  : sql``
+              }
               CASE WHEN rp.is_default THEN 0 ELSE 1 END,
               CASE
                 WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0
@@ -475,6 +520,25 @@ export async function loadRhythmPatternMetadata(
         JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
         LEFT JOIN genre_match gm ON 1 = 1
         WHERE (gm.id IS NULL OR rp.genre_id = gm.id)
+          AND ${
+            canUseHierarchicalOverrides
+              ? sql`
+                (
+                  (${userIdFilter} IS NOT NULL
+                    AND ${tuneIdFilter} IS NOT NULL
+                    AND rp.user_id = ${userIdFilter}
+                    AND rp.tune_id = ${tuneIdFilter})
+                  OR (${tuneIdFilter} IS NOT NULL
+                    AND rp.user_id IS NULL
+                    AND rp.tune_id = ${tuneIdFilter})
+                  OR (${userIdFilter} IS NOT NULL
+                    AND rp.user_id = ${userIdFilter}
+                    AND rp.tune_id IS NULL)
+                  OR (rp.user_id IS NULL AND rp.tune_id IS NULL)
+                )
+              `
+              : sql`1 = 1`
+          }
       )
       SELECT
         gm.name AS genre_name,
@@ -487,7 +551,8 @@ export async function loadRhythmPatternMetadata(
         } AS tempo_qpm,
         sp.abc_string AS abc_string,
         sp.sample_kit AS sample_kit,
-        sp.premium_audio_url AS premium_audio_url
+        sp.premium_audio_url AS premium_audio_url,
+        sp.pattern_type AS pattern_type
       FROM tune_type_match ttm
       LEFT JOIN genre_match gm ON 1 = 1
       LEFT JOIN genre_tune_type gtt
@@ -515,6 +580,7 @@ export async function loadRhythmPatternMetadata(
         tuneTypeName: row.tune_type_name,
         rhythmSignature: row.rhythm_signature ?? null,
         rhythmAbc: row.abc_string.trim(),
+        patternType: normalizePatternType(row.pattern_type),
         tempoQpm: resolvedTempoQpm,
         sampleKit: normalizeSampleKit(row.sample_kit),
         premiumAudioUrl: premiumLoop?.url ?? null,
@@ -579,6 +645,7 @@ export async function loadRhythmPatternMetadata(
           row.tune_type_name,
           row.rhythm_signature ?? null
         ),
+        patternType: "seed",
         tempoQpm: resolvedTempoQpm,
         sampleKit: DEFAULT_SAMPLE_KIT,
         premiumAudioUrl: premiumLoop?.url ?? null,
@@ -613,6 +680,7 @@ export async function loadRhythmPatternMetadata(
       fallbackRow.tune_type_name,
       fallbackRow.rhythm_signature ?? null
     ),
+    patternType: "seed",
     tempoQpm: getDefaultTempoForTuneType(fallbackRow.tune_type_name),
     sampleKit: DEFAULT_SAMPLE_KIT,
     premiumAudioUrl: null,

@@ -321,12 +321,18 @@ const TABLE_EXTRAS: Record<
       name: 'A human-readable description for the UI dropdown (e.g., "Basic Rolling", "Driving Backbeat").',
       part_target:
         'Specifies which structural part this pattern targets. "*" or NULL applies to the whole tune, "A" applies only to the A part, "B" to the B part, allowing the groove to change mid-tune.',
+      pattern_type:
+        'Defines how the frontend should render the abc_string. "seed" means tile/repeat it to match the tune length. "full_track" means play it exactly as written without looping.',
       premium_audio_url:
         "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
       sample_kit:
         'The identifier for the audio sample kit used by the frontend registry (e.g., "bodhran", "spoons") to map MIDI pitches to Cloudflare R2 audio URLs.',
+      tune_id:
+        "If set, this pattern specifically overrides the default for a single tune.",
       tune_type_id:
         "Foreign key component referencing the tune type (e.g., JigD).",
+      user_id:
+        "If set, this pattern is a private override created by a specific user.",
     },
   },
   setlist: {
