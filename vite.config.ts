@@ -12,6 +12,7 @@ export default defineConfig(() => {
   const showWorkboxLogs = process.env.VITE_WORKBOX_DEBUG === "true";
   const disableHmrForE2E = process.env.VITE_DISABLE_HMR_FOR_E2E === "true";
   const MEDIA_AUTH_TOKEN_QUERY_PARAM = "token";
+  const rhythmAssetsBaseUrl = process.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? "";
   const e2eArtifactWatchIgnore = [
     "**/logs/**",
     "**/test-results/**",
@@ -86,6 +87,31 @@ export default defineConfig(() => {
       }
       return url.toString();
     },
+  };
+
+  const matchesRhythmAssetUrl = ({ url }: { url: URL }) => {
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const isKnownRhythmAssetPath =
+      normalizedPath.startsWith("/audio/kits/") ||
+      normalizedPath.startsWith("/audio/loops/");
+
+    if (!isKnownRhythmAssetPath) {
+      return false;
+    }
+
+    if (!rhythmAssetsBaseUrl) {
+      // No R2 base URL configured – restrict to same-origin only so we don't
+      // accidentally CacheFirst arbitrary cross-origin /audio/kits or /audio/loops URLs.
+      return url.origin === self.location.origin;
+    }
+
+    try {
+      const configuredBase = new URL(rhythmAssetsBaseUrl);
+      return url.origin === configuredBase.origin;
+    } catch {
+      // Unparseable base URL – fall back to same-origin only.
+      return url.origin === self.location.origin;
+    }
   };
 
   return {
@@ -245,6 +271,23 @@ export default defineConfig(() => {
                 expiration: {
                   maxEntries: 100,
                   maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+              },
+            },
+            {
+              urlPattern: matchesRhythmAssetUrl,
+              // Rhythm assets are immutable kit/loop files hosted outside the
+              // app bundle. Cache the first successful fetch so they remain
+              // playable offline after initial load.
+              handler: "CacheFirst",
+              options: {
+                cacheName: "rhythm-audio-cache",
+                cacheableResponse: {
+                  statuses: [200],
+                },
+                expiration: {
+                  maxEntries: 128,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
                 },
               },
             },

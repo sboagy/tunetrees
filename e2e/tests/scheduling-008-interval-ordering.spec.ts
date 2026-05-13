@@ -257,7 +257,10 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       await createAndAddToReview(RATED_TUNES[3], "Slip Jig (9/8)");
 
       // Evaluate each tune once with designated rating
-      async function evaluate(meta: RatedTuneMeta) {
+      async function evaluate(
+        meta: RatedTuneMeta,
+        options: { restoreGridModeAfterSubmit: boolean }
+      ) {
         const toastCloser = page.getByRole("button", { name: "Close toast" });
         try {
           const isCloserVisible = await toastCloser.isVisible();
@@ -278,13 +281,22 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         await ttPage.submitEvaluations();
         await page.waitForLoadState("networkidle", { timeout: 15000 });
         await page.waitForTimeout(1500);
-        ttPage.flashcardModeSwitch.isVisible({ timeout: 15000 });
-        await ttPage.disableFlashcardMode();
+
+        // Only return to grid mode when the next loop iteration needs to locate
+        // another tune row in the practice table. After the final submission the
+        // queue is empty, so toggling the flashcard control adds a brittle UI
+        // dependency without affecting the interval-ordering assertion.
+        if (options.restoreGridModeAfterSubmit) {
+          await ttPage.flashcardModeSwitch.isVisible({ timeout: 15000 });
+          await ttPage.disableFlashcardMode();
+        }
         // Interval capture / tuneId resolution will be added later.
       }
 
-      for (const meta of RATED_TUNES) {
-        await evaluate(meta);
+      for (const [index, meta] of RATED_TUNES.entries()) {
+        await evaluate(meta, {
+          restoreGridModeAfterSubmit: index < RATED_TUNES.length - 1,
+        });
       }
 
       // Resolve tune IDs from LOCAL database and query practice records

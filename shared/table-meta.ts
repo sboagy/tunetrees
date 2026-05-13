@@ -323,6 +323,8 @@ const TABLE_EXTRAS: Record<
         'Specifies which structural part this pattern targets. "*" or NULL applies to the whole tune, "A" applies only to the A part, "B" to the B part, allowing the groove to change mid-tune.',
       premium_audio_url:
         "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
+      sample_kit:
+        'The identifier for the audio sample kit used by the frontend registry (e.g., "bodhran", "spoons") to map MIDI pitches to Cloudflare R2 audio URLs.',
       tune_type_id:
         "Foreign key component referencing the tune type (e.g., JigD).",
     },

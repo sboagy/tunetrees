@@ -330,6 +330,7 @@ export const rhythmPatterns = pgTable("rhythm_patterns", {
   abcString: text("abc_string").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
   premiumAudioUrl: text("premium_audio_url"),
+  sampleKit: text("sample_kit").notNull().default("bodhran"),
 });
 
 export const setlist = pgTable("setlist", {

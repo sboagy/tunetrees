@@ -64,6 +64,19 @@ async function waitForTestApi(page: Page) {
   });
 }
 
+async function resetLocalDbAndReopenPractice(page: Page, userId: string) {
+  await resetLocalDbAndResync(page);
+  ttPage = new TuneTreesPage(page);
+  await setInjectedTestUserId(page, userId);
+
+  // Some reset flows can leave the browser parked on e2e-origin.html after the
+  // storage clear finishes. Re-open the app explicitly so subsequent Practice
+  // assertions are scoped to the real UI instead of the origin helper page.
+  await page.goto("/?tab=practice", { waitUntil: "domcontentloaded" });
+  await waitForTestApi(page);
+  await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+}
+
 async function getQueueRows(page: Page, repertoireId: string) {
   return await page.evaluate(async (rid) => {
     const api = (window as any).__ttTestApi;
@@ -541,12 +554,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
 
     expect(expectedPendingOrder.length).toBeGreaterThan(0);
 
-    await resetLocalDbAndResync(page);
-    ttPage = new TuneTreesPage(page);
-    await setInjectedTestUserId(page, testUser.userId);
-    await waitForTestApi(page);
-
-    await ttPage.navigateToTab("practice");
+    await resetLocalDbAndReopenPractice(page, testUser.userId);
 
     const queueAfterReset = await getQueueSnapshot(page, testUser.repertoireId);
     const pendingAfterReset = getPendingTuneOrder(queueAfterReset.rows);
@@ -590,12 +598,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     currentDate = await advanceDays(context, 1, currentDate);
     await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
 
-    await resetLocalDbAndResync(page);
-    ttPage = new TuneTreesPage(page);
-    await setInjectedTestUserId(page, testUser.userId);
-    await waitForTestApi(page);
-
-    await ttPage.navigateToTab("practice");
+    await resetLocalDbAndReopenPractice(page, testUser.userId);
     await expect(ttPage.dateRolloverBanner).toBeVisible({ timeout: 10000 });
 
     const queueAfterReset = await getQueueSnapshot(page, testUser.repertoireId);
@@ -627,10 +630,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
         currentDate
       );
 
-      await resetLocalDbAndResync(page);
-      ttPage = new TuneTreesPage(page);
-      await waitForTestApi(page);
-      await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+      await resetLocalDbAndReopenPractice(page, testUser.userId);
 
       const repertoireAName = normalizeRepertoireLabel(
         (await ttPage.repertoireDropdownButton.textContent()) || ""
@@ -762,12 +762,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     ).toBeNull();
 
     // Resync so the stale row appears in local DB
-    await resetLocalDbAndResync(page);
-    ttPage = new TuneTreesPage(page);
-    await setInjectedTestUserId(page, testUser.userId);
-    await waitForTestApi(page);
-    await ttPage.navigateToTab("practice");
-    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+    await resetLocalDbAndReopenPractice(page, testUser.userId);
 
     // Queue should still be on the current date, not the stale one
     const queueAfterSync = await getQueueSnapshot(page, testUser.repertoireId);
@@ -903,12 +898,7 @@ test.describe("PRACTICE-005: Date Rollover Banner", () => {
     ).toBeNull();
 
     // Resync to pick up the new queue from "another device"
-    await resetLocalDbAndResync(page);
-    ttPage = new TuneTreesPage(page);
-    await setInjectedTestUserId(page, testUser.userId);
-    await waitForTestApi(page);
-    await ttPage.navigateToTab("practice");
-    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+    await resetLocalDbAndReopenPractice(page, testUser.userId);
 
     // The queue date should now be today (matching wall clock) so banner should be hidden
     await expect(ttPage.dateRolloverBanner).toBeHidden({ timeout: 10000 });
