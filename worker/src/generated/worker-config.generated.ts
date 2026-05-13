@@ -62,6 +62,11 @@ export const WORKER_SYNC_CONFIG = {
       idColumn: "repertoire_id",
       ownerColumn: "user_ref",
     },
+    rhythmPatternsIds: {
+      table: "rhythm_patterns",
+      idColumn: "id",
+      ownerColumn: "user_id",
+    },
     setlistIds: {
       table: "setlist",
       idColumn: "id",
@@ -236,6 +241,10 @@ export const WORKER_SYNC_CONFIG = {
         kind: "inCollection",
         column: "repertoire_ref",
         collection: "repertoireIds",
+      },
+      rhythm_patterns: {
+        kind: "orNullEqUserId",
+        column: "user_id",
       },
       setlist: {
         kind: "rpc",

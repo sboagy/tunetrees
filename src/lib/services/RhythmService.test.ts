@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import Database from "better-sqlite3";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -8,6 +10,8 @@ import {
   createRhythmService,
   loadRhythmPatternMetadata,
 } from "./RhythmService";
+
+const projectRoot = path.resolve(__dirname, "..", "..", "..");
 
 function createDb(sqlStatements: string[]): SqliteDatabase {
   const sqlite = new Database(":memory:");
@@ -25,17 +29,17 @@ function createPremiumLoopRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran')",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
-    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit)
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
       VALUES ('rp-1', 'ITRAD', 'Reel', 'Basic Rolling', '*', 'X:1
 T:Reel Groove
 M:4/4
 L:1/8
 K:clef=perc
-|: C2 A2 C2 A2 :|', 1, NULL, 'bodhran')`,
+|: C2 A2 C2 A2 :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
   ]);
 }
 
@@ -44,17 +48,17 @@ function createSampleKitRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran')",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
     "INSERT INTO genre (id, name) VALUES ('TEST', 'Session Test')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('TEST', 'Reel', 112)",
-    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit)
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
       VALUES ('rp-1', 'TEST', 'Reel', 'Basic Rolling', '*', 'X:1
 T:Reel Groove
 M:4/4
 L:1/8
 K:clef=perc
-|: C2 A2 C2 A2 :|', 1, NULL, 'bodhran')`,
+|: C2 A2 C2 A2 :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
   ]);
 }
 
@@ -92,11 +96,91 @@ function createRhythmDbWithoutPatternRow() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran')",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
   ]);
+}
+
+function createHierarchicalRhythmDb(options?: {
+  includeUserTuneOverride?: boolean;
+  includeGlobalTuneOverride?: boolean;
+  includeUserDefault?: boolean;
+}) {
+  const {
+    includeUserTuneOverride = true,
+    includeGlobalTuneOverride = true,
+    includeUserDefault = true,
+  } = options ?? {};
+
+  const statements = [
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
+      VALUES ('system-default', 'ITRAD', 'Reel', 'System Default', '*', 'X:1
+T:System Default
+M:4/4
+L:1/8
+K:clef=perc
+|: C2 A2 C2 A2 :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
+  ];
+
+  if (includeUserDefault) {
+    statements.push(`INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
+      VALUES ('user-default', 'ITRAD', 'Reel', 'User Default', '*', 'X:1
+T:User Default
+M:4/4
+L:1/8
+K:clef=perc
+|: D2 A2 D2 A2 :|', 0, NULL, 'generic_click', NULL, 'user-1', 'seed')`);
+  }
+
+  if (includeGlobalTuneOverride) {
+    statements.push(`INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
+      VALUES ('global-tune', 'ITRAD', 'Reel', 'Global Tune Override', '*', 'X:1
+T:Global Tune Override
+M:4/4
+L:1/8
+K:clef=perc
+|: E2 A2 E2 A2 :|', 0, NULL, 'bodhran', 'tune-1', NULL, 'full_track')`);
+  }
+
+  if (includeUserTuneOverride) {
+    statements.push(`INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
+      VALUES ('user-tune', 'ITRAD', 'Reel', 'User Tune Override', '*', 'X:1
+T:User Tune Override
+M:4/4
+L:1/8
+K:clef=perc
+|: F2 A2 F2 A2 :|', 0, 'custom/user-tune.mp3', 'bodhran', 'tune-1', 'user-1', 'full_track')`);
+  }
+
+  return createDb(statements);
+}
+
+function applySqliteMigration(db: Database.Database, fileName: string) {
+  const migrationPath = path.join(
+    projectRoot,
+    "drizzle",
+    "migrations",
+    "sqlite",
+    fileName
+  );
+  const contents = fs.readFileSync(migrationPath, "utf8");
+  const statements = contents
+    .split(/-->\s*statement-breakpoint/g)
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+
+  for (const statement of statements) {
+    db.exec(statement);
+  }
 }
 
 function createRhythmDbWithLegacyPatternColumns() {
@@ -133,6 +217,7 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata).toMatchObject({
       genreName: "Irish Traditional",
       tuneTypeName: "Reel",
+      patternType: "seed",
       tempoQpm: 112,
       sampleKit: "bodhran",
       premiumAudioSource: "registry",
@@ -162,6 +247,7 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata).toMatchObject({
       genreName: "Irish Traditional",
       tuneTypeName: "Reel",
+      patternType: "seed",
       tempoQpm: 112,
       sampleKit: "generic_click",
       premiumAudioSource: "registry",
@@ -191,6 +277,7 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata).toMatchObject({
       genreName: "Irish Traditional",
       tuneTypeName: "Reel",
+      patternType: "seed",
       tempoQpm: 112,
       sampleKit: "generic_click",
       premiumAudioSource: "registry",
@@ -220,6 +307,7 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata).toMatchObject({
       genreName: "Irish Traditional",
       tuneTypeName: "Jig",
+      patternType: "seed",
       tempoQpm: 115,
       sampleKit: "generic_click",
       premiumAudioSource: "registry",
@@ -248,6 +336,7 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata).toMatchObject({
       genreName: "Irish Traditional",
       tuneTypeName: "Polka",
+      patternType: "seed",
       tempoQpm: 120,
       sampleKit: "generic_click",
       premiumAudioSource: "registry",
@@ -294,11 +383,183 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata).toMatchObject({
       genreName: null,
       tuneTypeName: "Reel",
+      patternType: "seed",
       tempoQpm: 100,
       source: "tune_type_fallback",
     });
     expect(metadata?.rhythmAbc).toContain("M:4/4");
     expect(metadata?.rhythmAbc).toContain("K:clef=perc");
+  });
+  it("prioritizes the user tune override over tune and user defaults", async () => {
+    const db = createHierarchicalRhythmDb();
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "Reel",
+        tuneId: "tune-1",
+        userId: "user-1",
+      },
+      {
+        sampleBaseUrl: "https://media.example.test",
+      }
+    );
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      patternType: "full_track",
+      sampleKit: "bodhran",
+      premiumAudioSource: "database",
+      source: "rhythm_patterns",
+    });
+    expect(metadata?.rhythmAbc).toContain("User Tune Override");
+    expect(metadata?.premiumAudioUrl).toBe(
+      "https://media.example.test/custom/user-tune.mp3"
+    );
+  });
+
+  it("prioritizes the global tune override before the user default", async () => {
+    const db = createHierarchicalRhythmDb({
+      includeUserTuneOverride: false,
+    });
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "Reel",
+        tuneId: "tune-1",
+        userId: "user-1",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      patternType: "full_track",
+      sampleKit: "bodhran",
+      source: "rhythm_patterns",
+    });
+    expect(metadata?.rhythmAbc).toContain("Global Tune Override");
+  });
+
+  it("prioritizes the user default before the system default when no tune override exists", async () => {
+    const db = createHierarchicalRhythmDb({
+      includeUserTuneOverride: false,
+      includeGlobalTuneOverride: false,
+    });
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "Reel",
+        userId: "user-1",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      patternType: "seed",
+      sampleKit: "generic_click",
+      source: "rhythm_patterns",
+    });
+    expect(metadata?.rhythmAbc).toContain("User Default");
+  });
+});
+
+describe("rhythm pattern sqlite migrations", () => {
+  it("adds sample_kit, tune_id, user_id, and pattern_type to migrated local sqlite databases", () => {
+    const sqlite = new Database(":memory:");
+
+    sqlite.exec("CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)");
+    sqlite.exec(
+      "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)"
+    );
+    sqlite.exec(
+      "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, PRIMARY KEY (genre_id, tune_type_id))"
+    );
+    sqlite.exec(
+      "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')"
+    );
+    sqlite.exec(
+      "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')"
+    );
+
+    applySqliteMigration(
+      sqlite,
+      "0019_add_rhythm_patterns_and_default_bpm.sql"
+    );
+    applySqliteMigration(sqlite, "0020_add_sample_kit_to_rhythm_patterns.sql");
+    applySqliteMigration(sqlite, "0021_add_rhythm_pattern_overrides.sql");
+
+    const columns = sqlite
+      .prepare("PRAGMA table_info(rhythm_patterns)")
+      .all() as Array<{
+      name: string;
+      notnull: number;
+      dflt_value: string | null;
+    }>;
+
+    expect(columns.map((column) => column.name)).toEqual(
+      expect.arrayContaining([
+        "sample_kit",
+        "tune_id",
+        "user_id",
+        "pattern_type",
+      ])
+    );
+
+    const patternTypeColumn = columns.find(
+      (column) => column.name === "pattern_type"
+    );
+    expect(patternTypeColumn?.notnull).toBe(1);
+    expect(patternTypeColumn?.dflt_value ?? "").toContain("seed");
+
+    sqlite.exec(`INSERT INTO rhythm_patterns (
+      id,
+      genre_id,
+      tune_type_id,
+      name,
+      abc_string,
+      is_default
+    ) VALUES (
+      'migrated-row',
+      'ITRAD',
+      'Reel',
+      'Migrated Row',
+      'X:1\nT:Migrated\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 A2 C2 A2 :|',
+      1
+    )`);
+
+    const row = sqlite
+      .prepare(
+        "SELECT sample_kit, tune_id, user_id, pattern_type FROM rhythm_patterns WHERE id = 'migrated-row'"
+      )
+      .get() as {
+      sample_kit: string;
+      tune_id: string | null;
+      user_id: string | null;
+      pattern_type: string;
+    };
+
+    expect(row).toMatchObject({
+      sample_kit: "bodhran",
+      tune_id: null,
+      user_id: null,
+      pattern_type: "seed",
+    });
+
+    sqlite.close();
   });
 });
 
