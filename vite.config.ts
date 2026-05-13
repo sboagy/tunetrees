@@ -100,14 +100,17 @@ export default defineConfig(() => {
     }
 
     if (!rhythmAssetsBaseUrl) {
-      return true;
+      // No R2 base URL configured – restrict to same-origin only so we don't
+      // accidentally CacheFirst arbitrary cross-origin /audio/kits or /audio/loops URLs.
+      return url.origin === self.location.origin;
     }
 
     try {
       const configuredBase = new URL(rhythmAssetsBaseUrl);
       return url.origin === configuredBase.origin;
     } catch {
-      return true;
+      // Unparseable base URL – fall back to same-origin only.
+      return url.origin === self.location.origin;
     }
   };
 

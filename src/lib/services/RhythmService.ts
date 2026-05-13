@@ -862,23 +862,36 @@ export function createRhythmService(
     }
 
     const audioContext = await ensureAudioContext();
+    // Fallback kit used when a real sample file fails to load or decode.
+    const genericClickKit = SAMPLE_KITS[DEFAULT_SAMPLE_KIT];
     const decodedEntries = await Promise.all(
       Object.entries(kitMapping).map(async ([pitch, entry]) => {
-        const buffer =
-          entry.kind === "file"
-            ? await decodeSample(
-                audioContext,
-                fetchImpl,
-                options.sampleUrlBuilder
-                  ? options.sampleUrlBuilder(activeSampleKit, entry.fileName)
-                  : buildSampleUrl(
-                      sampleBaseUrl,
-                      activeSampleKit,
-                      entry.fileName
-                    )
-              )
-            : createSyntheticClickBuffer(audioContext, entry);
-        return [Number(pitch), buffer] as const;
+        if (entry.kind === "file") {
+          const url = options.sampleUrlBuilder
+            ? options.sampleUrlBuilder(activeSampleKit, entry.fileName)
+            : buildSampleUrl(sampleBaseUrl, activeSampleKit, entry.fileName);
+          try {
+            const buffer = await decodeSample(audioContext, fetchImpl, url);
+            return [Number(pitch), buffer] as const;
+          } catch {
+            // Network or decode failure – substitute a synthetic click for
+            // this pitch so rhythm playback continues without the remote asset.
+            const pitchKey = Number(pitch);
+            const fallback = genericClickKit?.[pitchKey];
+            const syntheticEntry: SampleKitSyntheticEntry =
+              fallback?.kind === "synthetic"
+                ? fallback
+                : { kind: "synthetic", durationMs: 30, frequency: 880 };
+            return [
+              pitchKey,
+              createSyntheticClickBuffer(audioContext, syntheticEntry),
+            ] as const;
+          }
+        }
+        return [
+          Number(pitch),
+          createSyntheticClickBuffer(audioContext, entry),
+        ] as const;
       })
     );
 
@@ -961,13 +974,27 @@ export function createRhythmService(
       throw new Error("Rhythm pattern metadata has not been loaded.");
     }
 
+    let usingPremiumLoop = false;
     const premiumLoopSelection = resolvePremiumLoopSelection(
       currentMetadata,
       tempoQpm()
     );
     if (premiumLoopSelection) {
-      await startPremiumLoopAudio(premiumLoopSelection, tempoQpm(), positionMs);
-    } else {
+      try {
+        await startPremiumLoopAudio(
+          premiumLoopSelection,
+          tempoQpm(),
+          positionMs
+        );
+        usingPremiumLoop = true;
+      } catch {
+        // Premium loop unavailable (e.g. 404, CORS, autoplay rejection) –
+        // clean up and fall through to the WebAudio sample path so rhythm
+        // playback continues.
+        stopPremiumLoopAudio(true);
+      }
+    }
+    if (!usingPremiumLoop) {
       await ensureSamplesLoaded();
     }
 
@@ -980,7 +1007,7 @@ export function createRhythmService(
     timingCallbacks = buildTimingCallbacks(
       currentMetadata.rhythmAbc,
       audioContext,
-      premiumLoopSelection == null
+      !usingPremiumLoop
     );
     timingCallbacks.start(
       positionMs == null ? undefined : msToSeconds(positionMs),
