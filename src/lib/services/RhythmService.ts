@@ -12,6 +12,8 @@ const DEFAULT_SAMPLE_BASE_URL = (
   import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
 ).replace(/\/+$/, "");
 const DEFAULT_SAMPLE_KIT = "generic_click";
+const PRIMARY_PERCUSSION_PITCH = 60;
+const SECONDARY_PERCUSSION_PITCH = 69;
 const REQUIRED_RHYTHM_PATTERN_COLUMNS = [
   "abc_string",
   "genre_id",
@@ -146,6 +148,11 @@ const DEFAULT_TEMPO_BY_TYPE: Record<string, number> = {
   polka: 120,
 };
 
+const GENRE_NAME_ALIASES: Record<string, string> = {
+  itrad: "irish traditional",
+  "irish traditional music": "irish traditional",
+};
+
 export interface RhythmPatternRequest {
   genreName?: string | null;
   tuneTypeName?: string | null;
@@ -212,7 +219,8 @@ function normalizeTuneTypeName(value: string): string {
 }
 
 function normalizeGenreName(value?: string | null): string {
-  return value?.trim().toLowerCase() ?? "";
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return GENRE_NAME_ALIASES[normalized] ?? normalized;
 }
 
 function sanitizeAbcTitle(value: string): string {
@@ -460,7 +468,10 @@ export async function loadRhythmPatternMetadata(
         SELECT id, name
         FROM genre
         WHERE ${genreFilter} IS NOT NULL
-          AND lower(name) = lower(${genreFilter})
+          AND (
+            lower(name) = lower(${genreFilter})
+            OR lower(id) = lower(${genreFilter})
+          )
         LIMIT 1
       ),
       selected_pattern AS (
@@ -609,7 +620,10 @@ export async function loadRhythmPatternMetadata(
         SELECT id, name
         FROM genre
         WHERE ${genreFilter} IS NOT NULL
-          AND lower(name) = lower(${genreFilter})
+          AND (
+            lower(name) = lower(${genreFilter})
+            OR lower(id) = lower(${genreFilter})
+          )
         LIMIT 1
       )
       SELECT
@@ -673,7 +687,7 @@ export async function loadRhythmPatternMetadata(
   }
 
   return {
-    genreName: genreFilter,
+    genreName: genreFilter ? normalizeGenreName(genreFilter) : null,
     tuneTypeName: fallbackRow.tune_type_name,
     rhythmSignature: fallbackRow.rhythm_signature ?? null,
     rhythmAbc: buildFallbackRhythmAbc(
@@ -771,12 +785,34 @@ function createSyntheticClickBuffer(
   return buffer;
 }
 
-function getPitchPlaybackGain(event: NoteTimingEvent): number {
-  const hasAccent = event.elements?.some((group) =>
-    group.some((element) =>
-      (element.getAttribute("class") ?? "").includes("abcjs-accent")
+function eventHasAccent(event: NoteTimingEvent): boolean {
+  return Boolean(
+    event.elements?.some((group) =>
+      group.some((element) =>
+        (element.getAttribute("class") ?? "").includes("abcjs-accent")
+      )
     )
   );
+}
+
+function getPlaybackPitches(event: NoteTimingEvent): number[] {
+  const explicitPitches = (event.midiPitches ?? [])
+    .map((pitch) => pitch.pitch)
+    .filter((pitch) => Number.isFinite(pitch));
+
+  if (explicitPitches.length > 0) {
+    return explicitPitches;
+  }
+
+  return [
+    eventHasAccent(event)
+      ? PRIMARY_PERCUSSION_PITCH
+      : SECONDARY_PERCUSSION_PITCH,
+  ];
+}
+
+function getPitchPlaybackGain(event: NoteTimingEvent): number {
+  const hasAccent = eventHasAccent(event);
 
   return hasAccent ? 1 : 0.8;
 }
@@ -977,8 +1013,8 @@ export function createRhythmService(
     }
 
     const gainValue = getPitchPlaybackGain(event);
-    for (const midiPitch of event.midiPitches ?? []) {
-      const buffer = sampleBuffers.get(midiPitch.pitch);
+    for (const playbackPitch of getPlaybackPitches(event)) {
+      const buffer = sampleBuffers.get(playbackPitch);
       if (!buffer) {
         continue;
       }

@@ -12,7 +12,7 @@
 
 import { Dialog as DialogPrimitive } from "@kobalte/core/dialog";
 import { X } from "lucide-solid";
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component, Show } from "solid-js";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { RhythmPlayer } from "./RhythmPlayer";
@@ -34,12 +34,7 @@ export interface RhythmDialogProps {
  * close button or presses Escape.
  */
 export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
-  const [mounted, setMounted] = createSignal(false);
-
   const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen) {
-      setMounted(true);
-    }
     props.onOpenChange(isOpen);
   };
 
@@ -81,7 +76,7 @@ export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
 
           {/* Player */}
           <div class="min-h-[200px]">
-            <Show when={mounted()}>
+            <Show when={props.open}>
               <RhythmPlayer
                 tuneTypeName={props.tuneTypeName}
                 tuneId={props.tuneId}
