@@ -31,6 +31,7 @@ import { getTunesForUser } from "../../lib/db/queries/tunes";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import type { Tune } from "../../lib/db/types";
+import { RhythmDialog } from "../rhythm/RhythmDialog";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 // Table state persistence is handled inside TunesGrid
@@ -231,6 +232,14 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
   let innerTable: any | null = null;
 
+  // Rhythm dialog state
+  const [rhythmDialog, setRhythmDialog] = createSignal<{
+    tuneId: string;
+    tuneTypeName: string;
+    genreName: string | null;
+    structure: string | null;
+  } | null>(null);
+
   // Debug: Log selectedCount changes
   createEffect(() => {
     console.log(
@@ -286,6 +295,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
             cellCallbacks={{
               onRecallEvalChange: props.onRecallEvalChange,
               onGoalChange: props.onGoalChange,
+              onTypeBadgeClick: (params) => setRhythmDialog(params),
             }}
             onSelectionChange={(count) => {
               console.log(
@@ -343,6 +353,16 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
           </Show>
         </div>
       </div>
+      <RhythmDialog
+        open={rhythmDialog() !== null}
+        onOpenChange={(open) => {
+          if (!open) setRhythmDialog(null);
+        }}
+        tuneTypeName={rhythmDialog()?.tuneTypeName ?? null}
+        tuneId={rhythmDialog()?.tuneId ?? null}
+        structure={rhythmDialog()?.structure ?? null}
+        genreName={rhythmDialog()?.genreName ?? null}
+      />
     </div>
   );
 };

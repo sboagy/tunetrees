@@ -9,10 +9,38 @@
 
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
+import { BASE_URL } from "../test-config";
 
 log.setLevel("info");
 
+/**
+ * Navigate back to the app if the current page is not on the app URL.
+ * Rapid offline/online toggling can cause the service worker or app to
+ * redirect to the e2e-origin fallback page.
+ */
+async function ensureAppPage(page: Page): Promise<void> {
+  const currentUrl = page.url();
+  const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+
+  // Already on the app (not about:blank, not e2e-origin, not data:)
+  if (
+    currentUrl.startsWith(baseUrl) &&
+    !currentUrl.includes("e2e-origin.html") &&
+    currentUrl !== "about:blank" &&
+    !currentUrl.startsWith("data:")
+  ) {
+    return;
+  }
+
+  log.info(`🔁 Redirected to ${currentUrl}, navigating back to app...`);
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  // Give the service worker and app time to initialise
+  await page.waitForTimeout(1000);
+}
+
 async function readSyncOutboxCount(page: Page): Promise<number> {
+  await ensureAppPage(page);
+
   return await page.evaluate(async () => {
     const api = (window as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
@@ -123,6 +151,8 @@ export async function getSyncOutboxCount(page: Page): Promise<number> {
  */
 export async function triggerManualSync(page: Page): Promise<void> {
   log.info("🔄 Triggering manual sync...");
+
+  await ensureAppPage(page);
 
   await page.evaluate(async () => {
     const forceSyncUp = (window as any).__forceSyncUpForTest;

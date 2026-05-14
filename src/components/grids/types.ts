@@ -175,4 +175,15 @@ export interface ICellEditorCallbacks {
   onScheduledChange?: (tuneId: string, newValue: string | null) => void;
   /** Reactive accessor for the list of available goals (for the GoalBadge dropdown). */
   goals?: () => IGoalOption[];
+  /**
+   * Called when the user clicks a type badge (e.g. "Reel") in a tune row.
+   * Receives the tune id, type name, genre, and structure so the consumer
+   * can open a RhythmPlayer dialog scoped to that tune.
+   */
+  onTypeBadgeClick?: (params: {
+    tuneId: string;
+    tuneTypeName: string;
+    genreName: string | null;
+    structure: string | null;
+  }) => void;
 }

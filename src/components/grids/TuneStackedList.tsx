@@ -77,11 +77,25 @@ function getRelativeLabel(value: string | null | undefined): {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const TypeBadge = (props: { value: string | null | undefined }) => (
+const TypeBadge = (props: {
+  value: string | null | undefined;
+  onClick?: () => void;
+}) => (
   <Show when={props.value}>
-    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+    <button
+      type="button"
+      class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer transition-colors"
+      onClick={(e) => {
+        e.stopPropagation();
+        props.onClick?.();
+      }}
+      aria-label={
+        props.value ? `Open rhythm player for ${props.value}` : undefined
+      }
+      title={props.value ? `Click to play ${props.value} rhythm` : undefined}
+    >
       {props.value}
-    </span>
+    </button>
   </Show>
 );
 
@@ -633,7 +647,18 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                     {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
                     <div class="mt-1 flex flex-wrap items-center gap-1.5">
                       <Show when={isColVisible("type")}>
-                        <TypeBadge value={item.type} />
+                        <TypeBadge
+                          value={item.type}
+                          onClick={() => {
+                            const tuneId = item.tune_id ?? item.id;
+                            props.cellCallbacks?.onTypeBadgeClick?.({
+                              tuneId: String(tuneId),
+                              tuneTypeName: item.type ?? "",
+                              genreName: item.genre ?? null,
+                              structure: item.structure ?? null,
+                            });
+                          }}
+                        />
                       </Show>
                       <Show when={isColVisible("mode")}>
                         <ModeBadge value={item.mode} />
