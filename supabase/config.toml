@@ -75,8 +75,13 @@ enabled = true
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 # sql_paths = ["./seed.sql", "./seeds/rsTop500.sql", "./seeds/null_irishtune_reference_user_ref.sql"]
 # This baseline is public-schema-only. Shared auth fixtures are seeded from
-# rhizome before TuneTrees migrations/seeds run.
-sql_paths = ["./seeds/baseline_local_20260217.sql"]
+# rhizome before TuneTrees migrations/seeds run. Apply rhythm defaults after
+# the baseline because the baseline truncates tune_type/genre with CASCADE,
+# which also clears rhythm_patterns.
+sql_paths = [
+	"./seeds/baseline_local_20260217.sql",
+	"./seeds/genre_tune_tempo_and_rhythms.sql",
+]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
