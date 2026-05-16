@@ -124,7 +124,7 @@
     "@types/node": "^25.6.0",
     "@types/papaparse": "^5.5.2",
     "@types/sql.js": "^1.4.11",
-    "vitest": "^4.0.18",
+    "vitest": "^4.1.6",
     "@vitest/coverage-v8": "^4.0.18",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
