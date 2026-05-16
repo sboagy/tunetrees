@@ -3,9 +3,9 @@ import path from "node:path";
 
 const DEFAULT_LOCAL_DB_URL =
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-const SEED_PATH = path.join(
+const UPDATE_PATH = path.join(
   process.cwd(),
-  "supabase/seeds/genre_tune_tempo_and_rhythms.sql"
+  "sql_scripts/update_genre_tune_tempo_and_rhythms.sql"
 );
 
 function main(): void {
@@ -20,25 +20,17 @@ function main(): void {
     "\\set ON_ERROR_STOP on",
     "BEGIN;",
     "",
-    "DELETE FROM public.rhythm_patterns",
-    "WHERE user_id IS NULL",
-    "  AND tune_id IS NULL",
-    "  AND pattern_type = 'seed';",
-    "",
-    "UPDATE public.genre_tune_type",
-    "SET default_bpm = NULL;",
-    "",
-    `\\i '${SEED_PATH.replaceAll("'", "''")}'`,
+    `\\i '${UPDATE_PATH.replaceAll("'", "''")}'`,
     "",
     txEnd,
     "",
   ].join("\n");
 
   console.log(
-    `[seed] ${shouldRollback ? "Previewing" : "Applying"} genre/rhythm seed to local Supabase using ${databaseUrl}`
+    `[seed] ${shouldRollback ? "Previewing" : "Applying"} genre/rhythm updates to local Supabase using ${databaseUrl}`
   );
   console.log(
-    `[seed] ${shouldRollback ? "Transaction will be rolled back after execution." : "Seed rows will be replaced and committed."}`
+    `[seed] ${shouldRollback ? "Transaction will be rolled back after execution." : "Updates will be committed."}`
   );
 
   const result = spawnSync("psql", [databaseUrl], {

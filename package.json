@@ -44,6 +44,7 @@
     "db:dump-seed": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- npx supabase db dump --local --data-only --schema public -f supabase/seed.sql",
     "db:remote:backup": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- node scripts/run-rhizome-db-remote-backup.mjs --schema public --schema auth",
     "db:remote:apply-top500": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- supabase db execute --linked --file supabase/seeds/rsTop500.sql",
+    "db:remote:apply-genre-rhythm": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- sh -c 'psql \"$DATABASE_URL\" -q -v ON_ERROR_STOP=1 -f sql_scripts/update_genre_tune_tempo_and_rhythms.sql'",
     "test": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vitest run",
     "test:unit": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vitest run tests/ src/",
     "test:e2e": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list",
