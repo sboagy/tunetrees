@@ -855,9 +855,47 @@ async function seedSampleCatalogRow() {
 async function getSyncOutboxCount(): Promise<number> {
   const db = await ensureDb();
   const rows = await db.all<{ count: number }>(sql`
-    SELECT COUNT(*) as count FROM sync_push_queue
+    SELECT COUNT(*) as count
+    FROM sync_push_queue
+    WHERE status IN ('pending', 'in_progress')
   `);
   return rows[0]?.count ?? 0;
+}
+
+async function getPendingSyncOutboxItems(): Promise<
+  Array<{
+    tableName: string;
+    rowId: string;
+    operation: string;
+    status: string;
+    attempts: number;
+    lastError: string | null;
+  }>
+> {
+  const db = await ensureDb();
+  const rows = await db.all<{
+    table_name: string;
+    row_id: string;
+    operation: string;
+    status: string;
+    attempts: number;
+    last_error: string | null;
+  }>(sql`
+    SELECT table_name, row_id, operation, status, attempts, last_error
+    FROM sync_push_queue
+    WHERE status IN ('pending', 'in_progress')
+    ORDER BY changed_at ASC
+    LIMIT 10
+  `);
+
+  return rows.map((row) => ({
+    tableName: row.table_name,
+    rowId: row.row_id,
+    operation: row.operation,
+    status: row.status,
+    attempts: row.attempts,
+    lastError: row.last_error,
+  }));
 }
 
 /**
@@ -889,8 +927,12 @@ async function getRepertoireCount(repertoireId?: string): Promise<number> {
  * Returns false when offline tests can proceed
  */
 function isSyncComplete(): boolean {
-  // For offline tests, always return true since we're not actually syncing
-  // In online tests, this would check if the sync service is idle
+  const syncControl = window.__ttSyncControl;
+  if (syncControl?.isSyncing) {
+    return !syncControl.isSyncing();
+  }
+
+  // Fallback for older test environments that only expose DOM markers.
   const el = document.querySelector("[data-auth-initialized]");
   const isSyncing = el?.getAttribute("data-is-syncing") === "true";
   return !isSyncing;
@@ -1092,6 +1134,11 @@ async function seedSetlistsScenario(input: SeedSetlistsScenarioInput) {
 // Attach to window
 declare global {
   interface Window {
+    __ttSyncControl?: {
+      isSyncing?: () => boolean;
+      stop?: () => Promise<void>;
+      waitForIdle?: (timeoutMs?: number) => Promise<boolean>;
+    };
     __ttTestApi?: {
       // User ID injection for bypassing Supabase auth
       setTestUserId: (userId: string) => void;
@@ -1289,6 +1336,16 @@ declare global {
         titles: string[]
       ) => Promise<Array<{ id: string; title: string }>>;
       getSyncOutboxCount: () => Promise<number>;
+      getPendingSyncOutboxItems: () => Promise<
+        Array<{
+          tableName: string;
+          rowId: string;
+          operation: string;
+          status: string;
+          attempts: number;
+          lastError: string | null;
+        }>
+      >;
       getRepertoireCount: (repertoireId?: string) => Promise<number>;
       isSyncComplete: () => boolean;
       getSyncErrors: () => Promise<string[]>;
@@ -1705,6 +1762,9 @@ if (typeof window !== "undefined") {
       },
       getSyncOutboxCount: async () => {
         return await getSyncOutboxCount();
+      },
+      getPendingSyncOutboxItems: async () => {
+        return await getPendingSyncOutboxItems();
       },
       getRepertoireCount: async (repertoireId?: string) => {
         return await getRepertoireCount(repertoireId);

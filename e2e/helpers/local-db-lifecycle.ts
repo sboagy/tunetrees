@@ -40,6 +40,10 @@ export async function clearTunetreesClientStorage(
         if (!preserveAuth) {
           localStorage.clear();
         } else {
+          // E2E resets should emulate a fresh browser device while preserving
+          // the authenticated session snapshot.
+          localStorage.removeItem("tunetrees_device_id");
+
           // These can leak in via Playwright storageState and cause Practice to render
           // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
           localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");

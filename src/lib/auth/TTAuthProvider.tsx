@@ -1584,9 +1584,10 @@ const TTInner: ParentComponent = (props) => {
       w.__forceSyncUpForTest = async () => {
         try {
           await waitForSyncService();
-          await forceSyncUp();
+          await forceSyncUp({ allowDeletes: true });
         } catch (e) {
           console.warn("__forceSyncUpForTest failed", e);
+          throw e;
         }
       };
     }
@@ -1597,6 +1598,7 @@ const TTInner: ParentComponent = (props) => {
           await forceSyncDown({ full: true });
         } catch (e) {
           console.warn("__forceSyncDownForTest failed", e);
+          throw e;
         }
       };
     }

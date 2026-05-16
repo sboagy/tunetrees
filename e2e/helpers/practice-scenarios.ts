@@ -802,6 +802,8 @@ const DETERMINISTIC_TABLES = [
   "tune_override",
   "prefs_scheduling_options",
   "prefs_spaced_repetition",
+  "tab_group_main_state",
+  "table_state",
   "plugin",
 ] as const;
 
@@ -1311,6 +1313,10 @@ function applyTableQueryFilters<
     query = query.eq("repertoire_ref", user.repertoireId);
   } else if (tableName === "tune_set") {
     query = query.eq("owner_user_ref", user.userId);
+  } else if (tableName === "tab_group_main_state") {
+    query = query.eq("user_id", user.userId);
+  } else if (tableName === "table_state") {
+    query = query.eq("user_id", user.userId);
   } else if (tableName === "table_transient_data") {
     query = query.eq("user_id", user.userId);
   } else if (tableName === "prefs_scheduling_options") {
@@ -1608,6 +1614,8 @@ export async function setupForPracticeTestsParallel(
     await clearUserTable(user, "tune_override");
     await clearUserTable(user, "prefs_scheduling_options");
     await clearUserTable(user, "prefs_spaced_repetition");
+    await clearUserTable(user, "tab_group_main_state");
+    await clearUserTable(user, "table_state");
     await clearUserTable(user, "plugin");
 
     // 2. Reset repertoire
@@ -1621,6 +1629,8 @@ export async function setupForPracticeTestsParallel(
       "tune_override",
       "prefs_scheduling_options",
       "prefs_spaced_repetition",
+      "tab_group_main_state",
+      "table_state",
       "plugin",
       "repertoire_tune",
       "user_genre_selection",
@@ -1846,6 +1856,8 @@ export async function setupForRepertoireTestsParallel(
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
   await clearUserTable(user, "prefs_spaced_repetition");
+  await clearUserTable(user, "tab_group_main_state");
+  await clearUserTable(user, "table_state");
   await clearUserTable(user, "plugin");
 
   // 2. Reset repertoire
@@ -1860,6 +1872,8 @@ export async function setupForRepertoireTestsParallel(
     "tune_override",
     "prefs_scheduling_options",
     "prefs_spaced_repetition",
+    "tab_group_main_state",
+    "table_state",
     "plugin",
     "repertoire_tune",
     "tune_set",
@@ -2002,6 +2016,8 @@ export async function setupForCatalogTestsParallel(
     "tune_override",
     "prefs_scheduling_options",
     "prefs_spaced_repetition",
+    "tab_group_main_state",
+    "table_state",
     "repertoire_tune",
     "plugin",
   ];
@@ -2020,6 +2036,8 @@ export async function setupForCatalogTestsParallel(
   await clearUserTable(user, "tune_override");
   await clearUserTable(user, "prefs_scheduling_options");
   await clearUserTable(user, "prefs_spaced_repetition");
+  await clearUserTable(user, "tab_group_main_state");
+  await clearUserTable(user, "table_state");
   await clearUserTable(user, "plugin");
 
   await verifyTablesEmpty(user, whichTables);

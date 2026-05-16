@@ -130,6 +130,9 @@ export const test = base.extend<ITuneTreesFixtures>({
 
   // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture pattern requires empty object
   testUser: async ({}, use, testInfo) => {
+    // parallelIndex is the stable active-worker slot. Playwright guarantees
+    // concurrently running workers have different parallelIndex values, and a
+    // restarted worker keeps the same slot instead of getting a new one.
     const user = getTestUserByWorkerIndex(testInfo.parallelIndex);
     await use(user);
   },
