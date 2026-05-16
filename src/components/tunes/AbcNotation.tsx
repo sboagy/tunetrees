@@ -39,12 +39,24 @@ export const AbcNotation: Component<AbcNotationProps> = (props) => {
         // Clear previous rendering
         containerRef.innerHTML = "";
 
-        // Render ABC notation
+        console.log("Rendering ABC notation:", props.notation);
+
+        // Keep the call close to abcjs defaults so the layout matches
+        // external ABC tools instead of being stretched by app-specific options.
         abcjs.renderAbc(containerRef, props.notation, {
-          responsive: props.responsive ? "resize" : undefined,
+          // This is the magic bullet for modals. It tells the SVG to fluidly
+          // stretch/shrink to fill the container instead of locking to a hardcoded width.
+          responsive: "resize",
+
+          // Adds helpful CSS classes to the SVG elements (staff, notes, etc.)
+          // in case you want to style them with Tailwind later.
           add_classes: true,
-          staffwidth: props.responsive ? undefined : 740,
-          scale: 1.0,
+
+          // Tightens up the blank space around the sheet music
+          paddingtop: 15,
+          paddingbottom: 15,
+          paddingleft: 0,
+          paddingright: 0,
         });
       } catch (err) {
         const errorMessage =
