@@ -75,12 +75,18 @@ export const genre = pgTable("genre", {
   name: text("name"),
   region: text("region"),
   description: text("description"),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const genreTuneType = pgTable("genre_tune_type", {
   genreId: text("genre_id").notNull(),
   tuneTypeId: text("tune_type_id").notNull(),
   defaultBpm: integer("default_bpm"),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const goal = pgTable("goal", {
@@ -334,6 +340,9 @@ export const rhythmPatterns = pgTable("rhythm_patterns", {
   tuneId: uuid("tune_id"),
   userId: uuid("user_id"),
   patternType: text("pattern_type").notNull().default("seed"),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const setlist = pgTable("setlist", {
@@ -547,6 +556,9 @@ export const tuneType = pgTable("tune_type", {
   name: text("name"),
   rhythm: text("rhythm"),
   description: text("description"),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
 });
 
 export const userGenreSelection = pgTable("user_genre_selection", {

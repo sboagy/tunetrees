@@ -3,6 +3,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
+import { getBrowserDeviceId } from "../device-id";
 import {
   setlist,
   setlistItem,
@@ -49,10 +50,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function getLocalDeviceId(): string {
-  return "local";
-}
-
 function normalizeName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) {
@@ -92,7 +89,7 @@ async function touchGroup(
     .set({
       syncVersion: (groupRow.syncVersion ?? 0) + 1,
       lastModifiedAt: at,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(userGroup.id, groupId));
 }
@@ -119,7 +116,7 @@ async function touchSetlist(
     .set({
       syncVersion: (setlistRow.syncVersion ?? 0) + 1,
       lastModifiedAt: at,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(setlist.id, setlistId));
 
@@ -173,7 +170,7 @@ async function touchTuneSet(
     .set({
       syncVersion: (tuneSetRow.syncVersion ?? 0) + 1,
       lastModifiedAt: at,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(tuneSet.id, tuneSetId));
 
@@ -415,7 +412,7 @@ export async function createSetlist(
     createdAt: now,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(setlist).values(newSetlist).returning();
@@ -448,7 +445,7 @@ export async function updateSetlist(
   const updateData: Partial<NewSetlist> = {
     syncVersion: (access.setlist.syncVersion ?? 0) + 1,
     lastModifiedAt: nowIso(),
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   if (data.name !== undefined) {
@@ -500,7 +497,7 @@ export async function deleteSetlist(
       deleted: 1,
       syncVersion: (access.setlist.syncVersion ?? 0) + 1,
       lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(setlist.id, setlistId));
 
@@ -515,7 +512,7 @@ export async function deleteSetlist(
         deleted: 1,
         syncVersion: (item.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(setlistItem.id, item.id));
   }
@@ -630,7 +627,7 @@ export async function addTuneToSetlist(
     deleted: 0,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(setlistItem).values(newItem).returning();
@@ -668,7 +665,7 @@ export async function addTuneSetToSetlist(
     deleted: 0,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(setlistItem).values(newItem).returning();
@@ -709,7 +706,7 @@ export async function removeSetlistItem(
       deleted: 1,
       syncVersion: (rows[0].syncVersion ?? 0) + 1,
       lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(setlistItem.id, rows[0].id));
 
@@ -761,7 +758,7 @@ export async function reorderSetlistItems(
         position: item.position + offset,
         syncVersion: (item.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(setlistItem.id, item.id));
   }
@@ -780,7 +777,7 @@ export async function reorderSetlistItems(
         position: index,
         syncVersion: (existingItem.syncVersion ?? 0) + 2,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(setlistItem.id, itemId));
   }

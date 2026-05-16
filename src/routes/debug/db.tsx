@@ -75,6 +75,25 @@ const buildRowKey = (
 const getRowLastModifiedAt = (row: Record<string, unknown>) =>
   (row.last_modified_at as string | null | undefined) ?? null;
 
+const normalizeComparableTimestamp = (value: string | null) => {
+  if (!value) return null;
+
+  let normalized = value.includes(" ") ? value.replace(" ", "T") : value;
+
+  if (
+    !/Z$/i.test(normalized) &&
+    !/[+-]\d{2}:?\d{2}$/.test(normalized) &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(normalized)
+  ) {
+    normalized = `${normalized}Z`;
+  }
+
+  const timestamp = Date.parse(normalized);
+  return Number.isNaN(timestamp)
+    ? normalized
+    : new Date(timestamp).toISOString();
+};
+
 const buildLocalRowMap = async (
   db: QueryableDb,
   tableName: string,
@@ -169,6 +188,8 @@ const compareRemoteRows = (
 ) => {
   for (const [key, remoteLm] of remoteMap) {
     const localLm = localMap.get(key);
+    const normalizedLocalLm = normalizeComparableTimestamp(localLm ?? null);
+    const normalizedRemoteLm = normalizeComparableTimestamp(remoteLm);
     let truncated = false;
 
     if (!localMap.has(key)) {
@@ -179,7 +200,7 @@ const compareRemoteRows = (
         local_last_modified_at: null,
         remote_last_modified_at: remoteLm,
       });
-    } else if (hasLastModified && localLm !== remoteLm) {
+    } else if (hasLastModified && normalizedLocalLm !== normalizedRemoteLm) {
       truncated = addCompareMismatch(mismatchRows, {
         table: tableName,
         type: "last_modified_at_diff",

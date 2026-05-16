@@ -99,12 +99,19 @@ export const event = sqliteTable(
   ]
 );
 
-export const genre = sqliteTable("genre", {
-  id: text("id").notNull().primaryKey(),
-  name: text("name"),
-  region: text("region"),
-  description: text("description"),
-});
+export const genre = sqliteTable(
+  "genre",
+  {
+    id: text("id").notNull().primaryKey(),
+    name: text("name"),
+    region: text("region"),
+    description: text("description"),
+    lastModifiedAt: text("last_modified_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [index("idx_genre_last_modified_at").on(t.lastModifiedAt)]
+);
 
 export const genreTuneType = sqliteTable(
   "genre_tune_type",
@@ -116,8 +123,14 @@ export const genreTuneType = sqliteTable(
       .notNull()
       .references(() => tuneType.id),
     defaultBpm: integer("default_bpm"),
+    lastModifiedAt: text("last_modified_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
   },
-  (t) => [primaryKey({ columns: [t.genreId, t.tuneTypeId] })]
+  (t) => [
+    primaryKey({ columns: [t.genreId, t.tuneTypeId] }),
+    index("idx_genre_tune_type_last_modified_at").on(t.lastModifiedAt),
+  ]
 );
 
 export const goal = sqliteTable(
@@ -426,27 +439,34 @@ export const repertoireTune = sqliteTable(
   (t) => [primaryKey({ columns: [t.repertoireRef, t.tuneRef] })]
 );
 
-export const rhythmPatterns = sqliteTable("rhythm_patterns", {
-  id: text("id")
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  genreId: text("genre_id")
-    .notNull()
-    .references(() => genre.id),
-  tuneTypeId: text("tune_type_id")
-    .notNull()
-    .references(() => tuneType.id),
-  name: text("name").notNull(),
-  partTarget: text("part_target").default("*"),
-  abcString: text("abc_string").notNull(),
-  isDefault: integer("is_default").notNull().default(0),
-  premiumAudioUrl: text("premium_audio_url"),
-  sampleKit: text("sample_kit").notNull().default("bodhran"),
-  tuneId: text("tune_id"),
-  userId: text("user_id"),
-  patternType: text("pattern_type").notNull().default("seed"),
-});
+export const rhythmPatterns = sqliteTable(
+  "rhythm_patterns",
+  {
+    id: text("id")
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    genreId: text("genre_id")
+      .notNull()
+      .references(() => genre.id),
+    tuneTypeId: text("tune_type_id")
+      .notNull()
+      .references(() => tuneType.id),
+    name: text("name").notNull(),
+    partTarget: text("part_target").default("*"),
+    abcString: text("abc_string").notNull(),
+    isDefault: integer("is_default").notNull().default(0),
+    premiumAudioUrl: text("premium_audio_url"),
+    sampleKit: text("sample_kit").notNull().default("bodhran"),
+    tuneId: text("tune_id"),
+    userId: text("user_id"),
+    patternType: text("pattern_type").notNull().default("seed"),
+    lastModifiedAt: text("last_modified_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [index("idx_rhythm_patterns_last_modified_at").on(t.lastModifiedAt)]
+);
 
 export const setlist = sqliteTable(
   "setlist",
@@ -705,12 +725,19 @@ export const tuneSetItem = sqliteTable(
   ]
 );
 
-export const tuneType = sqliteTable("tune_type", {
-  id: text("id").notNull().primaryKey(),
-  name: text("name"),
-  rhythm: text("rhythm"),
-  description: text("description"),
-});
+export const tuneType = sqliteTable(
+  "tune_type",
+  {
+    id: text("id").notNull().primaryKey(),
+    name: text("name"),
+    rhythm: text("rhythm"),
+    description: text("description"),
+    lastModifiedAt: text("last_modified_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (t) => [index("idx_tune_type_last_modified_at").on(t.lastModifiedAt)]
+);
 
 export const userGenreSelection = sqliteTable(
   "user_genre_selection",

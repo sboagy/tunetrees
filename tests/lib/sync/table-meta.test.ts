@@ -176,10 +176,10 @@ describe("supportsIncremental", () => {
     expect(supportsIncremental("daily_practice_queue")).toBe(true);
   });
 
-  it("returns false for reference tables without timestamps", () => {
-    expect(supportsIncremental("genre")).toBe(false);
-    expect(supportsIncremental("tune_type")).toBe(false);
-    expect(supportsIncremental("genre_tune_type")).toBe(false);
+  it("returns true for catalog tables with incremental timestamps", () => {
+    expect(supportsIncremental("genre")).toBe(true);
+    expect(supportsIncremental("tune_type")).toBe(true);
+    expect(supportsIncremental("genre_tune_type")).toBe(true);
   });
 
   it("returns false for unknown tables", () => {

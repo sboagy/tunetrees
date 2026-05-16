@@ -243,8 +243,26 @@ export const WORKER_SYNC_CONFIG = {
         collection: "repertoireIds",
       },
       rhythm_patterns: {
-        kind: "orNullEqUserId",
-        column: "user_id",
+        kind: "rpc",
+        functionName: "sync_get_rhythm_patterns",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
+          },
+          p_genre_ids: {
+            source: "collection",
+            collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
       },
       setlist: {
         kind: "rpc",

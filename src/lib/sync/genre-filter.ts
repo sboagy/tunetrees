@@ -591,6 +591,13 @@ export async function preSyncMetadataViaWorker(params: {
   }
 
   await pullTables(remainingTables);
+
+  // Genre is pulled during metadata bootstrap to satisfy repertoire.genre_default.
+  // Refresh it in a dedicated pass so the final local rows use the worker's
+  // authoritative lastModifiedAt values after the broader metadata batch.
+  if (remainingTables.includes("genre")) {
+    await pullTables(["genre"]);
+  }
 }
 
 async function getEffectiveGenreFilterInitialSync(params: {

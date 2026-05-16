@@ -8,6 +8,8 @@ import { initializeViewColumnMeta } from "./init-view-column-meta";
 import { initializeViews, recreateViews } from "./init-views";
 import { clearLocalDatabaseForMigration } from "./migration-version";
 
+let latestRawDb: SqliteRawDatabase | null = null;
+
 function ensureTuneTreesCompatibilityObjects(rawDb: SqliteRawDatabase): void {
   rawDb.run(`
     CREATE TABLE IF NOT EXISTS sync_change_log (
@@ -130,15 +132,18 @@ function ensureTuneTreesCompatibilityObjects(rawDb: SqliteRawDatabase): void {
 
 export const browserSqliteHooks: IBrowserSqliteHooks = {
   logger: log,
-  onExistingDatabaseLoaded: async (db) => {
+  onExistingDatabaseLoaded: async (db, context) => {
+    latestRawDb = context.rawDb;
     await recreateViews(db);
   },
   onDatabaseReady: async (db, context) => {
+    latestRawDb = context.rawDb;
     if (context.phase === "created") {
       await initializeViews(db);
     }
     await initializeViewColumnMeta(db);
     ensureTuneTreesCompatibilityObjects(context.rawDb);
   },
-  clearLocalDataForMigration: clearLocalDatabaseForMigration,
+  clearLocalDataForMigration: (db) =>
+    clearLocalDatabaseForMigration(db, { rawDb: latestRawDb ?? undefined }),
 };

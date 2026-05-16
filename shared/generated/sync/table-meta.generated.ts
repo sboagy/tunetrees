@@ -113,9 +113,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
   genre: {
     primaryKey: "id",
     uniqueKeys: null,
-    timestamps: [],
+    timestamps: ["last_modified_at"],
     booleanColumns: [],
-    supportsIncremental: false,
+    supportsIncremental: true,
     hasDeletedFlag: false,
     columnDescriptions: {
       description: "Description of the genre.",
@@ -127,9 +127,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
   genre_tune_type: {
     primaryKey: ["genre_id", "tune_type_id"],
     uniqueKeys: ["genre_id", "tune_type_id"],
-    timestamps: [],
+    timestamps: ["last_modified_at"],
     booleanColumns: [],
-    supportsIncremental: false,
+    supportsIncremental: true,
     hasDeletedFlag: false,
     columnDescriptions: {
       default_bpm:
@@ -387,9 +387,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
   rhythm_patterns: {
     primaryKey: "id",
     uniqueKeys: null,
-    timestamps: [],
+    timestamps: ["last_modified_at"],
     booleanColumns: ["is_default"],
-    supportsIncremental: false,
+    supportsIncremental: true,
     hasDeletedFlag: false,
     columnDescriptions: {
       abc_string:
@@ -609,9 +609,9 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
   tune_type: {
     primaryKey: "id",
     uniqueKeys: null,
-    timestamps: [],
+    timestamps: ["last_modified_at"],
     booleanColumns: [],
-    supportsIncremental: false,
+    supportsIncremental: true,
     hasDeletedFlag: false,
     columnDescriptions: {
       description: "Description of the tune type.",
