@@ -3,6 +3,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
+import { getBrowserDeviceId } from "../device-id";
 import { tune, tuneSet, tuneSetItem } from "../schema";
 import type {
   NewTuneSet,
@@ -36,10 +37,6 @@ export interface TuneSetItemWithTune extends TuneSetItem {
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function getLocalDeviceId(): string {
-  return "local";
 }
 
 function normalizeName(name: string): string {
@@ -244,7 +241,7 @@ export async function createTuneSet(
     createdAt: now,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(tuneSet).values(newSet).returning();
@@ -273,7 +270,7 @@ export async function updateTuneSet(
   const updateData: Partial<NewTuneSet> = {
     syncVersion: (access.set.syncVersion ?? 0) + 1,
     lastModifiedAt: nowIso(),
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   if (data.name !== undefined) {
@@ -317,7 +314,7 @@ export async function deleteTuneSet(
       deleted: 1,
       syncVersion: (access.set.syncVersion ?? 0) + 1,
       lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(tuneSet.id, tuneSetId));
 
@@ -328,7 +325,7 @@ export async function deleteTuneSet(
         deleted: 1,
         syncVersion: (item.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(tuneSetItem.id, item.id));
   }
@@ -482,7 +479,7 @@ export async function addTuneToTuneSet(
         position: nextPosition,
         syncVersion: (existing[0].syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(tuneSetItem.id, existing[0].id))
       .returning();
@@ -498,7 +495,7 @@ export async function addTuneToTuneSet(
     deleted: 0,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(tuneSetItem).values(newItem).returning();
@@ -604,7 +601,7 @@ export async function removeTuneFromTuneSet(
       deleted: 1,
       syncVersion: (rows[0].syncVersion ?? 0) + 1,
       lastModifiedAt: nowIso(),
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(tuneSetItem.id, rows[0].id));
 
@@ -652,7 +649,7 @@ export async function reorderTuneSetItems(
         position: item.position + offset,
         syncVersion: (item.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(tuneSetItem.id, item.id));
   }
@@ -671,7 +668,7 @@ export async function reorderTuneSetItems(
         position: index,
         syncVersion: (existingItem.syncVersion ?? 0) + 2,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(tuneSetItem.id, itemId));
   }

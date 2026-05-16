@@ -27,6 +27,7 @@ import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import * as schema from "../../lib/db/schema";
 import { filterRowsBySelectedTuneIds } from "../../lib/tune-sets/filter";
+import { RhythmDialog } from "../rhythm/RhythmDialog";
 import { GridStatusMessage } from "./GridStatusMessage";
 import {
   buildMixedTuneGridRows,
@@ -245,6 +246,14 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
   let innerTable: any | null = null;
 
+  // Rhythm dialog state
+  const [rhythmDialog, setRhythmDialog] = createSignal<{
+    tuneId: string;
+    tuneTypeName: string;
+    genreName: string | null;
+    structure: string | null;
+  } | null>(null);
+
   // Debug: Log selectedCount changes
   createEffect(() => {
     console.log(
@@ -331,6 +340,7 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
               onGoalChange: props.onGoalChange,
               onScheduledChange: props.onScheduledChange,
               goals: () => goalsData() ?? [],
+              onTypeBadgeClick: (params) => setRhythmDialog(params),
             }}
             onSelectionChange={(count) => {
               console.log(
@@ -382,6 +392,16 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
           </Show>
         </div>
       </div>
+      <RhythmDialog
+        open={rhythmDialog() !== null}
+        onOpenChange={(open) => {
+          if (!open) setRhythmDialog(null);
+        }}
+        tuneTypeName={rhythmDialog()?.tuneTypeName ?? null}
+        tuneId={rhythmDialog()?.tuneId ?? null}
+        structure={rhythmDialog()?.structure ?? null}
+        genreName={rhythmDialog()?.genreName ?? null}
+      />
     </div>
   );
 };

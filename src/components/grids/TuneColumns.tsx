@@ -282,11 +282,43 @@ export function getCatalogColumns(
       header: ({ column }) => <SortableHeader column={column} title="Type" />,
       cell: (info) => {
         const value = info.getValue() as string | null;
+        const onClick = _callbacks?.onTypeBadgeClick;
+        const handleClick = () => {
+          if (!onClick || !value) return;
+          const row = info.row.original as Record<string, unknown>;
+          onClick({
+            tuneId: String(row.id ?? ""),
+            tuneTypeName: value,
+            genreName: (row.genre as string) ?? null,
+            structure: (row.structure as string) ?? null,
+          });
+        };
+
         return (
           <Show when={value} fallback={<span class="text-gray-400">—</span>}>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-              {value}
-            </span>
+            {/* Render as an interactive button only when a handler is wired;
+                otherwise use a plain span to avoid a misleading affordance. */}
+            <Show
+              when={onClick}
+              fallback={
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                  {value}
+                </span>
+              }
+            >
+              <button
+                type="button"
+                class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClick();
+                }}
+                aria-label={`Open rhythm player for ${value}`}
+                title={`Click to play ${value} rhythm`}
+              >
+                {value}
+              </button>
+            </Show>
           </Show>
         );
       },

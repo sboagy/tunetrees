@@ -52,10 +52,6 @@ test.describe
     test("should keep Add To Repertoire disabled until rows are selected", async ({
       page,
     }) => {
-      const visibleAddToRepertoireButton = page
-        .locator('[data-testid="catalog-add-to-repertoire-button"]:visible')
-        .first();
-
       await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
         timeout: 10000,
       });
@@ -65,13 +61,15 @@ test.describe
       });
       await expect
         .poll(
-          () => visibleAddToRepertoireButton.isDisabled().catch(() => false),
+          // On mobile the action lives inside the overflow menu, so use the page
+          // object to reveal the current toolbar action before checking its state.
+          () => ttPage.isCatalogAddToRepertoireEnabled(),
           {
             timeout: 5000,
             intervals: [100, 250, 500, 1000],
           }
         )
-        .toBe(true);
+        .toBe(false);
 
       await page.keyboard.press("Escape").catch(() => undefined);
 
@@ -85,19 +83,10 @@ test.describe
         tab: "catalog",
       });
       await expect
-        .poll(
-          async () => {
-            await ttPage.expectToolbarVisible({
-              addToRepertoire: true,
-              tab: "catalog",
-            });
-            return visibleAddToRepertoireButton.isEnabled().catch(() => false);
-          },
-          {
-            timeout: 5000,
-            intervals: [100, 250, 500, 1000],
-          }
-        )
+        .poll(() => ttPage.isCatalogAddToRepertoireEnabled(), {
+          timeout: 5000,
+          intervals: [100, 250, 500, 1000],
+        })
         .toBe(true);
     });
 

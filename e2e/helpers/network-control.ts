@@ -21,8 +21,7 @@ log.setLevel("info");
 export async function goOffline(page: Page): Promise<void> {
   log.info("🔌 Going offline...");
   await page.context().setOffline(true);
-  // Wait a bit for offline state to propagate
-  await page.waitForTimeout(500);
+  await waitForNetworkState(page, "offline");
   log.info("✅ Offline mode enabled");
 }
 
@@ -34,8 +33,7 @@ export async function goOffline(page: Page): Promise<void> {
 export async function goOnline(page: Page): Promise<void> {
   log.info("🌐 Going online...");
   await page.context().setOffline(false);
-  // Wait for network to stabilize
-  await page.waitForTimeout(500);
+  await waitForNetworkState(page, "online");
   log.info("✅ Online mode enabled");
 }
 

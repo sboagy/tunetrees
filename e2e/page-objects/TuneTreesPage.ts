@@ -3106,6 +3106,36 @@ export class TuneTreesPage {
     await this.revealToolbarAction(tab, action);
   }
 
+  private async isVisibleToolbarActionEnabled(
+    action: Locator
+  ): Promise<boolean> {
+    return await action.evaluateAll((elements) => {
+      const visibleElement = elements.find((element) => {
+        const htmlElement = element as HTMLElement;
+        return htmlElement.getClientRects().length > 0;
+      }) as HTMLButtonElement | undefined;
+
+      if (!visibleElement) {
+        return false;
+      }
+
+      return (
+        !visibleElement.disabled &&
+        visibleElement.getAttribute("aria-disabled") !== "true"
+      );
+    });
+  }
+
+  async isCatalogAddToRepertoireEnabled(): Promise<boolean> {
+    await this.ensureToolbarActionVisible(
+      "catalog",
+      this.catalogAddToRepertoireButton
+    );
+    return this.isVisibleToolbarActionEnabled(
+      this.catalogAddToRepertoireButton
+    );
+  }
+
   private async clickVisibleToolbarAction(action: Locator): Promise<void> {
     await action.evaluateAll((elements) => {
       const visibleEnabledElement = elements.find((element) => {
@@ -4521,6 +4551,64 @@ export class TuneTreesPage {
       .toBe(true);
   }
 
+  private async dismissVisibleToasts(maxAttempts: number = 3) {
+    const toastCloser = this.page
+      .getByRole("button", { name: "Close toast" })
+      .first();
+
+    // Background sync errors use persistent toasts with pointer events enabled.
+    // Close them before critical clicks so tests interact with the page the same
+    // way a user would instead of forcing a click through an overlay.
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const isToastVisible = await toastCloser.isVisible().catch(() => false);
+      if (!isToastVisible) {
+        return;
+      }
+
+      await toastCloser.click({ timeout: 5_000 });
+      await expect(toastCloser).toBeHidden({ timeout: 5_000 });
+    }
+  }
+
+  private isToastClickInterception(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return (
+      message.includes("intercepts pointer events") &&
+      (message.includes("Notifications alt+T") ||
+        message.includes("data-react-aria-top-layer") ||
+        message.includes("Close toast"))
+    );
+  }
+
+  private async clickWithToastRecovery(
+    target: Locator,
+    options?: Parameters<Locator["click"]>[0],
+    logContext: string = "clickWithToastRecovery"
+  ) {
+    // Notification toasts are rendered in the top layer and can temporarily block
+    // otherwise-ready controls. Dismiss them and retry only for that exact UI obstruction.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await this.dismissVisibleToasts();
+
+      try {
+        await target.click(options);
+        return;
+      } catch (error) {
+        const isLastAttempt = attempt === 2;
+        if (!this.isToastClickInterception(error) || isLastAttempt) {
+          throw error;
+        }
+
+        console.log(`[TuneTreesPageDiag] ${logContext}:toast-retry`, {
+          attempt,
+          url: this.page.url(),
+        });
+
+        await this.page.waitForTimeout(250);
+      }
+    }
+  }
+
   async submitEvaluations(
     opts: { minCount?: number; timeoutMs?: number } = {}
   ) {
@@ -4555,7 +4643,14 @@ export class TuneTreesPage {
       readyText,
     });
 
-    await this.submitEvaluationsButton.click({ timeout: timeoutMs });
+    // A persistent sync-error toast can appear between readiness checks and the
+    // click itself. Retry only on that concrete obstruction instead of forcing
+    // the click through an overlay.
+    await this.clickWithToastRecovery(
+      this.submitEvaluationsButton,
+      { timeout: timeoutMs },
+      "submitEvaluations"
+    );
 
     const [hasLoadingQueue, hasNoTunes] = await Promise.all([
       this.page
@@ -4666,7 +4761,11 @@ export class TuneTreesPage {
             await expect(menu)
               .toBeHidden({ timeout: 3000 })
               .catch(() => undefined);
-            await this.flashcardView.click({ position: { x: 24, y: 24 } });
+            await this.clickWithToastRecovery(
+              this.flashcardView,
+              { position: { x: 24, y: 24 } },
+              "selectFlashcardEvaluation:focus-flashcard"
+            );
             // Wait for the flashcard view to be ready before sending keyboard shortcuts
             await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
             await this.page.keyboard.press(flashcardHotkeys[value]);
@@ -4710,8 +4809,16 @@ export class TuneTreesPage {
         let menuOpened = false;
         for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
           await evalButton.focus().catch(() => undefined);
-          await evalButton.click({ trial: true, timeout: 5000 });
-          await evalButton.click({ timeout: 5000 });
+          await this.clickWithToastRecovery(
+            evalButton,
+            { trial: true, timeout: 5000 },
+            "selectFlashcardEvaluation:trial-open-menu"
+          );
+          await this.clickWithToastRecovery(
+            evalButton,
+            { timeout: 5000 },
+            "selectFlashcardEvaluation:open-menu"
+          );
 
           try {
             await expect(menu).toBeVisible({ timeout: 4000 });

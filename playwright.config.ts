@@ -34,6 +34,9 @@ export default defineConfig({
   /* Remove local retries once recallEval issue is fixed */
   retries: process.env.CI ? 3 : 0,
   /* Enable parallel workers - each worker gets dedicated test user to avoid conflicts */
+  // Preview offline tests share a single preview/PWA surface and have proven
+  // flaky under parallel workers even with isolated users. Run that suite on a
+  // single worker when invoked directly; keep broader suites parallel.
   workers: process.env.CI ? 2 : 8,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   // reporter: process.env.CI ? [["blob"], ["list"]] : [["html"], ["list"]],

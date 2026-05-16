@@ -72,9 +72,27 @@ async function resetLocalDbAndReopenPractice(page: Page, userId: string) {
   // Some reset flows can leave the browser parked on e2e-origin.html after the
   // storage clear finishes. Re-open the app explicitly so subsequent Practice
   // assertions are scoped to the real UI instead of the origin helper page.
-  await page.goto("/?tab=practice", { waitUntil: "domcontentloaded" });
-  await waitForTestApi(page);
-  await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+  // The app may also redirect *after* __ttTestApi initialises (e.g. auth drift
+  // during sync), so retry if the grid doesn't appear.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.goto("/?tab=practice", { waitUntil: "domcontentloaded" });
+    await waitForTestApi(page);
+
+    // If the app redirected us away (service worker fallback, auth redirect),
+    // loop and try again instead of failing on the grid assertion.
+    const url = page.url();
+    if (url.includes("e2e-origin.html") || url === "about:blank") {
+      await page.waitForTimeout(1000);
+      continue;
+    }
+
+    await expect(ttPage.practiceGrid).toBeVisible({ timeout: 20000 });
+    return;
+  }
+
+  throw new Error(
+    "Practice grid did not appear after 3 attempts – app keeps redirecting to e2e-origin"
+  );
 }
 
 async function getQueueRows(page: Page, repertoireId: string) {

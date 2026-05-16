@@ -8,7 +8,7 @@
  * @module lib/db/migration-version
  */
 
-const CURRENT_SCHEMA_VERSION = "2.0.11-add-rhythm-sample-kit"; // Bump this when schema changes
+const CURRENT_SCHEMA_VERSION = "2.0.13-fix-sync-change-log-coverage"; // Bump this when schema changes
 
 /**
  * Get the locally stored schema version from localStorage
@@ -100,7 +100,12 @@ export function isForcedReset(): boolean {
  * @param db - The Drizzle database instance
  */
 export async function clearLocalDatabaseForMigration(
-  db: unknown
+  db: unknown,
+  context?: {
+    rawDb?: {
+      run: (sql: string) => unknown;
+    };
+  }
 ): Promise<void> {
   console.log("🔄 Schema migration detected - clearing local database...");
 
@@ -109,58 +114,105 @@ export async function clearLocalDatabaseForMigration(
   };
 
   try {
-    // Import schema tables
-    const {
-      dailyPracticeQueue,
-      groupMember,
-      mediaAsset,
-      practiceRecord,
-      repertoireTune,
-      note,
-      reference,
-      setlist,
-      setlistItem,
-      tuneSet,
-      tuneSetItem,
-      tag,
-      tuneOverride,
-      repertoire,
-      tune,
-      tableTransientData,
-      tabGroupMainState,
-      userGroup,
-    } = await import("./schema");
-
-    // Clear all user data tables (preserve reference data: genre, tuneType, instrument)
-    const tablesToClear = [
-      dailyPracticeQueue,
-      groupMember,
-      mediaAsset,
-      practiceRecord,
-      repertoireTune,
-      note,
-      reference,
-      // setlistItem before setlist (FK: setlist_item.setlist_ref → setlist)
-      // both before tuneSet and userGroup (FK references)
-      setlistItem,
-      setlist,
-      tuneSet,
-      tuneSetItem,
-      tag,
-      tuneOverride,
-      repertoire,
-      tune, // Clear private tunes, will re-sync public catalog
-      tableTransientData,
-      tabGroupMainState,
-      userGroup,
+    const tableNames = [
+      "daily_practice_queue",
+      "genre_tune_type",
+      "group_member",
+      "media_asset",
+      "practice_record",
+      "repertoire_tune",
+      "note",
+      "reference",
+      "rhythm_patterns",
+      "setlist_item",
+      "setlist",
+      "tune_set_item",
+      "tune_set",
+      "tag",
+      "tune_override",
+      "repertoire",
+      "tune",
+      "user_genre_selection",
+      "tune_type",
+      "genre",
+      "table_transient_data",
+      "tab_group_main_state",
+      "user_group",
     ];
 
-    for (const table of tablesToClear) {
+    if (context?.rawDb) {
+      context.rawDb.run("PRAGMA foreign_keys = OFF");
       try {
-        await drizzleDb.delete(table).run();
-      } catch (error) {
-        console.warn(`Failed to clear table ${table.toString()}:`, error);
-        // Continue clearing other tables even if one fails
+        for (const tableName of tableNames) {
+          try {
+            context.rawDb.run(`DELETE FROM ${tableName}`);
+          } catch (error) {
+            console.warn(`Failed to clear table ${tableName}:`, error);
+          }
+        }
+      } finally {
+        context.rawDb.run("PRAGMA foreign_keys = ON");
+      }
+    } else {
+      // Fallback path when raw SQLite access is unavailable.
+      const {
+        dailyPracticeQueue,
+        genre,
+        genreTuneType,
+        groupMember,
+        mediaAsset,
+        practiceRecord,
+        repertoireTune,
+        note,
+        reference,
+        rhythmPatterns,
+        setlist,
+        setlistItem,
+        tuneSet,
+        tuneSetItem,
+        tag,
+        tuneOverride,
+        repertoire,
+        tune,
+        tuneType,
+        userGenreSelection,
+        tableTransientData,
+        tabGroupMainState,
+        userGroup,
+      } = await import("./schema");
+
+      const tablesToClear = [
+        dailyPracticeQueue,
+        genreTuneType,
+        groupMember,
+        mediaAsset,
+        practiceRecord,
+        repertoireTune,
+        note,
+        reference,
+        rhythmPatterns,
+        setlistItem,
+        setlist,
+        tuneSetItem,
+        tuneSet,
+        tag,
+        tuneOverride,
+        repertoire,
+        tune,
+        userGenreSelection,
+        tuneType,
+        genre,
+        tableTransientData,
+        tabGroupMainState,
+        userGroup,
+      ];
+
+      for (const table of tablesToClear) {
+        try {
+          await drizzleDb.delete(table).run();
+        } catch (error) {
+          console.warn(`Failed to clear table ${table.toString()}:`, error);
+        }
       }
     }
 

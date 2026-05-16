@@ -22,6 +22,7 @@ import { useCurrentTune } from "../../lib/context/CurrentTuneContext";
 import { getGoals } from "../../lib/db/queries/user-settings";
 import { getViewColumnDescriptions } from "../../lib/db/queries/view-column-meta";
 import { useSidebarResize } from "../layout/SidebarResizeContext";
+import { RhythmDialog } from "../rhythm/RhythmDialog";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
 import type { IGridBaseProps, ITuneOverview } from "./types";
@@ -105,6 +106,14 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   const getRecallEvalOpen = (tuneId: string) => !!openMenus()[tuneId];
   const setRecallEvalOpen = (tuneId: string, isOpen: boolean) =>
     setOpenMenus((prev) => ({ ...prev, [tuneId]: isOpen }));
+
+  // Rhythm dialog state
+  const [rhythmDialog, setRhythmDialog] = createSignal<{
+    tuneId: string;
+    tuneTypeName: string;
+    genreName: string | null;
+    structure: string | null;
+  } | null>(null);
 
   // Notify parent when tunes change (for flashcard view)
   createEffect(() => {
@@ -201,6 +210,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
             onGoalChange: props.onGoalChange,
             onScheduledChange: props.onScheduledChange,
             goals: () => goalsData() ?? [],
+            onTypeBadgeClick: (params) => setRhythmDialog(params),
           }}
           onTableReady={(tbl) => {
             props.onTableReady?.(tbl as any);
@@ -243,6 +253,16 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           </button>
         )}
       </Show>
+      <RhythmDialog
+        open={rhythmDialog() !== null}
+        onOpenChange={(open) => {
+          if (!open) setRhythmDialog(null);
+        }}
+        tuneTypeName={rhythmDialog()?.tuneTypeName ?? null}
+        tuneId={rhythmDialog()?.tuneId ?? null}
+        structure={rhythmDialog()?.structure ?? null}
+        genreName={rhythmDialog()?.genreName ?? null}
+      />
     </div>
   );
 };

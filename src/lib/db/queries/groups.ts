@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
+import { getBrowserDeviceId } from "../device-id";
 import {
   groupMember,
   setlist,
@@ -120,10 +121,6 @@ async function getRemoteGroupMemberProfileMap(
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function getLocalDeviceId(): string {
-  return "local";
 }
 
 function normalizeDescription(description?: string | null): string | null {
@@ -555,7 +552,7 @@ export async function createGroup(
     createdAt: now,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(userGroup).values(newGroup).returning();
@@ -581,7 +578,7 @@ export async function updateGroup(
   const updateData: Partial<NewUserGroup> = {
     syncVersion: (access.group.syncVersion ?? 0) + 1,
     lastModifiedAt: nowIso(),
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   if (data.name !== undefined) {
@@ -657,7 +654,7 @@ export async function deleteGroup(
       deleted: 1,
       syncVersion: (access.group.syncVersion ?? 0) + 1,
       lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(userGroup.id, groupId));
 
@@ -668,7 +665,7 @@ export async function deleteGroup(
         deleted: 1,
         syncVersion: (membership.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(groupMember.id, membership.id));
   }
@@ -681,7 +678,7 @@ export async function deleteGroup(
           deleted: 1,
           syncVersion: (setRecord.syncVersion ?? 0) + 1,
           lastModifiedAt: now,
-          deviceId: getLocalDeviceId(),
+          deviceId: getBrowserDeviceId(),
         })
         .where(eq(tuneSet.id, setRecord.id));
     }
@@ -693,7 +690,7 @@ export async function deleteGroup(
           deleted: 1,
           syncVersion: (setItem.syncVersion ?? 0) + 1,
           lastModifiedAt: now,
-          deviceId: getLocalDeviceId(),
+          deviceId: getBrowserDeviceId(),
         })
         .where(eq(tuneSetItem.id, setItem.id));
     }
@@ -707,7 +704,7 @@ export async function deleteGroup(
           deleted: 1,
           syncVersion: (setlistRecord.syncVersion ?? 0) + 1,
           lastModifiedAt: now,
-          deviceId: getLocalDeviceId(),
+          deviceId: getBrowserDeviceId(),
         })
         .where(eq(setlist.id, setlistRecord.id));
     }
@@ -719,7 +716,7 @@ export async function deleteGroup(
           deleted: 1,
           syncVersion: (item.syncVersion ?? 0) + 1,
           lastModifiedAt: now,
-          deviceId: getLocalDeviceId(),
+          deviceId: getBrowserDeviceId(),
         })
         .where(eq(setlistItem.id, item.id));
     }
@@ -920,7 +917,7 @@ export async function addGroupMember(
         deleted: 0,
         syncVersion: (current.syncVersion ?? 0) + 1,
         lastModifiedAt: now,
-        deviceId: getLocalDeviceId(),
+        deviceId: getBrowserDeviceId(),
       })
       .where(eq(groupMember.id, current.id))
       .returning();
@@ -938,7 +935,7 @@ export async function addGroupMember(
     joinedAt: now,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: getLocalDeviceId(),
+    deviceId: getBrowserDeviceId(),
   };
 
   const result = await db.insert(groupMember).values(newMembership).returning();
@@ -978,7 +975,7 @@ export async function updateGroupMemberRole(
       role,
       syncVersion: (memberships[0].syncVersion ?? 0) + 1,
       lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(groupMember.id, membershipId))
     .returning();
@@ -1020,7 +1017,7 @@ export async function removeGroupMember(
       deleted: 1,
       syncVersion: (memberships[0].syncVersion ?? 0) + 1,
       lastModifiedAt: now,
-      deviceId: getLocalDeviceId(),
+      deviceId: getBrowserDeviceId(),
     })
     .where(eq(groupMember.id, membershipId));
 
