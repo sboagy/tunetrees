@@ -82,20 +82,31 @@ const TypeBadge = (props: {
   onClick?: () => void;
 }) => (
   <Show when={props.value}>
-    <button
-      type="button"
-      class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer transition-colors"
-      onClick={(e) => {
-        e.stopPropagation();
-        props.onClick?.();
-      }}
-      aria-label={
-        props.value ? `Open rhythm player for ${props.value}` : undefined
+    {/* Render as an interactive button only when a click handler is wired;
+        otherwise fall back to a plain span to avoid a misleading affordance. */}
+    <Show
+      when={props.onClick}
+      fallback={
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+          {props.value}
+        </span>
       }
-      title={props.value ? `Click to play ${props.value} rhythm` : undefined}
     >
-      {props.value}
-    </button>
+      <button
+        type="button"
+        class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          props.onClick?.();
+        }}
+        aria-label={
+          props.value ? `Open rhythm player for ${props.value}` : undefined
+        }
+        title={props.value ? `Click to play ${props.value} rhythm` : undefined}
+      >
+        {props.value}
+      </button>
+    </Show>
   </Show>
 );
 

@@ -52,7 +52,7 @@ export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
         <DialogPrimitive.Overlay class="fixed inset-0 z-40 bg-black/50 data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0" />
         <DialogPrimitive.Content
           class={cn(
-            "fixed left-[50%] top-[50%] z-50 flex h-[min(88vh,960px)] w-[min(94vw,1400px)] min-w-[820px] min-h-[680px] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-auto resize border bg-[hsl(var(--background))] p-6 shadow-lg duration-200",
+            "fixed left-[50%] top-[50%] z-50 flex h-[min(88vh,960px)] w-[min(94vw,1400px)] md:min-w-[820px] md:min-h-[680px] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-auto resize border bg-[hsl(var(--background))] p-6 shadow-lg duration-200",
             "data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
             "data-[closed]:slide-out-to-left-1/2 data-[closed]:slide-out-to-top-[48%] data-[expanded]:slide-in-from-left-1/2 data-[expanded]:slide-in-from-top-[48%]",
             "rounded-lg"
