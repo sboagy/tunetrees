@@ -84,7 +84,6 @@
     "clean": "rm -rf dist node_modules .vite .cache logs && cd worker && rm -rf dist node_modules .vite .cache logs"
   },
   "dependencies": {
-    "@biomejs/biome": "^2.4.3",
     "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/state": "^6.5.4",
     "@codemirror/theme-one-dark": "^6.1.3",
@@ -102,7 +101,6 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "jodit": "^4.12.2",
-    "jose": "^6.1.3",
     "loglevel": "^1.9.2",
     "lucide-solid": "^1.14.0",
     "oosync": "git+https://github.com/sboagy/oosync.git#main",
@@ -110,18 +108,15 @@
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.12",
     "solid-sonner": "^0.3.1",
-    "sonner": "^2.0.7",
     "sql.js": "^1.14.1",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.4",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "^5.2.3",
-    "vitest": "^4.0.18",
     "wavesurfer.js": "^7.12.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.3",
-    "@cloudflare/workers-types": "^4.20260507.1",
+    "@cloudflare/workers-types": "^4.20260516.1",
     "@playwright/test": "^1.60.0",
     "@solidjs/testing-library": "^0.8.10",
     "@tailwindcss/vite": "^4.2.2",
@@ -130,17 +125,19 @@
     "@types/node": "^25.6.0",
     "@types/papaparse": "^5.5.2",
     "@types/sql.js": "^1.4.11",
+    "vitest": "^4.1.6",
     "@vitest/coverage-v8": "^4.0.18",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
     "concurrently": "^9.2.1",
     "dotenv": "^17.3.1",
     "drizzle-kit": "^0.31.9",
-    "jsdom": "^28.1.0",
+    "jsdom": "^29.1.1",
     "postgres": "^3.4.8",
     "prettier": "^3.8.1",
     "shadcn-solid": "^0.7.7",
     "supabase": "^2.98.2",
+    "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "6.0.3",
     "vite": "8.0.5",
@@ -148,7 +145,7 @@
     "vite-plugin-solid": "^2.11.11",
     "vite-plugin-static-copy": "^3.2.0",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.90.1"
+    "wrangler": "^4.92.0"
   },
   "overrides": {
     "serialize-javascript": "7.0.5"
