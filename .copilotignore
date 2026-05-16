@@ -33,3 +33,18 @@ package-lock.json
 
 scratch.*
 _notes/
+
+# macOS
+.DS_Store
+
+# Environment files, but we want to include .env.example or .env.template
+.env
+.env.local
+.env.private
+.env.production
+.env.development
+.env.test
+
+# Backup/temp files
+.$*
+backups/
