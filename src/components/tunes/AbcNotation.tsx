@@ -39,8 +39,6 @@ export const AbcNotation: Component<AbcNotationProps> = (props) => {
         // Clear previous rendering
         containerRef.innerHTML = "";
 
-        console.log("Rendering ABC notation:", props.notation);
-
         // Keep the call close to abcjs defaults so the layout matches
         // external ABC tools instead of being stretched by app-specific options.
         abcjs.renderAbc(containerRef, props.notation, {
