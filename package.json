@@ -144,7 +144,7 @@
     "vite-plugin-solid": "^2.11.11",
     "vite-plugin-static-copy": "^3.2.0",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.90.1"
+    "wrangler": "^4.92.0"
   },
   "overrides": {
     "serialize-javascript": "7.0.5"
