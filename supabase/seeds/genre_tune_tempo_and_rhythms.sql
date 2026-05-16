@@ -261,7 +261,7 @@ K:clef=perc
     ('ITRAD', 'JigD', 'Standard Double Jig', '*', 'M:6/8
 L:1/8
 K:clef=perc
-|: C2 c C c c :|', true, NULL, 'bodhran', 'seed'),
+|: C2c Ccc | C2c Ccc | C2c Ccc | ccc Ccc :|', true, NULL, 'bodhran', 'seed'),
     ('ITRAD', 'JigSl', 'Standard Slip Jig', '*', 'M:9/8
 L:1/8
 K:clef=perc
