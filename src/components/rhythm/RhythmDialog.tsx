@@ -11,10 +11,8 @@
  */
 
 import { Dialog as DialogPrimitive } from "@kobalte/core/dialog";
-import { X } from "lucide-solid";
 import { type Component, Show } from "solid-js";
 import { cn } from "@/lib/utils";
-import { Button } from "../ui/button";
 import { RhythmPlayer } from "./RhythmPlayer";
 
 export interface RhythmDialogProps {
@@ -34,6 +32,8 @@ export interface RhythmDialogProps {
  * close button or presses Escape.
  */
 export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
+  let contentRef: HTMLDivElement | undefined;
+
   const handleOpenChange = (isOpen: boolean) => {
     props.onOpenChange(isOpen);
   };
@@ -51,37 +51,38 @@ export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay class="fixed inset-0 z-40 bg-black/50 data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0" />
         <DialogPrimitive.Content
+          ref={contentRef}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            requestAnimationFrame(() => {
+              contentRef
+                ?.querySelector<HTMLButtonElement>(
+                  "[data-testid='rhythm-player-close-button']"
+                )
+                ?.focus();
+            });
+          }}
           class={cn(
-            "fixed left-[50%] top-[50%] z-50 flex h-[min(88vh,960px)] w-[min(94vw,1400px)] md:min-w-[820px] md:min-h-[680px] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-auto resize border bg-[hsl(var(--background))] p-6 shadow-lg duration-200",
+            "fixed left-[50%] top-[50%] z-50 h-[min(88vh,960px)] w-[min(94vw,1400px)] -translate-x-1/2 -translate-y-1/2 outline-none md:min-h-[680px] md:min-w-[820px]",
             "data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
             "data-[closed]:slide-out-to-left-1/2 data-[closed]:slide-out-to-top-[48%] data-[expanded]:slide-in-from-left-1/2 data-[expanded]:slide-in-from-top-[48%]",
-            "rounded-lg"
+            ""
           )}
         >
-          {/* Header */}
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold leading-none tracking-tight">
-              {title}
-            </h2>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 rounded-md"
-              aria-label="Close rhythm player"
-              onClick={() => handleOpenChange(false)}
-            >
-              <X class="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogPrimitive.Title class="sr-only">{title}</DialogPrimitive.Title>
+          <DialogPrimitive.Description class="sr-only">
+            Rhythm practice player dialog
+          </DialogPrimitive.Description>
 
-          {/* Player */}
-          <div class="min-h-0 flex-1">
+          <div class="h-full w-full">
             <Show when={props.open}>
               <RhythmPlayer
                 tuneTypeName={props.tuneTypeName}
                 tuneId={props.tuneId}
                 structure={props.structure}
                 genreName={props.genreName}
+                onClose={() => handleOpenChange(false)}
+                class="h-full w-full shadow-xl"
               />
             </Show>
           </div>

@@ -1,4 +1,13 @@
-import { LoaderCircle, Pause, Play, RotateCcw, Square } from "lucide-solid";
+import { DropdownMenu } from "@kobalte/core/dropdown-menu";
+import {
+  EllipsisVertical,
+  LoaderCircle,
+  Pause,
+  Play,
+  RotateCcw,
+  Square,
+  X,
+} from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -10,6 +19,7 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import type { RhythmPatternType } from "@/lib/services/RhythmService";
 import { createRhythmService } from "@/lib/services/RhythmService";
 import { cn } from "@/lib/utils";
@@ -24,6 +34,7 @@ export interface RhythmPlayerProps {
   structure?: string | null;
   genreName?: string | null;
   class?: string;
+  onClose?: () => void;
 }
 
 interface ActiveBeatTarget {
@@ -786,6 +797,7 @@ function collectHighlightTargets(notehead: SVGElement): SVGElement[] {
 
 export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const { localDb, user } = useAuth();
+  const isMobile = createIsMobile();
   let activeBeatTargets: ActiveBeatTarget[] = [];
   let lastToastError: string | null = null;
 
@@ -796,6 +808,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   );
   const [usePremiumLoop, setUsePremiumLoop] = createSignal(false);
   const [selectedStartSection, setSelectedStartSection] = createSignal("start");
+  const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
 
   const service = createMemo(() => {
     const db = localDb();
@@ -926,6 +939,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     return isReady()
       ? "Samples loaded and ready."
       : "Samples load on first playback.";
+  });
+  const playerTitle = createMemo(() => {
+    const tuneTypeName = props.tuneTypeName?.trim();
+    return tuneTypeName ? `Rhythm Player: ${tuneTypeName}` : "Rhythm Player";
   });
 
   const updateTempo = (value: string) => {
@@ -1125,122 +1142,164 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       )}
     >
       <CardHeader class="space-y-3">
-        <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-start">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-              Rhythm Practice
-            </p>
-            <CardTitle class="text-xl text-slate-900 dark:text-slate-50">
-              {props.tuneTypeName?.trim() || "Rhythm Player"}
-            </CardTitle>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-center gap-4 md:justify-self-center">
-            <label class="flex min-w-24 items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <span class="font-medium whitespace-nowrap text-slate-900 dark:text-slate-100">
-                Start section
-              </span>
-              <select
-                value={selectedStartSection()}
-                onChange={(event) => {
-                  setSelectedStartSection(event.currentTarget.value);
-                }}
-                class="min-w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                data-testid="rhythm-player-start-section-select"
-              >
-                <For each={startSectionOptions()}>
-                  {(option) => (
-                    <option value={option.value}>{option.label}</option>
-                  )}
-                </For>
-              </select>
-            </label>
-
-            <button
-              type="button"
-              onClick={() => {
-                const currentService = service();
-                if (!currentService) {
-                  return;
-                }
-
-                if (isPlaying()) {
-                  currentService.stop();
-                  return;
-                }
-
-                const usePremiumStartOffset =
-                  Boolean(metadata()?.premiumAudioUrl) && usePremiumLoop();
-
-                void currentService.play({
-                  startPositionMs: usePremiumStartOffset
-                    ? selectedStartPositionMs()
-                    : 0,
-                  startBeatIndex: selectedPlaybackStartState().beatIndex,
-                  startMeasure: selectedPlaybackStartState().barsBefore,
-                  playbackRhythmAbc: usePremiumStartOffset
-                    ? undefined
-                    : (selectedPlaybackStartAbc() ?? undefined),
-                });
-              }}
-              disabled={!service() || !metadata() || isPatternLoading()}
-              class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-              data-testid="rhythm-player-play-toggle"
-            >
-              <Show
-                when={!isPatternLoading()}
-                fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
-              >
-                {isPlaying() ? (
-                  <Square class="h-4 w-4" />
-                ) : (
-                  <Play class="h-4 w-4" />
+        <div class="space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p
+                class={cn(
+                  "hidden text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 md:block",
+                  props.onClose ? "md:hidden" : undefined
                 )}
+              >
+                Rhythm Practice
+              </p>
+              <CardTitle
+                class="text-lg leading-tight text-slate-900 dark:text-slate-50 sm:text-xl"
+                data-testid="rhythm-player-title"
+              >
+                {playerTitle()}
+              </CardTitle>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <Show when={isMobile()}>
+                <DropdownMenu
+                  open={showOverflowMenu()}
+                  onOpenChange={setShowOverflowMenu}
+                >
+                  <DropdownMenu.Trigger
+                    type="button"
+                    aria-label="Rhythm player options"
+                    class="inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                    data-testid="rhythm-player-overflow-button"
+                  >
+                    <EllipsisVertical class="h-4 w-4" />
+                    <span class="sr-only">Rhythm player options</span>
+                  </DropdownMenu.Trigger>
+
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content class="z-50 min-w-[16rem] rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-950">
+                      <div class="space-y-3 p-1">
+                        <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
+                          <span class="font-medium text-slate-900 dark:text-slate-100">
+                            Start section
+                          </span>
+                          <select
+                            value={selectedStartSection()}
+                            onChange={(event) => {
+                              setSelectedStartSection(
+                                event.currentTarget.value
+                              );
+                            }}
+                            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            data-testid="rhythm-player-start-section-select"
+                          >
+                            <For each={startSectionOptions()}>
+                              {(option) => (
+                                <option value={option.value}>
+                                  {option.label}
+                                </option>
+                              )}
+                            </For>
+                          </select>
+                        </label>
+
+                        <div class="h-px bg-slate-200 dark:bg-slate-800" />
+
+                        <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
+                          <span class="font-medium text-slate-900 dark:text-slate-100">
+                            Tempo {tempoQpm()} QPM
+                          </span>
+                          <input
+                            type="number"
+                            min="30"
+                            max="240"
+                            step="1"
+                            inputMode="numeric"
+                            value={tempoQpm()}
+                            onChange={(event) => {
+                              updateTempo(event.currentTarget.value);
+                            }}
+                            class="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            data-testid="rhythm-player-tempo-input"
+                          />
+                          <input
+                            type="range"
+                            min="30"
+                            max="240"
+                            step="1"
+                            value={tempoQpm()}
+                            onInput={(event) => {
+                              updateTempo(event.currentTarget.value);
+                            }}
+                            class="w-full accent-blue-600"
+                            data-testid="rhythm-player-tempo-slider"
+                          />
+                        </label>
+                      </div>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu>
               </Show>
-              {isPatternLoading() ? "Loading" : isPlaying() ? "Stop" : "Play"}
-            </button>
+
+              <Show when={props.onClose}>
+                <button
+                  type="button"
+                  class="inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                  aria-label="Close rhythm player"
+                  data-testid="rhythm-player-close-button"
+                  onClick={() => props.onClose?.()}
+                >
+                  <X class="h-4 w-4" />
+                  <span class="sr-only">Close rhythm player</span>
+                </button>
+              </Show>
+            </div>
           </div>
 
-          <div class="flex flex-wrap items-center justify-center gap-2 md:justify-self-end">
-            <button
-              type="button"
-              onClick={() => {
-                const currentService = service();
-                if (!currentService) {
-                  return;
-                }
+          <div class="flex flex-wrap items-center gap-2 sm:gap-3 md:flex-nowrap md:items-center md:justify-between">
+            <Show when={!isMobile()}>
+              <div class="min-w-0 items-center gap-2 text-sm text-slate-600 dark:text-slate-300 md:flex">
+                <label class="flex min-w-24 items-center gap-2">
+                  <span class="font-medium whitespace-nowrap text-slate-900 dark:text-slate-100">
+                    Start section
+                  </span>
+                  <select
+                    value={selectedStartSection()}
+                    onChange={(event) => {
+                      setSelectedStartSection(event.currentTarget.value);
+                    }}
+                    class="min-w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                    data-testid="rhythm-player-start-section-select"
+                  >
+                    <For each={startSectionOptions()}>
+                      {(option) => (
+                        <option value={option.value}>{option.label}</option>
+                      )}
+                    </For>
+                  </select>
+                </label>
+              </div>
+            </Show>
 
-                if (isPlaying()) {
-                  currentService.pause();
-                  return;
-                }
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3 md:justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  const currentService = service();
+                  if (!currentService) {
+                    return;
+                  }
 
-                if (isPaused()) {
-                  void currentService.resume();
-                }
-              }}
-              disabled={
-                !service() ||
-                !metadata() ||
-                isPatternLoading() ||
-                (!isPlaying() && !isPaused())
-              }
-              class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              data-testid="rhythm-player-pause-button"
-            >
-              <Pause class="h-4 w-4" />
-              {isPlaying() ? "Pause" : "Resume"}
-            </button>
+                  if (isPlaying()) {
+                    currentService.stop();
+                    return;
+                  }
 
-            <button
-              type="button"
-              onClick={() => {
-                const currentService = service();
-                if (currentService) {
                   const usePremiumStartOffset =
                     Boolean(metadata()?.premiumAudioUrl) && usePremiumLoop();
 
-                  void currentService.restart({
+                  void currentService.play({
                     startPositionMs: usePremiumStartOffset
                       ? selectedStartPositionMs()
                       : 0,
@@ -1250,65 +1309,177 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                       ? undefined
                       : (selectedPlaybackStartAbc() ?? undefined),
                   });
+                }}
+                disabled={!service() || !metadata() || isPatternLoading()}
+                class="inline-flex min-h-11 min-w-[7rem] items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                data-testid="rhythm-player-play-toggle"
+              >
+                <Show
+                  when={!isPatternLoading()}
+                  fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
+                >
+                  {isPlaying() ? (
+                    <Square class="h-4 w-4" />
+                  ) : (
+                    <Play class="h-4 w-4" />
+                  )}
+                </Show>
+                {isPatternLoading() ? "Loading" : isPlaying() ? "Stop" : "Play"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const currentService = service();
+                  if (!currentService) {
+                    return;
+                  }
+
+                  if (isPlaying()) {
+                    currentService.pause();
+                    return;
+                  }
+
+                  if (isPaused()) {
+                    void currentService.resume();
+                  }
+                }}
+                disabled={
+                  !service() ||
+                  !metadata() ||
+                  isPatternLoading() ||
+                  (!isPlaying() && !isPaused())
                 }
-              }}
-              disabled={
-                !service() ||
-                !metadata() ||
-                isPatternLoading() ||
-                isPlaying() ||
-                !isPaused()
-              }
-              class="inline-flex min-w-28 items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-              data-testid="rhythm-player-restart-button"
-            >
-              <RotateCcw class="h-4 w-4" />
-              Restart
-            </button>
+                class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 md:h-auto md:w-auto md:min-w-[7rem] md:gap-2 md:px-4 md:py-2"
+                data-testid="rhythm-player-pause-button"
+                aria-label={isPlaying() ? "Pause" : "Resume"}
+                title={isPlaying() ? "Pause" : "Resume"}
+              >
+                <Pause class="h-4 w-4" />
+                <span class="sr-only">{isPlaying() ? "Pause" : "Resume"}</span>
+                <span class="hidden md:inline">
+                  {isPlaying() ? "Pause" : "Resume"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const currentService = service();
+                  if (currentService) {
+                    const usePremiumStartOffset =
+                      Boolean(metadata()?.premiumAudioUrl) && usePremiumLoop();
+
+                    void currentService.restart({
+                      startPositionMs: usePremiumStartOffset
+                        ? selectedStartPositionMs()
+                        : 0,
+                      startBeatIndex: selectedPlaybackStartState().beatIndex,
+                      startMeasure: selectedPlaybackStartState().barsBefore,
+                      playbackRhythmAbc: usePremiumStartOffset
+                        ? undefined
+                        : (selectedPlaybackStartAbc() ?? undefined),
+                    });
+                  }
+                }}
+                disabled={
+                  !service() ||
+                  !metadata() ||
+                  isPatternLoading() ||
+                  isPlaying() ||
+                  !isPaused()
+                }
+                class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 md:h-auto md:w-auto md:min-w-[7rem] md:gap-2 md:px-4 md:py-2"
+                data-testid="rhythm-player-restart-button"
+                aria-label="Restart"
+                title="Restart"
+              >
+                <RotateCcw class="h-4 w-4" />
+                <span class="sr-only">Restart</span>
+                <span class="hidden md:inline">Restart</span>
+              </button>
+
+              <Show when={!isMobile()}>
+                <div class="ml-auto items-center gap-3 md:flex">
+                  <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
+                    <span class="font-medium text-slate-900 dark:text-slate-100">
+                      Tempo {tempoQpm()} QPM
+                    </span>
+                    <input
+                      type="number"
+                      min="30"
+                      max="240"
+                      step="1"
+                      inputMode="numeric"
+                      value={tempoQpm()}
+                      onChange={(event) => {
+                        updateTempo(event.currentTarget.value);
+                      }}
+                      class="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      data-testid="rhythm-player-tempo-input"
+                    />
+                    <input
+                      type="range"
+                      min="30"
+                      max="240"
+                      step="1"
+                      value={tempoQpm()}
+                      onInput={(event) => {
+                        updateTempo(event.currentTarget.value);
+                      }}
+                      class="w-full accent-blue-600 md:w-56"
+                      data-testid="rhythm-player-tempo-slider"
+                    />
+                  </label>
+                </div>
+              </Show>
+            </div>
           </div>
         </div>
 
         <Show when={metadata()}>
           {(currentMetadata) => (
-            <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <div class="space-y-1 text-sm text-slate-600 dark:text-slate-300">
-                <p>
-                  <span class="font-medium text-slate-900 dark:text-slate-100">
-                    Meter:
-                  </span>{" "}
-                  {currentMetadata().rhythmSignature || "Unknown"}
-                </p>
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  Meter {currentMetadata().rhythmSignature || "Unknown"}
+                </span>
                 <Show when={effectiveStructure()}>
                   {(structure) => (
-                    <p data-testid="rhythm-player-structure">
-                      <span class="font-medium text-slate-900 dark:text-slate-100">
-                        Structure:
-                      </span>{" "}
-                      {structure()}
-                    </p>
+                    <span
+                      class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      data-testid="rhythm-player-structure"
+                    >
+                      Structure {structure()}
+                    </span>
                   )}
                 </Show>
-                <p>
-                  <span class="font-medium text-slate-900 dark:text-slate-100">
-                    Bar:
-                  </span>{" "}
-                  {currentBar() || 0}
+                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  Bar {currentBar() || 0}
                   <Show when={totalBars() > 0}>
                     <span class="px-1 text-slate-400">/</span>
                     {totalBars()}
                   </Show>
-                </p>
-                <p class={cn(currentPulse() > 0 ? "visible" : "invisible")}>
-                  <span class="font-medium text-slate-900 dark:text-slate-100">
-                    Pulse:
-                  </span>{" "}
-                  {Math.max(1, currentPulse())}
+                </span>
+                <span
+                  class={cn(
+                    "rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200",
+                    currentPulse() > 0 ? "visible" : "invisible"
+                  )}
+                >
+                  Pulse {Math.max(1, currentPulse())}
                   <span class="px-1 text-slate-400">/</span>
                   {Math.max(1, pulsesPerBar())}
-                </p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {playbackReadyLabel()}
-                </p>
+                </span>
+              </div>
+
+              <div class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300 md:flex-row md:items-start md:justify-between md:gap-4">
+                <div class="min-w-0 space-y-1">
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {playbackReadyLabel()}
+                  </p>
+                </div>
+
                 <Show when={currentMetadata().premiumAudioUrl}>
                   <Switch
                     checked={usePremiumLoop()}
@@ -1328,7 +1499,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                         void currentService?.resume();
                       }
                     }}
-                    class="flex items-center gap-2 pt-1"
+                    class="flex items-center gap-2 md:justify-end"
                     data-testid="rhythm-player-premium-loop-switch"
                   >
                     <SwitchLabel class="flex-1 cursor-pointer select-none text-sm font-medium text-slate-900 dark:text-slate-100">
@@ -1342,39 +1513,6 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                     </SwitchControl>
                   </Switch>
                 </Show>
-              </div>
-
-              <div class="flex flex-wrap items-end justify-end gap-4">
-                <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
-                  <span class="font-medium text-slate-900 dark:text-slate-100">
-                    Tempo {tempoQpm()} QPM
-                  </span>
-                  <input
-                    type="number"
-                    min="30"
-                    max="240"
-                    step="1"
-                    inputMode="numeric"
-                    value={tempoQpm()}
-                    onChange={(event) => {
-                      updateTempo(event.currentTarget.value);
-                    }}
-                    class="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                    data-testid="rhythm-player-tempo-input"
-                  />
-                  <input
-                    type="range"
-                    min="30"
-                    max="240"
-                    step="1"
-                    value={tempoQpm()}
-                    onInput={(event) => {
-                      updateTempo(event.currentTarget.value);
-                    }}
-                    class="w-full accent-blue-600 md:w-56"
-                    data-testid="rhythm-player-tempo-slider"
-                  />
-                </label>
               </div>
             </div>
           )}
