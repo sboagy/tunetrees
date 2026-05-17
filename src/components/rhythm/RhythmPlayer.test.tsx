@@ -234,6 +234,26 @@ describe("RhythmPlayer", () => {
     expect(getStructuredSectionLabel(sourceAbc, "AABB", 25)).toBe("B2");
   });
 
+  it("wraps AABB section passes after a later-section playback start", () => {
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      `| ${[
+        ...Array.from({ length: 8 }, () => "A2"),
+        ...Array.from({ length: 8 }, () => "a2"),
+        ...Array.from({ length: 8 }, () => "B2"),
+        ...Array.from({ length: 8 }, () => "b2"),
+      ].join(" | ")} |`,
+    ].join("\n");
+
+    expect(getStructuredSectionLabel(sourceAbc, "AABB", 33)).toBe("A");
+    expect(getStructuredSectionLabel(sourceAbc, "AABB", 41)).toBe("A2");
+    expect(getStructuredSectionLabel(sourceAbc, "AABB", 49)).toBe("B");
+    expect(getStructuredSectionLabel(sourceAbc, "AABB", 57)).toBe("B2");
+  });
+
   it("rewrites the rendered svg part labels for the active repeat pass", () => {
     const container = document.createElement("div");
     const makePartLabel = (lineIndex: number, label: string) => {
@@ -682,6 +702,62 @@ describe("RhythmPlayer", () => {
       expect(
         view.getByTestId("rhythm-player-current-section-badge").textContent
       ).toContain("A2");
+    });
+  });
+
+  it("wraps the current section badge correctly after starting from a later AABB section", async () => {
+    const seedAbc = [
+      "X:1",
+      "T:Seed Pattern",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      `| ${[
+        ...Array.from({ length: 8 }, () => "A2"),
+        ...Array.from({ length: 8 }, () => "a2"),
+        ...Array.from({ length: 8 }, () => "B2"),
+        ...Array.from({ length: 8 }, () => "b2"),
+      ].join(" | ")} |`,
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+    mocked.serviceStub.currentBeatIndex = () => 33;
+
+    const view = render(() => (
+      <RhythmPlayer tuneTypeName="Reel" structure="AABB" />
+    ));
+
+    await waitFor(() => {
+      expect(
+        view.getByTestId("rhythm-player-current-section-badge").textContent
+      ).toContain("A");
     });
   });
 

@@ -490,7 +490,15 @@ function getStructuredPlaybackPosition(
       sectionBars.reduce((sum, bar) => sum + countBarEvents(bar), 0)
   );
 
-  let remainingBeatIndex = currentBeatIndex - 1;
+  const totalEventCount = partEventCounts.reduce(
+    (sum, eventCount) => sum + eventCount,
+    0
+  );
+  if (totalEventCount <= 0) {
+    return null;
+  }
+
+  let remainingBeatIndex = (currentBeatIndex - 1) % totalEventCount;
   let activePartIndex = -1;
   for (let index = 0; index < partEventCounts.length; index += 1) {
     const eventCount = partEventCounts[index] ?? 0;
