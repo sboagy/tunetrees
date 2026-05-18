@@ -96,6 +96,12 @@ async function resetLocalDbAndReopenPractice(page: Page, userId: string) {
 }
 
 async function getQueueRows(page: Page, repertoireId: string) {
+  // Ensure the test API is actually available before attempting to query.
+  // After resetLocalDbAndReopenPractice the app may redirect asynchronously
+  // (e.g. auth drift during sync), leaving the page on e2e-origin.html where
+  // __ttTestApi does not exist.
+  await waitForTestApi(page);
+
   return await page.evaluate(async (rid) => {
     const api = (window as any).__ttTestApi;
     if (!api || typeof api.getPracticeQueue !== "function") {
