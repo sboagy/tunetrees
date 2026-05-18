@@ -557,6 +557,81 @@ describe("loadRhythmPatternMetadata", () => {
     });
     expect(metadata?.rhythmAbc).toContain("User Default");
   });
+
+  it("returns ranked pattern candidates alongside the selected pattern", async () => {
+    const db = createHierarchicalRhythmDb();
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "Reel",
+        tuneId: "tune-1",
+        userId: "user-1",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata?.selectedPatternId).toBe("user-tune");
+    expect(metadata?.patternCandidates).toEqual([
+      {
+        id: "user-tune",
+        name: "User Tune Override",
+        scope: "user_tune",
+        patternType: "full_track",
+        sampleKit: "bodhran",
+        hasPremiumAudio: true,
+      },
+      {
+        id: "global-tune",
+        name: "Global Tune Override",
+        scope: "tune_default",
+        patternType: "full_track",
+        sampleKit: "bodhran",
+        hasPremiumAudio: false,
+      },
+      {
+        id: "user-default",
+        name: "User Default",
+        scope: "user_default",
+        patternType: "seed",
+        sampleKit: "generic_click",
+        hasPremiumAudio: false,
+      },
+      {
+        id: "system-default",
+        name: "System Default",
+        scope: "system_default",
+        patternType: "seed",
+        sampleKit: "bodhran",
+        hasPremiumAudio: false,
+      },
+    ]);
+  });
+
+  it("honors a selectedPatternId when it matches an eligible candidate", async () => {
+    const db = createHierarchicalRhythmDb();
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "Reel",
+        tuneId: "tune-1",
+        userId: "user-1",
+        selectedPatternId: "global-tune",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata?.selectedPatternId).toBe("global-tune");
+    expect(metadata?.rhythmAbc).toContain("Global Tune Override");
+    expect(metadata?.patternType).toBe("full_track");
+  });
 });
 
 describe("rhythm pattern sqlite migrations", () => {

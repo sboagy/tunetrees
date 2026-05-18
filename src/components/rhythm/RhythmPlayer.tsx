@@ -20,7 +20,11 @@ import {
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
-import type { RhythmPatternType } from "@/lib/services/RhythmService";
+import type {
+  RhythmPatternCandidate,
+  RhythmPatternCandidateScope,
+  RhythmPatternType,
+} from "@/lib/services/RhythmService";
 import { createRhythmService } from "@/lib/services/RhythmService";
 import { cn } from "@/lib/utils";
 import { AbcNotation } from "../tunes/AbcNotation";
@@ -803,6 +807,33 @@ function collectHighlightTargets(notehead: SVGElement): SVGElement[] {
   return targets;
 }
 
+function getPatternScopeLabel(scope: RhythmPatternCandidateScope): string {
+  switch (scope) {
+    case "user_tune":
+      return "Your tune override";
+    case "tune_default":
+      return "Tune override";
+    case "user_default":
+      return "Your default";
+    case "system_default":
+      return "System default";
+    default:
+      return "Shared pattern";
+  }
+}
+
+function getPatternOptionLabel(candidate: RhythmPatternCandidate): string {
+  const descriptors = [getPatternScopeLabel(candidate.scope)];
+  if (candidate.patternType === "full_track") {
+    descriptors.push("Full track");
+  }
+  if (candidate.hasPremiumAudio) {
+    descriptors.push("Premium loop");
+  }
+
+  return `${candidate.name} (${descriptors.join(" - ")})`;
+}
+
 export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const { localDb, user } = useAuth();
   const isMobile = createIsMobile();
@@ -815,6 +846,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     null
   );
   const [usePremiumLoop, setUsePremiumLoop] = createSignal(false);
+  const [selectedPatternId, setSelectedPatternId] = createSignal<string | null>(
+    null
+  );
   const [selectedStartSection, setSelectedStartSection] = createSignal("start");
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
 
@@ -852,6 +886,12 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   );
   const pulsesPerBar = createMemo(() =>
     beatsPerMeasureFromSignature(metadata()?.rhythmSignature ?? null)
+  );
+  const patternCandidates = createMemo(
+    () => metadata()?.patternCandidates ?? []
+  );
+  const selectedPatternChoiceId = createMemo(
+    () => selectedPatternId() ?? metadata()?.selectedPatternId ?? ""
   );
   const startSectionOptions = createMemo(() =>
     getStructureStartOptions(effectiveStructure())
@@ -972,6 +1012,40 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     }
   });
 
+  createEffect<string | undefined>((previousRequestKey) => {
+    const nextRequestKey = [
+      props.genreName?.trim() || "",
+      props.tuneTypeName?.trim() || "",
+      props.tuneId?.trim() || "",
+      user()?.id ?? "",
+    ].join("|");
+
+    if (
+      previousRequestKey !== undefined &&
+      previousRequestKey !== nextRequestKey &&
+      selectedPatternId() !== null
+    ) {
+      setSelectedPatternId(null);
+    }
+
+    return nextRequestKey;
+  });
+
+  createEffect(() => {
+    const currentSelectedPatternId = selectedPatternId();
+    if (!currentSelectedPatternId) {
+      return;
+    }
+
+    if (
+      !patternCandidates().some(
+        (candidate) => candidate.id === currentSelectedPatternId
+      )
+    ) {
+      setSelectedPatternId(null);
+    }
+  });
+
   const clearActiveBeatTargets = () => {
     for (const target of activeBeatTargets) {
       target.element.classList.remove("tnt-active-note");
@@ -1022,6 +1096,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   createEffect(() => {
     const currentService = service();
     const tuneTypeName = props.tuneTypeName?.trim();
+    const currentSelectedPatternId = selectedPatternId();
 
     if (!currentService || !tuneTypeName) {
       setIsPatternLoading(false);
@@ -1036,6 +1111,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         tuneTypeName,
         tuneId: props.tuneId?.trim() || null,
         userId: user()?.id ?? null,
+        ...(currentSelectedPatternId
+          ? { selectedPatternId: currentSelectedPatternId }
+          : {}),
       })
       .then((nextMetadata) => {
         setSourceRhythmAbc(nextMetadata?.rhythmAbc ?? null);
@@ -1448,6 +1526,31 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         <Show when={metadata()}>
           {(currentMetadata) => (
             <div class="space-y-3">
+              <Show when={currentMetadata().patternCandidates?.length ?? 0 > 1}>
+                <label class="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                  <span class="shrink-0 font-medium text-slate-900 dark:text-slate-100">
+                    Pattern:
+                  </span>
+                  <select
+                    value={selectedPatternChoiceId()}
+                    onChange={(event) => {
+                      setSelectedPatternId(event.currentTarget.value || null);
+                    }}
+                    disabled={isPatternLoading()}
+                    class="min-h-11 w-full max-w-[20rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
+                    data-testid="rhythm-player-pattern-select"
+                  >
+                    <For each={currentMetadata().patternCandidates ?? []}>
+                      {(candidate) => (
+                        <option value={candidate.id}>
+                          {getPatternOptionLabel(candidate)}
+                        </option>
+                      )}
+                    </For>
+                  </select>
+                </label>
+              </Show>
+
               <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                 <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   Meter {currentMetadata().rhythmSignature || "Unknown"}

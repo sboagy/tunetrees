@@ -318,6 +318,10 @@ export default function DatabaseBrowser(): ReturnType<Component> {
     { name: "All Tunes", sql: "SELECT * FROM tune ORDER BY title LIMIT 100;" },
     { name: "Repertoires", sql: "SELECT * FROM repertoire;" },
     {
+      name: "Rhythm Patterns",
+      sql: "SELECT * FROM rhythm_patterns ORDER BY genre_id, tune_type_id, name LIMIT 100;",
+    },
+    {
       name: "Daily Practice Queue",
       sql: "SELECT * FROM daily_practice_queue ORDER BY queue_date DESC LIMIT 20;",
     },
