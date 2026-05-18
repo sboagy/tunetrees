@@ -169,9 +169,26 @@ export interface RhythmPatternRequest {
   tuneTypeName?: string | null;
   tuneId?: string | null;
   userId?: string | null;
+  selectedPatternId?: string | null;
 }
 
 export type RhythmPatternType = "seed" | "full_track";
+
+export type RhythmPatternCandidateScope =
+  | "user_tune"
+  | "tune_default"
+  | "user_default"
+  | "system_default"
+  | "system_pattern";
+
+export interface RhythmPatternCandidate {
+  id: string;
+  name: string;
+  scope: RhythmPatternCandidateScope;
+  patternType: RhythmPatternType;
+  sampleKit: string;
+  hasPremiumAudio: boolean;
+}
 
 export interface RhythmPatternMetadata {
   genreName: string | null;
@@ -187,6 +204,8 @@ export interface RhythmPatternMetadata {
   premiumAudioSource: "database" | null;
   premiumAudioSourceTempoQpm: number | null;
   source: "rhythm_patterns" | "tune_type_fallback";
+  selectedPatternId?: string | null;
+  patternCandidates?: RhythmPatternCandidate[];
 }
 
 export interface PlaybackStartOptions {
@@ -371,6 +390,30 @@ function normalizePatternType(patternType?: string | null): RhythmPatternType {
   return patternType === "full_track" ? "full_track" : "seed";
 }
 
+function getRhythmPatternCandidateScope(row: {
+  tune_id?: string | null;
+  user_id?: string | null;
+  is_default?: number | boolean | null;
+}): RhythmPatternCandidateScope {
+  if (row.user_id && row.tune_id) {
+    return "user_tune";
+  }
+
+  if (row.tune_id) {
+    return "tune_default";
+  }
+
+  if (row.user_id) {
+    return "user_default";
+  }
+
+  if (row.is_default) {
+    return "system_default";
+  }
+
+  return "system_pattern";
+}
+
 function getSampleKitMapping(
   sampleKit?: string | null
 ): Record<number, SampleKitEntry> {
@@ -515,6 +558,7 @@ export async function loadRhythmPatternMetadata(
   const genreFilter = request.genreName?.trim() || null;
   const tuneIdFilter = request.tuneId?.trim() || null;
   const userIdFilter = request.userId?.trim() || null;
+  const selectedPatternIdFilter = request.selectedPatternId?.trim() || null;
 
   if (canUseRhythmPatterns) {
     const rows = await db.all<{
@@ -522,10 +566,16 @@ export async function loadRhythmPatternMetadata(
       tune_type_name: string | null;
       rhythm_signature: string | null;
       tempo_qpm: number | null;
+      pattern_id: string | null;
+      pattern_name: string | null;
       abc_string: string | null;
       sample_kit: string | null;
       premium_audio_url: string | null;
       pattern_type: string | null;
+      tune_id: string | null;
+      user_id: string | null;
+      is_default: number | null;
+      row_num: number | null;
     }>(sql`
       WITH tune_type_match AS (
         SELECT id, name, rhythm
@@ -552,6 +602,8 @@ export async function loadRhythmPatternMetadata(
       ),
       selected_pattern AS (
         SELECT
+          rp.id,
+          rp.name,
           rp.genre_id,
           rp.tune_type_id,
           rp.abc_string,
@@ -568,6 +620,12 @@ export async function loadRhythmPatternMetadata(
               ? sql`rp.pattern_type`
               : sql`CAST('seed' AS TEXT)`
           } AS pattern_type,
+          ${
+            hasTuneIdColumn ? sql`rp.tune_id` : sql`CAST(NULL AS TEXT)`
+          } AS tune_id,
+          ${
+            hasUserIdColumn ? sql`rp.user_id` : sql`CAST(NULL AS TEXT)`
+          } AS user_id,
           rp.is_default,
           rp.part_target,
           ROW_NUMBER() OVER (
@@ -636,27 +694,51 @@ export async function loadRhythmPatternMetadata(
             ? sql`gtt.default_bpm`
             : sql`CAST(NULL AS INTEGER)`
         } AS tempo_qpm,
+        sp.id AS pattern_id,
+        sp.name AS pattern_name,
         sp.abc_string AS abc_string,
         sp.sample_kit AS sample_kit,
         sp.premium_audio_url AS premium_audio_url,
-        sp.pattern_type AS pattern_type
+        sp.pattern_type AS pattern_type,
+        sp.tune_id AS tune_id,
+        sp.user_id AS user_id,
+        sp.is_default AS is_default,
+        sp.row_num AS row_num
       FROM tune_type_match ttm
       LEFT JOIN genre_match gm ON 1 = 1
       LEFT JOIN genre_tune_type gtt
         ON gtt.tune_type_id = ttm.id
        AND (gm.id IS NULL OR gtt.genre_id = gm.id)
-      LEFT JOIN selected_pattern sp ON sp.row_num = 1
-      LIMIT 1
+      LEFT JOIN selected_pattern sp ON 1 = 1
+      ORDER BY sp.row_num
     `);
 
     const row = rows[0];
-    if (row?.tune_type_name && row.abc_string?.trim()) {
+    const candidateRows = rows.filter(
+      (
+        candidateRow
+      ): candidateRow is typeof candidateRow & {
+        pattern_id: string;
+        pattern_name: string;
+      } =>
+        Boolean(
+          candidateRow.pattern_id &&
+            candidateRow.pattern_name &&
+            candidateRow.abc_string?.trim()
+        )
+    );
+    const selectedPatternRow =
+      candidateRows.find(
+        (candidateRow) => candidateRow.pattern_id === selectedPatternIdFilter
+      ) ?? candidateRows.find((candidateRow) => candidateRow.row_num === 1);
+
+    if (row?.tune_type_name && selectedPatternRow?.abc_string?.trim()) {
       const resolvedTempoQpm =
         typeof row.tempo_qpm === "number" && Number.isFinite(row.tempo_qpm)
           ? row.tempo_qpm
           : getDefaultTempoForTuneType(row.tune_type_name);
       const premiumLoop = selectPremiumLoop(sampleBaseUrl, {
-        explicitUrl: row.premium_audio_url,
+        explicitUrl: selectedPatternRow.premium_audio_url,
         tempoQpm: resolvedTempoQpm,
       });
 
@@ -664,15 +746,24 @@ export async function loadRhythmPatternMetadata(
         genreName: row.genre_name ?? genreFilter,
         tuneTypeName: row.tune_type_name,
         rhythmSignature: row.rhythm_signature ?? null,
-        rhythmAbc: row.abc_string.trim(),
-        patternType: normalizePatternType(row.pattern_type),
+        rhythmAbc: selectedPatternRow.abc_string.trim(),
+        patternType: normalizePatternType(selectedPatternRow.pattern_type),
         tempoQpm: resolvedTempoQpm,
-        sampleKit: normalizeSampleKit(row.sample_kit),
+        sampleKit: normalizeSampleKit(selectedPatternRow.sample_kit),
         premiumAudioUrl: premiumLoop?.url ?? null,
         premiumAudioTrimMs: premiumLoop?.trimMs ?? 0,
         premiumAudioSource: premiumLoop?.source ?? null,
         premiumAudioSourceTempoQpm: premiumLoop?.sourceTempoQpm ?? null,
         source: "rhythm_patterns",
+        selectedPatternId: selectedPatternRow.pattern_id,
+        patternCandidates: candidateRows.map((candidateRow) => ({
+          id: candidateRow.pattern_id,
+          name: candidateRow.pattern_name,
+          scope: getRhythmPatternCandidateScope(candidateRow),
+          patternType: normalizePatternType(candidateRow.pattern_type),
+          sampleKit: normalizeSampleKit(candidateRow.sample_kit),
+          hasPremiumAudio: Boolean(candidateRow.premium_audio_url?.trim()),
+        })),
       };
     }
   }
@@ -743,6 +834,8 @@ export async function loadRhythmPatternMetadata(
         premiumAudioSource: null,
         premiumAudioSourceTempoQpm: null,
         source: "tune_type_fallback",
+        selectedPatternId: null,
+        patternCandidates: [],
       };
     }
   }
@@ -785,6 +878,8 @@ export async function loadRhythmPatternMetadata(
     premiumAudioSource: null,
     premiumAudioSourceTempoQpm: null,
     source: "tune_type_fallback",
+    selectedPatternId: null,
+    patternCandidates: [],
   };
 }
 

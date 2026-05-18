@@ -654,6 +654,105 @@ describe("RhythmPlayer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a pattern selector when multiple pattern candidates are available", async () => {
+    const defaultAbc = [
+      "X:1",
+      "T:System Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 A2 C2 A2 :|",
+    ].join("\n");
+    const userAbc = [
+      "X:1",
+      "T:User Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: D2 A2 D2 A2 :|",
+    ].join("\n");
+
+    let currentMetadata = {
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: defaultAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+      selectedPatternId: "system-default",
+      patternCandidates: [
+        {
+          id: "system-default",
+          name: "System Default",
+          scope: "system_default" as const,
+          patternType: "seed" as const,
+          sampleKit: "bodhran",
+          hasPremiumAudio: false,
+        },
+        {
+          id: "user-default",
+          name: "User Default",
+          scope: "user_default" as const,
+          patternType: "seed" as const,
+          sampleKit: "generic_click",
+          hasPremiumAudio: false,
+        },
+      ],
+    };
+
+    mocked.loadPatternMock.mockImplementation(async (request) => {
+      currentMetadata =
+        request.selectedPatternId === "user-default"
+          ? {
+              ...currentMetadata,
+              rhythmAbc: userAbc,
+              sampleKit: "generic_click",
+              selectedPatternId: "user-default",
+            }
+          : {
+              ...currentMetadata,
+              rhythmAbc: defaultAbc,
+              sampleKit: "bodhran",
+              selectedPatternId: "system-default",
+            };
+
+      return currentMetadata;
+    });
+    mocked.serviceStub.metadata = () => currentMetadata;
+
+    const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+
+    await waitFor(() => {
+      expect(view.getByTestId("rhythm-player-pattern-select")).toBeTruthy();
+    });
+
+    const patternSelect = view.getByTestId(
+      "rhythm-player-pattern-select"
+    ) as HTMLSelectElement;
+    expect(patternSelect.value).toBe("system-default");
+
+    fireEvent.change(patternSelect, {
+      target: { value: "user-default" },
+    });
+
+    await waitFor(() => {
+      expect(mocked.loadPatternMock).toHaveBeenLastCalledWith({
+        genreName: null,
+        tuneTypeName: "Reel",
+        tuneId: null,
+        userId: "auth-user-1",
+        selectedPatternId: "user-default",
+      });
+      expect(patternSelect.value).toBe("user-default");
+    });
+  });
+
   it("shows the current section badge next to the notation", async () => {
     const seedAbc = [
       "X:1",
