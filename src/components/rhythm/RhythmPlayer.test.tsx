@@ -672,59 +672,54 @@ describe("RhythmPlayer", () => {
       "|: D2 A2 D2 A2 :|",
     ].join("\n");
 
-    let currentMetadata = {
+    const patternCandidates = [
+      {
+        id: "system-default",
+        name: "System Default",
+        scope: "system_default" as const,
+        patternType: "seed" as const,
+        sampleKit: "bodhran",
+        hasPremiumAudio: false,
+      },
+      {
+        id: "user-default",
+        name: "User Default",
+        scope: "user_default" as const,
+        patternType: "seed" as const,
+        sampleKit: "generic_click",
+        hasPremiumAudio: false,
+      },
+    ];
+    let currentPatternId: "system-default" | "user-default" = "system-default";
+
+    const buildMetadata = (
+      patternId: "system-default" | "user-default"
+    ): RhythmPatternMetadata => ({
       genreName: "Irish Traditional",
       tuneTypeName: "Reel",
-      rhythmAbc: defaultAbc,
+      rhythmAbc: patternId === "user-default" ? userAbc : defaultAbc,
       rhythmSignature: "4/4",
-      patternType: "seed" as const,
+      patternType: "seed",
       tempoQpm: 112,
-      sampleKit: "bodhran",
+      sampleKit: patternId === "user-default" ? "generic_click" : "bodhran",
       premiumAudioUrl: null,
       premiumAudioTrimMs: 0,
       premiumAudioSource: null,
       premiumAudioSourceTempoQpm: null,
-      source: "rhythm_patterns" as const,
-      selectedPatternId: "system-default",
-      patternCandidates: [
-        {
-          id: "system-default",
-          name: "System Default",
-          scope: "system_default" as const,
-          patternType: "seed" as const,
-          sampleKit: "bodhran",
-          hasPremiumAudio: false,
-        },
-        {
-          id: "user-default",
-          name: "User Default",
-          scope: "user_default" as const,
-          patternType: "seed" as const,
-          sampleKit: "generic_click",
-          hasPremiumAudio: false,
-        },
-      ],
-    };
+      source: "rhythm_patterns",
+      selectedPatternId: patternId,
+      patternCandidates,
+    });
 
     mocked.loadPatternMock.mockImplementation(async (request) => {
-      currentMetadata =
+      currentPatternId =
         request.selectedPatternId === "user-default"
-          ? {
-              ...currentMetadata,
-              rhythmAbc: userAbc,
-              sampleKit: "generic_click",
-              selectedPatternId: "user-default",
-            }
-          : {
-              ...currentMetadata,
-              rhythmAbc: defaultAbc,
-              sampleKit: "bodhran",
-              selectedPatternId: "system-default",
-            };
+          ? "user-default"
+          : "system-default";
 
-      return currentMetadata;
+      return buildMetadata(currentPatternId);
     });
-    mocked.serviceStub.metadata = () => currentMetadata;
+    mocked.serviceStub.metadata = () => buildMetadata(currentPatternId);
 
     const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
 
@@ -751,6 +746,76 @@ describe("RhythmPlayer", () => {
       });
       expect(patternSelect.value).toBe("user-default");
     });
+  });
+
+  it("hides the pattern selector when only one pattern candidate is available", async () => {
+    const seedAbc = [
+      "X:1",
+      "T:System Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 A2 C2 A2 :|",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+      selectedPatternId: "system-default",
+      patternCandidates: [
+        {
+          id: "system-default",
+          name: "System Default",
+          scope: "system_default" as const,
+          patternType: "seed" as const,
+          sampleKit: "bodhran",
+          hasPremiumAudio: false,
+        },
+      ],
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+      selectedPatternId: "system-default",
+      patternCandidates: [
+        {
+          id: "system-default",
+          name: "System Default",
+          scope: "system_default" as const,
+          patternType: "seed" as const,
+          sampleKit: "bodhran",
+          hasPremiumAudio: false,
+        },
+      ],
+    });
+
+    const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+
+    await waitFor(() => {
+      expect(mocked.loadPatternMock).toHaveBeenCalled();
+    });
+
+    expect(view.queryByTestId("rhythm-player-pattern-select")).toBeNull();
   });
 
   it("shows the current section badge next to the notation", async () => {
