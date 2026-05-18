@@ -71,6 +71,21 @@ vi.mock("@/lib/services/RhythmService", () => ({
 
 describe("RhythmPlayer", () => {
   beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
     mocked.renderAbcMock.mockReset();
     mocked.renderAbcMock.mockReturnValue([]);
     mocked.loadPatternMock.mockReset();
@@ -535,6 +550,108 @@ describe("RhythmPlayer", () => {
         "AABB"
       );
     });
+  });
+
+  it("shows the combined player title with the rhythm type", async () => {
+    const seedAbc = [
+      "X:1",
+      "T:Seed Pattern",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 c C c c :|",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "6/8",
+      patternType: "seed",
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "6/8",
+      patternType: "seed" as const,
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    const view = render(() => (
+      <RhythmPlayer tuneTypeName="JigD" structure="AABB" />
+    ));
+
+    await waitFor(() => {
+      expect(view.getByTestId("rhythm-player-title").textContent).toContain(
+        "Rhythm Player: JigD"
+      );
+    });
+  });
+
+  it("renders a close button when embedded in a dialog shell", async () => {
+    const seedAbc = [
+      "X:1",
+      "T:Seed Pattern",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 c C c c :|",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "6/8",
+      patternType: "seed",
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "6/8",
+      patternType: "seed" as const,
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    const onClose = vi.fn();
+    const view = render(() => (
+      <RhythmPlayer tuneTypeName="JigD" structure="AABB" onClose={onClose} />
+    ));
+
+    await waitFor(() => {
+      expect(view.getByTestId("rhythm-player-close-button")).toBeTruthy();
+    });
+
+    fireEvent.click(view.getByTestId("rhythm-player-close-button"));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("shows the current section badge next to the notation", async () => {
