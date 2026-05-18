@@ -1526,7 +1526,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         <Show when={metadata()}>
           {(currentMetadata) => (
             <div class="space-y-3">
-              <Show when={currentMetadata().patternCandidates?.length ?? 0 > 1}>
+              <Show when={patternCandidates().length > 1}>
                 <label class="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
                   <span class="shrink-0 font-medium text-slate-900 dark:text-slate-100">
                     Pattern:
