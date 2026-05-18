@@ -1076,27 +1076,46 @@ export async function seedUserTuneSets(
   const { supabase } = await getTestUserClient(userKey);
   const now = new Date().toISOString();
   const createdSetIds: string[] = [];
+  const maxAttempts = 5;
 
   for (const tuneSet of tuneSets) {
     const tuneSetId = randomUUID();
-    const { error: tuneSetError } = await supabase.from("tune_set").insert({
-      id: tuneSetId,
-      owner_user_ref: user.userId,
-      group_ref: null,
-      name: tuneSet.name,
-      description: tuneSet.description ?? null,
-      set_kind: "practice_set",
-      deleted: false,
-      created_at: now,
-      sync_version: 1,
-      last_modified_at: now,
-      device_id: "test-seed",
-    });
+    let tuneSetAttempt = 0;
+    while (true) {
+      tuneSetAttempt += 1;
 
-    if (tuneSetError) {
-      throw new Error(
-        `Failed to seed tune set '${tuneSet.name}' for ${user.name}: ${tuneSetError.message}`
+      const { error: tuneSetError } = await supabase.from("tune_set").insert({
+        id: tuneSetId,
+        owner_user_ref: user.userId,
+        group_ref: null,
+        name: tuneSet.name,
+        description: tuneSet.description ?? null,
+        set_kind: "practice_set",
+        deleted: false,
+        created_at: now,
+        sync_version: 1,
+        last_modified_at: now,
+        device_id: "test-seed",
+      });
+
+      if (!tuneSetError) {
+        break;
+      }
+
+      if (tuneSetAttempt >= maxAttempts) {
+        throw new Error(
+          `Failed to seed tune set '${tuneSet.name}' for ${user.name}: ${tuneSetError.message}`
+        );
+      }
+
+      const backoffMs = Math.min(1000 * 2 ** (tuneSetAttempt - 1), 5000);
+      const jitter = Math.floor(Math.random() * 200);
+      const delay = backoffMs + jitter;
+
+      console.warn(
+        `[${user.name}] Transient error seeding tune set '${tuneSet.name}' (attempt ${tuneSetAttempt}/${maxAttempts}): ${tuneSetError.message}. Retrying in ${delay}ms`
       );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
     createdSetIds.push(tuneSetId);
@@ -1116,14 +1135,32 @@ export async function seedUserTuneSets(
       device_id: "test-seed",
     }));
 
-    const { error: tuneSetItemError } = await supabase
-      .from("tune_set_item")
-      .insert(itemRows);
+    let tuneSetItemAttempt = 0;
+    while (true) {
+      tuneSetItemAttempt += 1;
 
-    if (tuneSetItemError) {
-      throw new Error(
-        `Failed to seed tune set items for '${tuneSet.name}' (${user.name}): ${tuneSetItemError.message}`
+      const { error: tuneSetItemError } = await supabase
+        .from("tune_set_item")
+        .insert(itemRows);
+
+      if (!tuneSetItemError) {
+        break;
+      }
+
+      if (tuneSetItemAttempt >= maxAttempts) {
+        throw new Error(
+          `Failed to seed tune set items for '${tuneSet.name}' (${user.name}): ${tuneSetItemError.message}`
+        );
+      }
+
+      const backoffMs = Math.min(1000 * 2 ** (tuneSetItemAttempt - 1), 5000);
+      const jitter = Math.floor(Math.random() * 200);
+      const delay = backoffMs + jitter;
+
+      console.warn(
+        `[${user.name}] Transient error seeding tune set items for '${tuneSet.name}' (attempt ${tuneSetItemAttempt}/${maxAttempts}): ${tuneSetItemError.message}. Retrying in ${delay}ms`
       );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
