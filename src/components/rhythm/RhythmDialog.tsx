@@ -21,6 +21,7 @@ export interface RhythmDialogProps {
   tuneTypeName: string | null;
   tuneId: string | null;
   structure?: string | null;
+  genreId?: string | null;
   genreName?: string | null;
 }
 
@@ -80,6 +81,7 @@ export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
                 tuneTypeName={props.tuneTypeName}
                 tuneId={props.tuneId}
                 structure={props.structure}
+                genreId={props.genreId}
                 genreName={props.genreName}
                 onClose={() => handleOpenChange(false)}
                 class="h-full w-full shadow-xl"

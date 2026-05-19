@@ -552,6 +552,41 @@ const TTInner: ParentComponent = (props) => {
     let metadataPrefetchPromise: Promise<void> | null = null;
     let metadataPrefetchCompleted = false;
 
+    const signalAffectedChangeCategories = (affectedTables?: string[]) => {
+      try {
+        if (!affectedTables || affectedTables.length === 0) {
+          return;
+        }
+
+        const categories = new Set<string>();
+        for (const table of affectedTables) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const meta = (TABLE_REGISTRY as any)[table];
+          if (meta?.changeCategory) {
+            categories.add(meta.changeCategory);
+          }
+        }
+
+        if (categories.has("repertoire")) {
+          if (!consumeSuppressedViewRefresh("repertoire")) {
+            incrementRepertoireListChanged();
+          }
+        }
+        if (categories.has("practice")) {
+          if (!consumeSuppressedViewRefresh("practice")) {
+            incrementPracticeListStagedChanged();
+          }
+        }
+        if (categories.has("catalog")) {
+          if (!consumeSuppressedViewRefresh("catalog")) {
+            incrementCatalogListChanged();
+          }
+        }
+      } catch (e) {
+        log.error("[TTAuthProvider] Error in granular signaling:", e);
+      }
+    };
+
     const requestOverridesProvider = async () => {
       try {
         const { buildGenreFilterOverrides, preSyncMetadataViaWorker } =
@@ -811,35 +846,7 @@ const TTInner: ParentComponent = (props) => {
           await runSyncDiagnostics(db);
         }
 
-        try {
-          if (result.affectedTables && result.affectedTables.length > 0) {
-            const categories = new Set<string>();
-            for (const table of result.affectedTables) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const meta = (TABLE_REGISTRY as any)[table];
-              if (meta?.changeCategory) {
-                categories.add(meta.changeCategory);
-              }
-            }
-            if (categories.has("repertoire")) {
-              if (!consumeSuppressedViewRefresh("repertoire")) {
-                incrementRepertoireListChanged();
-              }
-            }
-            if (categories.has("practice")) {
-              if (!consumeSuppressedViewRefresh("practice")) {
-                incrementPracticeListStagedChanged();
-              }
-            }
-            if (categories.has("catalog")) {
-              if (!consumeSuppressedViewRefresh("catalog")) {
-                incrementCatalogListChanged();
-              }
-            }
-          }
-        } catch (e) {
-          log.error("[TTAuthProvider] Error in granular signaling:", e);
-        }
+        signalAffectedChangeCategories(result.affectedTables);
 
         await runOfflineMediaMaintenance();
       },

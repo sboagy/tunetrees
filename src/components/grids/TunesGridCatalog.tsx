@@ -236,6 +236,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
   const [rhythmDialog, setRhythmDialog] = createSignal<{
     tuneId: string;
     tuneTypeName: string;
+    genreId: string | null;
     genreName: string | null;
     structure: string | null;
   } | null>(null);
@@ -361,6 +362,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
         tuneTypeName={rhythmDialog()?.tuneTypeName ?? null}
         tuneId={rhythmDialog()?.tuneId ?? null}
         structure={rhythmDialog()?.structure ?? null}
+        genreId={rhythmDialog()?.genreId ?? null}
         genreName={rhythmDialog()?.genreName ?? null}
       />
     </div>

@@ -327,6 +327,29 @@ describe("loadRhythmPatternMetadata", () => {
     expect(metadata?.premiumAudioUrl).toBeNull();
   });
 
+  it("returns canonical genre ids and names from the genre table", async () => {
+    const db = createPremiumLoopRhythmDb();
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreId: "ITRAD",
+        tuneTypeName: "Reel",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata).toMatchObject({
+      genreName: "Irish Traditional",
+      genreId: "ITRAD",
+      tuneTypeName: "Reel",
+      tuneTypeId: "Reel",
+      source: "rhythm_patterns",
+    });
+  });
+
   it("falls back when rhythm_patterns exists with an older partial schema", async () => {
     const db = createRhythmDbWithLegacyPatternColumns();
 
@@ -603,6 +626,50 @@ describe("loadRhythmPatternMetadata", () => {
       {
         id: "system-default",
         name: "System Default",
+        scope: "system_default",
+        patternType: "seed",
+        sampleKit: "bodhran",
+        hasPremiumAudio: false,
+      },
+    ]);
+  });
+
+  it("does not duplicate pattern candidates when multiple genre_tune_type rows exist without a genre filter", async () => {
+    const db = createDb([
+      "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+      "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+      "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+      "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+      "INSERT INTO genre (id, name) VALUES ('ALT', 'Alt Genre')",
+      "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+      "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
+      "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ALT', 'Jig', 99)",
+      "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Jig', 115)",
+      `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
+        VALUES ('system-default', 'ITRAD', 'Jig', 'Standard Double Jig', '*', 'X:1
+T:Standard Double Jig
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
+    ]);
+
+    const metadata = await loadRhythmPatternMetadata(
+      db,
+      {
+        genreName: null,
+        tuneTypeName: "Jig",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata?.selectedPatternId).toBe("system-default");
+    expect(metadata?.patternCandidates).toEqual([
+      {
+        id: "system-default",
+        name: "Standard Double Jig",
         scope: "system_default",
         patternType: "seed",
         sampleKit: "bodhran",

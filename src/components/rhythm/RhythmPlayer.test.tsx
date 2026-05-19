@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   RhythmPatternMetadata,
@@ -13,13 +19,44 @@ import {
 
 const mocked = vi.hoisted(() => {
   const renderAbcMock = vi.fn();
+  const parseOnlyMock = vi.fn(() => [{}]);
   const loadPatternMock = vi.fn<RhythmService["loadPattern"]>(async () => null);
   const updateRhythmAbcMock = vi.fn<RhythmService["updateRhythmAbc"]>();
+  const createEditableRhythmPatternMock = vi.fn(async () => ({
+    id: "custom-user-pattern",
+    genreId: "irish-traditional",
+    tuneTypeId: "reel",
+    name: "My Reel Pattern",
+    abcString: [
+      "X:1",
+      "T:My Reel Pattern",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 z2 C2 z2 :|",
+    ].join("\n"),
+    isDefault: 0,
+    premiumAudioUrl: null,
+    sampleKit: "generic_click",
+    tuneId: "tune-42",
+    userId: "auth-user-1",
+    patternType: "seed",
+    partTarget: "*",
+    lastModifiedAt: "2024-01-01T00:00:00.000Z",
+  }));
+  const updateEditableRhythmPatternMock = vi.fn(async () => null);
+  const deleteEditableRhythmPatternMock = vi.fn(async () => undefined);
+  const getEditableRhythmPatternByIdMock = vi.fn(async () => null);
 
   return {
     renderAbcMock,
+    parseOnlyMock,
     loadPatternMock,
     updateRhythmAbcMock,
+    createEditableRhythmPatternMock,
+    updateEditableRhythmPatternMock,
+    deleteEditableRhythmPatternMock,
+    getEditableRhythmPatternByIdMock,
     serviceStub: {
       metadata: () => null as RhythmPatternMetadata | null,
       tempoQpm: () => 100,
@@ -49,6 +86,7 @@ const mocked = vi.hoisted(() => {
 vi.mock("abcjs", () => ({
   default: {
     renderAbc: mocked.renderAbcMock,
+    parseOnly: mocked.parseOnlyMock,
   },
 }));
 
@@ -67,6 +105,13 @@ vi.mock("@/lib/auth/AuthContext", () => ({
 
 vi.mock("@/lib/services/RhythmService", () => ({
   createRhythmService: () => mocked.serviceStub,
+}));
+
+vi.mock("@/lib/db/queries/rhythm-patterns", () => ({
+  createEditableRhythmPattern: mocked.createEditableRhythmPatternMock,
+  updateEditableRhythmPattern: mocked.updateEditableRhythmPatternMock,
+  deleteEditableRhythmPattern: mocked.deleteEditableRhythmPatternMock,
+  getEditableRhythmPatternById: mocked.getEditableRhythmPatternByIdMock,
 }));
 
 describe("RhythmPlayer", () => {
@@ -88,9 +133,15 @@ describe("RhythmPlayer", () => {
 
     mocked.renderAbcMock.mockReset();
     mocked.renderAbcMock.mockReturnValue([]);
+    mocked.parseOnlyMock.mockReset();
+    mocked.parseOnlyMock.mockReturnValue([{}]);
     mocked.loadPatternMock.mockReset();
     mocked.loadPatternMock.mockResolvedValue(null);
     mocked.updateRhythmAbcMock.mockReset();
+    mocked.createEditableRhythmPatternMock.mockClear();
+    mocked.updateEditableRhythmPatternMock.mockClear();
+    mocked.deleteEditableRhythmPatternMock.mockClear();
+    mocked.getEditableRhythmPatternByIdMock.mockClear();
     mocked.serviceStub.metadata = () => null;
     mocked.serviceStub.tempoQpm = () => 100;
     mocked.serviceStub.isPlaying = () => false;
@@ -120,6 +171,7 @@ describe("RhythmPlayer", () => {
 
     await waitFor(() => {
       expect(mocked.loadPatternMock).toHaveBeenCalledWith({
+        genreId: null,
         genreName: "Irish Traditional",
         tuneTypeName: "Reel",
         tuneId: "tune-42",
@@ -738,6 +790,7 @@ describe("RhythmPlayer", () => {
 
     await waitFor(() => {
       expect(mocked.loadPatternMock).toHaveBeenLastCalledWith({
+        genreId: null,
         genreName: null,
         tuneTypeName: "Reel",
         tuneId: null,
@@ -816,6 +869,246 @@ describe("RhythmPlayer", () => {
     });
 
     expect(view.queryByTestId("rhythm-player-pattern-select")).toBeNull();
+  });
+
+  it("creates a custom rhythm pattern and reloads the player with it selected", async () => {
+    const defaultAbc = [
+      "X:1",
+      "T:System Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 A2 C2 A2 :|",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional Music",
+      genreId: "ITRAD",
+      tuneTypeName: "Jig",
+      tuneTypeId: "JigD",
+      rhythmAbc: defaultAbc,
+      rhythmSignature: "6/8",
+      patternType: "seed",
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+      selectedPatternId: "system-default",
+      patternCandidates: [
+        {
+          id: "system-default",
+          name: "System Default",
+          scope: "system_default" as const,
+          patternType: "seed" as const,
+          sampleKit: "bodhran",
+          hasPremiumAudio: false,
+        },
+      ],
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional Music",
+      genreId: "ITRAD",
+      tuneTypeName: "Jig",
+      tuneTypeId: "JigD",
+      rhythmAbc: defaultAbc,
+      rhythmSignature: "6/8",
+      patternType: "seed" as const,
+      tempoQpm: 115,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+      selectedPatternId: "system-default",
+      patternCandidates: [
+        {
+          id: "system-default",
+          name: "System Default",
+          scope: "system_default" as const,
+          patternType: "seed" as const,
+          sampleKit: "bodhran",
+          hasPremiumAudio: false,
+        },
+      ],
+    });
+
+    const view = render(() => (
+      <RhythmPlayer
+        tuneTypeName="Jig"
+        tuneId="tune-42"
+        genreName="Irish Traditional Music"
+      />
+    ));
+
+    await waitFor(() => {
+      expect(
+        view.getByTestId("rhythm-player-custom-pattern-open-button")
+      ).toBeTruthy();
+    });
+
+    fireEvent.click(
+      view.getByTestId("rhythm-player-custom-pattern-open-button")
+    );
+
+    fireEvent.input(
+      screen.getByTestId("rhythm-player-custom-pattern-name-input"),
+      {
+        target: { value: "My Reel Pattern" },
+      }
+    );
+    fireEvent.change(
+      screen.getByTestId("rhythm-player-custom-pattern-sample-kit-select"),
+      {
+        target: { value: "generic_click" },
+      }
+    );
+    fireEvent.input(
+      screen.getByTestId("rhythm-player-custom-pattern-abc-input"),
+      {
+        target: {
+          value: [
+            "X:1",
+            "T:My Reel Pattern",
+            "M:4/4",
+            "L:1/8",
+            "K:clef=perc",
+            "|: C2 z2 C2 z2 :|",
+          ].join("\n"),
+        },
+      }
+    );
+    fireEvent.click(
+      screen.getByTestId("rhythm-player-custom-pattern-save-button")
+    );
+
+    await waitFor(() => {
+      expect(mocked.createEditableRhythmPatternMock).toHaveBeenCalledWith(
+        { fake: true },
+        {
+          genreName: "Irish Traditional Music",
+          genreId: "ITRAD",
+          tuneTypeName: "Jig",
+          tuneTypeId: "JigD",
+          name: "My Reel Pattern",
+          abcString: [
+            "X:1",
+            "T:My Reel Pattern",
+            "M:4/4",
+            "L:1/8",
+            "K:clef=perc",
+            "|: C2 z2 C2 z2 :|",
+          ].join("\n"),
+          sampleKit: "generic_click",
+          patternType: "seed",
+          userId: "auth-user-1",
+          scope: "user_tune",
+          tuneId: "tune-42",
+        }
+      );
+      expect(mocked.loadPatternMock).toHaveBeenLastCalledWith({
+        genreId: null,
+        genreName: "Irish Traditional Music",
+        tuneTypeName: "Jig",
+        tuneId: "tune-42",
+        userId: "auth-user-1",
+        selectedPatternId: "custom-user-pattern",
+      });
+    });
+  });
+
+  it("shows a validation error for invalid custom ABC and skips the save", async () => {
+    const defaultAbc = [
+      "X:1",
+      "T:System Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 A2 C2 A2 :|",
+    ].join("\n");
+
+    mocked.parseOnlyMock.mockImplementation(() => {
+      throw new Error("Bad ABC");
+    });
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: defaultAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+      selectedPatternId: "system-default",
+      patternCandidates: [],
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: defaultAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+      selectedPatternId: "system-default",
+      patternCandidates: [],
+    });
+
+    const view = render(() => (
+      <RhythmPlayer
+        tuneTypeName="Reel"
+        tuneId="tune-42"
+        genreName="Irish Traditional"
+      />
+    ));
+
+    await waitFor(() => {
+      expect(
+        view.getByTestId("rhythm-player-custom-pattern-open-button")
+      ).toBeTruthy();
+    });
+
+    fireEvent.click(
+      view.getByTestId("rhythm-player-custom-pattern-open-button")
+    );
+    fireEvent.input(
+      screen.getByTestId("rhythm-player-custom-pattern-abc-input"),
+      {
+        target: {
+          value: [
+            "X:1",
+            "T:Broken Pattern",
+            "M:4/4",
+            "L:1/8",
+            "K:clef=perc",
+            "not valid",
+          ].join("\n"),
+        },
+      }
+    );
+
+    fireEvent.click(
+      screen.getByTestId("rhythm-player-custom-pattern-save-button")
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("rhythm-player-custom-pattern-error").textContent
+      ).toContain("Bad ABC");
+    });
+    expect(mocked.createEditableRhythmPatternMock).not.toHaveBeenCalled();
   });
 
   it("shows the current section badge next to the notation", async () => {

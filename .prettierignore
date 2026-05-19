@@ -1,4 +1,2 @@
 # Ignore chatmode files because VS Code's parser is picky about YAML formatting
 .github/chatmodes/*.md
-
-supabase/seeds/genre_tune_tempo_and_rhythms.sql
