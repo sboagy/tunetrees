@@ -665,7 +665,8 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                             props.cellCallbacks?.onTypeBadgeClick?.({
                               tuneId: String(tuneId),
                               tuneTypeName: item.type ?? "",
-                              genreName: item.genre ?? null,
+                              genreId: item.genre ?? null,
+                              genreName: null,
                               structure: item.structure ?? null,
                             });
                           }}

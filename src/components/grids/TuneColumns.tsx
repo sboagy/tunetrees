@@ -289,7 +289,8 @@ export function getCatalogColumns(
           onClick({
             tuneId: String(row.id ?? ""),
             tuneTypeName: value,
-            genreName: (row.genre as string) ?? null,
+            genreId: (row.genre as string) ?? null,
+            genreName: null,
             structure: (row.structure as string) ?? null,
           });
         };

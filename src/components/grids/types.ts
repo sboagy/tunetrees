@@ -183,6 +183,7 @@ export interface ICellEditorCallbacks {
   onTypeBadgeClick?: (params: {
     tuneId: string;
     tuneTypeName: string;
+    genreId: string | null;
     genreName: string | null;
     structure: string | null;
   }) => void;

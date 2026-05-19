@@ -107,11 +107,6 @@ const DEFAULT_TEMPO_BY_TYPE: Record<string, number> = {
 };
 const RHYTHM_TEMPO_STORAGE_KEY_PREFIX = "tunetrees.rhythm-tempo";
 
-const GENRE_NAME_ALIASES: Record<string, string> = {
-  itrad: "irish traditional",
-  "irish traditional music": "irish traditional",
-};
-
 const TUNE_TYPE_NAME_ALIASES: Record<string, string> = {
   air: "air",
   bdnce: "barn dance",
@@ -165,6 +160,7 @@ const TUNE_TYPE_LOOKUP_VARIANTS: Record<string, readonly string[]> = {
 };
 
 export interface RhythmPatternRequest {
+  genreId?: string | null;
   genreName?: string | null;
   tuneTypeName?: string | null;
   tuneId?: string | null;
@@ -192,7 +188,9 @@ export interface RhythmPatternCandidate {
 
 export interface RhythmPatternMetadata {
   genreName: string | null;
+  genreId?: string | null;
   tuneTypeName: string;
+  tuneTypeId?: string | null;
   rhythmAbc: string;
   rhythmSignature: string | null;
   tuneStructure?: string | null;
@@ -274,11 +272,6 @@ function getTuneTypeLookupCandidates(value: string): string[] {
   return Array.from(
     new Set([trimmed, ...variants].filter((candidate) => candidate.trim()))
   );
-}
-
-function normalizeGenreName(value?: string | null): string {
-  const normalized = value?.trim().toLowerCase() ?? "";
-  return GENRE_NAME_ALIASES[normalized] ?? normalized;
 }
 
 function sanitizeAbcTitle(value: string): string {
@@ -388,6 +381,14 @@ function normalizeSampleKit(sampleKit?: string | null): string {
 
 function normalizePatternType(patternType?: string | null): RhythmPatternType {
   return patternType === "full_track" ? "full_track" : "seed";
+}
+
+function escapeSqlStringLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function toSqlNullableStringLiteral(value?: string | null): string {
+  return value == null ? "NULL" : escapeSqlStringLiteral(value);
 }
 
 function getRhythmPatternCandidateScope(row: {
@@ -547,23 +548,59 @@ export async function loadRhythmPatternMetadata(
   const canUseHierarchicalOverrides = hasTuneIdColumn && hasUserIdColumn;
   const sampleBaseUrl = options?.sampleBaseUrl ?? DEFAULT_SAMPLE_BASE_URL;
   const tuneTypeLookupCandidates = getTuneTypeLookupCandidates(tuneTypeName);
-  const tuneTypeMatchClause = sql.join(
-    tuneTypeLookupCandidates.map(
-      (candidate) =>
-        sql`lower(id) = lower(${candidate}) OR lower(name) = lower(${candidate})`
-    ),
-    sql` OR `
+  const tuneTypeMatchClause = sql.raw(
+    tuneTypeLookupCandidates.length > 0
+      ? tuneTypeLookupCandidates
+          .map((candidate) => {
+            const literal = escapeSqlStringLiteral(candidate);
+            return `(lower(id) = lower(${literal}) OR lower(name) = lower(${literal}))`;
+          })
+          .join(" OR ")
+      : "1 = 0"
   );
 
-  const genreFilter = request.genreName?.trim() || null;
+  const genreNameFilter = request.genreName?.trim() || null;
+  const genreIdFilter = request.genreId?.trim() || null;
+  const genreFilter = genreIdFilter ?? genreNameFilter;
   const tuneIdFilter = request.tuneId?.trim() || null;
   const userIdFilter = request.userId?.trim() || null;
   const selectedPatternIdFilter = request.selectedPatternId?.trim() || null;
+  const selectedPatternOrderClause = sql.raw(
+    [
+      canUseHierarchicalOverrides
+        ? `CASE
+            WHEN ${toSqlNullableStringLiteral(userIdFilter)} IS NOT NULL
+             AND ${toSqlNullableStringLiteral(tuneIdFilter)} IS NOT NULL
+             AND rp.user_id = ${toSqlNullableStringLiteral(userIdFilter)}
+             AND rp.tune_id = ${toSqlNullableStringLiteral(tuneIdFilter)} THEN 0
+            WHEN ${toSqlNullableStringLiteral(tuneIdFilter)} IS NOT NULL
+             AND rp.user_id IS NULL
+             AND rp.tune_id = ${toSqlNullableStringLiteral(tuneIdFilter)} THEN 1
+            WHEN ${toSqlNullableStringLiteral(userIdFilter)} IS NOT NULL
+             AND rp.user_id = ${toSqlNullableStringLiteral(userIdFilter)}
+             AND rp.tune_id IS NULL THEN 2
+            WHEN rp.user_id IS NULL
+             AND rp.tune_id IS NULL
+             AND rp.is_default THEN 3
+            WHEN rp.user_id IS NULL
+             AND rp.tune_id IS NULL THEN 4
+            ELSE 5
+          END`
+        : null,
+      "CASE WHEN rp.is_default THEN 0 ELSE 1 END",
+      "CASE WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0 ELSE 1 END",
+      "rp.name",
+    ]
+      .filter(Boolean)
+      .join(",\n              ")
+  );
 
   if (canUseRhythmPatterns) {
     const rows = await db.all<{
       genre_name: string | null;
+      genre_id: string | null;
       tune_type_name: string | null;
+      tune_type_id: string | null;
       rhythm_signature: string | null;
       tempo_qpm: number | null;
       pattern_id: string | null;
@@ -600,6 +637,20 @@ export async function loadRhythmPatternMetadata(
           )
         LIMIT 1
       ),
+      tempo_match AS (
+        SELECT gtt.default_bpm
+        FROM tune_type_match ttm
+        JOIN genre_tune_type gtt ON gtt.tune_type_id = ttm.id
+        LEFT JOIN genre_match gm ON 1 = 1
+        WHERE gm.id IS NULL OR gtt.genre_id = gm.id
+        ORDER BY
+          CASE
+            WHEN gm.id IS NOT NULL AND gtt.genre_id = gm.id THEN 0
+            ELSE 1
+          END,
+          gtt.genre_id
+        LIMIT 1
+      ),
       selected_pattern AS (
         SELECT
           rp.id,
@@ -629,37 +680,7 @@ export async function loadRhythmPatternMetadata(
           rp.is_default,
           rp.part_target,
           ROW_NUMBER() OVER (
-            ORDER BY
-              ${
-                canUseHierarchicalOverrides
-                  ? sql`
-                    CASE
-                      WHEN ${userIdFilter} IS NOT NULL
-                       AND ${tuneIdFilter} IS NOT NULL
-                       AND rp.user_id = ${userIdFilter}
-                       AND rp.tune_id = ${tuneIdFilter} THEN 0
-                      WHEN ${tuneIdFilter} IS NOT NULL
-                       AND rp.user_id IS NULL
-                       AND rp.tune_id = ${tuneIdFilter} THEN 1
-                      WHEN ${userIdFilter} IS NOT NULL
-                       AND rp.user_id = ${userIdFilter}
-                       AND rp.tune_id IS NULL THEN 2
-                      WHEN rp.user_id IS NULL
-                       AND rp.tune_id IS NULL
-                       AND rp.is_default THEN 3
-                      WHEN rp.user_id IS NULL
-                       AND rp.tune_id IS NULL THEN 4
-                      ELSE 5
-                    END,
-                  `
-                  : sql``
-              }
-              CASE WHEN rp.is_default THEN 0 ELSE 1 END,
-              CASE
-                WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0
-                ELSE 1
-              END,
-              rp.name
+            ORDER BY ${selectedPatternOrderClause}
           ) AS row_num
         FROM rhythm_patterns rp
         JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
@@ -687,11 +708,13 @@ export async function loadRhythmPatternMetadata(
       )
       SELECT
         gm.name AS genre_name,
+        COALESCE(sp.genre_id, gm.id) AS genre_id,
         ttm.name AS tune_type_name,
+        COALESCE(sp.tune_type_id, ttm.id) AS tune_type_id,
         ttm.rhythm AS rhythm_signature,
         ${
           hasGenreDefaultBpmColumn
-            ? sql`gtt.default_bpm`
+            ? sql`tm.default_bpm`
             : sql`CAST(NULL AS INTEGER)`
         } AS tempo_qpm,
         sp.id AS pattern_id,
@@ -706,9 +729,7 @@ export async function loadRhythmPatternMetadata(
         sp.row_num AS row_num
       FROM tune_type_match ttm
       LEFT JOIN genre_match gm ON 1 = 1
-      LEFT JOIN genre_tune_type gtt
-        ON gtt.tune_type_id = ttm.id
-       AND (gm.id IS NULL OR gtt.genre_id = gm.id)
+      LEFT JOIN tempo_match tm ON 1 = 1
       LEFT JOIN selected_pattern sp ON 1 = 1
       ORDER BY sp.row_num
     `);
@@ -743,8 +764,10 @@ export async function loadRhythmPatternMetadata(
       });
 
       return {
-        genreName: row.genre_name ?? genreFilter,
+        genreName: row.genre_name ?? genreNameFilter ?? genreIdFilter,
+        genreId: row.genre_id,
         tuneTypeName: row.tune_type_name,
+        tuneTypeId: row.tune_type_id,
         rhythmSignature: row.rhythm_signature ?? null,
         rhythmAbc: selectedPatternRow.abc_string.trim(),
         patternType: normalizePatternType(selectedPatternRow.pattern_type),
@@ -771,7 +794,9 @@ export async function loadRhythmPatternMetadata(
   if (hasGenreDefaultBpmColumn) {
     const rows = await db.all<{
       genre_name: string | null;
+      genre_id: string | null;
       tune_type_name: string | null;
+      tune_type_id: string | null;
       rhythm_signature: string | null;
       tempo_qpm: number | null;
     }>(sql`
@@ -800,7 +825,9 @@ export async function loadRhythmPatternMetadata(
       )
       SELECT
         gm.name AS genre_name,
+        gm.id AS genre_id,
         ttm.name AS tune_type_name,
+        ttm.id AS tune_type_id,
         ttm.rhythm AS rhythm_signature,
         gtt.default_bpm AS tempo_qpm
       FROM tune_type_match ttm
@@ -819,8 +846,10 @@ export async function loadRhythmPatternMetadata(
           : getDefaultTempoForTuneType(row.tune_type_name);
 
       return {
-        genreName: row.genre_name ?? genreFilter,
+        genreName: row.genre_name ?? genreNameFilter ?? genreIdFilter,
+        genreId: row.genre_id,
         tuneTypeName: row.tune_type_name,
+        tuneTypeId: row.tune_type_id,
         rhythmSignature: row.rhythm_signature ?? null,
         rhythmAbc: buildFallbackRhythmAbc(
           row.tune_type_name,
@@ -841,10 +870,11 @@ export async function loadRhythmPatternMetadata(
   }
 
   const fallbackRows = await db.all<{
+    tune_type_id: string | null;
     tune_type_name: string | null;
     rhythm_signature: string | null;
   }>(sql`
-    SELECT name AS tune_type_name, rhythm AS rhythm_signature
+    SELECT id AS tune_type_id, name AS tune_type_name, rhythm AS rhythm_signature
     FROM tune_type
     WHERE (${tuneTypeMatchClause})
     ORDER BY
@@ -863,8 +893,10 @@ export async function loadRhythmPatternMetadata(
   }
 
   return {
-    genreName: genreFilter ? normalizeGenreName(genreFilter) : null,
+    genreName: genreNameFilter ?? genreIdFilter,
+    genreId: genreIdFilter,
     tuneTypeName: fallbackRow.tune_type_name,
+    tuneTypeId: fallbackRow.tune_type_id,
     rhythmSignature: fallbackRow.rhythm_signature ?? null,
     rhythmAbc: buildFallbackRhythmAbc(
       fallbackRow.tune_type_name,

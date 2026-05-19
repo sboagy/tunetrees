@@ -1,11 +1,17 @@
+import { Dialog as DialogPrimitive } from "@kobalte/core/dialog";
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
+import abcjs from "abcjs";
 import {
   EllipsisVertical,
   LoaderCircle,
   Pause,
   Play,
+  Plus,
   RotateCcw,
+  Save,
   Square,
+  SquarePen,
+  Trash2,
   X,
 } from "lucide-solid";
 import {
@@ -19,6 +25,13 @@ import {
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAuth } from "@/lib/auth/AuthContext";
+import {
+  createEditableRhythmPattern,
+  deleteEditableRhythmPattern,
+  type EditableRhythmPatternScope,
+  getEditableRhythmPatternById,
+  updateEditableRhythmPattern,
+} from "@/lib/db/queries/rhythm-patterns";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import type {
   RhythmPatternCandidate,
@@ -28,6 +41,15 @@ import type {
 import { createRhythmService } from "@/lib/services/RhythmService";
 import { cn } from "@/lib/utils";
 import { AbcNotation } from "../tunes/AbcNotation";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import "./rhythm-player.css";
@@ -36,6 +58,7 @@ export interface RhythmPlayerProps {
   tuneTypeName: string | null;
   tuneId?: string | null;
   structure?: string | null;
+  genreId?: string | null;
   genreName?: string | null;
   class?: string;
   onClose?: () => void;
@@ -88,9 +111,19 @@ interface PlaybackStartState {
   beatIndex: number;
 }
 
+type CustomPatternEditorMode = "create" | "edit";
+
 const DEFAULT_BARS_PER_PART = 8;
 const STRUCTURE_TOKEN = /([^\d\s])(\d*)/g;
 const ACTIVE_NOTE_COLOR = "#60a5fa";
+const CUSTOM_PATTERN_SAMPLE_KIT_OPTIONS = [
+  { value: "bodhran", label: "Bodhran" },
+  { value: "generic_click", label: "Generic click" },
+] as const;
+const CUSTOM_PATTERN_SCOPE_OPTIONS = {
+  user_default: "All tunes of this type",
+  user_tune: "This tune only",
+} as const;
 
 function normalizeStructure(structure?: string | null): string | null {
   const trimmed = structure?.trim();
@@ -834,11 +867,63 @@ function getPatternOptionLabel(candidate: RhythmPatternCandidate): string {
   return `${candidate.name} (${descriptors.join(" - ")})`;
 }
 
+function buildCustomPatternTemplate(
+  title: string,
+  rhythmSignature?: string | null
+): string {
+  const safeTitle = title.trim() || "Custom Rhythm Pattern";
+
+  return [
+    "X:1",
+    `T:${safeTitle}`,
+    `M:${rhythmSignature?.trim() || "4/4"}`,
+    "L:1/8",
+    "K:clef=perc",
+    "|: z2 z2 z2 z2 :|",
+  ].join("\n");
+}
+
+function validateCustomPatternDraft(input: {
+  name: string;
+  abcString: string;
+}): string | null {
+  if (!input.name.trim()) {
+    return "Enter a pattern name before saving.";
+  }
+
+  const abcString = input.abcString.trim();
+  if (!abcString) {
+    return "Enter ABC notation before saving this pattern.";
+  }
+
+  const requiredHeaders = ["M:", "L:", "K:"];
+  const missingHeader = requiredHeaders.find(
+    (header) => !new RegExp(`^\\s*${header}`, "m").test(abcString)
+  );
+  if (missingHeader) {
+    return `ABC notation must include a ${missingHeader} header.`;
+  }
+
+  try {
+    const parsed = abcjs.parseOnly(abcString);
+    if (!Array.isArray(parsed) || !parsed[0]) {
+      return "ABC notation could not be parsed.";
+    }
+  } catch (error) {
+    return error instanceof Error
+      ? error.message
+      : "ABC notation could not be parsed.";
+  }
+
+  return null;
+}
+
 export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const { localDb, user } = useAuth();
   const isMobile = createIsMobile();
   let activeBeatTargets: ActiveBeatTarget[] = [];
   let lastToastError: string | null = null;
+  let customPatternNameInputRef: HTMLInputElement | undefined;
 
   const [isPatternLoading, setIsPatternLoading] = createSignal(false);
   const [notationHostRef, setNotationHostRef] = createSignal<HTMLDivElement>();
@@ -851,6 +936,34 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   );
   const [selectedStartSection, setSelectedStartSection] = createSignal("start");
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
+  const [patternReloadKey, setPatternReloadKey] = createSignal(0);
+  const [isCustomPatternEditorOpen, setIsCustomPatternEditorOpen] =
+    createSignal(false);
+  const [customPatternMode, setCustomPatternMode] =
+    createSignal<CustomPatternEditorMode>("create");
+  const [customPatternId, setCustomPatternId] = createSignal<string | null>(
+    null
+  );
+  const [customPatternName, setCustomPatternName] = createSignal("");
+  const [customPatternAbc, setCustomPatternAbc] = createSignal("");
+  const [customPatternPatternType, setCustomPatternPatternType] =
+    createSignal<RhythmPatternType>("seed");
+  const [customPatternSampleKit, setCustomPatternSampleKit] =
+    createSignal("bodhran");
+  const [customPatternScope, setCustomPatternScope] =
+    createSignal<EditableRhythmPatternScope>(
+      props.tuneId?.trim() ? "user_tune" : "user_default"
+    );
+  const [customPatternError, setCustomPatternError] = createSignal<
+    string | null
+  >(null);
+  const [isCustomPatternLoading, setIsCustomPatternLoading] =
+    createSignal(false);
+  const [isCustomPatternSaving, setIsCustomPatternSaving] = createSignal(false);
+  const [isCustomPatternDeleting, setIsCustomPatternDeleting] =
+    createSignal(false);
+  const [isDeleteCustomPatternDialogOpen, setIsDeleteCustomPatternDialogOpen] =
+    createSignal(false);
 
   const service = createMemo(() => {
     const db = localDb();
@@ -892,6 +1005,40 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   );
   const selectedPatternChoiceId = createMemo(
     () => selectedPatternId() ?? metadata()?.selectedPatternId ?? ""
+  );
+  const selectedPatternCandidate = createMemo(
+    () =>
+      patternCandidates().find(
+        (candidate) => candidate.id === selectedPatternChoiceId()
+      ) ?? null
+  );
+  const selectedEditablePatternId = createMemo(() => {
+    const candidate = selectedPatternCandidate();
+    if (!candidate) {
+      return null;
+    }
+
+    return candidate.scope === "user_default" || candidate.scope === "user_tune"
+      ? candidate.id
+      : null;
+  });
+  const rhythmPatternContext = createMemo(() => ({
+    genreName: metadata()?.genreName ?? props.genreName?.trim() ?? null,
+    genreId: metadata()?.genreId ?? props.genreId?.trim() ?? null,
+    tuneTypeName:
+      metadata()?.tuneTypeName ?? props.tuneTypeName?.trim() ?? null,
+    tuneTypeId: metadata()?.tuneTypeId ?? null,
+    rhythmSignature: metadata()?.rhythmSignature ?? null,
+    sampleKit: metadata()?.sampleKit ?? "bodhran",
+    patternType: metadata()?.patternType ?? "seed",
+  }));
+  const canManageCustomPatterns = createMemo(() =>
+    Boolean(
+      localDb() &&
+        user()?.id &&
+        rhythmPatternContext().genreName &&
+        rhythmPatternContext().tuneTypeName
+    )
   );
   const startSectionOptions = createMemo(() =>
     getStructureStartOptions(effectiveStructure())
@@ -993,6 +1140,184 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     return tuneTypeName ? `Rhythm Player: ${tuneTypeName}` : "Rhythm Player";
   });
 
+  const closeCustomPatternEditor = () => {
+    setIsCustomPatternEditorOpen(false);
+    setIsDeleteCustomPatternDialogOpen(false);
+    setCustomPatternError(null);
+    setCustomPatternId(null);
+  };
+
+  const openCreateCustomPatternEditor = () => {
+    const tuneTypeName = rhythmPatternContext().tuneTypeName ?? "Custom";
+    const selectedCandidateName = selectedPatternCandidate()?.name?.trim();
+    const baseName = selectedCandidateName
+      ? `${selectedCandidateName} copy`
+      : `My ${tuneTypeName} pattern`;
+
+    setCustomPatternMode("create");
+    setCustomPatternId(null);
+    setCustomPatternScope(props.tuneId?.trim() ? "user_tune" : "user_default");
+    setCustomPatternName(baseName);
+    setCustomPatternAbc(
+      sourceRhythmAbc() ??
+        buildCustomPatternTemplate(
+          baseName,
+          rhythmPatternContext().rhythmSignature
+        )
+    );
+    setCustomPatternPatternType(rhythmPatternContext().patternType);
+    setCustomPatternSampleKit(rhythmPatternContext().sampleKit);
+    setCustomPatternError(null);
+    setIsCustomPatternEditorOpen(true);
+  };
+
+  const openEditCustomPatternEditor = async () => {
+    const db = localDb();
+    const editablePatternId = selectedEditablePatternId();
+    const currentUserId = user()?.id ?? null;
+
+    if (!db || !editablePatternId || !currentUserId) {
+      return;
+    }
+
+    setIsCustomPatternLoading(true);
+    setCustomPatternError(null);
+
+    try {
+      const existingPattern = await getEditableRhythmPatternById(
+        db,
+        editablePatternId,
+        currentUserId
+      );
+
+      if (!existingPattern) {
+        throw new Error("The selected custom pattern could not be loaded.");
+      }
+
+      setCustomPatternMode("edit");
+      setCustomPatternId(existingPattern.id);
+      setCustomPatternScope(
+        existingPattern.tuneId ? "user_tune" : "user_default"
+      );
+      setCustomPatternName(existingPattern.name);
+      setCustomPatternAbc(existingPattern.abcString);
+      setCustomPatternPatternType(
+        existingPattern.patternType === "full_track" ? "full_track" : "seed"
+      );
+      setCustomPatternSampleKit(existingPattern.sampleKit);
+      setIsCustomPatternEditorOpen(true);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load the selected custom pattern.";
+      setCustomPatternError(message);
+      toast.error(message, { id: "rhythm-player-custom-pattern-error" });
+    } finally {
+      setIsCustomPatternLoading(false);
+    }
+  };
+
+  const saveCustomPattern = async () => {
+    const db = localDb();
+    const currentUserId = user()?.id ?? null;
+    const context = rhythmPatternContext();
+
+    if (!db || !currentUserId || !context.genreName || !context.tuneTypeName) {
+      const message =
+        "Custom patterns need a resolved genre and tune type before they can be saved.";
+      setCustomPatternError(message);
+      toast.error(message, { id: "rhythm-player-custom-pattern-error" });
+      return;
+    }
+
+    const validationError = validateCustomPatternDraft({
+      name: customPatternName(),
+      abcString: customPatternAbc(),
+    });
+    if (validationError) {
+      setCustomPatternError(validationError);
+      return;
+    }
+
+    setIsCustomPatternSaving(true);
+    setCustomPatternError(null);
+
+    try {
+      const payload = {
+        genreName: context.genreName,
+        genreId: context.genreId,
+        tuneTypeName: context.tuneTypeName,
+        tuneTypeId: context.tuneTypeId,
+        name: customPatternName(),
+        abcString: customPatternAbc(),
+        sampleKit: customPatternSampleKit(),
+        patternType: customPatternPatternType(),
+        userId: currentUserId,
+        scope: customPatternScope(),
+        tuneId: props.tuneId?.trim() || null,
+      };
+
+      const savedPattern =
+        customPatternMode() === "edit" && customPatternId()
+          ? await updateEditableRhythmPattern(
+              db,
+              customPatternId() as string,
+              currentUserId,
+              payload
+            )
+          : await createEditableRhythmPattern(db, payload);
+
+      setCustomPatternId(savedPattern.id);
+      setSelectedPatternId(savedPattern.id);
+      setPatternReloadKey((current) => current + 1);
+      closeCustomPatternEditor();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to save the custom rhythm pattern.";
+      setCustomPatternError(message);
+      toast.error(message, { id: "rhythm-player-custom-pattern-error" });
+    } finally {
+      setIsCustomPatternSaving(false);
+    }
+  };
+
+  const deleteCustomPattern = async () => {
+    const db = localDb();
+    const currentUserId = user()?.id ?? null;
+    const patternId = customPatternId();
+
+    if (!db || !currentUserId || !patternId) {
+      return;
+    }
+
+    setIsCustomPatternDeleting(true);
+    setCustomPatternError(null);
+
+    try {
+      await deleteEditableRhythmPattern(db, patternId, currentUserId);
+
+      if (selectedPatternChoiceId() === patternId) {
+        setSelectedPatternId(null);
+      }
+
+      setPatternReloadKey((current) => current + 1);
+      closeCustomPatternEditor();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to delete the custom rhythm pattern.";
+      setCustomPatternError(message);
+      toast.error(message, { id: "rhythm-player-custom-pattern-error" });
+    } finally {
+      setIsCustomPatternDeleting(false);
+      setIsDeleteCustomPatternDialogOpen(false);
+    }
+  };
+
   const updateTempo = (value: string) => {
     const parsedTempo = Number.parseInt(value, 10);
     if (!Number.isFinite(parsedTempo)) {
@@ -1014,6 +1339,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
   createEffect<string | undefined>((previousRequestKey) => {
     const nextRequestKey = [
+      props.genreId?.trim() || "",
       props.genreName?.trim() || "",
       props.tuneTypeName?.trim() || "",
       props.tuneId?.trim() || "",
@@ -1028,22 +1354,14 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       setSelectedPatternId(null);
     }
 
-    return nextRequestKey;
-  });
-
-  createEffect(() => {
-    const currentSelectedPatternId = selectedPatternId();
-    if (!currentSelectedPatternId) {
-      return;
-    }
-
     if (
-      !patternCandidates().some(
-        (candidate) => candidate.id === currentSelectedPatternId
-      )
+      previousRequestKey !== undefined &&
+      previousRequestKey !== nextRequestKey
     ) {
-      setSelectedPatternId(null);
+      closeCustomPatternEditor();
     }
+
+    return nextRequestKey;
   });
 
   const clearActiveBeatTargets = () => {
@@ -1094,6 +1412,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   });
 
   createEffect(() => {
+    patternReloadKey();
     const currentService = service();
     const tuneTypeName = props.tuneTypeName?.trim();
     const currentSelectedPatternId = selectedPatternId();
@@ -1107,6 +1426,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     setIsPatternLoading(true);
     void currentService
       .loadPattern({
+        genreId: props.genreId?.trim() || null,
         genreName: props.genreName?.trim() || null,
         tuneTypeName,
         tuneId: props.tuneId?.trim() || null,
@@ -1551,6 +1871,48 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                 </label>
               </Show>
 
+              <div class="flex flex-wrap items-center gap-2">
+                <Show when={canManageCustomPatterns()}>
+                  <Button
+                    type="button"
+                    onClick={openCreateCustomPatternEditor}
+                    disabled={
+                      isCustomPatternSaving() || isCustomPatternLoading()
+                    }
+                    variant="accent"
+                    class="min-h-11 rounded-full px-4"
+                    data-testid="rhythm-player-custom-pattern-open-button"
+                  >
+                    <Plus class="h-4 w-4" />
+                    New custom pattern
+                  </Button>
+
+                  <Show when={selectedEditablePatternId()}>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        void openEditCustomPatternEditor();
+                      }}
+                      disabled={
+                        isCustomPatternSaving() || isCustomPatternLoading()
+                      }
+                      variant="outline"
+                      class="min-h-11 rounded-full px-4"
+                      data-testid="rhythm-player-custom-pattern-edit-button"
+                    >
+                      <SquarePen class="h-4 w-4" />
+                      Edit selected custom
+                    </Button>
+                  </Show>
+                </Show>
+
+                <Show when={!canManageCustomPatterns()}>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Custom patterns need a resolved genre and tune type.
+                  </p>
+                </Show>
+              </div>
+
               <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
                 <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   Meter {currentMetadata().rhythmSignature || "Unknown"}
@@ -1736,6 +2098,256 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
           </Show>
         </Show>
       </CardContent>
+
+      <DialogPrimitive
+        open={isCustomPatternEditorOpen()}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeCustomPatternEditor();
+          }
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay class="fixed inset-0 z-[60] bg-black/50 data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0" />
+          <DialogPrimitive.Content
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              requestAnimationFrame(() => {
+                customPatternNameInputRef?.focus();
+              });
+            }}
+            class="fixed left-[50%] top-[50%] z-[70] flex h-[min(88vh,960px)] w-[min(96vw,980px)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border bg-background shadow-xl outline-none data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95 data-[closed]:slide-out-to-left-1/2 data-[closed]:slide-out-to-top-[48%] data-[expanded]:slide-in-from-left-1/2 data-[expanded]:slide-in-from-top-[48%]"
+            data-testid="rhythm-player-custom-pattern-editor"
+          >
+            <DialogPrimitive.Title class="sr-only">
+              {customPatternMode() === "edit"
+                ? "Edit custom rhythm pattern"
+                : "Create custom rhythm pattern"}
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Description class="sr-only">
+              Create or edit a personal rhythm pattern in ABC notation.
+            </DialogPrimitive.Description>
+
+            <div class="flex items-start justify-between gap-4 border-b px-5 py-4 sm:px-6">
+              <div class="min-w-0">
+                <p class="text-base font-semibold text-foreground">
+                  {customPatternMode() === "edit"
+                    ? "Edit custom rhythm pattern"
+                    : "Create custom rhythm pattern"}
+                </p>
+                <p class="text-sm text-muted-foreground">
+                  Save an ABC rhythm pattern to your local library and reuse it
+                  from the selector.
+                </p>
+              </div>
+
+              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <Show
+                  when={customPatternMode() === "edit" && customPatternId()}
+                >
+                  <Button
+                    type="button"
+                    variant="destructive-ghost"
+                    onClick={() => setIsDeleteCustomPatternDialogOpen(true)}
+                    disabled={
+                      isCustomPatternDeleting() || isCustomPatternSaving()
+                    }
+                    class="min-h-11 px-3"
+                    data-testid="rhythm-player-custom-pattern-delete-button"
+                  >
+                    <Trash2 class="h-4 w-4" />
+                    Delete
+                  </Button>
+                </Show>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeCustomPatternEditor}
+                  class="min-h-11 px-4"
+                  data-testid="rhythm-player-custom-pattern-cancel-button"
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => {
+                    void saveCustomPattern();
+                  }}
+                  disabled={
+                    isCustomPatternSaving() || isCustomPatternDeleting()
+                  }
+                  class="min-h-11 px-4"
+                  data-testid="rhythm-player-custom-pattern-save-button"
+                >
+                  <Show
+                    when={!isCustomPatternSaving()}
+                    fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
+                  >
+                    <Save class="h-4 w-4" />
+                  </Show>
+                  {customPatternMode() === "edit"
+                    ? "Save changes"
+                    : "Save pattern"}
+                </Button>
+              </div>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+              <div class="grid gap-4 md:grid-cols-2">
+                <label class="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <span class="font-medium text-foreground">Name</span>
+                  <input
+                    ref={customPatternNameInputRef}
+                    type="text"
+                    value={customPatternName()}
+                    onInput={(event) =>
+                      setCustomPatternName(event.currentTarget.value)
+                    }
+                    class="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                    data-testid="rhythm-player-custom-pattern-name-input"
+                  />
+                </label>
+
+                <label class="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <span class="font-medium text-foreground">Apply to</span>
+                  <select
+                    value={customPatternScope()}
+                    onChange={(event) => {
+                      setCustomPatternScope(
+                        event.currentTarget.value as EditableRhythmPatternScope
+                      );
+                    }}
+                    class="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                    data-testid="rhythm-player-custom-pattern-scope-select"
+                  >
+                    <option value="user_default">
+                      {CUSTOM_PATTERN_SCOPE_OPTIONS.user_default}
+                    </option>
+                    <Show when={props.tuneId?.trim()}>
+                      <option value="user_tune">
+                        {CUSTOM_PATTERN_SCOPE_OPTIONS.user_tune}
+                      </option>
+                    </Show>
+                  </select>
+                </label>
+
+                <label class="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <span class="font-medium text-foreground">Pattern type</span>
+                  <select
+                    value={customPatternPatternType()}
+                    onChange={(event) => {
+                      setCustomPatternPatternType(
+                        event.currentTarget.value as RhythmPatternType
+                      );
+                    }}
+                    class="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                    data-testid="rhythm-player-custom-pattern-type-select"
+                  >
+                    <option value="seed">Seed loop</option>
+                    <option value="full_track">Full track</option>
+                  </select>
+                </label>
+
+                <label class="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <span class="font-medium text-foreground">Sample kit</span>
+                  <select
+                    value={customPatternSampleKit()}
+                    onChange={(event) => {
+                      setCustomPatternSampleKit(event.currentTarget.value);
+                    }}
+                    class="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                    data-testid="rhythm-player-custom-pattern-sample-kit-select"
+                  >
+                    <For each={CUSTOM_PATTERN_SAMPLE_KIT_OPTIONS}>
+                      {(option) => (
+                        <option value={option.value}>{option.label}</option>
+                      )}
+                    </For>
+                  </select>
+                </label>
+              </div>
+
+              <label class="mt-5 flex flex-col gap-2 text-sm text-muted-foreground">
+                <span class="font-medium text-foreground">ABC notation</span>
+                <textarea
+                  value={customPatternAbc()}
+                  onInput={(event) =>
+                    setCustomPatternAbc(event.currentTarget.value)
+                  }
+                  rows="10"
+                  class="min-h-[14rem] rounded-md border border-input bg-background px-3 py-3 font-mono text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                  data-testid="rhythm-player-custom-pattern-abc-input"
+                />
+              </label>
+
+              <Show when={customPatternError()}>
+                {(message) => (
+                  <div
+                    class="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+                    data-testid="rhythm-player-custom-pattern-error"
+                  >
+                    {message()}
+                  </div>
+                )}
+              </Show>
+
+              <div class="mt-5 rounded-2xl border border-border bg-card p-4">
+                <p class="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Live preview
+                </p>
+                <AbcNotation
+                  notation={customPatternAbc()}
+                  showErrors
+                  class="w-full"
+                />
+              </div>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive>
+
+      <AlertDialog
+        open={isDeleteCustomPatternDialogOpen()}
+        onOpenChange={setIsDeleteCustomPatternDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete custom pattern?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected custom rhythm pattern from your library.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter class="gap-2 sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteCustomPatternDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive-ghost"
+              onClick={() => {
+                void deleteCustomPattern();
+              }}
+              disabled={isCustomPatternDeleting()}
+            >
+              <Show
+                when={!isCustomPatternDeleting()}
+                fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
+              >
+                <Trash2 class="h-4 w-4" />
+              </Show>
+              Delete pattern
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
