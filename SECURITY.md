@@ -90,7 +90,7 @@ The following vulnerabilities are present in development dependencies only and d
 | Advisory            | Package         | Severity | Reason for Acceptance                                                                              |
 | ------------------- | --------------- | -------- | -------------------------------------------------------------------------------------------------- |
 | GHSA-67mh-4wv8-2f99 | esbuild ≤0.24.2 | Moderate | Used by drizzle-kit (dev tool). Vulnerability only affects dev server, not production builds.      |
-| GHSA-35jh-r3h4-6jhm | lodash.template | High     | Used by shadcn-solid CLI (dev tool). Only runs during component installation, not in runtime code. |
+| GHSA-vqpr-j7v3-hqw9 | valibot <1.2.0  | High     | Pulled in by shadcn-solid tooling only. It is not part of the shipped runtime path.                 |
 
 ### Checking Production Security
 
