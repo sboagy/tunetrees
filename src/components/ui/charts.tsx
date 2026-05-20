@@ -334,8 +334,8 @@ const ScatterChart = /* #__PURE__ */ createTypedChart("scatter", [
 ]);
 
 export {
-  BaseChart as Chart,
   BarChart,
+  BaseChart as Chart,
   BubbleChart,
   DonutChart,
   LineChart,

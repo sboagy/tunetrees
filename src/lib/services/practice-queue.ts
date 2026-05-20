@@ -32,8 +32,8 @@ import {
 } from "../utils/scheduling-windows";
 import { generateId } from "../utils/uuid";
 
-export { classifyQueueBucket, computeSchedulingWindows };
 export type { SchedulingWindows };
+export { classifyQueueBucket, computeSchedulingWindows };
 
 type QueueCandidateRow = Pick<
   PracticeListStagedRow,

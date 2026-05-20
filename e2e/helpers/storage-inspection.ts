@@ -49,7 +49,7 @@ export async function getIndexedDBSize(page: Page): Promise<number> {
   log.info("📊 Getting IndexedDB size...");
 
   const sizeBytes = await page.evaluate(async () => {
-    if (!navigator.storage || !navigator.storage.estimate) {
+    if (!navigator.storage?.estimate) {
       throw new Error("Storage API not available");
     }
 
