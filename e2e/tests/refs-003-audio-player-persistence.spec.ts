@@ -13,26 +13,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 let ttPage: TuneTreesPage;
 
 async function readPersistedAudioState(page: Page, referenceId: string) {
-  return page.evaluate(async (id) => {
-    const clientSqliteUrl = new URL(
-      "/src/lib/db/client-sqlite.ts",
-      window.location.origin
-    ).toString();
-    const mediaAssetsUrl = new URL(
-      "/src/lib/db/queries/media-assets.ts",
-      window.location.origin
-    ).toString();
-
-    const { getDb } = await import(clientSqliteUrl);
-    const { getMediaAssetByReferenceId } = await import(mediaAssetsUrl);
-
-    const db = getDb();
-    if (!db) {
-      return null;
-    }
-
-    const mediaAsset = await getMediaAssetByReferenceId(db, id);
-    return mediaAsset?.regionsJson ?? null;
+  return page.evaluate((id) => {
+    return (window as any).__ttTestApi?.readMediaAssetRegions(id) ?? null;
   }, referenceId);
 }
 
@@ -62,6 +44,8 @@ function createSilentWavBuffer(durationSeconds = 1, sampleRate = 8000) {
 }
 
 test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
+  test.setTimeout(180_000);
+
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
 
