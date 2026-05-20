@@ -8,7 +8,20 @@
  * @module lib/db/migration-version
  */
 
-const CURRENT_SCHEMA_VERSION = "2.0.13-fix-sync-change-log-coverage"; // Bump this when schema changes
+const CURRENT_SCHEMA_VERSION = "2.0.15-refresh-public-rhythm-patterns"; // Bump this when stale public rhythm catalog rows must be re-pulled without dropping user-owned data
+
+const TARGETED_PUBLIC_RHYTHM_PATTERN_REFRESH_VERSIONS = new Set([
+  "2.0.13-fix-sync-change-log-coverage",
+  "2.0.14-reset-stale-rhythm-catalog",
+]);
+
+function shouldRefreshPublicRhythmPatternsOnly(
+  localVersion: string | null
+): boolean {
+  return TARGETED_PUBLIC_RHYTHM_PATTERN_REFRESH_VERSIONS.has(
+    localVersion ?? ""
+  );
+}
 
 /**
  * Get the locally stored schema version from localStorage
@@ -108,6 +121,22 @@ export async function clearLocalDatabaseForMigration(
   }
 ): Promise<void> {
   console.log("🔄 Schema migration detected - clearing local database...");
+
+  const localVersion = getLocalSchemaVersion();
+
+  if (shouldRefreshPublicRhythmPatternsOnly(localVersion) && context?.rawDb) {
+    console.log(
+      "🔄 Refreshing public rhythm_patterns rows while preserving user-owned local rows..."
+    );
+
+    context.rawDb.run(`
+      DELETE FROM rhythm_patterns
+      WHERE user_id IS NULL OR TRIM(user_id) = ''
+    `);
+
+    console.log("✅ Public rhythm_patterns rows cleared for targeted refresh");
+    return;
+  }
 
   const drizzleDb = db as {
     delete: <TTable>(table: TTable) => { run: () => unknown };
