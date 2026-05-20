@@ -14,6 +14,7 @@ import {
   type SqliteDatabase,
 } from "@/lib/db/client-sqlite";
 import { createGroup } from "@/lib/db/queries/groups";
+import { getMediaAssetByReferenceId } from "@/lib/db/queries/media-assets";
 import {
   addTuneSetToSetlist,
   addTuneToSetlist,
@@ -983,6 +984,19 @@ async function getLocalRecord(
 }
 
 /**
+ * Read the regionsJson column from a media_asset by its reference_ref.
+ * Uses the app's already-initialized DB instance (avoids Vite dynamic-import
+ * pitfalls where `getDb()` would see a null drizzleDb in a fresh module closure).
+ */
+async function readMediaAssetRegions(
+  referenceRef: string
+): Promise<string | null> {
+  const db = await ensureDb();
+  const mediaAsset = await getMediaAssetByReferenceId(db, referenceRef);
+  return mediaAsset?.regionsJson ?? null;
+}
+
+/**
  * Get currently selected genres for the user
  */
 async function getSelectedGenres(): Promise<string[]> {
@@ -1357,6 +1371,7 @@ declare global {
         table: string,
         recordId: string | number
       ) => Promise<any>;
+      readMediaAssetRegions: (referenceRef: string) => Promise<string | null>;
       getQueueInfo: (repertoireId: string) => Promise<{
         windowStartUtc: string;
         rowCount: number;
@@ -1780,6 +1795,9 @@ if (typeof window !== "undefined") {
       },
       getLocalRecord: async (table: string, recordId: string | number) => {
         return await getLocalRecord(table, recordId);
+      },
+      readMediaAssetRegions: async (referenceRef: string) => {
+        return await readMediaAssetRegions(referenceRef);
       },
       getAnnotationCounts: async (options?: { tuneId?: string }) => {
         const db = await ensureDb();

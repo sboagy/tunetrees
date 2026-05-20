@@ -8,6 +8,16 @@ function resolveBaseUrl(path: string = ""): string {
   return new URL(normalizedPath, normalizedBase).toString();
 }
 
+function isRealAppUrl(currentUrl: string): boolean {
+  const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+  return (
+    currentUrl.startsWith(baseUrl) &&
+    !currentUrl.includes("e2e-origin.html") &&
+    currentUrl !== "about:blank" &&
+    !currentUrl.startsWith("data:")
+  );
+}
+
 export async function gotoE2eOrigin(page: Page): Promise<void> {
   await page.goto(resolveBaseUrl("e2e-origin.html"), {
     waitUntil: "domcontentloaded",
@@ -186,6 +196,18 @@ export async function waitForSyncComplete(
   };
 
   while (Date.now() - startTime < timeoutMs) {
+    // Initial sync status only exists on the real app page. Setup can
+    // transiently bounce through e2e-origin.html while storage is being reset,
+    // so recover to the app before polling instead of timing out on the helper page.
+    if (!isRealAppUrl(page.url())) {
+      log.debug(
+        `⏳ waitForSyncComplete is on ${page.url() || "<empty>"}; navigating back to app root`
+      );
+      await page.goto(resolveBaseUrl(), { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(200);
+      continue;
+    }
+
     let status: {
       version: number;
       successStr: string;

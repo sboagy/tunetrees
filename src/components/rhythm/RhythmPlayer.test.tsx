@@ -201,12 +201,12 @@ describe("RhythmPlayer", () => {
     const noteheads = [
       makeNotehead(0, "a1"),
       makeNotehead(0, "a2"),
-      makeNotehead(0, "a3"),
-      makeNotehead(0, "a4"),
-      makeNotehead(1, "b1"),
-      makeNotehead(1, "b2"),
-      makeNotehead(1, "b3"),
-      makeNotehead(1, "b4"),
+      makeNotehead(1, "a3"),
+      makeNotehead(1, "a4"),
+      makeNotehead(2, "b1"),
+      makeNotehead(2, "b2"),
+      makeNotehead(3, "b3"),
+      makeNotehead(3, "b4"),
     ];
 
     const sourceAbc = [
@@ -232,7 +232,7 @@ describe("RhythmPlayer", () => {
         "A2A2B2B2",
         3
       )?.getAttribute("data-note-id")
-    ).toBe("a1");
+    ).toBe("a3");
     expect(
       resolveStructuredDisplayNotehead(
         noteheads,
@@ -247,6 +247,104 @@ describe("RhythmPlayer", () => {
         sourceAbc,
         "A2A2B2B2",
         7
+      )?.getAttribute("data-note-id")
+    ).toBe("b3");
+  });
+
+  it("maps compact full-track repeats by section when each section spans multiple staff lines", () => {
+    const makeNotehead = (lineIndex: number, id: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", `abcjs-note abcjs-l${lineIndex}`);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", id);
+      noteGroup.appendChild(notehead);
+      return notehead;
+    };
+
+    const noteheads = [
+      makeNotehead(0, "a1"),
+      makeNotehead(0, "a2"),
+      makeNotehead(0, "a3"),
+      makeNotehead(0, "a4"),
+      makeNotehead(1, "a5"),
+      makeNotehead(1, "a6"),
+      makeNotehead(1, "a7"),
+      makeNotehead(1, "a8"),
+      makeNotehead(2, "b1"),
+      makeNotehead(2, "b2"),
+      makeNotehead(2, "b3"),
+      makeNotehead(2, "b4"),
+      makeNotehead(3, "b5"),
+      makeNotehead(3, "b6"),
+      makeNotehead(3, "b7"),
+      makeNotehead(3, "b8"),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "|: A | B | C | D |",
+      "E | F | G | A :|",
+      "|: B | C | D | E |",
+      "F | G | A | B :|",
+    ].join("\n");
+
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        1
+      )?.getAttribute("data-note-id")
+    ).toBe("a1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        5
+      )?.getAttribute("data-note-id")
+    ).toBe("a5");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        9
+      )?.getAttribute("data-note-id")
+    ).toBe("a1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        13
+      )?.getAttribute("data-note-id")
+    ).toBe("a5");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        17
+      )?.getAttribute("data-note-id")
+    ).toBe("b1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        25
       )?.getAttribute("data-note-id")
     ).toBe("b1");
   });
@@ -391,9 +489,9 @@ describe("RhythmPlayer", () => {
     expect(playbackAbc).toContain("M:4/4");
     expect(playbackAbc).toContain("L:1/8");
     expect(playbackAbc).toContain("K:clef=perc");
-    expect(playbackAbc).toContain(
-      "| C2 A2 C2 A2 | C2 A2 C2 A2 | C2 A2 C2 A2 | C2 A2 C2 A2 |"
-    );
+    expect(playbackAbc).toContain("P:A");
+    expect(playbackAbc).toContain("P:B");
+    expect(playbackAbc).toContain("| C2 A2 C2 A2 | C2 A2 C2 A2 |");
   });
 
   it("repeats structured seed sections in playback order", async () => {
@@ -798,6 +896,94 @@ describe("RhythmPlayer", () => {
         selectedPatternId: "user-default",
       });
       expect(patternSelect.value).toBe("user-default");
+    });
+  });
+
+  it("shows the loaded pattern when a selection request resolves to a different candidate", async () => {
+    const defaultAbc = [
+      "X:1",
+      "T:System Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 A2 C2 A2 :|",
+    ].join("\n");
+    const userAbc = [
+      "X:1",
+      "T:User Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: D2 A2 D2 A2 :|",
+    ].join("\n");
+
+    const patternCandidates = [
+      {
+        id: "system-default",
+        name: "System Default",
+        scope: "system_default" as const,
+        patternType: "seed" as const,
+        sampleKit: "bodhran",
+        hasPremiumAudio: false,
+      },
+      {
+        id: "user-default",
+        name: "User Default",
+        scope: "user_default" as const,
+        patternType: "seed" as const,
+        sampleKit: "generic_click",
+        hasPremiumAudio: false,
+      },
+    ];
+    let currentPatternId: "system-default" | "user-default" = "system-default";
+
+    const buildMetadata = (
+      patternId: "system-default" | "user-default"
+    ): RhythmPatternMetadata => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: patternId === "user-default" ? userAbc : defaultAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      sampleKit: patternId === "user-default" ? "generic_click" : "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+      selectedPatternId: patternId,
+      patternCandidates,
+    });
+
+    mocked.loadPatternMock.mockImplementation(async (request) => {
+      currentPatternId =
+        request.selectedPatternId === "user-default"
+          ? "system-default"
+          : "system-default";
+
+      return buildMetadata(currentPatternId);
+    });
+    mocked.serviceStub.metadata = () => buildMetadata(currentPatternId);
+
+    const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+
+    await waitFor(() => {
+      expect(view.getByTestId("rhythm-player-pattern-select")).toBeTruthy();
+    });
+
+    const patternSelect = view.getByTestId(
+      "rhythm-player-pattern-select"
+    ) as HTMLSelectElement;
+    expect(patternSelect.value).toBe("system-default");
+
+    fireEvent.change(patternSelect, {
+      target: { value: "user-default" },
+    });
+
+    await waitFor(() => {
+      expect(mocked.loadPatternMock).toHaveBeenCalledTimes(2);
+      expect(patternSelect.value).toBe("system-default");
     });
   });
 
@@ -1713,6 +1899,129 @@ describe("RhythmPlayer", () => {
     );
   });
 
+  it("renders full_track notation without rewriting the tune body when no structure is provided", async () => {
+    const fullTrackAbc = [
+      "X:7",
+      "T:Full Tune Display",
+      "Q:1/4=112",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "P:A",
+      "|: C2 E G | A2 c e :|",
+      "P:B",
+      "|: e2 c A | G2 E C :|",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "6/8",
+      patternType: "full_track",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "6/8",
+      patternType: "full_track" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    render(() => <RhythmPlayer tuneTypeName="Jig" />);
+
+    await waitFor(() => {
+      expect(mocked.renderAbcMock).toHaveBeenCalled();
+    });
+
+    const renderedAbc = mocked.renderAbcMock.mock.calls.at(-1)?.[1] as string;
+    expect(renderedAbc).toContain("X:1");
+    expect(renderedAbc).toContain("M:6/8");
+    expect(renderedAbc).toContain("L:1/8");
+    expect(renderedAbc).toContain("K:clef=perc");
+    expect(renderedAbc).toContain("P:A");
+    expect(renderedAbc).toContain("|: C2 E G | A2 c e :|");
+    expect(renderedAbc).toContain("P:B");
+    expect(renderedAbc).toContain("|: e2 c A | G2 E C :|");
+    expect(renderedAbc).not.toContain("T:Full Tune Display");
+    expect(renderedAbc).not.toContain("Q:1/4=112");
+  });
+
+  it("renders compact full_track notation using structure repeats", async () => {
+    const fullTrackAbc = [
+      "X:1",
+      "T:Compact Full Tune",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      `P:A\n| ${Array.from({ length: 8 }, () => "C2 A2 C2 A2").join(" | ")} |`,
+      `P:B\n| ${Array.from({ length: 8 }, () => "C2 c2 C2 c2").join(" | ")} |`,
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    render(() => <RhythmPlayer tuneTypeName="Reel" structure="AABB" />);
+
+    await waitFor(() => {
+      expect(mocked.renderAbcMock).toHaveBeenCalled();
+    });
+
+    const renderedAbc = mocked.renderAbcMock.mock.calls.at(-1)?.[1] as string;
+    expect(renderedAbc).toContain("X:1");
+    expect(renderedAbc).toContain("M:4/4");
+    expect(renderedAbc).toContain("L:1/8");
+    expect(renderedAbc).toContain("K:clef=perc");
+    expect(renderedAbc).toContain("P:A");
+    expect(renderedAbc).toContain(
+      `| ${Array.from({ length: 4 }, () => "C2 A2 C2 A2").join(" | ")} |`
+    );
+    expect(renderedAbc).toContain("P:B");
+    expect(renderedAbc).toContain(
+      `| ${Array.from({ length: 4 }, () => "C2 c2 C2 c2").join(" | ")} |`
+    );
+  });
+
   it("shows the premium loop switch only when metadata exposes a premium audio URL", async () => {
     const metadata = {
       genreName: "Irish Traditional",
@@ -1797,8 +2106,13 @@ describe("RhythmPlayer", () => {
     expect(renderedAbc).toContain("M:6/8");
     expect(renderedAbc).toContain("L:1/8");
     expect(renderedAbc).toContain("K:clef=perc");
+    expect(renderedAbc).toContain("P:A");
+    expect(renderedAbc).toContain("P:B");
     expect(renderedAbc).toContain(
-      "|:C2 c C c c|C2 c C c c|C2 c C c c|C2 c C c c|C2 c C c c|C2 c C c c|C2 c C c c|C2 c C c c:|"
+      "|: C2 c C c c | C2 c C c c | C2 c C c c | C2 c C c c |"
+    );
+    expect(renderedAbc).toContain(
+      "| C2 c C c c | C2 c C c c | C2 c C c c | C2 c C c c :|"
     );
     expect(renderedAbc).not.toContain("$");
     expect(renderedAbc).not.toContain("T:");

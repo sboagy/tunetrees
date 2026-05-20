@@ -39,7 +39,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
   databaseVersion: 22,
-  schemaVersion: "2.0.13-fix-sync-change-log-coverage",
+  schemaVersion: "2.0.15-refresh-public-rhythm-patterns",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
