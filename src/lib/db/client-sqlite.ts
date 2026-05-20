@@ -38,7 +38,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 24,
+  databaseVersion: 22,
   schemaVersion: "2.0.15-refresh-public-rhythm-patterns",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
