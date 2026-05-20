@@ -1276,14 +1276,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   });
 
   const playbackAbc = createMemo(() => {
-    const patternType = metadata()?.patternType ?? "seed";
-
-    if (patternType === "seed") {
-      return expandedAbc();
-    }
-
     return expandedAbc();
   });
+
   const selectedPlaybackStartAbc = createMemo(() =>
     rotatePlaybackRhythmAbc(
       playbackAbc(),
@@ -2053,9 +2048,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                     >
                       <For each={currentMetadata().patternCandidates ?? []}>
                         {(candidate) => (
-                          <option
-                            value={candidate.id}
-                          >
+                          <option value={candidate.id}>
                             {getPatternOptionLabel(candidate)}
                           </option>
                         )}
