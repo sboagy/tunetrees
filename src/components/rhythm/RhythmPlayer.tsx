@@ -2055,7 +2055,6 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                         {(candidate) => (
                           <option
                             value={candidate.id}
-                            selected={candidate.id === currentPatternChoiceId()}
                           >
                             {getPatternOptionLabel(candidate)}
                           </option>
