@@ -853,7 +853,7 @@ const TTInner: ParentComponent = (props) => {
     });
 
     // E2E-only: expose sync control surface for Playwright
-    if (typeof window !== "undefined" && !!(window as any).__ttTestApi) {
+    if (typeof window !== "undefined" && (window as any).__ttTestApi) {
       (window as any).__ttSyncControl = {
         stop: async () => {
           try {

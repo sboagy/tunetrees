@@ -33,16 +33,16 @@ import {
 
 // Re-export catalog tune mappings for convenience
 export {
-  CATALOG_TUNE_ID_MAP,
-  getCatalogTuneUuid,
   CATALOG_TUNE_43_ID,
   CATALOG_TUNE_54_ID,
   CATALOG_TUNE_55_ID,
   CATALOG_TUNE_66_ID,
   CATALOG_TUNE_70_ID,
   CATALOG_TUNE_72_ID,
+  CATALOG_TUNE_ID_MAP,
   CATALOG_TUNE_MORRISON_ID,
   type CatalogTuneId,
+  getCatalogTuneUuid,
 };
 
 // Alias for backwards compatibility with existing tests
