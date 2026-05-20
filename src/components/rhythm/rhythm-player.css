@@ -55,5 +55,10 @@
 }
 
 .rhythm-player-notation svg {
+  display: block;
   height: auto;
+}
+
+.rhythm-player-notation [data-testid="abc-notation-container"] {
+  overflow-x: hidden;
 }

@@ -7,6 +7,8 @@ interface AbcNotationProps {
   notation: string;
   /** Whether to resize responsively */
   responsive?: boolean;
+  /** abcjs render scale */
+  scale?: number;
   /** Custom class name for container */
   class?: string;
   /** Show error messages */
@@ -45,6 +47,7 @@ export const AbcNotation: Component<AbcNotationProps> = (props) => {
           // This is the magic bullet for modals. It tells the SVG to fluidly
           // stretch/shrink to fill the container instead of locking to a hardcoded width.
           responsive: "resize",
+          scale: props.scale,
 
           // Adds helpful CSS classes to the SVG elements (staff, notes, etc.)
           // in case you want to style them with Tailwind later.

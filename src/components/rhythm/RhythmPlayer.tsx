@@ -262,7 +262,7 @@ function normalizeAbcBodyBars(abcBody: string): string[] {
     .replace(/^\s*\|:/, "")
     .replace(/:\|\s*$/, "")
     .split("|")
-    .map((segment) => segment.trim())
+    .map((segment) => segment.replace(/^:+|:+$/g, "").trim())
     .filter(Boolean);
 }
 
@@ -618,20 +618,21 @@ export function updateStructuredDisplayPartLabels(
     return;
   }
 
-  const collapsedSections = collapseStructureSections(
-    parseStructure(structure)
-  );
+  const parts = parseStructure(structure);
+  const collapsedSections = collapseStructureSections(parts);
   const labelTargets = getDisplayPartLabelTargets(container);
+  const displaySections =
+    labelTargets.length === parts.length ? parts : collapsedSections;
   if (
-    collapsedSections.length === 0 ||
+    displaySections.length === 0 ||
     labelTargets.length === 0 ||
-    labelTargets.length !== collapsedSections.length
+    labelTargets.length !== displaySections.length
   ) {
     return;
   }
 
   for (const [index, target] of labelTargets.entries()) {
-    const baseLabel = collapsedSections[index]?.label ?? "";
+    const baseLabel = displaySections[index]?.label ?? "";
     for (const element of target.elements) {
       element.textContent = baseLabel;
     }
@@ -650,7 +651,10 @@ export function updateStructuredDisplayPartLabels(
     position.sectionPass > 1
       ? `${position.part.label}${position.sectionPass}`
       : position.part.label;
-  const activeTarget = labelTargets[position.displaySectionIndex];
+  const activeTarget =
+    labelTargets.length === parts.length
+      ? labelTargets[position.activePartIndex]
+      : labelTargets[position.displaySectionIndex];
   if (!activeTarget) {
     return;
   }
@@ -681,17 +685,55 @@ export function resolveStructuredDisplayNotehead(
     currentBeatIndex
   );
   const parts = parseStructure(structure);
-  const collapsedSections = collapseStructureSections(parts);
-  if (!position || parts.length === 0 || collapsedSections.length === 0) {
+  if (!position || parts.length === 0) {
     return null;
   }
 
   const lineGroups = groupNoteheadsByDisplayLine(noteheads);
-  if (lineGroups.length !== collapsedSections.length) {
+  const compactTemplates = buildCompactDisplaySectionTemplates(
+    sourceAbc,
+    parts
+  );
+  if (compactTemplates.length > 0) {
+    const template = compactTemplates.find(
+      (candidate) => candidate.key === getSectionTemplateKey(position.part)
+    );
+
+    if (!template) {
+      return null;
+    }
+
+    let remainingBeatIndex = position.remainingBeatIndex;
+    for (
+      let lineOffset = 0;
+      lineOffset < template.lineEventCounts.length;
+      lineOffset += 1
+    ) {
+      const lineEventCount = template.lineEventCounts[lineOffset] ?? 0;
+      if (remainingBeatIndex < lineEventCount) {
+        const lineGroup = lineGroups[template.startLineIndex + lineOffset];
+        if (!lineGroup || lineGroup.length === 0) {
+          return null;
+        }
+
+        return lineGroup[remainingBeatIndex % lineGroup.length] ?? null;
+      }
+
+      remainingBeatIndex -= lineEventCount;
+    }
+
     return null;
   }
 
-  const lineGroup = lineGroups[position.displaySectionIndex];
+  const displayLineIndex =
+    lineGroups.length === parts.length
+      ? position.activePartIndex
+      : position.displaySectionIndex;
+  if (displayLineIndex < 0 || displayLineIndex >= lineGroups.length) {
+    return null;
+  }
+
+  const lineGroup = lineGroups[displayLineIndex];
   if (!lineGroup || lineGroup.length === 0) {
     return null;
   }
@@ -716,6 +758,79 @@ function splitAbcSections(abc: string): {
   };
 }
 
+function getAbcBodyLines(abc: string): string[] {
+  return abc
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .filter((line) => !/^[A-Z]:/.test(line));
+}
+
+interface CompactDisplaySectionTemplate {
+  key: string;
+  startLineIndex: number;
+  lineEventCounts: number[];
+}
+
+function buildCompactDisplaySectionTemplates(
+  abc: string,
+  parts: StructurePart[]
+): CompactDisplaySectionTemplate[] {
+  const { bodyBars } = splitAbcSections(abc);
+  const distinctParts = getDistinctStructureParts(parts);
+  const distinctStructureBarCount = distinctParts.reduce(
+    (sum, part) => sum + part.bars,
+    0
+  );
+
+  if (
+    distinctParts.length === 0 ||
+    distinctParts.length === parts.length ||
+    bodyBars.length > distinctStructureBarCount
+  ) {
+    return [];
+  }
+
+  const bodyLines = getAbcBodyLines(abc);
+  if (bodyLines.length === 0) {
+    return [];
+  }
+
+  const templates: CompactDisplaySectionTemplate[] = [];
+  let lineOffset = 0;
+
+  for (const part of distinctParts) {
+    let consumedBars = 0;
+    const lineEventCounts: number[] = [];
+    const startLineIndex = lineOffset;
+
+    while (lineOffset < bodyLines.length && consumedBars < part.bars) {
+      const line = bodyLines[lineOffset] ?? "";
+      const lineBars = normalizeAbcBodyBars(line);
+      const eventCount = lineBars.reduce(
+        (sum, bar) => sum + countBarEvents(bar),
+        0
+      );
+
+      consumedBars += lineBars.length;
+      lineEventCounts.push(eventCount);
+      lineOffset += 1;
+    }
+
+    if (lineEventCounts.length === 0 || consumedBars < part.bars) {
+      return [];
+    }
+
+    templates.push({
+      key: getSectionTemplateKey(part),
+      startLineIndex,
+      lineEventCounts,
+    });
+  }
+
+  return templates;
+}
+
 function normalizeDisplayHeaderLine(line: string): string | null {
   if (line.startsWith("X:")) {
     return "X:1";
@@ -732,7 +847,35 @@ function normalizeDisplayHeaderLine(line: string): string | null {
   return line;
 }
 
-function buildSectionDisplayBody(
+function wrapDisplayBodyLine(line: string, maxBarsPerLine = 4): string[] {
+  const trimmed = line.trim();
+  if (!trimmed || /^P:/.test(trimmed)) {
+    return trimmed ? [trimmed] : [];
+  }
+
+  const bodyBars = normalizeAbcBodyBars(trimmed);
+  if (bodyBars.length === 0 || bodyBars.length <= maxBarsPerLine) {
+    return [trimmed];
+  }
+
+  const hasRepeatStart = /^\|:/.test(trimmed);
+  const hasRepeatEnd = /:\|\s*$/.test(trimmed);
+  const wrappedLines: string[] = [];
+
+  for (let index = 0; index < bodyBars.length; index += maxBarsPerLine) {
+    const chunk = bodyBars.slice(index, index + maxBarsPerLine);
+    const isFirstChunk = index === 0;
+    const isLastChunk = index + maxBarsPerLine >= bodyBars.length;
+    const prefix = isFirstChunk && hasRepeatStart ? "|: " : "| ";
+    const suffix = isLastChunk && hasRepeatEnd ? " :|" : " |";
+
+    wrappedLines.push(`${prefix}${chunk.join(" | ")}${suffix}`);
+  }
+
+  return wrappedLines;
+}
+
+function buildStructuredFullTrackBody(
   bodyBars: string[],
   parts: StructurePart[]
 ): string[] {
@@ -746,12 +889,52 @@ function buildSectionDisplayBody(
     const sectionBars =
       templates.get(getSectionTemplateKey(section))?.bodyBars ??
       getSectionBodyBars(bodyBars, section.bars);
-
-    const body = sectionBars.join("|");
-    const sectionBody = section.repeatCount > 1 ? `|:${body}:|` : `|${body}|`;
+    const body = sectionBars.join(" | ");
+    const sectionBody =
+      section.repeatCount > 1 ? `|: ${body} :|` : `| ${body} |`;
 
     return [`P:${section.label}`, sectionBody];
   });
+}
+
+function buildStructuredFullTrackAbc(
+  abc: string,
+  structure: string | null | undefined
+): string {
+  if (!normalizeStructure(structure)) {
+    return abc;
+  }
+
+  const parts = parseStructure(structure);
+  const { headerLines, bodyBars } = splitAbcSections(abc);
+  const totalStructuredBarCount = parts.reduce(
+    (sum, part) => sum + part.bars,
+    0
+  );
+
+  if (bodyBars.length === 0 || bodyBars.length >= totalStructuredBarCount) {
+    return abc;
+  }
+
+  const bodyLines = buildStructuredFullTrackBody(bodyBars, parts);
+
+  return bodyLines.length > 0 ? [...headerLines, ...bodyLines].join("\n") : abc;
+}
+
+function normalizeFullTrackDisplayAbc(abc: string): string {
+  return abc
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .flatMap((line) => {
+      if (!/^[A-Z]:/.test(line)) {
+        return wrapDisplayBodyLine(line);
+      }
+
+      const normalizedLine = normalizeDisplayHeaderLine(line);
+      return normalizedLine ? [normalizedLine] : [];
+    })
+    .join("\n");
 }
 
 function buildDisplayRhythmAbc(
@@ -759,27 +942,10 @@ function buildDisplayRhythmAbc(
   patternType: RhythmPatternType,
   structure: string | null | undefined
 ): string {
-  const { headerLines, bodyBars } = splitAbcSections(abc);
-  const normalizedHeaders = headerLines
-    .map(normalizeDisplayHeaderLine)
-    .filter((line): line is string => Boolean(line));
-  const headers = [
-    normalizedHeaders.find((line) => line.startsWith("X:")) ?? "X:1",
-    ...normalizedHeaders.filter((line) => !line.startsWith("X:")),
-  ];
+  const displaySourceAbc =
+    patternType === "seed" ? buildStructuredFullTrackAbc(abc, structure) : abc;
 
-  if (patternType === "seed" && normalizeStructure(structure)) {
-    const sectionLines = buildSectionDisplayBody(
-      bodyBars,
-      parseStructure(structure)
-    );
-    if (sectionLines.length > 0) {
-      return [...headers, ...sectionLines].join("\n");
-    }
-  }
-
-  const body = bodyBars.length > 0 ? `|:${bodyBars.join("|")}:|` : "";
-  return [...headers, body].filter(Boolean).join("\n");
+  return normalizeFullTrackDisplayAbc(displaySourceAbc);
 }
 
 function expandRhythmAbcByPatternType(
@@ -931,7 +1097,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     null
   );
   const [usePremiumLoop, setUsePremiumLoop] = createSignal(false);
-  const [selectedPatternId, setSelectedPatternId] = createSignal<string | null>(
+  const [requestedPatternId, setRequestedPatternId] = createSignal<
+    string | null
+  >(null);
+  const [currentPatternId, setCurrentPatternId] = createSignal<string | null>(
     null
   );
   const [selectedStartSection, setSelectedStartSection] = createSignal("start");
@@ -1003,17 +1172,18 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const patternCandidates = createMemo(
     () => metadata()?.patternCandidates ?? []
   );
-  const selectedPatternChoiceId = createMemo(
-    () => selectedPatternId() ?? metadata()?.selectedPatternId ?? ""
+  const displayedPatternId = createMemo(
+    () => currentPatternId() ?? requestedPatternId() ?? null
   );
-  const selectedPatternCandidate = createMemo(
+  const currentPattern = createMemo(
     () =>
       patternCandidates().find(
-        (candidate) => candidate.id === selectedPatternChoiceId()
+        (candidate) => candidate.id === displayedPatternId()
       ) ?? null
   );
+  const currentPatternChoiceId = createMemo(() => displayedPatternId() ?? "");
   const selectedEditablePatternId = createMemo(() => {
-    const candidate = selectedPatternCandidate();
+    const candidate = currentPattern();
     if (!candidate) {
       return null;
     }
@@ -1054,9 +1224,19 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         barsBefore: 0,
       }
   );
+  const unifiedSourceAbc = createMemo(() => {
+    const abc = sourceRhythmAbc();
+    if (!abc) {
+      return null;
+    }
+
+    return (metadata()?.patternType ?? "seed") === "seed"
+      ? buildStructuredFullTrackAbc(abc, effectiveStructure())
+      : abc;
+  });
   const selectedPlaybackStartState = createMemo(() =>
     getStructuredPlaybackStartState(
-      sourceRhythmAbc(),
+      unifiedSourceAbc(),
       effectiveStructure(),
       selectedStartSectionOption()
     )
@@ -1072,8 +1252,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
    * rendered staff shows the full multi-section pattern, not just a 1-2 bar loop.
    */
   const expandedAbc = createMemo(() => {
-    const abc = sourceRhythmAbc();
-    const patternType = metadata()?.patternType ?? "seed";
+    const abc = unifiedSourceAbc();
     const structure = effectiveStructure();
     if (!abc) return null;
     if (!structure) return abc;
@@ -1083,21 +1262,17 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
     return expandRhythmAbcByPatternType(
       abc,
-      patternType,
+      "full_track",
       structuredBarCount,
       structure
     );
   });
 
   const displayAbc = createMemo(() => {
-    const abc = sourceRhythmAbc();
+    const abc = unifiedSourceAbc();
     if (!abc) return null;
 
-    return buildDisplayRhythmAbc(
-      abc,
-      metadata()?.patternType ?? "seed",
-      effectiveStructure()
-    );
+    return buildDisplayRhythmAbc(abc, "full_track", effectiveStructure());
   });
 
   const playbackAbc = createMemo(() => {
@@ -1119,7 +1294,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const currentBar = createMemo(() => currentMeasure() || 0);
   const currentSectionLabel = createMemo(() =>
     getStructuredSectionLabel(
-      sourceRhythmAbc(),
+      unifiedSourceAbc(),
       effectiveStructure(),
       currentBeatIndex()
     )
@@ -1149,7 +1324,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
   const openCreateCustomPatternEditor = () => {
     const tuneTypeName = rhythmPatternContext().tuneTypeName ?? "Custom";
-    const selectedCandidateName = selectedPatternCandidate()?.name?.trim();
+    const selectedCandidateName = currentPattern()?.name?.trim();
     const baseName = selectedCandidateName
       ? `${selectedCandidateName} copy`
       : `My ${tuneTypeName} pattern`;
@@ -1269,7 +1444,8 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
           : await createEditableRhythmPattern(db, payload);
 
       setCustomPatternId(savedPattern.id);
-      setSelectedPatternId(savedPattern.id);
+      setRequestedPatternId(savedPattern.id);
+      setCurrentPatternId(null);
       setPatternReloadKey((current) => current + 1);
       closeCustomPatternEditor();
     } catch (error) {
@@ -1299,8 +1475,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     try {
       await deleteEditableRhythmPattern(db, patternId, currentUserId);
 
-      if (selectedPatternChoiceId() === patternId) {
-        setSelectedPatternId(null);
+      if (currentPatternChoiceId() === patternId) {
+        setRequestedPatternId(null);
+        setCurrentPatternId(null);
       }
 
       setPatternReloadKey((current) => current + 1);
@@ -1330,6 +1507,17 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     }
   };
 
+  const handlePatternSelectionChange = (value: string) => {
+    const nextPatternId = value.trim() || null;
+
+    if (nextPatternId === currentPatternChoiceId()) {
+      return;
+    }
+
+    setCurrentPatternId(null);
+    setRequestedPatternId(nextPatternId);
+  };
+
   createEffect(() => {
     const options = startSectionOptions();
     if (!options.some((option) => option.value === selectedStartSection())) {
@@ -1349,9 +1537,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     if (
       previousRequestKey !== undefined &&
       previousRequestKey !== nextRequestKey &&
-      selectedPatternId() !== null
+      (requestedPatternId() !== null || currentPatternId() !== null)
     ) {
-      setSelectedPatternId(null);
+      setRequestedPatternId(null);
+      setCurrentPatternId(null);
     }
 
     if (
@@ -1413,9 +1602,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
   createEffect(() => {
     patternReloadKey();
+    const currentRequestedPatternId = requestedPatternId();
     const currentService = service();
     const tuneTypeName = props.tuneTypeName?.trim();
-    const currentSelectedPatternId = selectedPatternId();
 
     if (!currentService || !tuneTypeName) {
       setIsPatternLoading(false);
@@ -1431,11 +1620,12 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         tuneTypeName,
         tuneId: props.tuneId?.trim() || null,
         userId: user()?.id ?? null,
-        ...(currentSelectedPatternId
-          ? { selectedPatternId: currentSelectedPatternId }
+        ...(currentRequestedPatternId
+          ? { selectedPatternId: currentRequestedPatternId }
           : {}),
       })
       .then((nextMetadata) => {
+        setCurrentPatternId(nextMetadata?.selectedPatternId?.trim() || null);
         setSourceRhythmAbc(nextMetadata?.rhythmAbc ?? null);
       })
       .finally(() => {
@@ -1461,7 +1651,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
   createEffect(() => {
     const container = getNotationContainer();
-    const sourceAbc = sourceRhythmAbc();
+    const sourceAbc = unifiedSourceAbc();
     const structure = effectiveStructure();
     const beatIndex = currentBeatIndex();
 
@@ -1481,7 +1671,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     const container = getNotationContainer();
     const beatIndex = currentBeatIndex();
     const rhythmAbc = displayAbc();
-    const sourceAbc = sourceRhythmAbc();
+    const sourceAbc = unifiedSourceAbc();
     const structure = effectiveStructure();
 
     if (!container || !rhythmAbc) {
@@ -1846,32 +2036,35 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         <Show when={metadata()}>
           {(currentMetadata) => (
             <div class="space-y-3">
-              <Show when={patternCandidates().length > 1}>
-                <label class="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                  <span class="shrink-0 font-medium text-slate-900 dark:text-slate-100">
-                    Pattern:
-                  </span>
-                  <select
-                    value={selectedPatternChoiceId()}
-                    onChange={(event) => {
-                      setSelectedPatternId(event.currentTarget.value || null);
-                    }}
-                    disabled={isPatternLoading()}
-                    class="min-h-11 w-full max-w-[20rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
-                    data-testid="rhythm-player-pattern-select"
-                  >
-                    <For each={currentMetadata().patternCandidates ?? []}>
-                      {(candidate) => (
-                        <option value={candidate.id}>
-                          {getPatternOptionLabel(candidate)}
-                        </option>
-                      )}
-                    </For>
-                  </select>
-                </label>
-              </Show>
+              <div class="flex flex-wrap items-center gap-2 md:gap-3">
+                <Show when={patternCandidates().length > 1}>
+                  <label class="flex min-w-[18rem] flex-1 items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                    <span class="shrink-0 font-medium text-slate-900 dark:text-slate-100">
+                      Pattern:
+                    </span>
+                    <select
+                      value={currentPatternChoiceId()}
+                      onChange={(event) => {
+                        handlePatternSelectionChange(event.currentTarget.value);
+                      }}
+                      disabled={isPatternLoading()}
+                      class="min-h-11 w-full max-w-[20rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"
+                      data-testid="rhythm-player-pattern-select"
+                    >
+                      <For each={currentMetadata().patternCandidates ?? []}>
+                        {(candidate) => (
+                          <option
+                            value={candidate.id}
+                            selected={candidate.id === currentPatternChoiceId()}
+                          >
+                            {getPatternOptionLabel(candidate)}
+                          </option>
+                        )}
+                      </For>
+                    </select>
+                  </label>
+                </Show>
 
-              <div class="flex flex-wrap items-center gap-2">
                 <Show when={canManageCustomPatterns()}>
                   <Button
                     type="button"
@@ -1884,7 +2077,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                     data-testid="rhythm-player-custom-pattern-open-button"
                   >
                     <Plus class="h-4 w-4" />
-                    New custom pattern
+                    New Custom Pattern
                   </Button>
 
                   <Show when={selectedEditablePatternId()}>
@@ -2091,6 +2284,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   <AbcNotation
                     notation={displayAbc() ?? ""}
                     class="h-full w-full"
+                    scale={0.62}
                   />
                 </div>
               </div>
