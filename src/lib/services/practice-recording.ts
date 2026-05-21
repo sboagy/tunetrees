@@ -784,7 +784,7 @@ export async function commitStagedEvaluations(
         LIMIT 1
       `);
 
-      if (!verifyQueue || !verifyQueue.completed_at) {
+      if (!verifyQueue?.completed_at) {
         console.error(
           `❌ CRITICAL: completed_at NOT SET for tune ${staged.tune_id}!`,
           {

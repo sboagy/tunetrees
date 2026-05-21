@@ -10,12 +10,9 @@
     "start": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260507.1",
+    "@cloudflare/workers-types": "^4.20260521.1",
     "typescript": "6.0.3",
-    "wrangler": "^4.93.0"
-  },
-  "overrides": {
-    "ws": "8.20.1"
+    "wrangler": "^4.93.1"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

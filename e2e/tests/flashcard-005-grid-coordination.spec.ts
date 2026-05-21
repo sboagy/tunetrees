@@ -82,7 +82,9 @@ test.describe
       await app.enableFlashcardMode();
 
       // Verify flashcard shows same evaluation in combobox
-      const evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
+      const evalButton = app.flashcardView.getByTestId(
+        /^recall-eval-[0-9a-f-]+$/i
+      );
       await expect(evalButton).toContainText(/Good/i);
     });
 
@@ -275,7 +277,9 @@ test.describe
       await app.enableFlashcardMode();
 
       // Verify "current" flashcard shows "Easy"
-      let evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
+      let evalButton = app.flashcardView.getByTestId(
+        /^recall-eval-[0-9a-f-]+$/i
+      );
       await expect(evalButton).toContainText(/Easy/i);
 
       // Navigate backwards to first flashcard
@@ -283,7 +287,7 @@ test.describe
       await page.waitForTimeout(300);
 
       // Verify first flashcard shows "Good"
-      evalButton = page.getByTestId(/^recall-eval-[0-9a-f-]+$/i).first();
+      evalButton = app.flashcardView.getByTestId(/^recall-eval-[0-9a-f-]+$/i);
       await expect(evalButton).toContainText(/Good/i);
 
       // Change first evaluation to "Hard" in flashcards

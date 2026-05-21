@@ -105,20 +105,20 @@
     "oosync": "git+https://github.com/sboagy/oosync.git#main",
     "papaparse": "^5.5.3",
     "quickjs-emscripten": "^0.32.0",
-    "solid-js": "^1.9.12",
+    "solid-js": "^1.9.13",
     "solid-sonner": "^0.3.1",
     "sql.js": "^1.14.1",
-    "tailwind-merge": "^3.5.0",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "^5.2.3",
     "wavesurfer.js": "^7.12.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.3",
+    "@biomejs/biome": "^2.4.15",
     "@cloudflare/workers-types": "^4.20260516.1",
     "@playwright/test": "^1.60.0",
     "@solidjs/testing-library": "^0.8.10",
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
@@ -144,7 +144,7 @@
     "vite-plugin-solid": "^2.11.11",
     "vite-plugin-static-copy": "^3.2.0",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.93.0"
+    "wrangler": "^4.93.1"
   },
   "overrides": {
     "brace-expansion": "5.0.6",

@@ -18,7 +18,7 @@
     "dbVersionKeyPrefix": "tunetrees-db-version",
     "outboxBackupKeyPrefix": "tunetrees-outbox-backup",
     "lastSyncTimestampKeyPrefix": "TT_LAST_SYNC_TIMESTAMP",
-    "schemaVersion": "2.0.13-fix-sync-change-log-coverage",
+    "schemaVersion": "2.0.15-refresh-public-rhythm-patterns",
     "databaseVersion": 22,
     "migrationDirectory": "drizzle/migrations/sqlite",
     "migrationFiles": [

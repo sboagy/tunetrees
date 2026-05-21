@@ -23,6 +23,7 @@ Repository-specific architecture, tech stack details, and patterns (including sy
 ## 1. Reliability & Loop Prevention
 
 - **Verify State:** Before any file edit, read the current state of the file (and the specific section you will change) to ensure symbols and context match your plan.
+- **Generated Files Are Off-Limits:** If a file is listed as generated in any applicable instruction file, or if its header says `AUTO-GENERATED`, `GENERATED`, or `DO NOT EDIT`, do not edit it directly. Change the source input, run the generator, and only keep generator-produced diffs.
 - **Stop on Error:** If an edit results in a syntax error, type error, failing test, or logic loop, stop. Explain what failed, re-read the entire file from disk, then propose a corrected patch.
 - **No Apology-and-Retry Loops:** Do not keep attempting near-identical patches after failures. After 2 failed edit attempts on the same file without new information, stop and ask for guidance.
 - **No Duplicates:** Never append code that already exists. Before finalizing, check for duplicate imports, duplicate exports, repeated helper functions, and repeated config blocks.
@@ -50,6 +51,7 @@ Repository-specific architecture, tech stack details, and patterns (including sy
 - **No Commits / Pushes:** Never commit, push, or open PRs unless explicitly requested.
 - **NEVER COMMIT TO `main` branch:** Never commit to the main branch unless explicitly requested, and even then prefer to create a new branch and open a PR for review.
 - **Validate Changes:** When making code changes, run the smallest relevant checks (typecheck/lint/tests) when practical and report results.
+- **Generated-Output Validation:** If your work touches schema/codegen sources or any generated artifact, run the corresponding generator and its check command before handoff. A failing generator check is a blocker, not a warning.
 - **Keep Architecture Docs Current:** If a task changes architecture, sync boundaries, codegen outputs, runtime wiring, or repository responsibilities, read `ARCHITECTURE.md` before editing and update it in the same change unless the architecture document remains accurate without modification.
 
 ## 6. Multi-Repo Agentic Workflow

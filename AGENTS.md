@@ -71,11 +71,14 @@ Primary components:
   - `src/lib/db/client-sqlite.ts`
   - `src/lib/sync/runtime-config.ts`
   - `worker/src/index.ts`
+- **Generated-file edits are forbidden.** If a file is listed here, or if its header says `AUTO-GENERATED`, `GENERATED`, or `DO NOT EDIT`, do not patch it directly.
+- If a task appears to require a generated-file change, edit the source input instead (Supabase migration, `oosync.codegen.config.json`, codegen config, or generator code), run the appropriate generator, and keep only generator-produced diffs.
+- Before editing a file that might be generated, inspect its header first. A generated banner overrides file naming conventions or path heuristics.
 - **Required workflow for schema changes:**
   1. Apply Supabase migration to local Postgres (`npx supabase db push --local` or rhizome equivalent)
   2. Run `npm run codegen:schema` to regenerate all outputs from the live Postgres schema
-  3. Verify: `npm run typecheck && npm run lint && npm run test:unit`
-- If generated output is wrong, fix the **source** (Supabase migration, `oosync.codegen.config.json`, or the codegen generator itself) — never patch generated files.
+  3. Verify: `npm run codegen:schema:check && npm run typecheck && npm run lint && npm run test:unit`
+- If generated output is wrong, fix the **source** (Supabase migration, `oosync.codegen.config.json`, or the codegen generator itself) and regenerate — never patch generated files.
 - Boundary rules are enforced in the standalone `oosync` repo `AGENTS.md` (core must not import app `src/**`; worker must not import app `src/**`; shared/generated is contract-only).
 
 ## UI Principles (Pointers)
