@@ -68,7 +68,7 @@
     "test:e2e:report": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=html",
     "playwright:install": "playwright install",
     "audit:prod": "npm audit --production",
-    "audit:summary": "npm audit || echo '⚠️  Known dev-only vulnerabilities (esbuild, lodash.template) - see SECURITY.md'",
+    "audit:summary": "npm audit || echo '⚠️  Known dev-only vulnerabilities (esbuild, valibot) - see SECURITY.md'",
     "lighthouse": "npm run build && lhci autorun",
     "lighthouse:view": "npm run build && lighthouse http://localhost:4173 --view",
     "perf:test": "node scripts/performance-test.js",
@@ -130,7 +130,7 @@
     "better-sqlite3": "^12.9.0",
     "concurrently": "^9.2.1",
     "dotenv": "^17.3.1",
-    "drizzle-kit": "^0.31.9",
+    "drizzle-kit": "^0.31.10",
     "jsdom": "^29.1.1",
     "postgres": "^3.4.8",
     "prettier": "^3.8.1",
@@ -140,13 +140,15 @@
     "tsx": "^4.21.0",
     "typescript": "6.0.3",
     "vite": "8.0.5",
-    "vite-plugin-pwa": "^1.2.0",
+    "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-solid": "^2.11.11",
     "vite-plugin-static-copy": "^4.1.0",
     "workbox-window": "^7.4.1",
     "wrangler": "^4.93.1"
   },
   "overrides": {
-    "serialize-javascript": "7.0.5"
+    "brace-expansion": "5.0.6",
+    "serialize-javascript": "7.0.5",
+    "ws": "8.20.1"
   }
 }
