@@ -108,7 +108,7 @@
     "solid-js": "^1.9.13",
     "solid-sonner": "^0.3.1",
     "sql.js": "^1.14.1",
-    "tailwind-merge": "^3.5.0",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "^5.2.3",
     "wavesurfer.js": "^7.12.6"
