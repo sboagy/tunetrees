@@ -7,16 +7,20 @@ import {
 } from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  getStructuredSectionLabel,
   resolveStructuredDisplayNotehead,
   updateStructuredDisplayPartLabels,
-} from "@/lib/rhythm/playback-abc";
+} from "@/lib/rhythm/structured-display-sync";
+import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import type {
   PlaybackEventMarker,
   RhythmPatternMetadata,
   RhythmService,
 } from "@/lib/services/RhythmService";
-import { RhythmPlayer, resolvePlaybackMarkerNotehead } from "./RhythmPlayer";
+import {
+  RhythmPlayer,
+  resolveCurrentBeatNotehead,
+  resolvePlaybackMarkerNotehead,
+} from "./RhythmPlayer";
 
 const mocked = vi.hoisted(() => {
   const renderAbcMock = vi.fn();
@@ -787,6 +791,86 @@ describe("RhythmPlayer", () => {
         noteIndex: 1,
       })?.getAttribute("data-note-id")
     ).toBe("target");
+  });
+
+  it("prefers the structured display notehead when the playback marker drifts into the next visible section", () => {
+    const container = document.createElement("div");
+    const makeNote = (
+      className: string,
+      noteId: string,
+      parent: ParentNode = container
+    ) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", className);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", noteId);
+      noteGroup.appendChild(notehead);
+      parent.appendChild(noteGroup);
+      return notehead;
+    };
+
+    const noteheads = [
+      makeNote("abcjs-note abcjs-mm0 abcjs-n0 abcjs-l0", "a-1"),
+      makeNote("abcjs-note abcjs-mm0 abcjs-n1 abcjs-l0", "a-2"),
+      makeNote("abcjs-note abcjs-mm0 abcjs-n2 abcjs-l0", "a-3"),
+      makeNote("abcjs-note abcjs-mm0 abcjs-n3 abcjs-l0", "a-4"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n0 abcjs-l1", "a-5"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n1 abcjs-l1", "a-6"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n2 abcjs-l1", "a-7"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n3 abcjs-l1", "a-8"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n0 abcjs-l2", "b-1"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n1 abcjs-l2", "b-2"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n2 abcjs-l2", "b-3"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n3 abcjs-l2", "b-4"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n0 abcjs-l3", "b-5"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n1 abcjs-l3", "b-6"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n2 abcjs-l3", "b-7"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n3 abcjs-l3", "b-8"),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "P:A",
+      `| ${Array.from({ length: 8 }, () => "A").join(" | ")} |`,
+      "P:B",
+      `| ${Array.from({ length: 8 }, () => "B").join(" | ")} |`,
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "| A | A | A | A |",
+      "| A | A | A | A |",
+      "| B | B | B | B |",
+      "| B | B | B | B |",
+    ].join("\n");
+
+    expect(
+      resolveCurrentBeatNotehead(
+        container,
+        noteheads,
+        {
+          measureIndex: 2,
+          noteIndex: 0,
+        },
+        sourceAbc,
+        "AABB",
+        9,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a-1");
   });
 
   it("uses expanded sample ABC for seed playback so timing does not depend on repeat playback", async () => {

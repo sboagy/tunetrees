@@ -34,12 +34,12 @@ import {
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
 import { assembleCanonicalRhythmAbc } from "@/lib/rhythm/canonical-abc";
 import { buildNotationRhythmAbc } from "@/lib/rhythm/notation-abc";
+import { buildPlaybackRhythmPlan } from "@/lib/rhythm/playback-abc";
 import {
-  buildPlaybackRhythmPlan,
-  getStructuredSectionLabel,
   resolveStructuredDisplayNotehead,
   updateStructuredDisplayPartLabels,
-} from "@/lib/rhythm/playback-abc";
+} from "@/lib/rhythm/structured-display-sync";
+import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import type {
   PlaybackEventMarker,
   RhythmPatternMetadata,
@@ -160,6 +160,36 @@ export function resolvePlaybackMarkerNotehead(
   }
 
   return candidates.at(-1)?.notehead ?? null;
+}
+
+export function resolveCurrentBeatNotehead(
+  container: HTMLDivElement,
+  noteheads: SVGElement[],
+  playbackMarker: PlaybackEventMarker | null | undefined,
+  fullAbc: string | null,
+  structure: string | null | undefined,
+  currentBeatIndex: number,
+  displayAbc?: string | null
+): SVGElement | null {
+  const structuredTarget = resolveStructuredDisplayNotehead(
+    noteheads,
+    fullAbc,
+    structure,
+    currentBeatIndex,
+    displayAbc
+  );
+  const playbackMarkerTarget = resolvePlaybackMarkerNotehead(
+    container,
+    playbackMarker
+  );
+  const fallbackTarget =
+    noteheads.length > 0
+      ? (noteheads[(currentBeatIndex - 1) % noteheads.length] ?? null)
+      : null;
+
+  // Compact structured notation can intentionally render fewer visible sections
+  // than the expanded playback order, so prefer the structure-aware mapping.
+  return structuredTarget ?? playbackMarkerTarget ?? fallbackTarget;
 }
 
 function collectHighlightTargets(notehead: SVGElement): SVGElement[] {
@@ -815,21 +845,15 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       return;
     }
 
-    const playbackMarkerTarget = resolvePlaybackMarkerNotehead(
+    const nextNotehead = resolveCurrentBeatNotehead(
       container,
-      playbackMarker
-    );
-    const structuredTarget = resolveStructuredDisplayNotehead(
       noteheads,
+      playbackMarker,
       sourceAbc,
       structure,
       beatIndex,
       rhythmAbc
     );
-    const fallbackTarget =
-      noteheads[(beatIndex - 1) % noteheads.length] ?? null;
-    const nextNotehead =
-      playbackMarkerTarget ?? structuredTarget ?? fallbackTarget;
     if (!nextNotehead) {
       clearActiveBeatTargets();
       return;
