@@ -350,7 +350,11 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
           timeoutMs: 30000,
         });
         await ttPage.enableFlashcardMode();
-        await expect(ttPage.flashcardView).toBeVisible({ timeout: 5000 });
+        // After time-travel reload + sync, the flashcard container can briefly
+        // remount; assert the actionable card state instead of a transient shell.
+        await expect(ttPage.flashcardHeaderCounter).toContainText("1 of 1", {
+          timeout: 20000,
+        });
       }
     }
 
