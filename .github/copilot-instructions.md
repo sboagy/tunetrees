@@ -4,11 +4,6 @@ This file intentionally contains only global execution guardrails.
 
 Repository-specific architecture, tech stack details, and patterns (including sync adapters/codegen boundaries) live in the root `AGENTS.md` and scoped `*/AGENTS.md` files.
 
-### Unified Knowledge Access
-
-- **Single Source of Truth:** Use the Memory MCP server as the primary source for all durable knowledge about the codebase, architecture, and patterns. Avoid using Copilot `/memories` for persistent facts to prevent fragmentation and confusion.
-- **Global Memory Path:** Always utilize the Memory MCP server, if it is available.
-
 ## 0. Analysis Before Action
 
 - **Clarify Ambiguities:** If the requirements I give you are ambiguous, ask clarifying questions before writing any code.
