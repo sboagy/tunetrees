@@ -68,7 +68,7 @@
     "test:e2e:report": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=html",
     "playwright:install": "playwright install",
     "audit:prod": "npm audit --production",
-    "audit:summary": "npm audit || echo '⚠️  Known dev-only vulnerabilities (esbuild, valibot) - see SECURITY.md'",
+    "audit:summary": "npm audit || echo '⚠️  Known dev-only vulnerabilities (esbuild, valibot, lodash.template) - see SECURITY.md'",
     "lighthouse": "npm run build && lhci autorun",
     "lighthouse:view": "npm run build && lighthouse http://localhost:4173 --view",
     "perf:test": "node scripts/performance-test.js",
@@ -142,7 +142,7 @@
     "vite": "8.0.5",
     "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-solid": "^2.11.11",
-    "vite-plugin-static-copy": "^3.2.0",
+    "vite-plugin-static-copy": "^4.1.0",
     "workbox-window": "^7.4.1",
     "wrangler": "^4.93.1"
   },
