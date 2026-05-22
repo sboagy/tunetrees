@@ -214,6 +214,7 @@ export default defineConfig(() => {
           {
             src: "drizzle/migrations/sqlite/*.sql",
             dest: "drizzle/migrations/sqlite",
+            rename: { stripBase: true },
           },
         ],
       }),
