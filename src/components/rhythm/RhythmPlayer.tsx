@@ -32,16 +32,18 @@ import {
   updateEditableRhythmPattern,
 } from "@/lib/db/queries/rhythm-patterns";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
-import { assembleCanonicalRhythmAbc } from "@/lib/rhythm/canonical-abc";
+import {
+  assembleCanonicalRhythmAbc,
+  normalizeStructure,
+} from "@/lib/rhythm/canonical-abc";
 import { buildNotationRhythmAbc } from "@/lib/rhythm/notation-abc";
 import { buildPlaybackRhythmPlan } from "@/lib/rhythm/playback-abc";
 import {
-  resolveStructuredDisplayNotehead,
+  resolveCurrentBeatNotehead,
   updateStructuredDisplayPartLabels,
 } from "@/lib/rhythm/structured-display-sync";
 import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import type {
-  PlaybackEventMarker,
   RhythmPatternMetadata,
   RhythmPatternType,
 } from "@/lib/services/RhythmService";
@@ -91,105 +93,8 @@ const CUSTOM_PATTERN_SCOPE_OPTIONS = {
   user_tune: "This tune only",
 } as const;
 
-function normalizeStructure(structure?: string | null): string | null {
-  const trimmed = structure?.trim();
-  return trimmed ? trimmed : null;
-}
-
 function getBeatNoteTargets(container: HTMLDivElement): SVGElement[] {
   return Array.from(container.querySelectorAll<SVGElement>(".abcjs-notehead"));
-}
-
-function getAbcjsNoteIndex(element: Element): number | null {
-  const className = element.getAttribute("class") ?? "";
-  const match = className.match(/\babcjs-n(\d+)\b/);
-  if (!match) {
-    return null;
-  }
-
-  const noteIndex = Number.parseInt(match[1] ?? "", 10);
-  return Number.isFinite(noteIndex) ? noteIndex : null;
-}
-
-export function resolvePlaybackMarkerNotehead(
-  container: HTMLDivElement,
-  marker: PlaybackEventMarker | null | undefined
-): SVGElement | null {
-  if (!marker) {
-    return null;
-  }
-
-  const exactMatch = container.querySelector<SVGElement>(
-    `.abcjs-note.abcjs-mm${marker.measureIndex}.abcjs-n${marker.noteIndex} .abcjs-notehead`
-  );
-  if (exactMatch) {
-    return exactMatch;
-  }
-
-  const noteGroups = Array.from(
-    container.querySelectorAll<SVGGElement>(
-      `.abcjs-note.abcjs-mm${marker.measureIndex}`
-    )
-  );
-  if (noteGroups.length === 0) {
-    return null;
-  }
-
-  const candidates = noteGroups
-    .map((noteGroup) => ({
-      noteGroup,
-      noteIndex: getAbcjsNoteIndex(noteGroup),
-      notehead: noteGroup.querySelector<SVGElement>(".abcjs-notehead"),
-    }))
-    .filter(
-      (
-        candidate
-      ): candidate is {
-        noteGroup: SVGGElement;
-        noteIndex: number;
-        notehead: SVGElement;
-      } => candidate.noteIndex != null && candidate.notehead != null
-    )
-    .sort((left, right) => left.noteIndex - right.noteIndex);
-
-  const nextCandidate = candidates.find(
-    (candidate) => candidate.noteIndex >= marker.noteIndex
-  );
-  if (nextCandidate) {
-    return nextCandidate.notehead;
-  }
-
-  return candidates.at(-1)?.notehead ?? null;
-}
-
-export function resolveCurrentBeatNotehead(
-  container: HTMLDivElement,
-  noteheads: SVGElement[],
-  playbackMarker: PlaybackEventMarker | null | undefined,
-  fullAbc: string | null,
-  structure: string | null | undefined,
-  currentBeatIndex: number,
-  displayAbc?: string | null
-): SVGElement | null {
-  const structuredTarget = resolveStructuredDisplayNotehead(
-    noteheads,
-    fullAbc,
-    structure,
-    currentBeatIndex,
-    displayAbc
-  );
-  const playbackMarkerTarget = resolvePlaybackMarkerNotehead(
-    container,
-    playbackMarker
-  );
-  const fallbackTarget =
-    noteheads.length > 0
-      ? (noteheads[(currentBeatIndex - 1) % noteheads.length] ?? null)
-      : null;
-
-  // Compact structured notation can intentionally render fewer visible sections
-  // than the expanded playback order, so prefer the structure-aware mapping.
-  return structuredTarget ?? playbackMarkerTarget ?? fallbackTarget;
 }
 
 function collectHighlightTargets(notehead: SVGElement): SVGElement[] {

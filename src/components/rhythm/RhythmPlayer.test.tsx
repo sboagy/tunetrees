@@ -7,6 +7,8 @@ import {
 } from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  resolveCurrentBeatNotehead,
+  resolvePlaybackMarkerNotehead,
   resolveStructuredDisplayNotehead,
   updateStructuredDisplayPartLabels,
 } from "@/lib/rhythm/structured-display-sync";
@@ -16,11 +18,7 @@ import type {
   RhythmPatternMetadata,
   RhythmService,
 } from "@/lib/services/RhythmService";
-import {
-  RhythmPlayer,
-  resolveCurrentBeatNotehead,
-  resolvePlaybackMarkerNotehead,
-} from "./RhythmPlayer";
+import { RhythmPlayer } from "./RhythmPlayer";
 
 const mocked = vi.hoisted(() => {
   const renderAbcMock = vi.fn();

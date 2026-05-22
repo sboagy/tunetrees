@@ -1,4 +1,4 @@
-import type { RhythmPatternType } from "@/lib/services/RhythmService";
+import type { RhythmPatternType } from "./pattern-types";
 
 export interface StructurePart {
   label: string;

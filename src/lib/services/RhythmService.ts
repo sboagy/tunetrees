@@ -6,7 +6,20 @@ import abcjs, {
 } from "abcjs";
 import { type Accessor, createSignal, onCleanup } from "solid-js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
-import { loadRhythmPattern as loadRhythmPatternFromPatternLoader } from "@/lib/rhythm/pattern-loader";
+import {
+  loadRhythmPattern as loadRhythmPatternFromPatternLoader,
+  type RhythmPatternMetadata,
+  type RhythmPatternRequest,
+} from "@/lib/rhythm/pattern-loader";
+import { normalizeTuneTypeName } from "@/lib/rhythm/tune-type-lookup";
+
+export type {
+  RhythmPatternCandidate,
+  RhythmPatternCandidateScope,
+  RhythmPatternMetadata,
+  RhythmPatternRequest,
+  RhythmPatternType,
+} from "@/lib/rhythm/pattern-loader";
 
 const DEFAULT_SAMPLE_BASE_URL = (
   import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
@@ -181,87 +194,6 @@ const BODHRAN_SAMPLE_GAIN_MULTIPLIERS: Record<number, number> = {
 
 const RHYTHM_TEMPO_STORAGE_KEY_PREFIX = "tunetrees.rhythm-tempo";
 
-const TUNE_TYPE_NAME_ALIASES: Record<string, string> = {
-  air: "air",
-  bdnce: "barn dance",
-  "barn dance": "barn dance",
-  hland: "highland",
-  highland: "highland",
-  hpipe: "hornpipe",
-  hornpipe: "hornpipe",
-  jigd: "jig",
-  jig: "jig",
-  "double jig": "jig",
-  jigsl: "slip jig",
-  "slip jig": "slip jig",
-  sgjig: "jig (single)",
-  "single jig": "jig (single)",
-  "jig (single)": "jig (single)",
-  mzrka: "mazurka",
-  mazurka: "mazurka",
-  piece: "piece",
-  polka: "polka",
-  reel: "reel",
-  sgreel: "reel",
-  schot: "schottische",
-  schottische: "schottische",
-  setd: "set dance",
-  "set dance": "set dance",
-  slide: "slide",
-  song: "song",
-  strath: "strathspey",
-  strathspey: "strathspey",
-  "three-two": "3/2 hornpipe",
-  waltz: "waltz",
-};
-
-export interface RhythmPatternRequest {
-  genreId?: string | null;
-  genreName?: string | null;
-  tuneTypeName?: string | null;
-  tuneId?: string | null;
-  userId?: string | null;
-  selectedPatternId?: string | null;
-}
-
-export type RhythmPatternType = "seed" | "full_track";
-
-export type RhythmPatternCandidateScope =
-  | "user_tune"
-  | "tune_default"
-  | "user_default"
-  | "system_default"
-  | "system_pattern";
-
-export interface RhythmPatternCandidate {
-  id: string;
-  name: string;
-  scope: RhythmPatternCandidateScope;
-  patternType: RhythmPatternType;
-  sampleKit: string;
-  hasPremiumAudio: boolean;
-}
-
-export interface RhythmPatternMetadata {
-  genreName: string | null;
-  genreId?: string | null;
-  tuneTypeName: string;
-  tuneTypeId?: string | null;
-  rhythmAbc: string;
-  rhythmSignature: string | null;
-  tuneStructure?: string | null;
-  patternType: RhythmPatternType;
-  tempoQpm: number;
-  sampleKit: string;
-  premiumAudioUrl: string | null;
-  premiumAudioTrimMs: number;
-  premiumAudioSource: "database" | null;
-  premiumAudioSourceTempoQpm: number | null;
-  source: "rhythm_patterns" | "tune_type_fallback";
-  selectedPatternId?: string | null;
-  patternCandidates?: RhythmPatternCandidate[];
-}
-
 export interface PlaybackStartOptions {
   startPositionMs?: number;
   startBeatIndex?: number;
@@ -321,10 +253,6 @@ type TimingCallbacksInstance = InstanceType<
   ResolvedAbcjsModule["TimingCallbacks"]
 >;
 
-function normalizeTuneTypeName(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  return TUNE_TYPE_NAME_ALIASES[normalized] ?? normalized;
-}
 function getRhythmTempoStorage(): Storage | null {
   if (typeof globalThis === "undefined") {
     return null;

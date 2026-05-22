@@ -1,3 +1,4 @@
+import type { PlaybackEventMarker } from "@/lib/services/RhythmService";
 import {
   buildStructuredPlaybackSections,
   collapseStructureSections,
@@ -123,6 +124,17 @@ function getSvgLineIndex(element: Element): number | null {
 
   const lineIndex = Number.parseInt(match[1] ?? "", 10);
   return Number.isFinite(lineIndex) ? lineIndex : null;
+}
+
+function getAbcjsNoteIndex(element: Element): number | null {
+  const className = element.getAttribute("class") ?? "";
+  const match = className.match(/\babcjs-n(\d+)\b/);
+  if (!match) {
+    return null;
+  }
+
+  const noteIndex = Number.parseInt(match[1] ?? "", 10);
+  return Number.isFinite(noteIndex) ? noteIndex : null;
 }
 
 export function getDisplayPartLabelTargets(
@@ -312,8 +324,87 @@ export function updateStructuredDisplayPartLabels(
   }
 }
 
-// This module owns DOM synchronization now, but runtime position math still
-// lives in playback-abc until the dedicated model module is extracted.
+export function resolvePlaybackMarkerNotehead(
+  container: HTMLDivElement,
+  marker: PlaybackEventMarker | null | undefined
+): SVGElement | null {
+  if (!marker) {
+    return null;
+  }
+
+  const exactMatch = container.querySelector<SVGElement>(
+    `.abcjs-note.abcjs-mm${marker.measureIndex}.abcjs-n${marker.noteIndex} .abcjs-notehead`
+  );
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const noteGroups = Array.from(
+    container.querySelectorAll<SVGGElement>(
+      `.abcjs-note.abcjs-mm${marker.measureIndex}`
+    )
+  );
+  if (noteGroups.length === 0) {
+    return null;
+  }
+
+  const candidates = noteGroups
+    .map((noteGroup) => ({
+      noteGroup,
+      noteIndex: getAbcjsNoteIndex(noteGroup),
+      notehead: noteGroup.querySelector<SVGElement>(".abcjs-notehead"),
+    }))
+    .filter(
+      (
+        candidate
+      ): candidate is {
+        noteGroup: SVGGElement;
+        noteIndex: number;
+        notehead: SVGElement;
+      } => candidate.noteIndex != null && candidate.notehead != null
+    )
+    .sort((left, right) => left.noteIndex - right.noteIndex);
+
+  const nextCandidate = candidates.find(
+    (candidate) => candidate.noteIndex >= marker.noteIndex
+  );
+  if (nextCandidate) {
+    return nextCandidate.notehead;
+  }
+
+  return candidates.at(-1)?.notehead ?? null;
+}
+
+export function resolveCurrentBeatNotehead(
+  container: HTMLDivElement,
+  noteheads: SVGElement[],
+  playbackMarker: PlaybackEventMarker | null | undefined,
+  fullAbc: string | null,
+  structure: string | null | undefined,
+  currentBeatIndex: number,
+  displayAbc?: string | null
+): SVGElement | null {
+  const structuredTarget = resolveStructuredDisplayNotehead(
+    noteheads,
+    fullAbc,
+    structure,
+    currentBeatIndex,
+    displayAbc
+  );
+  const playbackMarkerTarget = resolvePlaybackMarkerNotehead(
+    container,
+    playbackMarker
+  );
+  const fallbackTarget =
+    noteheads.length > 0
+      ? (noteheads[(currentBeatIndex - 1) % noteheads.length] ?? null)
+      : null;
+
+  // Compact repeated notation reuses visible staff lines across repeat passes,
+  // so prefer structure-aware notehead mapping before raw abcjs markers.
+  return structuredTarget ?? playbackMarkerTarget ?? fallbackTarget;
+}
+
 export function resolveStructuredDisplayNotehead(
   noteheads: SVGElement[],
   fullAbc: string | null,
@@ -359,6 +450,8 @@ export function resolveStructuredDisplayNotehead(
     displayedEventCount === structuredEventCount &&
     noteheads.length >= structuredEventCount
   ) {
+    // When displayed and structured event counts still match, abcjs notehead
+    // order already lines up with playback and we can index directly.
     return noteheads[(currentBeatIndex - 1) % structuredEventCount] ?? null;
   }
 
@@ -370,6 +463,8 @@ export function resolveStructuredDisplayNotehead(
   const displayedPartTemplate =
     displayedPartTemplates[position.activePartIndex];
   if (displayedPartTemplate) {
+    // Expanded rendered output can preserve one visible run per playback pass,
+    // so map within the rendered part template before trying compact reuse.
     let remainingBeatIndex = position.remainingBeatIndex;
     for (
       let lineOffset = 0;
@@ -399,6 +494,8 @@ export function resolveStructuredDisplayNotehead(
     parts
   );
   if (compactTemplates.length > 0) {
+    // Compact repeated notation reuses the same visible section template for
+    // later passes, so map back onto the matching compact section key.
     const template = compactTemplates.find(
       (candidate) => candidate.key === getSectionTemplateKey(position.part)
     );
@@ -444,5 +541,7 @@ export function resolveStructuredDisplayNotehead(
     return null;
   }
 
+  // Last resort: stay on the resolved display line even when the rendered note
+  // shape is not rich enough to classify more precisely.
   return lineGroup[position.remainingBeatIndex % lineGroup.length] ?? null;
 }
