@@ -23,9 +23,49 @@ type ActiveNotationSnapshot = {
   x: number;
 };
 
+const ACTIVE_NOTE_POLL_INTERVAL_MS = 150;
+const MIN_ACTIVE_NOTE_OBSERVATION_MS = 30_000;
+const MAX_ACTIVE_NOTE_OBSERVATION_MS = 45_000;
+const ACTIVE_NOTE_OBSERVATION_SAFETY_MULTIPLIER = 4;
+
+function getStructureRepeatFactor(structureText: string): number {
+  const sectionLabels = structureText.match(/[A-Za-z]+/g) ?? [];
+  if (sectionLabels.length === 0) {
+    return 1;
+  }
+
+  const normalizedLabels = sectionLabels.map((label) => label.toUpperCase());
+  const distinctLabels = new Set(normalizedLabels);
+  return Math.max(1, normalizedLabels.length / distinctLabels.size);
+}
+
+function getActiveNoteObservationBudgetMs(options: {
+  structureText: string;
+  renderedNoteCount: number;
+  tempoQpm: number;
+}): number {
+  const normalizedTempo = Math.max(options.tempoQpm, 1);
+  const normalizedRenderedNoteCount = Math.max(options.renderedNoteCount, 1);
+  const repeatFactor = getStructureRepeatFactor(options.structureText);
+
+  // abcjs timing callbacks can represent subdivisions denser than quarter-note
+  // beats, so base the wait budget on an eighth-note cadence and pad it for CI.
+  const estimatedTraversalMs =
+    (normalizedRenderedNoteCount *
+      repeatFactor *
+      60_000 *
+      ACTIVE_NOTE_OBSERVATION_SAFETY_MULTIPLIER) /
+    (normalizedTempo * 2);
+
+  return Math.min(
+    MAX_ACTIVE_NOTE_OBSERVATION_MS,
+    Math.max(MIN_ACTIVE_NOTE_OBSERVATION_MS, Math.ceil(estimatedTraversalMs))
+  );
+}
+
 test.describe
   .serial("RHYTHM-001: Structured Playback Reaches B Section", () => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
 
     test("should advance through the full AABB loop during browser playback", async ({
       page,
@@ -94,6 +134,7 @@ test.describe
       const playButton = page.getByTestId("rhythm-player-play-toggle");
       const notation = page.getByTestId("rhythm-player-notation");
       const overflowButton = page.getByTestId("rhythm-player-overflow-button");
+      const tempoQpm = 220;
 
       await expect(page.getByTestId("rhythm-player-title")).toContainText(
         "Rhythm Player",
@@ -107,6 +148,9 @@ test.describe
           timeout: 10_000,
         }
       );
+      const structureText =
+        (await page.getByTestId("rhythm-player-structure").textContent()) ??
+        "";
 
       // Mobile moves the start-section and tempo controls into the overflow
       // menu. Open it only when the inline controls are not currently visible.
@@ -120,7 +164,7 @@ test.describe
       await expect(sectionSelect).toHaveValue("A1", {
         timeout: 10_000,
       });
-      await tempoInput.fill("220");
+      await tempoInput.fill(String(tempoQpm));
       await tempoInput.press("Tab");
 
       if (needsOverflowMenu) {
@@ -130,10 +174,11 @@ test.describe
       await playButton.click();
 
       let notationLineIndices: number[] = [];
+      let renderedNoteCount = 0;
       await expect
         .poll(
           async () => {
-            notationLineIndices = await notation.evaluate((container) => {
+            const notationState = await notation.evaluate((container) => {
               const noteLines = Array.from(
                 container.querySelectorAll<SVGElement>(".abcjs-note")
               )
@@ -145,10 +190,18 @@ test.describe
                 })
                 .filter((value): value is number => value != null);
 
-              return Array.from(new Set(noteLines)).sort((left, right) => {
-                return left - right;
-              });
+              return {
+                lineIndices: Array.from(new Set(noteLines)).sort(
+                  (left, right) => {
+                    return left - right;
+                  }
+                ),
+                noteCount: noteLines.length,
+              };
             });
+
+            notationLineIndices = notationState.lineIndices;
+            renderedNoteCount = notationState.noteCount;
 
             return notationLineIndices.length;
           },
@@ -200,13 +253,23 @@ test.describe
       const visitedNotationLines = new Set<number>();
       let lastSnapshot: ActiveNotationSnapshot | null = null;
       let returnedToFirstNotationLine = false;
+      const activeNoteObservationBudgetMs = getActiveNoteObservationBudgetMs({
+        structureText,
+        renderedNoteCount,
+        tempoQpm,
+      });
+      const maxObservationAttempts = Math.ceil(
+        activeNoteObservationBudgetMs / ACTIVE_NOTE_POLL_INTERVAL_MS
+      );
 
       // Follow the actual highlighted note in the rendered SVG. The notation
       // panel may be scrolled, so this reads the full SVG DOM rather than the
       // visible viewport. The regression should fail immediately the first time
       // the blue note jumps backward on the same rendered line before playback
-      // has traversed the later notation lines.
-      for (let attempt = 0; attempt < 160; attempt += 1) {
+      // has traversed the later notation lines. The wait budget scales with
+      // the rendered note count and repeated-structure factor instead of using
+      // a fixed 24-second cap that can be too short on slower CI runs.
+      for (let attempt = 0; attempt < maxObservationAttempts; attempt += 1) {
         const snapshot = await readActiveNotationSnapshot();
         if (snapshot) {
           const wrappedOnSameLine =
@@ -251,7 +314,7 @@ test.describe
           lastSnapshot = snapshot;
         }
 
-        await page.waitForTimeout(150);
+        await page.waitForTimeout(ACTIVE_NOTE_POLL_INTERVAL_MS);
       }
 
       expect(firstVisitedNotationLines).toEqual(notationLineIndices);
