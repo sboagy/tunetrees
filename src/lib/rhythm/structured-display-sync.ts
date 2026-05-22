@@ -21,12 +21,61 @@ export interface DisplayPartLabelTarget {
 export interface CompactDisplaySectionTemplate {
   key: string;
   startLineIndex: number;
-  lineEventCounts: number[];
+  lineNoteheadEventMaps: number[][];
 }
 
 export interface DisplayPartTemplate {
   startLineIndex: number;
-  lineEventCounts: number[];
+  lineNoteheadEventMaps: number[][];
+}
+
+function getBarDisplayEventMap(bar: string): number[] {
+  const eventTokens = bar
+    .replace(/![^!]+!/g, "")
+    .replace(/"[^"]*"/g, "")
+    .match(/[_^=]*[A-Ga-gxzXZ]/g);
+  if (!eventTokens || eventTokens.length === 0) {
+    return [];
+  }
+
+  const noteheadEventMap: number[] = [];
+  let currentNoteheadIndex = -1;
+
+  for (const token of eventTokens) {
+    const symbol = token[token.length - 1] ?? "";
+    const isRest =
+      symbol === "x" || symbol === "X" || symbol === "z" || symbol === "Z";
+    if (!isRest) {
+      currentNoteheadIndex += 1;
+    }
+
+    noteheadEventMap.push(Math.max(currentNoteheadIndex, 0));
+  }
+
+  return noteheadEventMap;
+}
+
+function getLineDisplayEventMap(line: string): number[] {
+  const lineBars = normalizeAbcBodyBars(line);
+  if (lineBars.length === 0) {
+    return [];
+  }
+
+  const lineEventMap: number[] = [];
+  let lineNoteheadOffset = 0;
+
+  for (const bar of lineBars) {
+    const barEventMap = getBarDisplayEventMap(bar);
+    lineEventMap.push(
+      ...barEventMap.map((index) => index + lineNoteheadOffset)
+    );
+
+    const barNoteheadCount =
+      barEventMap.length === 0 ? 0 : Math.max(...barEventMap) + 1;
+    lineNoteheadOffset += barNoteheadCount;
+  }
+
+  return lineEventMap;
 }
 
 function getNoteheadLineIndex(notehead: SVGElement): number | null {
@@ -116,29 +165,26 @@ export function buildDisplayedPartTemplates(
 
   for (const part of parts) {
     let consumedBars = 0;
-    const lineEventCounts: number[] = [];
+    const lineNoteheadEventMaps: number[][] = [];
     const startLineIndex = lineOffset;
 
     while (lineOffset < bodyLines.length && consumedBars < part.bars) {
       const line = bodyLines[lineOffset] ?? "";
       const lineBars = normalizeAbcBodyBars(line);
-      const eventCount = lineBars.reduce(
-        (sum, bar) => sum + countBarEvents(bar),
-        0
-      );
+      const lineEventMap = getLineDisplayEventMap(line);
 
       consumedBars += lineBars.length;
-      lineEventCounts.push(eventCount);
+      lineNoteheadEventMaps.push(lineEventMap);
       lineOffset += 1;
     }
 
-    if (lineEventCounts.length === 0 || consumedBars < part.bars) {
+    if (lineNoteheadEventMaps.length === 0 || consumedBars < part.bars) {
       return [];
     }
 
     templates.push({
       startLineIndex,
-      lineEventCounts,
+      lineNoteheadEventMaps,
     });
   }
 
@@ -183,30 +229,27 @@ export function buildCompactDisplaySectionTemplates(
 
   for (const part of distinctParts) {
     let consumedBars = 0;
-    const lineEventCounts: number[] = [];
+    const lineNoteheadEventMaps: number[][] = [];
     const startLineIndex = lineOffset;
 
     while (lineOffset < bodyLines.length && consumedBars < part.bars) {
       const line = bodyLines[lineOffset] ?? "";
       const lineBars = normalizeAbcBodyBars(line);
-      const eventCount = lineBars.reduce(
-        (sum, bar) => sum + countBarEvents(bar),
-        0
-      );
+      const lineEventMap = getLineDisplayEventMap(line);
 
       consumedBars += lineBars.length;
-      lineEventCounts.push(eventCount);
+      lineNoteheadEventMaps.push(lineEventMap);
       lineOffset += 1;
     }
 
-    if (lineEventCounts.length === 0 || consumedBars < part.bars) {
+    if (lineNoteheadEventMaps.length === 0 || consumedBars < part.bars) {
       return [];
     }
 
     templates.push({
       key: getSectionTemplateKey(part),
       startLineIndex,
-      lineEventCounts,
+      lineNoteheadEventMaps,
     });
   }
 
@@ -330,11 +373,12 @@ export function resolveStructuredDisplayNotehead(
     let remainingBeatIndex = position.remainingBeatIndex;
     for (
       let lineOffset = 0;
-      lineOffset < displayedPartTemplate.lineEventCounts.length;
+      lineOffset < displayedPartTemplate.lineNoteheadEventMaps.length;
       lineOffset += 1
     ) {
-      const lineEventCount =
-        displayedPartTemplate.lineEventCounts[lineOffset] ?? 0;
+      const lineEventMap =
+        displayedPartTemplate.lineNoteheadEventMaps[lineOffset] ?? [];
+      const lineEventCount = lineEventMap.length;
       if (remainingBeatIndex < lineEventCount) {
         const lineGroup =
           lineGroups[displayedPartTemplate.startLineIndex + lineOffset];
@@ -342,7 +386,8 @@ export function resolveStructuredDisplayNotehead(
           return null;
         }
 
-        return lineGroup[remainingBeatIndex % lineGroup.length] ?? null;
+        const noteheadIndex = lineEventMap[remainingBeatIndex] ?? 0;
+        return lineGroup[noteheadIndex] ?? lineGroup.at(-1) ?? null;
       }
 
       remainingBeatIndex -= lineEventCount;
@@ -365,17 +410,19 @@ export function resolveStructuredDisplayNotehead(
     let remainingBeatIndex = position.remainingBeatIndex;
     for (
       let lineOffset = 0;
-      lineOffset < template.lineEventCounts.length;
+      lineOffset < template.lineNoteheadEventMaps.length;
       lineOffset += 1
     ) {
-      const lineEventCount = template.lineEventCounts[lineOffset] ?? 0;
+      const lineEventMap = template.lineNoteheadEventMaps[lineOffset] ?? [];
+      const lineEventCount = lineEventMap.length;
       if (remainingBeatIndex < lineEventCount) {
         const lineGroup = lineGroups[template.startLineIndex + lineOffset];
         if (!lineGroup || lineGroup.length === 0) {
           return null;
         }
 
-        return lineGroup[remainingBeatIndex % lineGroup.length] ?? null;
+        const noteheadIndex = lineEventMap[remainingBeatIndex] ?? 0;
+        return lineGroup[noteheadIndex] ?? lineGroup.at(-1) ?? null;
       }
 
       remainingBeatIndex -= lineEventCount;

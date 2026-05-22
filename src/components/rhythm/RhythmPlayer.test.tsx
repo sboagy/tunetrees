@@ -873,6 +873,89 @@ describe("RhythmPlayer", () => {
     ).toBe("a-1");
   });
 
+  it("maps full rendered lines with rests without wrapping back within the line", () => {
+    const makeNotehead = (lineIndex: number, id: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", `abcjs-note abcjs-l${lineIndex}`);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", id);
+      noteGroup.appendChild(notehead);
+      return notehead;
+    };
+
+    const noteheads = [
+      ...Array.from({ length: 20 }, (_value, index) =>
+        makeNotehead(0, `a1-${index + 1}`)
+      ),
+      ...Array.from({ length: 20 }, (_value, index) =>
+        makeNotehead(1, `a2-${index + 1}`)
+      ),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "P:A",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+    ].join("\n");
+
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        20,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-16");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        21,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-17");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        24,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-20");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        25,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a2-1");
+  });
+
   it("uses expanded sample ABC for seed playback so timing does not depend on repeat playback", async () => {
     const seedAbc = [
       "X:1",
