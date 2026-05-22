@@ -149,8 +149,7 @@ test.describe
         }
       );
       const structureText =
-        (await page.getByTestId("rhythm-player-structure").textContent()) ??
-        "";
+        (await page.getByTestId("rhythm-player-structure").textContent()) ?? "";
 
       // Mobile moves the start-section and tempo controls into the overflow
       // menu. Open it only when the inline controls are not currently visible.
