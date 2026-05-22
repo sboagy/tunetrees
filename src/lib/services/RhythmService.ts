@@ -4,9 +4,22 @@ import abcjs, {
   type NoteTimingEvent,
   type TuneObject,
 } from "abcjs";
-import { sql } from "drizzle-orm";
 import { type Accessor, createSignal, onCleanup } from "solid-js";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import {
+  loadRhythmPattern as loadRhythmPatternFromPatternLoader,
+  type RhythmPatternMetadata,
+  type RhythmPatternRequest,
+} from "@/lib/rhythm/pattern-loader";
+import { normalizeTuneTypeName } from "@/lib/rhythm/tune-type-lookup";
+
+export type {
+  RhythmPatternCandidate,
+  RhythmPatternCandidateScope,
+  RhythmPatternMetadata,
+  RhythmPatternRequest,
+  RhythmPatternType,
+} from "@/lib/rhythm/pattern-loader";
 
 const DEFAULT_SAMPLE_BASE_URL = (
   import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
@@ -16,14 +29,6 @@ const GENERIC_CLICK_PRIMARY_PITCH = 60;
 const GENERIC_CLICK_SECONDARY_PITCH = 69;
 const BODHRAN_DEFAULT_STRIKE_PITCH = 28;
 const BODHRAN_DEFAULT_EDGE_PITCH = 47;
-const REQUIRED_RHYTHM_PATTERN_COLUMNS = [
-  "abc_string",
-  "genre_id",
-  "is_default",
-  "name",
-  "part_target",
-  "tune_type_id",
-] as const;
 
 type SampleKitFileEntry = {
   kind: "file";
@@ -68,6 +73,96 @@ const SAMPLE_KITS: Record<string, Record<number, SampleKitEntry>> = {
     46: { kind: "file", fileName: "65820__bosone__bodhran-border03.mp3" },
     47: { kind: "file", fileName: "65823__bosone__bodhran-border06.mp3" },
   },
+  bodhran2: {
+    21: { kind: "file", fileName: "A0.mp3" },
+    22: { kind: "file", fileName: "Bb0.mp3" },
+    23: { kind: "file", fileName: "B0.mp3" },
+    24: { kind: "file", fileName: "C1.mp3" },
+    25: { kind: "file", fileName: "Db1.mp3" },
+    26: { kind: "file", fileName: "D1.mp3" },
+    27: { kind: "file", fileName: "Eb1.mp3" },
+    28: { kind: "file", fileName: "E1.mp3" },
+    29: { kind: "file", fileName: "F1.mp3" },
+    30: { kind: "file", fileName: "Gb1.mp3" },
+    31: { kind: "file", fileName: "G1.mp3" },
+    32: { kind: "file", fileName: "Ab1.mp3" },
+    33: { kind: "file", fileName: "A1.mp3" },
+    34: { kind: "file", fileName: "Bb1.mp3" },
+    35: { kind: "file", fileName: "B1.mp3" },
+    36: { kind: "file", fileName: "C2.mp3" },
+    37: { kind: "file", fileName: "Db2.mp3" },
+    38: { kind: "file", fileName: "D2.mp3" },
+    39: { kind: "file", fileName: "Eb2.mp3" },
+    40: { kind: "file", fileName: "E2.mp3" },
+    41: { kind: "file", fileName: "F2.mp3" },
+    42: { kind: "file", fileName: "Gb2.mp3" },
+    43: { kind: "file", fileName: "G2.mp3" },
+    44: { kind: "file", fileName: "Ab2.mp3" },
+    45: { kind: "file", fileName: "A2.mp3" },
+    46: { kind: "file", fileName: "Bb2.mp3" },
+    47: { kind: "file", fileName: "B2.mp3" },
+    48: { kind: "file", fileName: "C3.mp3" },
+    49: { kind: "file", fileName: "Db3.mp3" },
+    50: { kind: "file", fileName: "D3.mp3" },
+    51: { kind: "file", fileName: "Eb3.mp3" },
+    52: { kind: "file", fileName: "E3.mp3" },
+    53: { kind: "file", fileName: "F3.mp3" },
+    54: { kind: "file", fileName: "Gb3.mp3" },
+    55: { kind: "file", fileName: "G3.mp3" },
+    56: { kind: "file", fileName: "Ab3.mp3" },
+    57: { kind: "file", fileName: "A3.mp3" },
+    58: { kind: "file", fileName: "Bb3.mp3" },
+    59: { kind: "file", fileName: "B3.mp3" },
+    60: { kind: "file", fileName: "C4.mp3" },
+    61: { kind: "file", fileName: "Db4.mp3" },
+    62: { kind: "file", fileName: "D4.mp3" },
+    63: { kind: "file", fileName: "Eb4.mp3" },
+    64: { kind: "file", fileName: "E4.mp3" },
+    65: { kind: "file", fileName: "F4.mp3" },
+    66: { kind: "file", fileName: "Gb4.mp3" },
+    67: { kind: "file", fileName: "G4.mp3" },
+    68: { kind: "file", fileName: "Ab4.mp3" },
+    69: { kind: "file", fileName: "A4.mp3" },
+    70: { kind: "file", fileName: "Bb4.mp3" },
+    71: { kind: "file", fileName: "B4.mp3" },
+    72: { kind: "file", fileName: "C5.mp3" },
+    73: { kind: "file", fileName: "Db5.mp3" },
+    74: { kind: "file", fileName: "D5.mp3" },
+    75: { kind: "file", fileName: "Eb5.mp3" },
+    76: { kind: "file", fileName: "E5.mp3" },
+    77: { kind: "file", fileName: "F5.mp3" },
+    78: { kind: "file", fileName: "Gb5.mp3" },
+    79: { kind: "file", fileName: "G5.mp3" },
+    80: { kind: "file", fileName: "Ab5.mp3" },
+    81: { kind: "file", fileName: "A5.mp3" },
+    82: { kind: "file", fileName: "Bb5.mp3" },
+    83: { kind: "file", fileName: "B5.mp3" },
+    84: { kind: "file", fileName: "C6.mp3" },
+    85: { kind: "file", fileName: "Db6.mp3" },
+    86: { kind: "file", fileName: "D6.mp3" },
+    87: { kind: "file", fileName: "Eb6.mp3" },
+    88: { kind: "file", fileName: "E6.mp3" },
+    89: { kind: "file", fileName: "F6.mp3" },
+    90: { kind: "file", fileName: "Gb6.mp3" },
+    91: { kind: "file", fileName: "G6.mp3" },
+    92: { kind: "file", fileName: "Ab6.mp3" },
+    93: { kind: "file", fileName: "A6.mp3" },
+    94: { kind: "file", fileName: "Bb6.mp3" },
+    95: { kind: "file", fileName: "B6.mp3" },
+    96: { kind: "file", fileName: "C7.mp3" },
+    97: { kind: "file", fileName: "Db7.mp3" },
+    98: { kind: "file", fileName: "D7.mp3" },
+    99: { kind: "file", fileName: "Eb7.mp3" },
+    100: { kind: "file", fileName: "E7.mp3" },
+    101: { kind: "file", fileName: "F7.mp3" },
+    102: { kind: "file", fileName: "Gb7.mp3" },
+    103: { kind: "file", fileName: "G7.mp3" },
+    104: { kind: "file", fileName: "Ab7.mp3" },
+    105: { kind: "file", fileName: "A7.mp3" },
+    106: { kind: "file", fileName: "Bb7.mp3" },
+    107: { kind: "file", fileName: "B7.mp3" },
+    108: { kind: "file", fileName: "C8.mp3" },
+  },
   generic_click: {
     60: { kind: "synthetic", durationMs: 30, frequency: 1760 },
     69: { kind: "synthetic", durationMs: 20, frequency: 880 },
@@ -97,120 +192,18 @@ const BODHRAN_SAMPLE_GAIN_MULTIPLIERS: Record<number, number> = {
   47: 1.2,
 };
 
-const DEFAULT_TEMPO_BY_TYPE: Record<string, number> = {
-  reel: 100,
-  hornpipe: 90,
-  jig: 115,
-  "jig (single)": 105,
-  "slip jig": 110,
-  polka: 120,
-};
 const RHYTHM_TEMPO_STORAGE_KEY_PREFIX = "tunetrees.rhythm-tempo";
-
-const TUNE_TYPE_NAME_ALIASES: Record<string, string> = {
-  air: "air",
-  bdnce: "barn dance",
-  "barn dance": "barn dance",
-  hland: "highland",
-  highland: "highland",
-  hpipe: "hornpipe",
-  hornpipe: "hornpipe",
-  jigd: "jig",
-  jig: "jig",
-  "double jig": "jig",
-  jigsl: "slip jig",
-  "slip jig": "slip jig",
-  sgjig: "jig (single)",
-  "single jig": "jig (single)",
-  "jig (single)": "jig (single)",
-  mzrka: "mazurka",
-  mazurka: "mazurka",
-  piece: "piece",
-  polka: "polka",
-  reel: "reel",
-  sgreel: "reel",
-  schot: "schottische",
-  schottische: "schottische",
-  setd: "set dance",
-  "set dance": "set dance",
-  slide: "slide",
-  song: "song",
-  strath: "strathspey",
-  strathspey: "strathspey",
-  "three-two": "3/2 hornpipe",
-  waltz: "waltz",
-};
-
-const TUNE_TYPE_LOOKUP_VARIANTS: Record<string, readonly string[]> = {
-  hpipe: ["Hpipe", "Hornpipe"],
-  hornpipe: ["Hornpipe", "Hpipe"],
-  jigd: ["JigD", "Jig", "Double Jig"],
-  jig: ["Jig", "JigD", "Double Jig"],
-  jigsl: ["JigSl", "Slip Jig"],
-  "slip jig": ["Slip Jig", "JigSl"],
-  sgjig: ["SgJig", "Jig (Single)", "Single Jig"],
-  "single jig": ["Single Jig", "Jig (Single)", "SgJig"],
-  "jig (single)": ["Jig (Single)", "Single Jig", "SgJig"],
-  sgreel: ["SgReel", "Single Reel", "Reel"],
-  reel: ["Reel", "SgReel", "Single Reel"],
-  setd: ["SetD", "Set Dance"],
-  "set dance": ["Set Dance", "SetD"],
-  strath: ["Strath", "Strathspey"],
-  strathspey: ["Strathspey", "Strath"],
-};
-
-export interface RhythmPatternRequest {
-  genreId?: string | null;
-  genreName?: string | null;
-  tuneTypeName?: string | null;
-  tuneId?: string | null;
-  userId?: string | null;
-  selectedPatternId?: string | null;
-}
-
-export type RhythmPatternType = "seed" | "full_track";
-
-export type RhythmPatternCandidateScope =
-  | "user_tune"
-  | "tune_default"
-  | "user_default"
-  | "system_default"
-  | "system_pattern";
-
-export interface RhythmPatternCandidate {
-  id: string;
-  name: string;
-  scope: RhythmPatternCandidateScope;
-  patternType: RhythmPatternType;
-  sampleKit: string;
-  hasPremiumAudio: boolean;
-}
-
-export interface RhythmPatternMetadata {
-  genreName: string | null;
-  genreId?: string | null;
-  tuneTypeName: string;
-  tuneTypeId?: string | null;
-  rhythmAbc: string;
-  rhythmSignature: string | null;
-  tuneStructure?: string | null;
-  patternType: RhythmPatternType;
-  tempoQpm: number;
-  sampleKit: string;
-  premiumAudioUrl: string | null;
-  premiumAudioTrimMs: number;
-  premiumAudioSource: "database" | null;
-  premiumAudioSourceTempoQpm: number | null;
-  source: "rhythm_patterns" | "tune_type_fallback";
-  selectedPatternId?: string | null;
-  patternCandidates?: RhythmPatternCandidate[];
-}
 
 export interface PlaybackStartOptions {
   startPositionMs?: number;
   startBeatIndex?: number;
   startMeasure?: number;
   playbackRhythmAbc?: string;
+}
+
+export interface PlaybackEventMarker {
+  measureIndex: number;
+  noteIndex: number;
 }
 
 export interface RhythmService {
@@ -223,6 +216,7 @@ export interface RhythmService {
   countInPulse: Accessor<number>;
   countInTotalPulses: Accessor<number>;
   currentBeatIndex: Accessor<number>;
+  currentPlaybackMarker: Accessor<PlaybackEventMarker | null>;
   currentPulse: Accessor<number>;
   currentMeasure: Accessor<number>;
   error: Accessor<string | null>;
@@ -259,52 +253,6 @@ type TimingCallbacksInstance = InstanceType<
   ResolvedAbcjsModule["TimingCallbacks"]
 >;
 
-function normalizeTuneTypeName(value: string): string {
-  const normalized = value.trim().toLowerCase();
-  return TUNE_TYPE_NAME_ALIASES[normalized] ?? normalized;
-}
-
-function getTuneTypeLookupCandidates(value: string): string[] {
-  const trimmed = value.trim();
-  const normalized = trimmed.toLowerCase();
-  const variants = TUNE_TYPE_LOOKUP_VARIANTS[normalized] ?? [trimmed];
-
-  return Array.from(
-    new Set([trimmed, ...variants].filter((candidate) => candidate.trim()))
-  );
-}
-
-function sanitizeAbcTitle(value: string): string {
-  return value.replace(/[\r\n:|[\]]+/g, " ").trim() || "Rhythm";
-}
-
-async function tableExists(
-  db: SqliteDatabase,
-  tableName: string
-): Promise<boolean> {
-  const rows = await db.all<{ name: string }>(sql`
-    SELECT name
-    FROM sqlite_master
-    WHERE type = 'table' AND name = ${tableName}
-    LIMIT 1
-  `);
-
-  return rows.length > 0;
-}
-
-async function getTableColumns(
-  db: SqliteDatabase,
-  tableName: string
-): Promise<Set<string>> {
-  const rows = await db.all<{ name: string }>(
-    sql.raw(`PRAGMA table_info("${tableName}")`)
-  );
-  return new Set(rows.map((row) => row.name));
-}
-
-function getDefaultTempoForTuneType(tuneTypeName: string): number {
-  return DEFAULT_TEMPO_BY_TYPE[normalizeTuneTypeName(tuneTypeName)] ?? 100;
-}
 function getRhythmTempoStorage(): Storage | null {
   if (typeof globalThis === "undefined") {
     return null;
@@ -379,42 +327,6 @@ function normalizeSampleKit(sampleKit?: string | null): string {
   return sampleKit?.trim() || DEFAULT_SAMPLE_KIT;
 }
 
-function normalizePatternType(patternType?: string | null): RhythmPatternType {
-  return patternType === "full_track" ? "full_track" : "seed";
-}
-
-function escapeSqlStringLiteral(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
-function toSqlNullableStringLiteral(value?: string | null): string {
-  return value == null ? "NULL" : escapeSqlStringLiteral(value);
-}
-
-function getRhythmPatternCandidateScope(row: {
-  tune_id?: string | null;
-  user_id?: string | null;
-  is_default?: number | boolean | null;
-}): RhythmPatternCandidateScope {
-  if (row.user_id && row.tune_id) {
-    return "user_tune";
-  }
-
-  if (row.tune_id) {
-    return "tune_default";
-  }
-
-  if (row.user_id) {
-    return "user_default";
-  }
-
-  if (row.is_default) {
-    return "system_default";
-  }
-
-  return "system_pattern";
-}
-
 function getSampleKitMapping(
   sampleKit?: string | null
 ): Record<number, SampleKitEntry> {
@@ -434,36 +346,6 @@ function buildSampleUrl(
   return normalizedBase ? `${normalizedBase}/${assetPath}` : `/${assetPath}`;
 }
 
-function normalizePremiumAudioUrl(baseUrl: string, value: string): string {
-  const trimmed = value.trim();
-  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("/")) {
-    return trimmed;
-  }
-
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
-  return normalizedBase ? `${normalizedBase}/${trimmed}` : `/${trimmed}`;
-}
-
-function selectPremiumLoop(
-  sampleBaseUrl: string,
-  request: {
-    explicitUrl?: string | null;
-    tempoQpm: number;
-  }
-): PremiumLoopSelection | null {
-  const explicitUrl = request.explicitUrl?.trim();
-  if (!explicitUrl) {
-    return null;
-  }
-
-  return {
-    source: "database",
-    url: normalizePremiumAudioUrl(sampleBaseUrl, explicitUrl),
-    sourceTempoQpm: request.tempoQpm,
-    trimMs: 0,
-  };
-}
-
 function msToSeconds(value: number): number {
   return value / 1000;
 }
@@ -474,445 +356,12 @@ function waitForMilliseconds(milliseconds: number): Promise<void> {
   });
 }
 
-function buildFallbackRhythmAbc(
-  tuneTypeName: string,
-  rhythmSignature: string | null
-): string {
-  const meter = rhythmSignature?.trim() || "4/4";
-
-  const patternByMeter: Record<
-    string,
-    { noteLength: string; pattern: string }
-  > = {
-    "2/4": { noteLength: "1/8", pattern: "|: !accent!C2 A2 :|" },
-    "3/4": { noteLength: "1/8", pattern: "|: !accent!C2 A2 A2 :|" },
-    "4/4": { noteLength: "1/8", pattern: "|: !accent!C2 A2 C2 A2 :|" },
-    "6/8": { noteLength: "1/8", pattern: "|: !accent!C2 c C c c :|" },
-    "9/8": {
-      noteLength: "1/8",
-      pattern: "|: !accent!C2 A C2 A C2 A :|",
-    },
-    "12/8": {
-      noteLength: "1/8",
-      pattern: "|: !accent!C2 A C2 A C2 A C2 A :|",
-    },
-    "3/2": {
-      noteLength: "1/8",
-      pattern: "|: !accent!C2 A2 C2 A2 C2 A2 :|",
-    },
-  };
-
-  const fallback = patternByMeter[meter] ?? patternByMeter["4/4"];
-
-  return [
-    "X:1",
-    `T:${sanitizeAbcTitle(tuneTypeName)} Rhythm`,
-    `M:${meter}`,
-    `L:${fallback.noteLength}`,
-    "Q:1/4=100",
-    "K:clef=perc",
-    fallback.pattern,
-  ].join("\n");
-}
-
-export async function loadRhythmPatternMetadata(
+export async function loadRhythmPattern(
   db: SqliteDatabase,
   request: RhythmPatternRequest,
   options?: { sampleBaseUrl?: string }
 ): Promise<RhythmPatternMetadata | null> {
-  const tuneTypeName = request.tuneTypeName?.trim();
-  if (!tuneTypeName) {
-    return null;
-  }
-
-  const hasGenreDefaultBpmColumn = (await tableExists(db, "genre_tune_type"))
-    ? (await getTableColumns(db, "genre_tune_type")).has("default_bpm")
-    : false;
-  const hasRhythmPatternsTable = await tableExists(db, "rhythm_patterns");
-
-  const rhythmPatternColumns = hasRhythmPatternsTable
-    ? await getTableColumns(db, "rhythm_patterns")
-    : new Set<string>();
-
-  const canUseRhythmPatterns =
-    hasRhythmPatternsTable &&
-    REQUIRED_RHYTHM_PATTERN_COLUMNS.every((column) =>
-      rhythmPatternColumns.has(column)
-    );
-  const hasSampleKitColumn = rhythmPatternColumns.has("sample_kit");
-  const hasPremiumAudioUrlColumn =
-    rhythmPatternColumns.has("premium_audio_url");
-  const hasTuneIdColumn = rhythmPatternColumns.has("tune_id");
-  const hasUserIdColumn = rhythmPatternColumns.has("user_id");
-  const hasPatternTypeColumn = rhythmPatternColumns.has("pattern_type");
-  const canUseHierarchicalOverrides = hasTuneIdColumn && hasUserIdColumn;
-  const sampleBaseUrl = options?.sampleBaseUrl ?? DEFAULT_SAMPLE_BASE_URL;
-  const tuneTypeLookupCandidates = getTuneTypeLookupCandidates(tuneTypeName);
-  const tuneTypeMatchClause = sql.raw(
-    tuneTypeLookupCandidates.length > 0
-      ? tuneTypeLookupCandidates
-          .map((candidate) => {
-            const literal = escapeSqlStringLiteral(candidate);
-            return `(lower(id) = lower(${literal}) OR lower(name) = lower(${literal}))`;
-          })
-          .join(" OR ")
-      : "1 = 0"
-  );
-
-  const genreNameFilter = request.genreName?.trim() || null;
-  const genreIdFilter = request.genreId?.trim() || null;
-  const genreFilter = genreIdFilter ?? genreNameFilter;
-  const tuneIdFilter = request.tuneId?.trim() || null;
-  const userIdFilter = request.userId?.trim() || null;
-  const selectedPatternIdFilter = request.selectedPatternId?.trim() || null;
-  const selectedPatternOrderClause = sql.raw(
-    [
-      canUseHierarchicalOverrides
-        ? `CASE
-            WHEN ${toSqlNullableStringLiteral(userIdFilter)} IS NOT NULL
-             AND ${toSqlNullableStringLiteral(tuneIdFilter)} IS NOT NULL
-             AND rp.user_id = ${toSqlNullableStringLiteral(userIdFilter)}
-             AND rp.tune_id = ${toSqlNullableStringLiteral(tuneIdFilter)} THEN 0
-            WHEN ${toSqlNullableStringLiteral(tuneIdFilter)} IS NOT NULL
-             AND rp.user_id IS NULL
-             AND rp.tune_id = ${toSqlNullableStringLiteral(tuneIdFilter)} THEN 1
-            WHEN ${toSqlNullableStringLiteral(userIdFilter)} IS NOT NULL
-             AND rp.user_id = ${toSqlNullableStringLiteral(userIdFilter)}
-             AND rp.tune_id IS NULL THEN 2
-            WHEN rp.user_id IS NULL
-             AND rp.tune_id IS NULL
-             AND rp.is_default THEN 3
-            WHEN rp.user_id IS NULL
-             AND rp.tune_id IS NULL THEN 4
-            ELSE 5
-          END`
-        : null,
-      "CASE WHEN rp.is_default THEN 0 ELSE 1 END",
-      "CASE WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0 ELSE 1 END",
-      "rp.name",
-    ]
-      .filter(Boolean)
-      .join(",\n              ")
-  );
-
-  if (canUseRhythmPatterns) {
-    const rows = await db.all<{
-      genre_name: string | null;
-      genre_id: string | null;
-      tune_type_name: string | null;
-      tune_type_id: string | null;
-      rhythm_signature: string | null;
-      tempo_qpm: number | null;
-      pattern_id: string | null;
-      pattern_name: string | null;
-      abc_string: string | null;
-      sample_kit: string | null;
-      premium_audio_url: string | null;
-      pattern_type: string | null;
-      tune_id: string | null;
-      user_id: string | null;
-      is_default: number | null;
-      row_num: number | null;
-    }>(sql`
-      WITH tune_type_match AS (
-        SELECT id, name, rhythm
-        FROM tune_type
-        WHERE (${tuneTypeMatchClause})
-        ORDER BY
-          CASE
-            WHEN lower(id) = lower(${tuneTypeName}) THEN 0
-            WHEN lower(name) = lower(${tuneTypeName}) THEN 1
-            ELSE 2
-          END,
-          length(coalesce(name, id))
-        LIMIT 1
-      ),
-      genre_match AS (
-        SELECT id, name
-        FROM genre
-        WHERE ${genreFilter} IS NOT NULL
-          AND (
-            lower(name) = lower(${genreFilter})
-            OR lower(id) = lower(${genreFilter})
-          )
-        LIMIT 1
-      ),
-      tempo_match AS (
-        SELECT gtt.default_bpm
-        FROM tune_type_match ttm
-        JOIN genre_tune_type gtt ON gtt.tune_type_id = ttm.id
-        LEFT JOIN genre_match gm ON 1 = 1
-        WHERE gm.id IS NULL OR gtt.genre_id = gm.id
-        ORDER BY
-          CASE
-            WHEN gm.id IS NOT NULL AND gtt.genre_id = gm.id THEN 0
-            ELSE 1
-          END,
-          gtt.genre_id
-        LIMIT 1
-      ),
-      selected_pattern AS (
-        SELECT
-          rp.id,
-          rp.name,
-          rp.genre_id,
-          rp.tune_type_id,
-          rp.abc_string,
-          ${
-            hasSampleKitColumn ? sql`rp.sample_kit` : sql`CAST(NULL AS TEXT)`
-          } AS sample_kit,
-          ${
-            hasPremiumAudioUrlColumn
-              ? sql`rp.premium_audio_url`
-              : sql`CAST(NULL AS TEXT)`
-          } AS premium_audio_url,
-          ${
-            hasPatternTypeColumn
-              ? sql`rp.pattern_type`
-              : sql`CAST('seed' AS TEXT)`
-          } AS pattern_type,
-          ${
-            hasTuneIdColumn ? sql`rp.tune_id` : sql`CAST(NULL AS TEXT)`
-          } AS tune_id,
-          ${
-            hasUserIdColumn ? sql`rp.user_id` : sql`CAST(NULL AS TEXT)`
-          } AS user_id,
-          rp.is_default,
-          rp.part_target,
-          ROW_NUMBER() OVER (
-            ORDER BY ${selectedPatternOrderClause}
-          ) AS row_num
-        FROM rhythm_patterns rp
-        JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
-        LEFT JOIN genre_match gm ON 1 = 1
-        WHERE (gm.id IS NULL OR rp.genre_id = gm.id)
-          AND ${
-            canUseHierarchicalOverrides
-              ? sql`
-                (
-                  (${userIdFilter} IS NOT NULL
-                    AND ${tuneIdFilter} IS NOT NULL
-                    AND rp.user_id = ${userIdFilter}
-                    AND rp.tune_id = ${tuneIdFilter})
-                  OR (${tuneIdFilter} IS NOT NULL
-                    AND rp.user_id IS NULL
-                    AND rp.tune_id = ${tuneIdFilter})
-                  OR (${userIdFilter} IS NOT NULL
-                    AND rp.user_id = ${userIdFilter}
-                    AND rp.tune_id IS NULL)
-                  OR (rp.user_id IS NULL AND rp.tune_id IS NULL)
-                )
-              `
-              : sql`1 = 1`
-          }
-      )
-      SELECT
-        gm.name AS genre_name,
-        COALESCE(sp.genre_id, gm.id) AS genre_id,
-        ttm.name AS tune_type_name,
-        COALESCE(sp.tune_type_id, ttm.id) AS tune_type_id,
-        ttm.rhythm AS rhythm_signature,
-        ${
-          hasGenreDefaultBpmColumn
-            ? sql`tm.default_bpm`
-            : sql`CAST(NULL AS INTEGER)`
-        } AS tempo_qpm,
-        sp.id AS pattern_id,
-        sp.name AS pattern_name,
-        sp.abc_string AS abc_string,
-        sp.sample_kit AS sample_kit,
-        sp.premium_audio_url AS premium_audio_url,
-        sp.pattern_type AS pattern_type,
-        sp.tune_id AS tune_id,
-        sp.user_id AS user_id,
-        sp.is_default AS is_default,
-        sp.row_num AS row_num
-      FROM tune_type_match ttm
-      LEFT JOIN genre_match gm ON 1 = 1
-      LEFT JOIN tempo_match tm ON 1 = 1
-      LEFT JOIN selected_pattern sp ON 1 = 1
-      ORDER BY sp.row_num
-    `);
-
-    const row = rows[0];
-    const candidateRows = rows.filter(
-      (
-        candidateRow
-      ): candidateRow is typeof candidateRow & {
-        pattern_id: string;
-        pattern_name: string;
-      } =>
-        Boolean(
-          candidateRow.pattern_id &&
-            candidateRow.pattern_name &&
-            candidateRow.abc_string?.trim()
-        )
-    );
-    const selectedPatternRow =
-      candidateRows.find(
-        (candidateRow) => candidateRow.pattern_id === selectedPatternIdFilter
-      ) ?? candidateRows.find((candidateRow) => candidateRow.row_num === 1);
-
-    if (row?.tune_type_name && selectedPatternRow?.abc_string?.trim()) {
-      const resolvedTempoQpm =
-        typeof row.tempo_qpm === "number" && Number.isFinite(row.tempo_qpm)
-          ? row.tempo_qpm
-          : getDefaultTempoForTuneType(row.tune_type_name);
-      const premiumLoop = selectPremiumLoop(sampleBaseUrl, {
-        explicitUrl: selectedPatternRow.premium_audio_url,
-        tempoQpm: resolvedTempoQpm,
-      });
-
-      return {
-        genreName: row.genre_name ?? genreNameFilter ?? genreIdFilter,
-        genreId: row.genre_id,
-        tuneTypeName: row.tune_type_name,
-        tuneTypeId: row.tune_type_id,
-        rhythmSignature: row.rhythm_signature ?? null,
-        rhythmAbc: selectedPatternRow.abc_string.trim(),
-        patternType: normalizePatternType(selectedPatternRow.pattern_type),
-        tempoQpm: resolvedTempoQpm,
-        sampleKit: normalizeSampleKit(selectedPatternRow.sample_kit),
-        premiumAudioUrl: premiumLoop?.url ?? null,
-        premiumAudioTrimMs: premiumLoop?.trimMs ?? 0,
-        premiumAudioSource: premiumLoop?.source ?? null,
-        premiumAudioSourceTempoQpm: premiumLoop?.sourceTempoQpm ?? null,
-        source: "rhythm_patterns",
-        selectedPatternId: selectedPatternRow.pattern_id,
-        patternCandidates: candidateRows.map((candidateRow) => ({
-          id: candidateRow.pattern_id,
-          name: candidateRow.pattern_name,
-          scope: getRhythmPatternCandidateScope(candidateRow),
-          patternType: normalizePatternType(candidateRow.pattern_type),
-          sampleKit: normalizeSampleKit(candidateRow.sample_kit),
-          hasPremiumAudio: Boolean(candidateRow.premium_audio_url?.trim()),
-        })),
-      };
-    }
-  }
-
-  if (hasGenreDefaultBpmColumn) {
-    const rows = await db.all<{
-      genre_name: string | null;
-      genre_id: string | null;
-      tune_type_name: string | null;
-      tune_type_id: string | null;
-      rhythm_signature: string | null;
-      tempo_qpm: number | null;
-    }>(sql`
-      WITH tune_type_match AS (
-        SELECT id, name, rhythm
-        FROM tune_type
-        WHERE (${tuneTypeMatchClause})
-        ORDER BY
-          CASE
-            WHEN lower(id) = lower(${tuneTypeName}) THEN 0
-            WHEN lower(name) = lower(${tuneTypeName}) THEN 1
-            ELSE 2
-          END,
-          length(coalesce(name, id))
-        LIMIT 1
-      ),
-      genre_match AS (
-        SELECT id, name
-        FROM genre
-        WHERE ${genreFilter} IS NOT NULL
-          AND (
-            lower(name) = lower(${genreFilter})
-            OR lower(id) = lower(${genreFilter})
-          )
-        LIMIT 1
-      )
-      SELECT
-        gm.name AS genre_name,
-        gm.id AS genre_id,
-        ttm.name AS tune_type_name,
-        ttm.id AS tune_type_id,
-        ttm.rhythm AS rhythm_signature,
-        gtt.default_bpm AS tempo_qpm
-      FROM tune_type_match ttm
-      LEFT JOIN genre_match gm ON 1 = 1
-      LEFT JOIN genre_tune_type gtt
-        ON gtt.tune_type_id = ttm.id
-       AND (gm.id IS NULL OR gtt.genre_id = gm.id)
-      LIMIT 1
-    `);
-
-    const row = rows[0];
-    if (row?.tune_type_name) {
-      const resolvedTempoQpm =
-        typeof row.tempo_qpm === "number" && Number.isFinite(row.tempo_qpm)
-          ? row.tempo_qpm
-          : getDefaultTempoForTuneType(row.tune_type_name);
-
-      return {
-        genreName: row.genre_name ?? genreNameFilter ?? genreIdFilter,
-        genreId: row.genre_id,
-        tuneTypeName: row.tune_type_name,
-        tuneTypeId: row.tune_type_id,
-        rhythmSignature: row.rhythm_signature ?? null,
-        rhythmAbc: buildFallbackRhythmAbc(
-          row.tune_type_name,
-          row.rhythm_signature ?? null
-        ),
-        patternType: "seed",
-        tempoQpm: resolvedTempoQpm,
-        sampleKit: DEFAULT_SAMPLE_KIT,
-        premiumAudioUrl: null,
-        premiumAudioTrimMs: 0,
-        premiumAudioSource: null,
-        premiumAudioSourceTempoQpm: null,
-        source: "tune_type_fallback",
-        selectedPatternId: null,
-        patternCandidates: [],
-      };
-    }
-  }
-
-  const fallbackRows = await db.all<{
-    tune_type_id: string | null;
-    tune_type_name: string | null;
-    rhythm_signature: string | null;
-  }>(sql`
-    SELECT id AS tune_type_id, name AS tune_type_name, rhythm AS rhythm_signature
-    FROM tune_type
-    WHERE (${tuneTypeMatchClause})
-    ORDER BY
-      CASE
-        WHEN lower(id) = lower(${tuneTypeName}) THEN 0
-        WHEN lower(name) = lower(${tuneTypeName}) THEN 1
-        ELSE 2
-      END,
-      length(coalesce(name, id))
-    LIMIT 1
-  `);
-
-  const fallbackRow = fallbackRows[0];
-  if (!fallbackRow?.tune_type_name) {
-    return null;
-  }
-
-  return {
-    genreName: genreNameFilter ?? genreIdFilter,
-    genreId: genreIdFilter,
-    tuneTypeName: fallbackRow.tune_type_name,
-    tuneTypeId: fallbackRow.tune_type_id,
-    rhythmSignature: fallbackRow.rhythm_signature ?? null,
-    rhythmAbc: buildFallbackRhythmAbc(
-      fallbackRow.tune_type_name,
-      fallbackRow.rhythm_signature ?? null
-    ),
-    patternType: "seed",
-    tempoQpm: getDefaultTempoForTuneType(fallbackRow.tune_type_name),
-    sampleKit: DEFAULT_SAMPLE_KIT,
-    premiumAudioUrl: null,
-    premiumAudioTrimMs: 0,
-    premiumAudioSource: null,
-    premiumAudioSourceTempoQpm: null,
-    source: "tune_type_fallback",
-    selectedPatternId: null,
-    patternCandidates: [],
-  };
+  return loadRhythmPatternFromPatternLoader(db, request, options);
 }
 
 function clampTempo(qpm: number): number {
@@ -1157,6 +606,38 @@ function getEventPulseIndex(
   return Math.min(Math.max(pulseIndex, 1), pulseCount);
 }
 
+function getPlaybackEventMarker(
+  event: NoteTimingEvent,
+  currentMeasureIndex: number | null | undefined
+): PlaybackEventMarker | null {
+  for (const group of event.elements ?? []) {
+    for (const element of group) {
+      const className = element.getAttribute("class") ?? "";
+      const measureMatch = className.match(/\babcjs-mm(\d+)\b/);
+      const noteMatch = className.match(/\babcjs-n(\d+)\b/);
+      if (!noteMatch) {
+        continue;
+      }
+
+      const noteIndex = Number.parseInt(noteMatch[1] ?? "", 10);
+      const classMeasureIndex = measureMatch
+        ? Number.parseInt(measureMatch[1] ?? "", 10)
+        : null;
+      const resolvedMeasureIndex =
+        (Number.isFinite(currentMeasureIndex)
+          ? Math.max(0, currentMeasureIndex ?? 0)
+          : null) ??
+        (Number.isFinite(classMeasureIndex) ? classMeasureIndex : null);
+
+      if (resolvedMeasureIndex != null && Number.isFinite(noteIndex)) {
+        return { measureIndex: resolvedMeasureIndex, noteIndex };
+      }
+    }
+  }
+
+  return null;
+}
+
 function parseRhythmSignatureParts(
   rhythmSignature?: string | null
 ): { numerator: number; denominator: number } | null {
@@ -1292,6 +773,8 @@ export function createRhythmService(
   const [countInPulse, setCountInPulse] = createSignal(0);
   const [countInTotalPulses, setCountInTotalPulses] = createSignal(0);
   const [currentBeatIndex, setCurrentBeatIndex] = createSignal(0);
+  const [currentPlaybackMarker, setCurrentPlaybackMarker] =
+    createSignal<PlaybackEventMarker | null>(null);
   const [currentPulse, setCurrentPulse] = createSignal(0);
   const [currentMeasure, setCurrentMeasure] = createSignal(0);
   const [error, setError] = createSignal<string | null>(null);
@@ -1355,6 +838,7 @@ export function createRhythmService(
     currentEventIndex = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
+    setCurrentPlaybackMarker(null);
     setCurrentPulse(0);
     setCurrentMeasure(0);
     setIsPlaying(false);
@@ -1625,6 +1109,7 @@ export function createRhythmService(
           lastKnownPositionMs = 0;
           currentEventIndex = playbackStartBeatIndex;
           setCurrentBeatIndex(playbackStartBeatIndex);
+          setCurrentPlaybackMarker(null);
           setCurrentPulse(0);
           setCurrentMeasure(playbackStartMeasure);
 
@@ -1649,13 +1134,17 @@ export function createRhythmService(
               return "continue" as const;
             });
         }
+        const playbackMeasureIndex = event.measureStart
+          ? playbackStartMeasure + (event.measureNumber ?? currentMeasure())
+          : currentMeasure();
         if (event.measureStart) {
-          setCurrentMeasure(
-            playbackStartMeasure + (event.measureNumber ?? currentMeasure())
-          );
+          setCurrentMeasure(playbackMeasureIndex);
         }
         currentEventIndex += 1;
         setCurrentBeatIndex(currentEventIndex);
+        setCurrentPlaybackMarker(
+          getPlaybackEventMarker(event, playbackMeasureIndex)
+        );
         const nextPulse = getEventPulseIndex(
           event,
           metadata()?.rhythmSignature ?? null
@@ -1688,6 +1177,7 @@ export function createRhythmService(
     playbackStartMeasure = Math.max(0, startOptions?.startMeasure ?? 0);
     currentEventIndex = playbackStartBeatIndex;
     setCurrentBeatIndex(playbackStartBeatIndex);
+    setCurrentPlaybackMarker(null);
     setCurrentPulse(0);
     setIsPaused(false);
     setCurrentMeasure(playbackStartMeasure);
@@ -1773,11 +1263,12 @@ export function createRhythmService(
     lastKnownPositionMs = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
+    setCurrentPlaybackMarker(null);
     setCurrentPulse(0);
     setCurrentMeasure(0);
     setError(null);
 
-    const nextMetadata = await loadRhythmPatternMetadata(options.db, request, {
+    const nextMetadata = await loadRhythmPattern(options.db, request, {
       sampleBaseUrl,
     });
     setMetadata(nextMetadata);
@@ -1864,6 +1355,7 @@ export function createRhythmService(
     playbackStartMeasure = Math.max(0, startOptions?.startMeasure ?? 0);
     activePlaybackRhythmAbc = startOptions?.playbackRhythmAbc?.trim() || null;
     setCurrentBeatIndex(0);
+    setCurrentPlaybackMarker(null);
     setCurrentPulse(0);
     setCurrentMeasure(playbackStartMeasure);
     setIsPlaying(false);
@@ -1942,6 +1434,7 @@ export function createRhythmService(
     countInPulse,
     countInTotalPulses,
     currentBeatIndex,
+    currentPlaybackMarker,
     currentPulse,
     currentMeasure,
     error,

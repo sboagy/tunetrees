@@ -1,59 +1,11 @@
 import { and, eq } from "drizzle-orm";
+import {
+  getTuneTypeLookupCandidates as getSharedTuneTypeLookupCandidates,
+  normalizeTuneTypeName,
+} from "@/lib/rhythm/tune-type-lookup";
 import { generateId } from "@/lib/utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import { genre, rhythmPatterns, tuneType } from "../schema";
-
-const TUNE_TYPE_NAME_ALIASES: Record<string, string> = {
-  air: "air",
-  bdnce: "barn dance",
-  "barn dance": "barn dance",
-  hland: "highland",
-  highland: "highland",
-  hpipe: "hornpipe",
-  hornpipe: "hornpipe",
-  jigd: "jig",
-  jig: "jig",
-  "double jig": "jig",
-  jigsl: "slip jig",
-  "slip jig": "slip jig",
-  sgjig: "jig (single)",
-  "single jig": "jig (single)",
-  "jig (single)": "jig (single)",
-  mzrka: "mazurka",
-  mazurka: "mazurka",
-  piece: "piece",
-  polka: "polka",
-  reel: "reel",
-  sgreel: "reel",
-  schot: "schottische",
-  schottische: "schottische",
-  setd: "set dance",
-  "set dance": "set dance",
-  slide: "slide",
-  song: "song",
-  strath: "strathspey",
-  strathspey: "strathspey",
-  "three-two": "3/2 hornpipe",
-  waltz: "waltz",
-};
-
-const TUNE_TYPE_LOOKUP_VARIANTS: Record<string, readonly string[]> = {
-  hpipe: ["Hpipe", "Hornpipe"],
-  hornpipe: ["Hornpipe", "Hpipe"],
-  jigd: ["JigD", "Jig", "Double Jig"],
-  jig: ["Jig", "JigD", "Double Jig"],
-  jigsl: ["JigSl", "Slip Jig"],
-  "slip jig": ["Slip Jig", "JigSl"],
-  sgjig: ["SgJig", "Jig (Single)", "Single Jig"],
-  "single jig": ["Single Jig", "Jig (Single)", "SgJig"],
-  "jig (single)": ["Jig (Single)", "Single Jig", "SgJig"],
-  sgreel: ["SgReel", "Single Reel", "Reel"],
-  reel: ["Reel", "SgReel", "Single Reel"],
-  setd: ["SetD", "Set Dance"],
-  "set dance": ["Set Dance", "SetD"],
-  strath: ["Strath", "Strathspey"],
-  strathspey: ["Strathspey", "Strath"],
-};
 
 export type EditableRhythmPattern = typeof rhythmPatterns.$inferSelect;
 export type EditableRhythmPatternScope = "user_default" | "user_tune";
@@ -83,15 +35,14 @@ function getTuneTypeLookupCandidates(tuneTypeName: string): string[] {
     return [];
   }
 
-  const normalized = normalizeLookupValue(trimmed);
-  const aliased = TUNE_TYPE_NAME_ALIASES[normalized] ?? normalized;
-  const variants = TUNE_TYPE_LOOKUP_VARIANTS[aliased] ?? [];
+  const normalized = normalizeTuneTypeName(trimmed);
+  const variants = getSharedTuneTypeLookupCandidates(trimmed);
 
   return Array.from(
     new Set([
       trimmed,
+      normalizeLookupValue(trimmed),
       normalized,
-      aliased,
       ...variants,
       ...variants.map((variant) => variant.toLowerCase()),
     ])

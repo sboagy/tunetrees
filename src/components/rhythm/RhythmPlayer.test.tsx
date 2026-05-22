@@ -6,16 +6,19 @@ import {
   waitFor,
 } from "@solidjs/testing-library";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  resolveCurrentBeatNotehead,
+  resolvePlaybackMarkerNotehead,
+  resolveStructuredDisplayNotehead,
+  updateStructuredDisplayPartLabels,
+} from "@/lib/rhythm/structured-display-sync";
+import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import type {
+  PlaybackEventMarker,
   RhythmPatternMetadata,
   RhythmService,
 } from "@/lib/services/RhythmService";
-import {
-  getStructuredSectionLabel,
-  RhythmPlayer,
-  resolveStructuredDisplayNotehead,
-  updateStructuredDisplayPartLabels,
-} from "./RhythmPlayer";
+import { RhythmPlayer } from "./RhythmPlayer";
 
 const mocked = vi.hoisted(() => {
   const renderAbcMock = vi.fn();
@@ -67,6 +70,7 @@ const mocked = vi.hoisted(() => {
       countInPulse: (): number => 0,
       countInTotalPulses: (): number => 0,
       currentBeatIndex: () => 0,
+      currentPlaybackMarker: () => null as PlaybackEventMarker | null,
       currentPulse: () => 0,
       currentMeasure: () => 0,
       error: () => null,
@@ -149,6 +153,7 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.isCountIn = () => false;
     mocked.serviceStub.countInPulse = () => 0;
     mocked.serviceStub.countInTotalPulses = () => 0;
+    mocked.serviceStub.currentPlaybackMarker = () => null;
     mocked.serviceStub.play = vi.fn(async (_options) => undefined);
     mocked.serviceStub.stop = vi.fn();
     mocked.serviceStub.pause = vi.fn();
@@ -349,6 +354,325 @@ describe("RhythmPlayer", () => {
     ).toBe("b1");
   });
 
+  it("maps wrapped compact full-track sections using the rendered display lines", () => {
+    const makeNotehead = (lineIndex: number, id: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", `abcjs-note abcjs-l${lineIndex}`);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", id);
+      noteGroup.appendChild(notehead);
+      return notehead;
+    };
+
+    const noteheads = [
+      makeNotehead(0, "a-1"),
+      makeNotehead(0, "a-2"),
+      makeNotehead(0, "a-3"),
+      makeNotehead(0, "a-4"),
+      makeNotehead(1, "a-5"),
+      makeNotehead(1, "a-6"),
+      makeNotehead(1, "a-7"),
+      makeNotehead(1, "a-8"),
+      makeNotehead(2, "b-1"),
+      makeNotehead(2, "b-2"),
+      makeNotehead(2, "b-3"),
+      makeNotehead(2, "b-4"),
+      makeNotehead(3, "b-5"),
+      makeNotehead(3, "b-6"),
+      makeNotehead(3, "b-7"),
+      makeNotehead(3, "b-8"),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "P:A",
+      `| ${Array.from({ length: 8 }, () => "A").join(" | ")} |`,
+      "P:B",
+      `| ${Array.from({ length: 8 }, () => "B").join(" | ")} |`,
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "P:A",
+      "| A | A | A | A |",
+      "| A | A | A | A |",
+      "P:B",
+      "| B | B | B | B |",
+      "| B | B | B | B |",
+    ].join("\n");
+
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        1,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        5,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a-5");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        9,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        13,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a-5");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        17,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("b-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        21,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("b-5");
+  });
+
+  it("maps expanded full-track repeats onto later displayed staff lines", () => {
+    const makeNotehead = (lineIndex: number, id: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", `abcjs-note abcjs-l${lineIndex}`);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", id);
+      noteGroup.appendChild(notehead);
+      return notehead;
+    };
+
+    const noteheads = [
+      makeNotehead(0, "a1-1"),
+      makeNotehead(0, "a1-2"),
+      makeNotehead(0, "a1-3"),
+      makeNotehead(0, "a1-4"),
+      makeNotehead(1, "a1-5"),
+      makeNotehead(1, "a1-6"),
+      makeNotehead(1, "a1-7"),
+      makeNotehead(1, "a1-8"),
+      makeNotehead(2, "a2-1"),
+      makeNotehead(2, "a2-2"),
+      makeNotehead(2, "a2-3"),
+      makeNotehead(2, "a2-4"),
+      makeNotehead(3, "a2-5"),
+      makeNotehead(3, "a2-6"),
+      makeNotehead(3, "a2-7"),
+      makeNotehead(3, "a2-8"),
+      makeNotehead(4, "b1-1"),
+      makeNotehead(4, "b1-2"),
+      makeNotehead(4, "b1-3"),
+      makeNotehead(4, "b1-4"),
+      makeNotehead(5, "b1-5"),
+      makeNotehead(5, "b1-6"),
+      makeNotehead(5, "b1-7"),
+      makeNotehead(5, "b1-8"),
+      makeNotehead(6, "b2-1"),
+      makeNotehead(6, "b2-2"),
+      makeNotehead(6, "b2-3"),
+      makeNotehead(6, "b2-4"),
+      makeNotehead(7, "b2-5"),
+      makeNotehead(7, "b2-6"),
+      makeNotehead(7, "b2-7"),
+      makeNotehead(7, "b2-8"),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      `| ${[
+        ...Array.from({ length: 8 }, () => "A"),
+        ...Array.from({ length: 8 }, () => "a"),
+        ...Array.from({ length: 8 }, () => "B"),
+        ...Array.from({ length: 8 }, () => "b"),
+      ].join(" | ")} |`,
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "| A | A | A | A |",
+      "| A | A | A | A |",
+      "| a | a | a | a |",
+      "| a | a | a | a |",
+      "| B | B | B | B |",
+      "| B | B | B | B |",
+      "| b | b | b | b |",
+      "| b | b | b | b |",
+    ].join("\n");
+
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        1,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        9,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a2-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        17,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("b1-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        25,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("b2-1");
+  });
+
+  it("uses rendered notehead order when expanded display ABC already matches the structured playback", () => {
+    const makeNotehead = (lineIndex: number, id: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", `abcjs-note abcjs-l${lineIndex}`);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", id);
+      noteGroup.appendChild(notehead);
+      return notehead;
+    };
+
+    const linePattern = [
+      0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 5, 5, 1, 1, 1, 1, 2, 2, 2, 2, 4,
+      4, 4, 5, 5, 5, 5, 5,
+    ];
+    const noteheads = linePattern.map((lineIndex, index) =>
+      makeNotehead(lineIndex, `n-${index + 1}`)
+    );
+
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "P:A",
+      `| ${Array.from({ length: 8 }, () => "A").join(" | ")} |`,
+      "P:B",
+      `| ${Array.from({ length: 8 }, () => "B").join(" | ")} |`,
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      `| ${[
+        ...Array.from({ length: 16 }, () => "A"),
+        ...Array.from({ length: 16 }, () => "B"),
+      ].join(" | ")} |`,
+    ].join("\n");
+
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        1,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("n-1");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        9,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("n-9");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        17,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("n-17");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "AABB",
+        25,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("n-25");
+  });
+
   it("derives section pass labels like A2 and B2 from structured playback", () => {
     const sourceAbc = [
       "X:1",
@@ -434,6 +758,200 @@ describe("RhythmPlayer", () => {
     updateStructuredDisplayPartLabels(container, sourceAbc, "A2A2B2B2", 7);
     expect(first.textContent).toBe("A");
     expect(second.textContent).toBe("B2");
+  });
+
+  it("resolves the displayed notehead from abcjs playback marker classes", () => {
+    const container = document.createElement("div");
+    const makeNote = (className: string, noteId: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", className);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", noteId);
+      noteGroup.appendChild(notehead);
+      container.appendChild(noteGroup);
+      return notehead;
+    };
+
+    makeNote("abcjs-note abcjs-mm8 abcjs-n0 abcjs-l2", "before");
+    makeNote("abcjs-note abcjs-mm8 abcjs-n2 abcjs-l2", "target");
+
+    expect(
+      resolvePlaybackMarkerNotehead(container, {
+        measureIndex: 8,
+        noteIndex: 1,
+      })?.getAttribute("data-note-id")
+    ).toBe("target");
+  });
+
+  it("prefers the structured display notehead when the playback marker drifts into the next visible section", () => {
+    const container = document.createElement("div");
+    const makeNote = (
+      className: string,
+      noteId: string,
+      parent: ParentNode = container
+    ) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", className);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", noteId);
+      noteGroup.appendChild(notehead);
+      parent.appendChild(noteGroup);
+      return notehead;
+    };
+
+    const noteheads = [
+      makeNote("abcjs-note abcjs-mm0 abcjs-n0 abcjs-l0", "a-1"),
+      makeNote("abcjs-note abcjs-mm0 abcjs-n1 abcjs-l0", "a-2"),
+      makeNote("abcjs-note abcjs-mm0 abcjs-n2 abcjs-l0", "a-3"),
+      makeNote("abcjs-note abcjs-mm0 abcjs-n3 abcjs-l0", "a-4"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n0 abcjs-l1", "a-5"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n1 abcjs-l1", "a-6"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n2 abcjs-l1", "a-7"),
+      makeNote("abcjs-note abcjs-mm1 abcjs-n3 abcjs-l1", "a-8"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n0 abcjs-l2", "b-1"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n1 abcjs-l2", "b-2"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n2 abcjs-l2", "b-3"),
+      makeNote("abcjs-note abcjs-mm2 abcjs-n3 abcjs-l2", "b-4"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n0 abcjs-l3", "b-5"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n1 abcjs-l3", "b-6"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n2 abcjs-l3", "b-7"),
+      makeNote("abcjs-note abcjs-mm3 abcjs-n3 abcjs-l3", "b-8"),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "P:A",
+      `| ${Array.from({ length: 8 }, () => "A").join(" | ")} |`,
+      "P:B",
+      `| ${Array.from({ length: 8 }, () => "B").join(" | ")} |`,
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:4/4",
+      "L:1/4",
+      "K:clef=perc",
+      "| A | A | A | A |",
+      "| A | A | A | A |",
+      "| B | B | B | B |",
+      "| B | B | B | B |",
+    ].join("\n");
+
+    expect(
+      resolveCurrentBeatNotehead(
+        container,
+        noteheads,
+        {
+          measureIndex: 2,
+          noteIndex: 0,
+        },
+        sourceAbc,
+        "AABB",
+        9,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a-1");
+  });
+
+  it("maps full rendered lines with rests without wrapping back within the line", () => {
+    const makeNotehead = (lineIndex: number, id: string) => {
+      const noteGroup = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "g"
+      );
+      noteGroup.setAttribute("class", `abcjs-note abcjs-l${lineIndex}`);
+
+      const notehead = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
+      notehead.setAttribute("class", "abcjs-notehead");
+      notehead.setAttribute("data-note-id", id);
+      noteGroup.appendChild(notehead);
+      return notehead;
+    };
+
+    const noteheads = [
+      ...Array.from({ length: 20 }, (_value, index) =>
+        makeNotehead(0, `a1-${index + 1}`)
+      ),
+      ...Array.from({ length: 20 }, (_value, index) =>
+        makeNotehead(1, `a2-${index + 1}`)
+      ),
+    ];
+
+    const sourceAbc = [
+      "X:1",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "P:A",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+    ].join("\n");
+    const displayAbc = [
+      "X:1",
+      "M:6/8",
+      "L:1/8",
+      "K:clef=perc",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+      "| =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, | =F,zD, F,=C,C, |",
+    ].join("\n");
+
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        20,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-16");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        21,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-17");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        24,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a1-20");
+    expect(
+      resolveStructuredDisplayNotehead(
+        noteheads,
+        sourceAbc,
+        "A",
+        25,
+        displayAbc
+      )?.getAttribute("data-note-id")
+    ).toBe("a2-1");
   });
 
   it("uses expanded sample ABC for seed playback so timing does not depend on repeat playback", async () => {
@@ -648,8 +1166,14 @@ describe("RhythmPlayer", () => {
     });
 
     const displayAbc = mocked.renderAbcMock.mock.calls.at(-1)?.[1] as string;
-    expect(displayAbc).toContain("P:A");
-    expect(displayAbc).toContain("P:B");
+    expect(displayAbc).not.toContain("P:A");
+    expect(displayAbc).not.toContain("P:B");
+    expect(displayAbc).toContain(
+      "|: C2 c C c c | C2 c C c c | C2 c C c c | C2 c C c c |"
+    );
+    expect(displayAbc).toContain(
+      "| C2 c C c c | C2 c C c c | C2 c C c c | C2 c C c c :|"
+    );
   });
 
   it("shows the tune structure in the player header", async () => {
@@ -984,6 +1508,100 @@ describe("RhythmPlayer", () => {
     await waitFor(() => {
       expect(mocked.loadPatternMock).toHaveBeenCalledTimes(2);
       expect(patternSelect.value).toBe("system-default");
+    });
+  });
+
+  it("keeps the newer pattern selection when an older load resolves late", async () => {
+    const defaultAbc = [
+      "X:1",
+      "T:System Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: C2 A2 C2 A2 :|",
+    ].join("\n");
+    const userAbc = [
+      "X:1",
+      "T:User Default",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "|: D2 A2 D2 A2 :|",
+    ].join("\n");
+
+    const patternCandidates = [
+      {
+        id: "system-default",
+        name: "System Default",
+        scope: "system_default" as const,
+        patternType: "seed" as const,
+        sampleKit: "bodhran",
+        hasPremiumAudio: false,
+      },
+      {
+        id: "user-default",
+        name: "User Default",
+        scope: "user_default" as const,
+        patternType: "seed" as const,
+        sampleKit: "generic_click",
+        hasPremiumAudio: false,
+      },
+    ];
+
+    const buildMetadata = (
+      patternId: "system-default" | "user-default"
+    ): RhythmPatternMetadata => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: patternId === "user-default" ? userAbc : defaultAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      sampleKit: patternId === "user-default" ? "generic_click" : "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+      selectedPatternId: patternId,
+      patternCandidates,
+    });
+
+    let resolveInitialLoad: ((value: RhythmPatternMetadata) => void) | null =
+      null;
+
+    mocked.loadPatternMock.mockImplementation((request) => {
+      if (!request.selectedPatternId) {
+        return new Promise<RhythmPatternMetadata>((resolve) => {
+          resolveInitialLoad = resolve;
+        });
+      }
+
+      return Promise.resolve(buildMetadata("user-default"));
+    });
+    mocked.serviceStub.metadata = () => buildMetadata("system-default");
+
+    const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+    const patternSelect = await view.findByTestId(
+      "rhythm-player-pattern-select"
+    );
+
+    fireEvent.change(patternSelect, {
+      target: { value: "user-default" },
+    });
+
+    await waitFor(() => {
+      expect((patternSelect as HTMLSelectElement).value).toBe("user-default");
+    });
+
+    expect(resolveInitialLoad).not.toBeNull();
+    resolveInitialLoad!(buildMetadata("system-default"));
+
+    await waitFor(() => {
+      expect((patternSelect as HTMLSelectElement).value).toBe("user-default");
+      expect(mocked.updateRhythmAbcMock.mock.calls.at(-1)?.[0]).toContain(
+        "D2 A2 D2 A2"
+      );
     });
   });
 
@@ -1845,6 +2463,79 @@ describe("RhythmPlayer", () => {
     );
   });
 
+  it("plays compact sectioned full_track ABC in tune structure order", async () => {
+    const fullTrackAbc = [
+      "X:1",
+      "T:Sectioned Full Track",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "P:A",
+      "|: A2 | A3 | A4 | A5 :|",
+      "P:B",
+      "|: B2 | B3 | B4 | B5 :|",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    const view = render(() => (
+      <RhythmPlayer tuneTypeName="Reel" structure="AABB" />
+    ));
+
+    const playButton = view.getByTestId("rhythm-player-play-toggle");
+
+    await waitFor(() => {
+      expect(mocked.updateRhythmAbcMock).toHaveBeenCalled();
+      expect(playButton.hasAttribute("disabled")).toBe(false);
+    });
+
+    fireEvent.change(view.getByTestId("rhythm-player-start-section-select"), {
+      target: { value: "B1" },
+    });
+    fireEvent.click(playButton);
+
+    expect(mocked.serviceStub.play).toHaveBeenCalledWith({
+      startPositionMs: 0,
+      startBeatIndex: 8,
+      startMeasure: 8,
+      playbackRhythmAbc: [
+        "X:1",
+        "T:Sectioned Full Track",
+        "M:4/4",
+        "L:1/8",
+        "K:clef=perc",
+        "| B2 | B3 | B4 | B5 | B2 | B3 | B4 | B5 | A2 | A3 | A4 | A5 | A2 | A3 | A4 | A5 |",
+      ].join("\n"),
+    });
+  });
+
   it("keeps already-expanded full_track patterns exactly as written", async () => {
     const expandedFullTrackBody = [
       ...Array.from({ length: 16 }, () => "C2 A2 C2 A2"),
@@ -1953,15 +2644,15 @@ describe("RhythmPlayer", () => {
     expect(renderedAbc).toContain("M:6/8");
     expect(renderedAbc).toContain("L:1/8");
     expect(renderedAbc).toContain("K:clef=perc");
-    expect(renderedAbc).toContain("P:A");
+    expect(renderedAbc).not.toContain("P:A");
     expect(renderedAbc).toContain("|: C2 E G | A2 c e :|");
-    expect(renderedAbc).toContain("P:B");
+    expect(renderedAbc).not.toContain("P:B");
     expect(renderedAbc).toContain("|: e2 c A | G2 E C :|");
     expect(renderedAbc).not.toContain("T:Full Tune Display");
     expect(renderedAbc).not.toContain("Q:1/4=112");
   });
 
-  it("renders compact full_track notation using structure repeats", async () => {
+  it("renders compact full_track notation assembled in tune-structure repeats", async () => {
     const fullTrackAbc = [
       "X:1",
       "T:Compact Full Tune",
@@ -2012,13 +2703,141 @@ describe("RhythmPlayer", () => {
     expect(renderedAbc).toContain("M:4/4");
     expect(renderedAbc).toContain("L:1/8");
     expect(renderedAbc).toContain("K:clef=perc");
-    expect(renderedAbc).toContain("P:A");
+    expect(renderedAbc).not.toContain("P:A");
+    expect(renderedAbc).not.toContain("P:B");
     expect(renderedAbc).toContain(
-      `| ${Array.from({ length: 4 }, () => "C2 A2 C2 A2").join(" | ")} |`
+      Array.from({ length: 4 }, () => "C2 A2 C2 A2").join(" | ")
     );
-    expect(renderedAbc).toContain("P:B");
     expect(renderedAbc).toContain(
-      `| ${Array.from({ length: 4 }, () => "C2 c2 C2 c2").join(" | ")} |`
+      Array.from({ length: 4 }, () => "C2 c2 C2 c2").join(" | ")
+    );
+
+    const renderedBodyBars = renderedAbc
+      .split("\n")
+      .filter((line) => !/^[A-Z]:/.test(line))
+      .flatMap((line) =>
+        line
+          .replace(/^\s*\|:?\s*/, "")
+          .replace(/\s*:?[|]\s*$/, "")
+          .split("|")
+          .map((segment) => segment.trim())
+          .filter(Boolean)
+      );
+
+    expect(renderedBodyBars).toEqual([
+      ...Array.from({ length: 8 }, () => "C2 A2 C2 A2"),
+      ...Array.from({ length: 8 }, () => "C2 c2 C2 c2"),
+    ]);
+  });
+
+  it("trims extra labeled accompaniment parts to the tune structure", async () => {
+    const fullTrackAbc = [
+      "X:1",
+      "T:Three Part Pattern",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "P:A",
+      "| A2 | A3 |",
+      "P:B",
+      "| B2 | B3 |",
+      "P:C",
+      "| C2 | C3 |",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    render(() => <RhythmPlayer tuneTypeName="Reel" structure="A2B2" />);
+
+    await waitFor(() => {
+      expect(mocked.updateRhythmAbcMock).toHaveBeenCalled();
+    });
+
+    expect(mocked.updateRhythmAbcMock.mock.calls.at(-1)?.[0]).toContain(
+      "| A2 | A3 | B2 | B3 |"
+    );
+    expect(mocked.updateRhythmAbcMock.mock.calls.at(-1)?.[0]).not.toContain(
+      "C2"
+    );
+  });
+
+  it("wraps labeled accompaniment parts when the tune has more distinct sections", async () => {
+    const fullTrackAbc = [
+      "X:1",
+      "T:Two Part Pattern",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "P:A",
+      "| A2 |",
+      "P:B",
+      "| B2 |",
+    ].join("\n");
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track",
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: fullTrackAbc,
+      rhythmSignature: "4/4",
+      patternType: "full_track" as const,
+      tempoQpm: 112,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+
+    render(() => <RhythmPlayer tuneTypeName="Reel" structure="A1B1C1D1E1" />);
+
+    await waitFor(() => {
+      expect(mocked.updateRhythmAbcMock).toHaveBeenCalled();
+    });
+
+    expect(mocked.updateRhythmAbcMock.mock.calls.at(-1)?.[0]).toContain(
+      "| A2 | B2 | A2 | B2 | A2 |"
     );
   });
 
@@ -2106,8 +2925,8 @@ describe("RhythmPlayer", () => {
     expect(renderedAbc).toContain("M:6/8");
     expect(renderedAbc).toContain("L:1/8");
     expect(renderedAbc).toContain("K:clef=perc");
-    expect(renderedAbc).toContain("P:A");
-    expect(renderedAbc).toContain("P:B");
+    expect(renderedAbc).not.toContain("P:A");
+    expect(renderedAbc).not.toContain("P:B");
     expect(renderedAbc).toContain(
       "|: C2 c C c c | C2 c C c c | C2 c C c c | C2 c C c c |"
     );
