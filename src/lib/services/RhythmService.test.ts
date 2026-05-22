@@ -6,10 +6,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
-import {
-  createRhythmService,
-  loadRhythmPatternMetadata,
-} from "./RhythmService";
+import { createRhythmService, loadRhythmPattern } from "./RhythmService";
 
 const projectRoot = path.resolve(__dirname, "..", "..", "..");
 
@@ -250,11 +247,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("loadRhythmPatternMetadata", () => {
+describe("loadRhythmPattern", () => {
   it("prefers rhythm_patterns and genre_tune_type.default_bpm when available", async () => {
     const db = createPremiumLoopRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -282,7 +279,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("falls back to generated ABC when rhythm_patterns has no matching row", async () => {
     const db = createRhythmDbWithoutPatternRow();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -308,7 +305,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("resolves genre code ITRAD without inventing premium loop URLs", async () => {
     const db = createRhythmDbWithoutPatternRow();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "ITRAD",
@@ -330,7 +327,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("returns canonical genre ids and names from the genre table", async () => {
     const db = createPremiumLoopRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreId: "ITRAD",
@@ -353,7 +350,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("falls back when rhythm_patterns exists with an older partial schema", async () => {
     const db = createRhythmDbWithLegacyPatternColumns();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -379,7 +376,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("resolves jig metadata without synthesizing a premium loop", async () => {
     const db = createFallbackJigRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -405,7 +402,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("matches tune-type ids like JigD and still resolves jig metadata", async () => {
     const db = createFallbackJigCodeRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -431,7 +428,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("resolves polka metadata without synthesizing a premium loop", async () => {
     const db = createFallbackPolkaRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -456,7 +453,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("prefixes explicit premium_audio_url values with the configured public R2 base URL", async () => {
     const db = createPremiumLoopRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -475,7 +472,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("falls back to generated percussion ABC and default tempo when new tables are absent", async () => {
     const db = createFallbackRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         tuneTypeName: "Reel",
@@ -498,7 +495,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("prioritizes the user tune override over tune and user defaults", async () => {
     const db = createHierarchicalRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -530,7 +527,7 @@ describe("loadRhythmPatternMetadata", () => {
       includeUserTuneOverride: false,
     });
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -559,7 +556,7 @@ describe("loadRhythmPatternMetadata", () => {
       includeGlobalTuneOverride: false,
     });
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -584,7 +581,7 @@ describe("loadRhythmPatternMetadata", () => {
   it("returns ranked pattern candidates alongside the selected pattern", async () => {
     const db = createHierarchicalRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
@@ -654,7 +651,7 @@ K:clef=perc
 |: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
     ]);
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: null,
@@ -681,7 +678,7 @@ K:clef=perc
   it("honors a selectedPatternId when it matches an eligible candidate", async () => {
     const db = createHierarchicalRhythmDb();
 
-    const metadata = await loadRhythmPatternMetadata(
+    const metadata = await loadRhythmPattern(
       db,
       {
         genreName: "Irish Traditional",
