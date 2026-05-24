@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import type { IncomingMessage } from "node:http";
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
@@ -19,22 +19,58 @@ export default defineConfig(() => {
     "**/playwright-report/**",
     "**/e2e/.auth/**",
   ];
+  const gitBinaryCandidates = [
+    "/usr/bin/git",
+    "/opt/homebrew/bin/git",
+    "/usr/local/bin/git",
+  ] as const;
+
+  const runGitCommand = (args: string[]): string | null => {
+    for (const gitBinaryPath of gitBinaryCandidates) {
+      try {
+        const output = execFileSync(gitBinaryPath, args, {
+          encoding: "utf8",
+        }).trim();
+
+        if (output) {
+          return output;
+        }
+      } catch {
+        // Try the next known git binary path.
+      }
+    }
+
+    return null;
+  };
 
   // Get build-time constants
   const getGitCommit = () => {
-    try {
-      return execSync("git rev-parse --short HEAD").toString().trim();
-    } catch {
-      return "unknown";
+    const ciCommit =
+      process.env.GITHUB_SHA?.slice(0, 7) ??
+      process.env.CI_COMMIT_SHA?.slice(0, 7);
+    if (ciCommit) {
+      return ciCommit;
     }
+
+    return runGitCommand(["rev-parse", "--short", "HEAD"]) ?? "unknown";
   };
 
   const getGitBranch = () => {
-    try {
-      return execSync("git rev-parse --abbrev-ref HEAD").toString().trim();
-    } catch {
-      return "unknown";
+    const ciBranch =
+      process.env.GITHUB_REF_NAME ?? process.env.CI_COMMIT_REF_NAME;
+    if (ciBranch) {
+      return ciBranch;
     }
+
+    return runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"]) ?? "unknown";
+  };
+
+  const trimTrailingSlashes = (value: string): string => {
+    let normalized = value;
+    while (normalized.endsWith("/")) {
+      normalized = normalized.slice(0, -1);
+    }
+    return normalized;
   };
 
   const manualChunkGroups = {
@@ -90,7 +126,7 @@ export default defineConfig(() => {
   };
 
   const matchesRhythmAssetUrl = ({ url }: { url: URL }) => {
-    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    const normalizedPath = trimTrailingSlashes(url.pathname);
     const isKnownRhythmAssetPath =
       normalizedPath.startsWith("/audio/kits/") ||
       normalizedPath.startsWith("/audio/loops/");
@@ -204,6 +240,10 @@ export default defineConfig(() => {
         "**/legacy/**", // Exclude legacy code
         "**/*.spec.ts", // Exclude Playwright test files (use .test.ts for Vitest)
       ],
+      coverage: {
+        provider: "v8", // or 'istanbul'
+        reporter: ["text", "lcov"], // 'lcov' produces the lcov.info file Sonar needs
+      },
     },
     plugins: [
       solid(),
