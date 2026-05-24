@@ -4,4 +4,4 @@ node_modules/
 # Ignore all contents of the legacy folder
 legacy/**/*
 
-public/sql-wasm/*
+public/sql-wasm/**
