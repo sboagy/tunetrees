@@ -25,7 +25,34 @@ const EXPECTED_BODHRAN_FETCH_URLS = Array.from(
 const EXPECTED_BODHRAN_FETCH_COUNT = EXPECTED_BODHRAN_FETCH_URLS.length;
 const EXPECTED_BODHRAN_FIRST_FETCH_URL = EXPECTED_BODHRAN_FETCH_URLS[0];
 const EXPECTED_BODHRAN_LAST_FETCH_URL =
-  EXPECTED_BODHRAN_FETCH_URLS[EXPECTED_BODHRAN_FETCH_URLS.length - 1];
+  EXPECTED_BODHRAN_FETCH_URLS.at(-1) ?? "";
+
+function noop(): void {
+  // Intentionally empty for test doubles that implement optional hooks.
+}
+
+function asFetch(mock: unknown): typeof fetch {
+  return mock as typeof fetch;
+}
+
+function getBodhranMockByteLength(url: string): number {
+  if (url.includes("bodhran-border")) {
+    return 18;
+  }
+  if (url.includes("bodhran-drag")) {
+    return 20;
+  }
+  if (url.includes("bodhran-ff")) {
+    return 14;
+  }
+  if (url.includes("bodhran-f")) {
+    return 13;
+  }
+  if (url.includes("bodhran-p")) {
+    return 12;
+  }
+  return 11;
+}
 
 function createDb(sqlStatements: string[]): SqliteDatabase {
   const sqlite = new Database(":memory:");
@@ -243,7 +270,7 @@ function createRhythmDbWithLegacyPatternColumns() {
 function createMockStorage(): Storage {
   const values = new Map<string, string>();
 
-  return {
+  const storage: Storage = {
     get length() {
       return values.size;
     },
@@ -262,7 +289,9 @@ function createMockStorage(): Storage {
     setItem(key: string, value: string) {
       values.set(key, value);
     },
-  } as Storage;
+  };
+
+  return storage;
 }
 
 afterEach(() => {
@@ -924,7 +953,9 @@ describe("createRhythmService", () => {
         this.paused = true;
       }
 
-      reset() {}
+      reset() {
+        noop();
+      }
 
       stop() {
         this.stopped = true;
@@ -953,7 +984,7 @@ describe("createRhythmService", () => {
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -980,7 +1011,7 @@ describe("createRhythmService", () => {
     expect(bufferSources[1]?.start).toHaveBeenCalledTimes(1);
     expect(FakeTimingCallbacks.instances[0]?.options.qpm).toBe(112);
 
-    FakeTimingCallbacks.instances[0]!.currentPositionMs = 1500;
+    FakeTimingCallbacks.instances[0].currentPositionMs = 1500;
     await service.setTempoQpm(132);
 
     expect(service.tempoQpm()).toBe(132);
@@ -1126,9 +1157,15 @@ describe("createRhythmService", () => {
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -1148,7 +1185,7 @@ describe("createRhythmService", () => {
         abcjsModule: fakeAbcjs,
         audioContext: new FakeAudioContext() as unknown as AudioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       })
     );
 
@@ -1343,9 +1380,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -1368,7 +1411,7 @@ K:clef=perc
         db,
         abcjsModule: fakeAbcjs,
         audioContext,
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
         initialCountInMeasures: 1,
         sampleBaseUrl: "",
         waitImpl: waitMock,
@@ -1504,9 +1547,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return this.currentPositionMs;
       }
@@ -1529,7 +1578,7 @@ K:clef=perc
         db,
         abcjsModule: fakeAbcjs,
         audioContext,
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
         initialCountInMeasures: 1,
         sampleBaseUrl: "",
         waitImpl: waitMock,
@@ -1628,9 +1677,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -1665,7 +1720,7 @@ K:clef=perc
             src,
           } as unknown as HTMLAudioElement;
         },
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -1798,9 +1853,13 @@ K:clef=perc
         this.paused = true;
       }
 
-      reset() {}
+      reset() {
+        noop();
+      }
 
-      stop() {}
+      stop() {
+        noop();
+      }
 
       currentMillisecond() {
         return this.currentPositionMs;
@@ -1840,7 +1899,7 @@ K:clef=perc
           createdAudio.push(element);
           return element as unknown as HTMLAudioElement;
         },
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -1864,7 +1923,7 @@ K:clef=perc
     expect(service.currentBeatIndex()).toBe(1);
     expect(service.currentMeasure()).toBe(1);
 
-    FakeTimingCallbacks.instances[0]!.currentPositionMs = 1500;
+    FakeTimingCallbacks.instances[0].currentPositionMs = 1500;
     await service.setTempoQpm(132);
 
     expect(createdAudio).toHaveLength(1);
@@ -1970,20 +2029,27 @@ K:clef=perc
       }
 
       start() {
+        const kickoffMeasure = 1;
         this.options.eventCallback?.({
           type: "event",
           measureStart: true,
-          measureNumber: 1,
+          measureNumber: kickoffMeasure,
           midiPitches: [{ pitch: 60 }, { pitch: 69 }],
           elements: [[]],
         });
       }
 
-      pause() {}
+      pause() {
+        noop();
+      }
 
-      reset() {}
+      reset() {
+        noop();
+      }
 
-      stop() {}
+      stop() {
+        noop();
+      }
 
       currentMillisecond() {
         return 0;
@@ -2006,7 +2072,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext: new FakeAudioContext() as unknown as AudioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2103,18 +2169,25 @@ K:clef=perc
       }
 
       start() {
+        const kickoffPitches = [60, 69] as const;
         this.options.eventCallback?.({
           type: "event",
           measureStart: true,
           measureNumber: 1,
-          midiPitches: [{ pitch: 60 }, { pitch: 69 }],
+          midiPitches: kickoffPitches.map((pitch) => ({ pitch })),
           elements: [[]],
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -2154,7 +2227,7 @@ K:clef=perc
             preload: "none",
             src,
           }) as unknown as HTMLAudioElement,
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2257,6 +2330,7 @@ K:clef=perc
       }
 
       start() {
+        noop();
         this.options.eventCallback?.({
           type: "event",
           measureStart: true,
@@ -2266,9 +2340,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -2292,7 +2372,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2405,9 +2485,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -2431,7 +2517,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2553,9 +2639,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -2579,7 +2671,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2708,9 +2800,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -2734,7 +2832,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2757,19 +2855,7 @@ K:clef=perc
     const db = createSampleKitRhythmDb();
 
     const fetchMock = vi.fn(async (url: string) => {
-      const bytes = url.includes("bodhran-border")
-        ? 18
-        : url.includes("bodhran-drag")
-          ? 20
-          : url.includes("bodhran-ff")
-            ? 14
-            : url.includes("bodhran-f")
-              ? 13
-              : url.includes("bodhran-pp")
-                ? 11
-                : url.includes("bodhran-p")
-                  ? 12
-                  : 11;
+      const bytes = getBodhranMockByteLength(url);
 
       return {
         ok: true,
@@ -2859,9 +2945,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -2885,7 +2977,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -2907,19 +2999,7 @@ K:clef=perc
     const db = createSampleKitRhythmDb();
 
     const fetchMock = vi.fn(async (url: string) => {
-      const bytes = url.includes("bodhran-border")
-        ? 18
-        : url.includes("bodhran-drag")
-          ? 20
-          : url.includes("bodhran-ff")
-            ? 14
-            : url.includes("bodhran-f")
-              ? 13
-              : url.includes("bodhran-pp")
-                ? 11
-                : url.includes("bodhran-p")
-                  ? 12
-                  : 11;
+      const bytes = getBodhranMockByteLength(url);
 
       return {
         ok: true,
@@ -3016,9 +3096,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3042,7 +3128,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -3069,19 +3155,7 @@ K:clef=perc
     const db = createSampleKitRhythmDb();
 
     const fetchMock = vi.fn(async (url: string) => {
-      const bytes = url.includes("bodhran-border")
-        ? 18
-        : url.includes("bodhran-drag")
-          ? 20
-          : url.includes("bodhran-ff")
-            ? 14
-            : url.includes("bodhran-f")
-              ? 13
-              : url.includes("bodhran-pp")
-                ? 11
-                : url.includes("bodhran-p")
-                  ? 12
-                  : 11;
+      const bytes = getBodhranMockByteLength(url);
 
       return {
         ok: true,
@@ -3177,9 +3251,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3203,7 +3283,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -3319,9 +3399,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3345,7 +3431,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -3454,9 +3540,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3480,7 +3572,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -3597,9 +3689,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3623,7 +3721,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -3728,9 +3826,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3754,7 +3858,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -3885,9 +3989,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -3911,7 +4021,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4024,9 +4134,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -4050,7 +4166,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4183,9 +4299,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -4209,7 +4331,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4355,9 +4477,15 @@ K:clef=perc
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -4381,7 +4509,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4485,18 +4613,25 @@ K:clef=perc
       }
 
       start() {
+        const kickoffPitch = 60;
         this.options.eventCallback?.({
           type: "event",
           measureStart: true,
           measureNumber: 1,
-          midiPitches: [{ pitch: 60 }],
+          midiPitches: [{ pitch: kickoffPitch }],
           elements: [[]],
         });
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -4520,7 +4655,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4621,13 +4756,19 @@ K:clef=perc
         });
 
         if (FakeTimingCallbacks.instances.length === 1) {
-          void this.options.eventCallback?.(null);
+          this.options.eventCallback?.(null);
         }
       }
 
-      pause() {}
-      reset() {}
-      stop() {}
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
+      stop() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -4651,7 +4792,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4739,9 +4880,15 @@ K:clef=perc
         timingInstances.push(this);
       }
 
-      start() {}
-      pause() {}
-      reset() {}
+      start() {
+        noop();
+      }
+      pause() {
+        noop();
+      }
+      reset() {
+        noop();
+      }
       currentMillisecond() {
         return 0;
       }
@@ -4763,7 +4910,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext: new FakeAudioContext() as unknown as AudioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
@@ -4775,7 +4922,7 @@ K:clef=perc
         abcjsModule: fakeAbcjs,
         audioContext: new FakeAudioContext() as unknown as AudioContext,
         sampleBaseUrl: "",
-        fetchImpl: fetchMock as unknown as typeof fetch,
+        fetchImpl: asFetch(fetchMock),
       });
     });
 
