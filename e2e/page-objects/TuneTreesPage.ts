@@ -2554,6 +2554,57 @@ export class TuneTreesPage {
     return this.getRenderedViewMode(tab);
   }
 
+  private async waitForViewModeSurfaceReady(
+    tab: "catalog" | "repertoire" | "practice",
+    timeout = 15000
+  ): Promise<void> {
+    const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+    const columnsButton = this.getColumnsButtonForTab(tab);
+
+    // Catalog setup can still be settling after the test helper lands on the tab.
+    // Poll for the real app surface before opening the Kobalte display-options menu,
+    // otherwise Mobile Chrome can race into teardown/navigation and report a closed page.
+    await expect
+      .poll(
+        async () => {
+          if (this.page.isClosed()) {
+            return false;
+          }
+
+          const currentUrl = this.page.url();
+          if (
+            !currentUrl.startsWith(baseUrl) ||
+            currentUrl.includes("e2e-origin.html") ||
+            currentUrl === "about:blank"
+          ) {
+            return false;
+          }
+
+          const buttonVisible = await columnsButton
+            .isVisible({ timeout: 250 })
+            .catch(() => false);
+          if (!buttonVisible) {
+            return false;
+          }
+
+          const buttonEnabled = await columnsButton
+            .isEnabled()
+            .catch(() => false);
+          if (!buttonEnabled) {
+            return false;
+          }
+
+          const renderedMode = await this.getRenderedViewMode(tab);
+          return renderedMode !== null;
+        },
+        {
+          timeout,
+          intervals: [100, 250, 500, 1000],
+        }
+      )
+      .toBe(true);
+  }
+
   private getDisplayModeSwitch(): Locator {
     return this.getColumnVisibilityMenu()
       .getByTestId("display-mode-switch")
@@ -2811,6 +2862,8 @@ export class TuneTreesPage {
     const throwPageClosedError = () => {
       throw new Error(`Page closed while setting ${tab} view mode to ${mode}`);
     };
+
+    await this.waitForViewModeSurfaceReady(tab);
 
     const columnsButton = this.getColumnsButtonForTab(tab);
     const grid = this.getGridForTab(tab);

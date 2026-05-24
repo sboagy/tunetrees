@@ -46,8 +46,8 @@ import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-mode
 import type {
   RhythmPatternMetadata,
   RhythmPatternType,
-} from "@/lib/services/RhythmService";
-import { createRhythmService } from "@/lib/services/RhythmService";
+} from "@/lib/services/rhythm-service/RhythmService";
+import { createRhythmService } from "@/lib/services/rhythm-service/RhythmService";
 import { cn } from "@/lib/utils";
 import { AbcNotation } from "../tunes/AbcNotation";
 import {
@@ -85,7 +85,7 @@ type CustomPatternEditorMode = "create" | "edit";
 const ACTIVE_NOTE_COLOR = "#60a5fa";
 const CUSTOM_PATTERN_SAMPLE_KIT_OPTIONS = [
   { value: "bodhran", label: "Bodhran" },
-  { value: "bodhran2", label: "Bodhran 2" },
+  { value: "melodicTom", label: "Melodic Tom" },
   { value: "generic_click", label: "Generic click" },
 ] as const;
 const CUSTOM_PATTERN_SCOPE_OPTIONS = {
@@ -139,7 +139,7 @@ function validateCustomPatternDraft(input: {
 
   const requiredHeaders = ["M:", "L:", "K:"];
   const missingHeader = requiredHeaders.find(
-    (header) => !new RegExp(`^\\s*${header}`, "m").test(abcString)
+    (header) => !new RegExp(String.raw`^\s*${header}`, "m").test(abcString)
   );
   if (missingHeader) {
     return `ABC notation must include a ${missingHeader} header.`;
@@ -353,6 +353,13 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const playerTitle = createMemo(() => {
     const tuneTypeName = props.tuneTypeName?.trim();
     return tuneTypeName ? `Rhythm Player: ${tuneTypeName}` : "Rhythm Player";
+  });
+  const playToggleLabel = createMemo(() => {
+    if (isPatternLoading()) {
+      return "Loading";
+    }
+
+    return isPlaying() ? "Stop" : "Play";
   });
 
   const closeCustomPatternEditor = () => {
@@ -989,7 +996,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                     <Play class="h-4 w-4" />
                   )}
                 </Show>
-                {isPatternLoading() ? "Loading" : isPlaying() ? "Stop" : "Play"}
+                {playToggleLabel()}
               </button>
 
               <button

@@ -191,3 +191,10 @@ practice_queues_recovered.csv
 
 _plans
 _notes
+
+# SonarQube local analysis cache
+.scannerwork/
+.sonar_lock
+report-task.txt
+issues.json
+sonar_issues.json

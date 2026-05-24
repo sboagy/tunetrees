@@ -11,7 +11,39 @@ import {
   type RhythmPatternMetadata,
   type RhythmPatternRequest,
 } from "@/lib/rhythm/pattern-loader";
-import { normalizeTuneTypeName } from "@/lib/rhythm/tune-type-lookup";
+import {
+  buildSampleUrl,
+  clampPremiumLoopPlaybackRate,
+  createSyntheticClickBuffer,
+  decodeSample,
+  getAudioContextConstructor,
+  getAudioElementConstructor,
+  msToSeconds,
+  waitForMilliseconds,
+} from "@/lib/services/rhythm-service/audio-helpers";
+import {
+  clampTempo,
+  createCountInBuffers,
+  eventHasAccent,
+  getCountInPulseIndices,
+  getEventPulseIndex,
+  getPitchPlaybackGain,
+  getPitchPlaybackRate,
+  getPlaybackDelaySeconds,
+  getPlaybackEventMarker,
+  getPlaybackPitchSelection,
+  getSampleKitMapping,
+  normalizePlaybackPitch,
+  normalizeSampleKit,
+  type PlaybackEventMarker,
+  type PlaybackPitchSelection,
+  parseRhythmPlaybackDebugFlag,
+  parseRhythmSignatureParts,
+} from "@/lib/services/rhythm-service/playback-helpers";
+import {
+  readStoredRhythmTempo,
+  writeStoredRhythmTempo,
+} from "@/lib/services/rhythm-service/tempo-storage";
 
 export type {
   RhythmPatternCandidate,
@@ -20,28 +52,17 @@ export type {
   RhythmPatternRequest,
   RhythmPatternType,
 } from "@/lib/rhythm/pattern-loader";
+export type { PlaybackEventMarker } from "@/lib/services/rhythm-service/playback-helpers";
 
-const DEFAULT_SAMPLE_BASE_URL = (
-  import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
-).replace(/\/+$/, "");
-const DEFAULT_SAMPLE_KIT = "generic_click";
-const GENERIC_CLICK_PRIMARY_PITCH = 60;
-const GENERIC_CLICK_SECONDARY_PITCH = 69;
-const BODHRAN_DEFAULT_STRIKE_PITCH = 28;
-const BODHRAN_DEFAULT_EDGE_PITCH = 47;
+const DEFAULT_SAMPLE_BASE_URL = (() => {
+  let value = import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? "";
 
-type SampleKitFileEntry = {
-  kind: "file";
-  fileName: string;
-};
+  while (value.endsWith("/")) {
+    value = value.slice(0, -1);
+  }
 
-type SampleKitSyntheticEntry = {
-  kind: "synthetic";
-  durationMs: number;
-  frequency: number;
-};
-
-type SampleKitEntry = SampleKitFileEntry | SampleKitSyntheticEntry;
+  return value;
+})();
 
 type PremiumLoopSelection = {
   source: "database";
@@ -61,149 +82,13 @@ type PremiumLoopAudio = Pick<
   | "preload"
   | "src"
 >;
-
-const SAMPLE_KITS: Record<string, Record<number, SampleKitEntry>> = {
-  bodhran: {
-    24: { kind: "file", fileName: "65849__bosone__bodhran-pp01.mp3" },
-    26: { kind: "file", fileName: "65839__bosone__bodhran-p01.mp3" },
-    28: { kind: "file", fileName: "65831__bosone__bodhran-f01.mp3" },
-    29: { kind: "file", fileName: "65835__bosone__bodhran-ff01.mp3" },
-    44: { kind: "file", fileName: "65824__bosone__bodhran-drag01.mp3" },
-    45: { kind: "file", fileName: "65818__bosone__bodhran-border01.mp3" },
-    46: { kind: "file", fileName: "65820__bosone__bodhran-border03.mp3" },
-    47: { kind: "file", fileName: "65823__bosone__bodhran-border06.mp3" },
-  },
-  bodhran2: {
-    21: { kind: "file", fileName: "A0.mp3" },
-    22: { kind: "file", fileName: "Bb0.mp3" },
-    23: { kind: "file", fileName: "B0.mp3" },
-    24: { kind: "file", fileName: "C1.mp3" },
-    25: { kind: "file", fileName: "Db1.mp3" },
-    26: { kind: "file", fileName: "D1.mp3" },
-    27: { kind: "file", fileName: "Eb1.mp3" },
-    28: { kind: "file", fileName: "E1.mp3" },
-    29: { kind: "file", fileName: "F1.mp3" },
-    30: { kind: "file", fileName: "Gb1.mp3" },
-    31: { kind: "file", fileName: "G1.mp3" },
-    32: { kind: "file", fileName: "Ab1.mp3" },
-    33: { kind: "file", fileName: "A1.mp3" },
-    34: { kind: "file", fileName: "Bb1.mp3" },
-    35: { kind: "file", fileName: "B1.mp3" },
-    36: { kind: "file", fileName: "C2.mp3" },
-    37: { kind: "file", fileName: "Db2.mp3" },
-    38: { kind: "file", fileName: "D2.mp3" },
-    39: { kind: "file", fileName: "Eb2.mp3" },
-    40: { kind: "file", fileName: "E2.mp3" },
-    41: { kind: "file", fileName: "F2.mp3" },
-    42: { kind: "file", fileName: "Gb2.mp3" },
-    43: { kind: "file", fileName: "G2.mp3" },
-    44: { kind: "file", fileName: "Ab2.mp3" },
-    45: { kind: "file", fileName: "A2.mp3" },
-    46: { kind: "file", fileName: "Bb2.mp3" },
-    47: { kind: "file", fileName: "B2.mp3" },
-    48: { kind: "file", fileName: "C3.mp3" },
-    49: { kind: "file", fileName: "Db3.mp3" },
-    50: { kind: "file", fileName: "D3.mp3" },
-    51: { kind: "file", fileName: "Eb3.mp3" },
-    52: { kind: "file", fileName: "E3.mp3" },
-    53: { kind: "file", fileName: "F3.mp3" },
-    54: { kind: "file", fileName: "Gb3.mp3" },
-    55: { kind: "file", fileName: "G3.mp3" },
-    56: { kind: "file", fileName: "Ab3.mp3" },
-    57: { kind: "file", fileName: "A3.mp3" },
-    58: { kind: "file", fileName: "Bb3.mp3" },
-    59: { kind: "file", fileName: "B3.mp3" },
-    60: { kind: "file", fileName: "C4.mp3" },
-    61: { kind: "file", fileName: "Db4.mp3" },
-    62: { kind: "file", fileName: "D4.mp3" },
-    63: { kind: "file", fileName: "Eb4.mp3" },
-    64: { kind: "file", fileName: "E4.mp3" },
-    65: { kind: "file", fileName: "F4.mp3" },
-    66: { kind: "file", fileName: "Gb4.mp3" },
-    67: { kind: "file", fileName: "G4.mp3" },
-    68: { kind: "file", fileName: "Ab4.mp3" },
-    69: { kind: "file", fileName: "A4.mp3" },
-    70: { kind: "file", fileName: "Bb4.mp3" },
-    71: { kind: "file", fileName: "B4.mp3" },
-    72: { kind: "file", fileName: "C5.mp3" },
-    73: { kind: "file", fileName: "Db5.mp3" },
-    74: { kind: "file", fileName: "D5.mp3" },
-    75: { kind: "file", fileName: "Eb5.mp3" },
-    76: { kind: "file", fileName: "E5.mp3" },
-    77: { kind: "file", fileName: "F5.mp3" },
-    78: { kind: "file", fileName: "Gb5.mp3" },
-    79: { kind: "file", fileName: "G5.mp3" },
-    80: { kind: "file", fileName: "Ab5.mp3" },
-    81: { kind: "file", fileName: "A5.mp3" },
-    82: { kind: "file", fileName: "Bb5.mp3" },
-    83: { kind: "file", fileName: "B5.mp3" },
-    84: { kind: "file", fileName: "C6.mp3" },
-    85: { kind: "file", fileName: "Db6.mp3" },
-    86: { kind: "file", fileName: "D6.mp3" },
-    87: { kind: "file", fileName: "Eb6.mp3" },
-    88: { kind: "file", fileName: "E6.mp3" },
-    89: { kind: "file", fileName: "F6.mp3" },
-    90: { kind: "file", fileName: "Gb6.mp3" },
-    91: { kind: "file", fileName: "G6.mp3" },
-    92: { kind: "file", fileName: "Ab6.mp3" },
-    93: { kind: "file", fileName: "A6.mp3" },
-    94: { kind: "file", fileName: "Bb6.mp3" },
-    95: { kind: "file", fileName: "B6.mp3" },
-    96: { kind: "file", fileName: "C7.mp3" },
-    97: { kind: "file", fileName: "Db7.mp3" },
-    98: { kind: "file", fileName: "D7.mp3" },
-    99: { kind: "file", fileName: "Eb7.mp3" },
-    100: { kind: "file", fileName: "E7.mp3" },
-    101: { kind: "file", fileName: "F7.mp3" },
-    102: { kind: "file", fileName: "Gb7.mp3" },
-    103: { kind: "file", fileName: "G7.mp3" },
-    104: { kind: "file", fileName: "Ab7.mp3" },
-    105: { kind: "file", fileName: "A7.mp3" },
-    106: { kind: "file", fileName: "Bb7.mp3" },
-    107: { kind: "file", fileName: "B7.mp3" },
-    108: { kind: "file", fileName: "C8.mp3" },
-  },
-  generic_click: {
-    60: { kind: "synthetic", durationMs: 30, frequency: 1760 },
-    69: { kind: "synthetic", durationMs: 20, frequency: 880 },
-  },
-};
-
-// abcjs reports percussion notes in its own pitch space. Normalize those
-// note values into concrete bodhran sample slots before looking up files.
-const BODHRAN_ABCJS_MIDI_TO_SAMPLE_PITCH: Record<number, number> = {
-  60: BODHRAN_DEFAULT_STRIKE_PITCH,
-  69: 45,
-  72: BODHRAN_DEFAULT_EDGE_PITCH,
-};
-
-const BODHRAN_ABCJS_PITCH_CLASS_TO_SAMPLE_PITCH: Record<number, number> = {
-  0: BODHRAN_DEFAULT_STRIKE_PITCH,
-  5: 45,
-  7: BODHRAN_DEFAULT_EDGE_PITCH,
-};
-
-const HORNPIPE_SWING_DELAY_MULTIPLIER = 1 / 3;
-const JIG_LILT_DELAY_MULTIPLIER = 1 / 6;
-
-const BODHRAN_SAMPLE_GAIN_MULTIPLIERS: Record<number, number> = {
-  45: 1.2,
-  46: 1.2,
-  47: 1.2,
-};
-
-const RHYTHM_TEMPO_STORAGE_KEY_PREFIX = "tunetrees.rhythm-tempo";
+const BODHRAN_DEBUG_ENV_VALUE = import.meta.env.VITE_DEBUG_RHYTHM_PLAYBACK;
 
 export interface PlaybackStartOptions {
   startPositionMs?: number;
   startBeatIndex?: number;
   startMeasure?: number;
   playbackRhythmAbc?: string;
-}
-
-export interface PlaybackEventMarker {
-  measureIndex: number;
-  noteIndex: number;
 }
 
 export interface RhythmService {
@@ -253,108 +138,11 @@ type TimingCallbacksInstance = InstanceType<
   ResolvedAbcjsModule["TimingCallbacks"]
 >;
 
-function getRhythmTempoStorage(): Storage | null {
-  if (typeof globalThis === "undefined") {
-    return null;
-  }
+type RhythmPlaybackDebugFlag = boolean | number;
 
-  try {
-    const storage =
-      "localStorage" in globalThis ? globalThis.localStorage : null;
-    if (
-      storage &&
-      typeof storage.getItem === "function" &&
-      typeof storage.setItem === "function"
-    ) {
-      return storage;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function buildRhythmTempoStorageKey(
-  userId: string | null | undefined,
-  tuneTypeName: string
-): string {
-  const normalizedUserId = userId?.trim() || "anonymous";
-  return [
-    RHYTHM_TEMPO_STORAGE_KEY_PREFIX,
-    normalizedUserId,
-    normalizeTuneTypeName(tuneTypeName),
-  ].join(":");
-}
-
-function readStoredRhythmTempo(
-  userId: string | null | undefined,
-  tuneTypeName: string
-): number | null {
-  const storage = getRhythmTempoStorage();
-  if (!storage) {
-    return null;
-  }
-
-  const rawValue = storage.getItem(
-    buildRhythmTempoStorageKey(userId, tuneTypeName)
-  );
-  if (!rawValue) {
-    return null;
-  }
-
-  const parsedValue = Number.parseInt(rawValue, 10);
-  return Number.isFinite(parsedValue) ? clampTempo(parsedValue) : null;
-}
-
-function writeStoredRhythmTempo(
-  userId: string | null | undefined,
-  tuneTypeName: string,
-  tempoQpm: number
-): void {
-  const storage = getRhythmTempoStorage();
-  if (!storage) {
-    return;
-  }
-
-  storage.setItem(
-    buildRhythmTempoStorageKey(userId, tuneTypeName),
-    String(clampTempo(tempoQpm))
-  );
-}
-
-function normalizeSampleKit(sampleKit?: string | null): string {
-  return sampleKit?.trim() || DEFAULT_SAMPLE_KIT;
-}
-
-function getSampleKitMapping(
-  sampleKit?: string | null
-): Record<number, SampleKitEntry> {
-  return (
-    SAMPLE_KITS[normalizeSampleKit(sampleKit)] ??
-    SAMPLE_KITS[DEFAULT_SAMPLE_KIT]
-  );
-}
-
-function buildSampleUrl(
-  baseUrl: string,
-  sampleKit: string,
-  fileName: string
-): string {
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
-  const assetPath = `audio/kits/${sampleKit}/${fileName}`;
-  return normalizedBase ? `${normalizedBase}/${assetPath}` : `/${assetPath}`;
-}
-
-function msToSeconds(value: number): number {
-  return value / 1000;
-}
-
-function waitForMilliseconds(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, milliseconds);
-  });
-}
+type RhythmPlaybackDebugGlobals = typeof globalThis & {
+  __TT_DEBUG_RHYTHM_PLAYBACK__?: RhythmPlaybackDebugFlag;
+};
 
 export async function loadRhythmPattern(
   db: SqliteDatabase,
@@ -364,388 +152,13 @@ export async function loadRhythmPattern(
   return loadRhythmPatternFromPatternLoader(db, request, options);
 }
 
-function clampTempo(qpm: number): number {
-  const normalized = Math.round(qpm);
-  if (!Number.isFinite(normalized)) {
-    return 100;
-  }
-
-  return Math.min(240, Math.max(30, normalized));
-}
-
-function getAudioContextConstructor(): (new () => AudioContext) | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-
-  return (
-    window.AudioContext ??
-    (window as Window & { webkitAudioContext?: new () => AudioContext })
-      .webkitAudioContext
+function getRequestedRhythmPlaybackDebugPasses(): number {
+  const globalDebugFlag = (globalThis as RhythmPlaybackDebugGlobals)
+    .__TT_DEBUG_RHYTHM_PLAYBACK__;
+  return Math.max(
+    parseRhythmPlaybackDebugFlag(BODHRAN_DEBUG_ENV_VALUE),
+    parseRhythmPlaybackDebugFlag(globalDebugFlag)
   );
-}
-
-function getAudioElementConstructor():
-  | (new (
-      src?: string
-    ) => HTMLAudioElement)
-  | undefined {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-
-  return window.Audio;
-}
-
-function clampPremiumLoopPlaybackRate(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return 1;
-  }
-
-  return Math.min(2, Math.max(0.5, value));
-}
-
-async function decodeSample(
-  audioContext: AudioContext,
-  fetchImpl: typeof fetch,
-  url: string
-): Promise<AudioBuffer> {
-  const response = await fetchImpl(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch rhythm sample: ${url}`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  return await audioContext.decodeAudioData(buffer);
-}
-
-function createSyntheticClickBuffer(
-  audioContext: AudioContext,
-  entry: SampleKitSyntheticEntry
-): AudioBuffer {
-  const frameCount = Math.max(
-    1,
-    Math.round((audioContext.sampleRate * entry.durationMs) / 1000)
-  );
-  const buffer = audioContext.createBuffer(
-    1,
-    frameCount,
-    audioContext.sampleRate
-  );
-  const channelData = buffer.getChannelData(0);
-
-  for (let index = 0; index < frameCount; index += 1) {
-    const time = index / audioContext.sampleRate;
-    const envelope = Math.exp((-8 * index) / frameCount);
-    channelData[index] =
-      Math.sin(2 * Math.PI * entry.frequency * time) * envelope;
-  }
-
-  return buffer;
-}
-
-function eventHasAccent(event: NoteTimingEvent): boolean {
-  return Boolean(
-    event.elements?.some((group) =>
-      group.some((element) =>
-        (element.getAttribute("class") ?? "").includes("abcjs-accent")
-      )
-    )
-  );
-}
-
-function getDefaultFallbackPitch(
-  sampleKit: string,
-  hasAccent: boolean
-): number {
-  if (sampleKit === "bodhran") {
-    return hasAccent
-      ? BODHRAN_DEFAULT_STRIKE_PITCH
-      : BODHRAN_DEFAULT_EDGE_PITCH;
-  }
-
-  return hasAccent
-    ? GENERIC_CLICK_PRIMARY_PITCH
-    : GENERIC_CLICK_SECONDARY_PITCH;
-}
-
-function getPitchClassesFromEventElements(event: NoteTimingEvent): number[] {
-  const pitchClasses = new Set<number>();
-
-  for (const group of event.elements ?? []) {
-    for (const element of group) {
-      const className = element.getAttribute("class") ?? "";
-      const matches = className.matchAll(/abcjs-p(-?\d+)/g);
-      for (const match of matches) {
-        const pitchClass = Number.parseInt(match[1] ?? "", 10);
-        if (Number.isFinite(pitchClass)) {
-          pitchClasses.add(pitchClass);
-        }
-      }
-    }
-  }
-
-  return Array.from(pitchClasses);
-}
-
-function getFallbackPitchesFromEventElements(
-  sampleKit: string,
-  event: NoteTimingEvent
-): number[] {
-  const pitchClasses = getPitchClassesFromEventElements(event);
-  if (pitchClasses.length === 0) {
-    return [];
-  }
-
-  if (sampleKit === "bodhran") {
-    return Array.from(
-      new Set(
-        pitchClasses
-          .map(
-            (pitchClass) =>
-              BODHRAN_ABCJS_PITCH_CLASS_TO_SAMPLE_PITCH[pitchClass]
-          )
-          .filter((pitch): pitch is number => Number.isFinite(pitch))
-      )
-    );
-  }
-
-  return Array.from(
-    new Set(
-      pitchClasses.map((pitchClass) =>
-        pitchClass <= 0
-          ? GENERIC_CLICK_PRIMARY_PITCH
-          : GENERIC_CLICK_SECONDARY_PITCH
-      )
-    )
-  );
-}
-
-function getPlaybackPitches(
-  sampleKit: string,
-  event: NoteTimingEvent
-): number[] {
-  const explicitPitches = Array.from(
-    new Set(
-      (event.midiPitches ?? [])
-        .map((pitch) => pitch.pitch)
-        .filter((pitch) => Number.isFinite(pitch))
-    )
-  );
-
-  if (explicitPitches.length > 0) {
-    return explicitPitches;
-  }
-
-  const elementPitches = getFallbackPitchesFromEventElements(sampleKit, event);
-  if (elementPitches.length > 0) {
-    return elementPitches;
-  }
-
-  return [getDefaultFallbackPitch(sampleKit, eventHasAccent(event))];
-}
-
-function normalizePlaybackPitch(
-  sampleKit: string,
-  pitch: number,
-  hasAccent: boolean
-): number {
-  if (sampleKit !== "bodhran") {
-    return pitch;
-  }
-
-  if (SAMPLE_KITS.bodhran?.[pitch]) {
-    return pitch;
-  }
-
-  return (
-    BODHRAN_ABCJS_MIDI_TO_SAMPLE_PITCH[pitch] ??
-    (hasAccent ? BODHRAN_DEFAULT_STRIKE_PITCH : BODHRAN_DEFAULT_EDGE_PITCH)
-  );
-}
-
-function getPitchPlaybackGain(
-  sampleKit: string,
-  resolvedPitch: number,
-  event: NoteTimingEvent
-): number {
-  const hasAccent = eventHasAccent(event);
-  const baseGain = hasAccent ? 1 : 0.8;
-
-  if (sampleKit === "bodhran") {
-    return baseGain * (BODHRAN_SAMPLE_GAIN_MULTIPLIERS[resolvedPitch] ?? 1);
-  }
-
-  return baseGain;
-}
-
-function getBeatsPerMeasure(rhythmSignature?: string | null): number {
-  const numerator = Number.parseInt(rhythmSignature?.split("/")[0] ?? "", 10);
-  return Number.isFinite(numerator) && numerator > 0 ? numerator : 4;
-}
-
-function getEventPulseIndex(
-  event: NoteTimingEvent,
-  rhythmSignature?: string | null
-): number | null {
-  const elapsedMs = event.milliseconds;
-  const measureMs = event.millisecondsPerMeasure;
-  if (
-    !Number.isFinite(elapsedMs) ||
-    !Number.isFinite(measureMs) ||
-    measureMs == null ||
-    measureMs <= 0
-  ) {
-    return null;
-  }
-
-  const pulseCount = getBeatsPerMeasure(rhythmSignature);
-  const normalizedElapsed = ((elapsedMs % measureMs) + measureMs) % measureMs;
-  const pulseIndex =
-    Math.floor((normalizedElapsed / measureMs) * pulseCount) + 1;
-  return Math.min(Math.max(pulseIndex, 1), pulseCount);
-}
-
-function getPlaybackEventMarker(
-  event: NoteTimingEvent,
-  currentMeasureIndex: number | null | undefined
-): PlaybackEventMarker | null {
-  for (const group of event.elements ?? []) {
-    for (const element of group) {
-      const className = element.getAttribute("class") ?? "";
-      const measureMatch = className.match(/\babcjs-mm(\d+)\b/);
-      const noteMatch = className.match(/\babcjs-n(\d+)\b/);
-      if (!noteMatch) {
-        continue;
-      }
-
-      const noteIndex = Number.parseInt(noteMatch[1] ?? "", 10);
-      const classMeasureIndex = measureMatch
-        ? Number.parseInt(measureMatch[1] ?? "", 10)
-        : null;
-      const resolvedMeasureIndex =
-        (Number.isFinite(currentMeasureIndex)
-          ? Math.max(0, currentMeasureIndex ?? 0)
-          : null) ??
-        (Number.isFinite(classMeasureIndex) ? classMeasureIndex : null);
-
-      if (resolvedMeasureIndex != null && Number.isFinite(noteIndex)) {
-        return { measureIndex: resolvedMeasureIndex, noteIndex };
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseRhythmSignatureParts(
-  rhythmSignature?: string | null
-): { numerator: number; denominator: number } | null {
-  const [rawNumerator, rawDenominator] = rhythmSignature?.split("/") ?? [];
-  const numerator = Number.parseInt(rawNumerator ?? "", 10);
-  const denominator = Number.parseInt(rawDenominator ?? "", 10);
-  if (
-    !Number.isFinite(numerator) ||
-    numerator <= 0 ||
-    !Number.isFinite(denominator) ||
-    denominator <= 0
-  ) {
-    return null;
-  }
-
-  return { numerator, denominator };
-}
-
-function isJigTuneType(tuneTypeName: string): boolean {
-  const normalizedTuneType = normalizeTuneTypeName(tuneTypeName);
-  return (
-    normalizedTuneType === "jig" ||
-    normalizedTuneType === "slip jig" ||
-    normalizedTuneType === "jig (single)"
-  );
-}
-
-function getPlaybackDelaySeconds(
-  currentMetadata: RhythmPatternMetadata | null,
-  event: NoteTimingEvent
-): number {
-  if (!currentMetadata) {
-    return 0;
-  }
-
-  const elapsedMs = event.milliseconds;
-  const measureMs = event.millisecondsPerMeasure;
-  if (
-    !Number.isFinite(elapsedMs) ||
-    !Number.isFinite(measureMs) ||
-    measureMs == null ||
-    measureMs <= 0
-  ) {
-    return 0;
-  }
-
-  const normalizedElapsed = ((elapsedMs % measureMs) + measureMs) % measureMs;
-  const tuneType = normalizeTuneTypeName(currentMetadata.tuneTypeName);
-  const signature = parseRhythmSignatureParts(currentMetadata.rhythmSignature);
-  if (!signature) {
-    return 0;
-  }
-
-  if (
-    tuneType === "hornpipe" &&
-    signature.numerator === 4 &&
-    signature.denominator === 4
-  ) {
-    const beatDurationMs = measureMs / signature.numerator;
-    const eighthDurationMs = beatDurationMs / 2;
-    const positionWithinBeat = normalizedElapsed % beatDurationMs;
-    const toleranceMs = Math.max(2, beatDurationMs * 0.08);
-    const isOffBeatEighth =
-      Math.abs(positionWithinBeat - eighthDurationMs) <= toleranceMs;
-
-    if (!isOffBeatEighth) {
-      return 0;
-    }
-
-    return (eighthDurationMs * HORNPIPE_SWING_DELAY_MULTIPLIER) / 1000;
-  }
-
-  if (
-    isJigTuneType(currentMetadata.tuneTypeName) &&
-    signature.denominator === 8 &&
-    signature.numerator % 3 === 0
-  ) {
-    const eighthDurationMs = measureMs / signature.numerator;
-    const tripletDurationMs = eighthDurationMs * 3;
-    const positionWithinTriplet = normalizedElapsed % tripletDurationMs;
-    const toleranceMs = Math.max(2, eighthDurationMs * 0.12);
-    const isMiddleTripletEighth =
-      Math.abs(positionWithinTriplet - eighthDurationMs) <= toleranceMs;
-
-    if (!isMiddleTripletEighth) {
-      return 0;
-    }
-
-    return (eighthDurationMs * JIG_LILT_DELAY_MULTIPLIER) / 1000;
-  }
-
-  return 0;
-}
-
-function getCountInPulseIndices(
-  signature: { numerator: number; denominator: number },
-  pulseCount: number
-): Set<number> {
-  if (signature.denominator === 8 && signature.numerator % 3 === 0) {
-    return new Set(
-      Array.from(
-        { length: Math.ceil(pulseCount / 3) },
-        (_value, index) => index * 3
-      )
-    );
-  }
-
-  return new Set([0]);
 }
 
 let nextRhythmServiceInstanceId = 1;
@@ -793,10 +206,49 @@ export function createRhythmService(
   let playbackStartBeatIndex = 0;
   let playbackStartMeasure = 0;
   let activePlaybackRhythmAbc: string | null = null;
+  let remainingDebugPlaybackPasses = getRequestedRhythmPlaybackDebugPasses();
   let tempoPreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
+
+  const armDebugPlaybackPasses = () => {
+    const requestedDebugPasses = getRequestedRhythmPlaybackDebugPasses();
+    if (requestedDebugPasses > remainingDebugPlaybackPasses) {
+      remainingDebugPlaybackPasses = requestedDebugPasses;
+    }
+  };
+
+  const shouldLogPlaybackDebug = () => remainingDebugPlaybackPasses > 0;
+
+  const finishDebugPlaybackPass = () => {
+    if (remainingDebugPlaybackPasses > 0) {
+      remainingDebugPlaybackPasses -= 1;
+    }
+  };
+
+  const logPlaybackDebug = (
+    event: NoteTimingEvent,
+    selection: PlaybackPitchSelection,
+    resolvedPitches: number[],
+    activeSampleKit: string
+  ) => {
+    if (!shouldLogPlaybackDebug()) {
+      return;
+    }
+
+    console.info("[RhythmService] playback event", {
+      sampleKit: activeSampleKit,
+      measureNumber: event.measureNumber,
+      measureStart: event.measureStart,
+      milliseconds: event.milliseconds,
+      midiPitches: selection.midiPitches,
+      elementPitches: selection.elementPitches,
+      playbackSource: selection.source,
+      playbackPitches: selection.playbackPitches,
+      resolvedPitches,
+    });
+  };
 
   const resetCountInState = () => {
     setIsCountIn(false);
@@ -950,13 +402,20 @@ export function createRhythmService(
     }
 
     const audioContext = await ensureAudioContext();
+    const decodedFileCache = new Map<string, Promise<AudioBuffer>>();
     const decodedEntries = await Promise.all(
       Object.entries(kitMapping).map(async ([pitch, entry]) => {
         if (entry.kind === "file") {
           const url = options.sampleUrlBuilder
             ? options.sampleUrlBuilder(activeSampleKit, entry.fileName)
             : buildSampleUrl(sampleBaseUrl, activeSampleKit, entry.fileName);
-          const buffer = await decodeSample(audioContext, fetchImpl, url);
+          let bufferPromise = decodedFileCache.get(url);
+          if (!bufferPromise) {
+            bufferPromise = decodeSample(audioContext, fetchImpl, url);
+            decodedFileCache.set(url, bufferPromise);
+          }
+
+          const buffer = await bufferPromise;
           return [Number(pitch), buffer] as const;
         }
         return [
@@ -982,17 +441,20 @@ export function createRhythmService(
     const activeSampleKit = normalizeSampleKit(metadata()?.sampleKit);
     const playbackDelaySeconds = getPlaybackDelaySeconds(metadata(), event);
     const hasAccent = eventHasAccent(event);
-    for (const playbackPitch of getPlaybackPitches(activeSampleKit, event)) {
-      const resolvedPitch = normalizePlaybackPitch(
-        activeSampleKit,
-        playbackPitch,
-        hasAccent
-      );
+    const selection = getPlaybackPitchSelection(activeSampleKit, event);
+    const resolvedPitches = selection.playbackPitches.map((playbackPitch) =>
+      normalizePlaybackPitch(activeSampleKit, playbackPitch, hasAccent)
+    );
+
+    logPlaybackDebug(event, selection, resolvedPitches, activeSampleKit);
+
+    for (const resolvedPitch of resolvedPitches) {
       const gainValue = getPitchPlaybackGain(
         activeSampleKit,
         resolvedPitch,
         event
       );
+      const playbackRate = getPitchPlaybackRate(activeSampleKit, resolvedPitch);
       const buffer = sampleBuffers.get(resolvedPitch);
       if (!buffer) {
         continue;
@@ -1001,6 +463,12 @@ export function createRhythmService(
       const source = audioContext.createBufferSource();
       const gainNode = audioContext.createGain();
       source.buffer = buffer;
+      if (
+        source.playbackRate &&
+        typeof source.playbackRate.value === "number"
+      ) {
+        source.playbackRate.value = playbackRate;
+      }
       gainNode.gain.value = gainValue;
       source.connect(gainNode);
       gainNode.connect(audioContext.destination);
@@ -1032,24 +500,13 @@ export function createRhythmService(
       (60_000 / Math.max(1, tempoQpm())) * (4 / signature.denominator);
     const pulseCount = signature.numerator * measureCount;
     const accentPulseIndices = getCountInPulseIndices(signature, pulseCount);
-    const primaryEntry = SAMPLE_KITS.generic_click[GENERIC_CLICK_PRIMARY_PITCH];
-    const secondaryEntry =
-      SAMPLE_KITS.generic_click[GENERIC_CLICK_SECONDARY_PITCH];
-    if (
-      primaryEntry?.kind !== "synthetic" ||
-      secondaryEntry?.kind !== "synthetic"
-    ) {
+    const countInBuffers = createCountInBuffers((entry) =>
+      createSyntheticClickBuffer(audioContext, entry)
+    );
+    if (!countInBuffers) {
       return;
     }
-
-    const primaryBuffer = createSyntheticClickBuffer(
-      audioContext,
-      primaryEntry
-    );
-    const secondaryBuffer = createSyntheticClickBuffer(
-      audioContext,
-      secondaryEntry
-    );
+    const { primaryBuffer, secondaryBuffer } = countInBuffers;
     const countInStartTime = audioContext.currentTime;
 
     setIsCountIn(true);
@@ -1083,7 +540,7 @@ export function createRhythmService(
     shouldPlayEventSamples: boolean
   ): TimingCallbacksInstance {
     if (typeof document === "undefined") {
-      throw new Error("ABC rhythm playback requires a browser document.");
+      throw new TypeError("ABC rhythm playback requires a browser document.");
     }
 
     renderTarget ??= document.createElement("div");
@@ -1106,6 +563,7 @@ export function createRhythmService(
       beatCallback,
       eventCallback: (event) => {
         if (!event) {
+          finishDebugPlaybackPass();
           lastKnownPositionMs = 0;
           currentEventIndex = playbackStartBeatIndex;
           setCurrentBeatIndex(playbackStartBeatIndex);
@@ -1291,6 +749,7 @@ export function createRhythmService(
 
   async function play(startOptions?: PlaybackStartOptions): Promise<void> {
     setError(null);
+    armDebugPlaybackPasses();
     const startPositionMs = Math.max(0, startOptions?.startPositionMs ?? 0);
     lastKnownPositionMs = startPositionMs;
     const shouldCountIn = (options.initialCountInMeasures ?? 0) > 0;
@@ -1327,6 +786,7 @@ export function createRhythmService(
 
   async function resume(): Promise<void> {
     setError(null);
+    armDebugPlaybackPasses();
     if (lastKnownPositionMs <= 0) {
       await play();
       return;

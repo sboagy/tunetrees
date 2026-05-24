@@ -365,3 +365,10 @@ Focused checks that have been useful for this area:
 - `npm run typecheck`
 
 When a bug is only visible in real browser rendering, follow with the structured playback E2E coverage or reproduce it manually in the live player.
+
+### Necessary Quality Gates before PR
+
+To be run by human.
+
+- npm run lint && npm run check && npm run typecheck && npm run codegen:schema:check && npm run test:unit
+- npm run db:local:reset && ./e2e-with-tee.sh

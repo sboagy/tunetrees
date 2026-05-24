@@ -105,5 +105,9 @@
     "[sql]": {
         "editor.formatOnSave": false,
         "editor.defaultFormatter": "inferrinizzard.prettier-sql-vscode"
+    },
+    "sonarlint.connectedMode.project": {
+        "connectionId": "sboagy",
+        "projectKey": "sboagy_tunetrees"
     }
 }
