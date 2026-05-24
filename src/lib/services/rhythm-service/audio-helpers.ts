@@ -5,7 +5,12 @@ export function buildSampleUrl(
   sampleKit: string,
   fileName: string
 ): string {
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
+  let normalizedBase = baseUrl;
+
+  while (normalizedBase.endsWith("/")) {
+    normalizedBase = normalizedBase.slice(0, -1);
+  }
+
   const assetPath = `audio/kits/${sampleKit}/${fileName}`;
   return normalizedBase ? `${normalizedBase}/${assetPath}` : `/${assetPath}`;
 }
@@ -16,21 +21,24 @@ export function msToSeconds(value: number): number {
 
 export function waitForMilliseconds(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
-    window.setTimeout(resolve, milliseconds);
+    globalThis.setTimeout(resolve, milliseconds);
   });
 }
 
 export function getAudioContextConstructor():
   | (new () => AudioContext)
   | undefined {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     return undefined;
   }
 
   return (
-    window.AudioContext ??
-    (window as Window & { webkitAudioContext?: new () => AudioContext })
-      .webkitAudioContext
+    globalThis.window.AudioContext ??
+    (
+      globalThis.window as Window & {
+        webkitAudioContext?: new () => AudioContext;
+      }
+    ).webkitAudioContext
   );
 }
 
@@ -39,11 +47,11 @@ export function getAudioElementConstructor():
       src?: string
     ) => HTMLAudioElement)
   | undefined {
-  if (typeof window === "undefined") {
+  if (globalThis.window === undefined) {
     return undefined;
   }
 
-  return window.Audio;
+  return globalThis.window.Audio;
 }
 
 export function clampPremiumLoopPlaybackRate(value: number): number {
