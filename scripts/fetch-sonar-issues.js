@@ -8,6 +8,20 @@ const PROJECT_KEY = "sboagy_tunetrees";
 const ISSUE_TYPE = "CODE_SMELL";
 const API_URL = "https://sonarcloud.io/api/issues/search";
 
+// Strip control characters to prevent terminal injection from remote data.
+const safeConsoleError = (msg) => {
+  const str = String(msg ?? "");
+  let sanitized = "";
+  for (let i = 0; i < str.length; i++) {
+    const c = str.codePointAt(i) ?? 0;
+    // Allow: tab (9), LF (10), CR (13), space (32) and above
+    if (c >= 32 || c === 9 || c === 10 || c === 13) {
+      sanitized += str[i];
+    }
+  }
+  console.error(sanitized);
+};
+
 class FatalError extends Error {
   constructor(message) {
     super(message);
@@ -116,9 +130,9 @@ try {
   await main();
 } catch (error) {
   if (error instanceof FatalError) {
-    console.error(error.message);
+    safeConsoleError(error.message);
   } else {
-    console.error("Unexpected failure while fetching Sonar issues.");
+    safeConsoleError("Unexpected failure while fetching Sonar issues.");
   }
   process.exitCode = 1;
 }

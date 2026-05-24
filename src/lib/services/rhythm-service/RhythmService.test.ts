@@ -1639,7 +1639,7 @@ K:clef=perc
         }
       );
       createBufferSource = vi.fn(() => ({
-        buffer: null as AudioBuffer | null,
+        buffer: null,
         connect: vi.fn(),
         start: vi.fn(),
       })) as unknown as typeof AudioContext.prototype.createBufferSource;

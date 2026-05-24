@@ -10,7 +10,12 @@ declare global {
   interface Window {
     __ttTestUserId?: string;
   }
+  // eslint-disable-next-line no-var
+  var __ttTestUserId: string | undefined;
 }
+
+type TabType = "catalog" | "repertoire" | "practice";
+type TabId = "practice" | "repertoire" | "catalog" | "analysis" | "setlists";
 
 type OnboardingRepertoireArgs = {
   name?: string | null;
@@ -493,7 +498,7 @@ export class TuneTreesPage {
     this.tuneEditorForm = page.getByTestId("tune-editor-form");
     this.tuneEditorSubmitButton = page.getByTestId("tune-editor-save-button");
     this.tuneEditorCancelButton = page.getByTestId("tune-editor-cancel-button");
-    // TODO(REFACTOR): Global show-public-toggle removed. Update tests to use per-field override indicators instead.
+    // REFACTOR: Global show-public-toggle removed. Tests use per-field override indicators instead.
     this.showPublicToggle = page.getByTestId("override-indicator-title");
     this.userSettingsButton = page.getByTestId("user-settings-button");
 
@@ -678,7 +683,9 @@ export class TuneTreesPage {
       .locator("input[type='checkbox']");
 
     // Error Display
-    this.authErrorMessage = page.locator(".bg-red-50, .bg-red-900\\/20");
+    this.authErrorMessage = page.locator(
+      String.raw`.bg-red-50, .bg-red-900\/20`
+    );
 
     // Sync & Offline Status Elements
     this.syncStatusIndicator = page.getByTestId("sync-status-indicator");
@@ -1048,7 +1055,7 @@ export class TuneTreesPage {
             const value = (await option.getAttribute("value"))?.trim();
             const label = (await option.textContent())?.trim();
 
-            if (value && value.toLowerCase() === desiredNormalized) {
+            if (value?.toLowerCase() === desiredNormalized) {
               return true;
             }
 
@@ -1072,7 +1079,7 @@ export class TuneTreesPage {
       const value = (await option.getAttribute("value"))?.trim();
       const label = (await option.textContent())?.trim();
 
-      if (value && value.toLowerCase() === desiredNormalized) {
+      if (value?.toLowerCase() === desiredNormalized) {
         await select.selectOption({ value });
         return true;
       }
@@ -1144,6 +1151,31 @@ export class TuneTreesPage {
     await this.page.waitForURL(/\/login/, { timeout: 10000 });
   }
 
+  private async waitForLoginConfirmation(
+    email: string,
+    maxAttempts: number
+  ): Promise<void> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const practiceTabVisible = await this.practiceTab
+        .isVisible()
+        .catch(() => false);
+      if (practiceTabVisible) {
+        console.log(`Practice tab visible after login, logged in as ${email}`);
+        return;
+      }
+      await this.page.waitForTimeout(1000);
+    }
+
+    // Failed to see practice tab after login - attach diagnostics
+    await this.page.screenshot(); // Captured for debugging
+    console.log("Login failure - screenshot captured");
+    console.log("Login failure - page content available via page.content()");
+
+    throw new Error(
+      `Unable to log in as ${email} after multiple attempts. Check console for diagnostics.`
+    );
+  }
+
   /**
    * Re-login if session was lost (e.g., after clearing IndexedDB).
    * Loops until either the practice tab is visible (still logged in) or
@@ -1163,7 +1195,7 @@ export class TuneTreesPage {
     // Doing this unconditionally, early on, seems to avoid what I think
     // may be a lagging page.evaluate (i.e. it logs out while the evaluate is still running?).
     await this.page.evaluate((userId) => {
-      window.__ttTestUserId = userId;
+      globalThis.__ttTestUserId = userId;
     }, userId);
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const loginVisible = await this.anonymousSignInButton
@@ -1175,7 +1207,9 @@ export class TuneTreesPage {
         if (password === "") {
           const password = process.env.ALICE_TEST_PASSWORD;
           if (!password) {
-            throw Error("ALICE_TEST_PASSWORD must be set in the environment");
+            throw new Error(
+              "ALICE_TEST_PASSWORD must be set in the environment"
+            );
           }
         }
         await this.emailInput.fill(email);
@@ -1183,29 +1217,8 @@ export class TuneTreesPage {
         await this.signInButton.click();
 
         // Wait for practice tab to appear after login
-        for (let attempt2 = 0; attempt2 < maxAttempts; attempt2++) {
-          const practiceTabVisible = await this.practiceTab
-            .isVisible()
-            .catch(() => false);
-          if (practiceTabVisible) {
-            console.log(
-              `Practice tab visible after login, logged in as ${email}`
-            );
-            return;
-          }
-          await this.page.waitForTimeout(1000);
-        }
-
-        // Failed to see practice tab after login - attach diagnostics
-        await this.page.screenshot(); // Captured for debugging
-        console.log("Login failure - screenshot captured");
-        console.log(
-          "Login failure - page content available via page.content()"
-        );
-
-        throw new Error(
-          `Unable to log in as ${email} after multiple attempts. Check console for diagnostics.`
-        );
+        await this.waitForLoginConfirmation(email, maxAttempts);
+        return;
       }
 
       // Check if already logged in (practice tab visible)
@@ -1485,168 +1498,124 @@ export class TuneTreesPage {
   /**
    * Navigate to a specific tab by ID
    */
-  async navigateToTab(
-    tabId: "practice" | "repertoire" | "catalog" | "analysis" | "setlists",
-    options?: { waitForContent?: boolean }
-  ) {
-    const waitForContent = options?.waitForContent ?? true;
-
-    // Check if we're in mobile view (Select dropdown) or desktop (tab buttons).
-    // On mobile (< 768px) TabBar renders a Kobalte Select; on desktop it renders tab buttons.
+  async navigateToTab(tabId: TabId, options?: { waitForContent?: boolean }) {
     const selectTrigger = this.page.getByTestId("tab-nav-select");
     const isSelectVisible = await selectTrigger.isVisible().catch(() => false);
 
     if (isSelectVisible) {
-      // Mobile: navigate via the Select dropdown.
-      // Determine the currently active tab from the URL (?tab=<id> param; defaults to "practice").
-      const currentUrl = this.page.url();
-      const currentTab =
-        new URL(currentUrl).searchParams.get("tab") || "practice";
-
-      if (currentTab !== tabId) {
-        const toastCloser = this.page
-          .getByRole("button", { name: "Close toast" })
-          .first();
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          const isToastVisible = await toastCloser
-            .isVisible()
-            .catch(() => false);
-          if (!isToastVisible) break;
-          await toastCloser.click({ timeout: 5_000 });
-          await expect(toastCloser).toBeHidden({ timeout: 5_000 });
-        }
-
-        await expect(selectTrigger).toBeEnabled({ timeout: 20_000 });
-        await selectTrigger.click({ timeout: 10_000 });
-
-        // Kobalte Select items have role="option"; match by the visible label text.
-        // These labels must match the `label` field of the TABS constant in TabBar.tsx.
-        const tabLabels: Record<string, string> = {
-          practice: "Practice",
-          repertoire: "Repertoire",
-          catalog: "Catalog",
-          analysis: "Analysis",
-          setlists: "Setlists",
-        };
-        const option = this.page.getByRole("option", {
-          name: new RegExp(tabLabels[tabId], "i"),
-        });
-        await expect(option).toBeVisible({ timeout: 5_000 });
-        await option.click({ timeout: 5_000 });
-
-        // Wait for the URL to reflect the newly selected tab.
-        await expect(this.page).toHaveURL(new RegExp(`[?&]tab=${tabId}`), {
-          timeout: 10_000,
-        });
-      }
+      await this.navigateToTabMobile(tabId, selectTrigger);
     } else {
-      // Desktop: navigate via the visible tab buttons.
-      const tab = this.page.getByTestId(`tab-${tabId}`);
-
-      await expect(tab).toBeVisible({ timeout: 20_000 });
-      await expect(tab).toBeEnabled({ timeout: 20_000 });
-
-      // Avoid short "trial" clicks: they can flake under CI load.
-      // Let Playwright's normal click retry within a reasonable timeout.
-      const [selectedBefore, currentBefore] = await Promise.all([
-        tab.getAttribute("aria-selected"),
-        tab.getAttribute("aria-current"),
-      ]);
-      const isActiveBefore =
-        selectedBefore === "true" || currentBefore === "page";
-
-      if (!isActiveBefore) {
-        await tab.scrollIntoViewIfNeeded().catch(() => undefined);
-        await tab.click({ timeout: 10_000 });
-      }
-
-      // The URL is the authoritative source of tab state in Home.tsx.
-      // Some CI flakes leave aria-current stale briefly even after navigation succeeded.
-      await expect
-        .poll(
-          async () => {
-            const urlMatches = (() => {
-              try {
-                const currentUrl = new URL(this.page.url());
-                return (
-                  (currentUrl.searchParams.get("tab") || "practice") === tabId
-                );
-              } catch {
-                return false;
-              }
-            })();
-            if (urlMatches) {
-              return true;
-            }
-
-            const [selected, current] = await Promise.all([
-              tab.getAttribute("aria-selected"),
-              tab.getAttribute("aria-current"),
-            ]);
-            return selected === "true" || current === "page";
-          },
-          { timeout: 10_000, intervals: [100, 250, 500, 1000] }
-        )
-        .toBe(true);
+      await this.navigateToTabDesktop(tabId);
     }
 
-    if (!waitForContent) {
+    if (!(options?.waitForContent ?? true)) {
       return;
     }
+    await this.waitForTabContent(tabId);
+  }
 
-    // Wait for tab-specific, always-present UI before asserting on grids.
-    // Some grids only mount when data is loaded and non-empty.
-    const sentinel =
-      tabId === "practice"
-        ? this.practiceColumnsButton
-        : tabId === "repertoire"
-          ? this.repertoireColumnsButton
-          : tabId === "catalog"
-            ? this.catalogColumnsButton
-            : tabId === "setlists"
-              ? this.setlistsColumnsButton
-              : undefined;
+  private async navigateToTabMobile(tabId: TabId, selectTrigger: Locator) {
+    const currentUrl = this.page.url();
+    const currentTab =
+      new URL(currentUrl).searchParams.get("tab") || "practice";
+
+    if (currentTab === tabId) return;
+
+    await this.dismissVisibleToasts();
+
+    await expect(selectTrigger).toBeEnabled({ timeout: 20_000 });
+    await selectTrigger.click({ timeout: 10_000 });
+
+    const tabLabels: Record<string, string> = {
+      practice: "Practice",
+      repertoire: "Repertoire",
+      catalog: "Catalog",
+      analysis: "Analysis",
+      setlists: "Setlists",
+    };
+    const option = this.page.getByRole("option", {
+      name: new RegExp(tabLabels[tabId], "i"),
+    });
+    await expect(option).toBeVisible({ timeout: 5_000 });
+    await option.click({ timeout: 5_000 });
+
+    await expect(this.page).toHaveURL(new RegExp(`[?&]tab=${tabId}`), {
+      timeout: 10_000,
+    });
+  }
+
+  private async navigateToTabDesktop(tabId: TabId) {
+    const tab = this.page.getByTestId(`tab-${tabId}`);
+    await expect(tab).toBeVisible({ timeout: 20_000 });
+    await expect(tab).toBeEnabled({ timeout: 20_000 });
+
+    const [selectedBefore, currentBefore] = await Promise.all([
+      tab.getAttribute("aria-selected"),
+      tab.getAttribute("aria-current"),
+    ]);
+    const isActiveBefore =
+      selectedBefore === "true" || currentBefore === "page";
+
+    if (!isActiveBefore) {
+      await tab.scrollIntoViewIfNeeded().catch(() => undefined);
+      await tab.click({ timeout: 10_000 });
+    }
+
+    // The URL is the authoritative source of tab state in Home.tsx.
+    await expect
+      .poll(
+        async () => {
+          const urlMatches = (() => {
+            try {
+              const currentUrl = new URL(this.page.url());
+              return (
+                (currentUrl.searchParams.get("tab") || "practice") === tabId
+              );
+            } catch {
+              return false;
+            }
+          })();
+          if (urlMatches) return true;
+
+          const [selected, current] = await Promise.all([
+            tab.getAttribute("aria-selected"),
+            tab.getAttribute("aria-current"),
+          ]);
+          return selected === "true" || current === "page";
+        },
+        { timeout: 10_000, intervals: [100, 250, 500, 1000] }
+      )
+      .toBe(true);
+  }
+
+  private async waitForTabContent(tabId: TabId) {
+    const sentinel = this.getSentinelForTab(tabId);
     if (sentinel) {
       await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
-      // Best-effort: anonymous users and empty states may not have a columns button.
-      // Use a short timeout so multiple navigations don't exhaust the test budget
-      // (e.g. 3 × 20 s would exceed a 30 s test timeout before .catch() fires).
       await expect(sentinel)
         .toBeVisible({ timeout: 5_000 })
         .catch(() => undefined);
     }
 
-    // Then wait for the corresponding grid/content to be visible
-    const grid =
-      tabId === "practice"
-        ? this.practiceGrid
-        : tabId === "repertoire"
-          ? this.repertoireGrid
-          : tabId === "catalog"
-            ? this.catalogGrid
-            : tabId === "setlists"
-              ? this.setlistsViewGrid
-              : undefined;
-    if (grid) {
-      // Best-effort: if the grid is mounted, wait for it; otherwise allow
-      // callers to assert on loading/empty states as needed.
-      const initialCount = await grid.count().catch(() => 0);
-      if (initialCount === 0) {
-        await expect
-          .poll(async () => (await grid.count().catch(() => 0)) > 0, {
-            timeout: 4000,
-            intervals: [100, 250, 500, 1000],
-          })
-          .toBe(true)
-          .catch(() => undefined);
-      }
+    const grid = this.getGridForTabId(tabId);
+    if (!grid) return;
 
-      const finalCount = await grid.count().catch(() => 0);
-      if (finalCount > 0) {
-        await expect(grid)
-          .toBeVisible({ timeout: 20_000 })
-          .catch(() => undefined);
-      }
+    const initialCount = await grid.count().catch(() => 0);
+    if (initialCount === 0) {
+      await expect
+        .poll(async () => (await grid.count().catch(() => 0)) > 0, {
+          timeout: 4000,
+          intervals: [100, 250, 500, 1000],
+        })
+        .toBe(true)
+        .catch(() => undefined);
+    }
+
+    const finalCount = await grid.count().catch(() => 0);
+    if (finalCount > 0) {
+      await expect(grid)
+        .toBeVisible({ timeout: 20_000 })
+        .catch(() => undefined);
     }
   }
 
@@ -1942,12 +1911,15 @@ export class TuneTreesPage {
   ) {
     await this.openSetlistsColumnVisibilityMenu(scope);
 
-    const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedLabel = columnLabel.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      String.raw`\$&`
+    );
 
     const menu = this.getColumnVisibilityMenu();
     const label = menu
       .locator("button span")
-      .filter({ hasText: new RegExp(`^\\s*${escapedLabel}\\s*$`, "i") })
+      .filter({ hasText: new RegExp(String.raw`^\s*${escapedLabel}\s*$`, "i") })
       .first();
     const option = label.locator("xpath=ancestor::button[1]");
     const checkbox = option.locator('input[type="checkbox"]').first();
@@ -2315,7 +2287,10 @@ export class TuneTreesPage {
    * Handles virtualized grids by searching within the grid context
    */
   async expectTuneVisible(tuneName: string, grid: Locator, timeout = 5000) {
-    const escapedName = tuneName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedName = tuneName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      String.raw`\$&`
+    );
 
     await expect
       .poll(
@@ -2390,18 +2365,13 @@ export class TuneTreesPage {
       addToRepertoire?: boolean;
       delete?: boolean;
       columns?: boolean;
-      tab?: "catalog" | "repertoire" | "practice";
+      tab?: TabType;
     } = {}
   ) {
-    const tab = options.tab || "catalog"; // Default to catalog for backwards compat
+    const tab: TabType = options.tab || "catalog"; // Default to catalog for backwards compat
 
     if (options.addTune) {
-      const button =
-        tab === "catalog"
-          ? this.catalogAddTuneButton
-          : tab === "repertoire"
-            ? this.repertoireAddTuneButton
-            : this.addTuneButton;
+      const button = this.getAddTuneButton(tab);
       if (tab === "catalog" || tab === "repertoire") {
         await this.ensureToolbarActionVisible(tab, button);
       }
@@ -2418,8 +2388,7 @@ export class TuneTreesPage {
     }
     if (options.delete !== undefined) {
       // Note: Delete button only exists on catalog tab, not on repertoire
-      const deleteBtn =
-        tab === "catalog" ? this.catalogDeleteButton : this.deleteButton;
+      const deleteBtn = this.getDeleteButton(tab);
 
       if (options.delete) {
         if (tab === "catalog") {
@@ -2437,14 +2406,7 @@ export class TuneTreesPage {
       }
     }
     if (options.columns) {
-      const columnsBtn =
-        tab === "catalog"
-          ? this.catalogColumnsButton
-          : tab === "repertoire"
-            ? this.repertoireColumnsButton
-            : tab === "practice"
-              ? this.practiceColumnsButton
-              : this.columnsButton;
+      const columnsBtn = this.getColumnsButtonForTab(tab);
       await expect(columnsBtn).toBeVisible({ timeout: 5000 });
     }
   }
@@ -2482,22 +2444,71 @@ export class TuneTreesPage {
     }
   }
 
-  private getGridForTab(tab: "catalog" | "repertoire" | "practice"): Locator {
-    return tab === "catalog"
-      ? this.catalogGrid
-      : tab === "repertoire"
-        ? this.repertoireGrid
-        : this.practiceGrid;
+  private getAddTuneButton(tab: TabType): Locator {
+    switch (tab) {
+      case "catalog":
+        return this.catalogAddTuneButton;
+      case "repertoire":
+        return this.repertoireAddTuneButton;
+      default:
+        return this.addTuneButton;
+    }
   }
 
-  private getColumnsButtonForTab(
-    tab: "catalog" | "repertoire" | "practice"
-  ): Locator {
-    return tab === "catalog"
-      ? this.catalogColumnsButton
-      : tab === "repertoire"
-        ? this.repertoireColumnsButton
-        : this.practiceColumnsButton;
+  private getDeleteButton(tab: TabType): Locator {
+    return tab === "catalog" ? this.catalogDeleteButton : this.deleteButton;
+  }
+
+  private getGridForTab(tab: TabType): Locator {
+    switch (tab) {
+      case "catalog":
+        return this.catalogGrid;
+      case "repertoire":
+        return this.repertoireGrid;
+      default:
+        return this.practiceGrid;
+    }
+  }
+
+  private getColumnsButtonForTab(tab: TabType): Locator {
+    switch (tab) {
+      case "catalog":
+        return this.catalogColumnsButton;
+      case "repertoire":
+        return this.repertoireColumnsButton;
+      default:
+        return this.practiceColumnsButton;
+    }
+  }
+
+  private getSentinelForTab(tabId: TabId): Locator | undefined {
+    switch (tabId) {
+      case "practice":
+        return this.practiceColumnsButton;
+      case "repertoire":
+        return this.repertoireColumnsButton;
+      case "catalog":
+        return this.catalogColumnsButton;
+      case "setlists":
+        return this.setlistsColumnsButton;
+      default:
+        return undefined;
+    }
+  }
+
+  private getGridForTabId(tabId: TabId): Locator | undefined {
+    switch (tabId) {
+      case "practice":
+        return this.practiceGrid;
+      case "repertoire":
+        return this.repertoireGrid;
+      case "catalog":
+        return this.catalogGrid;
+      case "setlists":
+        return this.setlistsViewGrid;
+      default:
+        return undefined;
+    }
   }
 
   private getVisibleStackedItems(): Locator {
@@ -2505,7 +2516,7 @@ export class TuneTreesPage {
   }
 
   private async getRenderedViewMode(
-    tab: "catalog" | "repertoire" | "practice"
+    tab: TabType
   ): Promise<"grid" | "list" | null> {
     const grid = this.getGridForTab(tab);
     const gridHeaderVisible = await grid
@@ -2529,7 +2540,7 @@ export class TuneTreesPage {
   }
 
   private async waitForRenderedViewMode(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     timeout = 10000
   ): Promise<"grid" | "list" | null> {
     const deadline = Date.now() + timeout;
@@ -2555,7 +2566,7 @@ export class TuneTreesPage {
   }
 
   private async waitForViewModeSurfaceReady(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     timeout = 15000
   ): Promise<void> {
     const baseUrl = String(BASE_URL).replace(/\/+$/, "");
@@ -2654,7 +2665,7 @@ export class TuneTreesPage {
     }
 
     const dataChecked = await displayModeSwitch
-      .getAttribute("data-checked")
+      .evaluate((el) => (el as HTMLElement).dataset.checked)
       .catch(() => null);
     if (dataChecked !== null) {
       return true;
@@ -2843,7 +2854,7 @@ export class TuneTreesPage {
 
   async selectTuneSetFilterByName(name: string) {
     await this.openTuneSetFilterDropdown();
-    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
     const option = this.tuneSetFilterMenu
       .getByRole("button", { name: new RegExp(escapedName, "i") })
       .first();
@@ -2855,10 +2866,7 @@ export class TuneTreesPage {
     await expect(checkbox).toBeChecked({ timeout: 5000 });
   }
 
-  async setViewMode(
-    tab: "catalog" | "repertoire" | "practice",
-    mode: "grid" | "list"
-  ) {
+  async setViewMode(tab: TabType, mode: "grid" | "list") {
     const throwPageClosedError = () => {
       throw new Error(`Page closed while setting ${tab} view mode to ${mode}`);
     };
@@ -2867,100 +2875,120 @@ export class TuneTreesPage {
 
     const columnsButton = this.getColumnsButtonForTab(tab);
     const grid = this.getGridForTab(tab);
-    const currentMode = await this.waitForRenderedViewMode(tab);
 
-    if (currentMode === mode) {
-      const lingeringMenu = this.getColumnVisibilityMenu();
-      const lingeringMenuVisible = await lingeringMenu
-        .isVisible({ timeout: 200 })
-        .catch(() => false);
-      if (lingeringMenuVisible) {
-        await this.closeColumnVisibilityMenu(lingeringMenu);
-      }
-
-      return;
-    }
+    if (await this.isAlreadyInViewMode(tab, mode)) return;
 
     await this.openColumnVisibilityMenu(columnsButton);
-
-    const renderedModeAfterMenuOpen = await this.getRenderedViewMode(tab);
-    if (renderedModeAfterMenuOpen === mode) {
+    if (await this.isAlreadyInViewMode(tab, mode)) {
       await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
       return;
     }
 
+    await this.attemptViewModeSwitch(columnsButton, tab, mode);
+    await this.verifyViewModeSwitch(tab, mode, grid, throwPageClosedError);
+  }
+
+  private async isAlreadyInViewMode(
+    tab: TabType,
+    mode: "grid" | "list"
+  ): Promise<boolean> {
+    if ((await this.waitForRenderedViewMode(tab)) !== mode) return false;
+
+    const lingeringMenu = this.getColumnVisibilityMenu();
+    const lingeringMenuVisible = await lingeringMenu
+      .isVisible({ timeout: 200 })
+      .catch(() => false);
+    if (lingeringMenuVisible) {
+      await this.closeColumnVisibilityMenu(lingeringMenu);
+    }
+    return true;
+  }
+
+  private async attemptViewModeSwitch(
+    columnsButton: Locator,
+    tab: TabType,
+    mode: "grid" | "list"
+  ) {
+    const throwPageClosedError = () => {
+      throw new Error(`Page closed while setting ${tab} view mode to ${mode}`);
+    };
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (this.page.isClosed()) {
-        throwPageClosedError();
-      }
+      if (this.page.isClosed()) throwPageClosedError();
 
       const displayModeSwitch = this.getDisplayModeSwitch();
-      const switchVisible = await displayModeSwitch
-        .isVisible({ timeout: 500 })
-        .catch(() => false);
-      if (!switchVisible) {
-        const reopenedMenu = this.getColumnVisibilityMenu();
-        const reopenedMenuVisible = await reopenedMenu
-          .isVisible({ timeout: 250 })
-          .catch(() => false);
-        if (!reopenedMenuVisible) {
-          await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
-          const renderedModeAfterReopen = await this.getRenderedViewMode(tab);
-          if (renderedModeAfterReopen === mode) {
-            await this.closeColumnVisibilityMenu(reopenedMenu);
-            return;
-          }
-        }
+      if (
+        !(await displayModeSwitch
+          .isVisible({ timeout: 500 })
+          .catch(() => false))
+      ) {
+        if (await this.reopenMenuAndCheck(columnsButton, tab, mode)) return;
         await this.page.waitForTimeout(150);
         continue;
       }
 
       await displayModeSwitch.scrollIntoViewIfNeeded().catch(() => undefined);
-
-      const switchMatchesRequestedModeBeforeClick =
-        await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode);
-      if (switchMatchesRequestedModeBeforeClick === true) {
-        break;
-      }
-
-      try {
-        await displayModeSwitch.click({ timeout: 5000 });
-      } catch {
-        const switchMatchesRequestedModeAfterFailedClick =
-          await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode);
-        if (switchMatchesRequestedModeAfterFailedClick === true) {
-          break;
-        }
-
-        if (attempt === 2) {
-          await displayModeSwitch.click({ timeout: 5000 });
-        }
-      }
-
-      const renderedMode = await this.waitForRenderedViewMode(tab, 1500);
-      if (renderedMode === mode) {
-        break;
-      }
-
-      const reopenedMenu = this.getColumnVisibilityMenu();
-      const reopenedMenuVisible = await reopenedMenu
-        .isVisible({ timeout: 250 })
-        .catch(() => false);
-      if (!reopenedMenuVisible) {
-        await this.openColumnVisibilityMenu(columnsButton, reopenedMenu);
-        const renderedModeAfterReopen = await this.getRenderedViewMode(tab);
-        if (renderedModeAfterReopen === mode) {
-          await this.closeColumnVisibilityMenu(reopenedMenu);
-          return;
-        }
-      }
-
+      if (
+        await this.tryClickDisplayModeSwitch(displayModeSwitch, mode, attempt)
+      )
+        return;
+      if ((await this.waitForRenderedViewMode(tab, 1500)) === mode) return;
+      if (await this.reopenMenuAndCheck(columnsButton, tab, mode)) return;
       await this.page.waitForTimeout(150);
     }
+  }
 
-    if (this.page.isClosed()) {
-      throwPageClosedError();
+  private async tryClickDisplayModeSwitch(
+    displayModeSwitch: Locator,
+    mode: "grid" | "list",
+    attempt: number
+  ): Promise<boolean> {
+    if (
+      (await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode)) ===
+      true
+    )
+      return true;
+
+    try {
+      await displayModeSwitch.click({ timeout: 5000 });
+    } catch {
+      if (attempt === 2) await displayModeSwitch.click({ timeout: 5000 });
+      return (
+        (await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode)) ===
+        true
+      );
     }
+
+    return (
+      (await this.doesDisplayModeSwitchMatchMode(displayModeSwitch, mode)) ===
+      true
+    );
+  }
+
+  private async reopenMenuAndCheck(
+    columnsButton: Locator,
+    tab: TabType,
+    mode: "grid" | "list"
+  ): Promise<boolean> {
+    const menu = this.getColumnVisibilityMenu();
+    const visible = await menu.isVisible({ timeout: 250 }).catch(() => false);
+    if (visible) return false;
+
+    await this.openColumnVisibilityMenu(columnsButton, menu);
+    if ((await this.waitForRenderedViewMode(tab)) === mode) {
+      await this.closeColumnVisibilityMenu(menu);
+      return true;
+    }
+    return false;
+  }
+
+  private async verifyViewModeSwitch(
+    tab: TabType,
+    mode: "grid" | "list",
+    grid: Locator,
+    throwPageClosedError: () => never
+  ) {
+    if (this.page.isClosed()) throwPageClosedError();
 
     await expect
       .poll(() => this.getRenderedViewMode(tab), {
@@ -2969,10 +2997,7 @@ export class TuneTreesPage {
       })
       .toBe(mode);
 
-    if (this.page.isClosed()) {
-      throwPageClosedError();
-    }
-
+    if (this.page.isClosed()) throwPageClosedError();
     await this.closeColumnVisibilityMenu(this.getColumnVisibilityMenu());
 
     if (mode === "grid") {
@@ -2986,11 +3011,11 @@ export class TuneTreesPage {
     }
   }
 
-  async ensureGridView(tab: "catalog" | "repertoire" | "practice") {
+  async ensureGridView(tab: TabType) {
     await this.setViewMode(tab, "grid");
   }
 
-  async ensureListView(tab: "catalog" | "repertoire" | "practice") {
+  async ensureListView(tab: TabType) {
     await this.setViewMode(tab, "list");
   }
 
@@ -3137,7 +3162,7 @@ export class TuneTreesPage {
   }
 
   private async revealToolbarAction(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     action: Locator
   ): Promise<boolean> {
     const alreadyVisible = await action
@@ -3152,10 +3177,7 @@ export class TuneTreesPage {
     return true;
   }
 
-  private async ensureToolbarActionVisible(
-    tab: "catalog" | "repertoire" | "practice",
-    action: Locator
-  ) {
+  private async ensureToolbarActionVisible(tab: TabType, action: Locator) {
     await this.revealToolbarAction(tab, action);
   }
 
@@ -3210,7 +3232,7 @@ export class TuneTreesPage {
   }
 
   private async clickToolbarAction(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     action: Locator,
     opts?: { timeoutMs?: number; settleMs?: number }
   ) {
@@ -3258,7 +3280,7 @@ export class TuneTreesPage {
   }
 
   private async getToolbarSwitchTarget(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     action: Locator
   ): Promise<Locator> {
     await this.ensureToolbarActionVisible(tab, action);
@@ -3270,7 +3292,7 @@ export class TuneTreesPage {
   }
 
   private async getToolbarSwitchClickTarget(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     action: Locator
   ): Promise<Locator> {
     await this.ensureToolbarActionVisible(tab, action);
@@ -3316,13 +3338,13 @@ export class TuneTreesPage {
     }
 
     const dataChecked = await target
-      .getAttribute("data-checked")
+      .evaluate((el) => (el as HTMLElement).dataset.checked)
       .catch(() => null);
     return dataChecked != null;
   }
 
   private async getToolbarSwitchChecked(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     action: Locator
   ): Promise<boolean> {
     const openedOverflow = await this.revealToolbarAction(tab, action);
@@ -3338,7 +3360,7 @@ export class TuneTreesPage {
   }
 
   private async setToolbarSwitchChecked(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     action: Locator,
     enabled: boolean,
     settleMs: number = 300
@@ -3662,12 +3684,15 @@ export class TuneTreesPage {
   }
 
   async setGridColumnVisibility(
-    tab: "catalog" | "repertoire" | "practice",
+    tab: TabType,
     columnLabel: string,
     visible: boolean
   ) {
     const columnsButton = this.getColumnsButtonForTab(tab);
-    const escapedLabel = columnLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedLabel = columnLabel.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      String.raw`\$&`
+    );
 
     await this.openColumnVisibilityMenu(columnsButton);
 
@@ -3675,7 +3700,7 @@ export class TuneTreesPage {
 
     const label = menu
       .locator("button span")
-      .filter({ hasText: new RegExp(`^\\s*${escapedLabel}\\s*$`, "i") })
+      .filter({ hasText: new RegExp(String.raw`^\s*${escapedLabel}\s*$`, "i") })
       .first();
     const option = label.locator("xpath=ancestor::button[1]");
     const checkbox = option.locator('input[type="checkbox"]').first();
@@ -3698,15 +3723,12 @@ export class TuneTreesPage {
     await this.closeColumnVisibilityMenu(menu);
   }
 
-  async ensureGridColumnVisible(
-    tab: "catalog" | "repertoire" | "practice",
-    columnLabel: string
-  ) {
+  async ensureGridColumnVisible(tab: TabType, columnLabel: string) {
     await this.setGridColumnVisibility(tab, columnLabel, true);
   }
 
   /**
-   * Filter by type (Jig, Reel, etc.)
+   * Filter by genre
    */
   async filterByGenre(
     genre: string,
@@ -3725,42 +3747,59 @@ export class TuneTreesPage {
     const rowsCount = await rowsLocator.count();
     expect(rowsCount).toBeGreaterThan(nRowsTest);
 
-    // Ensure panel is closed before trying to open it
-    // (might still be closing from a previous filter operation)
     await expect(this.searchBoxPanel)
       .not.toBeVisible({ timeout: 2000 })
       .catch(() => {});
 
-    // Wait for filters button to be enabled - it's disabled while genres/repertoires load
     await expect(this.filtersButton).toBeVisible({ timeout: 5000 });
     await expect(this.filtersButton).toBeEnabled({ timeout: 10000 });
 
-    const pause = async (ms: number) => {
-      if (!this.page.isClosed()) {
-        await this.page.waitForTimeout(ms);
-      }
+    const filtersPanelReady = await this.waitForFiltersPanelOpen();
+    expect(filtersPanelReady).toBe(true);
+
+    await expect(this.genreFilter).toBeVisible({ timeout: 5000 });
+    await expect(this.genreFilter).toBeEnabled({ timeout: 10000 });
+    await this.page.waitForTimeout(250);
+
+    const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-genre`);
+
+    const genreDropdownOpened = await this.ensureGenreDropdownOpen(
+      dropdownPanel,
+      genre
+    );
+    expect(genreDropdownOpened).toBe(true);
+
+    const genreOptionChecked = await this.checkGenreOption(
+      dropdownPanel,
+      genre
+    );
+    expect(genreOptionChecked).toBe(true);
+
+    const filterBoxIsOpen = await dropdownPanel.isVisible();
+    if (filterBoxIsOpen) {
+      await this.filtersButton.click();
+    }
+  }
+
+  private async waitForFiltersPanelOpen(): Promise<boolean> {
+    const pause = (ms: number) => {
+      if (!this.page.isClosed()) this.page.waitForTimeout(ms).catch(() => {});
     };
 
-    const clickFilterButton = async (locator: Locator): Promise<void> => {
+    const clickFilterButton = async (locator: Locator) => {
       await locator.scrollIntoViewIfNeeded().catch(() => {});
-
       try {
         await locator.click({ timeout: 1500 });
-        return;
       } catch {
         await locator.click({ timeout: 1500, force: true }).catch(() => {});
       }
     };
 
-    let filtersPanelReady = false;
     for (let attempt = 0; attempt < 4; attempt++) {
-      const genreFilterVisible = await this.genreFilter
+      const visible = await this.genreFilter
         .isVisible({ timeout: 500 })
         .catch(() => false);
-      if (genreFilterVisible) {
-        filtersPanelReady = true;
-        break;
-      }
+      if (visible) return true;
 
       const panelExpanded = await this.filtersButton
         .getAttribute("aria-expanded")
@@ -3771,14 +3810,12 @@ export class TuneTreesPage {
         await clickFilterButton(this.filtersButton);
       }
 
-      await pause(250);
+      pause(250);
 
-      const panelReadyNow = await this.genreFilter
-        .isVisible({ timeout: 1000 })
-        .catch(() => false);
-      if (panelReadyNow) {
-        filtersPanelReady = true;
-        break;
+      if (
+        await this.genreFilter.isVisible({ timeout: 1000 }).catch(() => false)
+      ) {
+        return true;
       }
 
       const stillExpanded = await this.filtersButton
@@ -3788,109 +3825,98 @@ export class TuneTreesPage {
 
       if (stillExpanded) {
         await this.page.keyboard.press("Escape").catch(() => {});
-        await pause(150);
+        pause(150);
       }
     }
 
-    expect(filtersPanelReady).toBe(true);
-    await expect(this.genreFilter).toBeVisible({ timeout: 5000 });
-    await expect(this.genreFilter).toBeEnabled({ timeout: 10000 });
-    await this.page.waitForTimeout(250);
+    return false;
+  }
 
-    const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-genre`);
+  private async ensureGenreDropdownOpen(
+    dropdownPanel: Locator,
+    _genre: string
+  ): Promise<boolean> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const filterVisible = await this.genreFilter
+        .isVisible({ timeout: 300 })
+        .catch(() => false);
 
-    const escapedGenre = genre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const optionByRole = () =>
-      dropdownPanel
-        .getByRole("checkbox", {
-          name: new RegExp(`^\\s*${escapedGenre}\\s*$`, "i"),
-        })
-        .first();
-    const optionByLabel = () =>
-      dropdownPanel
-        .locator("label", { hasText: genre })
-        .locator('input[type="checkbox"]')
-        .first();
-
-    const ensureGenreDropdownOpen = async (): Promise<boolean> => {
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const genreFilterVisible = await this.genreFilter
-          .isVisible({ timeout: 300 })
-          .catch(() => false);
-
-        if (!genreFilterVisible) {
-          await clickFilterButton(this.filtersButton);
-          await pause(200);
-        }
-
-        const [isExpanded, isPanelVisible] = await Promise.all([
-          this.genreFilter
-            .getAttribute("aria-expanded")
-            .then((value) => value === "true")
-            .catch(() => false),
-          dropdownPanel.isVisible({ timeout: 400 }).catch(() => false),
-        ]);
-
-        if (isExpanded && isPanelVisible) {
-          return true;
-        }
-
-        await clickFilterButton(this.genreFilter);
-        await pause(200);
+      if (!filterVisible) {
+        await this.filtersButton.click().catch(() => {});
+        if (!this.page.isClosed()) await this.page.waitForTimeout(200);
       }
 
-      return false;
-    };
+      const [isExpanded, isPanelVisible] = await Promise.all([
+        this.genreFilter
+          .getAttribute("aria-expanded")
+          .then((value) => value === "true")
+          .catch(() => false),
+        dropdownPanel.isVisible({ timeout: 400 }).catch(() => false),
+      ]);
 
-    console.log(`Filtering by genre: "${genre}"`);
+      if (isExpanded && isPanelVisible) return true;
 
-    const genreDropdownOpened = await ensureGenreDropdownOpen();
-    expect(genreDropdownOpened).toBe(true);
+      await this.genreFilter.click().catch(() => {});
+      if (!this.page.isClosed()) await this.page.waitForTimeout(200);
+    }
 
-    let selectedOption = optionByRole();
-    let genreOptionChecked = false;
+    return false;
+  }
+
+  private async checkGenreOption(
+    dropdownPanel: Locator,
+    genre: string
+  ): Promise<boolean> {
+    const escapedGenre = genre.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+    const genrePattern = new RegExp(String.raw`^\s*${escapedGenre}\s*$`, "i");
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const isOpen = await ensureGenreDropdownOpen();
-      if (!isOpen) {
-        await pause(250);
+      if (!(await this.ensureGenreDropdownOpen(dropdownPanel, genre))) {
+        await this.safeTimeout(250);
         continue;
       }
-
-      const roleOption = optionByRole();
-      const roleOptionCount = await roleOption.count().catch(() => 0);
-      const candidate = roleOptionCount > 0 ? roleOption : optionByLabel();
-
-      const isCandidateVisible = await candidate
-        .isVisible({ timeout: 1500 })
-        .catch(() => false);
-      if (!isCandidateVisible) {
-        await pause(250);
+      const candidate = await this.findGenreCheckbox(
+        dropdownPanel,
+        genre,
+        genrePattern
+      );
+      if (!candidate) {
+        await this.safeTimeout(250);
         continue;
       }
-
       try {
         await candidate.scrollIntoViewIfNeeded().catch(() => {});
         await expect(candidate).toBeEnabled({ timeout: 5000 });
         await candidate.check({ timeout: 5000 });
         await expect(candidate).toBeChecked({ timeout: 5000 });
-        selectedOption = candidate;
-        genreOptionChecked = true;
-        break;
+        return true;
       } catch {
-        await pause(200);
+        await this.safeTimeout(200);
       }
     }
+    return false;
+  }
 
-    expect(genreOptionChecked).toBe(true);
+  private async safeTimeout(ms: number) {
+    if (!this.page.isClosed()) await this.page.waitForTimeout(ms);
+  }
 
-    const filterBoxIsOpen = await dropdownPanel.isVisible();
-    if (filterBoxIsOpen) {
-      await this.filtersButton.click();
-      await expect(selectedOption)
-        .not.toBeVisible({ timeout: 5000 })
-        .catch(() => {});
-    }
+  private async findGenreCheckbox(
+    dropdownPanel: Locator,
+    genre: string,
+    pattern: RegExp
+  ): Promise<Locator | null> {
+    const byRole = dropdownPanel
+      .getByRole("checkbox", { name: pattern })
+      .first();
+    if ((await byRole.count().catch(() => 0)) > 0) return byRole;
+    const byLabel = dropdownPanel
+      .locator("label", { hasText: genre })
+      .locator('input[type="checkbox"]')
+      .first();
+    return (await byLabel.isVisible({ timeout: 1500 }).catch(() => false))
+      ? byLabel
+      : null;
   }
 
   /**
@@ -3913,11 +3939,11 @@ export class TuneTreesPage {
     await expect(this.typeFilter).toBeEnabled({ timeout: 10000 });
 
     const dropdownPanel = this.page.getByTestId(`filter-dropdown-menu-type`);
-    const escapedType = type.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedType = type.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
     const optionByRole = () =>
       dropdownPanel
         .getByRole("checkbox", {
-          name: new RegExp(`^\\s*${escapedType}\\s*$`, "i"),
+          name: new RegExp(String.raw`^\s*${escapedType}\s*$`, "i"),
         })
         .first();
     const optionByLabel = () =>
@@ -4385,187 +4411,183 @@ export class TuneTreesPage {
     await expect(evalTrigger).toBeEnabled({ timeout: 5000 });
 
     const expectedLabel =
-      evalValue === "not-set" ? "\\(Not Set\\)" : `${evalValue}:`;
+      evalValue === "not-set" ? String.raw`\(Not Set\)` : `${evalValue}:`;
+
     const triggerAlreadySelected = async () => {
       const text = (await evalTrigger.textContent().catch(() => null)) ?? "";
       return new RegExp(expectedLabel, "i").test(text);
     };
 
-    const waitBetweenAttempts = async () => {
-      if (!doTimeouts || this.page.isClosed()) return;
-      const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
-      await this.page
-        .waitForLoadState("domcontentloaded", { timeout: 1500 })
-        .catch(() => undefined);
-      await this.page.waitForTimeout(delay);
-    };
-
-    const isMenuOpen = async () => {
-      const [expanded, visible] = await Promise.all([
-        evalTrigger.getAttribute("aria-expanded").catch(() => null),
-        menu.isVisible().catch(() => false),
-      ]);
-
-      return expanded === "true" || visible;
-    };
-
-    const closeMenu = async () => {
-      if (!(await isMenuOpen())) {
-        return;
-      }
-
-      await evalTrigger.focus().catch(() => undefined);
-      await evalTrigger.press("Escape").catch(async () => {
-        await this.page.keyboard.press("Escape").catch(() => undefined);
-      });
-
-      await expect
-        .poll(() => isMenuOpen(), {
-          timeout: 2000,
-          intervals: [100, 250, 500],
-        })
-        .toBe(false)
-        .catch(() => undefined);
-    };
-
-    const openMenu = async () => {
-      if (await isMenuOpen()) {
-        return;
-      }
-
-      await whichRow.scrollIntoViewIfNeeded().catch(() => undefined);
-      await evalTrigger.scrollIntoViewIfNeeded().catch(() => undefined);
-      await evalTrigger.focus().catch(() => undefined);
-
-      try {
-        await evalTrigger.click({ timeout: 4000 });
-      } catch {
-        await evalTrigger.press("Enter");
-      }
-
-      await expect
-        .poll(() => isMenuOpen(), {
-          timeout: 4000,
-          intervals: [100, 250, 500, 1000],
-        })
-        .toBe(true);
-    };
-
-    const submitStateReflectsSelection = async () => {
-      if (evalValue === "not-set") {
-        return true;
-      }
-
-      const [title, textContent, enabled] = await Promise.all([
-        this.submitEvaluationsButton.getAttribute("title").catch(() => null),
-        this.submitEvaluationsButton.textContent().catch(() => null),
-        this.submitEvaluationsButton.isEnabled().catch(() => false),
-      ]);
-
-      const titleMatch = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
-      const textMatch = textContent?.match(/\b(\d+)\b/);
-      const count = titleMatch
-        ? Number(titleMatch[1])
-        : textMatch
-          ? Number(textMatch[1])
-          : 0;
-
-      return enabled && count >= 1;
-    };
+    const waitBetweenAttempts = () => this.pauseIfNotClosed(doTimeouts);
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      if (await triggerAlreadySelected()) {
-        return;
-      }
+      if (await triggerAlreadySelected()) return;
 
-      // The grid cell keeps local open state to survive re-renders. Double-click,
-      // force-click, and global keyboard fallbacks can easily toggle it twice and
-      // leave Playwright fighting the component instead of selecting an option.
-      await closeMenu();
-
-      try {
-        await openMenu();
-      } catch (error) {
-        if (this.page.isClosed()) {
-          throw error;
-        }
-        await waitBetweenAttempts();
-        continue;
-      }
-
-      const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
-      try {
-        await expect(menu).toBeVisible({ timeout: 4000 });
-        await expect(whichOption).toBeVisible({ timeout: 4000 });
-        await expect(whichOption).toBeEnabled({ timeout: 4000 });
-
-        await whichOption.scrollIntoViewIfNeeded().catch(() => undefined);
-        await whichOption.click({ timeout: 3000 });
-      } catch {
-        await closeMenu();
-        await waitBetweenAttempts();
-        continue;
-      }
-
-      try {
-        await expect
-          .poll(
-            async () => {
-              const [triggerText, open, submitReady] = await Promise.all([
-                evalTrigger.textContent().catch(() => null),
-                isMenuOpen(),
-                submitStateReflectsSelection(),
-              ]);
-
-              return {
-                triggerText: triggerText ?? "",
-                open,
-                submitReady,
-              };
-            },
-            {
-              timeout: 5000,
-              intervals: [100, 250, 500, 1000],
-            }
-          )
-          .toMatchObject({
-            triggerText: expect.stringMatching(new RegExp(expectedLabel, "i")),
-            open: false,
-            submitReady: true,
-          });
-      } catch {
-        await closeMenu();
-        await waitBetweenAttempts();
-        continue;
-      }
-
-      if (evalValue !== "not-set" && !this.page.isClosed()) {
-        const settleDelay =
-          typeof doTimeouts === "number" ? Math.max(doTimeouts, 250) : 250;
-        await this.page.waitForTimeout(settleDelay);
-
-        const [stillSelected, submitReady] = await Promise.all([
-          triggerAlreadySelected().catch(() => false),
-          submitStateReflectsSelection(),
-        ]);
-
-        if (!stillSelected || !submitReady) {
-          await closeMenu();
-          await waitBetweenAttempts();
-          continue;
-        }
-      }
-
-      if (doTimeouts && !this.page.isClosed()) {
-        const delay = typeof doTimeouts === "number" ? doTimeouts : 50;
-        await this.page.waitForTimeout(delay);
-      }
-      return;
+      const result = await this.trySelectEvalOption(
+        menu,
+        evalTrigger,
+        whichRow,
+        evalValue,
+        expectedLabel,
+        triggerAlreadySelected,
+        waitBetweenAttempts
+      );
+      if (result) return;
     }
 
     throw new Error(
       `Failed to select evaluation ${evalValue} for tune ${tuneId} after retries`
     );
+  }
+
+  private pauseIfNotClosed(doTimeouts: boolean | number) {
+    if (!doTimeouts || this.page.isClosed()) return;
+    const delay = typeof doTimeouts === "number" ? doTimeouts : 200;
+    this.page
+      .waitForLoadState("domcontentloaded", { timeout: 1500 })
+      .catch(() => undefined);
+    this.page.waitForTimeout(delay);
+  }
+
+  private async isEvalMenuOpen(
+    menu: Locator,
+    trigger: Locator
+  ): Promise<boolean> {
+    const [expanded, visible] = await Promise.all([
+      trigger.getAttribute("aria-expanded").catch(() => null),
+      menu.isVisible().catch(() => false),
+    ]);
+    return expanded === "true" || visible;
+  }
+
+  private async closeEvalMenu(menu: Locator, trigger: Locator) {
+    if (!(await this.isEvalMenuOpen(menu, trigger))) return;
+
+    await trigger.focus().catch(() => undefined);
+    await trigger.press("Escape").catch(async () => {
+      await this.page.keyboard.press("Escape").catch(() => undefined);
+    });
+
+    await expect
+      .poll(() => this.isEvalMenuOpen(menu, trigger), {
+        timeout: 2000,
+        intervals: [100, 250, 500],
+      })
+      .toBe(false)
+      .catch(() => undefined);
+  }
+
+  private async openEvalMenu(menu: Locator, trigger: Locator, row: Locator) {
+    if (await this.isEvalMenuOpen(menu, trigger)) return;
+
+    await row.scrollIntoViewIfNeeded().catch(() => undefined);
+    await trigger.scrollIntoViewIfNeeded().catch(() => undefined);
+    await trigger.focus().catch(() => undefined);
+
+    try {
+      await trigger.click({ timeout: 4000 });
+    } catch {
+      await trigger.press("Enter");
+    }
+
+    await expect
+      .poll(() => this.isEvalMenuOpen(menu, trigger), {
+        timeout: 4000,
+        intervals: [100, 250, 500, 1000],
+      })
+      .toBe(true);
+  }
+
+  private async submitStateReflectsEvalSelection(
+    evalValue: string
+  ): Promise<boolean> {
+    if (evalValue === "not-set") return true;
+
+    const [title, textContent, enabled] = await Promise.all([
+      this.submitEvaluationsButton.getAttribute("title").catch(() => null),
+      this.submitEvaluationsButton.textContent().catch(() => null),
+      this.submitEvaluationsButton.isEnabled().catch(() => false),
+    ]);
+
+    const titleMatch = title?.match(/Submit\s+(\d+)\s+practice evaluations/i);
+    const textMatch = textContent?.match(/\b(\d+)\b/);
+    const count = this.extractEvaluationCount(titleMatch, textMatch);
+    return enabled && count >= 1;
+  }
+
+  private async trySelectEvalOption(
+    menu: Locator,
+    trigger: Locator,
+    row: Locator,
+    evalValue: string,
+    expectedLabel: string,
+    isAlreadySelected: () => Promise<boolean>,
+    settle: () => void
+  ): Promise<boolean> {
+    await this.closeEvalMenu(menu, trigger);
+
+    try {
+      await this.openEvalMenu(menu, trigger, row);
+    } catch (error) {
+      if (this.page.isClosed()) throw error;
+      settle();
+      return false;
+    }
+
+    const whichOption = menu.getByTestId(`recall-eval-option-${evalValue}`);
+    try {
+      await expect(menu).toBeVisible({ timeout: 4000 });
+      await expect(whichOption).toBeVisible({ timeout: 4000 });
+      await expect(whichOption).toBeEnabled({ timeout: 4000 });
+      await whichOption.scrollIntoViewIfNeeded().catch(() => undefined);
+      await whichOption.click({ timeout: 3000 });
+    } catch {
+      await this.closeEvalMenu(menu, trigger);
+      settle();
+      return false;
+    }
+
+    try {
+      await expect
+        .poll(
+          async () => {
+            const [triggerText, open, submitReady] = await Promise.all([
+              trigger.textContent().catch(() => null),
+              this.isEvalMenuOpen(menu, trigger),
+              this.submitStateReflectsEvalSelection(evalValue),
+            ]);
+            return { triggerText: triggerText ?? "", open, submitReady };
+          },
+          { timeout: 5000, intervals: [100, 250, 500, 1000] }
+        )
+        .toMatchObject({
+          triggerText: expect.stringMatching(new RegExp(expectedLabel, "i")),
+          open: false,
+          submitReady: true,
+        });
+    } catch {
+      await this.closeEvalMenu(menu, trigger);
+      settle();
+      return false;
+    }
+
+    if (evalValue !== "not-set" && !this.page.isClosed()) {
+      await this.page.waitForTimeout(250);
+      const [stillSelected, submitReady] = await Promise.all([
+        isAlreadySelected().catch(() => false),
+        this.submitStateReflectsEvalSelection(evalValue),
+      ]);
+      if (!stillSelected || !submitReady) {
+        await this.closeEvalMenu(menu, trigger);
+        settle();
+        return false;
+      }
+    }
+
+    if (!this.page.isClosed()) {
+      await this.page.waitForTimeout(50);
+    }
+    return true;
   }
 
   async waitForSubmitReady(
@@ -4592,11 +4614,7 @@ export class TuneTreesPage {
             /Submit\s+(\d+)\s+practice evaluations/i
           );
           const textMatch = textContent?.match(/\b(\d+)\b/);
-          const count = titleMatch
-            ? Number(titleMatch[1])
-            : textMatch
-              ? Number(textMatch[1])
-              : 0;
+          const count = this.extractEvaluationCount(titleMatch, textMatch);
           return enabled && count >= minCount;
         },
         { timeout: timeoutMs, intervals: [100, 250, 500, 1000] }
@@ -4623,8 +4641,18 @@ export class TuneTreesPage {
     }
   }
 
+  private extractEvaluationCount(
+    titleMatch: RegExpMatchArray | null | undefined,
+    textMatch: RegExpMatchArray | null | undefined
+  ): number {
+    if (titleMatch) return Number(titleMatch[1]);
+    if (textMatch) return Number(textMatch[1]);
+    return 0;
+  }
+
   private isToastClickInterception(error: unknown): boolean {
-    const message = error instanceof Error ? error.message : String(error);
+    const message =
+      error instanceof Error ? error.message : JSON.stringify(error);
     return (
       message.includes("intercepts pointer events") &&
       (message.includes("Notifications alt+T") ||
@@ -4749,263 +4777,217 @@ export class TuneTreesPage {
     timeoutAfter: number = 500
   ) {
     const startedAt = Date.now();
-    console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:start", {
-      value,
-      timeoutAfter,
-      url: this.page.url(),
-    });
+    this.logFlashcard("start", { value, timeoutAfter });
 
-    const nOuterAttempts = 6;
-    for (let outerAttempt = 0; outerAttempt < nOuterAttempts; outerAttempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       try {
-        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:attempt", {
-          value,
-          outerAttempt,
-          nOuterAttempts,
-          url: this.page.url(),
-        });
-
+        this.logFlashcard("attempt", { value, attempt });
         await expect(this.flashcardView).toBeVisible({ timeout: 15_000 });
 
-        // Open the evaluation combobox within the flashcard view (avoid picking up
-        // any recall-eval controls that might exist elsewhere on the page).
-        const evalButton = this.flashcardView.getByTestId(
-          /^recall-eval-[0-9a-f-]+$/i
-        );
-        console.log(`outerAttempt: ${outerAttempt}`);
-        await expect(evalButton).toBeVisible({ timeout: 10_000 });
-        await evalButton.scrollIntoViewIfNeeded();
-        await expect(evalButton).toBeEnabled({ timeout: 10_000 });
-
-        const dropdownTestId = await evalButton.getAttribute("data-testid");
-        const tuneId = this.parseTuneIdFromRecallEvalTestId(dropdownTestId);
-        if (!tuneId) {
-          throw new Error(
-            `Expected tuneId to be present on flashcard recall evaluation dropdown (data-testid=${String(
-              dropdownTestId
-            )})`
-          );
-        }
-
-        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:tune", {
-          tuneId,
-          value,
-          outerAttempt,
-        });
+        const { evalButton, tuneId } = await this.findFlashcardEvalControls();
+        this.logFlashcard("tune", { tuneId, value, attempt });
 
         const menu = this.page.getByTestId(`recall-eval-menu-${tuneId}`);
-
         const expectedLabel = value === "not-set" ? "(Not Set)" : `${value}:`;
+        const elapsed = () => Date.now() - startedAt;
 
-        if (value !== "not-set") {
-          const flashcardHotkeys: Record<
-            "again" | "hard" | "good" | "easy",
-            string
-          > = {
-            again: "1",
-            hard: "2",
-            good: "3",
-            easy: "4",
-          };
-
-          try {
-            await this.page.keyboard.press("Escape").catch(() => undefined);
-            // Wait for any open dropdown to close before interacting with the flashcard view
-            await expect(menu)
-              .toBeHidden({ timeout: 3000 })
-              .catch(() => undefined);
-            await this.clickWithToastRecovery(
-              this.flashcardView,
-              { position: { x: 24, y: 24 } },
-              "selectFlashcardEvaluation:focus-flashcard"
-            );
-            // Wait for the flashcard view to be ready before sending keyboard shortcuts
-            await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
-            await this.page.keyboard.press(flashcardHotkeys[value]);
-
-            await expect
-              .poll(async () => (await evalButton.textContent()) ?? "", {
-                timeout: 5000,
-                intervals: [100, 250, 500, 1000],
-              })
-              .toMatch(new RegExp(expectedLabel, "i"));
-
-            console.log(
-              "[TuneTreesPageDiag] selectFlashcardEvaluation:shortcut-success",
-              {
-                tuneId,
-                value,
-                elapsedMs: Date.now() - startedAt,
-              }
-            );
-
-            break;
-          } catch (shortcutErr) {
-            console.log(
-              "[TuneTreesPageDiag] selectFlashcardEvaluation:shortcut-fallback",
-              {
-                tuneId,
-                value,
-                outerAttempt,
-                elapsedMs: Date.now() - startedAt,
-                error:
-                  shortcutErr instanceof Error
-                    ? shortcutErr.message
-                    : String(shortcutErr),
-              }
-            );
-          }
-        }
-
-        // Under load (esp. Mobile Chrome), opening the dropdown can be flaky.
-        // Retry a couple of times, and ensure the card back is revealed if needed.
-        let menuOpened = false;
-        for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
-          await evalButton.focus().catch(() => undefined);
-          await this.clickWithToastRecovery(
-            evalButton,
-            { trial: true, timeout: 5000 },
-            "selectFlashcardEvaluation:trial-open-menu"
-          );
-          await this.clickWithToastRecovery(
-            evalButton,
-            { timeout: 5000 },
-            "selectFlashcardEvaluation:open-menu"
-          );
-
-          try {
-            await expect(menu).toBeVisible({ timeout: 4000 });
-            menuOpened = true;
-            break;
-          } catch {
-            // Mobile/headless runs can report the combobox trigger as visible+enabled
-            // while pointer click doesn't actually toggle the popup (likely focus/overlay
-            // timing). Try keyboard activation first (Enter/Space), then log state and
-            // reset reveal/focus before the next retry.
-            try {
-              await this.page.keyboard.press("Enter");
-              await expect(menu).toBeVisible({ timeout: 1500 });
-              menuOpened = true;
-              break;
-            } catch {}
-
-            try {
-              await this.page.keyboard.press(" ");
-              await expect(menu).toBeVisible({ timeout: 1500 });
-              menuOpened = true;
-              break;
-            } catch {}
-
-            const [ariaExpanded, hasLoadingQueue, hasNoTunes] =
-              await Promise.all([
-                evalButton.getAttribute("aria-expanded").catch(() => null),
-                this.page
-                  .getByText("Loading practice queue...")
-                  .isVisible()
-                  .catch(() => false),
-                this.page
-                  .getByText("No tunes available")
-                  .isVisible()
-                  .catch(() => false),
-              ]);
-            console.log(
-              "[TuneTreesPageDiag] selectFlashcardEvaluation:menu-open-retry",
-              {
-                tuneId,
-                value,
-                outerAttempt,
-                openAttempt,
-                ariaExpanded,
-                hasLoadingQueue,
-                hasNoTunes,
-                url: this.page.url(),
-              }
-            );
-
-            try {
-              await this.ensureReveal(true);
-            } catch {}
-            try {
-              await this.page.keyboard.press("Escape");
-            } catch {}
-            await this.page.waitForTimeout(200);
-          }
-        }
-
-        if (!menuOpened) {
-          throw new Error(
-            `Failed to open recall evaluation menu for tune ${tuneId}`
-          );
-        }
-
-        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:menu-open", {
-          tuneId,
-          outerAttempt,
-          elapsedMs: Date.now() - startedAt,
-        });
-
-        const optionTestId = `recall-eval-option-${value}`;
-        const option = menu.getByTestId(optionTestId);
-        await expect(option).toBeVisible({ timeout: 5000 });
-        await expect(option).toBeEnabled({ timeout: 5000 });
-
-        await option.click({ trial: true, timeout: 5000 });
-        await option.click({ timeout: 5000 });
-
-        await expect(menu)
-          .toBeHidden({ timeout: 5000 })
-          .catch(() => undefined);
-
-        console.log(
-          "[TuneTreesPageDiag] selectFlashcardEvaluation:option-clicked",
-          {
-            tuneId,
+        if (
+          value !== "not-set" &&
+          (await this.tryFlashcardHotkey(
             value,
-            elapsedMs: Date.now() - startedAt,
-          }
-        );
+            evalButton,
+            menu,
+            expectedLabel
+          ))
+        ) {
+          this.logFlashcard("shortcut-success", {
+            value,
+            elapsedMs: elapsed(),
+          });
+          break;
+        }
 
-        await expect
-          .poll(async () => (await evalButton.textContent()) ?? "", {
-            timeout: 8000,
-            intervals: [100, 250, 500, 1000],
-          })
-          .toMatch(new RegExp(expectedLabel, "i"));
-
-        const [hasLoadingQueue, hasNoTunes] = await Promise.all([
-          this.page
-            .getByText("Loading practice queue...")
-            .isVisible()
-            .catch(() => false),
-          this.page
-            .getByText("No tunes available")
-            .isVisible()
-            .catch(() => false),
-        ]);
-        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:success", {
+        await this.openFlashcardEvalPopup(evalButton, tuneId, value, menu);
+        this.logFlashcard("menu-open", {
+          tuneId,
+          attempt,
+          elapsedMs: elapsed(),
+        });
+        await this.clickFlashcardEvalOption(
           tuneId,
           value,
-          elapsedMs: Date.now() - startedAt,
-          url: this.page.url(),
-          hasLoadingQueue,
-          hasNoTunes,
-        });
+          menu,
+          evalButton,
+          expectedLabel,
+          elapsed()
+        );
         break;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        console.log("[TuneTreesPageDiag] selectFlashcardEvaluation:error", {
+        this.logFlashcard("error", {
           value,
-          outerAttempt,
+          attempt,
           elapsedMs: Date.now() - startedAt,
-          error: errorMessage,
-          url: this.page.url(),
+          error: String(err),
         });
-        if (outerAttempt === nOuterAttempts - 1) throw err;
+        if (attempt === 5) throw err;
       }
     }
     if (typeof timeoutAfter === "number") {
       await this.page.waitForTimeout(timeoutAfter);
     }
+  }
+
+  private logFlashcard(stage: string, extra: Record<string, unknown>) {
+    console.log(`[TuneTreesPageDiag] selectFlashcardEvaluation:${stage}`, {
+      ...extra,
+      url: this.page.url(),
+    });
+  }
+
+  private async findFlashcardEvalControls() {
+    const evalButton = this.flashcardView.getByTestId(
+      /^recall-eval-[0-9a-f-]+$/i
+    );
+    await expect(evalButton).toBeVisible({ timeout: 10_000 });
+    await evalButton.scrollIntoViewIfNeeded();
+    await expect(evalButton).toBeEnabled({ timeout: 10_000 });
+
+    const dropdownTestId = await evalButton.getAttribute("data-testid");
+    const tuneId = this.parseTuneIdFromRecallEvalTestId(dropdownTestId);
+    if (!tuneId) {
+      throw new Error(
+        `Expected tuneId to be present on flashcard recall evaluation dropdown (data-testid=${String(dropdownTestId)})`
+      );
+    }
+    return { evalButton, tuneId };
+  }
+
+  private async tryFlashcardHotkey(
+    value: "again" | "hard" | "good" | "easy",
+    evalButton: Locator,
+    menu: Locator,
+    expectedLabel: string
+  ): Promise<boolean> {
+    const hotkeys: Record<"again" | "hard" | "good" | "easy", string> = {
+      again: "1",
+      hard: "2",
+      good: "3",
+      easy: "4",
+    };
+
+    try {
+      await this.page.keyboard.press("Escape").catch(() => undefined);
+      await expect(menu)
+        .toBeHidden({ timeout: 3000 })
+        .catch(() => undefined);
+      await this.clickWithToastRecovery(
+        this.flashcardView,
+        { position: { x: 24, y: 24 } },
+        "selectFlashcardEvaluation:focus-flashcard"
+      );
+      await expect(this.flashcardView).toBeVisible({ timeout: 5000 });
+      await this.page.keyboard.press(hotkeys[value]);
+
+      await expect
+        .poll(async () => (await evalButton.textContent()) ?? "", {
+          timeout: 5000,
+          intervals: [100, 250, 500, 1000],
+        })
+        .toMatch(new RegExp(expectedLabel, "i"));
+      return true;
+    } catch (err) {
+      this.logFlashcard("shortcut-fallback", {
+        value,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  private async openFlashcardEvalPopup(
+    evalButton: Locator,
+    tuneId: string,
+    value: string,
+    menu: Locator
+  ) {
+    for (let openAttempt = 0; openAttempt < 3; openAttempt++) {
+      await evalButton.focus().catch(() => undefined);
+      await this.clickWithToastRecovery(
+        evalButton,
+        { trial: true, timeout: 5000 },
+        "selectFlashcardEvaluation:trial-open-menu"
+      );
+      await this.clickWithToastRecovery(
+        evalButton,
+        { timeout: 5000 },
+        "selectFlashcardEvaluation:open-menu"
+      );
+
+      try {
+        await expect(menu).toBeVisible({ timeout: 4000 });
+        return;
+      } catch {
+        // Try keyboard activation as fallback
+        try {
+          await this.page.keyboard.press("Enter");
+          await expect(menu).toBeVisible({ timeout: 1500 });
+          return;
+        } catch {}
+        try {
+          await this.page.keyboard.press(" ");
+          await expect(menu).toBeVisible({ timeout: 1500 });
+          return;
+        } catch {}
+
+        this.logFlashcard("menu-open-retry", {
+          tuneId,
+          value,
+          openAttempt,
+          ariaExpanded: await evalButton
+            .getAttribute("aria-expanded")
+            .catch(() => null),
+        });
+
+        try {
+          await this.ensureReveal(true);
+        } catch {}
+        try {
+          await this.page.keyboard.press("Escape");
+        } catch {}
+        await this.page.waitForTimeout(200);
+      }
+    }
+    throw new Error(`Failed to open recall evaluation menu for tune ${tuneId}`);
+  }
+
+  private async clickFlashcardEvalOption(
+    tuneId: string,
+    value: string,
+    menu: Locator,
+    evalButton: Locator,
+    expectedLabel: string,
+    elapsedMs: number
+  ) {
+    const option = menu.getByTestId(`recall-eval-option-${value}`);
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await expect(option).toBeEnabled({ timeout: 5000 });
+    await option.click({ trial: true, timeout: 5000 });
+    await option.click({ timeout: 5000 });
+
+    await expect(menu)
+      .toBeHidden({ timeout: 5000 })
+      .catch(() => undefined);
+
+    this.logFlashcard("option-clicked", { tuneId, value, elapsedMs });
+
+    await expect
+      .poll(async () => (await evalButton.textContent()) ?? "", {
+        timeout: 8000,
+        intervals: [100, 250, 500, 1000],
+      })
+      .toMatch(new RegExp(expectedLabel, "i"));
+
+    this.logFlashcard("success", { tuneId, value, elapsedMs });
   }
 
   async openFlashcardFieldsMenu() {
@@ -5088,10 +5070,11 @@ export class TuneTreesPage {
     let total = 0;
     for (let i = 0; i < maxRetries; i++) {
       const counterText = await this.flashcardHeaderCounter.textContent();
-      total = parseInt(counterText?.split(" of ")[1] || "0", 10);
-      if (waitGTE && total >= countToWaitUpTo) {
-        return total;
-      } else if (!waitGTE && total <= countToWaitUpTo) {
+      total = Number.parseInt(counterText?.split(" of ")[1] || "0", 10);
+      if (
+        (waitGTE && total >= countToWaitUpTo) ||
+        (!waitGTE && total <= countToWaitUpTo)
+      ) {
         return total;
       }
       await this.page.waitForTimeout(retryDelayMs);
@@ -5234,7 +5217,6 @@ export class TuneTreesPage {
     await this.notesSaveButton.click();
     // Wait for Jodit editor to disappear indicating save completed
     await expect(joditEditor).not.toBeVisible({ timeout: 10000 });
-    // await this.page.waitForLoadState("networkidle", { timeout: 15000 });
   }
 
   // ===== References Panel helpers =====
@@ -5492,7 +5474,7 @@ export class TuneTreesPage {
 
   async getSyncOutboxCount(): Promise<number> {
     return await this.page.evaluate(async () => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getSyncOutboxCount();
     });
