@@ -139,7 +139,7 @@ function validateCustomPatternDraft(input: {
 
   const requiredHeaders = ["M:", "L:", "K:"];
   const missingHeader = requiredHeaders.find(
-    (header) => !new RegExp(`^\\s*${header}`, "m").test(abcString)
+    (header) => !new RegExp(String.raw`^\s*${header}`, "m").test(abcString)
   );
   if (missingHeader) {
     return `ABC notation must include a ${missingHeader} header.`;
@@ -353,6 +353,13 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const playerTitle = createMemo(() => {
     const tuneTypeName = props.tuneTypeName?.trim();
     return tuneTypeName ? `Rhythm Player: ${tuneTypeName}` : "Rhythm Player";
+  });
+  const playToggleLabel = createMemo(() => {
+    if (isPatternLoading()) {
+      return "Loading";
+    }
+
+    return isPlaying() ? "Stop" : "Play";
   });
 
   const closeCustomPatternEditor = () => {
@@ -989,7 +996,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                     <Play class="h-4 w-4" />
                   )}
                 </Show>
-                {isPatternLoading() ? "Loading" : isPlaying() ? "Stop" : "Play"}
+                {playToggleLabel()}
               </button>
 
               <button

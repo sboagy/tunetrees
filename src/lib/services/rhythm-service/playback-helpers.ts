@@ -223,6 +223,36 @@ export function getEventPulseIndex(
   return Math.min(Math.max(pulseIndex, 1), pulseCount);
 }
 
+const PLAYBACK_MEASURE_CLASS_RE = /\babcjs-mm(\d+)\b/;
+const PLAYBACK_NOTE_CLASS_RE = /\babcjs-n(\d+)\b/;
+
+function getMarkerFromClassName(
+  className: string,
+  currentMeasureIndex: number | null | undefined
+): PlaybackEventMarker | null {
+  const noteMatch = PLAYBACK_NOTE_CLASS_RE.exec(className);
+  if (!noteMatch) {
+    return null;
+  }
+
+  const measureMatch = PLAYBACK_MEASURE_CLASS_RE.exec(className);
+  const noteIndex = Number.parseInt(noteMatch[1] ?? "", 10);
+  const classMeasureIndex = measureMatch
+    ? Number.parseInt(measureMatch[1] ?? "", 10)
+    : null;
+  const resolvedMeasureIndex =
+    (Number.isFinite(currentMeasureIndex)
+      ? Math.max(0, currentMeasureIndex ?? 0)
+      : null) ??
+    (Number.isFinite(classMeasureIndex) ? classMeasureIndex : null);
+
+  if (resolvedMeasureIndex == null || !Number.isFinite(noteIndex)) {
+    return null;
+  }
+
+  return { measureIndex: resolvedMeasureIndex, noteIndex };
+}
+
 export function getPlaybackEventMarker(
   event: NoteTimingEvent,
   currentMeasureIndex: number | null | undefined
@@ -230,24 +260,9 @@ export function getPlaybackEventMarker(
   for (const group of event.elements ?? []) {
     for (const element of group) {
       const className = element.getAttribute("class") ?? "";
-      const measureMatch = className.match(/\babcjs-mm(\d+)\b/);
-      const noteMatch = className.match(/\babcjs-n(\d+)\b/);
-      if (!noteMatch) {
-        continue;
-      }
-
-      const noteIndex = Number.parseInt(noteMatch[1] ?? "", 10);
-      const classMeasureIndex = measureMatch
-        ? Number.parseInt(measureMatch[1] ?? "", 10)
-        : null;
-      const resolvedMeasureIndex =
-        (Number.isFinite(currentMeasureIndex)
-          ? Math.max(0, currentMeasureIndex ?? 0)
-          : null) ??
-        (Number.isFinite(classMeasureIndex) ? classMeasureIndex : null);
-
-      if (resolvedMeasureIndex != null && Number.isFinite(noteIndex)) {
-        return { measureIndex: resolvedMeasureIndex, noteIndex };
+      const marker = getMarkerFromClassName(className, currentMeasureIndex);
+      if (marker) {
+        return marker;
       }
     }
   }

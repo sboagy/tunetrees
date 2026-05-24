@@ -54,9 +54,15 @@ export type {
 } from "@/lib/rhythm/pattern-loader";
 export type { PlaybackEventMarker } from "@/lib/services/rhythm-service/playback-helpers";
 
-const DEFAULT_SAMPLE_BASE_URL = (
-  import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
-).replace(/\/+$/, "");
+const DEFAULT_SAMPLE_BASE_URL = (() => {
+  let value = import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? "";
+
+  while (value.endsWith("/")) {
+    value = value.slice(0, -1);
+  }
+
+  return value;
+})();
 
 type PremiumLoopSelection = {
   source: "database";
@@ -534,7 +540,7 @@ export function createRhythmService(
     shouldPlayEventSamples: boolean
   ): TimingCallbacksInstance {
     if (typeof document === "undefined") {
-      throw new Error("ABC rhythm playback requires a browser document.");
+      throw new TypeError("ABC rhythm playback requires a browser document.");
     }
 
     renderTarget ??= document.createElement("div");

@@ -30,12 +30,38 @@ export interface DisplayPartTemplate {
   lineNoteheadEventMaps: number[][];
 }
 
+function tokenizeBarEvents(bar: string): string[] {
+  const tokens: string[] = [];
+  let accidentalPrefix = "";
+
+  for (const char of bar) {
+    if (char === "_" || char === "^" || char === "=") {
+      accidentalPrefix += char;
+      continue;
+    }
+
+    const isEventSymbol =
+      (char >= "A" && char <= "G") ||
+      (char >= "a" && char <= "g") ||
+      char === "x" ||
+      char === "X" ||
+      char === "z" ||
+      char === "Z";
+
+    if (isEventSymbol) {
+      tokens.push(`${accidentalPrefix}${char}`);
+    }
+
+    accidentalPrefix = "";
+  }
+
+  return tokens;
+}
+
 function getBarDisplayEventMap(bar: string): number[] {
-  const eventTokens = bar
-    .replace(/![^!]+!/g, "")
-    .replace(/"[^"]*"/g, "")
-    .match(/[_^=]*[A-Ga-gxzXZ]/g);
-  if (!eventTokens || eventTokens.length === 0) {
+  const sanitizedBar = bar.replace(/![^!]+!/g, "").replace(/"[^"]*"/g, "");
+  const eventTokens = tokenizeBarEvents(sanitizedBar);
+  if (eventTokens.length === 0) {
     return [];
   }
 
@@ -43,7 +69,7 @@ function getBarDisplayEventMap(bar: string): number[] {
   let currentNoteheadIndex = -1;
 
   for (const token of eventTokens) {
-    const symbol = token[token.length - 1] ?? "";
+    const symbol = token.at(-1) ?? "";
     const isRest =
       symbol === "x" || symbol === "X" || symbol === "z" || symbol === "Z";
     if (!isRest) {
@@ -85,7 +111,7 @@ function getNoteheadLineIndex(notehead: SVGElement): number | null {
     notehead.closest(".abcjs-staff-wrapper")?.getAttribute("class") ??
     notehead.getAttribute("class") ??
     "";
-  const match = className.match(/abcjs-l(\d+)/);
+  const match = /abcjs-l(\d+)/.exec(className);
   if (!match) {
     return null;
   }
@@ -117,7 +143,7 @@ export function groupNoteheadsByDisplayLine(
 
 function getSvgLineIndex(element: Element): number | null {
   const className = element.getAttribute("class") ?? "";
-  const match = className.match(/abcjs-l(\d+)/);
+  const match = /abcjs-l(\d+)/.exec(className);
   if (!match) {
     return null;
   }
@@ -128,7 +154,7 @@ function getSvgLineIndex(element: Element): number | null {
 
 function getAbcjsNoteIndex(element: Element): number | null {
   const className = element.getAttribute("class") ?? "";
-  const match = className.match(/\babcjs-n(\d+)\b/);
+  const match = /\babcjs-n(\d+)\b/.exec(className);
   if (!match) {
     return null;
   }
@@ -166,7 +192,7 @@ export function buildDisplayedPartTemplates(
   parts: StructurePart[]
 ): DisplayPartTemplate[] {
   const bodyLines = getAbcBodyLines(displayAbc).filter(
-    (line) => !/^P:/.test(line.trim())
+    (line) => !line.trim().startsWith("P:")
   );
   if (bodyLines.length === 0 || parts.length === 0) {
     return [];
@@ -230,7 +256,7 @@ export function buildCompactDisplaySectionTemplates(
   }
 
   const bodyLines = getAbcBodyLines(abc).filter(
-    (line) => !/^P:/.test(line.trim())
+    (line) => !line.trim().startsWith("P:")
   );
   if (bodyLines.length === 0) {
     return [];
@@ -405,6 +431,37 @@ export function resolveCurrentBeatNotehead(
   return structuredTarget ?? playbackMarkerTarget ?? fallbackTarget;
 }
 
+function resolveTemplateNotehead(
+  lineGroups: SVGElement[][],
+  startLineIndex: number,
+  lineNoteheadEventMaps: number[][],
+  beatIndex: number
+): SVGElement | null {
+  let remainingBeatIndex = beatIndex;
+
+  for (
+    let lineOffset = 0;
+    lineOffset < lineNoteheadEventMaps.length;
+    lineOffset += 1
+  ) {
+    const lineEventMap = lineNoteheadEventMaps[lineOffset] ?? [];
+    const lineEventCount = lineEventMap.length;
+    if (remainingBeatIndex < lineEventCount) {
+      const lineGroup = lineGroups[startLineIndex + lineOffset];
+      if (!lineGroup || lineGroup.length === 0) {
+        return null;
+      }
+
+      const noteheadIndex = lineEventMap[remainingBeatIndex] ?? 0;
+      return lineGroup[noteheadIndex] ?? lineGroup.at(-1) ?? null;
+    }
+
+    remainingBeatIndex -= lineEventCount;
+  }
+
+  return null;
+}
+
 export function resolveStructuredDisplayNotehead(
   noteheads: SVGElement[],
   fullAbc: string | null,
@@ -465,27 +522,14 @@ export function resolveStructuredDisplayNotehead(
   if (displayedPartTemplate) {
     // Expanded rendered output can preserve one visible run per playback pass,
     // so map within the rendered part template before trying compact reuse.
-    let remainingBeatIndex = position.remainingBeatIndex;
-    for (
-      let lineOffset = 0;
-      lineOffset < displayedPartTemplate.lineNoteheadEventMaps.length;
-      lineOffset += 1
-    ) {
-      const lineEventMap =
-        displayedPartTemplate.lineNoteheadEventMaps[lineOffset] ?? [];
-      const lineEventCount = lineEventMap.length;
-      if (remainingBeatIndex < lineEventCount) {
-        const lineGroup =
-          lineGroups[displayedPartTemplate.startLineIndex + lineOffset];
-        if (!lineGroup || lineGroup.length === 0) {
-          return null;
-        }
-
-        const noteheadIndex = lineEventMap[remainingBeatIndex] ?? 0;
-        return lineGroup[noteheadIndex] ?? lineGroup.at(-1) ?? null;
-      }
-
-      remainingBeatIndex -= lineEventCount;
+    const mappedNotehead = resolveTemplateNotehead(
+      lineGroups,
+      displayedPartTemplate.startLineIndex,
+      displayedPartTemplate.lineNoteheadEventMaps,
+      position.remainingBeatIndex
+    );
+    if (mappedNotehead) {
+      return mappedNotehead;
     }
   }
 
@@ -504,28 +548,12 @@ export function resolveStructuredDisplayNotehead(
       return null;
     }
 
-    let remainingBeatIndex = position.remainingBeatIndex;
-    for (
-      let lineOffset = 0;
-      lineOffset < template.lineNoteheadEventMaps.length;
-      lineOffset += 1
-    ) {
-      const lineEventMap = template.lineNoteheadEventMaps[lineOffset] ?? [];
-      const lineEventCount = lineEventMap.length;
-      if (remainingBeatIndex < lineEventCount) {
-        const lineGroup = lineGroups[template.startLineIndex + lineOffset];
-        if (!lineGroup || lineGroup.length === 0) {
-          return null;
-        }
-
-        const noteheadIndex = lineEventMap[remainingBeatIndex] ?? 0;
-        return lineGroup[noteheadIndex] ?? lineGroup.at(-1) ?? null;
-      }
-
-      remainingBeatIndex -= lineEventCount;
-    }
-
-    return null;
+    return resolveTemplateNotehead(
+      lineGroups,
+      template.startLineIndex,
+      template.lineNoteheadEventMaps,
+      position.remainingBeatIndex
+    );
   }
 
   const displayLineIndex =
