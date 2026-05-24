@@ -48,6 +48,9 @@ function getBodhranMockByteLength(url: string): number {
   if (url.includes("bodhran-f")) {
     return 13;
   }
+  if (url.includes("bodhran-pp")) {
+    return 11;
+  }
   if (url.includes("bodhran-p")) {
     return 12;
   }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import fs from "fs";
+import { writeFileSync } from "node:fs";
 
 const OUTPUT_FILE = "sonar_issues.json";
 const PAGE_SIZE = 500;
@@ -107,13 +107,15 @@ async function main() {
     fetchedPages: totalPages,
   };
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(output, null, 2));
+  writeFileSync(OUTPUT_FILE, JSON.stringify(output, null, 2));
   console.log(
     `Success! Saved ${allIssues.length} code smells to ${OUTPUT_FILE} across ${totalPages} pages`
   );
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error(error instanceof Error ? error.stack : error);
   process.exit(1);
-});
+}

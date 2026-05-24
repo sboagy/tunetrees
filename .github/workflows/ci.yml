@@ -263,7 +263,7 @@ jobs:
         if: steps.cache-supabase.outputs.cache-hit != 'true'
         run: |
           mkdir -p /tmp/supabase-cli
-          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
+          curl -fsSL --proto "=https" --tlsv1.2 https://github.com/supabase/cli/releases/download/v1.200.0/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
           sudo mv -f /tmp/supabase-cli/supabase /usr/local/bin/
           rm -rf /tmp/supabase-cli
 
@@ -563,7 +563,7 @@ jobs:
         if: steps.cache-supabase.outputs.cache-hit != 'true'
         run: |
           mkdir -p /tmp/supabase-cli
-          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
+          curl -fsSL --proto "=https" --tlsv1.2 https://github.com/supabase/cli/releases/download/v1.200.0/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
           sudo mv -f /tmp/supabase-cli/supabase /usr/local/bin/
           rm -rf /tmp/supabase-cli
 
@@ -843,7 +843,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v2
+        uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
       - name: Build Application
         run: npm run build
@@ -891,7 +891,7 @@ jobs:
         run: cd worker && npm ci --ignore-scripts
 
       - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v2
+        uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
       - name: Deploy Worker
         # The worker JWT secret must exist as a Cloudflare Worker secret binding.
