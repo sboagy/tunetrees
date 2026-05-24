@@ -8,12 +8,15 @@ const PROJECT_KEY = "sboagy_tunetrees";
 const ISSUE_TYPE = "CODE_SMELL";
 const API_URL = "https://sonarcloud.io/api/issues/search";
 
-function fail(message, details) {
-  console.error(message);
-  if (details) {
-    console.error(details);
+class FatalError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "FatalError";
   }
-  process.exit(1);
+}
+
+function fail(message) {
+  throw new FatalError(message);
 }
 
 async function fetchPage(token, page) {
@@ -35,16 +38,12 @@ async function fetchPage(token, page) {
 
   if (!response.ok) {
     fail(
-      `Sonar request failed on page ${page}: ${response.status} ${response.statusText}`,
-      `Content-Type: ${contentType}\n${text.slice(0, 400)}`
+      `Sonar request failed on page ${page} with status ${response.status}.`
     );
   }
 
   if (!contentType.toLowerCase().includes("json")) {
-    fail(
-      `Unexpected Sonar response content type on page ${page}: ${contentType}`,
-      text.slice(0, 400)
-    );
+    fail(`Sonar returned a non-JSON response on page ${page}.`);
   }
 
   return JSON.parse(text);
@@ -116,6 +115,10 @@ async function main() {
 try {
   await main();
 } catch (error) {
-  console.error(error instanceof Error ? error.stack : error);
-  process.exit(1);
+  if (error instanceof FatalError) {
+    console.error(error.message);
+  } else {
+    console.error("Unexpected failure while fetching Sonar issues.");
+  }
+  process.exitCode = 1;
 }

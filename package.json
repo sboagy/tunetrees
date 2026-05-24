@@ -82,7 +82,7 @@
     "ingest:top500": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx ingest/top500/top500.ts",
     "view:top500": "cd ingest/top500 && python3 -m http.server 8888",
     "clean": "rm -rf dist node_modules .vite .cache logs && cd worker && rm -rf dist node_modules .vite .cache logs",
-    "sonar:scan": "FORCE_COLOR=1 op run --env-file=\".env.sonar.template\" -- npx @sonar/scan -Dsonar.sources=src",
+    "sonar:scan": "FORCE_COLOR=1 op run --env-file=\".env.sonar.template\" -- npx @sonar/scan -Dsonar.sources=src,e2e,tests,worker",
     "sonar:issues": "op run --env-file=\".env.sonar.template\" -- node scripts/fetch-sonar-issues.js"
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,15 +59,22 @@ const resolveSeedSqlFilePath = (): string => {
   );
 };
 
+const runCommand = (command: string, args: string[]): void => {
+  execFileSync(command, args, { stdio: "inherit" });
+};
+
 const resetSupabaseAndLoadSeed = (): void => {
   const sqlFilePath = resolveSeedSqlFilePath();
-  execSync("supabase stop", { stdio: "inherit" });
-  execSync("supabase start", { stdio: "inherit" });
-  execSync("supabase db reset --local --no-seed", { stdio: "inherit" });
-  execSync(
-    `psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "${sqlFilePath}"`,
-    { stdio: "inherit" }
-  );
+  runCommand("supabase", ["stop"]);
+  runCommand("supabase", ["start"]);
+  runCommand("supabase", ["db", "reset", "--local", "--no-seed"]);
+  runCommand("psql", [
+    "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-f",
+    sqlFilePath,
+  ]);
 };
 
 test.describe("SCHEDULING-004: Mixed Evaluation Patterns", () => {

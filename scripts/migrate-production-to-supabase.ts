@@ -39,6 +39,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { execSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import BetterSqlite3 from "better-sqlite3";
 import * as dotenv from "dotenv";
@@ -46,6 +47,10 @@ import postgres from "postgres";
 import { getCatalogInstrumentUuid } from "../src/lib/db/catalog-instrument-ids.js";
 import { getCatalogTuneUuid } from "../src/lib/db/catalog-tune-ids.js";
 import { generateId } from "../src/lib/utils/uuid.js";
+
+function generateTemporaryPassword(): string {
+  return randomBytes(24).toString("base64url");
+}
 
 // ============================================================================
 // Helper: Get Service Role Key from Supabase
@@ -393,7 +398,7 @@ async function migrateUsers() {
           const { data: authData, error: authError } =
             await supabase.auth.admin.createUser({
               email: user.email,
-              password: "MigratedUser123!",
+              password: generateTemporaryPassword(),
               email_confirm: true,
               user_metadata: {
                 name: user.name,
