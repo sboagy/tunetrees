@@ -2587,7 +2587,9 @@ export class TuneTreesPage {
             return false;
           }
 
-          const buttonEnabled = await columnsButton.isEnabled().catch(() => false);
+          const buttonEnabled = await columnsButton
+            .isEnabled()
+            .catch(() => false);
           if (!buttonEnabled) {
             return false;
           }
