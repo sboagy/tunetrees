@@ -1,4 +1,4 @@
-import type { PlaybackEventMarker } from "@/lib/services/RhythmService";
+import type { PlaybackEventMarker } from "@/lib/services/rhythm-service/RhythmService";
 import {
   buildStructuredPlaybackSections,
   collapseStructureSections,

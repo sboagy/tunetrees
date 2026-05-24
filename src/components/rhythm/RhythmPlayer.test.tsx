@@ -17,7 +17,7 @@ import type {
   PlaybackEventMarker,
   RhythmPatternMetadata,
   RhythmService,
-} from "@/lib/services/RhythmService";
+} from "@/lib/services/rhythm-service/RhythmService";
 import { RhythmPlayer } from "./RhythmPlayer";
 
 const mocked = vi.hoisted(() => {
@@ -107,7 +107,7 @@ vi.mock("@/lib/auth/AuthContext", () => ({
   }),
 }));
 
-vi.mock("@/lib/services/RhythmService", () => ({
+vi.mock("@/lib/services/rhythm-service/RhythmService", () => ({
   createRhythmService: () => mocked.serviceStub,
 }));
 

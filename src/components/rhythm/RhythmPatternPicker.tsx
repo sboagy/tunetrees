@@ -3,7 +3,7 @@ import { type Component, For, Show } from "solid-js";
 import type {
   RhythmPatternCandidate,
   RhythmPatternCandidateScope,
-} from "@/lib/services/RhythmService";
+} from "@/lib/services/rhythm-service/RhythmService";
 import { Button } from "../ui/button";
 
 export interface RhythmPatternPickerProps {

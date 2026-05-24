@@ -6,9 +6,26 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import { BODHRAN_SAMPLE_KIT } from "@/lib/services/rhythm-service/kits/bodhran";
 import { createRhythmService, loadRhythmPattern } from "./RhythmService";
 
-const projectRoot = path.resolve(__dirname, "..", "..", "..");
+const projectRoot = path.resolve(__dirname, "..", "..", "..", "..");
+const EXPECTED_BODHRAN_FETCH_URLS = Array.from(
+  new Set(
+    Object.entries(BODHRAN_SAMPLE_KIT)
+      .sort(
+        ([leftPitch], [rightPitch]) =>
+          Number.parseInt(leftPitch, 10) - Number.parseInt(rightPitch, 10)
+      )
+      .flatMap(([_pitch, entry]) =>
+        entry.kind === "file" ? [`/audio/kits/bodhran/${entry.fileName}`] : []
+      )
+  )
+);
+const EXPECTED_BODHRAN_FETCH_COUNT = EXPECTED_BODHRAN_FETCH_URLS.length;
+const EXPECTED_BODHRAN_FIRST_FETCH_URL = EXPECTED_BODHRAN_FETCH_URLS[0];
+const EXPECTED_BODHRAN_LAST_FETCH_URL =
+  EXPECTED_BODHRAN_FETCH_URLS[EXPECTED_BODHRAN_FETCH_URLS.length - 1];
 
 function createDb(sqlStatements: string[]): SqliteDatabase {
   const sqlite = new Database(":memory:");
@@ -48,7 +65,9 @@ function createSampleKitRhythmDb() {
     "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
     "INSERT INTO genre (id, name) VALUES ('TEST', 'Session Test')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('TEST', 'Reel', 112)",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('TEST', 'Jig', 115)",
     `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
       VALUES ('rp-1', 'TEST', 'Reel', 'Basic Rolling', '*', 'X:1
 T:Reel Groove
@@ -56,6 +75,13 @@ M:4/4
 L:1/8
 K:clef=perc
 |: C2 A2 C2 A2 :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type)
+      VALUES ('rp-jig-1', 'TEST', 'Jig', 'Lift Jig', '*', 'X:1
+T:Jig Groove
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed')`,
   ]);
 }
 
@@ -944,12 +970,10 @@ describe("createRhythmService", () => {
     expect(service.isReady()).toBe(true);
     expect(service.currentBeatIndex()).toBe(1);
     expect(service.currentMeasure()).toBe(1);
-    expect(fetchMock).toHaveBeenCalledTimes(8);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/audio/kits/bodhran/65849__bosone__bodhran-pp01.mp3"
-    );
-    expect(fetchMock.mock.calls[7]?.[0]).toBe(
-      "/audio/kits/bodhran/65823__bosone__bodhran-border06.mp3"
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(EXPECTED_BODHRAN_FIRST_FETCH_URL);
+    expect(fetchMock.mock.calls[EXPECTED_BODHRAN_FETCH_COUNT - 1]?.[0]).toBe(
+      EXPECTED_BODHRAN_LAST_FETCH_URL
     );
     expect(bufferSources).toHaveLength(2);
     expect(bufferSources[0]?.start).toHaveBeenCalledTimes(1);
@@ -1654,12 +1678,10 @@ K:clef=perc
 
     await service.play();
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/audio/kits/bodhran/65849__bosone__bodhran-pp01.mp3"
-    );
-    expect(fetchMock.mock.calls[7]?.[0]).toBe(
-      "/audio/kits/bodhran/65823__bosone__bodhran-border06.mp3"
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(EXPECTED_BODHRAN_FIRST_FETCH_URL);
+    expect(fetchMock.mock.calls[EXPECTED_BODHRAN_FETCH_COUNT - 1]?.[0]).toBe(
+      EXPECTED_BODHRAN_LAST_FETCH_URL
     );
     expect(createdAudio).toHaveLength(0);
 
@@ -2145,12 +2167,10 @@ K:clef=perc
     await service.play();
 
     // Fell back to the bodhran sample kit fetches.
-    expect(fetchMock).toHaveBeenCalledTimes(8);
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/audio/kits/bodhran/65849__bosone__bodhran-pp01.mp3"
-    );
-    expect(fetchMock.mock.calls[7]?.[0]).toBe(
-      "/audio/kits/bodhran/65823__bosone__bodhran-border06.mp3"
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(EXPECTED_BODHRAN_FIRST_FETCH_URL);
+    expect(fetchMock.mock.calls[EXPECTED_BODHRAN_FETCH_COUNT - 1]?.[0]).toBe(
+      EXPECTED_BODHRAN_LAST_FETCH_URL
     );
     // Sample buffers were used to drive the timing callbacks.
     expect(bufferSources).toHaveLength(2);
@@ -2283,7 +2303,7 @@ K:clef=perc
 
     await service.play();
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
     expect(bufferSources).toHaveLength(0);
     expect(service.isPlaying()).toBe(false);
     expect(service.isReady()).toBe(false);
@@ -2570,16 +2590,1202 @@ K:clef=perc
 
     await service.play();
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
     expect(bufferSources).toHaveLength(2);
     expect(bufferSources[0]?.buffer?.duration).toBeCloseTo(16 / 1000, 6);
     expect(bufferSources[1]?.buffer?.duration).toBeCloseTo(16 / 1000, 6);
     expect(bufferSources[0]?.buffer).not.toBe(bufferSources[1]?.buffer);
     expect(gainNodes).toHaveLength(2);
-    expect(gainNodes[1]?.gain.value).toBeGreaterThan(
-      gainNodes[0]?.gain.value ?? 0
+    expect(gainNodes[0]?.gain.value).toBeCloseTo(0.8, 6);
+    expect(gainNodes[1]?.gain.value).toBeCloseTo(0.8, 6);
+
+    dispose();
+  });
+
+  it("applies subtle playback-rate offsets to low and high bodhran strikes only", async () => {
+    const db = createSampleKitRhythmDb();
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(16),
+    }));
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+      playbackRate: { value: number };
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async (buffer: ArrayBuffer) => {
+        const bytes = buffer.byteLength;
+        return {
+          duration: bytes / 1000,
+          length: 1,
+          numberOfChannels: 1,
+          sampleRate: 44_100,
+        } as unknown as AudioBuffer;
+      }) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          playbackRate: { value: 1 },
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 24 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 57 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 91 }],
+          elements: [[]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Reel",
+    });
+
+    await service.play();
+
+    expect(bufferSources).toHaveLength(3);
+    expect(bufferSources[0]?.playbackRate.value).toBeLessThan(1);
+    expect(bufferSources[1]?.playbackRate.value).toBeCloseTo(1, 6);
+    expect(bufferSources[2]?.playbackRate.value).toBeGreaterThan(1);
+
+    dispose();
+  });
+
+  it("routes the bodhran upper alias lane to body strikes instead of border taps", async () => {
+    const db = createSampleKitRhythmDb();
+
+    const fetchMock = vi.fn(async (url: string) => {
+      const bytes = url.includes("bodhran-border")
+        ? 18
+        : url.includes("bodhran-drag")
+          ? 20
+          : url.includes("bodhran-ff")
+            ? 14
+            : url.includes("bodhran-f")
+              ? 13
+              : url.includes("bodhran-pp")
+                ? 11
+                : url.includes("bodhran-p")
+                  ? 12
+                  : 11;
+
+      return {
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(bytes),
+      };
+    });
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+      playbackRate: { value: number };
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async (buffer: ArrayBuffer) => ({
+        duration: buffer.byteLength / 1000,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          playbackRate: { value: 1 },
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 92 }],
+          elements: [[]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Reel",
+    });
+
+    await service.play();
+
+    expect(bufferSources).toHaveLength(1);
+    expect(bufferSources[0]?.buffer?.duration).toBeCloseTo(11 / 1000, 6);
+    expect(bufferSources[0]?.playbackRate.value).toBeLessThan(1);
+
+    dispose();
+  });
+
+  it("maps bodhran abcjs low notes to body strikes instead of border taps", async () => {
+    const db = createSampleKitRhythmDb();
+
+    const fetchMock = vi.fn(async (url: string) => {
+      const bytes = url.includes("bodhran-border")
+        ? 18
+        : url.includes("bodhran-drag")
+          ? 20
+          : url.includes("bodhran-ff")
+            ? 14
+            : url.includes("bodhran-f")
+              ? 13
+              : url.includes("bodhran-pp")
+                ? 11
+                : url.includes("bodhran-p")
+                  ? 12
+                  : 11;
+
+      return {
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(bytes),
+      };
+    });
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+      playbackRate: { value: number };
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async (buffer: ArrayBuffer) => ({
+        duration: buffer.byteLength / 1000,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          playbackRate: { value: 1 },
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 72 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 69 }],
+          elements: [[]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Reel",
+    });
+
+    await service.play();
+
+    expect(bufferSources).toHaveLength(2);
+    expect(bufferSources[0]?.buffer).not.toBe(bufferSources[1]?.buffer);
+    expect(bufferSources[0]?.buffer?.duration ?? 0).toBeGreaterThan(10 / 1000);
+    expect(bufferSources[0]?.buffer?.duration ?? 0).toBeLessThan(18 / 1000);
+    expect(bufferSources[1]?.buffer?.duration ?? 0).toBeGreaterThan(10 / 1000);
+    expect(bufferSources[1]?.buffer?.duration ?? 0).toBeLessThan(18 / 1000);
+    expect(bufferSources[0]?.playbackRate.value).toBeLessThan(1);
+    expect(bufferSources[1]?.playbackRate.value).toBeLessThan(1);
+
+    dispose();
+  });
+
+  it("maps the live jig bodhran template pitch classes onto body strikes", async () => {
+    const db = createSampleKitRhythmDb();
+
+    const fetchMock = vi.fn(async (url: string) => {
+      const bytes = url.includes("bodhran-border")
+        ? 18
+        : url.includes("bodhran-drag")
+          ? 20
+          : url.includes("bodhran-ff")
+            ? 14
+            : url.includes("bodhran-f")
+              ? 13
+              : url.includes("bodhran-pp")
+                ? 11
+                : url.includes("bodhran-p")
+                  ? 12
+                  : 11;
+
+      return {
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(bytes),
+      };
+    });
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+      playbackRate: { value: number };
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async (buffer: ArrayBuffer) => ({
+        duration: buffer.byteLength / 1000,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          playbackRate: { value: 1 },
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [],
+          elements: [
+            [
+              {
+                getAttribute: () => "abcjs-note abcjs-p-4 abcjs-p-6 abcjs-p-7",
+              },
+            ],
+          ],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Jig",
+    });
+
+    await service.play();
+
+    expect(bufferSources).toHaveLength(3);
+    expect(bufferSources[0]?.buffer?.duration ?? 0).toBeGreaterThan(10 / 1000);
+    expect(bufferSources[0]?.buffer?.duration ?? 0).toBeLessThan(18 / 1000);
+    expect(bufferSources[1]?.buffer?.duration ?? 0).toBeGreaterThan(10 / 1000);
+    expect(bufferSources[1]?.buffer?.duration ?? 0).toBeLessThan(18 / 1000);
+    expect(bufferSources[2]?.buffer?.duration ?? 0).toBeGreaterThan(10 / 1000);
+    expect(bufferSources[2]?.buffer?.duration ?? 0).toBeLessThan(18 / 1000);
+    expect(bufferSources[0]?.playbackRate.value).toBeLessThan(1);
+    expect(bufferSources[1]?.playbackRate.value).toBeLessThan(1);
+    expect(bufferSources[2]?.playbackRate.value).toBeLessThan(1);
+
+    dispose();
+  });
+
+  it("keeps abcjs rest events silent during playback", async () => {
+    const db = createFallbackRhythmDb();
+    const fetchMock = vi.fn();
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async () => ({
+        duration: 0.25,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [],
+          elements: [[{ getAttribute: () => "abcjs-rest" }]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 60 }],
+          elements: [[]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      tuneTypeName: "Reel",
+    });
+
+    await service.play();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(bufferSources).toHaveLength(1);
+    expect(bufferSources[0]?.start).toHaveBeenCalledTimes(1);
+
+    dispose();
+  });
+
+  it("honors the selected generic click kit instead of forcing bodhran samples", async () => {
+    const db = createHierarchicalRhythmDb({
+      includeGlobalTuneOverride: false,
+      includeUserTuneOverride: false,
+      includeUserDefault: true,
+    });
+    const fetchMock = vi.fn();
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async () => {
+        throw new Error("generic click playback should not fetch files");
+      }) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 60 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 69 }],
+          elements: [[]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      userId: "user-1",
+    });
+
+    await service.play();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(bufferSources).toHaveLength(2);
+    expect(bufferSources[0]?.buffer).not.toBeNull();
+    expect(bufferSources[1]?.buffer).not.toBeNull();
+
+    dispose();
+  });
+
+  it("maps varied abcjs element pitches onto distinct bodhran samples when midi pitches are absent", async () => {
+    const db = createSampleKitRhythmDb();
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(16),
+    }));
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      connect: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async (buffer: ArrayBuffer) => {
+        const bytes = buffer.byteLength;
+        return {
+          duration: bytes / 1000,
+          length: 1,
+          numberOfChannels: 1,
+          sampleRate: 44_100,
+        } as unknown as AudioBuffer;
+      }) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          midiPitches?: Array<{ pitch: number }>;
+          elements: Array<
+            Array<{ getAttribute: (name: string) => string | null }>
+          >;
+        }) => void;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [],
+          elements: [[{ getAttribute: () => "abcjs-note abcjs-p-4 abcjs-p0" }]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          midiPitches: [],
+          elements: [[{ getAttribute: () => "abcjs-note abcjs-p7 abcjs-p12" }]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Reel",
+    });
+
+    await service.play();
+
+    expect(bufferSources).toHaveLength(4);
+    const distinctBuffers = new Set(
+      bufferSources.map((source) => source.buffer)
+    );
+    expect(distinctBuffers.size).toBeGreaterThan(2);
+
+    dispose();
+  });
+
+  it("logs playback pitch resolution for one pass when debug playback logging is enabled", async () => {
+    const db = createSampleKitRhythmDb();
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(16),
+    }));
+    const consoleInfoSpy = vi
+      .spyOn(console, "info")
+      .mockImplementation(() => undefined);
+
+    class FakeAudioContext {
+      state: AudioContextState = "suspended";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => {
+        this.state = "running";
+      });
+      decodeAudioData = vi.fn(async () => ({
+        duration: 0.25,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(
+        () =>
+          ({
+            buffer: null,
+            connect: vi.fn(),
+            start: vi.fn(),
+          }) as unknown as AudioBufferSourceNode
+      );
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => {
+        this.state = "closed";
+      });
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        eventCallback?: (
+          event: {
+            type: "event";
+            measureStart: boolean;
+            measureNumber: number;
+            midiPitches?: Array<{ pitch: number }>;
+            elements: Array<
+              Array<{ getAttribute: (name: string) => string | null }>
+            >;
+          } | null
+        ) => "continue" | Promise<"continue"> | undefined;
+      };
+
+      constructor(_visualObj: unknown, options: typeof this.options) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          midiPitches: [{ pitch: 60 }, { pitch: 72 }],
+          elements: [[{ getAttribute: () => "abcjs-note abcjs-p0 abcjs-p7" }]],
+        });
+      }
+
+      pause() {}
+      reset() {}
+      stop() {}
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    const audioContext = new FakeAudioContext() as unknown as AudioContext;
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext,
+        sampleBaseUrl: "",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Reel",
+    });
+
+    (
+      globalThis as typeof globalThis & {
+        __TT_DEBUG_RHYTHM_PLAYBACK__?: boolean;
+      }
+    ).__TT_DEBUG_RHYTHM_PLAYBACK__ = true;
+
+    await service.play();
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      "[RhythmService] playback event",
+      expect.objectContaining({
+        midiPitches: [60, 72],
+        playbackSource: "midi",
+        resolvedPitches: [60, 43],
+      })
     );
 
+    delete (
+      globalThis as typeof globalThis & {
+        __TT_DEBUG_RHYTHM_PLAYBACK__?: boolean;
+      }
+    ).__TT_DEBUG_RHYTHM_PLAYBACK__;
+    consoleInfoSpy.mockRestore();
     dispose();
   });
 
@@ -2716,7 +3922,7 @@ K:clef=perc
 
     await service.play();
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
     expect(bufferSources).toHaveLength(2);
     expect(bufferSources[0]?.buffer).not.toBe(bufferSources[1]?.buffer);
 
@@ -3329,7 +4535,7 @@ K:clef=perc
     releaseFetch();
     await Promise.all([firstPlay, secondPlay]);
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
     expect(bufferSources).toHaveLength(1);
     expect(bufferSources[0]?.start).toHaveBeenCalledTimes(1);
 

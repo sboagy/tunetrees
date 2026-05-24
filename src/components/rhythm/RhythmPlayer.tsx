@@ -46,8 +46,8 @@ import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-mode
 import type {
   RhythmPatternMetadata,
   RhythmPatternType,
-} from "@/lib/services/RhythmService";
-import { createRhythmService } from "@/lib/services/RhythmService";
+} from "@/lib/services/rhythm-service/RhythmService";
+import { createRhythmService } from "@/lib/services/rhythm-service/RhythmService";
 import { cn } from "@/lib/utils";
 import { AbcNotation } from "../tunes/AbcNotation";
 import {
@@ -85,7 +85,7 @@ type CustomPatternEditorMode = "create" | "edit";
 const ACTIVE_NOTE_COLOR = "#60a5fa";
 const CUSTOM_PATTERN_SAMPLE_KIT_OPTIONS = [
   { value: "bodhran", label: "Bodhran" },
-  { value: "bodhran2", label: "Bodhran 2" },
+  { value: "melodicTom", label: "Melodic Tom" },
   { value: "generic_click", label: "Generic click" },
 ] as const;
 const CUSTOM_PATTERN_SCOPE_OPTIONS = {
