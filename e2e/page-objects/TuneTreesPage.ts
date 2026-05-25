@@ -2049,7 +2049,6 @@ export class TuneTreesPage {
       await this.searchBox.isEditable({ timeout: 5000 });
       await this.page.waitForTimeout(100); // Trying to help flaky test
       await this.searchBox.fill(tuneTitle);
-      await this.page.waitForTimeout(2000); // Wait for virtualized grid to update
     } else {
       // Mobile: open filter panel if needed and use search box inside
       const isPanelSearchVisible = await this.searchBoxPanel
@@ -2178,6 +2177,38 @@ export class TuneTreesPage {
       .catch(() => false);
     if (!noTunesVisible) {
       await expect(grid).toBeVisible({ timeout: 10_000 });
+
+      const escapedTitle = tuneTitle.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        String.raw`\$&`
+      );
+      const exactTitleLink = grid
+        .getByRole("link", {
+          name: new RegExp(String.raw`^\s*${escapedTitle}\s*$`, "i"),
+        })
+        .first();
+      const matchingRow = grid
+        .locator(
+          "tbody tr[data-index], tbody tr, li[data-testid^='stacked-item-']"
+        )
+        .filter({ hasText: new RegExp(escapedTitle, "i") })
+        .first();
+
+      await expect
+        .poll(
+          async () => {
+            const linkVisible = await exactTitleLink
+              .isVisible({ timeout: 250 })
+              .catch(() => false);
+            if (linkVisible) return true;
+
+            return await matchingRow
+              .isVisible({ timeout: 250 })
+              .catch(() => false);
+          },
+          { timeout: 10_000, intervals: [100, 250, 500, 1000] }
+        )
+        .toBe(true);
     }
   }
 

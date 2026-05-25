@@ -126,11 +126,11 @@ async function ensureDb(): Promise<SqliteDatabase> {
 
 async function resolveUserId(_db: SqliteDatabase): Promise<string> {
   // First check for injected test user ID (bypasses Supabase entirely)
-  if (typeof window !== "undefined" && window.__ttTestUserId) {
+  if (globalThis.window?.__ttTestUserId) {
     console.log(
-      `[TestApi] Using injected test user ID: ${window.__ttTestUserId}`
+      `[TestApi] Using injected test user ID: ${globalThis.window.__ttTestUserId}`
     );
-    return window.__ttTestUserId;
+    return globalThis.window.__ttTestUserId;
   }
 
   // After eliminating user_profile.id, just return the Supabase Auth UUID
@@ -158,7 +158,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .update(repertoireTune)
       .set({
         scheduled: now,
-        syncVersion: sql.raw(`${repertoireTune.syncVersion} + 1`),
+        syncVersion: sql.raw(`${repertoireTune.syncVersion.name} + 1`),
         lastModifiedAt: new Date().toISOString(),
       })
       .where(
@@ -186,8 +186,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
       .limit(1);
 
     if (!existing || existing.length === 0) {
-      await db
-        .insert(practiceRecord)
+      db.insert(practiceRecord)
         .values({
           id: generateId(),
           repertoireRef: repertoireId,
@@ -230,8 +229,7 @@ async function seedAddToReview(input: SeedAddToReviewInput) {
     .limit(1);
 
   if (latestWindow.length > 0) {
-    await db
-      .delete(dailyPracticeQueue)
+    db.delete(dailyPracticeQueue)
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
@@ -299,7 +297,7 @@ async function getPracticeCount(repertoireId: string) {
   const db = await ensureDb();
   // Resolve userId
   const userRef = await resolveUserId(db);
-  const rows = await db.all<{ count: number }>(sql`
+  const rows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM daily_practice_queue dpq
     WHERE dpq.user_ref = ${userRef}
@@ -316,7 +314,7 @@ async function getPracticeCount(repertoireId: string) {
 
 async function getRepertoireTuneCount(repertoireId: string) {
   const db = await ensureDb();
-  const rows = await db.all<{ count: number }>(sql`
+  const rows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM repertoire_tune pt
     WHERE pt.repertoire_ref = ${repertoireId}
@@ -329,7 +327,7 @@ async function getTuneOverrideCountForCurrentUser() {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
   // Prefer SQL to avoid ORM differences across builds
-  const rows = await db.all<{ count: number }>(sql`
+  const rows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM tune_override tovr
     WHERE tovr.user_ref = ${userRef}
@@ -341,7 +339,7 @@ async function getCatalogTuneCountsForUser() {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
 
-  const totalRows = await db.all<{ count: number }>(sql`
+  const totalRows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM tune t
     WHERE t.deleted = 0
@@ -360,7 +358,7 @@ async function getCatalogSelectionDiagnostics() {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
 
-  const userProfileRows = await db.all<{
+  const userProfileRows = db.all<{
     id: string;
   }>(sql`
     SELECT id
@@ -377,7 +375,7 @@ async function getCatalogSelectionDiagnostics() {
     .map((id) => `'${id.replaceAll("'", "''")}'`)
     .join(", ");
 
-  const selectionRows = await db.all<{ user_id: string; genre_id: string }>(
+  const selectionRows = db.all<{ user_id: string; genre_id: string }>(
     sql`
       SELECT user_id, genre_id
       FROM user_genre_selection
@@ -385,7 +383,7 @@ async function getCatalogSelectionDiagnostics() {
     `
   );
 
-  const repertoireDefaultsRows = await db.all<{ genre: string | null }>(sql`
+  const repertoireDefaultsRows = db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT p.genre_default AS genre
     FROM repertoire p
     WHERE p.deleted = 0
@@ -393,7 +391,7 @@ async function getCatalogSelectionDiagnostics() {
       AND p.genre_default IS NOT NULL
   `);
 
-  const repertoireGenreRows = await db.all<{ genre: string | null }>(sql`
+  const repertoireGenreRows = db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
     FROM repertoire_tune pt
     JOIN repertoire p
@@ -408,14 +406,14 @@ async function getCatalogSelectionDiagnostics() {
       AND p.user_ref IN (${sql.raw(userIdList)})
   `);
 
-  const repertoireCountRows = await db.all<{ count: number }>(sql`
+  const repertoireCountRows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
     FROM repertoire p
     WHERE p.deleted = 0
       AND p.user_ref IN (${sql.raw(userIdList)})
   `);
 
-  const repertoireTuneCountRows = await db.all<{ count: number }>(sql`
+  const repertoireTuneCountRows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
     FROM repertoire_tune pt
     JOIN repertoire p
@@ -424,7 +422,7 @@ async function getCatalogSelectionDiagnostics() {
       AND p.user_ref IN (${sql.raw(userIdList)})
   `);
 
-  const catalogTuneCountRows = await db.all<{ count: number }>(sql`
+  const catalogTuneCountRows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
     FROM tune t
     WHERE t.deleted = 0
@@ -458,7 +456,7 @@ async function getPracticeRecords(tuneIds: string[]) {
   if (!tuneIds || tuneIds.length === 0) return [];
   // Build an IN list (UUIDs) for test-only usage. UUIDs contain no quotes.
   const inList = tuneIds.map((id) => `'${id}'`).join(",");
-  const rows = await db.all<{
+  const rows = db.all<{
     id: string;
     tune_ref: string;
     repertoire_ref: string;
@@ -503,7 +501,7 @@ async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
     throw new Error(`Invalid repertoireId format: ${repertoireId}`);
   }
   const db = await ensureDb();
-  const rows = await db.all<{
+  const rows = db.all<{
     id: string;
     tune_ref: string;
     repertoire_ref: string;
@@ -540,7 +538,7 @@ async function getLatestPracticeRecord(tuneId: string, repertoireId: string) {
   console.log(`[TestApi] getLatestPracticeRecord committedRows=${rows.length}`);
   if (rows.length === 0) {
     // Additional diagnostic: count total rows for tune regardless of repertoire to spot mismatch
-    const diagRows = await db.all<{ c: number }>(sql`
+    const diagRows = db.all<{ c: number }>(sql`
       SELECT COUNT(*) as c FROM practice_record WHERE tune_ref = ${sql.raw(`'${tuneId}'`)}
     `);
     // eslint-disable-next-line no-console
@@ -564,7 +562,7 @@ async function getScheduledDates(repertoireId: string, tuneIds?: string[]) {
 
   if (tuneIds && tuneIds.length > 0) {
     const inList = tuneIds.map((id) => `'${id}'`).join(",");
-    const rows = await db.all<{
+    const rows = db.all<{
       tune_ref: string;
       scheduled: string | null;
       learned: string | null;
@@ -590,7 +588,7 @@ async function getScheduledDates(repertoireId: string, tuneIds?: string[]) {
     return result;
   }
 
-  const rows = await db.all<{
+  const rows = db.all<{
     tune_ref: string;
     scheduled: string | null;
     learned: string | null;
@@ -706,7 +704,7 @@ async function getPracticeQueue(repertoireId: string, windowStartUtc?: string) {
     `;
   }
 
-  const rows = await db.all<{
+  const rows = db.all<{
     id: string;
     tune_ref: string;
     bucket: number;
@@ -725,7 +723,7 @@ async function getPracticeQueue(repertoireId: string, windowStartUtc?: string) {
  */
 async function getRepertoireTuneRow(repertoireId: string, tuneId: string) {
   const db = await ensureDb();
-  const rows = await db.all<{
+  const rows = db.all<{
     repertoire_ref: string;
     tune_ref: string;
     scheduled: string | null;
@@ -750,7 +748,7 @@ async function getDistinctPracticeRecordCount(
   tuneId: string
 ) {
   const db = await ensureDb();
-  const rows = await db.all<{ count: number }>(sql`
+  const rows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM practice_record
     WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${tuneId}
@@ -764,7 +762,7 @@ async function getDistinctPracticeRecordCount(
 async function getAllQueueWindows(repertoireId: string) {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
-  const rows = await db.all<{
+  const rows = db.all<{
     window_start_utc: string;
     count: number;
     active: number;
@@ -788,7 +786,7 @@ async function getTunesByTitles(titles: string[]) {
   if (!titles || titles.length === 0) return [];
   // Escape single quotes in titles for safety
   const inList = titles.map((t) => `'${t.replaceAll("'", "''")}'`).join(",");
-  const rows = await db.all<{ id: string; title: string }>(sql`
+  const rows = db.all<{ id: string; title: string }>(sql`
     SELECT id, title FROM tune WHERE title IN (${sql.raw(inList)})
   `);
   return rows;
@@ -855,7 +853,7 @@ async function seedSampleCatalogRow() {
  */
 async function getSyncOutboxCount(): Promise<number> {
   const db = await ensureDb();
-  const rows = await db.all<{ count: number }>(sql`
+  const rows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM sync_push_queue
     WHERE status IN ('pending', 'in_progress')
@@ -874,7 +872,7 @@ async function getPendingSyncOutboxItems(): Promise<
   }>
 > {
   const db = await ensureDb();
-  const rows = await db.all<{
+  const rows = db.all<{
     table_name: string;
     row_id: string;
     operation: string;
@@ -908,7 +906,7 @@ async function getRepertoireCount(repertoireId?: string): Promise<number> {
   const db = await ensureDb();
 
   if (repertoireId) {
-    const rows = await db.all<{ count: number }>(sql`
+    const rows = db.all<{ count: number }>(sql`
       SELECT COUNT(*) as count
       FROM repertoire_tune rt
       WHERE rt.repertoire_ref = ${repertoireId}
@@ -917,7 +915,7 @@ async function getRepertoireCount(repertoireId?: string): Promise<number> {
     return rows[0]?.count ?? 0;
   }
 
-  const rows = await db.all<{ count: number }>(sql`
+  const rows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) as count FROM repertoire WHERE deleted = 0
   `);
   return rows[0]?.count ?? 0;
@@ -928,7 +926,7 @@ async function getRepertoireCount(repertoireId?: string): Promise<number> {
  * Returns false when offline tests can proceed
  */
 function isSyncComplete(): boolean {
-  const syncControl = window.__ttSyncControl;
+  const syncControl = globalThis.window?.__ttSyncControl;
   if (syncControl?.isSyncing) {
     return !syncControl.isSyncing();
   }
@@ -976,9 +974,19 @@ async function getLocalRecord(
   recordId: string | number
 ): Promise<any> {
   const db = await ensureDb();
-  // Simple query - assumes table has 'id' column
+  // Limit to identifier-safe table names to avoid malformed test SQL.
+  const safeTable = table.replaceAll(/\W/g, "");
+  if (!safeTable) {
+    throw new Error(`Invalid table name: ${table}`);
+  }
+
+  const recordIdSql =
+    typeof recordId === "number"
+      ? String(recordId)
+      : `'${String(recordId).replaceAll("'", "''")}'`;
+
   const rows = db.all(
-    `SELECT * FROM ${sql.raw(table)} WHERE id = ${recordId} LIMIT 1`
+    `SELECT * FROM ${safeTable} WHERE id = ${recordIdSql} LIMIT 1`
   );
   return rows.length > 0 ? rows[0] : null;
 }
@@ -1019,7 +1027,7 @@ async function getQueueInfo(repertoireId: string): Promise<{
 }> {
   const db = await ensureDb();
   const userRef = await resolveUserId(db);
-  const rows = await db.all<{
+  const rows = db.all<{
     windowStartUtc: string;
     rowCount: number;
     completedCount: number;
@@ -1051,7 +1059,7 @@ async function getQueueInfo(repertoireId: string): Promise<{
  */
 async function getTuneIdByGenre(genre: string): Promise<string | null> {
   const db = await ensureDb();
-  const rows = await db.all(
+  const rows = db.all(
     sql`SELECT id FROM tune WHERE genre = ${genre} AND deleted = 0 LIMIT 1`
   );
   return rows.length > 0 ? (rows[0] as { id: string }).id : null;
@@ -1402,18 +1410,18 @@ declare global {
   }
 }
 
-if (typeof window !== "undefined") {
+if (globalThis.window !== undefined) {
   // Idempotent attach
-  if (!window.__ttTestApi) {
-    window.__ttTestApi = {
+  if (!globalThis.window.__ttTestApi) {
+    globalThis.window.__ttTestApi = {
       // User ID injection methods
       setTestUserId: (userId: string) => {
-        window.__ttTestUserId = userId;
+        globalThis.window.__ttTestUserId = userId;
         console.log(`[TestApi] Test user ID set to: ${userId}`);
       },
-      getTestUserId: () => window.__ttTestUserId,
+      getTestUserId: () => globalThis.window.__ttTestUserId,
       clearTestUserId: () => {
-        delete window.__ttTestUserId;
+        delete globalThis.window.__ttTestUserId;
         console.log("[TestApi] Test user ID cleared");
       },
       getCurrentUserId: async () => {
@@ -1444,7 +1452,7 @@ if (typeof window !== "undefined") {
         }
 
         // Try to find existing private tune
-        const existing = await db.all<{ id: string }>(
+        const existing = db.all<{ id: string }>(
           sql`SELECT id FROM tune WHERE genre = ${genre} AND private_for = ${userId} AND deleted = 0 LIMIT 1`
         );
 
@@ -1454,7 +1462,7 @@ if (typeof window !== "undefined") {
 
         const tuneId = generateId();
 
-        await db.run(sql`
+        db.run(sql`
           INSERT INTO tune (
             id,
             title,
@@ -1503,7 +1511,7 @@ if (typeof window !== "undefined") {
           });
         }
 
-        const existing = await db.all<{ id: string }>(sql`
+        const existing = db.all<{ id: string }>(sql`
           SELECT id
           FROM tune
           WHERE title = ${input.title}
@@ -1517,7 +1525,7 @@ if (typeof window !== "undefined") {
         }
 
         const tuneId = generateId();
-        await db.run(sql`
+        db.run(sql`
           INSERT INTO tune (
             id,
             title,
@@ -1546,7 +1554,7 @@ if (typeof window !== "undefined") {
         const db = await ensureDb();
         const now = new Date().toISOString();
 
-        const existing = await db.all<{ id: string }>(sql`
+        const existing = db.all<{ id: string }>(sql`
           SELECT id
           FROM tune
           WHERE title = ${input.title}
@@ -1560,7 +1568,7 @@ if (typeof window !== "undefined") {
         }
 
         const tuneId = generateId();
-        await db.run(sql`
+        db.run(sql`
           INSERT INTO tune (
             id,
             title,
@@ -1651,7 +1659,7 @@ if (typeof window !== "undefined") {
         }>;
         if (tuneIds && tuneIds.length > 0) {
           const inList = tuneIds.map((id) => `'${id}'`).join(",");
-          rows = await db.all<{
+          rows = db.all<{
             id: string;
             repertoire_ref: string;
             tune_ref: string;
@@ -1687,7 +1695,7 @@ if (typeof window !== "undefined") {
             WHERE repertoire.repertoire_id = ${repertoireId} AND repertoire.user_ref = ${userRef} AND tune.id IN (${sql.raw(inList)})
           `);
         } else {
-          rows = await db.all<{
+          rows = db.all<{
             id: string;
             repertoire_ref: string;
             tune_ref: string;
@@ -1728,7 +1736,7 @@ if (typeof window !== "undefined") {
       getQueueWindows: async (repertoireId: string) => {
         const db = await ensureDb();
         const userRef = await resolveUserId(db);
-        const rows = await db.all<{ window_start_utc: string }>(sql`
+        const rows = db.all<{ window_start_utc: string }>(sql`
           SELECT DISTINCT window_start_utc
           FROM daily_practice_queue
           WHERE user_ref = ${userRef} AND repertoire_ref = ${repertoireId}
@@ -1818,7 +1826,7 @@ if (typeof window !== "undefined") {
                 AND t.deleted = 0
             `;
 
-        const noteRows = await db.all<{ count: number }>(noteQuery);
+        const noteRows = db.all<{ count: number }>(noteQuery);
 
         // Count references (same pattern)
         const refQuery = options?.tuneId
@@ -1831,7 +1839,7 @@ if (typeof window !== "undefined") {
                 AND t.deleted = 0
             `;
 
-        const refRows = await db.all<{ count: number }>(refQuery);
+        const refRows = db.all<{ count: number }>(refQuery);
 
         return {
           notes: Number(noteRows[0]?.count ?? 0),
@@ -1846,14 +1854,14 @@ if (typeof window !== "undefined") {
         const db = await ensureDb();
 
         // Count notes with tune_ref NOT in tune table
-        const orphanedNotes = await db.all<{ count: number }>(sql`
+        const orphanedNotes = db.all<{ count: number }>(sql`
           SELECT COUNT(*) as count
           FROM note n
           WHERE n.tune_ref NOT IN (SELECT id FROM tune WHERE deleted = 0)
         `);
 
         // Count references with tune_ref NOT in tune table
-        const orphanedRefs = await db.all<{ count: number }>(sql`
+        const orphanedRefs = db.all<{ count: number }>(sql`
           SELECT COUNT(*) as count
           FROM reference r
           WHERE r.tune_ref NOT IN (SELECT id FROM tune WHERE deleted = 0)
