@@ -53,7 +53,7 @@ const PASTEL_PALETTES = [
 function nameHash(name: string): number {
   let h = 0;
   for (let i = 0; i < name.length; i++) {
-    h = (Math.imul(31, h) + (name.codePointAt(i) ?? 0)) | 0;
+    h = Math.trunc(Math.imul(31, h) + (name.codePointAt(i) ?? 0));
   }
   return Math.abs(h);
 }
@@ -83,6 +83,7 @@ export const GoalBadge: Component<GoalBadgeProps> = (props) => {
       <DropdownMenu>
         <DropdownMenu.Trigger
           class={`${badgeClass()} cursor-pointer hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+          onClick={(event) => event.stopPropagation()}
         >
           {displayName()}
           <ChevronDown class="w-3 h-3 ml-0.5 opacity-60" />

@@ -79,8 +79,8 @@ const TECHNIQUE_MODIFIERS = {
  * with Solid signals and stores.
  */
 export class FSRSService implements SchedulingService {
-  private scheduler: ReturnType<typeof fsrs>;
-  private repertoireTuneCount: number | null = null; // populated asynchronously
+  private readonly scheduler: ReturnType<typeof fsrs>;
+  private readonly repertoireTuneCount: number | null = null; // populated asynchronously
   /** Accessor for tune count (may be null if not yet loaded) */
   getRepertoireTuneCountCached(): number | null {
     return this.repertoireTuneCount;
@@ -113,9 +113,9 @@ export class FSRSService implements SchedulingService {
 
     // Allow test override via window property
     const tuneCountOverride =
-      typeof window !== "undefined"
-        ? (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__
-        : undefined;
+      globalThis.window === undefined
+        ? undefined
+        : (globalThis.window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__;
 
     /**
      * Calculate effective repertoire size with bounds for maximum interval calculation.
@@ -150,9 +150,9 @@ export class FSRSService implements SchedulingService {
     );
 
     const testMaxReviewsOverride =
-      typeof window !== "undefined"
-        ? (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__
-        : undefined;
+      globalThis.window === undefined
+        ? undefined
+        : (globalThis.window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__;
     const effectiveMaxReviews = testMaxReviewsOverride ?? maxReviewsPerDay;
 
     const calculatedMaxInterval = Math.round(
@@ -160,16 +160,17 @@ export class FSRSService implements SchedulingService {
     );
 
     const testRequestRetentionOverride =
-      typeof window !== "undefined"
-        ? (window as any).__TUNETREES_TEST_REQUEST_RETENTION__
-        : undefined;
+      globalThis.window === undefined
+        ? undefined
+        : (globalThis.window as any).__TUNETREES_TEST_REQUEST_RETENTION__;
 
     const testEnableFuzzOverride =
-      typeof window !== "undefined"
-        ? (window as any).__TUNETREES_TEST_ENABLE_FUZZ__
-        : undefined;
+      globalThis.window === undefined
+        ? undefined
+        : (globalThis.window as any).__TUNETREES_TEST_ENABLE_FUZZ__;
 
-    if (typeof window !== "undefined") {
+    const hasWindow = globalThis.window !== undefined;
+    if (hasWindow) {
       console.log("[FSRSService] Initializing with overrides:", {
         effectiveRepertoireTuneCount,
         effectiveMaxReviews,
@@ -221,7 +222,7 @@ export class FSRSService implements SchedulingService {
       state: schedule.card.state,
       stability: schedule.card.stability,
       difficulty: schedule.card.difficulty,
-      elapsed_days: schedule.card.elapsed_days,
+      elapsed_days: this.getElapsedDays(schedule.card),
       scheduled_days: schedule.card.scheduled_days,
       reps: schedule.card.reps,
       lapses: schedule.card.lapses,
@@ -271,13 +272,17 @@ export class FSRSService implements SchedulingService {
       state: schedule.card.state,
       stability: schedule.card.stability,
       difficulty: schedule.card.difficulty,
-      elapsed_days: schedule.card.elapsed_days,
+      elapsed_days: this.getElapsedDays(schedule.card),
       scheduled_days: schedule.card.scheduled_days,
       reps: schedule.card.reps,
       lapses: schedule.card.lapses,
       last_review: schedule.card.last_review ?? input.practiced,
       interval: this.calculateInterval(input.practiced, schedule.card.due),
     };
+  }
+
+  private getElapsedDays(card: Card): number {
+    return (card as unknown as Record<string, unknown>).elapsed_days as number;
   }
 
   /**
@@ -362,7 +367,8 @@ export class FSRSService implements SchedulingService {
       due: schedule.nextDue.toISOString(),
       backupPracticed: input.practiced.toISOString(),
       stability: schedule.stability,
-      elapsedDays: schedule.elapsed_days,
+      elapsedDays: (schedule as unknown as Record<string, unknown>)
+        .elapsed_days as number,
       lapses: schedule.lapses,
       state: schedule.state,
       difficulty: schedule.difficulty,
@@ -450,7 +456,7 @@ export async function getRepertoireTuneCount(
   db: SqliteDatabase,
   repertoireRef: string
 ): Promise<number> {
-  const rows = await db.all<{ cnt: number }>(sql`
+  const rows = db.all<{ cnt: number }>(sql`
     SELECT COUNT(*) AS cnt
     FROM repertoire_tune pt
     WHERE pt.repertoire_ref = ${repertoireRef}

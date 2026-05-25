@@ -1113,6 +1113,13 @@ export const TunesGrid = (<T extends { id: string | number }>(
     );
   };
 
+  const getPinnedCellBgClass = (cell: Cell<T, unknown>, rowOriginal: T) => {
+    if (!cell.column.getIsPinned()) return "";
+    return rowBelongsToSet(rowOriginal)
+      ? " bg-emerald-100/80 dark:bg-emerald-950/45"
+      : " bg-white dark:bg-gray-900";
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* List mode: stacked list view, either by mobile default or explicit override. */}
@@ -1356,60 +1363,72 @@ export const TunesGrid = (<T extends { id: string | number }>(
               <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualRow) => {
                   const row = () => currentRows()[virtualRow.index];
-                  const rowProps = () => props.getRowProps?.(row().original);
-                  const rowClass = () => {
-                    if (!row()) return ROW_CLASSES;
-
-                    if (props.currentRowId === row().original.id) {
-                      return "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25";
-                    }
-                    if (rowBelongsToSet(row().original)) {
-                      return "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60";
-                    }
-                    return ROW_CLASSES;
-                  };
-                  const getPinnedCellBgClass = (cell: Cell<T, unknown>) => {
-                    if (!cell.column.getIsPinned()) return "";
-                    return rowBelongsToSet(row().original)
-                      ? " bg-emerald-100/80 dark:bg-emerald-950/45"
-                      : " bg-white dark:bg-gray-900";
+                  const getProps = (r: ReturnType<typeof row>) => {
+                    if (!r) return undefined;
+                    return props.getRowProps?.(r.original);
                   };
 
                   return (
-                    <Show when={row()}>
-                      {/* Read the current row through an accessor so filtering can swap
-                            row content without requiring a full table remount. */}
-                      <tr
-                        class={`${rowClass()} ${rowProps()?.class ?? ""}`.trim()}
-                        onClick={() => props.onRowClick?.(row().original)}
-                        onDblClick={() =>
-                          props.onRowDoubleClick?.(row().original)
-                        }
-                        data-index={virtualRow.index}
-                        draggable={rowProps()?.draggable}
-                        data-testid={rowProps()?.["data-testid"]}
-                        data-setlist-item-id={
-                          rowProps()?.["data-setlist-item-id"]
-                        }
-                        onDragStart={rowProps()?.onDragStart}
-                        onDragEnd={rowProps()?.onDragEnd}
-                        onDragOver={rowProps()?.onDragOver}
-                        onDrop={rowProps()?.onDrop}
-                      >
-                        <For each={row().getVisibleCells()}>
-                          {(cell) => (
-                            <td
-                              class={`${CELL_CLASSES}${getPinnedCellBgClass(cell)}${getPinnedBorderClass(cell.column)}`}
-                              style={getPinnedCellStyle(
-                                cell.column,
-                                cell.column.getSize()
+                    <Show when={row()} keyed>
+                      {(currentRow) => {
+                        if (!currentRow) return null;
+                        const currentRowProps = () => getProps(currentRow);
+                        const currentRowMatchId = () => {
+                          const original = currentRow.original as T & {
+                            tune_id?: string | number | null;
+                          };
+                          return original.tune_id ?? currentRow.original.id;
+                        };
+                        const currentRowIsSelected = () =>
+                          props.currentRowId === currentRowMatchId();
+                        const highlightClass = () =>
+                          currentRowIsSelected()
+                            ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
+                            : "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60";
+                        const trClass = () =>
+                          rowBelongsToSet(currentRow.original) ||
+                          currentRowIsSelected()
+                            ? highlightClass()
+                            : ROW_CLASSES;
+                        return (
+                          <tr
+                            class={`${trClass()} ${currentRowProps()?.class ?? ""}`.trim()}
+                            onClick={() =>
+                              props.onRowClick?.(currentRow.original)
+                            }
+                            onDblClick={() =>
+                              props.onRowDoubleClick?.(currentRow.original)
+                            }
+                            data-index={virtualRow.index}
+                            draggable={currentRowProps()?.draggable}
+                            data-testid={currentRowProps()?.["data-testid"]}
+                            data-setlist-item-id={
+                              currentRowProps()?.["data-setlist-item-id"]
+                            }
+                            onDragStart={currentRowProps()?.onDragStart}
+                            onDragEnd={currentRowProps()?.onDragEnd}
+                            onDragOver={currentRowProps()?.onDragOver}
+                            onDrop={currentRowProps()?.onDrop}
+                          >
+                            <For each={currentRow.getVisibleCells()}>
+                              {(cell) => (
+                                <td
+                                  class={`${CELL_CLASSES}${getPinnedCellBgClass(
+                                    cell,
+                                    currentRow.original
+                                  )}${getPinnedBorderClass(cell.column)}`}
+                                  style={getPinnedCellStyle(
+                                    cell.column,
+                                    cell.column.getSize()
+                                  )}
+                                >
+                                  {renderCellContent(cell)}
+                                </td>
                               )}
-                            >
-                              {renderCellContent(cell)}
-                            </td>
-                          )}
-                        </For>
-                      </tr>
+                            </For>
+                          </tr>
+                        );
+                      }}
                     </Show>
                   );
                 }}

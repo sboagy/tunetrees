@@ -752,7 +752,7 @@ export const TopNav: Component = () => {
   const getPendingDeleteCount = async (): Promise<number> => {
     const db = localDb();
     if (!db) return 0;
-    const rows = await db.all<{ count: number }>(
+    const rows = db.all<{ count: number }>(
       "SELECT COUNT(*) as count FROM sync_push_queue WHERE status IN ('pending','in_progress') AND lower(operation) = 'delete';"
     );
     return Number(rows[0]?.count ?? 0);
@@ -858,7 +858,7 @@ export const TopNav: Component = () => {
     // In Playwright E2E runs, avoid polling SQLite WASM in the UI.
     // This has caused browser OOMs under heavy parallelism.
     const isE2E =
-      typeof window !== "undefined" && !!(globalThis as any).__ttTestApi;
+      globalThis.window !== undefined && !!(globalThis as any).__ttTestApi;
 
     if (!db || isAnonymous() || isE2E) {
       setPendingCount(0); // Reset count for anonymous users
@@ -1426,8 +1426,8 @@ export const TopNav: Component = () => {
                     </div>
 
                     {/* Database Browser (Temporarily enabled for production) */}
-                    {/* TODO: Restore dev-only condition: <Show when={import.meta.env.DEV}> */}
-                    {/* TODO: Switch back to target="_blank" after https://github.com/sboagy/tunetrees/issues/321 is resolved */}
+                    {/* NOTE: Restore dev-only condition: <Show when={import.meta.env.DEV}> */}
+                    {/* NOTE: Switch back to target="_blank" after https://github.com/sboagy/tunetrees/issues/321 is resolved */}
                     <Show when={true}>
                       <a
                         href="/debug/db"

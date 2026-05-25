@@ -2365,6 +2365,26 @@ export class TuneTreesPage {
     await row.scrollIntoViewIfNeeded().catch(() => undefined);
     await expect(row).toBeVisible({ timeout });
 
+    const stackedActivator = row
+      .locator('[data-testid^="stacked-row-activate-"]')
+      .first();
+    const hasStackedActivator = await stackedActivator
+      .isVisible({ timeout: 250 })
+      .catch(() => false);
+    if (hasStackedActivator) {
+      await stackedActivator.evaluate((element) => {
+        if (!(element instanceof HTMLButtonElement)) {
+          return false;
+        }
+
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+        element.click();
+        return true;
+      });
+      await this.page.waitForTimeout(150);
+      return;
+    }
+
     const clicked = await row
       .evaluate((element) => {
         if (!(element instanceof HTMLElement)) {

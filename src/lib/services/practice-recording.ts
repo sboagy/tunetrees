@@ -18,7 +18,7 @@
  * @module lib/services/practice-recording
  */
 
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import {
   getLatestPracticeRecord,
@@ -58,6 +58,30 @@ export interface RecordPracticeResult {
   practiceRecord?: NewPracticeRecord;
   nextReview?: NextReviewSchedule;
   error?: string;
+}
+
+interface StagedEvaluationRow {
+  tune_id: string;
+  quality: number;
+  difficulty: number;
+  stability: number;
+  interval: number;
+  step: number | null;
+  repetitions: number;
+  practiced: string;
+  due: string;
+  state: number;
+  goal: string;
+  technique: string;
+  recall_eval: string;
+  elapsed_days: number | null;
+  lapses: number | null;
+}
+
+interface QueueWindowRow {
+  tune_ref: string;
+  scheduled_snapshot: string | null;
+  generated_at: string | null;
 }
 
 /**
@@ -160,7 +184,7 @@ export async function evaluatePractice(
   const goalName = normalizedInput.goal ?? "recall";
   if (!pluginSchedule && goalName !== "recall") {
     // Look up user-owned goal first, then fall back to system goal (private_for IS NULL).
-    const goalRows = await db
+    const goalRows = db
       .select()
       .from(goalTable)
       .where(
@@ -412,6 +436,231 @@ export function shouldClearConsumedScheduledOverride(input: {
   return repertoireTuneLastModifiedAt <= queueGeneratedAt;
 }
 
+function findUniquePracticedTimestamp(
+  db: SqliteDatabase,
+  staged: StagedEvaluationRow,
+  repertoireId: string
+): string {
+  let practicedTimestamp = staged.practiced;
+  let attempts = 0;
+  const maxAttempts = 60;
+
+  while (attempts < maxAttempts) {
+    const existing = db.all<{ id: string }>(sql`
+      SELECT id FROM practice_record
+      WHERE tune_ref = ${staged.tune_id}
+        AND repertoire_ref = ${repertoireId}
+        AND practiced = ${practicedTimestamp}
+      LIMIT 1
+    `);
+
+    if (existing.length === 0) {
+      return practicedTimestamp;
+    }
+
+    const dt = new Date(practicedTimestamp);
+    dt.setSeconds(dt.getSeconds() + 1);
+    practicedTimestamp = dt.toISOString();
+    attempts++;
+  }
+
+  throw new Error(
+    `Failed to find unique practiced timestamp for tune ${staged.tune_id} after ${maxAttempts} attempts`
+  );
+}
+
+function verifyQueueCompletion(params: {
+  db: SqliteDatabase;
+  userId: string;
+  repertoireId: string;
+  tuneId: string;
+  activeWindowStart: string;
+  windowStartIso19: string;
+}): void {
+  const verifyQueue = params.db.get<{ completed_at: string | null }>(sql`
+    SELECT completed_at
+    FROM daily_practice_queue
+    WHERE user_ref = ${params.userId}
+      AND repertoire_ref = ${params.repertoireId}
+      AND tune_ref = ${params.tuneId}
+      AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${params.windowStartIso19}
+    LIMIT 1
+  `);
+
+  if (!verifyQueue?.completed_at) {
+    console.error(
+      `❌ CRITICAL: completed_at NOT SET for tune ${params.tuneId}!`,
+      {
+        verifyQueue,
+        userId: params.userId,
+        repertoireId: params.repertoireId,
+        tuneId: params.tuneId,
+        windowStart: params.activeWindowStart,
+      }
+    );
+    throw new Error(
+      `Failed to set completed_at for tune ${params.tuneId} in daily_practice_queue`
+    );
+  }
+
+  console.log(
+    `✓ Verified completed_at set for tune ${params.tuneId}:`,
+    verifyQueue.completed_at
+  );
+}
+
+function commitSingleStagedEvaluation(params: {
+  db: SqliteDatabase;
+  staged: StagedEvaluationRow;
+  userId: string;
+  repertoireId: string;
+  now: string;
+  activeWindowStart: string;
+  windowStartIso19: string;
+  queueByTuneId: Map<string, QueueWindowRow>;
+}): string {
+  const {
+    db,
+    staged,
+    userId,
+    repertoireId,
+    now,
+    activeWindowStart,
+    windowStartIso19,
+    queueByTuneId,
+  } = params;
+
+  console.log(`Processing tune ${staged.tune_id}...`);
+
+  const practicedTimestamp = findUniquePracticedTimestamp(
+    db,
+    staged,
+    repertoireId
+  );
+
+  const recordId = generateId();
+  const prior = db.get<{
+    lapses: number | null;
+    state: number | null;
+  }>(sql`
+    SELECT lapses, state
+    FROM practice_record
+    WHERE tune_ref = ${staged.tune_id} AND repertoire_ref = ${repertoireId}
+    ORDER BY
+      CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
+      practiced DESC,
+      last_modified_at DESC
+    LIMIT 1
+  `);
+  const priorLapses = prior?.lapses ?? 0;
+  const priorState = prior?.state ?? 0;
+  const lapsesValue =
+    staged.quality === 1 && priorState === 2 ? priorLapses + 1 : priorLapses;
+
+  db.run(sql`
+    INSERT INTO practice_record (
+      id,
+      repertoire_ref,
+      tune_ref,
+      practiced,
+      quality,
+      easiness,
+      interval,
+      repetitions,
+      due,
+      backup_practiced,
+      stability,
+      elapsed_days,
+      lapses,
+      state,
+      difficulty,
+      step,
+      goal,
+      technique,
+      last_modified_at
+    ) VALUES (
+      ${recordId},
+      ${repertoireId},
+      ${staged.tune_id},
+      ${practicedTimestamp},
+      ${staged.quality},
+      NULL,
+      ${staged.interval},
+      ${staged.repetitions},
+      ${staged.due},
+      NULL,
+      ${staged.stability},
+      ${staged.elapsed_days ?? null},
+      ${lapsesValue},
+      ${staged.state},
+      ${staged.difficulty},
+      ${staged.step},
+      ${staged.goal},
+      ${staged.technique},
+      ${now}
+    )
+  `);
+
+  const queueRow = queueByTuneId.get(staged.tune_id);
+  const repertoireTuneRow = db.get<{
+    scheduled: string | null;
+    last_modified_at: string | null;
+  }>(sql`
+    SELECT scheduled, last_modified_at
+    FROM repertoire_tune
+    WHERE repertoire_ref = ${repertoireId}
+      AND tune_ref = ${staged.tune_id}
+    LIMIT 1
+  `);
+
+  const currentScheduled = repertoireTuneRow?.scheduled ?? null;
+  const shouldClearScheduled = shouldClearConsumedScheduledOverride({
+    queueScheduledSnapshot: queueRow?.scheduled_snapshot,
+    currentScheduled,
+    queueGeneratedAt: queueRow?.generated_at,
+    repertoireTuneLastModifiedAt: repertoireTuneRow?.last_modified_at,
+  });
+
+  db.run(sql`
+    UPDATE repertoire_tune
+    SET current = ${staged.due},
+        scheduled = ${shouldClearScheduled ? null : currentScheduled},
+        last_modified_at = ${now}
+    WHERE repertoire_ref = ${repertoireId}
+      AND tune_ref = ${staged.tune_id}
+  `);
+
+  console.log(`Deleting staged evaluation for tune ${staged.tune_id}...`);
+  db.run(sql`
+    DELETE FROM table_transient_data
+    WHERE user_id = ${userId}
+      AND tune_id = ${staged.tune_id}
+      AND repertoire_id = ${repertoireId}
+  `);
+
+  console.log(`Marking queue item as completed for tune ${staged.tune_id}...`);
+  db.run(sql`
+    UPDATE daily_practice_queue
+    SET completed_at = ${now}
+    WHERE user_ref = ${userId}
+      AND repertoire_ref = ${repertoireId}
+      AND tune_ref = ${staged.tune_id}
+      AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
+  `);
+
+  verifyQueueCompletion({
+    db,
+    userId,
+    repertoireId,
+    tuneId: staged.tune_id,
+    activeWindowStart,
+    windowStartIso19,
+  });
+
+  console.log(`✓ Completed processing tune ${staged.tune_id}`);
+  return staged.tune_id;
+}
+
 /**
  * Commit staged evaluations to practice records
  *
@@ -461,8 +710,6 @@ export async function commitStagedEvaluations(
       userIdType: typeof userId,
       repertoireIdType: typeof repertoireId,
     });
-
-    const { sql } = await import("drizzle-orm");
     const { persistDb } = await import("../db/client-sqlite");
 
     // 2. Determine which queue window we're working with
@@ -473,7 +720,7 @@ export async function commitStagedEvaluations(
       console.log(`Using provided queue window: ${activeWindowStart}`);
     } else {
       // Find the most recent queue window for this repertoire
-      const latestWindow = await db.get<{ window_start_utc: string }>(sql`
+      const latestWindow = db.get<{ window_start_utc: string }>(sql`
         SELECT window_start_utc
         FROM daily_practice_queue
         WHERE user_ref = ${userId}
@@ -499,14 +746,14 @@ export async function commitStagedEvaluations(
     const windowStartIso19 = startISO.replace(" ", "T").substring(0, 19);
 
     // DEBUG: Check what's actually in table_transient_data
-    const allTransientData = await db.all(sql`
+    const allTransientData = db.all(sql`
       SELECT user_id, tune_id, repertoire_id, practiced, recall_eval
       FROM table_transient_data
     `);
     console.log("ALL table_transient_data rows:", allTransientData);
 
     // DEBUG: Try the exact query we're about to run
-    const debugQuery = await db.all(sql`
+    const debugQuery = db.all(sql`
       SELECT user_id, tune_id, repertoire_id, practiced
       FROM table_transient_data
       WHERE user_id = ${userId}
@@ -517,23 +764,7 @@ export async function commitStagedEvaluations(
 
     // 1. Fetch all staged evaluations from table_transient_data for this repertoire
     console.log("Querying table_transient_data...");
-    const stagedEvaluations = await db.all<{
-      tune_id: string;
-      quality: number;
-      difficulty: number;
-      stability: number;
-      interval: number;
-      step: number | null;
-      repetitions: number;
-      practiced: string;
-      due: string;
-      state: number;
-      goal: string;
-      technique: string;
-      recall_eval: string;
-      elapsed_days: number | null;
-      lapses: number | null;
-    }>(sql`
+    const stagedEvaluations = db.all<StagedEvaluationRow>(sql`
       SELECT 
         tune_id,
         quality,
@@ -566,11 +797,7 @@ export async function commitStagedEvaluations(
 
     // 2. Get tune_ids that are in the active practice queue window
     console.log("Querying daily_practice_queue...");
-    const queueRows = await db.all<{
-      tune_ref: string;
-      scheduled_snapshot: string | null;
-      generated_at: string | null;
-    }>(sql`
+    const queueRows = db.all<QueueWindowRow>(sql`
       SELECT tune_ref, scheduled_snapshot, generated_at
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
@@ -604,7 +831,7 @@ export async function commitStagedEvaluations(
     // Run the commit as a single atomic transaction. This prevents
     // partial-success states (e.g., practice_record inserted but transient rows
     // not cleared) which can cause subsequent re-submits to collide.
-    await db.run(sql`BEGIN`);
+    db.run(sql`BEGIN`);
     didStartTransaction = true;
 
     // 4. For each staged evaluation, create practice_record and update related tables
@@ -613,205 +840,20 @@ export async function commitStagedEvaluations(
 
     console.log("Starting to commit evaluations...");
     for (const staged of evaluationsToCommit) {
-      console.log(`Processing tune ${staged.tune_id}...`);
-
-      // Ensure unique practiced timestamp (check if already exists)
-      let practicedTimestamp = staged.practiced;
-      let attempts = 0;
-      const maxAttempts = 60; // Prevent infinite loop
-
-      while (attempts < maxAttempts) {
-        const existing = await db.all<{ id: string }>(sql`
-          SELECT id FROM practice_record
-          WHERE tune_ref = ${staged.tune_id}
-            AND repertoire_ref = ${repertoireId}
-            AND practiced = ${practicedTimestamp}
-          LIMIT 1
-        `);
-
-        if (existing.length === 0) {
-          break; // Timestamp is unique
-        }
-
-        // Increment by 1 second to make unique
-        const dt = new Date(practicedTimestamp);
-        dt.setSeconds(dt.getSeconds() + 1);
-        practicedTimestamp = dt.toISOString();
-        attempts++;
-      }
-
-      if (attempts >= maxAttempts) {
-        throw new Error(
-          `Failed to find unique practiced timestamp for tune ${staged.tune_id} after ${maxAttempts} attempts`
-        );
-      }
-
-      // Insert practice_record
-      const recordId = generateId();
-      // Determine prior state & lapses (latest committed record for tune/repertoire)
-      const prior = await db.get<{
-        lapses: number | null;
-        state: number | null;
-      }>(sql`
-        SELECT lapses, state
-        FROM practice_record
-        WHERE tune_ref = ${staged.tune_id} AND repertoire_ref = ${repertoireId}
-        ORDER BY
-          CASE WHEN practiced IS NULL THEN 1 ELSE 0 END ASC,
-          practiced DESC,
-          last_modified_at DESC
-        LIMIT 1
-      `);
-      const priorLapses = prior?.lapses ?? 0;
-      const priorState = prior?.state ?? 0;
-      // Only increment lapses on Again (quality=1) when prior state was Review (2)
-      const lapsesValue =
-        staged.quality === 1 && priorState === 2
-          ? priorLapses + 1
-          : priorLapses;
-      await db.run(sql`
-        INSERT INTO practice_record (
-          id,
-          repertoire_ref,
-          tune_ref,
-          practiced,
-          quality,
-          easiness,
-          interval,
-          repetitions,
-          due,
-          backup_practiced,
-          stability,
-          elapsed_days,
-          lapses,
-          state,
-          difficulty,
-          step,
-          goal,
-          technique,
-          last_modified_at
-        ) VALUES (
-          ${recordId},
-          ${repertoireId},
-          ${staged.tune_id},
-          ${practicedTimestamp},
-          ${staged.quality},
-          NULL,
-          ${staged.interval},
-          ${staged.repetitions},
-          ${staged.due},
-          NULL,
-          ${staged.stability},
-          ${staged.elapsed_days ?? null},
-          ${lapsesValue},
-          ${staged.state},
-          ${staged.difficulty},
-          ${staged.step},
-          ${staged.goal},
-          ${staged.technique},
-          ${now}
-        )
-      `);
-
-      // Sync is handled automatically by SQL triggers populating sync_outbox
-
-      const queueRow = queueByTuneId.get(staged.tune_id);
-      const repertoireTuneRow = await db.get<{
-        scheduled: string | null;
-        last_modified_at: string | null;
-      }>(sql`
-        SELECT scheduled, last_modified_at
-        FROM repertoire_tune
-        WHERE repertoire_ref = ${repertoireId}
-          AND tune_ref = ${staged.tune_id}
-        LIMIT 1
-      `);
-
-      const currentScheduled = repertoireTuneRow?.scheduled ?? null;
-      const shouldClearScheduled = shouldClearConsumedScheduledOverride({
-        queueScheduledSnapshot: queueRow?.scheduled_snapshot,
-        currentScheduled,
-        queueGeneratedAt: queueRow?.generated_at,
-        repertoireTuneLastModifiedAt: repertoireTuneRow?.last_modified_at,
+      const committedTuneId = commitSingleStagedEvaluation({
+        db,
+        staged,
+        userId,
+        repertoireId,
+        now,
+        activeWindowStart,
+        windowStartIso19,
+        queueByTuneId,
       });
-
-      // Update repertoire_tune.current (FSRS next review date) while preserving
-      // a newly created or edited manual override for the upcoming next review.
-      await db.run(sql`
-        UPDATE repertoire_tune
-        SET current = ${staged.due},
-            scheduled = ${shouldClearScheduled ? null : currentScheduled},
-            last_modified_at = ${now}
-        WHERE repertoire_ref = ${repertoireId}
-          AND tune_ref = ${staged.tune_id}
-      `);
-
-      // Sync is handled automatically by SQL triggers populating sync_outbox
-
-      // Delete from table_transient_data
-      console.log(`Deleting staged evaluation for tune ${staged.tune_id}...`);
-      await db.run(sql`
-        DELETE FROM table_transient_data
-        WHERE user_id = ${userId}
-          AND tune_id = ${staged.tune_id}
-          AND repertoire_id = ${repertoireId}
-      `);
-
-      // Sync is handled automatically by SQL triggers populating sync_outbox
-
-      // Mark queue item as completed
-      console.log(
-        `Marking queue item as completed for tune ${staged.tune_id}...`
-      );
-
-      await db.run(sql`
-        UPDATE daily_practice_queue
-        SET completed_at = ${now}
-        WHERE user_ref = ${userId}
-          AND repertoire_ref = ${repertoireId}
-          AND tune_ref = ${staged.tune_id}
-					AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
-      `);
-
-      // CRITICAL: Verify the update succeeded
-      const verifyQueue = await db.get<{ completed_at: string | null }>(sql`
-        SELECT completed_at
-        FROM daily_practice_queue
-        WHERE user_ref = ${userId}
-          AND repertoire_ref = ${repertoireId}
-          AND tune_ref = ${staged.tune_id}
-					AND substr(replace(window_start_utc, ' ', 'T'), 1, 19) = ${windowStartIso19}
-        LIMIT 1
-      `);
-
-      if (!verifyQueue?.completed_at) {
-        console.error(
-          `❌ CRITICAL: completed_at NOT SET for tune ${staged.tune_id}!`,
-          {
-            verifyQueue,
-            userId,
-            repertoireId,
-            tuneId: staged.tune_id,
-            windowStart: activeWindowStart,
-          }
-        );
-        throw new Error(
-          `Failed to set completed_at for tune ${staged.tune_id} in daily_practice_queue`
-        );
-      }
-
-      console.log(
-        `✓ Verified completed_at set for tune ${staged.tune_id}:`,
-        verifyQueue.completed_at
-      );
-
-      // Sync is handled automatically by SQL triggers populating sync_outbox
-
-      committedTuneIds.push(staged.tune_id);
-      console.log(`✓ Completed processing tune ${staged.tune_id}`);
+      committedTuneIds.push(committedTuneId);
     }
 
-    await db.run(sql`COMMIT`);
+    db.run(sql`COMMIT`);
     didStartTransaction = false;
 
     // 5. Persist database to IndexedDB
@@ -830,8 +872,7 @@ export async function commitStagedEvaluations(
   } catch (error) {
     if (didStartTransaction) {
       try {
-        const { sql } = await import("drizzle-orm");
-        await db.run(sql`ROLLBACK`);
+        db.run(sql`ROLLBACK`);
       } catch (rollbackError) {
         console.error("Failed to rollback transaction:", rollbackError);
       }
