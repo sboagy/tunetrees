@@ -15,7 +15,7 @@ import {
   Database,
   Download,
   FileText,
-  Home,
+  House,
   Info,
   LogOut,
   MessageCircle,
@@ -354,7 +354,7 @@ const LogoDropdown: Component<{
               class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
               onClick={() => setShowDropdown(false)}
             >
-              <Home class="w-4 h-4" aria-hidden="true" />
+              <House class="w-4 h-4" aria-hidden="true" />
               Home
             </a>
 
@@ -743,7 +743,7 @@ export const TopNav: Component = () => {
   });
 
   const handleOpenAssistant = () => {
-    window.dispatchEvent(new CustomEvent("tt-open-ai-assistant"));
+    globalThis.dispatchEvent(new CustomEvent("tt-open-ai-assistant"));
   };
 
   let userMenuContainerRef: HTMLDivElement | undefined;
@@ -843,12 +843,12 @@ export const TopNav: Component = () => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    globalThis.addEventListener("online", handleOnline);
+    globalThis.addEventListener("offline", handleOffline);
 
     onCleanup(() => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      globalThis.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("offline", handleOffline);
     });
   });
 
@@ -1077,7 +1077,7 @@ export const TopNav: Component = () => {
                           class="w-full px-4 py-2 text-left text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 font-medium"
                           onClick={() => {
                             setShowUserMenu(false);
-                            window.location.href = "/login?convert=true";
+                            globalThis.location.href = "/login?convert=true";
                           }}
                           data-testid="create-account-button"
                         >
@@ -1124,7 +1124,7 @@ export const TopNav: Component = () => {
                         onClick={async () => {
                           setShowUserMenu(false);
                           await signOut();
-                          window.location.href = "/login";
+                          globalThis.location.href = "/login";
                         }}
                       >
                         <LogOut class="w-4 h-4" aria-hidden="true" />

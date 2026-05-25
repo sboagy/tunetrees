@@ -90,12 +90,12 @@ export function classifyQueueBucket(
       const [, year, month, day, hour, minute, second] = match;
       dt = new Date(
         Date.UTC(
-          parseInt(year, 10),
-          parseInt(month, 10) - 1,
-          parseInt(day, 10),
-          parseInt(hour, 10),
-          parseInt(minute, 10),
-          parseInt(second, 10)
+          Number.parseInt(year, 10),
+          Number.parseInt(month, 10) - 1,
+          Number.parseInt(day, 10),
+          Number.parseInt(hour, 10),
+          Number.parseInt(minute, 10),
+          Number.parseInt(second, 10)
         )
       );
     }

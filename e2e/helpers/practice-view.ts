@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import type { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 export type TestHookName =
   | "__forceSyncDownForTest"
@@ -71,7 +72,7 @@ export async function runTestHook(
       async () => {
         try {
           return await page.evaluate((name) => {
-            return typeof (window as any)[name] === "function";
+            return typeof (globalThis as any)[name] === "function";
           }, hookName);
         } catch (error) {
           if (isTransientExecutionContextError(error)) {
@@ -91,9 +92,9 @@ export async function runTestHook(
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       await page.evaluate(async (name) => {
-        const hook = (window as any)[name];
+        const hook = (globalThis as any)[name];
         if (typeof hook !== "function") {
-          throw new Error(`${name} is not available`);
+          throw new TypeError(`${name} is not available`);
         }
         await hook();
       }, hookName);
@@ -114,7 +115,7 @@ export async function runTestHook(
           async () => {
             try {
               return await page.evaluate((name) => {
-                return typeof (window as any)[name] === "function";
+                return typeof (globalThis as any)[name] === "function";
               }, hookName);
             } catch (retryError) {
               if (isTransientExecutionContextError(retryError)) {
@@ -157,6 +158,20 @@ export async function waitForPracticeViewSettled(
   const emptyState = page.getByText("All Caught Up!");
   const practiceRows = ttPage.getRows("scheduled");
   let latestRowCount = 0;
+
+  const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+  const currentUrl = page.url();
+  const isRealAppUrl =
+    currentUrl.startsWith(baseUrl) &&
+    !currentUrl.includes("e2e-origin.html") &&
+    currentUrl !== "about:blank" &&
+    !currentUrl.startsWith("data:");
+
+  if (!isRealAppUrl) {
+    await page.goto(`${baseUrl}/?tab=practice`, {
+      waitUntil: "domcontentloaded",
+    });
+  }
 
   await expect(ttPage.practiceColumnsButton).toBeVisible({
     timeout: timeoutMs,

@@ -10,7 +10,7 @@
  * @module components/catalog/FilterPanel
  */
 
-import { ChevronDown, Filter, X } from "lucide-solid";
+import { ChevronDown, ListFilter, X } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -444,7 +444,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     if (buttonRef && isExpanded()) {
       const rect = buttonRef.getBoundingClientRect();
       const panelWidth = 384; // min-w-96 = 24rem = 384px
-      const viewportWidth = window.innerWidth;
+      const viewportWidth = globalThis.innerWidth;
       const gap = 4;
 
       // On mobile, make it full width with padding
@@ -481,15 +481,15 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
 
   onCleanup(() => {
     if (typeof window !== "undefined") {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      globalThis.removeEventListener("resize", updatePosition);
+      globalThis.removeEventListener("scroll", updatePosition, true);
     }
   });
 
   createEffect(() => {
     if (isExpanded()) {
-      window.addEventListener("resize", updatePosition);
-      window.addEventListener("scroll", updatePosition, true);
+      globalThis.addEventListener("resize", updatePosition);
+      globalThis.addEventListener("scroll", updatePosition, true);
     }
   });
 
@@ -612,7 +612,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
         aria-haspopup="true"
         data-testid="filters-button"
       >
-        <Filter class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+        <ListFilter class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
         <span class="hidden sm:inline">Filters</span>
         <Show when={totalSelected() > 0}>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">

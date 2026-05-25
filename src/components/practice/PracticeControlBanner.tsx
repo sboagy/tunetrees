@@ -22,7 +22,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
-  Columns,
+  Columns2,
   EllipsisVertical,
   ListRestart,
   Plus,
@@ -612,7 +612,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
                 data-testid="practice-columns-button"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
               >
-                <Columns size={14} />
+                <Columns2 size={14} />
                 <span>
                   {props.flashcardMode ? "Fields" : "Display Options"}
                 </span>

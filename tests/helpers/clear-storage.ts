@@ -19,17 +19,17 @@ export async function clearAllStorage(page: Page): Promise<void> {
 
     // Clear all IndexedDB databases
     return new Promise<void>((resolve) => {
-      if (!window.indexedDB) {
+      if (!globalThis.indexedDB) {
         resolve();
         return;
       }
 
       // Get all databases and delete them
-      window.indexedDB.databases().then((databases) => {
+      globalThis.indexedDB.databases().then((databases) => {
         const deletePromises = databases.map((db) => {
           if (db.name) {
             return new Promise<void>((deleteResolve) => {
-              const request = window.indexedDB.deleteDatabase(db.name!);
+              const request = globalThis.indexedDB.deleteDatabase(db.name!);
               request.onsuccess = () => deleteResolve();
               request.onerror = () => deleteResolve(); // Continue even on error
             });
@@ -55,7 +55,7 @@ export async function clearIndexedDB(
 ): Promise<void> {
   await page.evaluate((name) => {
     return new Promise<void>((resolve, reject) => {
-      const request = window.indexedDB.deleteDatabase(name);
+      const request = globalThis.indexedDB.deleteDatabase(name);
       request.onsuccess = () => {
         console.log(`✅ Deleted IndexedDB: ${name}`);
         resolve();

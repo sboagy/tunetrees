@@ -293,7 +293,7 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
     const parseCsvHandle = qjs.newFunction("parseCsv", (arg, configArg) => {
       const raw = qjs.dump(arg);
       if (typeof raw !== "string") {
-        throw new Error("parseCsv expects a CSV string");
+        throw new TypeError("parseCsv expects a CSV string");
       }
       const config = configArg ? qjs.dump(configArg) : undefined;
       const result = Papa.parse(raw, {
@@ -316,7 +316,7 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
       async (urlHandle, optionsHandle) => {
         const urlValue = qjs.dump(urlHandle);
         if (typeof urlValue !== "string") {
-          throw new Error("fetchUrl expects a URL string");
+          throw new TypeError("fetchUrl expects a URL string");
         }
         const options = optionsHandle ? qjs.dump(optionsHandle) : undefined;
         const responseType =
@@ -369,7 +369,7 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
       async (sqlHandle) => {
         const raw = qjs.dump(sqlHandle);
         if (typeof raw !== "string") {
-          throw new Error("queryDb expects a SQL string");
+          throw new TypeError("queryDb expects a SQL string");
         }
         const result = await requestQuery(message.id, raw);
         return toHandle(result);

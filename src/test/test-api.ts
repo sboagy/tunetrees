@@ -2,7 +2,7 @@
  * Test API (browser-exposed) for fast, deterministic E2E setup
  *
  * Provides helpers to seed local SQLite (sql.js) directly during Playwright tests,
- * bypassing slow remote DB resets. Attached as window.__ttTestApi.
+ * bypassing slow remote DB resets. Attached as globalThis.__ttTestApi.
  */
 
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -106,7 +106,7 @@ const DEFAULT_SCHEDULING_PLUGIN_SCRIPT = `function createScheduler() {
 }`;
 
 /**
- * Injected test user ID - set via window.__ttTestUserId to bypass Supabase auth lookup.
+ * Injected test user ID - set via globalThis.__ttTestUserId to bypass Supabase auth lookup.
  * This allows tests to run without requiring a valid Supabase session.
  */
 declare global {
@@ -934,8 +934,8 @@ function isSyncComplete(): boolean {
   }
 
   // Fallback for older test environments that only expose DOM markers.
-  const el = document.querySelector("[data-auth-initialized]");
-  const isSyncing = el?.getAttribute("data-is-syncing") === "true";
+  const el = document.querySelector<HTMLElement>("[data-auth-initialized]");
+  const isSyncing = el?.dataset.isSyncing === "true";
   return !isSyncing;
 }
 
@@ -1742,14 +1742,18 @@ if (typeof window !== "undefined") {
       getSyncVersion: () => {
         // Access the sync version from AuthContext
         // The version starts at 0 and increments to 1 after initial sync
-        const el = document.querySelector("[data-auth-initialized]");
-        const version = el?.getAttribute("data-sync-version");
+        const el = document.querySelector<HTMLElement>(
+          "[data-auth-initialized]"
+        );
+        const version = el?.dataset.syncVersion;
         return version ? Number.parseInt(version, 10) : 0;
       },
       isInitialSyncComplete: () => {
         // Initial sync is complete when syncVersion >= 1
-        const el = document.querySelector("[data-auth-initialized]");
-        const version = el?.getAttribute("data-sync-version");
+        const el = document.querySelector<HTMLElement>(
+          "[data-auth-initialized]"
+        );
+        const version = el?.dataset.syncVersion;
         return version ? Number.parseInt(version, 10) >= 1 : false;
       },
       dispose: async () => {

@@ -8,7 +8,7 @@
  */
 
 import { Navigate } from "@solidjs/router";
-import { Loader2 } from "lucide-solid";
+import { LoaderCircle } from "lucide-solid";
 import { type ParentComponent, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 
@@ -45,7 +45,7 @@ export const ProtectedRoute: ParentComponent<ProtectedRouteProps> = (props) => {
       fallback={
         <div class="flex items-center justify-center min-h-screen">
           <div class="text-center">
-            <Loader2
+            <LoaderCircle
               class="animate-spin h-12 w-12 mx-auto text-blue-600"
               aria-hidden="true"
             />

@@ -221,10 +221,10 @@ export async function waitForSyncComplete(
         const el = document.querySelector(
           "[data-auth-initialized]"
         ) as HTMLElement | null;
-        const versionStr = el?.getAttribute("data-sync-version") || "0";
-        const successStr = el?.getAttribute("data-sync-success") || "";
-        const errorCountStr = el?.getAttribute("data-sync-error-count") || "0";
-        const errorSummary = el?.getAttribute("data-sync-error-summary") || "";
+        const versionStr = el?.dataset.syncVersion ?? "0";
+        const successStr = el?.dataset.syncSuccess ?? "";
+        const errorCountStr = el?.dataset.syncErrorCount ?? "0";
+        const errorSummary = el?.dataset.syncErrorSummary ?? "";
 
         const version = Number.parseInt(versionStr, 10) || 0;
         const errorCount = Number.parseInt(errorCountStr, 10) || 0;

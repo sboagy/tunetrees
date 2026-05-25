@@ -58,8 +58,8 @@ export const RepertoireManagerDialog: Component<
         props.onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleRepertoireSelect = (repertoire: RepertoireWithSummary) => {

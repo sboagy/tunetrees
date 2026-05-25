@@ -103,8 +103,8 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const [setlistAccess] = createResource(
@@ -246,11 +246,11 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
     };
 
     const animationFrameId = requestAnimationFrame(focusInput);
-    const timeoutId = window.setTimeout(focusInput, 120);
+    const timeoutId = globalThis.setTimeout(focusInput, 120);
 
     onCleanup(() => {
       cancelAnimationFrame(animationFrameId);
-      window.clearTimeout(timeoutId);
+      globalThis.clearTimeout(timeoutId);
     });
   });
 

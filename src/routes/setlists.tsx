@@ -17,7 +17,7 @@ import type { ColumnDef, Table } from "@tanstack/solid-table";
 import {
   ChevronDown,
   ChevronRight,
-  Columns,
+  Columns2,
   EllipsisVertical,
   GripVertical,
   Mail,
@@ -147,6 +147,18 @@ function normalizeExclusiveLibrarySelection(
   }
 
   return normalized;
+}
+
+function getFilterLabel(filter: string): string {
+  if (filter === "all") return "All";
+  if (filter === "tune") return "Tunes";
+  return "Sets";
+}
+
+function getSaveButtonLabel(isSaving: boolean, isCreating: boolean): string {
+  if (isSaving) return "Saving...";
+  if (isCreating) return "Create Setlist";
+  return "Done Editing";
 }
 
 // ── Empty State ──────────────────────────────────────────────────────────────
@@ -397,7 +409,7 @@ const SetlistsPage: Component = () => {
               s_setlist: undefined,
               s_mode: undefined,
               s_create: undefined,
-            } as unknown as Record<string, string>,
+            } as Record<string, string | undefined>,
             { replace: true }
           );
         }
@@ -705,7 +717,7 @@ const SetlistsPage: Component = () => {
         setSelectedSetlistId(created.id);
         setIsCreating(false);
         incrementTuneSetListChanged();
-        void refetchSetlists();
+        refetchSetlists();
         if (showSuccessToast) {
           toast.success(`Created setlist "${created.name}".`, {
             duration: 2500,
@@ -723,7 +735,7 @@ const SetlistsPage: Component = () => {
         description: editorDescription(),
       });
       incrementTuneSetListChanged();
-      void refetchSetlists();
+      refetchSetlists();
       if (showSuccessToast) {
         toast.success(`Saved setlist "${updated?.name ?? editorName()}".`, {
           duration: 2500,
@@ -810,7 +822,7 @@ const SetlistsPage: Component = () => {
         setIsMutatingItems(true);
         await reorderSetlistItems(db, progId, reorderedIds, uid);
         incrementTuneSetListChanged();
-        void refetchSetlists();
+        refetchSetlists();
       } catch (error) {
         showError(
           error instanceof Error
@@ -866,7 +878,7 @@ const SetlistsPage: Component = () => {
         uid
       );
       incrementTuneSetListChanged();
-      void refetchSetlists();
+      refetchSetlists();
     } catch (error) {
       showError(
         error instanceof Error
@@ -890,7 +902,7 @@ const SetlistsPage: Component = () => {
       return;
     }
 
-    const confirmed = window.confirm(`Delete the setlist "${prog.name}"?`);
+    const confirmed = globalThis.confirm(`Delete the setlist "${prog.name}"?`);
     if (!confirmed) return;
 
     try {
@@ -898,7 +910,7 @@ const SetlistsPage: Component = () => {
       await deleteSetlist(db, prog.id, uid);
       setSelectedSetlistId(null);
       incrementTuneSetListChanged();
-      void refetchSetlists();
+      refetchSetlists();
       toast.success(`Deleted setlist "${prog.name}".`, { duration: 2500 });
     } catch (error) {
       toast.error(
@@ -990,8 +1002,8 @@ const SetlistsPage: Component = () => {
                 };
 
                 const onUp = () => {
-                  window.removeEventListener("pointermove", onMove);
-                  window.removeEventListener("pointerup", onUp);
+                  globalThis.removeEventListener("pointermove", onMove);
+                  globalThis.removeEventListener("pointerup", onUp);
                   handle.classList.remove("cursor-grabbing");
                   handle.classList.add("cursor-grab");
 
@@ -1003,8 +1015,8 @@ const SetlistsPage: Component = () => {
                   }
                 };
 
-                window.addEventListener("pointermove", onMove);
-                window.addEventListener("pointerup", onUp);
+                globalThis.addEventListener("pointermove", onMove);
+                globalThis.addEventListener("pointerup", onUp);
               }}
               onKeyDown={(event) => {
                 if (!canMutateSetlistItems()) return;
@@ -1053,9 +1065,7 @@ const SetlistsPage: Component = () => {
       (column) => column.id !== "select"
     );
 
-    columns.push(...sharedColumns);
-
-    columns.push({
+    columns.push(...sharedColumns, {
       accessorKey: "details",
       id: "details",
       meta: { headerLabel: "Details" },
@@ -1157,7 +1167,7 @@ const SetlistsPage: Component = () => {
 
       if (addedCount > 0) {
         incrementTuneSetListChanged();
-        void refetchSetlists();
+        refetchSetlists();
         toast.success(
           `Added ${addedCount} item${addedCount === 1 ? "" : "s"} to this Setlist.`,
           {
@@ -1213,7 +1223,7 @@ const SetlistsPage: Component = () => {
       return;
     }
 
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       `Remove ${itemIds.length} item${itemIds.length === 1 ? "" : "s"} from this setlist?`
     );
     if (!confirmed) return;
@@ -1233,7 +1243,7 @@ const SetlistsPage: Component = () => {
 
       if (removedCount > 0) {
         incrementTuneSetListChanged();
-        void refetchSetlists();
+        refetchSetlists();
         toast.success(
           `Removed ${removedCount} item${removedCount === 1 ? "" : "s"} from this Setlist.`,
           {
@@ -1256,7 +1266,7 @@ const SetlistsPage: Component = () => {
   };
 
   const handleNotYetImplemented = () => {
-    window.alert("Not yet implemented");
+    globalThis.alert("Not yet implemented");
   };
 
   const handleViewModeEdit = () => {
@@ -1403,11 +1413,7 @@ const SetlistsPage: Component = () => {
                       }}
                     >
                       <span>
-                        {isSaving()
-                          ? "Saving..."
-                          : isCreating()
-                            ? "Create Setlist"
-                            : "Done Editing"}
+                        {getSaveButtonLabel(isSaving(), isCreating())}
                       </span>
                     </button>
 
@@ -1724,7 +1730,7 @@ const SetlistsPage: Component = () => {
                   aria-expanded={showColumnsDropdown()}
                   title="Display options"
                 >
-                  <Columns size={14} aria-hidden="true" />
+                  <Columns2 size={14} aria-hidden="true" />
                   <span>Display Options</span>
                   <ChevronDown size={14} aria-hidden="true" />
                 </button>
@@ -1947,13 +1953,7 @@ const SetlistsPage: Component = () => {
                                   }}
                                   data-testid={`setlists-library-filter-menu-${filter}`}
                                 >
-                                  <span>
-                                    {filter === "all"
-                                      ? "All"
-                                      : filter === "tune"
-                                        ? "Tunes"
-                                        : "Sets"}
-                                  </span>
+                                  <span>{getFilterLabel(filter)}</span>
                                   <Show when={libraryFilter() === filter}>
                                     <span class="text-blue-600 dark:text-blue-400">
                                       Selected
@@ -2011,11 +2011,7 @@ const SetlistsPage: Component = () => {
                               onClick={() => setLibraryFilter(filter)}
                               data-testid={`setlists-library-filter-${filter}`}
                             >
-                              {filter === "all"
-                                ? "All"
-                                : filter === "tune"
-                                  ? "Tunes"
-                                  : "Sets"}
+                              {getFilterLabel(filter)}
                             </button>
                           )
                         )}
@@ -2030,7 +2026,7 @@ const SetlistsPage: Component = () => {
                         aria-expanded={showLibraryColumnsDropdown()}
                         title="Display options"
                       >
-                        <Columns size={14} aria-hidden="true" />
+                        <Columns2 size={14} aria-hidden="true" />
                         <span>Display Options</span>
                         <ChevronDown size={14} aria-hidden="true" />
                       </button>
@@ -2147,9 +2143,9 @@ const SetlistsPage: Component = () => {
                           value={editorName()}
                           onInput={(e) => setEditorName(e.currentTarget.value)}
                           class={`min-w-0 flex-1 rounded-md border bg-white px-3 py-1.5 text-xs text-gray-900 dark:bg-gray-800 dark:text-white md:min-w-[14rem] md:py-2 md:text-sm ${
-                            !hasValidSetlistName()
-                              ? "border-red-400 ring-1 ring-red-400/40"
-                              : "border-gray-300 dark:border-gray-600"
+                            hasValidSetlistName()
+                              ? "border-gray-300 dark:border-gray-600"
+                              : "border-red-400 ring-1 ring-red-400/40"
                           }`}
                           placeholder="Festival opener"
                           data-testid="setlist-editor-name-input-collapsed"
@@ -2321,9 +2317,9 @@ const SetlistsPage: Component = () => {
                           value={editorName()}
                           onInput={(e) => setEditorName(e.currentTarget.value)}
                           class={`mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-white ${
-                            !hasValidSetlistName()
-                              ? "border-red-400 ring-1 ring-red-400/40"
-                              : "border-gray-300 dark:border-gray-600"
+                            hasValidSetlistName()
+                              ? "border-gray-300 dark:border-gray-600"
+                              : "border-red-400 ring-1 ring-red-400/40"
                           }`}
                           placeholder="Festival opener"
                           data-testid="setlist-editor-name-input"
@@ -2398,7 +2394,7 @@ const SetlistsPage: Component = () => {
                           aria-expanded={showEditorColumnsDropdown()}
                           title="Display options"
                         >
-                          <Columns size={14} aria-hidden="true" />
+                          <Columns2 size={14} aria-hidden="true" />
                           <span>Display Options</span>
                           <ChevronDown size={14} aria-hidden="true" />
                         </button>

@@ -386,7 +386,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
     });
 
     // 2. Validate increasing intervals across all days
-    validateIncreasingIntervals(intervals, 1.0); // At least 9.5% growth each time
+    validateIncreasingIntervals(intervals, 1); // At least 9.5% growth each time
 
     // 3. Exponential growth check: final interval should be >> initial interval
     const lastIndex = intervals.length - 1;
@@ -416,9 +416,8 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
 
     console.log(`\n✓ All validations passed!`);
     console.log(`  Growth factor: ${growthFactor.toFixed(2)}x`);
-    console.log(
-      `  Final interval: ${intervals[intervals.length - 1].toFixed(1)} days`
-    );
+    const finalInterval = intervals.at(-1) ?? 0;
+    console.log(`  Final interval: ${finalInterval.toFixed(1)} days`);
     console.log(`  Final scheduled: ${daysOut.toFixed(1)} days out`);
   });
 

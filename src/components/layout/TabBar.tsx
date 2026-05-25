@@ -95,11 +95,11 @@ export const TabBar: Component<TabBarProps> = (props) => {
   // the app (e.g. sidebar auto-collapse in MainLayout.tsx).
   const [isMobile, setIsMobile] = createSignal(
     typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 767px)").matches
+      globalThis.matchMedia("(max-width: 767px)").matches
   );
 
   onMount(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
+    const mq = globalThis.matchMedia("(max-width: 767px)");
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     // Return cleanup function (matches the onMount cleanup pattern used in MainLayout.tsx)

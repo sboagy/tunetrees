@@ -81,9 +81,9 @@ const Home: Component = () => {
     const currentTabId = activeTab(); // Capture the old tab before switching
     try {
       if (typeof window !== "undefined") {
-        // Read DIRECTLY from window.location.search to get the CURRENT URL state
+        // Read DIRECTLY from globalThis.location.search to get the CURRENT URL state
         // (searchParams signal may have been updated by previous setSearchParams calls)
-        const currentParams = new URLSearchParams(window.location.search);
+        const currentParams = new URLSearchParams(globalThis.location.search);
         currentParams.delete("tab"); // Remove tab param
         const queryWithoutTab = currentParams.toString();
 

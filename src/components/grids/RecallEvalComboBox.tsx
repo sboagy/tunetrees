@@ -33,7 +33,7 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   const [selectedValue, setSelectedValue] = createSignal(props.value);
 
   createEffect(() => {
-    void props.tuneId;
+    props.tuneId;
     setSelectedValue(props.value);
   });
 

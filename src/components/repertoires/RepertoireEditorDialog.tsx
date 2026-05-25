@@ -97,8 +97,8 @@ export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
         props.onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleSave = async () => {

@@ -276,7 +276,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
           .from(instrument)
           .where(eq(instrument.id, pl.instrumentRef))
           .limit(1);
-        const resolved = inst && inst.length > 0 ? inst[0].genreDefault : null;
+        const resolved = inst?.length > 0 ? inst[0].genreDefault : null;
         return { ...pl, resolvedGenreDefault: resolved } as any;
       }
       return { ...pl, resolvedGenreDefault: pl.genreDefault } as any;

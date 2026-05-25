@@ -220,7 +220,7 @@ export const ScheduledOverridePicker: Component<
     const _value = props.value;
     setOpen(false);
     untrack(() => {
-      void _value;
+      _value;
       syncFromProps();
     });
   });

@@ -24,6 +24,15 @@ import {
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
+type CatalogSelectionDiagnostics = {
+  selectedGenreIds: string[];
+};
+
+type CatalogTuneCounts = {
+  total: number;
+  filtered: number;
+};
+
 async function openCatalogSync(page: Page, ttPage: TuneTreesPage) {
   await ttPage.userMenuButton.click();
   await page.waitForTimeout(500);
@@ -371,7 +380,8 @@ test.describe
       });
 
       await page.evaluate((userId) => {
-        window.__ttTestUserId = userId;
+        (window as unknown as { __ttTestUserId?: string }).__ttTestUserId =
+          userId;
       }, injectedUserId);
     });
 
@@ -394,7 +404,11 @@ test.describe
           )
           .toBe(true);
         await page.evaluate((userId) => {
-          window.__ttTestApi?.setTestUserId(userId);
+          (
+            window as unknown as {
+              __ttTestApi?: { setTestUserId?: (id: string) => void };
+            }
+          ).__ttTestApi?.setTestUserId?.(userId);
         }, injectedUserId);
       };
 
@@ -434,7 +448,7 @@ test.describe
         const el = document.querySelector(
           "[data-auth-initialized]"
         ) as HTMLElement | null;
-        const versionStr = el?.getAttribute("data-sync-version") || "0";
+        const versionStr = el?.dataset.syncVersion ?? "0";
         return Number.parseInt(versionStr, 10) || 0;
       });
 
@@ -447,7 +461,7 @@ test.describe
             const el = document.querySelector(
               "[data-auth-initialized]"
             ) as HTMLElement | null;
-            const versionStr = el?.getAttribute("data-sync-version") || "0";
+            const versionStr = el?.dataset.syncVersion ?? "0";
             return Number.parseInt(versionStr, 10) || 0;
           });
         })
@@ -461,12 +475,28 @@ test.describe
       await ttPage.navigateToTab("catalog");
 
       await ensureTestUserId();
-      const diagBefore = await page.evaluate(async () => {
-        return window.__ttTestApi?.getCatalogSelectionDiagnostics();
+      const diagBefore = await page.evaluate<
+        CatalogSelectionDiagnostics | undefined
+      >(async () => {
+        return (
+          window as unknown as {
+            __ttTestApi?: {
+              getCatalogSelectionDiagnostics: () => Promise<CatalogSelectionDiagnostics>;
+            };
+          }
+        ).__ttTestApi?.getCatalogSelectionDiagnostics();
       });
-      const countsBefore = await page.evaluate(async () => {
-        return window.__ttTestApi?.getCatalogTuneCountsForUser();
-      });
+      const countsBefore = await page.evaluate<CatalogTuneCounts | undefined>(
+        async () => {
+          return (
+            window as unknown as {
+              __ttTestApi?: {
+                getCatalogTuneCountsForUser: () => Promise<CatalogTuneCounts>;
+              };
+            }
+          ).__ttTestApi?.getCatalogTuneCountsForUser();
+        }
+      );
 
       expect(diagBefore?.selectedGenreIds ?? []).toContain(chosenGenreId);
       expect(countsBefore?.total ?? 0).toBeGreaterThan(0);
@@ -478,17 +508,34 @@ test.describe
       await page.reload({ waitUntil: "domcontentloaded" });
       await waitForSyncComplete(page);
       await page.evaluate((userId) => {
-        window.__ttTestUserId = userId;
+        (window as unknown as { __ttTestUserId?: string }).__ttTestUserId =
+          userId;
       }, injectedUserId);
       await ttPage.navigateToTab("catalog");
 
       await ensureTestUserId();
-      const diagAfter = await page.evaluate(async () => {
-        return window.__ttTestApi?.getCatalogSelectionDiagnostics();
+      const diagAfter = await page.evaluate<
+        CatalogSelectionDiagnostics | undefined
+      >(async () => {
+        return (
+          window as unknown as {
+            __ttTestApi?: {
+              getCatalogSelectionDiagnostics: () => Promise<CatalogSelectionDiagnostics>;
+            };
+          }
+        ).__ttTestApi?.getCatalogSelectionDiagnostics();
       });
-      const countsAfter = await page.evaluate(async () => {
-        return window.__ttTestApi?.getCatalogTuneCountsForUser();
-      });
+      const countsAfter = await page.evaluate<CatalogTuneCounts | undefined>(
+        async () => {
+          return (
+            window as unknown as {
+              __ttTestApi?: {
+                getCatalogTuneCountsForUser: () => Promise<CatalogTuneCounts>;
+              };
+            }
+          ).__ttTestApi?.getCatalogTuneCountsForUser();
+        }
+      );
 
       expect(diagAfter?.selectedGenreIds ?? []).toContain(chosenGenreId);
       expect(countsAfter?.total ?? 0).toBeGreaterThan(0);

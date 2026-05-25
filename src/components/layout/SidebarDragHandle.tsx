@@ -35,8 +35,8 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
   const EDGE_THRESHOLD = 96; // px from edge considered a drop zone
 
   const pickZoneFromPoint = (x: number, y: number): DockPosition | null => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = globalThis.innerWidth;
+    const vh = globalThis.innerHeight;
     const leftDist = x;
     const rightDist = vw - x;
     const bottomDist = vh - y;
@@ -101,9 +101,9 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     }
     pointerId = null;
     endPointerDrag(true, e.clientX, e.clientY);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    window.removeEventListener("pointercancel", onPointerCancel);
+    globalThis.removeEventListener("pointermove", onPointerMove);
+    globalThis.removeEventListener("pointerup", onPointerUp);
+    globalThis.removeEventListener("pointercancel", onPointerCancel);
   };
 
   const onPointerCancel = (e: PointerEvent) => {
@@ -115,9 +115,9 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     }
     pointerId = null;
     endPointerDrag(false, e.clientX, e.clientY);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    window.removeEventListener("pointercancel", onPointerCancel);
+    globalThis.removeEventListener("pointermove", onPointerMove);
+    globalThis.removeEventListener("pointerup", onPointerUp);
+    globalThis.removeEventListener("pointercancel", onPointerCancel);
   };
 
   const onPointerDown = (e: PointerEvent) => {
@@ -135,9 +135,9 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     } catch (_) {
       /* ignore */
     }
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerCancel);
+    globalThis.addEventListener("pointermove", onPointerMove);
+    globalThis.addEventListener("pointerup", onPointerUp);
+    globalThis.addEventListener("pointercancel", onPointerCancel);
   };
 
   // Keep legacy drag handlers in case some browsers still try HTML5 DnD,

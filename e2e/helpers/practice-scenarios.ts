@@ -507,10 +507,10 @@ async function assertHasLocalRepertoires(
       "[data-auth-initialized]"
     ) as HTMLElement | null;
     return {
-      syncVersion: el?.getAttribute("data-sync-version") || "0",
-      syncSuccess: el?.getAttribute("data-sync-success") || "",
-      syncErrorCount: el?.getAttribute("data-sync-error-count") || "0",
-      syncErrorSummary: el?.getAttribute("data-sync-error-summary") || "",
+      syncVersion: el?.dataset.syncVersion ?? "0",
+      syncSuccess: el?.dataset.syncSuccess ?? "",
+      syncErrorCount: el?.dataset.syncErrorCount ?? "0",
+      syncErrorSummary: el?.dataset.syncErrorSummary ?? "",
     };
   });
 
@@ -1837,7 +1837,7 @@ export async function setupForPracticeTestsParallel(
         await page.evaluate(async () => {
           const forceSyncUp = (window as any).__forceSyncUpForTest;
           if (typeof forceSyncUp !== "function") {
-            throw new Error("__forceSyncUpForTest not available");
+            throw new TypeError("__forceSyncUpForTest not available");
           }
           await forceSyncUp();
         });
@@ -2246,7 +2246,11 @@ export async function setupForSetlistTestsParallel(
     .toBe(true);
 
   await page.evaluate((userId) => {
-    window.__ttTestApi?.setTestUserId(userId);
+    (
+      window as unknown as {
+        __ttTestApi?: { setTestUserId?: (id: string) => void };
+      }
+    ).__ttTestApi?.setTestUserId?.(userId);
   }, user.userId);
 
   // __ttTestApi can attach before the app's local DB bootstrap and initial
@@ -2257,7 +2261,17 @@ export async function setupForSetlistTestsParallel(
   const seededPublicTunes = opts.publicTunes?.length
     ? await page.evaluate(
         async ({ tunes }) => {
-          const api = window.__ttTestApi;
+          const api = (
+            window as unknown as {
+              __ttTestApi?: {
+                getSelectedGenres: () => Promise<string[]>;
+                findOrCreateNamedPublicTune: (input: {
+                  title: string;
+                  genreId?: string | null;
+                }) => Promise<string>;
+              };
+            }
+          ).__ttTestApi;
           if (!api) {
             throw new Error("__ttTestApi is not available");
           }

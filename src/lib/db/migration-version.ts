@@ -61,7 +61,7 @@ export function needsMigration(): boolean {
   }
 
   // Check URL parameters first (allows manual reset)
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = new URLSearchParams(globalThis.location.search);
   const resetParam = urlParams.get("reset");
   const migrateParam = urlParams.get("migrate");
 
@@ -99,7 +99,7 @@ export function isForcedReset(): boolean {
   if (typeof window === "undefined") {
     return false;
   }
-  const urlParams = new URLSearchParams(window.location.search);
+  const urlParams = new URLSearchParams(globalThis.location.search);
   return urlParams.get("reset") === "true";
 }
 
@@ -262,7 +262,7 @@ export function clearMigrationParams(): void {
     return;
   }
 
-  const url = new URL(window.location.href);
+  const url = new URL(globalThis.location.href);
   const hadParams =
     url.searchParams.has("reset") || url.searchParams.has("migrate");
 
@@ -271,7 +271,7 @@ export function clearMigrationParams(): void {
     url.searchParams.delete("migrate");
 
     // Replace URL without reload
-    window.history.replaceState({}, "", url.toString());
+    globalThis.history.replaceState({}, "", url.toString());
     console.log("✅ Migration URL parameters cleared");
   }
 }

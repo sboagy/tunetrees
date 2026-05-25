@@ -388,10 +388,10 @@ export async function deleteTune(
 function getDeviceId(): string {
   if (
     typeof window !== "undefined" &&
-    typeof window.localStorage?.getItem === "function" &&
-    typeof window.localStorage?.setItem === "function"
+    typeof globalThis.localStorage?.getItem === "function" &&
+    typeof globalThis.localStorage?.setItem === "function"
   ) {
-    const storage = window.localStorage;
+    const storage = globalThis.localStorage;
     let deviceId = storage.getItem("tunetrees_device_id");
     if (!deviceId) {
       deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

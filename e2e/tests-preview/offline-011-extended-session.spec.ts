@@ -45,7 +45,7 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
       const api = (window as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       if (typeof api.getRepertoireCount !== "function") {
-        throw new Error("getRepertoireCount not available on __ttTestApi");
+        throw new TypeError("getRepertoireCount not available on __ttTestApi");
       }
       return await api.getRepertoireCount(pid);
     }, repertoireId);

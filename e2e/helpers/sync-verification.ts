@@ -33,12 +33,12 @@ async function waitForTestApi(page: Page): Promise<void> {
 async function waitForInitializedApp(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const url = window.location.href;
+      const url = globalThis.location.href;
       const api = (window as any).__ttTestApi;
-      const authMarker = document.querySelector("[data-auth-initialized]");
-      const isAuthInitialized = authMarker?.getAttribute(
-        "data-auth-initialized"
+      const authMarker = document.querySelector<HTMLElement>(
+        "[data-auth-initialized]"
       );
+      const isAuthInitialized = authMarker?.dataset.authInitialized;
 
       return (
         Boolean(api) &&
@@ -158,20 +158,17 @@ async function readSyncState(page: Page): Promise<{
         return {
           count: await api.getSyncOutboxCount(),
           isSyncComplete: Boolean(api.isSyncComplete?.() ?? false),
-          url: window.location.href,
+          url: globalThis.location.href,
           pendingItems: await api.getPendingSyncOutboxItems?.(),
           syncErrorCount:
-            document
-              .querySelector("[data-auth-initialized]")
-              ?.getAttribute("data-sync-error-count") ?? "",
+            document.querySelector<HTMLElement>("[data-auth-initialized]")
+              ?.dataset.syncErrorCount ?? "",
           syncErrorSummary:
-            document
-              .querySelector("[data-auth-initialized]")
-              ?.getAttribute("data-sync-error-summary") ?? "",
+            document.querySelector<HTMLElement>("[data-auth-initialized]")
+              ?.dataset.syncErrorSummary ?? "",
           syncSuccess:
-            document
-              .querySelector("[data-auth-initialized]")
-              ?.getAttribute("data-sync-success") ?? "",
+            document.querySelector<HTMLElement>("[data-auth-initialized]")
+              ?.dataset.syncSuccess ?? "",
         };
       });
     } catch (error) {

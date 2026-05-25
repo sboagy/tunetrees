@@ -66,7 +66,7 @@ export const GOAL_BASE_INTERVALS: Record<string, ReadonlyArray<number>> = {
  * Reference: legacy schedule.py _calculate_goal_specific_due
  */
 const TECHNIQUE_MODIFIERS = {
-  daily_practice: (interval: number) => Math.min(interval, 1.0), // Cap at daily
+  daily_practice: (interval: number) => Math.min(interval, 1), // Cap at daily
   motor_skills: (interval: number) => interval * 0.7, // More frequent
   metronome: (interval: number) => interval * 0.8, // Slightly more frequent
   default: (interval: number) => interval, // No modification

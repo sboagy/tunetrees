@@ -31,7 +31,7 @@ export const ThemeSwitcher: Component<ThemeSwitcherProps> = (props) => {
   // Get effective theme based on mode
   const getEffectiveTheme = (themeMode: ThemeMode): "light" | "dark" => {
     if (themeMode === "system") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches
+      return globalThis.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
     }
@@ -56,10 +56,10 @@ export const ThemeSwitcher: Component<ThemeSwitcherProps> = (props) => {
 
     if (effectiveTheme === "dark") {
       html.classList.add("dark");
-      html.setAttribute("data-kb-theme", "dark");
+      html.dataset.kbTheme = "dark";
     } else {
       html.classList.remove("dark");
-      html.setAttribute("data-kb-theme", "light");
+      html.dataset.kbTheme = "light";
     }
 
     localStorage.setItem("themeMode", currentMode);
@@ -67,7 +67,7 @@ export const ThemeSwitcher: Component<ThemeSwitcherProps> = (props) => {
 
   // Listen to system theme changes when in system mode
   onMount(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const mediaQuery = globalThis.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => {
       if (mode() === "system") {
         // Trigger effect by setting mode again

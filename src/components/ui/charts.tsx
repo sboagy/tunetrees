@@ -61,8 +61,8 @@ type TypedChartProps = {
   options?: ChartOptions;
   plugins?: ChartPlugin[];
   ref?: Ref<HTMLCanvasElement | null>;
-  width?: number | undefined;
-  height?: number | undefined;
+  width?: number;
+  height?: number;
 };
 
 type ChartProps = TypedChartProps & {

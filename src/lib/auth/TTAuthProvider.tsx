@@ -1166,9 +1166,9 @@ const TTInner: ParentComponent = (props) => {
   );
 
   createEffect(() => {
-    void localDb();
-    void rhizome.user();
-    void rhizome.session();
+    localDb();
+    rhizome.user();
+    rhizome.session();
     void runOfflineMediaMaintenance();
   });
 
@@ -1181,9 +1181,9 @@ const TTInner: ParentComponent = (props) => {
       return;
     }
 
-    window.addEventListener("online", handleOnline);
+    globalThis.addEventListener("online", handleOnline);
     onCleanup(() => {
-      window.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("online", handleOnline);
     });
   });
 
@@ -1208,7 +1208,7 @@ const TTInner: ParentComponent = (props) => {
   const signInWithOAuth = async (provider: "google" | "github") => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${globalThis.location.origin}/auth/callback` },
     });
     return { error };
   };

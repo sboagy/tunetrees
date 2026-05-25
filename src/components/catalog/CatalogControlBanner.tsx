@@ -19,7 +19,7 @@
 
 import { useLocation, useNavigate } from "@solidjs/router";
 import type { Table } from "@tanstack/solid-table";
-import { ChevronDown, Columns, Plus, Search, Trash2 } from "lucide-solid";
+import { ChevronDown, Columns2, Plus, Search, Trash2 } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
@@ -262,7 +262,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
             title="Show/hide columns"
             class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL}`}
           >
-            <Columns class="w-4 h-4" aria-hidden="true" />
+            <Columns2 class="w-4 h-4" aria-hidden="true" />
             <span class="hidden lg:inline">Columns</span>
             <ChevronDown class="w-4 h-4" aria-hidden="true" />
           </button>

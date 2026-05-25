@@ -235,7 +235,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         emailVal,
         {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${globalThis.location.origin}/auth/callback`,
         }
       );
 

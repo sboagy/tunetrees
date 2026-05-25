@@ -43,10 +43,10 @@ let currentDate: Date;
 
 async function setInjectedTestUserId(page: Page, userId: string) {
   await page.addInitScript((id) => {
-    window.__ttTestUserId = id;
+    globalThis.__ttTestUserId = id;
   }, userId);
   await page.evaluate((id) => {
-    window.__ttTestUserId = id;
+    globalThis.__ttTestUserId = id;
   }, userId);
 }
 
@@ -122,7 +122,7 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     await page.evaluate(async () => {
       const syncDown = (window as any).__forceSyncDownForTest;
       if (typeof syncDown !== "function") {
-        throw new Error("__forceSyncDownForTest is not available");
+        throw new TypeError("__forceSyncDownForTest is not available");
       }
       await syncDown();
     });

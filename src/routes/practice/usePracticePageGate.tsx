@@ -123,9 +123,12 @@ export function usePracticePageGate(
   });
 
   createEffect(() => {
-    window.addEventListener("tt-open-ai-assistant", props.onOpenAssistant);
+    globalThis.addEventListener("tt-open-ai-assistant", props.onOpenAssistant);
     onCleanup(() => {
-      window.removeEventListener("tt-open-ai-assistant", props.onOpenAssistant);
+      globalThis.removeEventListener(
+        "tt-open-ai-assistant",
+        props.onOpenAssistant
+      );
     });
   });
 

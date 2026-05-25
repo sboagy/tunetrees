@@ -146,7 +146,7 @@ function parsePracticeInput(raw: Record<string, unknown>): RecordPracticeInput {
   const practicedRaw = raw.practiced;
   const practiced = toDate(practicedRaw, new Date());
   if (Number.isNaN(practiced.getTime())) {
-    throw new Error("Invalid practiced date");
+    throw new TypeError("Invalid practiced date");
   }
 
   const repertoireRef = String(raw.repertoireRef ?? "");

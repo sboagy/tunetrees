@@ -11,7 +11,7 @@
  * - Offline + Pending: Orange banner with pending count
  */
 
-import { Loader2, WifiOff, X } from "lucide-solid";
+import { LoaderCircle, WifiOff, X } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -36,12 +36,12 @@ export const OfflineIndicator: Component = () => {
   };
 
   createEffect(() => {
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    globalThis.addEventListener("online", handleOnline);
+    globalThis.addEventListener("offline", handleOffline);
 
     onCleanup(() => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      globalThis.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("offline", handleOffline);
     });
   });
 
@@ -152,7 +152,7 @@ export const OfflineIndicator: Component = () => {
         <div class="px-4 py-3 flex items-center gap-3">
           {/* Status Icon */}
           <Show when={bannerVariant() === "syncing"}>
-            <Loader2
+            <LoaderCircle
               class="animate-spin h-5 w-5 flex-shrink-0"
               aria-hidden="true"
             />

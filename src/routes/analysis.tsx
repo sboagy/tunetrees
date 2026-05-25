@@ -45,9 +45,12 @@ const AnalysisPage: Component = () => {
 
   createEffect(() => {
     const handleOpenAssistant = () => setIsChatOpen(true);
-    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    globalThis.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
     onCleanup(() => {
-      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+      globalThis.removeEventListener(
+        "tt-open-ai-assistant",
+        handleOpenAssistant
+      );
     });
   });
 

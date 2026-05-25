@@ -51,10 +51,10 @@ async function setRolloverInterval(page: Page) {
 
 async function setInjectedTestUserId(page: Page, userId: string) {
   await page.addInitScript((id) => {
-    window.__ttTestUserId = id;
+    globalThis.__ttTestUserId = id;
   }, userId);
   await page.evaluate((id) => {
-    window.__ttTestUserId = id;
+    globalThis.__ttTestUserId = id;
   }, userId);
 }
 

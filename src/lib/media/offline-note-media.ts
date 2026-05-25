@@ -215,7 +215,7 @@ export async function queueOfflineNoteMedia({
   showProgress,
 }: QueueOfflineNoteMediaParams): Promise<NoteMediaUploadResult> {
   if (typeof indexedDB === "undefined") {
-    throw new Error(
+    throw new TypeError(
       "Offline media queueing is unavailable because persistent browser storage is not supported."
     );
   }

@@ -58,7 +58,9 @@ export function usePWAUpdate(): PWAUpdateState {
     try {
       const { useRegisterSW } = await import("virtual:pwa-register/solid");
 
-      let updateCheckInterval: number | undefined;
+      let updateCheckInterval:
+        | ReturnType<typeof globalThis.setInterval>
+        | undefined;
       let registration: ServiceWorkerRegistration | undefined;
       let handleVisibilityChange: (() => void) | undefined;
 
@@ -91,7 +93,7 @@ export function usePWAUpdate(): PWAUpdateState {
           document.addEventListener("visibilitychange", handleVisibilityChange);
 
           // Check for updates every hour
-          updateCheckInterval = window.setInterval(
+          updateCheckInterval = globalThis.setInterval(
             () => {
               checkForUpdateNow();
             },

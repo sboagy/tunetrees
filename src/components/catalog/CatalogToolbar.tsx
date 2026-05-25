@@ -22,7 +22,7 @@ import type { Table } from "@tanstack/solid-table";
 import {
   ChevronDown,
   ChevronRight,
-  Columns,
+  Columns2,
   EllipsisVertical,
   Plus,
   Search,
@@ -436,7 +436,7 @@ export const CatalogToolbar: Component<CatalogToolbarProps> = (props) => {
                   data-testid="catalog-columns-button"
                   class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_NEUTRAL_ALT}`}
                 >
-                  <Columns size={14} />
+                  <Columns2 size={14} />
                   <span>Display Options</span>
                   <ChevronDown class="w-3.5 h-3.5" aria-hidden="true" />
                 </button>

@@ -130,8 +130,7 @@ export const OnboardingOverlay: Component = () => {
 
   // Load genres when component mounts or step changes to choose-genres
   createEffect(() => {
-    const syncVersion = remoteSyncDownCompletionVersion();
-    void syncVersion;
+    remoteSyncDownCompletionVersion();
 
     if (onboardingStep() === "choose-genres" && genres().length === 0) {
       const loadGenres = async () => {

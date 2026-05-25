@@ -220,7 +220,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
 
     if (typeof browserWindow.showOpenFilePicker === "function") {
       try {
-        console.log("Using window.showOpenFilePicker");
+        console.log("Using globalThis.showOpenFilePicker");
         const [fileHandle] = await browserWindow.showOpenFilePicker({
           multiple: false,
           excludeAcceptAllOption: false,

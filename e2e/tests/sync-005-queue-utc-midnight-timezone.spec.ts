@@ -12,7 +12,7 @@ import {
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
-// Inject window.__ttTestUserId so test-api.ts can resolve the user after
+// Inject globalThis.__ttTestUserId so test-api.ts can resolve the user after
 // page reloads (Supabase session may not be available immediately after resync).
 async function setInjectedTestUserId(page: Page, userId: string) {
   await page.addInitScript((id) => {

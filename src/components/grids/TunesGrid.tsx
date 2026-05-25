@@ -586,11 +586,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
   // Clear resize state on mouseup/touchend globally
   onMount(() => {
     const up = () => setIsResizing(false);
-    window.addEventListener("mouseup", up, { passive: true });
-    window.addEventListener("touchend", up, { passive: true });
+    globalThis.addEventListener("mouseup", up, { passive: true });
+    globalThis.addEventListener("touchend", up, { passive: true });
     onCleanup(() => {
-      window.removeEventListener("mouseup", up);
-      window.removeEventListener("touchend", up);
+      globalThis.removeEventListener("mouseup", up);
+      globalThis.removeEventListener("touchend", up);
     });
   });
 

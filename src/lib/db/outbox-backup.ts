@@ -41,7 +41,7 @@ function parseRowIdToPkObject(
 
   if (Array.isArray(primaryKey)) {
     // Composite PKs are always JSON row_id in our trigger convention.
-    throw new Error(
+    throw new TypeError(
       `Expected JSON rowId for composite PK table ${tableName}, got string rowId`
     );
   }
@@ -66,7 +66,7 @@ function getExistingColumns(db: SqlJsDatabase, tableName: string): Set<string> {
 type SqlValue = string | number | null | Uint8Array;
 
 function toSqlValue(value: unknown): SqlValue {
-  if (value === null || typeof value === "undefined") return null;
+  if (value === null || value === undefined) return null;
   if (typeof value === "string") return value;
   if (typeof value === "number") return value;
   if (typeof value === "boolean") return value ? 1 : 0;

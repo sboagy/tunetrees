@@ -201,11 +201,7 @@ export function collapseStructureSections(
 
   for (const part of parts) {
     const previous = sections.at(-1);
-    if (
-      previous &&
-      previous.label === part.label &&
-      previous.bars === part.bars
-    ) {
+    if (previous?.label === part.label && previous.bars === part.bars) {
       previous.repeatCount += 1;
       continue;
     }

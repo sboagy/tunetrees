@@ -6,7 +6,7 @@ export function getBrowserDeviceId(): string {
   }
 
   try {
-    const storage = window.localStorage;
+    const storage = globalThis.localStorage;
     let deviceId = storage.getItem(DEVICE_ID_STORAGE_KEY);
 
     if (!deviceId) {

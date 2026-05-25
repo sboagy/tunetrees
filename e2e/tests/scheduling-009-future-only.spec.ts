@@ -217,6 +217,6 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
     // Final check on intervals
     console.log("Interval sequence:", intervals);
-    validateIncreasingIntervals(intervals, 1.0);
+    validateIncreasingIntervals(intervals, 1);
   });
 });

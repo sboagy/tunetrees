@@ -573,7 +573,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
           After making changes in another tab,{" "}
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => globalThis.location.reload()}
             class="text-blue-600 dark:text-blue-400 hover:underline font-medium"
           >
             refresh this page

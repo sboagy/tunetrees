@@ -7,7 +7,7 @@
  * @module components/ai/AIChatDrawer
  */
 
-import { Loader2, MessageCircle, Music, Send, X } from "lucide-solid";
+import { LoaderCircle, MessageCircle, Music, Send, X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
@@ -56,7 +56,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
   // Handle tool calls
   createEffect(() => {
     const messages = state().messages;
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages.at(-1);
 
     if (
       lastMessage?.toolCall &&
@@ -215,7 +215,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
           <Show when={state().isLoading}>
             <div class="flex justify-start">
               <div class="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2">
-                <Loader2 class="animate-spin text-gray-500" size={16} />
+                <LoaderCircle class="animate-spin text-gray-500" size={16} />
               </div>
             </div>
           </Show>

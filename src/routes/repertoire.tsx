@@ -133,9 +133,12 @@ const RepertoirePage: Component = () => {
 
   createEffect(() => {
     const handleOpenAssistant = () => setIsChatOpen(true);
-    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    globalThis.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
     onCleanup(() => {
-      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+      globalThis.removeEventListener(
+        "tt-open-ai-assistant",
+        handleOpenAssistant
+      );
     });
   });
 
@@ -451,7 +454,7 @@ const RepertoirePage: Component = () => {
       selectedIds.includes(String(tuneId)) && selectedIds.length > 1;
 
     const targetIds: string[] = isInSelection
-      ? window.confirm(
+      ? globalThis.confirm(
           `Apply goal "${goal ?? "recall"}" to all ${selectedIds.length} selected tunes?`
         )
         ? selectedIds

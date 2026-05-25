@@ -36,8 +36,8 @@ export const TunePickerDialog: Component<TunePickerDialogProps> = (props) => {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const existingTuneIdSet = createMemo(

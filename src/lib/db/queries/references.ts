@@ -405,7 +405,7 @@ export function extractTitleFromUrl(url: string): string {
     // Special case for The Session
     if (matchesHostname(urlObj, "thesession.org")) {
       const parts = urlObj.pathname.split("/");
-      const tuneName = parts[parts.length - 1];
+      const tuneName = parts.at(-1);
       if (tuneName) {
         return `The Session: ${tuneName.replace(/-/g, " ")}`;
       }

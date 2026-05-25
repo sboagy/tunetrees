@@ -100,9 +100,9 @@ const UserSettingsLayout: ParentComponent = (props) => {
     setIsOpen(false);
     // Navigate back to preserve tab/repertoire context
     if (typeof window !== "undefined") {
-      const returnTo = window.sessionStorage.getItem("tt-settings-return");
+      const returnTo = globalThis.sessionStorage.getItem("tt-settings-return");
       if (returnTo) {
-        window.sessionStorage.removeItem("tt-settings-return");
+        globalThis.sessionStorage.removeItem("tt-settings-return");
         if (!returnTo.startsWith("/user-settings")) {
           navigate(returnTo, { replace: true });
           return;

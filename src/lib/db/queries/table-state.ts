@@ -32,7 +32,7 @@ export type ScreenSize = "small" | "full";
  */
 export function getScreenSize(): ScreenSize {
   if (typeof window === "undefined") return "full";
-  return window.innerWidth < 768 ? "small" : "full";
+  return globalThis.innerWidth < 768 ? "small" : "full";
 }
 
 /**

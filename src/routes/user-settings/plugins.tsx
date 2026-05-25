@@ -532,7 +532,9 @@ const PluginsPage: Component = () => {
     const currentDraft = draft();
     if (!db || !currentDraft) return;
 
-    const confirmed = window.confirm(`Delete plugin "${currentDraft.name}"?`);
+    const confirmed = globalThis.confirm(
+      `Delete plugin "${currentDraft.name}"?`
+    );
     if (!confirmed) return;
 
     setIsSaving(true);

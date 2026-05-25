@@ -36,7 +36,7 @@ afterEach(() => {
     .showOpenFilePicker;
   delete (window as Window & { __TT_ALLOW_DEBUG_FILE_PICKER__?: unknown })
     .__TT_ALLOW_DEBUG_FILE_PICKER__;
-  Object.defineProperty(window.navigator, "webdriver", {
+  Object.defineProperty(globalThis.navigator, "webdriver", {
     configurable: true,
     value: undefined,
   });
@@ -181,7 +181,7 @@ describe("ReferenceForm audio uploads", () => {
   });
 
   it("shows a clear error instead of invoking blocked picker paths in webdriver-controlled browsers", async () => {
-    Object.defineProperty(window.navigator, "webdriver", {
+    Object.defineProperty(globalThis.navigator, "webdriver", {
       configurable: true,
       value: true,
     });

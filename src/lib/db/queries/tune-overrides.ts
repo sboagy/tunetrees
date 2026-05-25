@@ -220,7 +220,6 @@ export async function clearTuneOverrideFields(
   if (!hasAny) {
     // Soft delete entire override
     await deleteTuneOverride(db, overrideId);
-    return;
   }
 
   // Sync is handled automatically by SQL triggers populating sync_outbox

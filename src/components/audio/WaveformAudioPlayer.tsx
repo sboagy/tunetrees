@@ -61,9 +61,7 @@ interface StoredAudioPlayerState {
 
 interface WaveformAudioPlayerProps {
   track: AudioPlayerTrack;
-  onPersistRequestChange?:
-    | ((handler: (() => Promise<void>) | null) => void)
-    | undefined;
+  onPersistRequestChange?: (handler: (() => Promise<void>) | null) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -403,7 +401,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   let waveSurfer: WaveSurfer | null = null;
   let regionsPlugin: RegionsPluginInstance | null = null;
   let audioElement: HTMLAudioElement | null = null;
-  let persistTimer: number | undefined;
+  let persistTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let isRestoringRegions = false;
   let hasPendingStateChanges = false;
   let isDisposing = false;
@@ -602,10 +600,10 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     hasPendingStateChanges = true;
 
     if (persistTimer) {
-      window.clearTimeout(persistTimer);
+      globalThis.clearTimeout(persistTimer);
     }
 
-    persistTimer = window.setTimeout(async () => {
+    persistTimer = globalThis.setTimeout(async () => {
       persistTimer = undefined;
       try {
         await persistCurrentState();
@@ -639,7 +637,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
 
   const flushPendingPersist = async (showToastOnError: boolean) => {
     if (persistTimer) {
-      window.clearTimeout(persistTimer);
+      globalThis.clearTimeout(persistTimer);
       persistTimer = undefined;
     }
 
@@ -682,7 +680,10 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     }
 
     const start = selectedMarks[0].start;
-    const end = selectedMarks[selectedMarks.length - 1].start;
+    const end = selectedMarks.at(-1)?.start;
+    if (typeof end !== "number") {
+      return null;
+    }
     if (end <= start) {
       return null;
     }
@@ -909,7 +910,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     }
 
     const currentLabel = getRegionDisplayLabel(currentRegion);
-    const nextLabel = window.prompt("Rename mark or region", currentLabel);
+    const nextLabel = globalThis.prompt("Rename mark or region", currentLabel);
     if (nextLabel === null) {
       return;
     }

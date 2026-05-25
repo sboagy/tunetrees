@@ -67,12 +67,12 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
   const COLLAPSED_DESKTOP_KEY = "sidebar-collapsed-desktop";
 
   const collapsedKey = () =>
-    window.innerWidth < 768 ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY;
+    globalThis.innerWidth < 768 ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY;
 
   // Load sidebar state from localStorage on mount
   onMount(() => {
     // Load the correct key based on initial viewport
-    const isMobileNow = window.innerWidth < 768;
+    const isMobileNow = globalThis.innerWidth < 768;
     const savedCollapsed = localStorage.getItem(
       isMobileNow ? COLLAPSED_MOBILE_KEY : COLLAPSED_DESKTOP_KEY
     );
@@ -93,7 +93,7 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     // outgoing key and restore the saved state for the incoming viewport type.
     let wasMobile = isMobileNow;
     const handleViewportChange = () => {
-      const nowMobile = window.innerWidth < 768;
+      const nowMobile = globalThis.innerWidth < 768;
       if (nowMobile !== wasMobile) {
         // Save current collapsed state under the outgoing viewport key
         localStorage.setItem(
@@ -109,9 +109,11 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
       }
     };
 
-    window.addEventListener("resize", handleViewportChange);
+    globalThis.addEventListener("resize", handleViewportChange);
     // Properly register cleanup (onMount ignores return values in SolidJS)
-    onCleanup(() => window.removeEventListener("resize", handleViewportChange));
+    onCleanup(() =>
+      globalThis.removeEventListener("resize", handleViewportChange)
+    );
   });
 
   const handleSidebarToggle = () => {
@@ -141,9 +143,9 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
             <Show when={isAnonymous()}>
               <AnonymousBanner
                 onConvert={() => {
-                  // Use window.location instead of navigate() due to SolidJS router issues
+                  // Use globalThis.location instead of navigate() due to SolidJS router issues
                   // when called from within nested component callbacks
-                  window.location.href = "/login?convert=true";
+                  globalThis.location.href = "/login?convert=true";
                 }}
               />
             </Show>

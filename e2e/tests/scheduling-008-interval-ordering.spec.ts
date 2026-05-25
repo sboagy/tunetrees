@@ -130,7 +130,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         const searchInput = document.querySelector(
           '[data-testid="search-box-panel"]'
         ) as HTMLInputElement | null;
-        const url = window.location.href;
+        const url = globalThis.location.href;
         return { rows, firstCells, searchValue: searchInput?.value, url };
       });
       console.log(

@@ -82,8 +82,8 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   return (
@@ -677,7 +677,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
       return;
     }
 
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       `Remove ${member.profileName ?? member.profileEmail ?? member.userRef} from this group?`
     );
     if (!confirmed) {
@@ -710,7 +710,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
       return;
     }
 
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       `Delete the group "${group.name}"? This will also delete all setlists and tune sets owned by this group.`
     );
     if (!confirmed) return;
@@ -1070,8 +1070,8 @@ export const GroupsManagerDialog: Component<GroupsManagerDialogProps> = (
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   return (

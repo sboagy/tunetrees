@@ -199,15 +199,13 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
 
       const parsedUrl = parseAbsoluteUrl(input);
       if (
-        parsedUrl &&
-        parsedUrl.protocol === "https:" &&
+        parsedUrl?.protocol === "https:" &&
         matchesHostname(parsedUrl, "thesession.org")
       ) {
         // Direct URL import
         await importFromTheSessionURL(input);
       } else if (
-        parsedUrl &&
-        parsedUrl.protocol === "https:" &&
+        parsedUrl?.protocol === "https:" &&
         matchesHostname(parsedUrl, "irishtune.info")
       ) {
         // IrishTune.info not implemented in this minimal version

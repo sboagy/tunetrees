@@ -887,14 +887,14 @@ export async function undoLastPracticeRating(
       return false; // Nothing to undo
     }
 
-    const lastRecord = records[records.length - 1];
-    const previousRecord =
-      records.length > 1 ? records[records.length - 2] : null;
+    const lastRecord = records.at(-1);
+    const previousRecord = records.length > 1 ? records.at(-2) : null;
+    if (!lastRecord) {
+      return false;
+    }
 
     // Delete the last record
-    await db
-      .delete(practiceRecord)
-      .where(eq(practiceRecord.id, lastRecord.id!));
+    await db.delete(practiceRecord).where(eq(practiceRecord.id, lastRecord.id));
 
     // Revert repertoire_tune.current to previous due date (or null if no previous)
     const previousDue = previousRecord?.due || null;

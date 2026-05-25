@@ -40,7 +40,7 @@ export const TuneSetList: Component<TuneSetListProps> = (props) => {
     const userId = user()?.id;
     if (!db || !userId) return;
 
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       "Delete this tune set? The set and its item links will be removed."
     );
     if (!confirmed) return;

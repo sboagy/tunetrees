@@ -213,7 +213,7 @@ class MockAudioElement {
 }
 
 const originalAudio = globalThis.Audio;
-const originalPrompt = window.prompt;
+const originalPrompt = globalThis.prompt;
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
 const promptMock =
@@ -233,7 +233,7 @@ function getLastPersistCall(): {
   const referenceId = call.at(1);
   const payload = call.at(2);
   if (typeof referenceId !== "string") {
-    throw new Error(
+    throw new TypeError(
       "Expected persisted media asset call to include a reference id"
     );
   }
@@ -608,7 +608,7 @@ describe("WaveformAudioPlayer persistence", () => {
       screen
         .getByTestId("audio-player-region-list")
         .querySelectorAll('[role="option"]')
-    ).map((row) => row.getAttribute("data-testid"));
+    ).map((row) => (row as HTMLElement).dataset.testid);
 
     expect(renderedIds).toEqual([
       "audio-player-region-measure-early",

@@ -53,7 +53,7 @@ const PASTEL_PALETTES = [
 function nameHash(name: string): number {
   let h = 0;
   for (let i = 0; i < name.length; i++) {
-    h = (Math.imul(31, h) + name.charCodeAt(i)) | 0;
+    h = (Math.imul(31, h) + (name.codePointAt(i) ?? 0)) | 0;
   }
   return Math.abs(h);
 }

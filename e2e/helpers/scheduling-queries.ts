@@ -449,7 +449,7 @@ export function validateScheduledDatesInFuture(
  */
 export function validateIncreasingIntervals(
   intervals: number[],
-  minGrowthFactor = 1.0
+  minGrowthFactor = 1
 ): void {
   for (let i = 1; i < intervals.length; i++) {
     const ratio = intervals[i] / intervals[i - 1];
@@ -494,7 +494,7 @@ export function calculateIntervalStats(intervals: number[]): {
 
   const stats = {
     min: sorted[0],
-    max: sorted[sorted.length - 1],
+    max: sorted.at(-1) ?? sorted[0],
     avg: intervals.reduce((sum, val) => sum + val, 0) / intervals.length,
     median:
       sorted.length % 2 === 0

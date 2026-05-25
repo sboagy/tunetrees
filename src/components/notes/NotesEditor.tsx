@@ -375,8 +375,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     const binaryPayload = encodingFlag
       ? atob(payload)
       : decodeURIComponent(payload);
-    const bytes = Uint8Array.from(binaryPayload, (character) =>
-      character.charCodeAt(0)
+    const bytes = Uint8Array.from(
+      binaryPayload,
+      (character) => character.codePointAt(0) ?? 0
     );
 
     return new File([bytes], `pasted-image-${index + 1}.${extension}`, {
@@ -475,7 +476,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
         showProgress: (progress: number) => void
       ) => {
         if (!(requestData instanceof FormData)) {
-          throw new Error("Unexpected media upload payload.");
+          throw new TypeError("Unexpected media upload payload.");
         }
 
         return uploadMediaFormData(requestData, showProgress);
