@@ -97,10 +97,10 @@ export async function seedAddToReviewLocally(
   opts: { repertoireId: string; tuneIds: string[]; userIdInt?: string }
 ) {
   return await page.evaluate(async (input) => {
-    if (!(window as any).__ttTestApi) {
+    if (!(globalThis as any).__ttTestApi) {
       throw new Error("__ttTestApi not attached on window");
     }
-    return await (window as any).__ttTestApi.seedAddToReview(input);
+    return await (globalThis as any).__ttTestApi.seedAddToReview(input);
   }, opts);
 }
 
@@ -117,10 +117,10 @@ export async function seedSchedulingPluginLocally(
   }
 ) {
   return await page.evaluate(async (input) => {
-    if (!(window as any).__ttTestApi) {
+    if (!(globalThis as any).__ttTestApi) {
       throw new Error("__ttTestApi not attached on window");
     }
-    return await (window as any).__ttTestApi.seedSchedulingPlugin(input);
+    return await (globalThis as any).__ttTestApi.seedSchedulingPlugin(input);
   }, opts);
 }
 
@@ -132,10 +132,10 @@ export async function getPracticeCountLocally(
   repertoireId: string
 ) {
   return await page.evaluate(async (pid) => {
-    if (!(window as any).__ttTestApi) {
+    if (!(globalThis as any).__ttTestApi) {
       throw new Error("__ttTestApi not attached on window");
     }
-    return await (window as any).__ttTestApi.getPracticeCount(pid);
+    return await (globalThis as any).__ttTestApi.getPracticeCount(pid);
   }, repertoireId);
 }
 
@@ -159,7 +159,7 @@ export async function clearTunetreesStorageDB(
   let armedE2eClearFlag = false;
   try {
     await page.evaluate(() => {
-      (window as any).__ttE2eIsClearing = true;
+      (globalThis as any).__ttE2eIsClearing = true;
     });
     armedE2eClearFlag = true;
   } catch {
@@ -171,8 +171,8 @@ export async function clearTunetreesStorageDB(
   try {
     await page.waitForFunction(
       () =>
-        !!(window as any).__ttTestApi &&
-        typeof (window as any).__ttTestApi.dispose === "function",
+        !!(globalThis as any).__ttTestApi &&
+        typeof (globalThis as any).__ttTestApi.dispose === "function",
       { timeout: 20000 }
     );
 
@@ -180,16 +180,16 @@ export async function clearTunetreesStorageDB(
       const dbName = "tunetrees-storage";
       // Signal to the app that E2E teardown is actively clearing storage.
       // App code can use this to avoid re-initializing DB/sync while IndexedDB is being deleted.
-      (window as any).__ttE2eIsClearing = true;
+      (globalThis as any).__ttE2eIsClearing = true;
 
       try {
         // First, ask the app to dispose in-memory DB to avoid re-persisting
         try {
           if (
-            (window as any).__ttTestApi &&
-            typeof (window as any).__ttTestApi.dispose === "function"
+            (globalThis as any).__ttTestApi &&
+            typeof (globalThis as any).__ttTestApi.dispose === "function"
           ) {
-            await (window as any).__ttTestApi.dispose();
+            await (globalThis as any).__ttTestApi.dispose();
           }
         } catch (err) {
           console.warn(
@@ -308,22 +308,22 @@ export async function clearTunetreesStorageDB(
 
         // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
         try {
-          if ((window as any).__ttTestApi) {
-            if (typeof (window as any).__ttTestApi.dispose === "function") {
+          if ((globalThis as any).__ttTestApi) {
+            if (typeof (globalThis as any).__ttTestApi.dispose === "function") {
               try {
-                await (window as any).__ttTestApi.dispose();
+                await (globalThis as any).__ttTestApi.dispose();
               } catch {
                 /* ignore disposal errors */
               }
             }
-            delete (window as any).__ttTestApi;
+            delete (globalThis as any).__ttTestApi;
           }
 
           // If app exposes other global caches, try clearing a few common ones
-          if ((window as any).__tunetreesCache) {
+          if ((globalThis as any).__tunetreesCache) {
             try {
-              (window as any).__tunetreesCache = null;
-              delete (window as any).__tunetreesCache;
+              (globalThis as any).__tunetreesCache = null;
+              delete (globalThis as any).__tunetreesCache;
             } catch {
               /* ignore */
             }
@@ -339,7 +339,7 @@ export async function clearTunetreesStorageDB(
         return;
       } finally {
         // Always clear the flag so subsequent navigations in the same test can boot normally.
-        (window as any).__ttE2eIsClearing = false;
+        (globalThis as any).__ttE2eIsClearing = false;
       }
     });
   } finally {
@@ -348,7 +348,7 @@ export async function clearTunetreesStorageDB(
     if (armedE2eClearFlag) {
       try {
         await page.evaluate(() => {
-          (window as any).__ttE2eIsClearing = false;
+          (globalThis as any).__ttE2eIsClearing = false;
         });
       } catch {
         // ignore
@@ -493,7 +493,7 @@ async function assertHasLocalRepertoires(
   minCount = 1
 ): Promise<void> {
   const repertoireCount = await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api || typeof api.getRepertoireCount !== "function") {
       throw new Error("__ttTestApi.getRepertoireCount is not available");
     }
@@ -946,10 +946,10 @@ export async function seedSetlistsScenarioLocally(
   }
 ) {
   return await page.evaluate(async (payload) => {
-    if (!(window as any).__ttTestApi) {
+    if (!(globalThis as any).__ttTestApi) {
       throw new Error("__ttTestApi not attached on window");
     }
-    return await (window as any).__ttTestApi.seedSetlistsScenario(payload);
+    return await (globalThis as any).__ttTestApi.seedSetlistsScenario(payload);
   }, input);
 }
 
@@ -1810,7 +1810,7 @@ export async function setupForPracticeTestsParallel(
         );
 
         await page.evaluate(async () => {
-          const forceSyncDown = (window as any).__forceSyncDownForTest;
+          const forceSyncDown = (globalThis as any).__forceSyncDownForTest;
           if (typeof forceSyncDown === "function") {
             await forceSyncDown();
           }
@@ -1835,7 +1835,7 @@ export async function setupForPracticeTestsParallel(
       // queue window instead of silently losing it with the local wipe.
       if (scheduleDaysAgo !== undefined) {
         await page.evaluate(async () => {
-          const forceSyncUp = (window as any).__forceSyncUpForTest;
+          const forceSyncUp = (globalThis as any).__forceSyncUpForTest;
           if (typeof forceSyncUp !== "function") {
             throw new TypeError("__forceSyncUpForTest not available");
           }

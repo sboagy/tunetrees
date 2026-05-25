@@ -82,8 +82,15 @@
     "ingest:top500": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx ingest/top500/top500.ts",
     "view:top500": "cd ingest/top500 && python3 -m http.server 8888",
     "clean": "rm -rf dist node_modules .vite .cache logs && cd worker && rm -rf dist node_modules .vite .cache logs",
-    "sonar:scan": "FORCE_COLOR=1 op run --env-file=\".env.sonar.template\" -- npx @sonar/scan -Dsonar.sources=src,e2e,tests,worker",
-    "sonar:issues": "op run --env-file=\".env.sonar.template\" -- node scripts/fetch-sonar-issues.js"
+    "sonar:scan": "branch=$(git branch --show-current) && FORCE_COLOR=1 op run --env-file=\".env.sonar.template\" -- npx @sonar/scan -Dsonar.sources=src,e2e,tests,worker -Dsonar.branch.name=\"$branch\"",
+    "sonar:scan:pr": "branch=$(git branch --show-current) && pr=$(node scripts/get-open-pr.js number) && base=$(node scripts/get-open-pr.js base) && FORCE_COLOR=1 op run --env-file=\".env.sonar.template\" -- npx @sonar/scan -Dsonar.sources=src,e2e,tests,worker -Dsonar.pullrequest.key=\"$pr\" -Dsonar.pullrequest.branch=\"$branch\" -Dsonar.pullrequest.base=\"$base\"",
+    "sonar:wait": "branch=$(git branch --show-current) && SONAR_BRANCH=\"$branch\" op run --env-file=\".env.sonar.template\" -- node scripts/wait-for-sonar-analysis.js",
+    "sonar:issues": "branch=$(git branch --show-current) && SONAR_BRANCH=\"$branch\" op run --env-file=\".env.sonar.template\" -- node scripts/fetch-sonar-issues.js",
+    "sonar:issues:main": "SONAR_BRANCH=main op run --env-file=\".env.sonar.template\" -- node scripts/fetch-sonar-issues.js",
+    "sonar:issues:branch": "branch=$(git branch --show-current) && SONAR_BRANCH=\"$branch\" op run --env-file=\".env.sonar.template\" -- node scripts/fetch-sonar-issues.js",
+    "sonar:issues:pr": "pr=$(node scripts/get-open-pr.js number) && SONAR_PULL_REQUEST=\"$pr\" op run --env-file=\".env.sonar.template\" -- node scripts/fetch-sonar-issues.js",
+    "sonar:scan-and-fetch": "npm run sonar:scan && npm run sonar:wait && npm run sonar:issues",
+    "sonar:scan-and-fetch:pr": "npm run sonar:scan:pr && npm run sonar:wait && npm run sonar:issues:pr"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",

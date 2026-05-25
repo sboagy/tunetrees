@@ -904,7 +904,7 @@ describe("createRhythmService", () => {
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       startedWith: Array<{ position?: number; units?: string }> = [];
       paused = false;
       stopped = false;
@@ -1130,7 +1130,7 @@ describe("createRhythmService", () => {
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       readonly startedWith: Array<{ position?: number; units?: string }> = [];
       readonly options: {
         qpm?: number;
@@ -1805,7 +1805,7 @@ K:clef=perc
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       startedWith: Array<{ position?: number; units?: string }> = [];
       paused = false;
       currentPositionMs = 0;
@@ -4724,7 +4724,7 @@ K:clef=perc
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       startedWith: Array<{ position?: number; units?: string }> = [];
       readonly options: {
         qpm?: number;

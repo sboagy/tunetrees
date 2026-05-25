@@ -217,9 +217,9 @@ function buildRetypedAnnotationLabel(
     return nextLabel;
   }
 
-  const defaultLabelMatch = currentLabel.match(
-    new RegExp(`^${previousLabel}(\\s+\\d+)?$`)
-  );
+  const defaultLabelMatch = new RegExp(
+    String.raw`^${previousLabel}(\s+\d+)?$`
+  ).exec(currentLabel);
   if (defaultLabelMatch) {
     return `${nextLabel}${defaultLabelMatch[1] ?? ""}`;
   }

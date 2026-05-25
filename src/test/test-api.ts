@@ -374,7 +374,7 @@ async function getCatalogSelectionDiagnostics() {
   }
 
   const userIdList = Array.from(userIds)
-    .map((id) => `'${id.replace(/'/g, "''")}'`)
+    .map((id) => `'${id.replaceAll("'", "''")}'`)
     .join(", ");
 
   const selectionRows = await db.all<{ user_id: string; genre_id: string }>(
@@ -787,7 +787,7 @@ async function getTunesByTitles(titles: string[]) {
   const db = await ensureDb();
   if (!titles || titles.length === 0) return [];
   // Escape single quotes in titles for safety
-  const inList = titles.map((t) => `'${t.replace(/'/g, "''")}'`).join(",");
+  const inList = titles.map((t) => `'${t.replaceAll("'", "''")}'`).join(",");
   const rows = await db.all<{ id: string; title: string }>(sql`
     SELECT id, title FROM tune WHERE title IN (${sql.raw(inList)})
   `);
@@ -1760,7 +1760,7 @@ if (typeof window !== "undefined") {
         try {
           // Best-effort: stop background sync before clearing the local DB.
           // Background auto sync timers can race with clearDb() during E2E teardown.
-          const ctrl = (window as any).__ttSyncControl;
+          const ctrl = (globalThis as any).__ttSyncControl;
           if (ctrl?.stop) {
             await ctrl.stop();
           }

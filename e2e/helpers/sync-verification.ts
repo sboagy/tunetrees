@@ -25,7 +25,7 @@ function isRealAppUrl(currentUrl: string, baseUrl: string): boolean {
 }
 
 async function waitForTestApi(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!(window as any).__ttTestApi, {
+  await page.waitForFunction(() => !!(globalThis as any).__ttTestApi, {
     timeout: 20_000,
   });
 }
@@ -34,7 +34,7 @@ async function waitForInitializedApp(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
       const url = globalThis.location.href;
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       const authMarker = document.querySelector<HTMLElement>(
         "[data-auth-initialized]"
       );
@@ -108,7 +108,7 @@ async function readSyncOutboxCount(page: Page): Promise<number> {
 
     try {
       return await page.evaluate(async () => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) throw new Error("__ttTestApi not available");
         return await api.getSyncOutboxCount();
       });
@@ -152,7 +152,7 @@ async function readSyncState(page: Page): Promise<{
 
     try {
       return await page.evaluate(async () => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) throw new Error("__ttTestApi not available");
 
         return {
@@ -374,7 +374,7 @@ export async function triggerManualSync(page: Page): Promise<void> {
 
   const usedTestHook = await page
     .evaluate(async () => {
-      const forceSyncUp = (window as any).__forceSyncUpForTest;
+      const forceSyncUp = (globalThis as any).__forceSyncUpForTest;
       if (!forceSyncUp) {
         return false;
       }
@@ -427,7 +427,7 @@ export async function verifySupabaseRecord(
 
   const record = await page.evaluate(
     async ({ table, recordId }) => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getSupabaseRecord(table, recordId);
     },
@@ -462,7 +462,7 @@ export async function verifyLocalRecord(
 
   const record = await page.evaluate(
     async ({ table, recordId }) => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getLocalRecord(table, recordId);
     },
@@ -507,7 +507,7 @@ export async function verifySyncSuccess(page: Page): Promise<void> {
   log.info("🔍 Verifying sync completed successfully...");
 
   const hasErrors = await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
     return await api.getSyncErrors();
   });

@@ -665,7 +665,7 @@ const RepertoireDropdown: Component<{
                       </div>
                       <div class="text-xs text-gray-500 dark:text-gray-400">
                         {repertoire.tuneCount} tune
-                        {repertoire.tuneCount !== 1 ? "s" : ""}
+                        {repertoire.tuneCount === 1 ? "" : "s"}
                         {repertoire.genreDefault &&
                           ` • ${repertoire.genreDefault}`}
                       </div>
@@ -858,7 +858,7 @@ export const TopNav: Component = () => {
     // In Playwright E2E runs, avoid polling SQLite WASM in the UI.
     // This has caused browser OOMs under heavy parallelism.
     const isE2E =
-      typeof window !== "undefined" && !!(window as any).__ttTestApi;
+      typeof window !== "undefined" && !!(globalThis as any).__ttTestApi;
 
     if (!db || isAnonymous() || isE2E) {
       setPendingCount(0); // Reset count for anonymous users

@@ -35,7 +35,7 @@ export async function clearTunetreesClientStorage(
     const preserveAuth = options.preserveAuth ?? true;
     const deleteAllIndexedDbs = options.deleteAllIndexedDbs ?? false;
 
-    (window as any).__ttE2eIsClearing = true;
+    (globalThis as any).__ttE2eIsClearing = true;
 
     try {
       // 1) sessionStorage is always safe to clear.
@@ -153,12 +153,12 @@ export async function clearTunetreesClientStorage(
 
       // 5) Clear any in-memory test hooks (best-effort).
       try {
-        delete (window as any).__ttTestApi;
+        delete (globalThis as any).__ttTestApi;
       } catch {
         /* ignore */
       }
     } finally {
-      (window as any).__ttE2eIsClearing = false;
+      (globalThis as any).__ttE2eIsClearing = false;
     }
   }, opts);
 }
