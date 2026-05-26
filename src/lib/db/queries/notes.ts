@@ -177,7 +177,8 @@ export async function updateNoteOrder(
         displayOrder: i,
         lastModifiedAt: now,
       })
-      .where(eq(schema.note.id, noteIds[i]));
+      .where(eq(schema.note.id, noteIds[i]))
+      .run();
   }
 
   // CRITICAL: Persist to IndexedDB immediately after batch updates

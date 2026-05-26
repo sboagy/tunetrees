@@ -235,7 +235,8 @@ export async function updateReferenceOrder(
         displayOrder: i,
         lastModifiedAt: now,
       })
-      .where(eq(schema.reference.id, referenceIds[i]));
+      .where(eq(schema.reference.id, referenceIds[i]))
+      .run();
   }
 
   // CRITICAL: Persist to IndexedDB immediately after batch updates
@@ -273,7 +274,8 @@ export async function deleteReference(
       syncVersion: sql.raw(`${schema.mediaAsset.syncVersion.name} + 1`),
       lastModifiedAt: now,
     })
-    .where(eq(schema.mediaAsset.referenceRef, referenceId));
+    .where(eq(schema.mediaAsset.referenceRef, referenceId))
+    .run();
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 

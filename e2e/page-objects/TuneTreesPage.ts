@@ -1600,34 +1600,77 @@ export class TuneTreesPage {
   }
 
   private async waitForTabContent(tabId: TabId) {
+    const startTime = Date.now();
+    console.log(`[ViewModeDiag] waitForTabContent:start tabId=${tabId}`);
+
     const sentinel = this.getSentinelForTab(tabId);
     if (sentinel) {
       await sentinel.scrollIntoViewIfNeeded().catch(() => undefined);
       await expect(sentinel)
         .toBeVisible({ timeout: 5_000 })
-        .catch(() => undefined);
+        .catch(() => {
+          console.log(
+            `[ViewModeDiag] waitForTabContent:sentinelTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+          );
+        });
     }
 
     const grid = this.getGridForTabId(tabId);
-    if (!grid) return;
+    if (!grid) {
+      console.log(
+        `[ViewModeDiag] waitForTabContent:noGrid tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+      );
+      return;
+    }
 
     const initialCount = await grid.count().catch(() => 0);
+    console.log(
+      `[ViewModeDiag] waitForTabContent:initialCount tabId=${tabId} count=${initialCount} elapsed=${Date.now() - startTime}ms`
+    );
+
     if (initialCount === 0) {
       await expect
-        .poll(async () => (await grid.count().catch(() => 0)) > 0, {
-          timeout: 4000,
-          intervals: [100, 250, 500, 1000],
-        })
+        .poll(
+          async () => {
+            const count = await grid.count().catch(() => 0);
+            if (count > 0) {
+              console.log(
+                `[ViewModeDiag] waitForTabContent:gridAppeared tabId=${tabId} count=${count} elapsed=${Date.now() - startTime}ms`
+              );
+            }
+            return count > 0;
+          },
+          {
+            timeout: 4000,
+            intervals: [100, 250, 500, 1000],
+          }
+        )
         .toBe(true)
-        .catch(() => undefined);
+        .catch(() => {
+          console.log(
+            `[ViewModeDiag] waitForTabContent:gridAppearTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+          );
+        });
     }
 
     const finalCount = await grid.count().catch(() => 0);
+    console.log(
+      `[ViewModeDiag] waitForTabContent:finalCount tabId=${tabId} count=${finalCount} elapsed=${Date.now() - startTime}ms`
+    );
+
     if (finalCount > 0) {
       await expect(grid)
         .toBeVisible({ timeout: 20_000 })
-        .catch(() => undefined);
+        .catch(() => {
+          console.log(
+            `[ViewModeDiag] waitForTabContent:gridVisibleTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+          );
+        });
     }
+
+    console.log(
+      `[ViewModeDiag] waitForTabContent:done tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+    );
   }
 
   async navigateToSetlistsTab(options?: { waitForContent?: boolean }) {
@@ -2633,6 +2676,11 @@ export class TuneTreesPage {
   ): Promise<void> {
     const baseUrl = trimTrailingSlashes(String(BASE_URL));
     const columnsButton = this.getColumnsButtonForTab(tab);
+    const startTime = Date.now();
+
+    console.log(
+      `[ViewModeDiag] waitForViewModeSurfaceReady:start tab=${tab} timeout=${timeout}`
+    );
 
     // Catalog setup can still be settling after the test helper lands on the tab.
     // Poll for the real app surface before opening the Kobalte display-options menu,
@@ -2641,15 +2689,21 @@ export class TuneTreesPage {
       .poll(
         async () => {
           if (this.page.isClosed()) {
+            console.log(
+              `[ViewModeDiag] waitForViewModeSurfaceReady:pageClosed elapsed=${Date.now() - startTime}ms`
+            );
             return false;
           }
 
           const currentUrl = this.page.url();
-          if (
-            !currentUrl.startsWith(baseUrl) ||
-            currentUrl.includes("e2e-origin.html") ||
-            currentUrl === "about:blank"
-          ) {
+          const urlOk =
+            currentUrl.startsWith(baseUrl) &&
+            !currentUrl.includes("e2e-origin.html") &&
+            currentUrl !== "about:blank";
+          if (!urlOk) {
+            console.log(
+              `[ViewModeDiag] waitForViewModeSurfaceReady:badUrl elapsed=${Date.now() - startTime}ms url=${currentUrl}`
+            );
             return false;
           }
 
@@ -2657,6 +2711,9 @@ export class TuneTreesPage {
             .isVisible({ timeout: 250 })
             .catch(() => false);
           if (!buttonVisible) {
+            console.log(
+              `[ViewModeDiag] waitForViewModeSurfaceReady:buttonHidden elapsed=${Date.now() - startTime}ms tab=${tab}`
+            );
             return false;
           }
 
@@ -2664,11 +2721,20 @@ export class TuneTreesPage {
             .isEnabled()
             .catch(() => false);
           if (!buttonEnabled) {
+            console.log(
+              `[ViewModeDiag] waitForViewModeSurfaceReady:buttonDisabled elapsed=${Date.now() - startTime}ms tab=${tab}`
+            );
             return false;
           }
 
           const renderedMode = await this.getRenderedViewMode(tab);
-          return renderedMode !== null;
+          const modeReady = renderedMode !== null;
+          if (!modeReady) {
+            console.log(
+              `[ViewModeDiag] waitForViewModeSurfaceReady:noRenderedMode elapsed=${Date.now() - startTime}ms tab=${tab}`
+            );
+          }
+          return modeReady;
         },
         {
           timeout,
@@ -2676,6 +2742,10 @@ export class TuneTreesPage {
         }
       )
       .toBe(true);
+
+    console.log(
+      `[ViewModeDiag] waitForViewModeSurfaceReady:done elapsed=${Date.now() - startTime}ms tab=${tab}`
+    );
   }
 
   private getDisplayModeSwitch(): Locator {
