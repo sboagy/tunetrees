@@ -16,9 +16,9 @@ const MOBILE_BREAKPOINT_PX = 768; // Tailwind `md`
  */
 export function createIsMobile(): () => boolean {
   const query =
-    typeof window !== "undefined"
-      ? globalThis.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`)
-      : null;
+    globalThis.window === undefined
+      ? null
+      : globalThis.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`);
 
   const [isMobile, setIsMobile] = createSignal(query ? query.matches : false);
 

@@ -77,7 +77,7 @@ interface TabBarProps {
  * - 5 main tabs (Practice, Repertoire, Catalog, Analysis, Setlists)
  * - Active tab highlights with blue underline
  * - Tab state controlled by parent (Home component)
- * - Persists active tab to database (TODO)
+ * - Persists active tab to database
  * - Responsive design:
  *   - Mobile (< 768px): Kobalte Select dropdown with icon + label for clarity
  *   - Desktop (≥ 768px): Tab buttons with icons and labels
@@ -94,7 +94,7 @@ export const TabBar: Component<TabBarProps> = (props) => {
   // (no flash from desktop→mobile). Use the same 768px (md) breakpoint as the rest of
   // the app (e.g. sidebar auto-collapse in MainLayout.tsx).
   const [isMobile, setIsMobile] = createSignal(
-    typeof window !== "undefined" &&
+    globalThis.window !== undefined &&
       globalThis.matchMedia("(max-width: 767px)").matches
   );
 
@@ -110,7 +110,6 @@ export const TabBar: Component<TabBarProps> = (props) => {
 
   const handleTabClick = (tab: Tab) => {
     props.onTabChange?.(tab.id);
-    // TODO: Save to tab_group_main_state table
     console.log(`Active tab: ${tab.id}`);
   };
 
@@ -118,7 +117,7 @@ export const TabBar: Component<TabBarProps> = (props) => {
     <Select
       class="w-auto flex-none"
       value={activeTabId()}
-      onChange={(value) => value && props.onTabChange?.(value as TabId)}
+      onChange={(value) => value && props.onTabChange?.(value)}
       options={TABS.map((t) => t.id)}
       itemComponent={(itemProps) => {
         const tab = TABS.find((t) => t.id === itemProps.item.rawValue);
