@@ -201,7 +201,8 @@ function createHandleMapper(params: {
 function requestQuery(invokeId: number, sql: string): Promise<unknown> {
   queryRequestId += 1;
   const id = queryRequestId;
-  ctx.postMessage({ type: "query", id, invokeId, sql } as QueryRequest);
+  const msg: QueryRequest = { type: "query", id, invokeId, sql };
+  ctx.postMessage(msg);
   return new Promise((resolve, reject) => {
     pendingQueries.set(id, {
       resolve,
@@ -219,13 +220,14 @@ function requestFsrs(params: {
 }): Promise<unknown> {
   fsrsRequestId += 1;
   const id = fsrsRequestId;
-  ctx.postMessage({
+  const msg: FsrsRequest = {
     type: "fsrs",
     id,
     invokeId: params.invokeId,
     method: params.method,
     payload: params.payload,
-  } as FsrsRequest);
+  };
+  ctx.postMessage(msg);
   return new Promise((resolve, reject) => {
     pendingFsrs.set(id, {
       resolve,
@@ -608,6 +610,10 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
 }
 
 ctx.addEventListener("message", (event: MessageEvent<AnyMessage>) => {
+  // In a dedicated worker, all messages originate from the owning context.
+  // See: https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/message_event
+  if (!(event instanceof MessageEvent)) return;
+
   const message = event.data;
   if (message.type === "invoke") {
     executeInvoke(message)

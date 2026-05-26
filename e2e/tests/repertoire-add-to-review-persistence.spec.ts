@@ -34,10 +34,10 @@ async function setInjectedTestUserId(
   userId: string
 ) {
   await page.addInitScript((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
   await page.evaluate((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
 }
 
@@ -134,14 +134,6 @@ test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
     // CRITICAL: Verify those EXACT 3 tunes appear in the practice queue
     console.log("🔍 Verifying the selected tunes appear in practice queue...");
 
-    // const practiceTable = page.locator(
-    //   '[data-testid="tunes-grid-scheduled"] table tbody'
-    // );
-
-    // Look for each tune by name in the practice tab
-    // const tune1InPractice = practiceTable.locator(`text="${tune1Name}"`);
-    // const tune2InPractice = practiceTable.locator(`text="${tune2Name}"`);
-    // const tune3InPractice = practiceTable.locator(`text="${tune3Name}"`);
     for (const title of expectedTuneTitles) {
       await ttPage.expectTuneVisible(title, ttPage.practiceGrid, 8000);
     }

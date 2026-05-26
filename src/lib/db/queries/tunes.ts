@@ -387,7 +387,7 @@ export async function deleteTune(
  */
 function getDeviceId(): string {
   if (
-    typeof globalThis.window !== "undefined" &&
+    globalThis.window !== undefined &&
     typeof globalThis.localStorage?.getItem === "function" &&
     typeof globalThis.localStorage?.setItem === "function"
   ) {

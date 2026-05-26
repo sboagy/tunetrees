@@ -29,13 +29,9 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 test.describe
   .serial("PRACTICE-001: Unscheduled Tunes (Q3 New Bucket)", () => {
-    // let currentTestUser: TestUser;
-
     test.beforeEach(async ({ page, testUser, context }) => {
       const currentDate = new Date(STANDARD_TEST_DATE);
       await setStableDate(context, currentDate);
-      //
-      // currentTestUser = testUser;
       // Fast setup: clear practice state, seed 2 unscheduled tunes
       const { privateTune1Id } = getPrivateTuneIds(testUser.userId);
       await setupForPracticeTestsParallel(page, testUser, {

@@ -120,7 +120,7 @@ export const RepertoireCoverageChart: Component<Props> = (props) => {
                             enabled: true,
                             callbacks: {
                               label: (ctx) =>
-                                ` ${ctx.label}: ${ctx.parsed} tune${ctx.parsed !== 1 ? "s" : ""}`,
+                                ` ${ctx.label}: ${ctx.parsed} tune${ctx.parsed === 1 ? "" : "s"}`,
                             },
                           },
                         },

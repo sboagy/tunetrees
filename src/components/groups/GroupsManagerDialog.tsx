@@ -796,8 +796,7 @@ const GroupsManagerContent: Component<{ onClose: () => void }> = (props) => {
                     onClick={() => setShowCreateGroupDialog(true)}
                     data-testid="empty-create-group-button"
                   >
-                    <span aria-hidden="true">+</span>
-                    Create Your First Group
+                    <span aria-hidden="true">+</span> Create Your First Group
                   </Button>
                 </div>
               }

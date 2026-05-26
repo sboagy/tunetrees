@@ -189,7 +189,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const handleChooseAudioFile = async () => {
     console.log("Choose Audio File button clicked");
 
-    const browserWindow: Window & {
+    const browserWindow = globalThis as unknown as Window & {
       showOpenFilePicker?: (options?: {
         multiple?: boolean;
         excludeAcceptAllOption?: boolean;
@@ -199,7 +199,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         }>;
       }) => Promise<Array<{ getFile: () => Promise<File> }>>;
       __TT_ALLOW_DEBUG_FILE_PICKER__?: boolean;
-    } = window;
+    };
     const isDebugControlledBrowser = navigator.webdriver === true;
     const allowDebugFilePicker =
       browserWindow.__TT_ALLOW_DEBUG_FILE_PICKER__ === true;

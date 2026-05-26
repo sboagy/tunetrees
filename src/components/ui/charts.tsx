@@ -83,8 +83,8 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
     {
       width: 512,
       height: 512,
-      options: { responsive: true } as ChartOptions,
-      plugins: [] as ChartPlugin[],
+      options: { responsive: true } satisfies ChartOptions,
+      plugins: [] satisfies ChartPlugin[],
     },
     rawProps
   );

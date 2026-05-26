@@ -29,7 +29,10 @@ export function computeSchedulingWindows(
 
   let startOfDayUtc: Date;
 
-  if (localTzOffsetMinutes !== null) {
+  if (localTzOffsetMinutes === null) {
+    startOfDayUtc = new Date(sitdownUtc);
+    startOfDayUtc.setUTCHours(0, 0, 0, 0);
+  } else {
     const offsetMs = localTzOffsetMinutes * 60 * 1000;
     const localDt = new Date(sitdownUtc.getTime() + offsetMs);
 
@@ -46,9 +49,6 @@ export function computeSchedulingWindows(
     );
 
     startOfDayUtc = new Date(localStart.getTime() - offsetMs);
-  } else {
-    startOfDayUtc = new Date(sitdownUtc);
-    startOfDayUtc.setUTCHours(0, 0, 0, 0);
   }
 
   const endOfDayUtc = addDays(startOfDayUtc, 1);

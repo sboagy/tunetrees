@@ -33,10 +33,7 @@ export interface TuneOverrideInput {
  * Get device ID (browser fingerprint or generate one)
  */
 function getDeviceId(): string {
-  if (
-    typeof globalThis !== "undefined" &&
-    typeof globalThis.localStorage !== "undefined"
-  ) {
+  if (globalThis !== undefined && globalThis.localStorage !== undefined) {
     let deviceId = globalThis.localStorage.getItem("tunetrees_device_id");
     if (!deviceId) {
       deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

@@ -283,12 +283,30 @@ async function getTuneDetails(
 
   return {
     success: true,
-    message: `Details for "${tune.title}":
-• Type: ${tune.type || "unknown"}
-• Mode: ${tune.mode || "unknown"}
-${tune.structure ? `• Structure: ${tune.structure}` : ""}
-${tune.composer ? `• Composer: ${tune.composer}` : ""}
-${notes && notes.length > 0 ? `• Notes: ${notes[0].noteText}` : ""}`,
+    message: buildTuneDetailsMessage(tune, notes),
     data: details,
   };
+}
+
+/** Build a human-readable details string for a tune. */
+function buildTuneDetailsMessage(
+  tune: {
+    title: string | null;
+    type?: string | null;
+    mode?: string | null;
+    structure?: string | null;
+    composer?: string | null;
+  },
+  notes?: Array<{ noteText?: string | null }>
+): string {
+  const lines: string[] = [];
+  lines.push(`Details for "${tune.title ?? "unknown"}":`);
+  lines.push(`• Type: ${tune.type || "unknown"}`);
+  lines.push(`• Mode: ${tune.mode || "unknown"}`);
+  if (tune.structure) lines.push(`• Structure: ${tune.structure}`);
+  if (tune.composer) lines.push(`• Composer: ${tune.composer}`);
+  if (notes && notes.length > 0 && notes[0].noteText) {
+    lines.push(`• Notes: ${notes[0].noteText}`);
+  }
+  return lines.join("\n");
 }

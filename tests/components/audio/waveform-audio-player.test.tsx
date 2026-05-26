@@ -246,10 +246,7 @@ function getLastPersistCall(): {
 
   return {
     referenceId,
-    payload: payload as {
-      regionsJson: string;
-      durationSeconds?: number | null;
-    },
+    payload: payload,
   };
 }
 
@@ -262,9 +259,7 @@ async function emitReadyAfterInit() {
   // the IndexedDB media vault before creating the Audio element. Flush one
   // microtask before and after the mocked ready event so document-level
   // listeners and Wavesurfer callbacks are fully wired before test actions run.
-  await Promise.resolve();
   emitWaveEvent("ready");
-  await Promise.resolve();
 }
 
 describe("WaveformAudioPlayer persistence", () => {
@@ -275,7 +270,7 @@ describe("WaveformAudioPlayer persistence", () => {
       writable: true,
       value: MockAudioElement,
     });
-    Object.defineProperty(window, "prompt", {
+    Object.defineProperty(globalThis, "prompt", {
       configurable: true,
       writable: true,
       value: promptMock,
@@ -301,7 +296,7 @@ describe("WaveformAudioPlayer persistence", () => {
       writable: true,
       value: originalAudio,
     });
-    Object.defineProperty(window, "prompt", {
+    Object.defineProperty(globalThis, "prompt", {
       configurable: true,
       writable: true,
       value: originalPrompt,
@@ -376,7 +371,6 @@ describe("WaveformAudioPlayer persistence", () => {
 
     view.unmount();
     resolveVaultLookup?.(new Blob(["audio-bytes"], { type: "audio/mpeg" }));
-    await Promise.resolve();
 
     // The late resolution should be ignored entirely, so no blob URL is
     // created and there is nothing to revoke during cleanup.
@@ -430,14 +424,14 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
-    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
-    await fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
+    fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
       target: { value: "1.25" },
     });
-    await fireEvent.input(screen.getByTestId("audio-player-zoom-slider"), {
+    fireEvent.input(screen.getByTestId("audio-player-zoom-slider"), {
       target: { value: "80" },
     });
-    await fireEvent.click(screen.getByTestId("audio-player-loop-toggle"));
+    fireEvent.click(screen.getByTestId("audio-player-loop-toggle"));
 
     view.unmount();
 
@@ -485,7 +479,7 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
-    await fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
+    fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
     expect(waveSurferInstance.play).toHaveBeenCalled();
 
     view.unmount();
@@ -512,13 +506,13 @@ describe("WaveformAudioPlayer persistence", () => {
     ) as HTMLInputElement;
     expect(loopToggle.disabled).toBe(true);
 
-    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+    fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
     expect(loopToggle.disabled).toBe(true);
 
-    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
     expect(loopToggle.disabled).toBe(false);
 
-    await fireEvent.click(loopToggle);
+    fireEvent.click(loopToggle);
     expect(loopToggle.checked).toBe(true);
   });
 
@@ -630,14 +624,14 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
-    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+    fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
 
     const typeSelect = view.container.querySelector(
       '[data-testid^="audio-player-region-type-"]'
     ) as HTMLSelectElement | null;
     expect(typeSelect).toBeTruthy();
 
-    await fireEvent.change(typeSelect!, {
+    fireEvent.change(typeSelect!, {
       target: { value: "measure" },
     });
 
@@ -682,9 +676,7 @@ describe("WaveformAudioPlayer persistence", () => {
     await emitReadyAfterInit();
     promptMock.mockReturnValueOnce("Pickup Beat");
 
-    await fireEvent.click(
-      screen.getByTestId("audio-player-region-rename-beat-1")
-    );
+    fireEvent.click(screen.getByTestId("audio-player-region-rename-beat-1"));
 
     expect(promptMock).toHaveBeenCalledWith("Rename mark or region", "Beat 1");
     expect(screen.getByText("Pickup Beat")).toBeDefined();
@@ -718,12 +710,12 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
-    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
-    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+    fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
 
     regionsPluginInstance.getRegions.mockImplementation(() => []);
 
-    await fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
+    fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
       target: { value: "1.25" },
     });
 
@@ -759,14 +751,14 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
-    await fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
-    await fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
-    await fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
+    fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    fireEvent.click(screen.getByTestId("audio-player-add-beat-button"));
+    fireEvent.input(screen.getByTestId("audio-player-tempo-slider"), {
       target: { value: "1.25" },
     });
 
     waveSurferInstance.destroy.mockImplementationOnce(() => {
-      for (const region of [...regionsPluginInstance.getRegions()]) {
+      for (const region of regionsPluginInstance.getRegions()) {
         region.remove();
       }
     });
@@ -816,8 +808,8 @@ describe("WaveformAudioPlayer persistence", () => {
 
     await emitReadyAfterInit();
 
-    await fireEvent.click(screen.getByText("Beat 1"));
-    await fireEvent.click(screen.getByText("Beat 2"), {
+    fireEvent.click(screen.getByText("Beat 1"));
+    fireEvent.click(screen.getByText("Beat 2"), {
       shiftKey: true,
     });
 
@@ -828,9 +820,7 @@ describe("WaveformAudioPlayer persistence", () => {
       screen.getByTestId("audio-player-region-beat-2").className
     ).toContain("border-blue-500");
 
-    await fireEvent.click(
-      screen.getByTestId("audio-player-remove-region-button")
-    );
+    fireEvent.click(screen.getByTestId("audio-player-remove-region-button"));
 
     await waitFor(() => {
       expect(screen.queryByTestId("audio-player-region-beat-1")).toBeNull();
@@ -870,7 +860,7 @@ describe("WaveformAudioPlayer persistence", () => {
       screen.queryByTestId("audio-player-clear-selection-button")
     ).toBeNull();
 
-    await fireEvent.click(screen.getByText("Beat 1"));
+    fireEvent.click(screen.getByText("Beat 1"));
 
     expect(
       screen
@@ -878,9 +868,7 @@ describe("WaveformAudioPlayer persistence", () => {
         .getAttribute("aria-selected")
     ).toBe("true");
 
-    await fireEvent.click(
-      screen.getByTestId("audio-player-clear-selection-button")
-    );
+    fireEvent.click(screen.getByTestId("audio-player-clear-selection-button"));
 
     expect(
       screen
@@ -907,19 +895,19 @@ describe("WaveformAudioPlayer persistence", () => {
 
     // Click the player surface first so the subsequent keyboard events follow
     // the same focused-interaction path a user would take in the browser.
-    await fireEvent.click(screen.getByTestId("audio-player-panel"));
+    fireEvent.click(screen.getByTestId("audio-player-panel"));
 
-    await fireEvent.keyDown(document.body, {
+    fireEvent.keyDown(document.body, {
       key: "b",
       code: "KeyB",
       bubbles: true,
     });
-    await fireEvent.keyDown(document.body, {
+    fireEvent.keyDown(document.body, {
       key: "m",
       code: "KeyM",
       bubbles: true,
     });
-    await fireEvent.keyDown(document.body, {
+    fireEvent.keyDown(document.body, {
       key: "s",
       code: "KeyS",
       bubbles: true,

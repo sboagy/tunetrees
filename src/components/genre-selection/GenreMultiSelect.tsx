@@ -279,9 +279,10 @@ export const GenreMultiSelect: Component<GenreMultiSelectProps> = (props) => {
 
       {/* Selection summary */}
       <div class="text-sm text-gray-600 dark:text-gray-400">
-        {props.selectedGenreIds.length === 0
-          ? "No genres selected"
-          : `${props.selectedGenreIds.length} genre${props.selectedGenreIds.length === 1 ? "" : "s"} selected`}
+        {(() => {
+          if (props.selectedGenreIds.length === 0) return "No genres selected";
+          return `${props.selectedGenreIds.length} genre${props.selectedGenreIds.length === 1 ? "" : "s"} selected`;
+        })()}
       </div>
     </div>
   );

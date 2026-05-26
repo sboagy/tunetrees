@@ -42,7 +42,7 @@ let currentDate: Date;
 test.describe("OFFLINE-011: Extended Offline Session", () => {
   async function getLocalRepertoireCount(page: Page, repertoireId: string) {
     return await page.evaluate(async (pid: string) => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       if (typeof api.getRepertoireCount !== "function") {
         throw new TypeError("getRepertoireCount not available on __ttTestApi");
@@ -310,10 +310,6 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     // Work around potential outbox count fluctuations caused by some strange test
     // behavior with multiple workers, by passing skipVerifyEmpty true.
     await waitForSync(page, 60000, false, true);
-
-    // // Verify sync completed successfully
-    // console.log("✅ Verifying sync completed...");
-    // await verifySyncOutboxEmpty(page);
 
     // Verify data integrity after sync
     console.log("🔍 Verifying data integrity...");

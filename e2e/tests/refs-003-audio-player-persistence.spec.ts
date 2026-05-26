@@ -14,7 +14,7 @@ let ttPage: TuneTreesPage;
 
 async function readPersistedAudioState(page: Page, referenceId: string) {
   return page.evaluate((id) => {
-    return (window as any).__ttTestApi?.readMediaAssetRegions(id) ?? null;
+    return (globalThis as any).__ttTestApi?.readMediaAssetRegions(id) ?? null;
   }, referenceId);
 }
 

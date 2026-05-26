@@ -32,9 +32,9 @@ vi.mock("@/lib/context/UIPreferencesContext", () => ({
 afterEach(() => {
   vi.restoreAllMocks();
   toastError.mockReset();
-  delete (window as Window & { showOpenFilePicker?: unknown })
+  delete (globalThis as unknown as { showOpenFilePicker?: unknown })
     .showOpenFilePicker;
-  delete (window as Window & { __TT_ALLOW_DEBUG_FILE_PICKER__?: unknown })
+  delete (globalThis as unknown as { __TT_ALLOW_DEBUG_FILE_PICKER__?: unknown })
     .__TT_ALLOW_DEBUG_FILE_PICKER__;
   Object.defineProperty(globalThis.navigator, "webdriver", {
     configurable: true,
@@ -59,7 +59,7 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={() => undefined} onCancel={() => undefined} />
     ));
 
-    await fireEvent.click(screen.getByTestId("reference-type-option-audio"));
+    fireEvent.click(screen.getByTestId("reference-type-option-audio"));
 
     expect(screen.getByTestId("reference-audio-dropzone")).toBeTruthy();
     expect(screen.queryByTestId("reference-url-input")).toBeNull();
@@ -77,12 +77,12 @@ describe("ReferenceForm audio uploads", () => {
     ) as HTMLButtonElement;
     expect(submitButton.disabled).toBe(true);
 
-    await fireEvent.input(screen.getByTestId("reference-url-input"), {
+    fireEvent.input(screen.getByTestId("reference-url-input"), {
       target: { value: "not a valid url" },
     });
     expect(submitButton.disabled).toBe(true);
 
-    await fireEvent.input(screen.getByTestId("reference-url-input"), {
+    fireEvent.input(screen.getByTestId("reference-url-input"), {
       target: { value: "https://example.com/demo" },
     });
     expect(submitButton.disabled).toBe(false);
@@ -95,11 +95,11 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={onSubmit} onCancel={() => undefined} />
     ));
 
-    await fireEvent.input(screen.getByTestId("reference-url-input"), {
+    fireEvent.input(screen.getByTestId("reference-url-input"), {
       target: { value: "https://example.com/shared-reference" },
     });
-    await fireEvent.click(screen.getByTestId("reference-public-checkbox"));
-    await fireEvent.click(screen.getByTestId("reference-submit-button"));
+    fireEvent.click(screen.getByTestId("reference-public-checkbox"));
+    fireEvent.click(screen.getByTestId("reference-submit-button"));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -117,10 +117,8 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={onSubmit} onCancel={() => undefined} />
     ));
 
-    await fireEvent.click(screen.getByTestId("reference-type-option-audio"));
-    await fireEvent.click(
-      screen.getByTestId("reference-audio-source-upload-button")
-    );
+    fireEvent.click(screen.getByTestId("reference-type-option-audio"));
+    fireEvent.click(screen.getByTestId("reference-audio-source-upload-button"));
 
     const submitButton = screen.getByTestId(
       "reference-submit-button"
@@ -130,13 +128,13 @@ describe("ReferenceForm audio uploads", () => {
     const file = new File(["audio-bytes"], "banish-misfortune.mp3", {
       type: "audio/mpeg",
     });
-    await fireEvent.change(screen.getByTestId("reference-audio-file-input"), {
+    fireEvent.change(screen.getByTestId("reference-audio-file-input"), {
       target: { files: [file] },
     });
 
     expect(submitButton.disabled).toBe(false);
 
-    await fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -154,7 +152,7 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={() => undefined} onCancel={() => undefined} />
     ));
 
-    await fireEvent.click(screen.getByTestId("reference-type-option-audio"));
+    fireEvent.click(screen.getByTestId("reference-type-option-audio"));
 
     const file = new File(["audio-bytes"], "picker-audio.mp3", {
       type: "audio/mpeg",
@@ -162,12 +160,12 @@ describe("ReferenceForm audio uploads", () => {
     const getFile = vi.fn().mockResolvedValue(file);
     const showOpenFilePicker = vi.fn().mockResolvedValue([{ getFile }]);
     (
-      window as Window & { showOpenFilePicker?: typeof showOpenFilePicker }
+      globalThis as unknown as {
+        showOpenFilePicker?: typeof showOpenFilePicker;
+      }
     ).showOpenFilePicker = showOpenFilePicker;
 
-    await fireEvent.click(
-      screen.getByTestId("reference-audio-choose-file-button")
-    );
+    fireEvent.click(screen.getByTestId("reference-audio-choose-file-button"));
 
     await waitFor(() => {
       expect(showOpenFilePicker).toHaveBeenCalledTimes(1);
@@ -190,11 +188,13 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={() => undefined} onCancel={() => undefined} />
     ));
 
-    await fireEvent.click(screen.getByTestId("reference-type-option-audio"));
+    fireEvent.click(screen.getByTestId("reference-type-option-audio"));
 
     const showOpenFilePicker = vi.fn();
     (
-      window as Window & { showOpenFilePicker?: typeof showOpenFilePicker }
+      globalThis as unknown as {
+        showOpenFilePicker?: typeof showOpenFilePicker;
+      }
     ).showOpenFilePicker = showOpenFilePicker;
 
     const fileInput = screen.getByTestId(
@@ -202,9 +202,7 @@ describe("ReferenceForm audio uploads", () => {
     ) as HTMLInputElement;
     const clickSpy = vi.spyOn(fileInput, "click");
 
-    await fireEvent.click(
-      screen.getByTestId("reference-audio-choose-file-button")
-    );
+    fireEvent.click(screen.getByTestId("reference-audio-choose-file-button"));
 
     expect(showOpenFilePicker).not.toHaveBeenCalled();
     expect(clickSpy).not.toHaveBeenCalled();
@@ -218,16 +216,14 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={() => undefined} onCancel={() => undefined} />
     ));
 
-    await fireEvent.click(screen.getByTestId("reference-type-option-audio"));
+    fireEvent.click(screen.getByTestId("reference-type-option-audio"));
 
     const fileInput = screen.getByTestId(
       "reference-audio-file-input"
     ) as HTMLInputElement;
     const clickSpy = vi.spyOn(fileInput, "click");
 
-    await fireEvent.click(
-      screen.getByTestId("reference-audio-choose-file-button")
-    );
+    fireEvent.click(screen.getByTestId("reference-audio-choose-file-button"));
 
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
@@ -237,10 +233,8 @@ describe("ReferenceForm audio uploads", () => {
       <ReferenceForm onSubmit={() => undefined} onCancel={() => undefined} />
     ));
 
-    await fireEvent.click(screen.getByTestId("reference-type-option-audio"));
-    await fireEvent.click(
-      screen.getByTestId("reference-audio-source-upload-button")
-    );
+    fireEvent.click(screen.getByTestId("reference-type-option-audio"));
+    fireEvent.click(screen.getByTestId("reference-audio-source-upload-button"));
 
     expect(
       (screen.getByTestId("reference-submit-button") as HTMLButtonElement)

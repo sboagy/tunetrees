@@ -82,10 +82,12 @@ export const FlashcardFieldVisibilityMenu: Component<
       //   null       → explicitly disabled; any click outside the menu closes it
       //   HTMLElement → use that element as the guard
       const guardRef =
-        props.closeGuardRef !== undefined
-          ? props.closeGuardRef
-          : props.triggerRef;
-      if (!guardRef?.contains(e.target as Node)) {
+        props.closeGuardRef === undefined
+          ? props.triggerRef
+          : props.closeGuardRef;
+      if (guardRef?.contains(e.target as Node)) {
+        // Click is inside the guard, do nothing
+      } else {
         e.stopPropagation(); // Prevent click from propagating to lower elements
         props.onClose();
       }

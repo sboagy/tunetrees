@@ -117,10 +117,12 @@ export const PracticeHeatmap: Component<Props> = (props) => {
               >
                 <For each={grid()}>
                   {(cell) => {
-                    const cellLabel =
-                      cell.count === 0
-                        ? "No sessions"
-                        : `${cell.count} session${cell.count === 1 ? "" : "s"}`;
+                    let cellLabel: string;
+                    if (cell.count === 0) {
+                      cellLabel = "No sessions";
+                    } else {
+                      cellLabel = `${cell.count} session${cell.count === 1 ? "" : "s"}`;
+                    }
                     return (
                       <div
                         title={`${formatDay(cell.day)}: ${cellLabel}`}

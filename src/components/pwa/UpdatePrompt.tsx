@@ -18,8 +18,9 @@ export const UpdatePrompt: Component = () => {
   const [toastShown, setToastShown] = createSignal(false);
   const { needRefresh, updateServiceWorker } = usePWAUpdate();
 
-  // In dev mode, skip update prompts
+  // In dev mode, skip update prompts (HMR handles refreshes)
   if (import.meta.env.DEV) {
+    // Dev mode: update prompt is unnecessary since HMR handles refreshes
     return null;
   }
 

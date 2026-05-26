@@ -163,9 +163,9 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
         //   null       → explicitly disabled; any click outside the menu closes it
         //   HTMLElement → use that element as the guard
         const guardRef =
-          props.closeGuardRef !== undefined
-            ? props.closeGuardRef
-            : props.triggerRef;
+          props.closeGuardRef === undefined
+            ? props.triggerRef
+            : props.closeGuardRef;
         const isInsideGuard = guardRef?.contains(target);
 
         // Only close if click is truly outside

@@ -349,6 +349,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
       <Portal>
         {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay, not a focusable interactive element */}
         <div
+          role="presentation"
           class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
           onClick={handleBackdropClick}
           onKeyDown={handleKeyDown}

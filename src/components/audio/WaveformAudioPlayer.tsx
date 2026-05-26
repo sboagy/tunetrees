@@ -1274,7 +1274,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
           </div>
 
           <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            Tempo
+            Tempo{" "}
             <input
               type="range"
               min="0.5"
@@ -1296,7 +1296,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
           </label>
 
           <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            Zoom
+            Zoom{" "}
             <input
               type="range"
               min="0"
@@ -1467,19 +1467,13 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
                     return (
                       <div
                         onPointerDown={(event) =>
-                          handleRegionListPointerDown(
-                            region.id,
-                            event as PointerEvent
-                          )
+                          handleRegionListPointerDown(region.id, event)
                         }
                         onClick={(event) =>
-                          handleRegionListClick(region.id, event as MouseEvent)
+                          handleRegionListClick(region.id, event)
                         }
                         onKeyDown={(event) =>
-                          handleRegionListKeyDown(
-                            region.id,
-                            event as KeyboardEvent
-                          )
+                          handleRegionListKeyDown(region.id, event)
                         }
                         onPointerEnter={() =>
                           handleRegionListPointerEnter(region.id)

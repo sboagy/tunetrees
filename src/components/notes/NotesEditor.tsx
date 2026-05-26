@@ -347,13 +347,11 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       ...upload,
       data: {
         ...upload.data,
-        files: upload.data.files.map((url) =>
-          url.startsWith("blob:")
-            ? url
-            : accessToken
-              ? attachMediaAuthTokenToUrl(url, accessToken)
-              : url
-        ),
+        files: upload.data.files.map((url) => {
+          if (url.startsWith("blob:")) return url;
+          if (accessToken) return attachMediaAuthTokenToUrl(url, accessToken);
+          return url;
+        }),
       },
     };
   };

@@ -9,7 +9,7 @@ export const BASE_URL = {
 
       // 2. Return it, or fall back to dev if something goes wrong
       return url || "http://localhost:5173";
-    } catch (_error) {
+    } catch {
       // Fallback for when this file is accessed outside of a test (e.g. during imports)
       return "http://localhost:5173";
     }

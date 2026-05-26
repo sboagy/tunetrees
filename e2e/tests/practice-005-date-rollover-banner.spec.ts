@@ -42,7 +42,7 @@ let primaryTuneIds: string[];
 async function setRolloverInterval(page: Page) {
   await page.addInitScript((intervalMs) => {
     (
-      window as unknown as {
+      globalThis as unknown as {
         __TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__?: number;
       }
     ).__TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__ = intervalMs;
@@ -59,7 +59,7 @@ async function setInjectedTestUserId(page: Page, userId: string) {
 }
 
 async function waitForTestApi(page: Page) {
-  await page.waitForFunction(() => !!(window as any).__ttTestApi, {
+  await page.waitForFunction(() => !!(globalThis as any).__ttTestApi, {
     timeout: 20000,
   });
 }
@@ -103,7 +103,7 @@ async function getQueueRows(page: Page, repertoireId: string) {
   await waitForTestApi(page);
 
   return await page.evaluate(async (rid) => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api || typeof api.getPracticeQueue !== "function") {
       throw new Error("__ttTestApi.getPracticeQueue is not available");
     }

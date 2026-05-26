@@ -105,9 +105,7 @@ const SpacedRepetitionPage: Component = () => {
     // Validate FSRS weights if FSRS is selected
     if (algType() === "FSRS") {
       const weights = fsrsWeights().trim();
-      if (!weights) {
-        errors.fsrsWeights = "FSRS weights are required";
-      } else {
+      if (weights) {
         // Check if it's a valid comma-separated list of numbers
         const parts = weights.split(",").map((s) => s.trim());
         const allNumbers = parts.every((part) =>

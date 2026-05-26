@@ -50,7 +50,8 @@ export function usePracticePageGate(
     const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
     const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
     const remoteSyncVersion = props.remoteSyncDownCompletionVersion();
-    const remoteSyncReady = remoteSyncVersion > 0 || !isOnline || syncDisabled;
+    const remoteSyncReady =
+      remoteSyncVersion > 0 || isOnline === false || syncDisabled;
 
     return {
       hasUser: !!currentUser,

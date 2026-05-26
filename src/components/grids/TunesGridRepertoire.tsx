@@ -244,6 +244,7 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
 
   // Selection summary from inner grid
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let innerTable: any | null = null;
 
   // Rhythm dialog state

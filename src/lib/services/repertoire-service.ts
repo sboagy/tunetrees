@@ -105,7 +105,7 @@ export async function getOrCreateDefaultRepertoire(
  * @returns Repertoire ID (UUID string) or null
  */
 export function getSelectedRepertoireId(userId: string): string | null {
-  if (typeof globalThis.window === "undefined") return null;
+  if (globalThis.window === undefined) return null;
 
   const repertoireKey = getSelectedRepertoireKey(userId);
   const legacyRepertoireKey = getLegacySelectedRepertoireKey(userId);
@@ -132,7 +132,7 @@ export function setSelectedRepertoireId(
   userId: string,
   repertoireId: string
 ): void {
-  if (typeof globalThis.window === "undefined") return;
+  if (globalThis.window === undefined) return;
 
   const repertoireKey = getSelectedRepertoireKey(userId);
   const legacyRepertoireKey = getLegacySelectedRepertoireKey(userId);
@@ -148,7 +148,7 @@ export function setSelectedRepertoireId(
  * @param userId - User's Supabase UUID
  */
 export function clearSelectedRepertoireId(userId: string): void {
-  if (typeof globalThis.window === "undefined") return;
+  if (globalThis.window === undefined) return;
 
   localStorage.removeItem(getSelectedRepertoireKey(userId));
   localStorage.removeItem(getLegacySelectedRepertoireKey(userId));

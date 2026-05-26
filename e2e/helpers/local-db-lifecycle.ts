@@ -47,9 +47,7 @@ export async function clearTunetreesClientStorage(
 
       // 2) localStorage: default is preserve auth (worker storageState).
       try {
-        if (!preserveAuth) {
-          localStorage.clear();
-        } else {
+        if (preserveAuth) {
           // E2E resets should emulate a fresh browser device while preserving
           // the authenticated session snapshot.
           localStorage.removeItem("tunetrees_device_id");
@@ -70,6 +68,8 @@ export async function clearTunetreesClientStorage(
           for (const key of keysToRemove) {
             localStorage.removeItem(key);
           }
+        } else {
+          localStorage.clear();
         }
       } catch (err) {
         console.warn("[E2ECleanup] Failed to clear localStorage:", err);
@@ -91,48 +91,53 @@ export async function clearTunetreesClientStorage(
 
       // 4) IndexedDB: delete the sql.js persistence DB.
       const deleteDbWithRetry = async (dbName: string): Promise<void> => {
-        await new Promise<void>((resolve, reject) => {
-          const maxAttempts = 5;
-          let attempt = 0;
+        const maxAttempts = 5;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const req = indexedDB.deleteDatabase(dbName);
 
-          function tryDelete() {
-            attempt++;
-            const req = indexedDB.deleteDatabase(dbName);
+              req.onsuccess = () => resolve();
 
-            req.onsuccess = () => resolve();
+              req.onerror = () => {
+                if (attempt < maxAttempts) {
+                  const delay = 200 * attempt;
+                  console.warn(
+                    `[E2ECleanup] IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
+                    req.error
+                  );
+                  resolve();
+                } else {
+                  const msg = `[E2ECleanup] IndexedDB delete failed after ${maxAttempts} attempts: ${req.error}`;
+                  console.error(msg);
+                  reject(new Error(msg));
+                }
+              };
 
-            req.onerror = () => {
-              if (attempt < maxAttempts) {
-                const delay = 200 * attempt;
-                console.warn(
-                  `[E2ECleanup] IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
-                  req.error
-                );
-                setTimeout(tryDelete, delay);
-              } else {
-                const msg = `[E2ECleanup] IndexedDB delete failed after ${maxAttempts} attempts: ${req.error}`;
-                console.error(msg);
-                reject(new Error(msg));
-              }
-            };
-
-            req.onblocked = () => {
-              if (attempt < maxAttempts) {
+              req.onblocked = () => {
                 const delay = 500 * attempt;
                 console.warn(
                   `[E2ECleanup] IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
                 );
-                setTimeout(tryDelete, delay);
-              } else {
-                const msg = `[E2ECleanup] IndexedDB delete blocked after ${maxAttempts} attempts`;
-                console.error(msg);
-                reject(new Error(msg));
-              }
-            };
+                setTimeout(() => {
+                  const retryReq = indexedDB.deleteDatabase(dbName);
+                  retryReq.onsuccess = () => resolve();
+                  retryReq.onerror = () =>
+                    reject(new Error(String(retryReq.error)));
+                }, delay);
+              };
+            });
+            // Successfully deleted, exit loop
+            break;
+          } catch {
+            if (attempt >= maxAttempts) {
+              throw new Error(
+                `Failed to delete IndexedDB database "${dbName}" after ${maxAttempts} attempts`
+              );
+            }
+            // Otherwise continue to next attempt
           }
-
-          tryDelete();
-        });
+        }
       };
 
       if (deleteAllIndexedDbs && typeof indexedDB.databases === "function") {

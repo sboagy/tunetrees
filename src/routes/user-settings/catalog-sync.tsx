@@ -44,7 +44,8 @@ const CatalogSyncPage: Component = () => {
   const [successMessage, setSuccessMessage] = createSignal<string | null>(null);
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 
-  const normalizeIds = (ids: string[]) => [...ids].sort();
+  const normalizeIds = (ids: string[]) =>
+    [...ids].sort((a, b) => a.localeCompare(b));
   const idsEqual = (a: string[], b: string[]) => {
     if (a.length !== b.length) return false;
     const aSorted = normalizeIds(a);
@@ -64,13 +65,13 @@ const CatalogSyncPage: Component = () => {
       ])
         .then(([genreList, requiredIds]) => {
           // Sort by name using simple comparison
-          genreList.sort((a, b) =>
-            (a.name ?? "") < (b.name ?? "")
-              ? -1
-              : (a.name ?? "") > (b.name ?? "")
-                ? 1
-                : 0
-          );
+          genreList.sort((a, b) => {
+            const aName = a.name ?? "";
+            const bName = b.name ?? "";
+            if (aName < bName) return -1;
+            if (aName > bName) return 1;
+            return 0;
+          });
           setGenres(genreList);
 
           const selectedIds = genreList

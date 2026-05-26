@@ -103,9 +103,9 @@ const UserSettingsLayout: ParentComponent = (props) => {
     setIsOpen(false);
     // Navigate back to preserve tab/repertoire context
     const returnTo =
-      typeof globalThis !== "undefined"
-        ? globalThis.sessionStorage?.getItem("tt-settings-return")
-        : null;
+      globalThis === undefined
+        ? null
+        : globalThis.sessionStorage?.getItem("tt-settings-return");
     if (returnTo) {
       globalThis.sessionStorage?.removeItem("tt-settings-return");
       if (!returnTo.startsWith("/user-settings")) {
@@ -144,10 +144,10 @@ const UserSettingsLayout: ParentComponent = (props) => {
         class="fixed inset-0 z-50 flex items-start justify-center pt-2 md:pt-8 pb-2 md:pb-16 pointer-events-none"
         data-testid="settings-modal-wrapper"
       >
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Event handled by backdrop */}
         <dialog
           class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}
           aria-labelledby="settings-title"
           data-testid="settings-modal"
           open

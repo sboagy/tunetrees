@@ -150,7 +150,7 @@ function flattenCanonicalRhythmAbc(
   const { headerLines, bodyBars } = splitAbcSections(fullAbc);
   const hasLabeledTemplates = fullAbc
     .split("\n")
-    .some((line) => /^P:/.test(line.trim()));
+    .some((line) => line.trim().startsWith("P:"));
   const distinctStructureBarCount = getDistinctStructureParts(parts).reduce(
     (sum, part) => sum + part.bars,
     0

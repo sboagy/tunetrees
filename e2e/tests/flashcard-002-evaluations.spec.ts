@@ -159,7 +159,6 @@ test.describe
       const submitEvaluationsButton = page.getByTestId(
         "submit-evaluations-button"
       );
-      // const submitEvaluationsTest = await submitEvaluationsButton.textContent();
       await expect
         .poll(
           async () =>

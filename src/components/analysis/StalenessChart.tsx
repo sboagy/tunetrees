@@ -135,7 +135,7 @@ export const StalenessChart: Component<Props> = (props) => {
                           enabled: true,
                           callbacks: {
                             label: (ctx) =>
-                              ` ${ctx.parsed.y} tune${ctx.parsed.y !== 1 ? "s" : ""}`,
+                              ` ${ctx.parsed.y} tune${ctx.parsed.y === 1 ? "" : "s"}`,
                           },
                         },
                       },

@@ -76,7 +76,7 @@ function toSqlValue(value: unknown): SqlValue {
   try {
     return JSON.stringify(value);
   } catch {
-    return (value as object).toString() as SqlValue;
+    return value.toString() as SqlValue;
   }
 }
 

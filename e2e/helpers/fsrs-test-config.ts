@@ -23,12 +23,12 @@ export async function applyDeterministicFsrsConfig(
   };
 
   await page.addInitScript((cfg: FsrsTestConfig) => {
-    (window as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = cfg.repertoireSize;
-    (window as any).__TUNETREES_TEST_ENABLE_FUZZ__ = cfg.enableFuzz;
-    (window as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ = cfg.maxReviews;
+    (globalThis as any).__TUNETREES_TEST_REPERTOIRE_SIZE__ = cfg.repertoireSize;
+    (globalThis as any).__TUNETREES_TEST_ENABLE_FUZZ__ = cfg.enableFuzz;
+    (globalThis as any).__TUNETREES_TEST_MAX_REVIEWS_PER_DAY__ = cfg.maxReviews;
 
     if (typeof cfg.scheduleNewTunesAutomatically === "boolean") {
-      (window as any).__TUNETREES_TEST_SCHEDULE_NEW_TUNES_AUTOMATICALLY__ =
+      (globalThis as any).__TUNETREES_TEST_SCHEDULE_NEW_TUNES_AUTOMATICALLY__ =
         cfg.scheduleNewTunesAutomatically;
     }
   }, config);

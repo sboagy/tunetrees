@@ -60,7 +60,7 @@ function normalizeName(name: string): string {
 
 function normalizeDescription(description?: string | null): string | null {
   const trimmed = description?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 async function touchGroup(

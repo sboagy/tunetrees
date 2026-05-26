@@ -121,14 +121,16 @@ export interface RepertoireWithSummary extends Repertoire {
   genreName?: string;
 }
 
+type GroupRole = "owner" | "admin" | "member";
+
 export interface UserGroupWithSummary extends UserGroup {
   memberCount: number;
   tuneSetCount: number;
-  role: "owner" | "admin" | "member";
+  role: GroupRole;
 }
 
 export interface GroupMemberWithProfile extends GroupMember {
-  effectiveRole: "owner" | "admin" | "member";
+  effectiveRole: GroupRole;
   isOwner: boolean;
   profileName?: string | null;
   profileEmail?: string | null;

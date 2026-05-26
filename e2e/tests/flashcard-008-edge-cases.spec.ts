@@ -26,7 +26,6 @@ test.describe
 
     let ttPage: TuneTreesPage;
     let currentDate: Date;
-    // let currentTestUser: TestUser;
 
     test.beforeEach(async ({ page, context }) => {
       ttPage = new TuneTreesPage(page);
@@ -34,8 +33,6 @@ test.describe
       // Set stable starting date
       currentDate = new Date(STANDARD_TEST_DATE);
       await setStableDate(context, currentDate);
-
-      // currentTestUser = testUser;
     });
 
     test("01. Single tune in flashcard list", async ({ page, testUser }) => {
@@ -73,9 +70,9 @@ test.describe
       page,
       testUser,
     }) => {
-      // FIXME: This scenario remains flaky due to background sync/virtualized grid timing.
+      // This scenario remains flaky due to background sync/virtualized grid timing.
       // Occasionally the evaluation menu or grid count does not update within the timeout window.
-      // Marking as fixme until the underlying UI synchronization is stabilized.
+      // Marked as fixme until the underlying UI synchronization is stabilized.
       test.fixme(!!process.env.CI, "Known timing issue in CI");
 
       await setupForPracticeTestsParallel(page, testUser, {

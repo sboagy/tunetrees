@@ -44,10 +44,7 @@ export const CurrentTuneProvider: ParentComponent = (props) => {
   );
 
   const storageKey = () => {
-    if (
-      typeof globalThis === "undefined" ||
-      typeof globalThis.localStorage === "undefined"
-    )
+    if (globalThis === undefined || globalThis.localStorage === undefined)
       return null;
     const userId = user()?.id;
     if (!userId) return null;

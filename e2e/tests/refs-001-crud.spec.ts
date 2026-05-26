@@ -101,10 +101,12 @@ test.describe("REFS-001: References CRUD Operations", () => {
       );
 
       (
-        window as Window & { __TT_ALLOW_DEBUG_FILE_PICKER__?: boolean }
+        globalThis as unknown as Window & {
+          __TT_ALLOW_DEBUG_FILE_PICKER__?: boolean;
+        }
       ).__TT_ALLOW_DEBUG_FILE_PICKER__ = true;
 
-      Object.defineProperty(window, "showOpenFilePicker", {
+      Object.defineProperty(globalThis, "showOpenFilePicker", {
         configurable: true,
         writable: true,
         value: async () => [

@@ -53,7 +53,7 @@ const MAX_INTERVAL = Math.round(3 * (REPERTOIRE_SIZE / MAX_DAILY_TUNES));
 // Diagnostic helper: invoke auth session diagnostic hook with label if available.
 async function diagAuth(page: import("@playwright/test").Page, label: string) {
   await page.evaluate(
-    (l) => (window as any).__authSessionDiagForTest?.(l),
+    (l) => (globalThis as any).__authSessionDiagForTest?.(l),
     label
   );
 }
@@ -160,7 +160,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       await diagAuth(page, `day-${day}-post-submit-pre-syncup`);
 
       // CRITICAL: Flush local changes to Supabase before any time travel/reload
-      await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+      await page.evaluate(() => (globalThis as any).__forceSyncUpForTest?.());
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await diagAuth(page, `day-${day}-after-syncup`);
 
@@ -279,7 +279,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
       // Advance time to the card's actual scheduled due date (simulate practicing exactly when due)
       if (day < 10) {
         // Persist DB before reload so practice_record inserts aren't lost
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await page.evaluate(() => (globalThis as any).__persistDbForTest?.());
         await diagAuth(page, `day-${day}-before-advance`);
 
         // Avoid carrying queue-window UI state or flashcard-mode state across the
@@ -299,7 +299,7 @@ test.describe("SCHEDULING-003: Repeated Easy Evaluations", () => {
           );
         }
         // Persist DB snapshot and reload to pick up new frozen time
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await page.evaluate(() => (globalThis as any).__persistDbForTest?.());
 
         currentDate = nextDue;
         await setStableDate(context, currentDate);

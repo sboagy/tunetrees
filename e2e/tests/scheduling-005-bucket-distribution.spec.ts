@@ -116,7 +116,7 @@ test.describe
       // Update scheduled dates in local SQLite
       const updateResult = await page.evaluate(
         async ({ repertoireId, updates }) => {
-          const api = (window as any).__ttTestApi;
+          const api = (globalThis as any).__ttTestApi;
           if (!api?.updateScheduledDates) {
             throw new Error(
               "updateScheduledDates not available on __ttTestApi"
@@ -132,7 +132,7 @@ test.describe
 
       // Regenerate the queue with correct scheduled dates
       await page.evaluate(async (repertoireId: string) => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) return;
 
         // Use seedAddToReview with empty tuneIds to trigger queue regeneration
@@ -311,7 +311,7 @@ test.describe
       page,
       testUser,
     }) => {
-      // FIXME: Skip this test when running in CI environment.
+      // Skip this test when running in CI environment (known timing issue).
       // Error: expect(received).toBeGreaterThanOrEqual(expected)
       //
       // Expected: >= 1
@@ -358,7 +358,7 @@ test.describe
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(2000);
 
-      await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+      await page.evaluate(() => (globalThis as any).__forceSyncUpForTest?.());
       await page.waitForLoadState("networkidle", { timeout: 15000 });
       await page.waitForTimeout(2000);
 

@@ -163,7 +163,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         currentDate = nextDue;
 
         // Persist DB before reload
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await page.evaluate(() => (globalThis as any).__persistDbForTest?.());
 
         // Clear Flashcard Mode persistence to ensure we start in Grid Mode
         await page.evaluate(() => {

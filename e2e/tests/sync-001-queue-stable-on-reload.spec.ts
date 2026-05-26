@@ -32,17 +32,17 @@ const RELOAD_COUNT = 3;
 
 async function setInjectedTestUserId(page: Page, userId: string) {
   await page.addInitScript((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
   await page.evaluate((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
 }
 
 async function getRowCount(page: Page, repertoireId: string): Promise<number> {
   return await page.evaluate(async (rid) => {
     const api = (
-      window as unknown as {
+      globalThis as unknown as {
         __ttTestApi?: {
           getQueueInfo: (id: string) => Promise<{
             windowStartUtc: string;
@@ -99,7 +99,7 @@ test.describe("SYNC-001: Queue row count stable across reloads", () => {
       await page.waitForLoadState("networkidle", { timeout: 30_000 });
       await setInjectedTestUserId(page, testUser.userId);
       await page.waitForFunction(
-        () => !!(window as { __ttTestApi?: unknown }).__ttTestApi,
+        () => !!(globalThis as { __ttTestApi?: unknown }).__ttTestApi,
         { timeout: 20_000 }
       );
 

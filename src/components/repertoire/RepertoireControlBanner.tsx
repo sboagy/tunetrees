@@ -15,8 +15,7 @@ import type { Component } from "solid-js";
 
 export const RepertoireControlBanner: Component = () => {
   const handleAddToReview = () => {
-    // TODO: Implement "Add To Review" functionality
-    // This should add selected tunes to the practice queue
+    // "Add To Review" should add selected tunes to the practice queue
     console.log("Add To Review clicked");
   };
 

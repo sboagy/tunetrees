@@ -40,7 +40,7 @@ test.describe("Data Preservation During Conversion", () => {
     ttPage = new TuneTreesPage(page);
   });
 
-  // TODO: KNOWN BUG - Data is not being preserved during anonymous to registered conversion.
+  // Known bug: Data is not being preserved during anonymous to registered conversion.
   // The conversion process creates the account but the local SQLite data (repertoire tunes)
   // is not being synced to Supabase during conversion. This needs investigation in:
   // - AuthContext.tsx convertAnonymousAccount flow
@@ -131,7 +131,7 @@ test.describe("Data Preservation During Conversion", () => {
     console.log("✅ CRITICAL TEST PASSED: Data preserved after conversion!");
   });
 
-  // TODO: KNOWN BUG - Same as 6.1, data not preserved during conversion.
+  // Known bug: Same as 6.1, data not preserved during conversion.
   test.fixme("6.2 Data persists after sign-out and sign-in post-conversion @critical", async ({
     page,
   }) => {
@@ -200,7 +200,7 @@ test.describe("Data Preservation During Conversion", () => {
     );
   });
 
-  // TODO: KNOWN BUG - Same as 6.1, data not preserved during conversion.
+  // Known bug: Same as 6.1, data not preserved during conversion.
   test.fixme("6.3 Multiple tunes preserved during conversion", async ({
     page,
   }) => {

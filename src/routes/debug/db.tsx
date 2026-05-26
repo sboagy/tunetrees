@@ -803,7 +803,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
           class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <h3 class="text-blue-800 dark:text-blue-400 font-semibold flex items-center gap-2">
-            💡 Tips
+            💡 Tips{" "}
             <span class="text-xs text-blue-600 dark:text-blue-300">
               {tipsOpen() ? "▼" : "▶"}
             </span>

@@ -380,7 +380,7 @@ test.describe
       });
 
       await page.evaluate((userId) => {
-        (window as unknown as { __ttTestUserId?: string }).__ttTestUserId =
+        (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId =
           userId;
       }, injectedUserId);
     });
@@ -394,7 +394,8 @@ test.describe
             () =>
               page.evaluate(() =>
                 Boolean(
-                  (window as unknown as { __ttTestApi?: unknown }).__ttTestApi
+                  (globalThis as unknown as { __ttTestApi?: unknown })
+                    .__ttTestApi
                 )
               ),
             {
@@ -405,7 +406,7 @@ test.describe
           .toBe(true);
         await page.evaluate((userId) => {
           (
-            window as unknown as {
+            globalThis as unknown as {
               __ttTestApi?: { setTestUserId?: (id: string) => void };
             }
           ).__ttTestApi?.setTestUserId?.(userId);
@@ -479,7 +480,7 @@ test.describe
         CatalogSelectionDiagnostics | undefined
       >(async () => {
         return (
-          window as unknown as {
+          globalThis as unknown as {
             __ttTestApi?: {
               getCatalogSelectionDiagnostics: () => Promise<CatalogSelectionDiagnostics>;
             };
@@ -489,7 +490,7 @@ test.describe
       const countsBefore = await page.evaluate<CatalogTuneCounts | undefined>(
         async () => {
           return (
-            window as unknown as {
+            globalThis as unknown as {
               __ttTestApi?: {
                 getCatalogTuneCountsForUser: () => Promise<CatalogTuneCounts>;
               };
@@ -508,7 +509,7 @@ test.describe
       await page.reload({ waitUntil: "domcontentloaded" });
       await waitForSyncComplete(page);
       await page.evaluate((userId) => {
-        (window as unknown as { __ttTestUserId?: string }).__ttTestUserId =
+        (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId =
           userId;
       }, injectedUserId);
       await ttPage.navigateToTab("catalog");
@@ -518,7 +519,7 @@ test.describe
         CatalogSelectionDiagnostics | undefined
       >(async () => {
         return (
-          window as unknown as {
+          globalThis as unknown as {
             __ttTestApi?: {
               getCatalogSelectionDiagnostics: () => Promise<CatalogSelectionDiagnostics>;
             };
@@ -528,7 +529,7 @@ test.describe
       const countsAfter = await page.evaluate<CatalogTuneCounts | undefined>(
         async () => {
           return (
-            window as unknown as {
+            globalThis as unknown as {
               __ttTestApi?: {
                 getCatalogTuneCountsForUser: () => Promise<CatalogTuneCounts>;
               };

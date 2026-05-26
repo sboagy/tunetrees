@@ -184,9 +184,6 @@ test.describe
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         afterCount = await afterRows.count();
-        // console.log(
-        //   `After submission count (attempt ${attempt}/${maxAttempts}): ${afterCount}`
-        // );
 
         if (afterCount === expectedCount) break;
 

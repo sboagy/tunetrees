@@ -359,9 +359,9 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
       artist: normalized.artist ?? "",
       idForeign: normalized.idForeign ?? "",
       releaseYear:
-        normalized.releaseYear !== undefined
-          ? String(normalized.releaseYear)
-          : "",
+        normalized.releaseYear === undefined
+          ? ""
+          : String(normalized.releaseYear),
       sourceUrl: normalized.sourceUrl ?? input,
     });
 

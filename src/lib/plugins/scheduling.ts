@@ -125,7 +125,7 @@ function ensureQueryAllowed(rawQuery: string): string {
     }
   }
 
-  const limitMatch = query.match(/\blimit\s+(\d+)/i);
+  const limitMatch = /\blimit\s+(\d+)/i.exec(query);
   if (limitMatch) {
     const limitValue = Number(limitMatch[1]);
     if (Number.isFinite(limitValue) && limitValue > QUERY_LIMIT) {

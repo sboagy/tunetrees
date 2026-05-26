@@ -89,7 +89,7 @@ test.describe
         // Preserve a reference for debugging if the browser test needs to inspect
         // whether audio decoding was stubbed.
         (
-          window as Window & {
+          globalThis as unknown as Window & {
             __ttOriginalDecodeAudioData?: typeof originalDecodeAudioData;
           }
         ).__ttOriginalDecodeAudioData = originalDecodeAudioData;
