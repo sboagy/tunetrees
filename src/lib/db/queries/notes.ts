@@ -28,7 +28,7 @@ export async function getNotesByTune(
   db: SqliteDatabase,
   tuneId: string // UUID
 ): Promise<Note[]> {
-  return await db
+  return db
     .select()
     .from(schema.note)
     .where(and(eq(schema.note.tuneRef, tuneId), eq(schema.note.deleted, 0)))
@@ -43,7 +43,7 @@ export async function getNotesByRepertoire(
   db: SqliteDatabase,
   repertoireId: string // UUID
 ): Promise<Note[]> {
-  return await db
+  return db
     .select()
     .from(schema.note)
     .where(
@@ -63,7 +63,7 @@ export async function getNoteById(
   db: SqliteDatabase,
   noteId: string // UUID
 ): Promise<Note | undefined> {
-  const notes = await db
+  const notes = db
     .select()
     .from(schema.note)
     .where(and(eq(schema.note.id, noteId), eq(schema.note.deleted, 0)))
@@ -82,7 +82,7 @@ export async function createNote(
 ): Promise<Note> {
   const now = new Date().toISOString();
 
-  const result = await db
+  const result = db
     .insert(schema.note)
     .values({
       id: generateId(), // Generate UUID
@@ -106,7 +106,7 @@ export async function createNote(
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
 
-  return result as Note;
+  return result;
 }
 
 /**
@@ -140,7 +140,7 @@ export async function updateNote(
     updateData.displayOrder = data.displayOrder;
   }
 
-  const result = await db
+  const result = db
     .update(schema.note)
     .set(updateData)
     .where(eq(schema.note.id, noteId))
@@ -153,7 +153,7 @@ export async function updateNote(
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
 
-  return result as Note | undefined;
+  return result;
 }
 
 /**
@@ -172,8 +172,7 @@ export async function updateNoteOrder(
   // Update each note's display_order based on its index in the array
   // Sync is handled automatically by SQL triggers populating sync_outbox
   for (let i = 0; i < noteIds.length; i++) {
-    await db
-      .update(schema.note)
+    db.update(schema.note)
       .set({
         displayOrder: i,
         lastModifiedAt: now,
@@ -196,7 +195,7 @@ export async function deleteNote(
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
-  const result = await db
+  const result = db
     .update(schema.note)
     .set({
       deleted: 1,
@@ -223,7 +222,7 @@ export async function permanentlyDeleteNote(
   db: SqliteDatabase,
   noteId: string // UUID
 ): Promise<boolean> {
-  const result = await db
+  const result = db
     .delete(schema.note)
     .where(eq(schema.note.id, noteId))
     .returning()

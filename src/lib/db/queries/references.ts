@@ -77,7 +77,7 @@ export async function getReferencesByTune(
       )
     : or(isNull(schema.reference.userRef), eq(schema.reference.public, 1));
 
-  return await db
+  return db
     .select()
     .from(schema.reference)
     .where(and(...baseConditions, visibilityCondition))
@@ -96,7 +96,7 @@ export async function getReferenceById(
   db: SqliteDatabase,
   referenceId: string // UUID
 ): Promise<Reference | undefined> {
-  const references = await db
+  const references = db
     .select()
     .from(schema.reference)
     .where(
@@ -122,7 +122,7 @@ export async function createReference(
 ): Promise<Reference> {
   const now = new Date().toISOString();
 
-  const result = await db
+  const result = db
     .insert(schema.reference)
     .values({
       id: generateId(),
@@ -148,7 +148,7 @@ export async function createReference(
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
 
-  return result as Reference;
+  return result;
 }
 
 /**
@@ -198,7 +198,7 @@ export async function updateReference(
     updateData.displayOrder = data.displayOrder;
   }
 
-  const result = await db
+  const result = db
     .update(schema.reference)
     .set(updateData)
     .where(eq(schema.reference.id, referenceId))
@@ -211,7 +211,7 @@ export async function updateReference(
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
 
-  return result as Reference | undefined;
+  return result;
 }
 
 /**
@@ -230,8 +230,7 @@ export async function updateReferenceOrder(
   // Update each reference's display_order based on its index in the array
   // Sync is handled automatically by SQL triggers populating sync_outbox
   for (let i = 0; i < referenceIds.length; i++) {
-    await db
-      .update(schema.reference)
+    db.update(schema.reference)
       .set({
         displayOrder: i,
         lastModifiedAt: now,
@@ -258,7 +257,7 @@ export async function deleteReference(
 ): Promise<boolean> {
   const now = new Date().toISOString();
 
-  const result = await db
+  const result = db
     .update(schema.reference)
     .set({
       deleted: 1,
@@ -268,8 +267,7 @@ export async function deleteReference(
     .returning()
     .get();
 
-  await db
-    .update(schema.mediaAsset)
+  db.update(schema.mediaAsset)
     .set({
       deleted: 1,
       syncVersion: sql.raw(`${schema.mediaAsset.syncVersion.name} + 1`),
@@ -407,7 +405,7 @@ export function extractTitleFromUrl(url: string): string {
       const parts = urlObj.pathname.split("/");
       const tuneName = parts.at(-1);
       if (tuneName) {
-        return `The Session: ${tuneName.replace(/-/g, " ")}`;
+        return `The Session: ${tuneName.replaceAll("-", " ")}`;
       }
     }
 

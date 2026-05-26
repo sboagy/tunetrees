@@ -475,32 +475,32 @@ export async function initializeViews(db: SqliteDatabase): Promise<void> {
 
   try {
     // Create view_repertoire_joined
-    await db.run("DROP VIEW IF EXISTS view_repertoire_joined");
-    await db.run(VIEW_REPERTOIRE_JOINED);
+    db.run("DROP VIEW IF EXISTS view_repertoire_joined");
+    db.run(VIEW_REPERTOIRE_JOINED);
     console.log("✅ Created view: view_repertoire_joined");
 
     // Create practice_list_joined
-    await db.run(PRACTICE_LIST_JOINED);
+    db.run(PRACTICE_LIST_JOINED);
     console.log("✅ Created view: practice_list_joined");
 
     // Create practice_list_staged
-    await db.run(PRACTICE_LIST_STAGED);
+    db.run(PRACTICE_LIST_STAGED);
     console.log("✅ Created view: practice_list_staged");
 
     // Create view_daily_practice_queue_readable
-    await db.run(VIEW_DAILY_PRACTICE_QUEUE_READABLE);
+    db.run(VIEW_DAILY_PRACTICE_QUEUE_READABLE);
     console.log("✅ Created view: view_daily_practice_queue_readable");
 
     // Create view_transient_data_readable
-    await db.run(VIEW_TRANSIENT_DATA_READABLE);
+    db.run(VIEW_TRANSIENT_DATA_READABLE);
     console.log("✅ Created view: view_transient_data_readable");
 
     // Create view_practice_record_readable
-    await db.run(VIEW_PRACTICE_RECORD_READABLE);
+    db.run(VIEW_PRACTICE_RECORD_READABLE);
     console.log("✅ Created view: view_practice_record_readable");
 
     // Create view_tune_override_readable
-    await db.run(VIEW_TUNE_OVERRIDE_READABLE);
+    db.run(VIEW_TUNE_OVERRIDE_READABLE);
     console.log("✅ Created view: view_tune_override_readable");
 
     console.log("✅ All database views initialized successfully");
@@ -519,13 +519,13 @@ export async function dropViews(db: SqliteDatabase): Promise<void> {
   console.log("🗑️  Dropping SQLite database views...");
 
   try {
-    await db.run("DROP VIEW IF EXISTS view_practice_record_readable");
-    await db.run("DROP VIEW IF EXISTS view_tune_override_readable");
-    await db.run("DROP VIEW IF EXISTS view_transient_data_readable");
-    await db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
-    await db.run("DROP VIEW IF EXISTS practice_list_staged");
-    await db.run("DROP VIEW IF EXISTS practice_list_joined");
-    await db.run("DROP VIEW IF EXISTS view_repertoire_joined");
+    db.run("DROP VIEW IF EXISTS view_practice_record_readable");
+    db.run("DROP VIEW IF EXISTS view_tune_override_readable");
+    db.run("DROP VIEW IF EXISTS view_transient_data_readable");
+    db.run("DROP VIEW IF EXISTS view_daily_practice_queue_readable");
+    db.run("DROP VIEW IF EXISTS practice_list_staged");
+    db.run("DROP VIEW IF EXISTS practice_list_joined");
+    db.run("DROP VIEW IF EXISTS view_repertoire_joined");
 
     console.log("✅ All views dropped");
   } catch (error) {

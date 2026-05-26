@@ -223,7 +223,7 @@ export async function initializeViewColumnMeta(
   db: SqliteDatabase
 ): Promise<void> {
   try {
-    await db.run("DELETE FROM view_column_meta");
+    db.run("DELETE FROM view_column_meta");
   } catch (error) {
     console.warn("⚠️ Failed to reset view_column_meta table:", error);
     return;
@@ -234,7 +234,7 @@ export async function initializeViewColumnMeta(
       const sanitizedDescription = meta.description.replaceAll("'", "''");
       const sanitizedViewName = meta.viewName.replaceAll("'", "''");
       const sanitizedColumnName = meta.columnName.replaceAll("'", "''");
-      await db.run(
+      db.run(
         `INSERT OR REPLACE INTO view_column_meta (view_name, column_name, description)
          VALUES ('${sanitizedViewName}', '${sanitizedColumnName}', '${sanitizedDescription}')`
       );

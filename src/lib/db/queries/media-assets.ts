@@ -35,7 +35,7 @@ export async function getMediaAssetsByTune(
   tuneId: string,
   userId: string
 ): Promise<MediaAsset[]> {
-  const rows = await db
+  const rows = db
     .select({ mediaAsset: schema.mediaAsset })
     .from(schema.mediaAsset)
     .innerJoin(
@@ -57,7 +57,7 @@ export async function getMediaAssetsByTune(
     )
     .all();
 
-  return rows.map((row) => row.mediaAsset as MediaAsset);
+  return rows.map((row) => row.mediaAsset);
 }
 
 export async function getMediaAssetByReferenceId(
@@ -74,13 +74,13 @@ export async function getMediaAssetByReferenceId(
     conditions.push(eq(schema.mediaAsset.userRef, userId));
   }
 
-  const rows = await db
+  const rows = db
     .select()
     .from(schema.mediaAsset)
     .where(and(...conditions))
     .all();
 
-  return rows[0] as MediaAsset | undefined;
+  return rows[0];
 }
 
 export async function createMediaAsset(
@@ -89,7 +89,7 @@ export async function createMediaAsset(
 ): Promise<MediaAsset> {
   const now = new Date().toISOString();
 
-  const result = await db
+  const result = db
     .insert(schema.mediaAsset)
     .values({
       id: data.id || generateId(),
@@ -111,7 +111,7 @@ export async function createMediaAsset(
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
 
-  return result as MediaAsset;
+  return result;
 }
 
 export async function updateMediaAssetByReferenceId(
@@ -137,7 +137,7 @@ export async function updateMediaAssetByReferenceId(
     updateData.deleted = data.deleted ? 1 : 0;
   }
 
-  const result = await db
+  const result = db
     .update(schema.mediaAsset)
     .set(updateData)
     .where(eq(schema.mediaAsset.referenceRef, referenceId))
@@ -147,5 +147,5 @@ export async function updateMediaAssetByReferenceId(
   const { persistDb } = await import("../client-sqlite");
   await persistDb();
 
-  return result as MediaAsset | undefined;
+  return result;
 }

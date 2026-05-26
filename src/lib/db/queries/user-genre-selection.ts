@@ -176,7 +176,7 @@ export async function getRepertoireGenreDefaultsForUser(
     `[getRepertoireGenreDefaultsForUser] Querying for userId=${userId}`
   );
 
-  const rows = await db.all<{ genre: string | null }>(sql`
+  const rows = db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT v.genre_default AS genre
     FROM view_repertoire_joined v
     WHERE v.repertoire_deleted = 0
@@ -201,7 +201,7 @@ export async function getRepertoireTuneGenreIdsForUser(
   db: SqliteDatabase,
   userId: string
 ): Promise<string[]> {
-  const rows = await db.all<{ genre: string | null }>(sql`
+  const rows = db.all<{ genre: string | null }>(sql`
     SELECT DISTINCT COALESCE(o.genre, t.genre) AS genre
     FROM repertoire_tune pt
     JOIN repertoire p
@@ -228,7 +228,7 @@ export async function getUserRepertoireStats(
   db: SqliteDatabase,
   userId: string
 ): Promise<{ repertoireCount: number; repertoireTuneCount: number }> {
-  const repertoireRows = await db.all<{ count: number }>(sql`
+  const repertoireRows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
     FROM repertoire p
     WHERE p.deleted = 0
@@ -236,7 +236,7 @@ export async function getUserRepertoireStats(
   `);
   const repertoireCount = Number(repertoireRows?.[0]?.count ?? 0);
 
-  const tuneRows = await db.all<{ count: number }>(sql`
+  const tuneRows = db.all<{ count: number }>(sql`
     SELECT COUNT(*) AS count
     FROM repertoire_tune pt
     JOIN repertoire p
@@ -260,10 +260,10 @@ export async function purgeLocalCatalogForGenres(
 ): Promise<{ tuneIds: string[] }> {
   if (genreIds.length === 0) return { tuneIds: [] };
 
-  const escaped = genreIds.map((id) => `'${id.replace(/'/g, "''")}'`);
+  const escaped = genreIds.map((id) => `'${id.replaceAll("'", "''")}'`);
   const genreList = escaped.join(", ");
 
-  const rows = await db.all<{ id: string }>(sql`
+  const rows = db.all<{ id: string }>(sql`
     SELECT DISTINCT t.id AS id
     FROM tune t
     LEFT JOIN tune_override o
