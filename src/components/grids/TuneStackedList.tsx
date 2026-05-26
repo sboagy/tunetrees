@@ -547,21 +547,29 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
               props.onRowDoubleClick?.(item);
             };
 
+            const bindRowDoubleClick = (element: HTMLLIElement) => {
+              element.addEventListener("dblclick", openRow);
+            };
+
+            const rowTestId = `stacked-item-${rowId}`;
+            const rowActivatorTestId = `stacked-row-activate-${rowId}`;
+            const rowAriaLabel = `Select tune ${title}`;
+            const rowPressed = isSelected();
+            const rowSelectedAttr = rowPressed ? "true" : undefined;
+
             return (
               <li
-                ref={(element) => {
-                  element.addEventListener("dblclick", openRow);
-                }}
+                ref={bindRowDoubleClick}
                 class={`relative ${rowStateClass()}`}
-                data-testid={`stacked-item-${rowId}`}
-                data-selected={isSelected() ? "true" : undefined}
+                data-testid={rowTestId}
+                data-selected={rowSelectedAttr}
               >
                 <button
                   type="button"
                   class="absolute inset-0 z-10 w-full text-left"
-                  data-testid={`stacked-row-activate-${rowId}`}
-                  aria-label={`Select tune ${title}`}
-                  aria-pressed={isSelected()}
+                  data-testid={rowActivatorTestId}
+                  aria-label={rowAriaLabel}
+                  aria-pressed={rowPressed}
                   onClick={activateRow}
                 />
                 <div class="relative flex min-h-[44px] items-start gap-2.5 px-4 py-3 pointer-events-none">

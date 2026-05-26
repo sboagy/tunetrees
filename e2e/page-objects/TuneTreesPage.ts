@@ -27,6 +27,14 @@ type OnboardingRepertoireArgs = {
 const OVERFLOW_MENU_MAX_RETRIES = 3;
 const OVERFLOW_MENU_RETRY_DELAY_MS = 150;
 
+function trimTrailingSlashes(value: string): string {
+  let normalized = value;
+  while (normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
 /**
  * Page Object Model for TuneTrees SolidJS PWA
  * Based on legacy React implementation with adaptations for new stack
@@ -318,7 +326,10 @@ export class TuneTreesPage {
     this.userMenuDropdown = page.getByTestId("user-menu-dropdown");
     this.userMenuButton = page.getByTestId("user-menu-button");
 
-    this.userEmail = page.getByText(/.*@.*\.test$/);
+    this.userEmail = page
+      .getByTestId("user-menu-panel")
+      .locator("dl dd")
+      .first();
 
     this.databaseDropdownPanel = page.getByTestId("database-dropdown-panel");
     this.userMenuPanel = page.getByTestId("user-menu-panel");
@@ -2620,7 +2631,7 @@ export class TuneTreesPage {
     tab: TabType,
     timeout = 15000
   ): Promise<void> {
-    const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+    const baseUrl = trimTrailingSlashes(String(BASE_URL));
     const columnsButton = this.getColumnsButtonForTab(tab);
 
     // Catalog setup can still be settling after the test helper lands on the tab.

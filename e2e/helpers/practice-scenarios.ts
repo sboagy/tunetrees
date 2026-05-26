@@ -5,13 +5,17 @@
  * Uses direct Supabase calls to manipulate database state before tests run.
  */
 
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import log from "loglevel";
 import postgres from "postgres";
 import { CATALOG_INSTRUMENT_IRISH_FLUTE_ID } from "../../src/lib/db/catalog-instrument-ids.js";
 
 log.setLevel("info");
+
+function getRetryJitter(maxExclusive: number): number {
+  return randomInt(maxExclusive);
+}
 
 // ============================================================================
 // TAB NAVIGATION HELPER (MOBILE + DESKTOP COMPATIBLE)
@@ -139,6 +143,188 @@ export async function getPracticeCountLocally(
   }, repertoireId);
 }
 
+async function clearTunetreesStorageDbInBrowser() {
+  const dbName = "tunetrees-storage";
+  const ttGlobal = globalThis as typeof globalThis & {
+    __ttE2eIsClearing?: boolean;
+    __ttTestApi?: { dispose?: () => Promise<void> };
+    __tunetreesCache?: unknown;
+  };
+
+  const resolveDeleteRequest = (resolveDelete: () => void) => {
+    resolveDelete();
+  };
+
+  const rejectDeleteError = (
+    request: IDBOpenDBRequest,
+    rejectDelete: (reason?: unknown) => void
+  ) => {
+    rejectDelete(
+      new Error(`IndexedDB delete failed: ${request.error ?? "unknown error"}`)
+    );
+  };
+
+  const rejectDeleteBlocked = (rejectDelete: (reason?: unknown) => void) => {
+    rejectDelete(new Error("IndexedDB delete blocked"));
+  };
+
+  const deleteIndexedDbOnce = () =>
+    new Promise<void>((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(dbName);
+
+      request.onsuccess = resolveDeleteRequest.bind(null, resolve);
+      request.onerror = rejectDeleteError.bind(null, request, reject);
+      request.onblocked = rejectDeleteBlocked.bind(null, reject);
+    });
+
+  const disposeTestApi = async (failurePrefix: string) => {
+    try {
+      if (typeof ttGlobal.__ttTestApi?.dispose === "function") {
+        await ttGlobal.__ttTestApi.dispose();
+      }
+    } catch (error) {
+      console.warn(`${failurePrefix}:`, error);
+      throw error;
+    }
+  };
+
+  const deleteIndexedDbWithRetries = async () => {
+    const maxAttempts = 5;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await deleteIndexedDbOnce();
+        return;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        if (attempt === maxAttempts) {
+          const finalMessage =
+            errorMessage === "IndexedDB delete blocked"
+              ? `[ClearDBStore] IndexedDB delete blocked after ${maxAttempts} attempts`
+              : `IndexedDB delete failed after ${maxAttempts} attempts: ${errorMessage}`;
+          console.error(finalMessage);
+          throw new Error(finalMessage);
+        }
+
+        const retryDelayMs =
+          errorMessage === "IndexedDB delete blocked"
+            ? 500 * attempt
+            : 200 * attempt;
+        const retryLabel =
+          errorMessage === "IndexedDB delete blocked" ? "blocked" : "error";
+        console.warn(
+          `[ClearDBStore] IndexedDB delete ${retryLabel}, retrying in ${retryDelayMs}ms (attempt ${attempt}/${maxAttempts})`,
+          errorMessage
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+    }
+  };
+
+  const clearPracticeQueueDateKeys = () => {
+    localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
+    localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
+  };
+
+  const clearSyncTimestampKeys = () => {
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
+        keysToRemove.push(key);
+      }
+    }
+    for (const key of keysToRemove) {
+      localStorage.removeItem(key);
+    }
+  };
+
+  const clearSessionAndLocalStorage = () => {
+    try {
+      sessionStorage.clear();
+    } catch (error) {
+      console.warn("[ClearDBStore] Failed to clear sessionStorage:", error);
+    }
+
+    try {
+      clearPracticeQueueDateKeys();
+    } catch (error) {
+      console.warn(
+        "[ClearDBStore] Failed to clear practice queue date keys:",
+        error
+      );
+    }
+
+    try {
+      clearSyncTimestampKeys();
+    } catch (error) {
+      console.warn(
+        "[ClearDBStore] Failed to clear sync timestamp keys:",
+        error
+      );
+    }
+  };
+
+  const clearCacheStorage = async () => {
+    if (typeof caches === "undefined") {
+      return;
+    }
+
+    try {
+      const cacheNames = await caches.keys();
+      const toDelete = cacheNames.filter(
+        (name) => !name.startsWith("workbox-precache-")
+      );
+
+      await Promise.all(toDelete.map((name) => caches.delete(name)));
+    } catch (error) {
+      console.warn("[ClearDBStore] Failed to clear CacheStorage:", error);
+    }
+  };
+
+  const clearInMemoryGlobals = async () => {
+    try {
+      if (ttGlobal.__ttTestApi) {
+        if (typeof ttGlobal.__ttTestApi.dispose === "function") {
+          try {
+            await ttGlobal.__ttTestApi.dispose();
+          } catch {
+            /* ignore disposal errors */
+          }
+        }
+        delete ttGlobal.__ttTestApi;
+      }
+
+      if (ttGlobal.__tunetreesCache) {
+        try {
+          ttGlobal.__tunetreesCache = null;
+          delete ttGlobal.__tunetreesCache;
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch (error) {
+      console.warn("[ClearDBStore] Failed to clear in-memory globals:", error);
+    }
+  };
+
+  ttGlobal.__ttE2eIsClearing = true;
+
+  try {
+    await disposeTestApi(
+      "[ClearDBStore] dispose() failed before IndexedDB delete"
+    );
+    await deleteIndexedDbWithRetries();
+    clearSessionAndLocalStorage();
+    await clearCacheStorage();
+    await clearInMemoryGlobals();
+  } finally {
+    ttGlobal.__ttE2eIsClearing = false;
+  }
+}
+
 /**
  * Clear local IndexedDB cache to force fresh sync from Supabase
  * This ensures tests start with a clean slate matching Supabase state
@@ -176,172 +362,7 @@ export async function clearTunetreesStorageDB(
       { timeout: 20000 }
     );
 
-    await page.evaluate(async () => {
-      const dbName = "tunetrees-storage";
-      // Signal to the app that E2E teardown is actively clearing storage.
-      // App code can use this to avoid re-initializing DB/sync while IndexedDB is being deleted.
-      (globalThis as any).__ttE2eIsClearing = true;
-
-      try {
-        // First, ask the app to dispose in-memory DB to avoid re-persisting
-        try {
-          if (
-            (globalThis as any).__ttTestApi &&
-            typeof (globalThis as any).__ttTestApi.dispose === "function"
-          ) {
-            await (globalThis as any).__ttTestApi.dispose();
-          }
-        } catch (err) {
-          console.warn(
-            "[ClearDBStore] dispose() failed before IndexedDB delete:",
-            err
-          );
-          throw err;
-        }
-        // NOTE: After dispose(), the local DB keys are already deleted via clearDb().
-        // Deleting the entire IndexedDB database must succeed to prevent unbounded growth
-        // across tests (which can cause OOM in sql.js WASM).
-        await new Promise<void>((resolve, reject) => {
-          const maxAttempts = 5;
-          let attempt = 0;
-
-          function tryDelete() {
-            attempt++;
-            const req = indexedDB.deleteDatabase(dbName);
-
-            req.onsuccess = () => resolve();
-
-            req.onerror = () => {
-              if (attempt < maxAttempts) {
-                const delay = 200 * attempt; // backoff: 200ms, 400ms, ...
-                // eslint-disable-next-line no-console
-                console.warn(
-                  `IndexedDB delete error, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`,
-                  req.error
-                );
-                setTimeout(tryDelete, delay);
-              } else {
-                const msg = `IndexedDB delete failed after ${maxAttempts} attempts: ${req.error}`;
-                // eslint-disable-next-line no-console
-                console.error(msg);
-                reject(new Error(msg));
-              }
-            };
-
-            req.onblocked = () => {
-              if (attempt < maxAttempts) {
-                const delay = 500 * attempt; // longer wait for blocked case
-                // eslint-disable-next-line no-console
-                console.warn(
-                  `[ClearDBStore] IndexedDB delete blocked, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`
-                );
-                setTimeout(tryDelete, delay);
-              } else {
-                const msg = `[ClearDBStore] IndexedDB delete blocked after ${maxAttempts} attempts`;
-                // eslint-disable-next-line no-console
-                console.error(msg);
-                reject(new Error(msg));
-              }
-            };
-          }
-
-          tryDelete();
-        });
-
-        // Clear app caches (but preserve auth state for parallel workers)
-
-        // 1) Clear sessionStorage only (non-persistent storage)
-        try {
-          sessionStorage.clear();
-        } catch (err) {
-          console.warn("[ClearDBStore] Failed to clear sessionStorage:", err);
-        }
-
-        // 1a) Clear Practice queue-date keys.
-        // These can leak in via Playwright storageState and cause Practice to render
-        // an unexpected day (e.g., manual/future date) leading to "All Caught Up!".
-        try {
-          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE");
-          localStorage.removeItem("TT_PRACTICE_QUEUE_DATE_MANUAL");
-        } catch (err) {
-          console.warn(
-            "[ClearDBStore] Failed to clear practice queue date keys:",
-            err
-          );
-        }
-
-        // 1b) Clear sync timestamp keys from localStorage (forces full initial sync)
-        // These are user-namespaced: TT_LAST_SYNC_TIMESTAMP_<userId>
-        try {
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key?.startsWith("TT_LAST_SYNC_TIMESTAMP")) {
-              keysToRemove.push(key);
-            }
-          }
-          for (const key of keysToRemove) {
-            localStorage.removeItem(key);
-          }
-        } catch (err) {
-          console.warn(
-            "[ClearDBStore] Failed to clear sync timestamp keys:",
-            err
-          );
-        }
-
-        // 2) Clear CacheStorage (service-worker / workbox caches for app code)
-        if (typeof caches !== "undefined") {
-          try {
-            const cacheNames = await caches.keys();
-            // IMPORTANT: Preserve Workbox precache so offline SPA navigations (e.g. /?tab=practice)
-            // can still be fulfilled by cached app-shell HTML.
-            const toDelete = cacheNames.filter(
-              (n) => !n.startsWith("workbox-precache-")
-            );
-
-            await Promise.all(toDelete.map((n) => caches.delete(n)));
-          } catch (err) {
-            console.warn("[ClearDBStore] Failed to clear CacheStorage:", err);
-          }
-        }
-
-        // 3) Clear any in-memory test hooks the app may have exposed (again, after delete)
-        try {
-          if ((globalThis as any).__ttTestApi) {
-            if (typeof (globalThis as any).__ttTestApi.dispose === "function") {
-              try {
-                await (globalThis as any).__ttTestApi.dispose();
-              } catch {
-                /* ignore disposal errors */
-              }
-            }
-            delete (globalThis as any).__ttTestApi;
-          }
-
-          // If app exposes other global caches, try clearing a few common ones
-          if ((globalThis as any).__tunetreesCache) {
-            try {
-              (globalThis as any).__tunetreesCache = null;
-              delete (globalThis as any).__tunetreesCache;
-            } catch {
-              /* ignore */
-            }
-          }
-        } catch (err) {
-          console.warn(
-            "[ClearDBStore] Failed to clear in-memory globals:",
-            err
-          );
-        }
-
-        // Return so page.evaluate resolves
-        return;
-      } finally {
-        // Always clear the flag so subsequent navigations in the same test can boot normally.
-        (globalThis as any).__ttE2eIsClearing = false;
-      }
-    });
+    await page.evaluate(clearTunetreesStorageDbInBrowser);
   } finally {
     // Safety net: if we set the flag but never reached the in-app finally (e.g., timeout
     // before __ttTestApi exists), clear it so we don't block later init in this worker.
@@ -386,10 +407,7 @@ const E2E_DATABASE_URL =
 let e2eSqlClient: ReturnType<typeof postgres> | null = null;
 
 function getE2eSqlClient() {
-  if (!e2eSqlClient) {
-    e2eSqlClient = postgres(E2E_DATABASE_URL, { max: 1 });
-  }
-
+  e2eSqlClient ??= postgres(E2E_DATABASE_URL, { max: 1 });
   return e2eSqlClient;
 }
 
@@ -557,7 +575,7 @@ async function retryTransientSetupOperation<T>(
       }
 
       const backoffMs = Math.min(500 * 2 ** (attempt - 1), 2000);
-      const jitterMs = Math.floor(Math.random() * 150);
+      const jitterMs = getRetryJitter(150);
       const delayMs = backoffMs + jitterMs;
 
       console.warn(
@@ -750,9 +768,12 @@ async function resetUserProfileAvatar(user: TestUser, supabase?: any) {
           authUserId === user.userId
             ? `authenticated as expected user ${authUserId}`
             : `authenticated as ${authUserId ?? "anonymous"}, expected ${user.userId}`;
+        const authErrorDetail = authError
+          ? ` auth.getUser() error: ${authError.message}`
+          : "";
 
         throw new Error(
-          `user_profile ${user.userId} is not visible for ${user.name}; ${authDetail}. This usually means the current Supabase project is missing the user_profile RLS policies for the UUID id column or the helper is pointed at a different project.${authError ? ` auth.getUser() error: ${authError.message}` : ""}`
+          `user_profile ${user.userId} is not visible for ${user.name}; ${authDetail}. This usually means the current Supabase project is missing the user_profile RLS policies for the UUID id column or the helper is pointed at a different project.${authErrorDetail}`
         );
       }
 
@@ -1109,7 +1130,7 @@ export async function seedUserTuneSets(
       }
 
       const backoffMs = Math.min(1000 * 2 ** (tuneSetAttempt - 1), 5000);
-      const jitter = Math.floor(Math.random() * 200);
+      const jitter = getRetryJitter(200);
       const delay = backoffMs + jitter;
 
       console.warn(
@@ -1154,7 +1175,7 @@ export async function seedUserTuneSets(
       }
 
       const backoffMs = Math.min(1000 * 2 ** (tuneSetItemAttempt - 1), 5000);
-      const jitter = Math.floor(Math.random() * 200);
+      const jitter = getRetryJitter(200);
       const delay = backoffMs + jitter;
 
       console.warn(
@@ -1284,7 +1305,7 @@ export async function seedUserRepertoire(
       }
 
       const backoffMs = Math.min(1000 * 2 ** (attempt - 1), 5000);
-      const jitter = Math.floor(Math.random() * 200);
+      const jitter = getRetryJitter(200);
       const delay = backoffMs + jitter;
 
       console.warn(
@@ -1404,7 +1425,7 @@ async function verifyTableEmpty(
     let countQuery = supabase.from(tableName).select("*", {
       count: "exact",
       head: true,
-    }) as any;
+    });
     if (tableName === "tune_override") {
       const internalId = await getInternalUserRef(supabase, user);
       if (internalId) {
@@ -1442,7 +1463,7 @@ async function verifyTableEmpty(
     let finalQuery = supabase.from(tableName).select("*", {
       count: "exact",
       head: true,
-    }) as any;
+    });
     if (tableName === "tune_override") {
       const internalId = await getInternalUserRef(supabase, user);
       if (internalId) {
@@ -1497,7 +1518,7 @@ async function verifyTablesEmpty(
       let countQuery = supabase.from(tableName).select("*", {
         count: "exact",
         head: true,
-      }) as any;
+      });
       if (tableName === "tune_override") {
         const internalId = await getInternalUserRef(supabase, user);
         if (internalId) {
@@ -1974,13 +1995,11 @@ export async function setupForRepertoireTestsParallel(
 
     if (msg.type() === "error") {
       console.error(`[Browser Error] ${text}`);
-    } else {
-      if (
-        process.env.E2E_TEST_SETUP_DEBUG === "true" ||
-        process.env.E2E_TEST_SETUP_DEBUG === "1"
-      ) {
-        console.log(`[Browser] ${text}`);
-      }
+    } else if (
+      process.env.E2E_TEST_SETUP_DEBUG === "true" ||
+      process.env.E2E_TEST_SETUP_DEBUG === "1"
+    ) {
+      console.log(`[Browser] ${text}`);
     }
   });
 
@@ -2186,11 +2205,6 @@ export async function setupForCatalogTestsParallel(
     );
   }
 
-  // await tuneCountComponent.waitFor({
-  //   state: "visible",
-  //   timeout: 10000,
-  // });
-
   await page.waitForTimeout(500);
 
   log.debug(`✅ [${user.name}] setupForCatalogTests Ready on ${startTab} tab`);
@@ -2236,7 +2250,13 @@ export async function setupForSetlistTestsParallel(
     .poll(
       () =>
         page.evaluate(() =>
-          Boolean((window as unknown as { __ttTestApi?: unknown }).__ttTestApi)
+          Boolean(
+            (
+              globalThis as typeof globalThis & {
+                __ttTestApi?: unknown;
+              }
+            ).__ttTestApi
+          )
         ),
       {
         timeout: 15000,
@@ -2246,11 +2266,11 @@ export async function setupForSetlistTestsParallel(
     .toBe(true);
 
   await page.evaluate((userId) => {
-    (
-      window as unknown as {
-        __ttTestApi?: { setTestUserId?: (id: string) => void };
-      }
-    ).__ttTestApi?.setTestUserId?.(userId);
+    const ttGlobal = globalThis as typeof globalThis & {
+      __ttTestApi?: { setTestUserId?: (id: string) => void };
+    };
+
+    ttGlobal.__ttTestApi?.setTestUserId?.(userId);
   }, user.userId);
 
   // __ttTestApi can attach before the app's local DB bootstrap and initial
@@ -2261,17 +2281,16 @@ export async function setupForSetlistTestsParallel(
   const seededPublicTunes = opts.publicTunes?.length
     ? await page.evaluate(
         async ({ tunes }) => {
-          const api = (
-            window as unknown as {
-              __ttTestApi?: {
-                getSelectedGenres: () => Promise<string[]>;
-                findOrCreateNamedPublicTune: (input: {
-                  title: string;
-                  genreId?: string | null;
-                }) => Promise<string>;
-              };
-            }
-          ).__ttTestApi;
+          const ttGlobal = globalThis as typeof globalThis & {
+            __ttTestApi?: {
+              getSelectedGenres: () => Promise<string[]>;
+              findOrCreateNamedPublicTune: (input: {
+                title: string;
+                genreId?: string | null;
+              }) => Promise<string>;
+            };
+          };
+          const api = ttGlobal.__ttTestApi;
           if (!api) {
             throw new Error("__ttTestApi is not available");
           }
