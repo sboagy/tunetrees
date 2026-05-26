@@ -12,6 +12,7 @@ import { Menu, X } from "lucide-solid";
 import {
   type Component,
   createSignal,
+  For,
   type ParentComponent,
   Show,
 } from "solid-js";
@@ -64,23 +65,25 @@ const SidebarNav: Component<{ items: SidebarNavItem[] }> = (props) => {
 
   return (
     <nav class="flex flex-col space-y-1">
-      {props.items.map((item) => {
-        const isActive = () => location.pathname === item.href;
-        return (
-          <A
-            href={item.href}
-            class="px-3 py-2 text-sm rounded-md transition-colors"
-            classList={{
-              "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium":
-                isActive(),
-              "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700":
-                !isActive(),
-            }}
-          >
-            {item.title}
-          </A>
-        );
-      })}
+      <For each={props.items}>
+        {(item) => {
+          const isActive = () => location.pathname === item.href;
+          return (
+            <A
+              href={item.href}
+              class="px-3 py-2 text-sm rounded-md transition-colors"
+              classList={{
+                "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium":
+                  isActive(),
+                "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700":
+                  !isActive(),
+              }}
+            >
+              {item.title}
+            </A>
+          );
+        }}
+      </For>
     </nav>
   );
 };
@@ -99,14 +102,15 @@ const UserSettingsLayout: ParentComponent = (props) => {
   const handleClose = () => {
     setIsOpen(false);
     // Navigate back to preserve tab/repertoire context
-    if (typeof window !== "undefined") {
-      const returnTo = globalThis.sessionStorage.getItem("tt-settings-return");
-      if (returnTo) {
-        globalThis.sessionStorage.removeItem("tt-settings-return");
-        if (!returnTo.startsWith("/user-settings")) {
-          navigate(returnTo, { replace: true });
-          return;
-        }
+    const returnTo =
+      typeof globalThis !== "undefined"
+        ? globalThis.sessionStorage?.getItem("tt-settings-return")
+        : null;
+    if (returnTo) {
+      globalThis.sessionStorage?.removeItem("tt-settings-return");
+      if (!returnTo.startsWith("/user-settings")) {
+        navigate(returnTo, { replace: true });
+        return;
       }
     }
 
@@ -141,13 +145,12 @@ const UserSettingsLayout: ParentComponent = (props) => {
         data-testid="settings-modal-wrapper"
       >
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Event handled by backdrop */}
-        <div
+        <dialog
           class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
           onClick={(e) => e.stopPropagation()}
-          role="dialog"
           aria-labelledby="settings-title"
-          aria-modal="true"
           data-testid="settings-modal"
+          open
         >
           {/* Header */}
           <div class="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between shrink-0">
@@ -220,7 +223,7 @@ const UserSettingsLayout: ParentComponent = (props) => {
               {props.children}
             </main>
           </div>
-        </div>
+        </dialog>
       </div>
     </Show>
   );

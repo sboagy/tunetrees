@@ -7,7 +7,7 @@ import type { Database as SqlJsDatabase } from "sql.js";
 export interface IOutboxBackupItem {
   tableName: SyncableTableName;
   rowId: string;
-  operation: "INSERT" | "UPDATE" | "DELETE" | string;
+  operation: "INSERT" | "UPDATE" | "DELETE";
   changedAt: string;
   rowData?: Record<string, unknown>;
 }
@@ -76,7 +76,7 @@ function toSqlValue(value: unknown): SqlValue {
   try {
     return JSON.stringify(value);
   } catch {
-    return String(value);
+    return (value as object).toString() as SqlValue;
   }
 }
 
@@ -94,7 +94,7 @@ function selectRowByPk(
   stmt.bind(keys.map((k) => toSqlValue(pk[k])));
   try {
     if (!stmt.step()) return null;
-    return stmt.getAsObject() as Record<string, unknown>;
+    return stmt.getAsObject();
   } finally {
     stmt.free();
   }
@@ -152,7 +152,7 @@ export function createOutboxBackup(db: SqlJsDatabase): IOutboxBackup {
       const item: IOutboxBackupItem = {
         tableName: syncableTableName,
         rowId,
-        operation,
+        operation: operation as "INSERT" | "UPDATE" | "DELETE",
         changedAt,
       };
 

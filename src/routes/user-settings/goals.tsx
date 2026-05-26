@@ -177,10 +177,10 @@ const GoalForm: Component<{
       </div>
 
       {/* Technique selector */}
-      <div>
-        <p class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <fieldset>
+        <legend class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Technique
-        </p>
+        </legend>
         <div class="space-y-2">
           {(
             [
@@ -217,7 +217,7 @@ const GoalForm: Component<{
             </label>
           ))}
         </div>
-      </div>
+      </fieldset>
 
       {/* Base Intervals input */}
       <Show when={form().technique === "base_interval"}>

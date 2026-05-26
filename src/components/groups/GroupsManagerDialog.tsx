@@ -96,10 +96,8 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
         data-testid="group-dialog-backdrop"
       />
 
-      <div
+      <dialog
         class="fixed left-1/2 top-1/2 z-[70] w-[95vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="group-dialog-title"
         data-testid="group-dialog"
       >
@@ -195,7 +193,7 @@ const GroupDialog: Component<GroupDialogProps> = (props) => {
             <p class="text-sm text-red-600 dark:text-red-400">{props.error}</p>
           </Show>
         </div>
-      </div>
+      </dialog>
     </Show>
   );
 };
@@ -218,7 +216,7 @@ const getMemberDisplayName = (
   // When the listed member IS the current auth user, prefer auth metadata
   // over potentially stale local userProfile data (which can surface a
   // different user's name after account switches / sync races).
-  if (currentUser && member.userRef === currentUser.id) {
+  if (member.userRef === currentUser?.id) {
     return (
       currentUser.user_metadata?.name ??
       currentUser.email ??
@@ -1088,19 +1086,21 @@ export const GroupsManagerDialog: Component<GroupsManagerDialogProps> = (
         class="fixed inset-0 z-50 flex items-start justify-center pb-2 pt-2 md:pb-16 md:pt-8 pointer-events-none"
         data-testid="groups-modal-wrapper"
       >
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click only stops propagation inside modal shell */}
-        <div
+        <dialog
           class="mx-2 flex h-[calc(100vh-1rem)] w-full max-w-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl pointer-events-auto dark:border-gray-700 dark:bg-gray-800 md:h-[calc(100vh-4rem)] md:max-w-6xl"
-          role="dialog"
           aria-labelledby="groups-dialog-title"
-          aria-modal="true"
           onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+            }
+          }}
           data-testid="groups-modal"
         >
           <div class="min-h-0 flex-1 overflow-hidden">
             <GroupsManagerContent onClose={closeDialog} />
           </div>
-        </div>
+        </dialog>
       </div>
     </Show>
   );

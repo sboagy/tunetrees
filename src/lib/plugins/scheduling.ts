@@ -78,11 +78,11 @@ const ALLOWED_TABLES = new Set([
   "prefs_scheduling_options",
   "prefs_spaced_repetition",
 ]);
-const DISALLOWED_COLUMNS: string[] = []; // TODO: add column disallow-list as needed.
+const DISALLOWED_COLUMNS: string[] = []; // Column disallow-list is kept empty until a specific column-restriction use case is identified.
 
 function extractTableNames(query: string): string[] {
   const names: string[] = [];
-  const regex = /\b(from|join)\s+([a-zA-Z0-9_."]+)/gi;
+  const regex = /\b(from|join)\s+([\w."]+)/gi;
   let match = regex.exec(query);
   while (match) {
     const raw = match[2] ?? "";
@@ -101,7 +101,7 @@ function ensureQueryAllowed(rawQuery: string): string {
   if (!/^select\s/i.test(query)) {
     throw new Error("Only SELECT queries are allowed");
   }
-  if (/[;]|--|\/\*/.test(query)) {
+  if (/;|--|\/\*/.test(query)) {
     throw new Error("Query contains unsupported tokens");
   }
 
@@ -116,7 +116,10 @@ function ensureQueryAllowed(rawQuery: string): string {
   }
 
   if (DISALLOWED_COLUMNS.length > 0) {
-    const pattern = new RegExp(`\\b(${DISALLOWED_COLUMNS.join("|")})\\b`, "i");
+    const pattern = new RegExp(
+      String.raw`\b(${DISALLOWED_COLUMNS.join("|")})\b`,
+      "i"
+    );
     if (pattern.test(query)) {
       throw new Error("Query references disallowed column");
     }
@@ -149,8 +152,9 @@ function parsePracticeInput(raw: Record<string, unknown>): RecordPracticeInput {
     throw new TypeError("Invalid practiced date");
   }
 
-  const repertoireRef = String(raw.repertoireRef ?? "");
-  const tuneRef = String(raw.tuneRef ?? "");
+  const repertoireRef =
+    typeof raw.repertoireRef === "string" ? raw.repertoireRef : "";
+  const tuneRef = typeof raw.tuneRef === "string" ? raw.tuneRef : "";
   const quality = Number(raw.quality ?? 0);
   if (!repertoireRef || !tuneRef || !Number.isFinite(quality)) {
     throw new Error("Missing required practice input fields");

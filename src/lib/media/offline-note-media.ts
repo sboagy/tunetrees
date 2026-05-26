@@ -240,7 +240,8 @@ export async function queueOfflineNoteMedia({
     URL.revokeObjectURL(blobUrl);
     throw error;
   }
-  await enqueueMediaDraftUpload(db, {
+  // Fire-and-forget: enqueue the upload entry without awaiting.
+  enqueueMediaDraftUpload(db, {
     id: draftId,
     userRef: userId,
     blobUrl: draftUrl,
@@ -380,8 +381,9 @@ export async function processPendingNoteMediaDrafts({
       await persistDb();
     }
 
-    await deleteMediaDraftUpload(db, entry.id);
-    await deleteMediaDraft(entry.id);
+    // Fire-and-forget: clean up the draft entry without awaiting.
+    deleteMediaDraftUpload(db, entry.id);
+    deleteMediaDraft(entry.id);
     processedCount += 1;
   }
 

@@ -97,11 +97,11 @@ export const RepertoireSelectorModal: Component<
         onClick={handleCancel}
         aria-label="Close modal backdrop"
       />
-      <div
-        class="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
-        role="dialog"
+      <dialog
+        class="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800 m-0 max-h-[90vh]"
         aria-modal="true"
         aria-labelledby="repertoire-modal-title"
+        open
       >
         <h2
           id="repertoire-modal-title"
@@ -186,7 +186,7 @@ export const RepertoireSelectorModal: Component<
             Add to Repertoire
           </Button>
         </div>
-      </div>
+      </dialog>
     </Show>
   );
 };

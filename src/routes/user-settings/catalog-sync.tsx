@@ -63,15 +63,19 @@ const CatalogSyncPage: Component = () => {
         getRequiredGenreIdsForUser(db, currentUserId),
       ])
         .then(([genreList, requiredIds]) => {
-          // Sort by name
-          genreList.sort((a: GenreWithSelection, b: GenreWithSelection) =>
-            (a.name ?? "").localeCompare(b.name ?? "")
+          // Sort by name using simple comparison
+          genreList.sort((a, b) =>
+            (a.name ?? "") < (b.name ?? "")
+              ? -1
+              : (a.name ?? "") > (b.name ?? "")
+                ? 1
+                : 0
           );
           setGenres(genreList);
 
           const selectedIds = genreList
-            .filter((g: GenreWithSelection) => g.selected)
-            .map((g: GenreWithSelection) => g.id);
+            .filter((g) => g.selected)
+            .map((g) => g.id);
           const combined = Array.from(
             new Set([...selectedIds, ...requiredIds])
           );

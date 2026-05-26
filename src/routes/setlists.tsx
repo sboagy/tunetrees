@@ -83,6 +83,8 @@ function moveItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
   return next;
 }
 
+const FILTER_KEYS = ["all", "tune", "tune_set"] as const;
+
 function normalizeMetadataValue(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
@@ -92,6 +94,50 @@ interface CandidateItem {
   id: string;
   title: string;
   subtitle: string;
+}
+
+function excludeTuneSetContainingRow(
+  normalized: Record<string, boolean>,
+  rowId: string,
+  tuneSetRef: string,
+  getRow: (rowId: string) => ISetlistGridRow | undefined
+): void {
+  for (const selectedId of Object.keys(normalized)) {
+    if (selectedId === rowId) continue;
+    const selectedRow = getRow(selectedId);
+    if (
+      selectedRow?.rowKind === "tune_set" &&
+      selectedRow.sourceId === tuneSetRef
+    ) {
+      delete normalized[selectedId];
+    }
+  }
+}
+
+function excludeChildTuneRows(
+  normalized: Record<string, boolean>,
+  rowId: string,
+  sourceId: string,
+  getRow: (rowId: string) => ISetlistGridRow | undefined
+): void {
+  for (const selectedId of Object.keys(normalized)) {
+    if (selectedId === rowId) continue;
+    const selectedRow = getRow(selectedId);
+    if (selectedRow?.tuneSetRef === sourceId) {
+      delete normalized[selectedId];
+    }
+  }
+}
+
+function cleanupOrphanedChildTuneRows(
+  normalized: Record<string, boolean>,
+  getRow: (rowId: string) => ISetlistGridRow | undefined
+): void {
+  for (const selectedId of Object.keys(normalized)) {
+    const selectedRow = getRow(selectedId);
+    if (selectedRow?.rowKind !== "tune_set") continue;
+    excludeChildTuneRows(normalized, selectedId, selectedRow.sourceId, getRow);
+  }
 }
 
 function normalizeExclusiveLibrarySelection(
@@ -109,43 +155,16 @@ function normalizeExclusiveLibrarySelection(
     if (!row) continue;
 
     if (row.rowKind === "tune" && row.tuneSetRef) {
-      for (const selectedId of Object.keys(normalized)) {
-        if (selectedId === rowId) continue;
-        const selectedRow = getRow(selectedId);
-        if (
-          selectedRow?.rowKind === "tune_set" &&
-          selectedRow.sourceId === row.tuneSetRef
-        ) {
-          delete normalized[selectedId];
-        }
-      }
+      excludeTuneSetContainingRow(normalized, rowId, row.tuneSetRef, getRow);
       continue;
     }
 
     if (row.rowKind === "tune_set") {
-      for (const selectedId of Object.keys(normalized)) {
-        if (selectedId === rowId) continue;
-        const selectedRow = getRow(selectedId);
-        if (selectedRow?.tuneSetRef === row.sourceId) {
-          delete normalized[selectedId];
-        }
-      }
+      excludeChildTuneRows(normalized, rowId, row.sourceId, getRow);
     }
   }
 
-  for (const selectedId of Object.keys(normalized)) {
-    const selectedRow = getRow(selectedId);
-    if (selectedRow?.rowKind !== "tune_set") continue;
-
-    for (const childId of Object.keys(normalized)) {
-      if (childId === selectedId) continue;
-      const childRow = getRow(childId);
-      if (childRow?.tuneSetRef === selectedRow.sourceId) {
-        delete normalized[childId];
-      }
-    }
-  }
-
+  cleanupOrphanedChildTuneRows(normalized, getRow);
   return normalized;
 }
 
@@ -403,15 +422,13 @@ const SetlistsPage: Component = () => {
 
         setLastHydratedStorageKey(storageKey);
         if (hasUrlOverride) {
-          setSearchParams(
-            {
-              s_group: undefined,
-              s_setlist: undefined,
-              s_mode: undefined,
-              s_create: undefined,
-            } as Record<string, string | undefined>,
-            { replace: true }
-          );
+          const clearedParams: Record<string, string | undefined> = {
+            s_group: undefined,
+            s_setlist: undefined,
+            s_mode: undefined,
+            s_create: undefined,
+          };
+          setSearchParams(clearedParams, { replace: true });
         }
 
         if (!isRouteInitialized()) setIsRouteInitialized(true);
@@ -927,6 +944,47 @@ const SetlistsPage: Component = () => {
   const canMutateSetlistItems = () =>
     hasValidSetlistName() && !isSaving() && !isMutatingItems();
 
+  const startDragReorder = (
+    event: PointerEvent,
+    setlistItemId: string
+  ): void => {
+    if (!canMutateSetlistItems()) return;
+    event.preventDefault();
+
+    const handle = event.currentTarget as HTMLElement;
+    handle.classList.add("cursor-grabbing");
+    handle.classList.remove("cursor-grab");
+    setDraggedItemId(setlistItemId);
+
+    const onMove = (e: PointerEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const tr = el?.closest<HTMLTableRowElement>(
+        '[data-testid="setlist-editor-item-row"]'
+      );
+      const targetId = tr
+        ? ((tr as HTMLElement).dataset.setlistItemId ?? null)
+        : null;
+      setDropTargetId(targetId && targetId !== setlistItemId ? targetId : null);
+    };
+
+    const onUp = () => {
+      globalThis.removeEventListener("pointermove", onMove);
+      globalThis.removeEventListener("pointerup", onUp);
+      handle.classList.remove("cursor-grabbing");
+      handle.classList.add("cursor-grab");
+
+      const target = dropTargetId();
+      setDraggedItemId(null);
+      setDropTargetId(null);
+      if (target) {
+        void handleDropOnItem(target, setlistItemId);
+      }
+    };
+
+    globalThis.addEventListener("pointermove", onMove);
+    globalThis.addEventListener("pointerup", onUp);
+  };
+
   const handleGridRowClick = (row: ISetlistGridRow) => {
     if (row.rowKind !== "tune") return;
     setCurrentTuneId(row.id);
@@ -980,43 +1038,7 @@ const SetlistsPage: Component = () => {
               }`}
               onPointerDown={(event) => {
                 if (!canMutateSetlistItems()) return;
-                event.preventDefault();
-
-                const handle = event.currentTarget as HTMLElement;
-                handle.classList.add("cursor-grabbing");
-                handle.classList.remove("cursor-grab");
-                const setlistItemId = row.original.setlistItemId!;
-                setDraggedItemId(setlistItemId);
-
-                const onMove = (e: PointerEvent) => {
-                  const el = document.elementFromPoint(e.clientX, e.clientY);
-                  const tr = el?.closest<HTMLTableRowElement>(
-                    '[data-testid="setlist-editor-item-row"]'
-                  );
-                  const targetId = tr
-                    ? ((tr as HTMLElement).dataset.setlistItemId ?? null)
-                    : null;
-                  setDropTargetId(
-                    targetId && targetId !== setlistItemId ? targetId : null
-                  );
-                };
-
-                const onUp = () => {
-                  globalThis.removeEventListener("pointermove", onMove);
-                  globalThis.removeEventListener("pointerup", onUp);
-                  handle.classList.remove("cursor-grabbing");
-                  handle.classList.add("cursor-grab");
-
-                  const target = dropTargetId();
-                  setDraggedItemId(null);
-                  setDropTargetId(null);
-                  if (target) {
-                    void handleDropOnItem(target, setlistItemId);
-                  }
-                };
-
-                globalThis.addEventListener("pointermove", onMove);
-                globalThis.addEventListener("pointerup", onUp);
+                startDragReorder(event, row.original.setlistItemId!);
               }}
               onKeyDown={(event) => {
                 if (!canMutateSetlistItems()) return;
@@ -1841,7 +1863,8 @@ const SetlistsPage: Component = () => {
                             setViewTable(table);
                           }}
                           getRowProps={(row) =>
-                            row.setlistPosition != null
+                            row.setlistPosition !== null &&
+                            row.setlistPosition !== undefined
                               ? { "data-testid": "setlist-item-row" }
                               : undefined
                           }
@@ -1942,8 +1965,8 @@ const SetlistsPage: Component = () => {
                             <div class="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                               Filter Library
                             </div>
-                            {(["all", "tune", "tune_set"] as const).map(
-                              (filter) => (
+                            <For each={[...FILTER_KEYS]}>
+                              {(filter) => (
                                 <button
                                   type="button"
                                   class={mobileMenuItemClasses}
@@ -1960,8 +1983,8 @@ const SetlistsPage: Component = () => {
                                     </span>
                                   </Show>
                                 </button>
-                              )
-                            )}
+                              )}
+                            </For>
 
                             <div class="my-1 h-px bg-gray-200 dark:bg-gray-700" />
 
@@ -1999,8 +2022,8 @@ const SetlistsPage: Component = () => {
                     {/* Search + filter */}
                     <div class="hidden min-w-0 items-center justify-between gap-2 overflow-x-auto md:flex">
                       <div class="flex shrink-0 items-center gap-1 whitespace-nowrap">
-                        {(["all", "tune", "tune_set"] as const).map(
-                          (filter) => (
+                        <For each={[...FILTER_KEYS]}>
+                          {(filter) => (
                             <button
                               type="button"
                               class={`rounded-md px-2 py-1 text-[11px] font-medium md:px-2.5 md:py-1.5 md:text-xs ${
@@ -2013,8 +2036,8 @@ const SetlistsPage: Component = () => {
                             >
                               {getFilterLabel(filter)}
                             </button>
-                          )
-                        )}
+                          )}
+                        </For>
                       </div>
                       <button
                         ref={libraryColumnsButtonRef}
@@ -2426,7 +2449,9 @@ const SetlistsPage: Component = () => {
                           enableColumnReorder={true}
                           enableRowSelection={true}
                           canSelectRow={(row) =>
-                            !!row.setlistItemId && row.setlistPosition != null
+                            !!row.setlistItemId &&
+                            row.setlistPosition !== null &&
+                            row.setlistPosition !== undefined
                           }
                           onSelectionChange={setEditorSelectionCount}
                           onTableReady={(table) => {
@@ -2437,7 +2462,9 @@ const SetlistsPage: Component = () => {
                           getSubRows={getSetlistGridSubRows}
                           hierarchyColumnId="title"
                           getRowProps={(row) =>
-                            row.setlistItemId && row.setlistPosition != null
+                            row.setlistItemId &&
+                            row.setlistPosition !== null &&
+                            row.setlistPosition !== undefined
                               ? {
                                   class: [
                                     draggedItemId() === row.setlistItemId

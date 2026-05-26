@@ -52,12 +52,12 @@ export const TuneSetFilterDialog: Component<TuneSetFilterDialogProps> = (
           data-testid="tune-set-filter-backdrop"
         />
 
-        <div
-          class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 overflow-hidden flex flex-col"
-          role="dialog"
+        <dialog
+          class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 overflow-hidden flex flex-col m-0"
           aria-modal="true"
           aria-labelledby="tune-set-filter-title"
           data-testid="tune-set-filter-dialog"
+          open
         >
           <div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
             <div>
@@ -173,7 +173,7 @@ export const TuneSetFilterDialog: Component<TuneSetFilterDialogProps> = (
               Close
             </button>
           </div>
-        </div>
+        </dialog>
       </Show>
 
       <TuneSetManagerDialog

@@ -144,7 +144,7 @@ export const PracticeControlBanner: Component<PracticeControlBannerProps> = (
 
     try {
       if (props.onSubmitEvaluations) {
-        await props.onSubmitEvaluations();
+        props.onSubmitEvaluations();
       } else {
         console.log("Submit practice evaluations");
       }

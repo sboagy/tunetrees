@@ -40,9 +40,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
   });
 
   const handleEvalChange = (newValue: string) => {
-    if (props.onRecallEvalChange) {
-      props.onRecallEvalChange(newValue);
-    }
+    props.onRecallEvalChange?.(newValue);
   };
 
   const formatMode = (mode: string | null): string => {

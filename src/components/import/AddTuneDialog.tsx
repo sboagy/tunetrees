@@ -64,6 +64,30 @@ export interface AddTuneDialogProps {
   showButton?: boolean;
 }
 
+function getButtonContent(
+  isImporting: boolean,
+  urlOrTitle: string,
+  hasHttpProtocolFn: (url: string) => boolean
+) {
+  if (isImporting) {
+    return "Importing...";
+  }
+  if (hasHttpProtocolFn(urlOrTitle)) {
+    return (
+      <>
+        <Import class="h-4 w-4" />
+        Import
+      </>
+    );
+  }
+  return (
+    <>
+      <Search class="h-4 w-4" />
+      Search
+    </>
+  );
+}
+
 /**
  * Main Add Tune Dialog
  * Orchestrates the tune import flow with multiple sub-dialogs
@@ -236,10 +260,30 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
     sourceUrl?: string;
   }
 
+  const getStringField = (
+    record: Record<string, unknown>,
+    ...keys: string[]
+  ): string | undefined => {
+    for (const key of keys) {
+      const val = record[key];
+      if (typeof val === "string") return val;
+    }
+    return undefined;
+  };
+
+  const getReleaseYear = (raw: unknown): number | undefined => {
+    if (typeof raw === "number") return raw;
+    if (typeof raw === "string" && raw.trim() !== "") {
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  };
+
   const normalizePluginImportData = (
     value: unknown
   ): PluginImportData | null => {
-    if (!value) return null;
+    if (value == null) return null;
     if (Array.isArray(value)) {
       return value.length > 0 ? normalizePluginImportData(value[0]) : null;
     }
@@ -252,48 +296,31 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
         : null;
     }
     if (record.tune && typeof record.tune === "object") {
-      return normalizePluginImportData(record.tune as Record<string, unknown>);
+      return normalizePluginImportData(record.tune);
     }
 
     const title = typeof record.title === "string" ? record.title : "";
-    if (!title) return null;
+    if (title === "") return null;
 
     const releaseYearRaw =
       record.releaseYear ?? record.release_year ?? record.release_years;
-    const releaseYear =
-      typeof releaseYearRaw === "number"
-        ? releaseYearRaw
-        : typeof releaseYearRaw === "string" && releaseYearRaw.trim() !== ""
-          ? Number(releaseYearRaw)
-          : undefined;
+    const releaseYear = getReleaseYear(releaseYearRaw);
 
     return {
       title,
-      type: typeof record.type === "string" ? record.type : undefined,
-      mode: typeof record.mode === "string" ? record.mode : undefined,
-      structure:
-        typeof record.structure === "string" ? record.structure : undefined,
-      incipit: typeof record.incipit === "string" ? record.incipit : undefined,
-      genre: typeof record.genre === "string" ? record.genre : undefined,
-      composer:
-        typeof record.composer === "string" ? record.composer : undefined,
-      artist: typeof record.artist === "string" ? record.artist : undefined,
-      idForeign:
-        typeof record.idForeign === "string"
-          ? record.idForeign
-          : typeof record.id_foreign === "string"
-            ? record.id_foreign
-            : undefined,
+      type: getStringField(record, "type"),
+      mode: getStringField(record, "mode"),
+      structure: getStringField(record, "structure"),
+      incipit: getStringField(record, "incipit"),
+      genre: getStringField(record, "genre"),
+      composer: getStringField(record, "composer"),
+      artist: getStringField(record, "artist"),
+      idForeign: getStringField(record, "idForeign", "id_foreign"),
       releaseYear:
-        releaseYear && Number.isFinite(releaseYear) ? releaseYear : undefined,
-      sourceUrl:
-        typeof record.sourceUrl === "string"
-          ? record.sourceUrl
-          : typeof record.source_url === "string"
-            ? record.source_url
-            : typeof record.url === "string"
-              ? record.url
-              : undefined,
+        releaseYear !== undefined && Number.isFinite(releaseYear)
+          ? releaseYear
+          : undefined,
+      sourceUrl: getStringField(record, "sourceUrl", "source_url", "url"),
     };
   };
 
@@ -517,19 +544,7 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
                   !urlOrTitle() || selectedGenre() !== "ITRAD" || isImporting()
                 }
               >
-                {isImporting() ? (
-                  "Importing..."
-                ) : hasHttpProtocol(urlOrTitle()) ? (
-                  <>
-                    <Import class="h-4 w-4" />
-                    Import
-                  </>
-                ) : (
-                  <>
-                    <Search class="h-4 w-4" />
-                    Search
-                  </>
-                )}
+                {getButtonContent(isImporting(), urlOrTitle(), hasHttpProtocol)}
               </Button>
             </div>
           </header>

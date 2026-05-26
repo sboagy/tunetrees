@@ -93,7 +93,7 @@ const Home: Component = () => {
           localStorage.setItem(CATALOG_URL_KEY, queryWithoutTab);
         }
       }
-    } catch (_e) {
+    } catch {
       // non-fatal: storage might be unavailable
     }
 
@@ -116,7 +116,9 @@ const Home: Component = () => {
       try {
         const saved = localStorage.getItem(CATALOG_URL_KEY);
         if (saved) restoreObj = parseQuery(saved);
-      } catch {}
+      } catch {
+        // Storage access may fail; non-fatal.
+      }
       // Build params: clear repertoire/legacy, restore catalog
       // Only include defined, non-empty values
       const wantedParams: Record<string, string> = { tab: tabId };
@@ -132,7 +134,9 @@ const Home: Component = () => {
       try {
         const saved = localStorage.getItem(REPERTOIRE_URL_KEY);
         if (saved) restoreObj = parseQuery(saved);
-      } catch {}
+      } catch {
+        // Storage access may fail; non-fatal.
+      }
       // Only include defined, non-empty values
       const wantedParams: Record<string, string> = { tab: tabId };
       Object.entries(restoreObj).forEach(([k, v]) => {

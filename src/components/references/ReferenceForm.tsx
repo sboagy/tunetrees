@@ -189,7 +189,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const handleChooseAudioFile = async () => {
     console.log("Choose Audio File button clicked");
 
-    const browserWindow = window as Window & {
+    const browserWindow: Window & {
       showOpenFilePicker?: (options?: {
         multiple?: boolean;
         excludeAcceptAllOption?: boolean;
@@ -199,7 +199,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
         }>;
       }) => Promise<Array<{ getFile: () => Promise<File> }>>;
       __TT_ALLOW_DEBUG_FILE_PICKER__?: boolean;
-    };
+    } = window;
     const isDebugControlledBrowser = navigator.webdriver === true;
     const allowDebugFilePicker =
       browserWindow.__TT_ALLOW_DEBUG_FILE_PICKER__ === true;
@@ -539,8 +539,8 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
           <div class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
             Audio File <span class="text-red-500">*</span>
           </div>
-          {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop stays on the container while file selection is handled by the explicit button */}
-          <div
+          <section
+            aria-label="Audio file drop zone"
             class="rounded-md border-2 border-dashed px-4 py-5 text-center transition-colors"
             classList={{
               "border-blue-400 bg-blue-50/60 dark:border-blue-500 dark:bg-blue-950/30":
@@ -610,7 +610,7 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
                 {fileError()}
               </p>
             </Show>
-          </div>
+          </section>
         </div>
       </Show>
 

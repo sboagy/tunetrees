@@ -197,7 +197,7 @@ const CatalogPage: Component = () => {
       repertoires: undefined,
     };
 
-    setSearchParams(params as Record<string, string>, { replace: true });
+    setSearchParams(params, { replace: true });
   });
 
   // Note: persistence is now handled centrally in Home.tsx by saving the tab's
@@ -274,7 +274,7 @@ const CatalogPage: Component = () => {
         syncVersion: params?.version,
       });
       if (!params) return [];
-      const result = await params.db.select().from(schema.genre).all();
+      const result = params.db.select().from(schema.genre).all();
       log.debug("CATALOG allGenres result:", result.length, "genres");
       return result;
     }
@@ -287,7 +287,7 @@ const CatalogPage: Component = () => {
     tunes.forEach((tune) => {
       if (tune.type) types.add(tune.type);
     });
-    return Array.from(types).sort();
+    return Array.from(types).sort((a, b) => a.localeCompare(b));
   });
 
   const availableModes = createMemo(() => {
@@ -296,7 +296,7 @@ const CatalogPage: Component = () => {
     tunes.forEach((tune) => {
       if (tune.mode) modes.add(tune.mode);
     });
-    return Array.from(modes).sort();
+    return Array.from(modes).sort((a, b) => a.localeCompare(b));
   });
 
   const availableGenres = createMemo(() => {
@@ -325,7 +325,7 @@ const CatalogPage: Component = () => {
       genreNames.add(genreById.get(raw) ?? raw);
     }
 
-    const result = Array.from(genreNames).sort();
+    const result = Array.from(genreNames).sort((a, b) => a.localeCompare(b));
     log.debug("CATALOG Final genre names:", result);
     return result;
   });

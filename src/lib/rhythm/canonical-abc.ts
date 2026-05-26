@@ -47,7 +47,7 @@ const STRUCTURE_TOKEN = /([^\d\s])(\d*)/g;
 
 export function normalizeStructure(structure?: string | null): string | null {
   const trimmed = structure?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 export function parseStructure(structure?: string | null): StructurePart[] {
@@ -110,7 +110,7 @@ export function splitAbcSections(abc: string): {
 
   return {
     headerLines: lines.filter(
-      (line) => /^[A-Z]:/.test(line) && !/^P:/.test(line)
+      (line) => /^[A-Z]:/.test(line) && !line.startsWith("P:")
     ),
     bodyBars: normalizeAbcBodyBars(getNormalizedAbcBodyLines(abc).join(" ")),
   };
@@ -139,7 +139,7 @@ export function getLabeledAbcSections(abc: string): LabeledAbcSection[] {
   };
 
   for (const line of lines) {
-    if (/^P:/.test(line)) {
+    if (line.startsWith("P:")) {
       flushSection();
       currentLabel = line.slice(2).trim().toUpperCase();
       currentBodyBars = [];

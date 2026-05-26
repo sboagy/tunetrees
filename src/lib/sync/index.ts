@@ -4,7 +4,7 @@
  * Temporary re-export layer for backward compatibility.
  * All sync functionality has moved to the linked `oosync` package.
  *
- * TODO: Remove this re-export layer after all imports have been migrated to use
+ * FIXME: Remove this re-export layer after all imports have been migrated to use
  * `import { ... } from "@oosync/sync"`
  *
  * @module lib/sync

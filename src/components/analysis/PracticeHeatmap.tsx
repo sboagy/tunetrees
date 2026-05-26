@@ -116,18 +116,24 @@ export const PracticeHeatmap: Component<Props> = (props) => {
                 aria-label="Practice activity heatmap"
               >
                 <For each={grid()}>
-                  {(cell) => (
-                    <div
-                      title={`${formatDay(cell.day)}: ${cell.count === 0 ? "No sessions" : `${cell.count} session${cell.count !== 1 ? "s" : ""}`}`}
-                      style={{
-                        width: "10px",
-                        height: "10px",
-                        "border-radius": "2px",
-                        background: countToColor(cell.count),
-                        cursor: "default",
-                      }}
-                    />
-                  )}
+                  {(cell) => {
+                    const cellLabel =
+                      cell.count === 0
+                        ? "No sessions"
+                        : `${cell.count} session${cell.count === 1 ? "" : "s"}`;
+                    return (
+                      <div
+                        title={`${formatDay(cell.day)}: ${cellLabel}`}
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          "border-radius": "2px",
+                          background: countToColor(cell.count),
+                          cursor: "default",
+                        }}
+                      />
+                    );
+                  }}
                 </For>
               </div>
 

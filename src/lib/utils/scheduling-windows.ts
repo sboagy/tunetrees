@@ -83,11 +83,10 @@ export function classifyQueueBucket(
   let dt: Date | null = null;
 
   try {
-    const match = norm19.match(
-      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-    );
-    if (match) {
-      const [, year, month, day, hour, minute, second] = match;
+    const matchResult =
+      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(norm19);
+    if (matchResult) {
+      const [, year, month, day, hour, minute, second] = matchResult;
       dt = new Date(
         Date.UTC(
           Number.parseInt(year, 10),

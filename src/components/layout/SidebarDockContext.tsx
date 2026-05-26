@@ -5,7 +5,7 @@
  * Persists state to localStorage for immediate UI updates.
  * Mobile and desktop positions are stored separately so that
  * a user's desktop preference does not override their mobile preference.
- * TODO: Sync to database via tab_group_main_state.sidebarDockPosition
+ * FIXME: Sync to database via tab_group_main_state.sidebarDockPosition
  *
  * @module components/layout/SidebarDockContext
  */
@@ -120,7 +120,7 @@ export const SidebarDockProvider: ParentComponent = (props) => {
       setDesktopPositionInternal(newPosition);
       localStorage.setItem(DESKTOP_KEY, newPosition);
     }
-    // TODO: Save to database via tab_group_main_state
+    // FIXME: Save to database via tab_group_main_state
   };
 
   return (

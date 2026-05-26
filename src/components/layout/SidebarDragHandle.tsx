@@ -97,7 +97,7 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     try {
       buttonRef?.releasePointerCapture(e.pointerId);
     } catch (_) {
-      // ignore
+      // Release may fail if pointer was not captured; non-critical.
     }
     pointerId = null;
     endPointerDrag(true, e.clientX, e.clientY);
@@ -111,7 +111,7 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     try {
       buttonRef?.releasePointerCapture(e.pointerId);
     } catch (_) {
-      // ignore
+      // Release may fail if pointer was not captured; non-critical.
     }
     pointerId = null;
     endPointerDrag(false, e.clientX, e.clientY);
@@ -133,7 +133,7 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     try {
       buttonRef?.setPointerCapture(e.pointerId);
     } catch (_) {
-      /* ignore */
+      // setPointerCapture may fail if element is detached; non-critical.
     }
     globalThis.addEventListener("pointermove", onPointerMove);
     globalThis.addEventListener("pointerup", onPointerUp);

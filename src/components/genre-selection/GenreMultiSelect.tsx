@@ -45,7 +45,7 @@ interface GenreMultiSelectProps {
 export const GenreMultiSelect: Component<GenreMultiSelectProps> = (props) => {
   const [searchQuery, setSearchQuery] = createSignal("");
   const [hasAutoScrolled, setHasAutoScrolled] = createSignal(false);
-  const itemRefs = new Map<string, HTMLLabelElement>();
+  const itemRefs = new Map<string, HTMLElement>();
   const lockedIds = () => new Set(props.lockedGenreIds ?? []);
   const lockedLabel = () => props.lockedLabel ?? "Required";
 
@@ -207,7 +207,7 @@ export const GenreMultiSelect: Component<GenreMultiSelectProps> = (props) => {
               const isSelected = () => props.selectedGenreIds.includes(gen.id);
               const isLocked = () => lockedIds().has(gen.id);
               return (
-                <label
+                <div
                   ref={(el) => {
                     if (el) {
                       itemRefs.set(gen.id, el);
@@ -221,54 +221,56 @@ export const GenreMultiSelect: Component<GenreMultiSelectProps> = (props) => {
                       : "gap-3 p-2 -mx-2"
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={isSelected()}
-                    onChange={() => handleGenreChange(gen.id)}
-                    disabled={props.disabled || isLocked()}
-                    class={`${
-                      props.density === "compact" ? "mt-0.5" : "mt-1"
-                    } w-4 h-4 accent-blue-600 dark:accent-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed`}
-                    data-testid={`${props.testIdPrefix || "genre-multiselect"}-checkbox-${gen.id}`}
-                  />
-                  <div class="flex-1 min-w-0">
-                    <div
+                  <label class="flex items-start gap-2 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={isSelected()}
+                      onChange={() => handleGenreChange(gen.id)}
+                      disabled={props.disabled || isLocked()}
                       class={`${
-                        props.density === "compact" ? "text-xs" : "text-sm"
-                      } font-medium text-gray-900 dark:text-white`}
-                    >
-                      {gen.id}
-                      <Show when={gen.name}>
-                        <span class="text-gray-700 dark:text-gray-200">
-                          {" "}
-                          - {gen.name}
-                        </span>
-                      </Show>
-                      <Show when={isLocked()}>
-                        <span
+                        props.density === "compact" ? "mt-0.5" : "mt-1"
+                      } w-4 h-4 accent-blue-600 dark:accent-blue-400 rounded disabled:opacity-50 disabled:cursor-not-allowed`}
+                      data-testid={`${props.testIdPrefix || "genre-multiselect"}-checkbox-${gen.id}`}
+                    />
+                    <div class="flex-1 min-w-0">
+                      <div
+                        class={`${
+                          props.density === "compact" ? "text-xs" : "text-sm"
+                        } font-medium text-gray-900 dark:text-white`}
+                      >
+                        {gen.id}
+                        <Show when={gen.name}>
+                          <span class="text-gray-700 dark:text-gray-200">
+                            {" "}
+                            - {gen.name}
+                          </span>
+                        </Show>
+                        <Show when={isLocked()}>
+                          <span
+                            class={`${
+                              props.density === "compact"
+                                ? "ml-2 text-[10px]"
+                                : "ml-2 text-xs"
+                            } uppercase tracking-wide text-amber-600 dark:text-amber-300`}
+                          >
+                            {lockedLabel()}
+                          </span>
+                        </Show>
+                      </div>
+                      <Show when={gen.region}>
+                        <p
                           class={`${
                             props.density === "compact"
-                              ? "ml-2 text-[10px]"
-                              : "ml-2 text-xs"
-                          } uppercase tracking-wide text-amber-600 dark:text-amber-300`}
+                              ? "text-[11px]"
+                              : "text-xs"
+                          } text-gray-500 dark:text-gray-400`}
                         >
-                          {lockedLabel()}
-                        </span>
+                          {gen.region}
+                        </p>
                       </Show>
                     </div>
-                    <Show when={gen.region}>
-                      <p
-                        class={`${
-                          props.density === "compact"
-                            ? "text-[11px]"
-                            : "text-xs"
-                        } text-gray-500 dark:text-gray-400`}
-                      >
-                        {gen.region}
-                      </p>
-                    </Show>
-                  </div>
-                </label>
+                  </label>
+                </div>
               );
             }}
           </For>

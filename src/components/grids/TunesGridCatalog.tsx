@@ -14,7 +14,7 @@
 
 import type { VisibilityState } from "@tanstack/solid-table";
 import { eq } from "drizzle-orm";
-// import { GripVertical } from "lucide-solid";
+
 import {
   type Component,
   createEffect,
@@ -53,8 +53,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       props.onColumnVisibilityChange(columnVisibility());
     }
   });
-
-  // (Drag state removed; reordering not handled at wrapper level)
 
   // Fetch tunes data
   // CRITICAL: Must wait for initialSyncComplete before fetching tunes.

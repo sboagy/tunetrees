@@ -47,6 +47,17 @@ const isPointerEventInside = (
   return !!target && element.contains(target);
 };
 
+/**
+ * Shared handler for pointer-down-outside detection used by dropdown components.
+ * Returns true if the event target is outside all provided refs.
+ */
+function isOutsideRefs(
+  event: PointerEvent,
+  ...refs: (Element | undefined | null)[]
+): boolean {
+  return refs.every((ref) => !isPointerEventInside(event, ref));
+}
+
 export interface TuneSetFilterOption {
   id: string;
   name: string;
@@ -99,14 +110,9 @@ const FilterDropdown: Component<{
   let buttonRef: HTMLButtonElement | undefined;
 
   const handlePointerDownOutside = (event: PointerEvent) => {
-    if (
-      isPointerEventInside(event, dropdownRef) ||
-      isPointerEventInside(event, buttonRef)
-    ) {
-      return;
+    if (isOutsideRefs(event, dropdownRef, buttonRef)) {
+      setIsOpen(false);
     }
-
-    setIsOpen(false);
   };
 
   // Setup outside-pointer listener
@@ -245,14 +251,9 @@ const TuneSetFilterDropdown: Component<{
     props.filterAnyTuneSet ? 1 : props.selectedTuneSetIds.length;
 
   const handlePointerDownOutside = (event: PointerEvent) => {
-    if (
-      isPointerEventInside(event, dropdownRef) ||
-      isPointerEventInside(event, buttonRef)
-    ) {
-      return;
+    if (isOutsideRefs(event, dropdownRef, buttonRef)) {
+      setIsOpen(false);
     }
-
-    setIsOpen(false);
   };
 
   createEffect(() => {
@@ -480,7 +481,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
   });
 
   onCleanup(() => {
-    if (typeof window !== "undefined") {
+    if (typeof globalThis !== "undefined") {
       globalThis.removeEventListener("resize", updatePosition);
       globalThis.removeEventListener("scroll", updatePosition, true);
     }
@@ -641,7 +642,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   items={props.availableTypes}
                   selectedItems={props.selectedTypes}
                   onSelectionChange={(selected) =>
-                    props.onTypesChange(selected as string[])
+                    props.onTypesChange(selected)
                   }
                 />
 
@@ -650,7 +651,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   items={props.availableModes}
                   selectedItems={props.selectedModes}
                   onSelectionChange={(selected) =>
-                    props.onModesChange(selected as string[])
+                    props.onModesChange(selected)
                   }
                 />
 
@@ -659,7 +660,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   items={props.availableGenres}
                   selectedItems={props.selectedGenres}
                   onSelectionChange={(selected) =>
-                    props.onGenresChange(selected as string[])
+                    props.onGenresChange(selected)
                   }
                   loading={props.loading?.genres}
                 />

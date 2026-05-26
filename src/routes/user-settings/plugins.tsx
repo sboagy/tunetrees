@@ -4,11 +4,12 @@
  * Manage import and scheduling plugins.
  */
 
-import type { Component } from "solid-js";
 import {
+  type Component,
   createEffect,
   createMemo,
   createSignal,
+  For,
   onCleanup,
   onMount,
   Show,
@@ -626,29 +627,32 @@ const PluginsPage: Component = () => {
                 </tr>
               </thead>
               <tbody>
-                {plugins().map((row) => (
-                  <tr
-                    class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
-                    classList={{
-                      "bg-blue-50 dark:bg-blue-900/20": row.id === selectedId(),
-                    }}
-                    onClick={() => setSelectedId(row.id)}
-                    data-testid={`plugin-row-${row.id}`}
-                  >
-                    <td class="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
-                      {row.name}
-                    </td>
-                    <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
-                      {formatCapabilities(row)}
-                    </td>
-                    <td class="px-4 py-2">
-                      {row.isPublic === 1 ? "Yes" : "No"}
-                    </td>
-                    <td class="px-4 py-2">
-                      {row.enabled === 1 ? "Enabled" : "Disabled"}
-                    </td>
-                  </tr>
-                ))}
+                <For each={plugins()}>
+                  {(row) => (
+                    <tr
+                      class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
+                      classList={{
+                        "bg-blue-50 dark:bg-blue-900/20":
+                          row.id === selectedId(),
+                      }}
+                      onClick={() => setSelectedId(row.id)}
+                      data-testid={`plugin-row-${row.id}`}
+                    >
+                      <td class="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
+                        {row.name}
+                      </td>
+                      <td class="px-4 py-2 text-gray-600 dark:text-gray-300">
+                        {formatCapabilities(row)}
+                      </td>
+                      <td class="px-4 py-2">
+                        {row.isPublic === 1 ? "Yes" : "No"}
+                      </td>
+                      <td class="px-4 py-2">
+                        {row.enabled === 1 ? "Enabled" : "Disabled"}
+                      </td>
+                    </tr>
+                  )}
+                </For>
               </tbody>
             </table>
           </div>
@@ -764,8 +768,12 @@ const PluginsPage: Component = () => {
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label
+                  class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                  for="plugin-cap-parse-import"
+                >
                   <input
+                    id="plugin-cap-parse-import"
                     type="checkbox"
                     checked={current().capabilities.parseImport ?? false}
                     disabled={!isOwner()}
@@ -778,10 +786,14 @@ const PluginsPage: Component = () => {
                       })
                     }
                   />
-                  Import Parser
+                  {"Import Parser"}
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label
+                  class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                  for="plugin-cap-schedule-goal"
+                >
                   <input
+                    id="plugin-cap-schedule-goal"
                     type="checkbox"
                     checked={current().capabilities.scheduleGoal ?? false}
                     disabled={!isOwner()}
@@ -794,10 +806,14 @@ const PluginsPage: Component = () => {
                       })
                     }
                   />
-                  Goal Scheduler
+                  {"Goal Scheduler"}
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label
+                  class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                  for="plugin-is-public"
+                >
                   <input
+                    id="plugin-is-public"
                     type="checkbox"
                     checked={current().isPublic}
                     disabled={!isOwner()}
@@ -805,10 +821,14 @@ const PluginsPage: Component = () => {
                       updateDraft({ isPublic: e.currentTarget.checked })
                     }
                   />
-                  Public
+                  {"Public"}
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label
+                  class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+                  for="plugin-enabled"
+                >
                   <input
+                    id="plugin-enabled"
                     type="checkbox"
                     checked={current().enabled}
                     disabled={!isOwner()}
@@ -816,7 +836,7 @@ const PluginsPage: Component = () => {
                       updateDraft({ enabled: e.currentTarget.checked })
                     }
                   />
-                  Enabled
+                  {"Enabled"}
                 </label>
               </div>
 

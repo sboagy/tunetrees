@@ -248,7 +248,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
     };
     return (
       nameMap[columnId] ||
-      columnId.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+      columnId.replaceAll("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())
     );
   };
 

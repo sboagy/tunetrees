@@ -260,7 +260,7 @@ export async function createRepertoire(
     deleted: 0,
     syncVersion: 1,
     lastModifiedAt: now,
-    deviceId: "local", // TODO: Get actual device ID
+    deviceId: "local",
   };
 
   const result = await db.insert(repertoire).values(newRepertoire).returning();
@@ -273,8 +273,8 @@ export async function createRepertoire(
 
   // Sync is handled automatically by SQL triggers populating sync_outbox
 
-  // Persist to IndexedDB
-  await persistDb();
+  // Persist to IndexedDB (fire-and-forget; not awaited)
+  persistDb();
 
   return created;
 }

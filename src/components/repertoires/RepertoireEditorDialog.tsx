@@ -158,14 +158,14 @@ export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
       />
 
       {/* Dialog - higher z-index to appear over manager dialog */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Dialog is modal and has backdrop for closing */}
-      <div
+      <dialog
+        open
         class="fixed left-1/2 top-1/2 z-[70] w-[95vw] max-w-2xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="repertoire-editor-title"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && props.onClose()}
         data-testid="repertoire-editor-dialog"
+        onClose={props.onClose}
       >
         {/* Header */}
         <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
@@ -239,7 +239,7 @@ export const RepertoireEditorDialog: Component<RepertoireEditorDialogProps> = (
             />
           </Show>
         </div>
-      </div>
+      </dialog>
     </Show>
   );
 };

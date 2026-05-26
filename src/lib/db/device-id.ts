@@ -1,7 +1,10 @@
 const DEVICE_ID_STORAGE_KEY = "tunetrees_device_id";
 
 export function getBrowserDeviceId(): string {
-  if (typeof window === "undefined") {
+  if (
+    typeof globalThis === "undefined" ||
+    typeof globalThis.localStorage === "undefined"
+  ) {
     return "local";
   }
 

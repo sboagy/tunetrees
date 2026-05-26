@@ -78,7 +78,7 @@ interface FsrsResponse {
 
 type AnyMessage = InvokeMessage | QueryResponse | FsrsResponse;
 
-const ctx = self as DedicatedWorkerGlobalScope;
+const ctx = globalThis;
 
 type CallResult = ReturnType<QuickJSAsyncContext["callFunction"]>;
 
@@ -237,6 +237,165 @@ function requestFsrs(params: {
   });
 }
 
+/**
+ * Install host API functions into the QuickJS context.
+ * Returns the elapsed time and any handles that need disposal.
+ */
+function installHostApis(params: {
+  qjs: QuickJSAsyncContext;
+  staticHandles: ReturnType<typeof buildStaticHandles>;
+  toHandle: ReturnType<typeof createHandleMapper>["toHandle"];
+  shouldDispose: ReturnType<typeof createHandleMapper>["shouldDispose"];
+  invokeId: number;
+}): number {
+  const { qjs, staticHandles, toHandle, shouldDispose, invokeId } = params;
+  const startedAt = performance.now();
+
+  const logHandle = qjs.newFunction("log", (...args) => {
+    const values = args.map((arg) => qjs.dump(arg));
+    // eslint-disable-next-line no-console
+    console.log("[Plugin]", ...values);
+    return staticHandles.undefined;
+  });
+  qjs.setProp(qjs.global, "log", logHandle);
+  if (shouldDispose(logHandle)) logHandle.dispose();
+
+  const parseJsonHandle = qjs.newFunction("parseJson", (arg) => {
+    const raw = qjs.dump(arg);
+    const text = typeof raw === "string" ? raw : JSON.stringify(raw ?? "");
+    const parsed = JSON.parse(text);
+    return toHandle(parsed);
+  });
+  qjs.setProp(qjs.global, "parseJson", parseJsonHandle);
+  if (shouldDispose(parseJsonHandle)) parseJsonHandle.dispose();
+
+  const parseCsvHandle = qjs.newFunction("parseCsv", (arg, configArg) => {
+    const raw = qjs.dump(arg);
+    if (typeof raw !== "string") {
+      throw new TypeError("parseCsv expects a CSV string");
+    }
+    const config = configArg ? qjs.dump(configArg) : undefined;
+    const parseConfig: Papa.ParseConfig = {
+      header: true,
+      skipEmptyLines: true,
+      ...(config && typeof config === "object" ? config : {}),
+      worker: false,
+    };
+    const result = Papa.parse(
+      raw,
+      parseConfig
+    ) as unknown as Papa.ParseResult<unknown>;
+    if (result.errors?.length) {
+      const msg = result.errors[0]?.message ?? "CSV parse error";
+      throw new Error(msg);
+    }
+    return toHandle(result.data);
+  });
+  qjs.setProp(qjs.global, "parseCsv", parseCsvHandle);
+  if (shouldDispose(parseCsvHandle)) parseCsvHandle.dispose();
+
+  const fetchUrlHandle = qjs.newAsyncifiedFunction(
+    "fetchUrl",
+    async (urlHandle, optionsHandle) => {
+      const urlValue = qjs.dump(urlHandle);
+      if (typeof urlValue !== "string") {
+        throw new TypeError("fetchUrl expects a URL string");
+      }
+      const options = optionsHandle ? qjs.dump(optionsHandle) : undefined;
+      const responseType =
+        options && typeof options === "object"
+          ? (options as Record<string, unknown>).responseType
+          : undefined;
+      const headers =
+        options && typeof options === "object"
+          ? (options as Record<string, unknown>).headers
+          : undefined;
+      const timeoutMs =
+        options && typeof options === "object"
+          ? Number((options as Record<string, unknown>).timeoutMs ?? 10000)
+          : 10000;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const proxyUrl = `/api/proxy?url=${encodeURIComponent(urlValue)}`;
+        const response = await fetch(proxyUrl, {
+          headers: {
+            Accept: responseType === "json" ? "application/json" : "text/plain",
+            ...(headers && typeof headers === "object" ? headers : {}),
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Proxy request failed: ${response.status}`);
+        }
+
+        if (responseType === "json") {
+          const data = await response.json();
+          return toHandle(data);
+        }
+
+        const text = await response.text();
+        return qjs.newString(text);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+  );
+  qjs.setProp(qjs.global, "fetchUrl", fetchUrlHandle);
+  if (shouldDispose(fetchUrlHandle)) fetchUrlHandle.dispose();
+
+  const queryDbHandle = qjs.newAsyncifiedFunction(
+    "queryDb",
+    async (sqlHandle) => {
+      const raw = qjs.dump(sqlHandle);
+      if (typeof raw !== "string") {
+        throw new TypeError("queryDb expects a SQL string");
+      }
+      const result = await requestQuery(invokeId, raw);
+      return toHandle(result);
+    }
+  );
+  qjs.setProp(qjs.global, "queryDb", queryDbHandle);
+  if (shouldDispose(queryDbHandle)) queryDbHandle.dispose();
+
+  const fsrsSchedulerHandle = qjs.newObject();
+  const processFirstHandle = qjs.newAsyncifiedFunction(
+    "processFirstReview",
+    async (payloadHandle) => {
+      const payload = qjs.dump(payloadHandle);
+      const result = await requestFsrs({
+        invokeId,
+        method: "processFirstReview",
+        payload,
+      });
+      return toHandle(result);
+    }
+  );
+  qjs.setProp(fsrsSchedulerHandle, "processFirstReview", processFirstHandle);
+  if (shouldDispose(processFirstHandle)) processFirstHandle.dispose();
+
+  const processReviewHandle = qjs.newAsyncifiedFunction(
+    "processReview",
+    async (payloadHandle) => {
+      const payload = qjs.dump(payloadHandle);
+      const result = await requestFsrs({
+        invokeId,
+        method: "processReview",
+        payload,
+      });
+      return toHandle(result);
+    }
+  );
+  qjs.setProp(fsrsSchedulerHandle, "processReview", processReviewHandle);
+  if (shouldDispose(processReviewHandle)) processReviewHandle.dispose();
+  qjs.setProp(qjs.global, "fsrsScheduler", fsrsSchedulerHandle);
+  if (shouldDispose(fsrsSchedulerHandle)) fsrsSchedulerHandle.dispose();
+
+  return performance.now() - startedAt;
+}
+
 async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
   const invokeStartedAt = performance.now();
   const timings: Record<string, number> = {};
@@ -260,157 +419,23 @@ async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
     qjsForDispose = qjs;
     timings.contextCreateMs = performance.now() - contextStartedAt;
 
-    const hostApiStartedAt = performance.now();
     const staticHandles = buildStaticHandles(qjs);
     const { toHandle, shouldDispose } = createHandleMapper({
       qjs,
       staticHandles,
+    });
+    timings.hostApiInstallMs = installHostApis({
+      qjs,
+      staticHandles,
+      toHandle,
+      shouldDispose,
+      invokeId: message.id,
     });
 
     const track = (handle: QuickJSHandle) => {
       if (shouldDispose(handle)) disposables.push(handle);
       return handle;
     };
-
-    const logHandle = qjs.newFunction("log", (...args) => {
-      const values = args.map((arg) => qjs.dump(arg));
-      // eslint-disable-next-line no-console
-      console.log("[Plugin]", ...values);
-      return staticHandles.undefined;
-    });
-    qjs.setProp(qjs.global, "log", logHandle);
-    if (shouldDispose(logHandle)) logHandle.dispose();
-
-    const parseJsonHandle = qjs.newFunction("parseJson", (arg) => {
-      const raw = qjs.dump(arg);
-      const text = typeof raw === "string" ? raw : JSON.stringify(raw ?? "");
-      const parsed = JSON.parse(text);
-      return toHandle(parsed);
-    });
-    qjs.setProp(qjs.global, "parseJson", parseJsonHandle);
-    if (shouldDispose(parseJsonHandle)) parseJsonHandle.dispose();
-
-    const parseCsvHandle = qjs.newFunction("parseCsv", (arg, configArg) => {
-      const raw = qjs.dump(arg);
-      if (typeof raw !== "string") {
-        throw new TypeError("parseCsv expects a CSV string");
-      }
-      const config = configArg ? qjs.dump(configArg) : undefined;
-      const result = Papa.parse(raw, {
-        header: true,
-        skipEmptyLines: true,
-        worker: false,
-        ...(config && typeof config === "object" ? config : {}),
-      }) as unknown as Papa.ParseResult<unknown>;
-      if (result.errors?.length) {
-        const message = result.errors[0]?.message ?? "CSV parse error";
-        throw new Error(message);
-      }
-      return toHandle(result.data);
-    });
-    qjs.setProp(qjs.global, "parseCsv", parseCsvHandle);
-    if (shouldDispose(parseCsvHandle)) parseCsvHandle.dispose();
-
-    const fetchUrlHandle = qjs.newAsyncifiedFunction(
-      "fetchUrl",
-      async (urlHandle, optionsHandle) => {
-        const urlValue = qjs.dump(urlHandle);
-        if (typeof urlValue !== "string") {
-          throw new TypeError("fetchUrl expects a URL string");
-        }
-        const options = optionsHandle ? qjs.dump(optionsHandle) : undefined;
-        const responseType =
-          options && typeof options === "object"
-            ? (options as Record<string, unknown>).responseType
-            : undefined;
-        const headers =
-          options && typeof options === "object"
-            ? (options as Record<string, unknown>).headers
-            : undefined;
-        const timeoutMs =
-          options && typeof options === "object"
-            ? Number((options as Record<string, unknown>).timeoutMs ?? 10000)
-            : 10000;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-          const proxyUrl = `/api/proxy?url=${encodeURIComponent(urlValue)}`;
-          const response = await fetch(proxyUrl, {
-            headers: {
-              Accept:
-                responseType === "json" ? "application/json" : "text/plain",
-              ...(headers && typeof headers === "object" ? headers : {}),
-            },
-            signal: controller.signal,
-          });
-
-          if (!response.ok) {
-            throw new Error(`Proxy request failed: ${response.status}`);
-          }
-
-          if (responseType === "json") {
-            const data = await response.json();
-            return toHandle(data);
-          }
-
-          const text = await response.text();
-          return qjs.newString(text);
-        } finally {
-          clearTimeout(timeoutId);
-        }
-      }
-    );
-    qjs.setProp(qjs.global, "fetchUrl", fetchUrlHandle);
-    if (shouldDispose(fetchUrlHandle)) fetchUrlHandle.dispose();
-
-    const queryDbHandle = qjs.newAsyncifiedFunction(
-      "queryDb",
-      async (sqlHandle) => {
-        const raw = qjs.dump(sqlHandle);
-        if (typeof raw !== "string") {
-          throw new TypeError("queryDb expects a SQL string");
-        }
-        const result = await requestQuery(message.id, raw);
-        return toHandle(result);
-      }
-    );
-    qjs.setProp(qjs.global, "queryDb", queryDbHandle);
-    if (shouldDispose(queryDbHandle)) queryDbHandle.dispose();
-
-    const fsrsSchedulerHandle = qjs.newObject();
-    const processFirstHandle = qjs.newAsyncifiedFunction(
-      "processFirstReview",
-      async (payloadHandle) => {
-        const payload = qjs.dump(payloadHandle);
-        const result = await requestFsrs({
-          invokeId: message.id,
-          method: "processFirstReview",
-          payload,
-        });
-        return toHandle(result);
-      }
-    );
-    qjs.setProp(fsrsSchedulerHandle, "processFirstReview", processFirstHandle);
-    if (shouldDispose(processFirstHandle)) processFirstHandle.dispose();
-
-    const processReviewHandle = qjs.newAsyncifiedFunction(
-      "processReview",
-      async (payloadHandle) => {
-        const payload = qjs.dump(payloadHandle);
-        const result = await requestFsrs({
-          invokeId: message.id,
-          method: "processReview",
-          payload,
-        });
-        return toHandle(result);
-      }
-    );
-    qjs.setProp(fsrsSchedulerHandle, "processReview", processReviewHandle);
-    if (shouldDispose(processReviewHandle)) processReviewHandle.dispose();
-    qjs.setProp(qjs.global, "fsrsScheduler", fsrsSchedulerHandle);
-    if (shouldDispose(fsrsSchedulerHandle)) fsrsSchedulerHandle.dispose();
-    timings.hostApiInstallMs = performance.now() - hostApiStartedAt;
 
     const evalStartedAt = performance.now();
     const evalResult = qjs.evalCode(message.script);

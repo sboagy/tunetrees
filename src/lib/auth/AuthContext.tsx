@@ -163,5 +163,5 @@ export function useAuth(): AuthState {
   if (!context) {
     throw new Error("useAuth must be used within AuthProvider");
   }
-  return context as AuthState;
+  return context;
 }

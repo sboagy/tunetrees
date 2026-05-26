@@ -174,7 +174,7 @@ export function usePracticeSubmit(
         .replace(" ", "T")
         .substring(0, 19);
 
-      await db.run(sql`
+      db.run(sql`
         DELETE FROM daily_practice_queue
         WHERE user_ref = ${userId}
           AND repertoire_ref = ${repertoireId}

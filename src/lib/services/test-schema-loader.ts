@@ -62,7 +62,7 @@ export function applyMigrations(db: BetterSQLite3Database): void {
           continue;
         }
 
-        db.run(statement as unknown as string);
+        db.run(statement);
       } catch (error) {
         console.error(`Failed to execute statement from ${migrationFile}:`);
         console.error(statement);

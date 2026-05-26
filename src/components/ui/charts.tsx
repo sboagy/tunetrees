@@ -16,7 +16,6 @@ import { mergeRefs } from "@solid-primitives/refs";
 import type {
   ChartComponent,
   ChartData,
-  ChartItem,
   ChartOptions,
   Plugin as ChartPlugin,
   ChartType,
@@ -92,7 +91,10 @@ const BaseChart: Component<ChartProps> = (rawProps) => {
   const setRefs = mergeRefs(props.ref, (el) => setCanvasRef(el));
 
   const init = () => {
-    const ctx = canvasRef()?.getContext("2d") as ChartItem;
+    const canvas = canvasRef();
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const config = unwrap(props);
     const instance = new Chart(ctx, {
       type: config.type,

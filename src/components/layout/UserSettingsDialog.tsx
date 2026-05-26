@@ -101,10 +101,6 @@ export const UserSettingsDialog: Component = () => {
     useUserSettingsDialog();
   const [isSidebarOpen, setIsSidebarOpen] = createSignal(false);
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") closeUserSettings();
-  };
-
   const handleTabClick = (tab: UserSettingsTab) => {
     navigateToTab(tab);
     setIsSidebarOpen(false);
@@ -116,7 +112,9 @@ export const UserSettingsDialog: Component = () => {
         type="button"
         class="fixed inset-0 bg-black/50 z-40"
         onClick={closeUserSettings}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") closeUserSettings();
+        }}
         aria-label="Close settings"
         data-testid="settings-modal-backdrop"
       />
@@ -126,12 +124,10 @@ export const UserSettingsDialog: Component = () => {
         data-testid="settings-modal-wrapper"
       >
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: Event handled by backdrop */}
-        <div
+        <dialog
           class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
           onClick={(e) => e.stopPropagation()}
-          role="dialog"
           aria-labelledby="settings-dialog-title"
-          aria-modal="true"
           data-testid="settings-modal"
         >
           <div class="px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between shrink-0">
@@ -216,7 +212,7 @@ export const UserSettingsDialog: Component = () => {
               <TabContent tab={currentTab()} />
             </main>
           </div>
-        </div>
+        </dialog>
       </div>
     </Show>
   );

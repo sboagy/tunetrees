@@ -165,9 +165,10 @@ async function logPractice(
     }
   );
 
+  const qualitySuffix = args.quality ? ` (Quality: ${args.quality}/4)` : "";
   return {
     success: true,
-    message: `Practice session logged for "${tune.title}"${args.quality ? ` (Quality: ${args.quality}/4)` : ""}`,
+    message: `Practice session logged for "${tune.title}"${qualitySuffix}`,
     data: { recordId },
   };
 }

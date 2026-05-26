@@ -89,8 +89,7 @@ const AccountPage: Component = () => {
     // Phone is optional, but validate format if provided
     if (phone().trim()) {
       // Basic phone validation (allow various formats)
-      const phoneRegex =
-        /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/;
+      const phoneRegex = /^\+?\(?\d{1,4}\)?[-\s.]?\(?\d{1,4}\)?[-\s.]?\d{1,9}$/;
       if (!phoneRegex.test(phone().replace(/\s/g, ""))) {
         errors.phone = "Invalid phone format";
       }

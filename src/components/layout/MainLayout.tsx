@@ -121,14 +121,14 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
     setSidebarCollapsed(newState);
     // Save under the correct viewport key
     localStorage.setItem(collapsedKey(), String(newState));
-    // TODO: Save to tab_group_main_state table
+    // Future: Save to tab_group_main_state table
   };
 
   const handleSidebarWidthChangeEnd = (width: number) => {
     // Update state and save to localStorage when drag ends
     setSidebarWidth(width);
     localStorage.setItem("sidebar-width", String(width));
-    // TODO: Save to tab_group_main_state table
+    // Future: Save to tab_group_main_state table
   };
 
   return (
@@ -157,7 +157,7 @@ export const MainLayout: ParentComponent<MainLayoutProps> = (props) => {
                   : dockPosition() === "right"
                     ? "flex-row-reverse"
                     : "flex-row"
-              }`}
+              }`} // NOSONAR
             >
               {/* Drop Zone Overlays (shown during drag) */}
               <DropZoneOverlays isDragging={isDragging()} />

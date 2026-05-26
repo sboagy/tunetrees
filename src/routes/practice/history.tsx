@@ -54,7 +54,7 @@ const PracticeHistory: Component = () => {
   ]);
   const [filterQuality, setFilterQuality] = createSignal<string>("");
   const [filterGoal, setFilterGoal] = createSignal<string>("");
-  const [selectedRepertoireId] = createSignal("1"); // TODO: Add repertoire selector
+  const [selectedRepertoireId] = createSignal("1"); // Will add repertoire selector in future update
   const [pageSize, setPageSize] = createSignal(25);
 
   // Fetch practice records from local database
@@ -107,7 +107,7 @@ const PracticeHistory: Component = () => {
     allRecords.forEach((record) => {
       if (record.goal) goalSet.add(record.goal);
     });
-    return Array.from(goalSet).sort();
+    return Array.from(goalSet).sort((a, b) => a.localeCompare(b, "en"));
   });
 
   // Format date for display
@@ -202,12 +202,12 @@ const PracticeHistory: Component = () => {
       size: 100,
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
+        return value === null ? (
+          <span class="text-gray-400">—</span>
+        ) : (
           <span class="font-mono text-sm text-gray-600 dark:text-gray-400">
             {value.toFixed(2)}
           </span>
-        ) : (
-          <span class="text-gray-400">—</span>
         );
       },
     },
@@ -217,12 +217,12 @@ const PracticeHistory: Component = () => {
       size: 100,
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
+        return value === null ? (
+          <span class="text-gray-400">—</span>
+        ) : (
           <span class="font-mono text-sm text-gray-600 dark:text-gray-400">
             {value.toFixed(2)}
           </span>
-        ) : (
-          <span class="text-gray-400">—</span>
         );
       },
     },
@@ -232,12 +232,12 @@ const PracticeHistory: Component = () => {
       size: 90,
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">
-            {value} day{value !== 1 ? "s" : ""}
-          </span>
-        ) : (
+        return value === null ? (
           <span class="text-gray-400">—</span>
+        ) : (
+          <span class="text-sm text-gray-600 dark:text-gray-400">
+            {value} day{value === 1 ? "" : "s"}
+          </span>
         );
       },
     },
@@ -248,7 +248,7 @@ const PracticeHistory: Component = () => {
       cell: (info) => {
         const value = info.getValue() as number | null;
         const states = ["New", "Learning", "Review", "Relearning"];
-        const stateLabel = value !== null ? states[value] || "—" : "—";
+        const stateLabel = value === null ? "—" : states[value] || "—";
         return (
           <span class="text-xs text-gray-600 dark:text-gray-400">
             {stateLabel}
@@ -403,7 +403,7 @@ const PracticeHistory: Component = () => {
           {/* Results Count */}
           <div class="mb-3 text-sm text-gray-600 dark:text-gray-400">
             Showing {filteredRecords().length} practice session
-            {filteredRecords().length !== 1 ? "s" : ""}
+            {filteredRecords().length === 1 ? "" : "s"}
           </div>
 
           {/* Loading State */}

@@ -289,7 +289,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
   // Get table list for quick access
   const [tables] = createResource(localDb, async (db) => {
     if (!db) return [];
-    const rows = await db.all<{ name: string }>(
+    const rows = db.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
     );
     return rows.map((row) => row.name);
@@ -381,7 +381,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
 
     try {
       const startTime = performance.now();
-      const rows = await db.all<Record<string, unknown>>(query());
+      const rows = db.all<Record<string, unknown>>(query());
       const endTime = performance.now();
       setExecutionTime(endTime - startTime);
 
@@ -494,8 +494,7 @@ export default function DatabaseBrowser(): ReturnType<Component> {
       const localTables = new Set(tables() ?? []);
 
       const selectedTable = compareTable();
-      const tableFilter =
-        selectedTable === "__all__" ? null : (selectedTable as string);
+      const tableFilter = selectedTable === "__all__" ? null : selectedTable;
 
       const mismatchRows: Array<{
         table: string;
@@ -763,19 +762,26 @@ export default function DatabaseBrowser(): ReturnType<Component> {
                         {(row) => (
                           <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/50">
                             <For each={row}>
-                              {(cell) => (
-                                <td class="px-4 py-2 font-mono text-xs">
-                                  {cell === null ? (
-                                    <span class="text-gray-400 italic">
-                                      NULL
-                                    </span>
-                                  ) : typeof cell === "object" ? (
-                                    JSON.stringify(cell)
-                                  ) : (
-                                    String(cell)
-                                  )}
-                                </td>
-                              )}
+                              {(cell) => {
+                                const formatCell = (val: unknown) => {
+                                  if (val === null) {
+                                    return (
+                                      <span class="text-gray-400 italic">
+                                        NULL
+                                      </span>
+                                    );
+                                  }
+                                  if (typeof val === "object") {
+                                    return JSON.stringify(val);
+                                  }
+                                  return String(val);
+                                };
+                                return (
+                                  <td class="px-4 py-2 font-mono text-xs">
+                                    {formatCell(cell)}
+                                  </td>
+                                );
+                              }}
                             </For>
                           </tr>
                         )}

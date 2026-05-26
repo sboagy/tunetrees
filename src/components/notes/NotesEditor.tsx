@@ -48,13 +48,11 @@ interface NotesEditorProps {
 /**
  * Get the current theme from the document
  */
-const getCurrentTheme = (): "light" | "dark" => {
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
-};
+const getCurrentTheme = (): "light" | "dark" =>
+  document.documentElement.classList.contains("dark") ? "dark" : "light";
 
-const getJoditTheme = (theme: "light" | "dark"): "default" | "dark" => {
-  return theme === "dark" ? "dark" : "default";
-};
+const getJoditTheme = (theme: "light" | "dark"): "default" | "dark" =>
+  theme === "dark" ? "dark" : "default";
 
 const NOTES_EDITOR_MENU_THEME = {
   light: {
@@ -361,12 +359,12 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
   };
 
   const dataUrlToFile = (dataUrl: string, index: number) => {
-    const matches = dataUrl.match(/^data:(image\/[^;,]+)(;base64)?,(.*)$/);
-    if (!matches) {
+    const execResult = /^data:(image\/[^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
+    if (!execResult) {
       return null;
     }
 
-    const [, mimeType, encodingFlag, payload] = matches;
+    const [, mimeType, encodingFlag, payload] = execResult;
     if (!mimeType || !payload) {
       return null;
     }

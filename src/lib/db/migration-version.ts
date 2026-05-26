@@ -29,7 +29,7 @@ function shouldRefreshPublicRhythmPatternsOnly(
  * @returns The stored schema version string, or null if not set
  */
 export function getLocalSchemaVersion(): string | null {
-  if (typeof window === "undefined") {
+  if (typeof globalThis === "undefined") {
     return null; // SSR safety
   }
   return localStorage.getItem("schema_version");
@@ -41,7 +41,7 @@ export function getLocalSchemaVersion(): string | null {
  * @param version - The schema version to store
  */
 export function setLocalSchemaVersion(version: string): void {
-  if (typeof window === "undefined") {
+  if (typeof globalThis === "undefined") {
     return; // SSR safety
   }
   localStorage.setItem("schema_version", version);
@@ -56,7 +56,7 @@ export function setLocalSchemaVersion(version: string): void {
  * @returns true if migration is needed, false otherwise
  */
 export function needsMigration(): boolean {
-  if (typeof window === "undefined") {
+  if (typeof globalThis === "undefined") {
     return false; // SSR safety
   }
 
@@ -96,7 +96,7 @@ export function needsMigration(): boolean {
  * @returns true if the reset was forced via URL parameter
  */
 export function isForcedReset(): boolean {
-  if (typeof window === "undefined") {
+  if (typeof globalThis === "undefined") {
     return false;
   }
   const urlParams = new URLSearchParams(globalThis.location.search);
@@ -240,7 +240,10 @@ export async function clearLocalDatabaseForMigration(
         try {
           await drizzleDb.delete(table).run();
         } catch (error) {
-          console.warn(`Failed to clear table ${table.toString()}:`, error);
+          console.warn(
+            `Failed to clear table ${JSON.stringify(table)}:`,
+            error
+          );
         }
       }
     }
@@ -258,7 +261,7 @@ export async function clearLocalDatabaseForMigration(
  * This removes ?reset=true and ?migrate=uuid from the URL without reloading the page.
  */
 export function clearMigrationParams(): void {
-  if (typeof window === "undefined") {
+  if (typeof globalThis === "undefined") {
     return;
   }
 

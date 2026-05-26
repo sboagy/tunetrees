@@ -28,7 +28,10 @@
  */
 export function getPracticeDate(): Date {
   // Check for URL override (testing mode only in development/test)
-  if (typeof window !== "undefined") {
+  if (
+    typeof globalThis !== "undefined" &&
+    typeof globalThis.location !== "undefined"
+  ) {
     const params = new URLSearchParams(globalThis.location.search);
     const testDate = params.get("practiceDate");
 

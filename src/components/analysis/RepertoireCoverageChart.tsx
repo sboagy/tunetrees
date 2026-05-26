@@ -91,7 +91,7 @@ export const RepertoireCoverageChart: Component<Props> = (props) => {
               Failed to load data
             </div>
           </Match>
-          <Match when={!coverage.loading && totalTunes() === 0}>
+          <Match when={totalTunes() === 0 && !coverage.loading}>
             <div class="flex h-48 flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
               <span>No tunes in repertoire yet</span>
               <span class="text-xs">Add tunes from the Catalog tab</span>
