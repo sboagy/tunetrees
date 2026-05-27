@@ -21,7 +21,7 @@ async function listUpcomingAudioReferenceUrls(
   lookaheadDays: number
 ): Promise<string[]> {
   const dayModifier = `+${Math.max(0, Math.trunc(lookaheadDays))} day`;
-  const results = await db.all<{ url: string }>(sql`
+  const results = db.all<{ url: string }>(sql`
     WITH scheduled_audio AS (
       SELECT
         r.url AS url,

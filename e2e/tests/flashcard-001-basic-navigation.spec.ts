@@ -59,7 +59,7 @@ test.describe
       await expect(app.flashcardPrevButton).toBeDisabled();
 
       const text = await app.getFlashcardCounterText();
-      const total = parseInt(text.split(" of ")[1] || "0", 10);
+      const total = Number.parseInt(text.split(" of ")[1] || "0", 10);
 
       if (total > 1) {
         await expect(app.flashcardNextButton).toBeEnabled();
@@ -75,7 +75,7 @@ test.describe
       const app = new TuneTreesPage(page);
       await app.enableFlashcardMode();
       const text = await app.getFlashcardCounterText();
-      const total = parseInt(text.split(" of ")[1] || "0", 10);
+      const total = Number.parseInt(text.split(" of ")[1] || "0", 10);
       expect(total).toBeGreaterThanOrEqual(1);
     });
 

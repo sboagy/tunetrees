@@ -96,13 +96,18 @@ vi.mock("jodit", () => ({
 }));
 
 class MockMutationObserver {
-  private static callbacks = new Map<MockMutationObserver, MutationCallback>();
+  private static readonly callbacks = new Map<
+    MockMutationObserver,
+    MutationCallback
+  >();
 
   constructor(callback: MutationCallback) {
     MockMutationObserver.callbacks.set(this, callback);
   }
 
-  observe() {}
+  observe() {
+    // Mock implementation - noop
+  }
 
   disconnect() {
     MockMutationObserver.callbacks.delete(this);
@@ -125,7 +130,7 @@ class MockMutationObserver {
 }
 
 class MockResizeObserver {
-  private static callbacks = new Map<
+  private static readonly callbacks = new Map<
     MockResizeObserver,
     ResizeObserverCallback
   >();
@@ -134,13 +139,17 @@ class MockResizeObserver {
     MockResizeObserver.callbacks.set(this, callback);
   }
 
-  observe() {}
+  observe() {
+    // Mock implementation - noop
+  }
 
   disconnect() {
     MockResizeObserver.callbacks.delete(this);
   }
 
-  unobserve() {}
+  unobserve() {
+    // Mock implementation - noop
+  }
 
   static async notifyAll() {
     await Promise.resolve();
@@ -155,9 +164,9 @@ class MockResizeObserver {
 }
 
 const createdEditors: MockJoditInstance[] = [];
-let originalWindowMutationObserver: typeof window.MutationObserver;
+let originalWindowMutationObserver: typeof globalThis.MutationObserver;
 let originalGlobalMutationObserver: typeof globalThis.MutationObserver;
-let originalWindowResizeObserver: typeof window.ResizeObserver;
+let originalWindowResizeObserver: typeof globalThis.ResizeObserver;
 let originalGlobalResizeObserver: typeof globalThis.ResizeObserver;
 let originalFetch: typeof globalThis.fetch;
 let originalRevokeObjectURL: typeof URL.revokeObjectURL;
@@ -226,19 +235,19 @@ describe("NotesEditor", () => {
     document.documentElement.className = "";
     MockMutationObserver.reset();
     MockResizeObserver.reset();
-    originalWindowMutationObserver = window.MutationObserver;
+    originalWindowMutationObserver = globalThis.MutationObserver;
     originalGlobalMutationObserver = globalThis.MutationObserver;
-    originalWindowResizeObserver = window.ResizeObserver;
+    originalWindowResizeObserver = globalThis.ResizeObserver;
     originalGlobalResizeObserver = globalThis.ResizeObserver;
     originalFetch = globalThis.fetch;
     originalRevokeObjectURL = URL.revokeObjectURL;
 
-    Object.defineProperty(window, "MutationObserver", {
+    Object.defineProperty(globalThis, "MutationObserver", {
       configurable: true,
       writable: true,
       value: MockMutationObserver,
     });
-    Object.defineProperty(window, "ResizeObserver", {
+    Object.defineProperty(globalThis, "ResizeObserver", {
       configurable: true,
       writable: true,
       value: MockResizeObserver,
@@ -263,7 +272,7 @@ describe("NotesEditor", () => {
   });
 
   afterEach(() => {
-    Object.defineProperty(window, "MutationObserver", {
+    Object.defineProperty(globalThis, "MutationObserver", {
       configurable: true,
       writable: true,
       value: originalWindowMutationObserver,
@@ -273,7 +282,7 @@ describe("NotesEditor", () => {
       writable: true,
       value: originalGlobalMutationObserver,
     });
-    Object.defineProperty(window, "ResizeObserver", {
+    Object.defineProperty(globalThis, "ResizeObserver", {
       configurable: true,
       writable: true,
       value: originalWindowResizeObserver,
@@ -394,7 +403,7 @@ describe("NotesEditor", () => {
     const overflowMenu = undoButton.closest(".notes-editor__toolbar-menu");
     expect(overflowMenu).toBeInstanceOf(HTMLElement);
     if (!(overflowMenu instanceof HTMLElement)) {
-      throw new Error(
+      throw new TypeError(
         "Expected overflow menu to be rendered as an HTML element"
       );
     }

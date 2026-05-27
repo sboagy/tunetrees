@@ -349,7 +349,7 @@ async function waitForCatalogSnapshotReady(
     await page.waitForFunction(
       () => {
         const api = (
-          window as unknown as {
+          globalThis as unknown as {
             __ttTestApi?: {
               getCatalogTuneCountsForUser: () => Promise<{
                 total: number;
@@ -793,7 +793,7 @@ setup("authenticate all test users", async ({ browser }) => {
       );
       await page.waitForFunction(
         () =>
-          (window as unknown as { __ttTestApi?: unknown }).__ttTestApi !==
+          (globalThis as unknown as { __ttTestApi?: unknown }).__ttTestApi !==
           undefined,
         { timeout: 30_000 }
       );

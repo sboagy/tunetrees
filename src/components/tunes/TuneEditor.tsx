@@ -135,6 +135,17 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     return formatDateForInput(scheduledOverride || latestDue);
   };
 
+  const getTuneTypeLabel = (
+    tuneType: { name?: string | null; rhythm?: string | null } | undefined,
+    fallback: string
+  ): string => {
+    if (!tuneType) return fallback;
+    if (tuneType.rhythm) {
+      return `${tuneType.name ?? fallback} (${tuneType.rhythm})`;
+    }
+    return tuneType.name ?? fallback;
+  };
+
   // UI state
   const [isSaving, setIsSaving] = createSignal(false);
   const [errors, setErrors] = createSignal<Record<string, string>>({});
@@ -276,7 +287,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
           .from(instrument)
           .where(eq(instrument.id, pl.instrumentRef))
           .limit(1);
-        const resolved = inst && inst.length > 0 ? inst[0].genreDefault : null;
+        const resolved = inst?.length > 0 ? inst[0].genreDefault : null;
         return { ...pl, resolvedGenreDefault: resolved } as any;
       }
       return { ...pl, resolvedGenreDefault: pl.genreDefault } as any;
@@ -288,10 +299,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
     if (
       !props.tune && // new tune
       !genre() && // no existing genre selection
-      currentRepertoire() &&
-      currentRepertoire()!.resolvedGenreDefault
+      currentRepertoire()?.resolvedGenreDefault
     ) {
-      setGenre(currentRepertoire()!.resolvedGenreDefault || "");
+      setGenre(currentRepertoire()?.resolvedGenreDefault || "");
     }
   });
 
@@ -367,10 +377,8 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
       } catch (error) {
         console.error("ABC rendering error:", error);
         // Clear preview on error
-        if (abcPreviewRef) {
-          abcPreviewRef.innerHTML =
-            '<p class="text-red-500 text-sm">Invalid ABC notation</p>';
-        }
+        abcPreviewRef.innerHTML =
+          '<p class="text-red-500 text-sm">Invalid ABC notation</p>';
       }
     } else if (abcPreviewRef) {
       abcPreviewRef.innerHTML =
@@ -510,11 +518,11 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                 </div>
                 <div class="flex min-w-0 flex-1 justify-center px-3">
                   <h2 class="text-center text-lg font-semibold text-gray-900 dark:text-white">
-                    {props.readOnly
-                      ? title()
-                      : props.tune
-                        ? "Edit Tune"
-                        : "Create Tune"}
+                    {((): string => {
+                      if (props.readOnly) return title();
+                      if (props.tune) return "Edit Tune";
+                      return "Create Tune";
+                    })()}
                   </h2>
                 </div>
                 <div class="flex flex-1 justify-end">
@@ -583,12 +591,9 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 <Show when={props.tune?.id}>
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label
-                      for="genre"
-                      class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
-                    >
+                    <div class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right">
                       Id:
-                    </label>
+                    </div>
                     <div class="md:col-span-2">
                       <em class="text-gray-400">{props.tune?.id}</em>
                     </div>
@@ -790,9 +795,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                           );
                           return (
                             <SelectItem item={props.item}>
-                              {tt
-                                ? `${tt.name}${tt.rhythm ? ` (${tt.rhythm})` : ""}`
-                                : String(raw)}
+                              {getTuneTypeLabel(tt, String(raw))}
                             </SelectItem>
                           );
                         }}
@@ -857,9 +860,7 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
                             const tt = opts.find(
                               (x) => String(x.id) === String(tId)
                             );
-                            return tt
-                              ? `${tt.name}${tt.rhythm ? ` (${tt.rhythm})` : ""}`
-                              : tId || "";
+                            return getTuneTypeLabel(tt, tId || "");
                           })()}
                         </p>
                       </div>
@@ -872,16 +873,17 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Structure */}
                 <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-                  <label
-                    for="structure"
+                  <div
+                    id="structure-label"
                     class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Structure:
-                  </label>
+                  </div>
                   <div class="flex-1">
                     <div class="flex items-center gap-2">
                       <input
                         id="structure"
+                        aria-labelledby="structure-label"
                         type="text"
                         value={structure()}
                         onInput={(e) => setStructure(e.currentTarget.value)}
@@ -932,16 +934,17 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Mode */}
                 <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-                  <label
-                    for="mode"
+                  <div
+                    id="mode-label"
                     class="h-9 flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Mode:
-                  </label>
+                  </div>
                   <div class="flex-1">
                     <div class="flex items-center gap-2">
                       <input
                         id="mode"
+                        aria-labelledby="mode-label"
                         type="text"
                         value={mode()}
                         onInput={(e) => setMode(e.currentTarget.value)}
@@ -988,16 +991,17 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Incipit */}
                 <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
-                  <label
-                    for="incipit"
+                  <div
+                    id="incipit-label"
                     class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Incipit:
-                  </label>
+                  </div>
                   <div class="flex-1 space-y-2">
                     <div class="flex items-center gap-2">
                       <textarea
                         id="incipit"
+                        aria-labelledby="incipit-label"
                         value={incipit()}
                         onInput={(e) => setIncipit(e.currentTarget.value)}
                         placeholder="ABC notation (e.g., |:DFA dAF|GBE gBE|...)"
@@ -1050,17 +1054,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Composer */}
                 <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
-                  <label
-                    for="composer"
+                  <div
+                    id="composer-label"
                     class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Composer:
-                  </label>
+                  </div>
                   <div class="flex-1 space-y-2">
                     <div class="flex items-center gap-2">
                       <input
                         type="text"
                         id="composer"
+                        aria-labelledby="composer-label"
                         value={composer()}
                         onInput={(e) => setComposer(e.currentTarget.value)}
                         placeholder="e.g., Bach, Mozart (Classical/Choral)"
@@ -1108,17 +1113,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Artist */}
                 <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
-                  <label
-                    for="artist"
+                  <div
+                    id="artist-label"
                     class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Artist:
-                  </label>
+                  </div>
                   <div class="flex-1 space-y-2">
                     <div class="flex items-center gap-2">
                       <input
                         type="text"
                         id="artist"
+                        aria-labelledby="artist-label"
                         value={artist()}
                         onInput={(e) => setArtist(e.currentTarget.value)}
                         placeholder="e.g., Beatles, Miles Davis (Pop/Rock/Jazz)"
@@ -1166,17 +1172,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Release Year */}
                 <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
-                  <label
-                    for="release_year"
+                  <div
+                    id="release-year-label"
                     class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     Release Year:
-                  </label>
+                  </div>
                   <div class="flex-1 space-y-2">
                     <div class="flex items-center gap-2">
                       <input
                         type="number"
                         id="release_year"
+                        aria-labelledby="release-year-label"
                         value={releaseYear()}
                         onInput={(e) => setReleaseYear(e.currentTarget.value)}
                         placeholder="e.g., 1969"
@@ -1229,17 +1236,18 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* External ID */}
                 <div class="flex flex-col md:flex-row md:items-start gap-1 md:gap-2">
-                  <label
-                    for="id_foreign"
+                  <div
+                    id="id-foreign-label"
                     class="pt-2 flex text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right md:w-40 w-full md:justify-end"
                   >
                     External ID:
-                  </label>
+                  </div>
                   <div class="flex-1 space-y-2">
                     <div class="flex items-center gap-2">
                       <input
                         type="text"
                         id="id_foreign"
+                        aria-labelledby="id-foreign-label"
                         value={idForeign()}
                         onInput={(e) => setIdForeign(e.currentTarget.value)}
                         placeholder="Spotify ID, YouTube ID, etc."
@@ -1309,15 +1317,16 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                 {/* Request Public */}
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                  <label
-                    for="request-public"
+                  <div
+                    id="request-public-label"
                     class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                   >
                     Request Public:
-                  </label>
+                  </div>
                   <div class="md:col-span-2">
                     <input
                       id="request-public"
+                      aria-labelledby="request-public-label"
                       type="checkbox"
                       checked={requestPublic()}
                       onChange={(e) =>
@@ -1345,15 +1354,16 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                   {/* Learned Date */}
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label
-                      for="learned"
+                    <div
+                      id="learned-label"
                       class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
                       <em>Learned Date:</em>
-                    </label>
+                    </div>
                     <div class="md:col-span-2">
                       <input
                         id="learned"
+                        aria-labelledby="learned-label"
                         type="datetime-local"
                         value={learned()}
                         onInput={(e) => setLearned(e.currentTarget.value)}
@@ -1366,15 +1376,16 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                   {/* Practice Goal */}
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label
-                      for="goal"
+                    <div
+                      id="goal-label"
                       class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
                       Practice Goal:
-                    </label>
+                    </div>
                     <div class="md:col-span-2">
                       <select
                         id="goal"
+                        aria-labelledby="goal-label"
                         value={goal()}
                         onChange={(e) => setGoal(e.currentTarget.value)}
                         disabled={isFormReadOnly()}
@@ -1394,15 +1405,16 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                   {/* Schedule Override */}
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label
-                      for="scheduled"
+                    <div
+                      id="scheduled-label"
                       class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
                       Schedule Override:
-                    </label>
+                    </div>
                     <div class="md:col-span-2">
                       <input
                         id="scheduled"
+                        aria-labelledby="scheduled-label"
                         type="datetime-local"
                         value={scheduled()}
                         onInput={(e) => setScheduled(e.currentTarget.value)}
@@ -1419,15 +1431,16 @@ export const TuneEditor: Component<TuneEditorProps> = (props) => {
 
                   {/* Next Review (Computed - Read Only) */}
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label
-                      for="current"
+                    <div
+                      id="current-label"
                       class="text-sm font-medium text-gray-700 dark:text-gray-300 md:text-right"
                     >
                       Next Review (Computed):
-                    </label>
+                    </div>
                     <div class="md:col-span-2">
                       <input
                         id="current"
+                        aria-labelledby="current-label"
                         type="text"
                         value={
                           computedNextReview()

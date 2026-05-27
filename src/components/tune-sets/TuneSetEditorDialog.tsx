@@ -184,8 +184,8 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleSave = async () => {
@@ -318,12 +318,11 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
         data-testid="tune-set-editor-backdrop"
       />
 
-      <div
+      <dialog
         class="fixed left-1/2 top-1/2 z-[70] w-[95vw] max-w-2xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="tune-set-editor-title"
         data-testid="tune-set-editor-dialog"
+        open
       >
         <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
           <header class="flex justify-between items-center w-full mb-4">
@@ -386,6 +385,7 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
           >
             <div class="space-y-2">
               <label
+                id="tune-set-name-label"
                 for="tune-set-name"
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
@@ -403,12 +403,14 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                     ? "Festival opener"
                     : "Warm-up set"
                 }
+                aria-labelledby="tune-set-name-label"
                 data-testid="tune-set-name-input"
               />
             </div>
 
             <div class="space-y-2">
               <label
+                id="tune-set-description-label"
                 for="tune-set-description"
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300"
               >
@@ -425,6 +427,7 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
                     ? "Optional notes about when to use this setlist"
                     : "Optional notes about when to use this set"
                 }
+                aria-labelledby="tune-set-description-label"
                 data-testid="tune-set-description-input"
               />
             </div>
@@ -532,7 +535,7 @@ export const TuneSetEditorDialog: Component<TuneSetEditorDialogProps> = (
             </Show>
           </Show>
         </div>
-      </div>
+      </dialog>
 
       <TunePickerDialog
         isOpen={showTunePicker()}

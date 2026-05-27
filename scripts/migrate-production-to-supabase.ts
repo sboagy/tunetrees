@@ -39,6 +39,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { execSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import BetterSqlite3 from "better-sqlite3";
 import * as dotenv from "dotenv";
@@ -46,6 +47,10 @@ import postgres from "postgres";
 import { getCatalogInstrumentUuid } from "../src/lib/db/catalog-instrument-ids.js";
 import { getCatalogTuneUuid } from "../src/lib/db/catalog-tune-ids.js";
 import { generateId } from "../src/lib/utils/uuid.js";
+
+function generateTemporaryPassword(): string {
+  return randomBytes(24).toString("base64url");
+}
 
 // ============================================================================
 // Helper: Get Service Role Key from Supabase
@@ -203,21 +208,24 @@ const tuneIdMapping = new Map<number, string>();
 const practiceRecordIdMapping = new Map<number, string>();
 const dailyPracticeQueueIdMapping = new Map<number, string>();
 const noteIdMapping = new Map<number, string>();
-const referenceIdMapping = new Map<string, string>(); // Key is URL (PK)
 const tagIdMapping = new Map<string, string>(); // Composite key: "user_ref:tune_ref:tag_text"
 // Note: tune_override uses (tune_ref, user_ref) as composite PK - no separate UUID
-const tableTransientDataIdMapping = new Map<number, string>();
-const tableStateIdMapping = new Map<number, string>();
+const tableTransientDataIdMapping = new Map<number, string>(); // NOSONAR
+const tableStateIdMapping = new Map<number, string>(); // NOSONAR
 const tabGroupMainStateIdMapping = new Map<number, string>();
+const referenceIdMapping = new Map<string, string>(); // NOSONAR
 
 // Instrument mapping: SQLite integer ID → Generated UUID
 const instrumentIdMapping = new Map<number, string>();
-// Also map instrument name → UUID for lookups
-const instrumentNameMapping = new Map<string, string>();
+const instrumentNameMapping = new Map<string, string>(); // NOSONAR
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+function nonNull<T>(value: T | null | undefined): value is T {
+  return value != null;
+}
 
 function now(): string {
   return new Date().toISOString();
@@ -261,7 +269,8 @@ async function checkAndInstallSchema() {
       ) as table_exists
     `;
 
-    if (!tableCheck[0]?.table_exists) {
+    const tableExists = tableCheck[0]?.table_exists ?? false;
+    if (tableExists === false) {
       console.log(
         "⚠️  Schema not found. Installing schema from sql_scripts/create-uuid-schema.sql...\n"
       );
@@ -363,7 +372,6 @@ async function migrateUsers() {
   console.log("\n📊 Phase 1: Migrating Users");
   console.log(`=${"=".repeat(59)}`);
 
-  // Skip user_id=0 (public-all-psuedo user with null email)
   const users = sqlite
     .prepare("SELECT * FROM user WHERE deleted = 0 AND id != 0")
     .all() as any[];
@@ -372,103 +380,10 @@ async function migrateUsers() {
 
   for (const user of users) {
     try {
-      let supabaseAuthUserId: string;
-      let userProfileId: string;
+      const userProfileId = await ensureAuthUser(user);
+      if (!userProfileId) continue;
 
-      // Check if auth user already exists by email
-      const existingAuthUser = await sql<{ id: string }[]>`
-        SELECT id FROM auth.users WHERE email = ${user.email}
-      `;
-
-      if (existingAuthUser.length > 0) {
-        // User already exists - use their UUID
-        supabaseAuthUserId = existingAuthUser[0].id;
-        userProfileId = existingAuthUser[0].id;
-        console.log(
-          `✓ User ${user.id} (${user.email}) → Using existing auth user UUID ${supabaseAuthUserId}`
-        );
-      } else {
-        // Create auth user using Supabase Admin API (works with proper JWT service role key)
-        try {
-          const { data: authData, error: authError } =
-            await supabase.auth.admin.createUser({
-              email: user.email,
-              password: "MigratedUser123!",
-              email_confirm: true,
-              user_metadata: {
-                name: user.name,
-                migrated_from_sqlite: true,
-                original_sqlite_id: user.id,
-                migration_date: now(),
-              },
-            });
-
-          if (authError) {
-            console.error(
-              `✗ Failed to create auth user via Admin API for ${user.email}:`,
-              authError.message
-            );
-            continue;
-          }
-
-          if (!authData.user) {
-            console.error(
-              `✗ No user returned from Admin API for ${user.email}`
-            );
-            continue;
-          }
-
-          supabaseAuthUserId = authData.user.id;
-          userProfileId = authData.user.id;
-
-          console.log(
-            `✓ User ${user.id} (${user.email}) → Created auth user UUID ${supabaseAuthUserId}`
-          );
-        } catch (authApiError: any) {
-          console.error(
-            `✗ Failed to create auth user for ${user.email}:`,
-            authApiError.message
-          );
-          continue;
-        }
-      }
-
-      // Insert into user_profile using direct SQL (bypasses PostgREST cache issue)
-      try {
-        console.log(
-          `Trying to insert into user_profile ${user.email} as ${userProfileId}`
-        );
-        await sql`
-          INSERT INTO user_profile (
-            id, name, email, sr_alg_type, phone, phone_verified,
-            acceptable_delinquency_window, avatar_url, deleted, sync_version, last_modified_at, device_id
-          ) VALUES (
-            ${userProfileId}, ${user.name}, ${user.email},
-            ${user.sr_alg_type || null}, ${user.phone || null},
-            ${sqliteTimestampToPostgres(user.phone_verified)},
-            ${user.acceptable_delinquency_window || 21}, ${
-              user.avatar_url || null
-            }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
-          )
-          ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            email = EXCLUDED.email,
-            sr_alg_type = EXCLUDED.sr_alg_type,
-            phone = EXCLUDED.phone,
-            phone_verified = EXCLUDED.phone_verified,
-            acceptable_delinquency_window = EXCLUDED.acceptable_delinquency_window,
-            avatar_url = EXCLUDED.avatar_url,
-            last_modified_at = EXCLUDED.last_modified_at
-        `;
-      } catch (profileError: any) {
-        console.error(
-          `✗ Failed to insert user_profile for ${user.email}:`,
-          profileError.message
-        );
-        continue;
-      }
-
-      // Store mapping: SQLite integer ID → Generated UUID
+      await insertUserProfile(user, userProfileId);
       userIdMapping.set(user.id, userProfileId);
     } catch (error) {
       console.error(`✗ Error migrating user ${user.id}:`, error);
@@ -484,6 +399,81 @@ async function migrateUsers() {
   );
 }
 
+async function ensureAuthUser(user: any): Promise<string | null> {
+  const existingAuthUser = await sql<{ id: string }[]>`
+    SELECT id FROM auth.users WHERE email = ${user.email}
+  `;
+
+  if (existingAuthUser.length > 0) {
+    console.log(
+      `✓ User ${user.id} (${user.email}) → Using existing auth user UUID ${existingAuthUser[0].id}`
+    );
+    return existingAuthUser[0].id;
+  }
+
+  const { data: authData, error: authError } =
+    await supabase.auth.admin.createUser({
+      email: user.email,
+      password: generateTemporaryPassword(),
+      email_confirm: true,
+      user_metadata: {
+        name: user.name,
+        migrated_from_sqlite: true,
+        original_sqlite_id: user.id,
+        migration_date: now(),
+      },
+    });
+
+  if (authError || !authData.user) {
+    console.error(
+      `✗ Failed to create auth user for ${user.email}:`,
+      authError?.message ?? "No user returned"
+    );
+    return null;
+  }
+
+  console.log(
+    `✓ User ${user.id} (${user.email}) → Created auth user UUID ${authData.user.id}`
+  );
+  return authData.user.id;
+}
+
+async function insertUserProfile(user: any, userProfileId: string) {
+  try {
+    console.log(
+      `Trying to insert into user_profile ${user.email} as ${userProfileId}`
+    );
+    await sql`
+      INSERT INTO user_profile (
+        id, name, email, sr_alg_type, phone, phone_verified,
+        acceptable_delinquency_window, avatar_url, deleted, sync_version, last_modified_at, device_id
+      ) VALUES (
+        ${userProfileId}, ${user.name}, ${user.email},
+        ${user.sr_alg_type || null}, ${user.phone || null},
+        ${sqliteTimestampToPostgres(user.phone_verified)},
+        ${user.acceptable_delinquency_window || 21}, ${
+          user.avatar_url || null
+        }, false, 1, ${now()}, ${MIGRATION_DEVICE_ID}
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        email = EXCLUDED.email,
+        sr_alg_type = EXCLUDED.sr_alg_type,
+        phone = EXCLUDED.phone,
+        phone_verified = EXCLUDED.phone_verified,
+        acceptable_delinquency_window = EXCLUDED.acceptable_delinquency_window,
+        avatar_url = EXCLUDED.avatar_url,
+        last_modified_at = EXCLUDED.last_modified_at
+    `;
+  } catch (profileError: any) {
+    console.error(
+      `✗ Failed to insert user_profile for ${user.email}:`,
+      profileError.message
+    );
+    throw profileError;
+  }
+}
+
 // ============================================================================
 // Phase 2: Migrate Reference Data (genres, tune_types, instruments)
 // ============================================================================
@@ -492,141 +482,125 @@ async function migrateReferenceData() {
   console.log("\n📊 Phase 2: Migrating Reference Data");
   console.log(`=${"=".repeat(59)}`);
 
-  // Genres (id is TEXT in both schemas)
-  console.log("\nMigrating genres...");
-  const genres = sqlite.prepare("SELECT * FROM genre").all() as any[];
-
-  if (genres.length > 0) {
-    const supabaseGenres = genres.map((g) => ({
+  await migrateSimpleTable(
+    "genre",
+    sqlite.prepare("SELECT * FROM genre").all(),
+    (g: any) => ({
       id: g.id,
       name: g.name || null,
       region: g.region || null,
       description: g.description || null,
-    }));
+    }),
+    { onConflict: "id" }
+  );
 
-    const { error } = await supabase
-      .from("genre")
-      .upsert(supabaseGenres, { onConflict: "id" });
-    if (error) {
-      console.error("Error migrating genres:", error);
-    } else {
-      console.log(`✓ Migrated ${genres.length} genres`);
-    }
-  }
-
-  // Tune Types (id is TEXT in both schemas)
-  console.log("\nMigrating tune types...");
-  const tuneTypes = sqlite.prepare("SELECT * FROM tune_type").all() as any[];
-
-  if (tuneTypes.length > 0) {
-    const supabaseTuneTypes = tuneTypes.map((tt) => ({
+  await migrateSimpleTable(
+    "tune_type",
+    sqlite.prepare("SELECT * FROM tune_type").all(),
+    (tt: any) => ({
       id: tt.id,
       name: tt.name || null,
       rhythm: tt.rhythm || null,
       description: tt.description || null,
-    }));
+    }),
+    { onConflict: "id" }
+  );
 
-    const { error } = await supabase
-      .from("tune_type")
-      .upsert(supabaseTuneTypes, { onConflict: "id" });
-    if (error) {
-      console.error("Error migrating tune types:", error);
-    } else {
-      console.log(`✓ Migrated ${tuneTypes.length} tune types`);
-    }
+  await migrateGenreTuneTypes();
+
+  await migrateSingleInstruments();
+
+  console.log("\n✅ Reference data migration complete");
+}
+
+async function migrateSimpleTable(
+  tableName: string,
+  rows: any[],
+  mapper: (row: any) => Record<string, unknown>,
+  upsertOpts: { onConflict: string }
+) {
+  console.log(`\nMigrating ${tableName}...`);
+  if (rows.length === 0) return;
+
+  const records = rows.map(mapper);
+  const { error } = await supabase.from(tableName).upsert(records, upsertOpts);
+  if (error) {
+    console.error(`Error migrating ${tableName}:`, error);
+  } else {
+    console.log(`✓ Migrated ${records.length} ${tableName}`);
   }
+}
 
-  // Genre-TuneType relationships
+async function migrateGenreTuneTypes() {
   console.log("\nMigrating genre-tune type relationships...");
-  const genreTuneTypes = sqlite
-    .prepare("SELECT * FROM genre_tune_type")
-    .all() as any[];
+  const rows = sqlite.prepare("SELECT * FROM genre_tune_type").all() as any[];
+  if (rows.length === 0) return;
 
-  if (genreTuneTypes.length > 0) {
-    // Skip orphaned BluesBallad reference (tune type doesn't exist)
-    const validGenreTuneTypes = genreTuneTypes.filter(
-      (gtt: any) => gtt.tune_type_id !== "BluesBallad"
+  const valid = rows.filter((gtt: any) => gtt.tune_type_id !== "BluesBallad");
+  if (valid.length < rows.length) {
+    console.log(
+      `⚠️  Skipped ${rows.length - valid.length} orphaned genre-tune type relationships`
     );
-
-    if (validGenreTuneTypes.length < genreTuneTypes.length) {
-      console.log(
-        `⚠️  Skipped ${
-          genreTuneTypes.length - validGenreTuneTypes.length
-        } orphaned genre-tune type relationships`
-      );
-    }
-
-    const supabaseGTT = validGenreTuneTypes.map((gtt: any) => ({
-      genre_id: gtt.genre_id,
-      tune_type_id: gtt.tune_type_id,
-    }));
-
-    const { error } = await supabase
-      .from("genre_tune_type")
-      .upsert(supabaseGTT, { onConflict: "genre_id,tune_type_id" });
-    if (error) {
-      console.error("Error migrating genre_tune_type:", error);
-    } else {
-      console.log(
-        `✓ Migrated ${validGenreTuneTypes.length} genre-tune type relationships`
-      );
-    }
   }
 
-  // Instruments (INTEGER in SQLite → UUID in PostgreSQL)
+  const records = valid.map((gtt: any) => ({
+    genre_id: gtt.genre_id,
+    tune_type_id: gtt.tune_type_id,
+  }));
+  const { error } = await supabase
+    .from("genre_tune_type")
+    .upsert(records, { onConflict: "genre_id,tune_type_id" });
+  if (error) {
+    console.error("Error migrating genre_tune_type:", error);
+  } else {
+    console.log(`✓ Migrated ${records.length} genre-tune type relationships`);
+  }
+}
+
+async function migrateSingleInstruments() {
   console.log("\nMigrating instruments...");
   const instruments = sqlite
     .prepare("SELECT * FROM instrument WHERE deleted = 0")
     .all() as any[];
+  if (instruments.length === 0) return;
 
-  if (instruments.length > 0) {
-    // Migrate each instrument
-    for (const inst of instruments) {
-      const instrumentName = inst.instrument;
-
-      // Use catalog instrument UUID if this is a catalog instrument (legacy IDs 1-8)
-      // Otherwise generate a new UUID for private instruments
-      const instrumentUuid =
-        inst.id >= 1 && inst.id <= 8
-          ? getCatalogInstrumentUuid(inst.id)
-          : generateId();
-      instrumentIdMapping.set(inst.id, instrumentUuid);
-      instrumentNameMapping.set(instrumentName, instrumentUuid);
-
-      // Map private_to_user from integer ID to UUID
-      const privateToUserUuid = inst.private_to_user
-        ? userIdMapping.get(inst.private_to_user)
-        : null;
-
-      // Insert new instrument
-      const { error } = await supabase.from("instrument").insert({
-        id: instrumentUuid, // UUID instead of integer
-        private_to_user: privateToUserUuid || null, // UUID reference
-        instrument: instrumentName,
-        description: inst.description || null,
-        genre_default: inst.genre_default || null,
-        deleted: false,
-        sync_version: 1,
-        last_modified_at: now(),
-        device_id: MIGRATION_DEVICE_ID,
-      });
-
-      if (error) {
-        console.error(`Error inserting instrument ${instrumentName}:`, error);
-      } else {
-        console.log(
-          `✓ Migrated instrument: ${instrumentName} → UUID ${instrumentUuid.substring(
-            0,
-            8
-          )}...`
-        );
-      }
-    }
-
-    console.log(`✓ Total instruments: ${instrumentIdMapping.size}`);
+  for (const inst of instruments) {
+    await migrateSingleInstrument(inst);
   }
+  console.log(`✓ Total instruments: ${instrumentIdMapping.size}`);
+}
 
-  console.log("\n✅ Reference data migration complete");
+async function migrateSingleInstrument(inst: any) {
+  const instrumentName = inst.instrument;
+  const instrumentUuid =
+    inst.id >= 1 && inst.id <= 8
+      ? getCatalogInstrumentUuid(inst.id)
+      : generateId();
+
+  instrumentIdMapping.set(inst.id, instrumentUuid);
+  instrumentNameMapping.set(instrumentName, instrumentUuid);
+
+  const { error } = await supabase.from("instrument").insert({
+    id: instrumentUuid,
+    private_to_user: inst.private_to_user
+      ? userIdMapping.get(inst.private_to_user) || null
+      : null,
+    instrument: instrumentName,
+    description: inst.description || null,
+    genre_default: inst.genre_default || null,
+    deleted: false,
+    sync_version: 1,
+    last_modified_at: now(),
+    device_id: MIGRATION_DEVICE_ID,
+  });
+
+  if (error) {
+    console.error(`Error inserting instrument ${instrumentName}:`, error);
+  } else {
+    console.log(
+      `✓ Migrated instrument: ${instrumentName} → UUID ${instrumentUuid.substring(0, 8)}...`
+    );
+  }
 }
 
 // ============================================================================
@@ -675,11 +649,11 @@ async function migrateTunes() {
     let genreValue = tune.genre || "ITRAD";
 
     // data hack time!
-    if (tune.type === "BREAKDOWN") {
-      genreValue = "BGRA";
-    } else if (tune.title?.trim() === "Turkey in the Straw") {
-      genreValue = "BGRA";
-    } else if (tune.title?.trim() === "Bile Dem Cabbage Down") {
+    if (
+      tune.type === "BREAKDOWN" ||
+      tune.title?.trim() === "Turkey in the Straw" ||
+      tune.title?.trim() === "Bile Dem Cabbage Down"
+    ) {
       genreValue = "BGRA";
     }
 
@@ -780,7 +754,7 @@ async function migrateTuneOverrides() {
         device_id: MIGRATION_DEVICE_ID,
       };
     })
-    .filter((to: any) => to !== null); // Remove nulls from failed mappings
+    .filter(nonNull);
 
   if (supabaseTuneOverrides.length > 0) {
     const { error } = await supabase
@@ -912,7 +886,7 @@ async function migratePlaylistTunes() {
         device_id: MIGRATION_DEVICE_ID,
       };
     })
-    .filter((pt: any) => pt !== null); // Remove failed mappings
+    .filter(nonNull); // Remove failed mappings
 
   console.log(
     `Migrating ${supabasePlaylistTunes.length} valid relationships\n`
@@ -1000,7 +974,7 @@ async function migratePracticeRecords() {
         device_id: MIGRATION_DEVICE_ID,
       };
     })
-    .filter((pr: any) => pr !== null); // Remove failed mappings
+    .filter(nonNull); // Remove failed mappings
 
   // Batch insert
   for (let i = 0; i < supabasePracticeRecords.length; i += BATCH_SIZE) {
@@ -1076,7 +1050,7 @@ async function migrateNotes() {
         device_id: MIGRATION_DEVICE_ID,
       };
     })
-    .filter((note: any) => note !== null); // Remove failed mappings
+    .filter(nonNull); // Remove failed mappings
 
   const { error } = await supabase
     .from("note")
@@ -1135,7 +1109,7 @@ async function migrateReferences() {
         device_id: MIGRATION_DEVICE_ID,
       };
     })
-    .filter((ref: any) => ref !== null); // Remove failed mappings
+    .filter(nonNull); // Remove failed mappings
 
   // Batch insert references
   for (let i = 0; i < supabaseReferences.length; i += BATCH_SIZE) {
@@ -1195,7 +1169,7 @@ async function migrateTags() {
         device_id: MIGRATION_DEVICE_ID,
       };
     })
-    .filter((tag: any) => tag !== null); // Remove failed mappings
+    .filter(nonNull); // Remove failed mappings
 
   const { error } = await supabase
     .from("tag")
@@ -1251,7 +1225,7 @@ async function migratePreferences() {
           device_id: MIGRATION_DEVICE_ID,
         };
       })
-      .filter((pref: any) => pref !== null);
+      .filter(nonNull);
 
     const { error } = await supabase
       .from("prefs_spaced_repetition")
@@ -1298,7 +1272,7 @@ async function migratePreferences() {
           device_id: MIGRATION_DEVICE_ID,
         };
       })
-      .filter((pref: any) => pref !== null);
+      .filter(nonNull);
 
     const { error } = await supabase
       .from("prefs_scheduling_options")
@@ -1391,7 +1365,7 @@ async function migrateDailyPracticeQueue() {
           device_id: MIGRATION_DEVICE_ID,
         };
       })
-      .filter((record: any) => record !== null);
+      .filter(nonNull);
 
     const { error } = await supabase
       .from("daily_practice_queue")
@@ -1474,7 +1448,7 @@ async function migrateUIStateTables() {
           device_id: MIGRATION_DEVICE_ID,
         };
       })
-      .filter((state: any) => state !== null);
+      .filter(nonNull);
 
     const { error } = await supabase
       .from("tab_group_main_state")
@@ -1530,7 +1504,7 @@ async function migrateUIStateTables() {
           device_id: MIGRATION_DEVICE_ID,
         };
       })
-      .filter((state: any) => state !== null);
+      .filter(nonNull);
 
     const { error } = await supabase
       .from("table_state")
@@ -1599,7 +1573,7 @@ async function migrateUIStateTables() {
           device_id: MIGRATION_DEVICE_ID,
         };
       })
-      .filter((data: any) => data !== null);
+      .filter(nonNull);
 
     const { error } = await supabase
       .from("table_transient_data")
@@ -1642,9 +1616,14 @@ function convertSqliteToPostgres(sqliteSql: string): string {
       // Replace integer boolean comparisons with proper boolean
       .replace(/\.favorite\s*=\s*1/gi, ".favorite = true")
       .replace(/\.favorite\s*=\s*0/gi, ".favorite = false")
-      // Replace SQLite's legacy latest-record pattern with PostgreSQL DISTINCT ON
+      // Replace SQLite's legacy latest-record pattern with PostgreSQL DISTINCT ON.
+      // Break into two passes to avoid a single high-complexity regex.
       .replace(
-        /INNER JOIN \(\s*SELECT\s+tune_ref,\s+playlist_ref,\s+MAX\(id\)\s+[aA][sS]\s+max_id\s+FROM\s+practice_record\s+GROUP BY\s+tune_ref,\s+playlist_ref\s*\)\s+latest\s+ON\s+pr\.tune_ref\s*=\s*latest\.tune_ref\s+AND\s+pr\.playlist_ref\s*=\s*latest\.playlist_ref\s+AND\s+pr\.id\s*=\s*latest\.max_id/gi,
+        /INNER JOIN\s*\(\s*SELECT\s+tune_ref,\s+playlist_ref,\s+MAX\(id\)\s+AS\s+max_id\s+FROM\s+practice_record\s+GROUP BY\s+tune_ref,\s+playlist_ref\s*\)\s+latest/gi,
+        ""
+      )
+      .replace(
+        /ON\s+pr\.tune_ref\s*=\s*latest\.tune_ref\s+AND\s+pr\.playlist_ref\s*=\s*latest\.playlist_ref\s+AND\s+pr\.id\s*=\s*latest\.max_id/gi,
         ""
       )
       // Clean up the practice_record subquery to use timestamp-ordered DISTINCT ON
@@ -1821,7 +1800,7 @@ async function verifyMigration() {
 // Main Migration
 // ============================================================================
 
-async function main() {
+{
   console.log("\n");
   console.log("═".repeat(60));
   console.log("  TUNETREES PRODUCTION DATA MIGRATION");
@@ -1871,6 +1850,3 @@ async function main() {
     await sql.end(); // Close Postgres connection pool
   }
 }
-
-// Run migration
-main();

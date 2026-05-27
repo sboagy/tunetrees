@@ -35,8 +35,8 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
   const EDGE_THRESHOLD = 96; // px from edge considered a drop zone
 
   const pickZoneFromPoint = (x: number, y: number): DockPosition | null => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vw = globalThis.innerWidth;
+    const vh = globalThis.innerHeight;
     const leftDist = x;
     const rightDist = vw - x;
     const bottomDist = vh - y;
@@ -96,28 +96,28 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     // Release capture (guard errors in case capture wasn't set)
     try {
       buttonRef?.releasePointerCapture(e.pointerId);
-    } catch (_) {
-      // ignore
+    } catch {
+      // Release may fail if pointer was not captured; non-critical.
     }
     pointerId = null;
     endPointerDrag(true, e.clientX, e.clientY);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    window.removeEventListener("pointercancel", onPointerCancel);
+    globalThis.removeEventListener("pointermove", onPointerMove);
+    globalThis.removeEventListener("pointerup", onPointerUp);
+    globalThis.removeEventListener("pointercancel", onPointerCancel);
   };
 
   const onPointerCancel = (e: PointerEvent) => {
     if (pointerId === null || e.pointerId !== pointerId) return;
     try {
       buttonRef?.releasePointerCapture(e.pointerId);
-    } catch (_) {
-      // ignore
+    } catch {
+      // Release may fail if pointer was not captured; non-critical.
     }
     pointerId = null;
     endPointerDrag(false, e.clientX, e.clientY);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    window.removeEventListener("pointercancel", onPointerCancel);
+    globalThis.removeEventListener("pointermove", onPointerMove);
+    globalThis.removeEventListener("pointerup", onPointerUp);
+    globalThis.removeEventListener("pointercancel", onPointerCancel);
   };
 
   const onPointerDown = (e: PointerEvent) => {
@@ -132,12 +132,13 @@ export const SidebarDragHandle: Component<SidebarDragHandleProps> = (props) => {
     setShowMenu(false);
     try {
       buttonRef?.setPointerCapture(e.pointerId);
-    } catch (_) {
-      /* ignore */
+    } catch {
+      // setPointerCapture may fail if element is detached; non-critical.
+      void 0;
     }
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    window.addEventListener("pointercancel", onPointerCancel);
+    globalThis.addEventListener("pointermove", onPointerMove);
+    globalThis.addEventListener("pointerup", onPointerUp);
+    globalThis.addEventListener("pointercancel", onPointerCancel);
   };
 
   // Keep legacy drag handlers in case some browsers still try HTML5 DnD,

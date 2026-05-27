@@ -85,10 +85,8 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     setIsSubmitting(true);
 
     try {
-      const injectedTestUserId =
-        typeof window !== "undefined"
-          ? (window as { __ttTestUserId?: string }).__ttTestUserId
-          : undefined;
+      const injectedTestUserId = (globalThis as { __ttTestUserId?: string })
+        .__ttTestUserId;
       if (injectedTestUserId) {
         await signInAnonymously(injectedTestUserId);
         props.onSuccess?.();
@@ -235,7 +233,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         emailVal,
         {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${globalThis.location.origin}/auth/callback`,
         }
       );
 
@@ -255,10 +253,8 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
       {/* Forgot Password Modal */}
       <Show when={showForgotPassword()}>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div
+          <dialog
             class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
-            role="dialog"
-            aria-modal="true"
             aria-labelledby="reset-password-title"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
@@ -358,7 +354,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 </div>
               </form>
             </Show>
-          </div>
+          </dialog>
         </div>
       </Show>
 

@@ -36,8 +36,8 @@ export const TunePickerDialog: Component<TunePickerDialogProps> = (props) => {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const existingTuneIdSet = createMemo(
@@ -82,12 +82,12 @@ export const TunePickerDialog: Component<TunePickerDialogProps> = (props) => {
         data-testid="tune-picker-backdrop"
       />
 
-      <div
-        class="fixed left-1/2 top-1/2 z-[90] w-[95vw] max-w-3xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
-        role="dialog"
+      <dialog
+        class="fixed left-1/2 top-1/2 z-[90] w-[95vw] max-w-3xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 m-0"
         aria-modal="true"
         aria-labelledby="tune-picker-title"
         data-testid="tune-picker-dialog"
+        open
       >
         <div class="flex items-start justify-between gap-4 border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
           <div>
@@ -228,7 +228,7 @@ export const TunePickerDialog: Component<TunePickerDialogProps> = (props) => {
             </div>
           </div>
         </div>
-      </div>
+      </dialog>
     </Show>
   );
 };

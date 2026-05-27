@@ -117,15 +117,16 @@ test.describe("NOTES-002: Notes Drag Reorder", () => {
     await ttPage.dispatchHtml5DragAndDrop(firstDragHandle, secondNoteItem);
 
     // Verify order changed - second note should now be first
-    // try for a few times
-    let newFirstNoteTestId: string | null = null;
-    for (let i = 0; i < 10; i++) {
-      newFirstNoteTestId = await noteItems.first().getAttribute("data-testid");
-      if (newFirstNoteTestId === `note-item-${secondNoteId}`) {
-        break;
-      }
-      await page.waitForTimeout(20);
-    }
-    expect(newFirstNoteTestId).toBe(`note-item-${secondNoteId}`);
+    // Use expect.poll to wait for the async handleDrop pipeline
+    // (updateNoteOrder → persistDb → refetch → SolidJS re-render) to complete.
+    await expect
+      .poll(
+        async () => {
+          const id = await noteItems.first().getAttribute("data-testid");
+          return id;
+        },
+        { timeout: 5000, intervals: [100, 250, 500, 1000, 3000] }
+      )
+      .toBe(`note-item-${secondNoteId}`);
   });
 });

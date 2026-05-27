@@ -61,9 +61,7 @@ interface StoredAudioPlayerState {
 
 interface WaveformAudioPlayerProps {
   track: AudioPlayerTrack;
-  onPersistRequestChange?:
-    | ((handler: (() => Promise<void>) | null) => void)
-    | undefined;
+  onPersistRequestChange?: (handler: (() => Promise<void>) | null) => void;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -219,9 +217,9 @@ function buildRetypedAnnotationLabel(
     return nextLabel;
   }
 
-  const defaultLabelMatch = currentLabel.match(
-    new RegExp(`^${previousLabel}(\\s+\\d+)?$`)
-  );
+  const defaultLabelMatch = new RegExp(
+    String.raw`^${previousLabel}(\s+\d+)?$`
+  ).exec(currentLabel);
   if (defaultLabelMatch) {
     return `${nextLabel}${defaultLabelMatch[1] ?? ""}`;
   }
@@ -403,7 +401,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   let waveSurfer: WaveSurfer | null = null;
   let regionsPlugin: RegionsPluginInstance | null = null;
   let audioElement: HTMLAudioElement | null = null;
-  let persistTimer: number | undefined;
+  let persistTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let isRestoringRegions = false;
   let hasPendingStateChanges = false;
   let isDisposing = false;
@@ -442,7 +440,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   const disableLoopIfSelectionIsInvalid = (shouldPersist: boolean) => {
     const selectedRegion = getSelectedRegion();
     const selectedKind = selectedRegion
-      ? getAudioRegionKind(selectedRegion as AudioRegionInstance)
+      ? getAudioRegionKind(selectedRegion)
       : null;
 
     if (selectedKind === "loop" || !loopEnabled()) {
@@ -497,11 +495,15 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       ? currentIds.filter((id) => id !== regionId)
       : [...currentIds, regionId];
 
-    const nextSelectedRegionId = isCurrentlySelected
-      ? currentSelectedRegionId === regionId
-        ? (nextIds.at(-1) ?? null)
-        : currentSelectedRegionId
-      : regionId;
+    let nextSelectedRegionId: string | null;
+    if (isCurrentlySelected) {
+      nextSelectedRegionId =
+        currentSelectedRegionId === regionId
+          ? (nextIds.at(-1) ?? null)
+          : currentSelectedRegionId;
+    } else {
+      nextSelectedRegionId = regionId;
+    }
 
     setSelectedRegionIds(nextIds);
     setSelectedRegionId(nextSelectedRegionId);
@@ -602,10 +604,10 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     hasPendingStateChanges = true;
 
     if (persistTimer) {
-      window.clearTimeout(persistTimer);
+      globalThis.clearTimeout(persistTimer);
     }
 
-    persistTimer = window.setTimeout(async () => {
+    persistTimer = globalThis.setTimeout(async () => {
       persistTimer = undefined;
       try {
         await persistCurrentState();
@@ -639,7 +641,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
 
   const flushPendingPersist = async (showToastOnError: boolean) => {
     if (persistTimer) {
-      window.clearTimeout(persistTimer);
+      globalThis.clearTimeout(persistTimer);
       persistTimer = undefined;
     }
 
@@ -682,7 +684,10 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     }
 
     const start = selectedMarks[0].start;
-    const end = selectedMarks[selectedMarks.length - 1].start;
+    const end = selectedMarks.at(-1)?.start;
+    if (typeof end !== "number") {
+      return null;
+    }
     if (end <= start) {
       return null;
     }
@@ -715,11 +720,14 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       kind === "loop" ? getLoopBoundsFromSelectedMarks() : null;
     const start = selectedLoopBounds?.start ?? currentTime();
     const safeDuration = duration();
-    const end = selectedLoopBounds
-      ? selectedLoopBounds.end
-      : safeDuration
-        ? Math.min(start + getDefaultDuration(), safeDuration)
-        : start + getDefaultDuration();
+    let end: number;
+    if (selectedLoopBounds) {
+      end = selectedLoopBounds.end;
+    } else if (safeDuration) {
+      end = Math.min(start + getDefaultDuration(), safeDuration);
+    } else {
+      end = start + getDefaultDuration();
+    }
     const label = buildAnnotationLabel(kind);
     const color = getAnnotationColor(kind);
 
@@ -732,7 +740,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       drag: true,
       resize: isRangeAnnotation(kind),
     });
-    setAudioRegionMetadata(region as AudioRegionInstance, kind, label, color);
+    setAudioRegionMetadata(region, kind, label, color);
   };
 
   const removeRegionById = (regionId: string) => {
@@ -880,7 +888,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       return;
     }
 
-    const currentKind = getAudioRegionKind(region as AudioRegionInstance);
+    const currentKind = getAudioRegionKind(region);
     if (currentKind === nextKind || isRangeAnnotation(currentKind)) {
       return;
     }
@@ -891,7 +899,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       nextKind
     );
     setAudioRegionMetadata(
-      region as AudioRegionInstance,
+      region,
       nextKind,
       nextLabel,
       getAnnotationColor(nextKind)
@@ -909,7 +917,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     }
 
     const currentLabel = getRegionDisplayLabel(currentRegion);
-    const nextLabel = window.prompt("Rename mark or region", currentLabel);
+    const nextLabel = globalThis.prompt("Rename mark or region", currentLabel);
     if (nextLabel === null) {
       return;
     }
@@ -927,7 +935,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
 
     if (region) {
       setAudioRegionMetadata(
-        region as AudioRegionInstance,
+        region,
         kind,
         trimmedLabel,
         typeof region.color === "string"
@@ -1109,7 +1117,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
           });
           if (restoredRegion) {
             setAudioRegionMetadata(
-              restoredRegion as AudioRegionInstance,
+              restoredRegion,
               kind,
               label,
               region.color || getAnnotationColor(kind)
@@ -1165,7 +1173,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
         event.stopPropagation();
         setSingleSelection(region.id);
         if (
-          getAudioRegionKind(region as AudioRegionInstance) === "loop" &&
+          getAudioRegionKind(region) === "loop" &&
           typeof region.end === "number" &&
           waveSurfer
         ) {
@@ -1266,7 +1274,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
           </div>
 
           <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            Tempo
+            Tempo{" "}
             <input
               type="range"
               min="0.5"
@@ -1288,7 +1296,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
           </label>
 
           <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-            Zoom
+            Zoom{" "}
             <input
               type="range"
               min="0"
@@ -1459,22 +1467,13 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
                     return (
                       <div
                         onPointerDown={(event) =>
-                          handleRegionListPointerDown(
-                            region.id,
-                            event as unknown as PointerEvent
-                          )
+                          handleRegionListPointerDown(region.id, event)
                         }
                         onClick={(event) =>
-                          handleRegionListClick(
-                            region.id,
-                            event as unknown as MouseEvent
-                          )
+                          handleRegionListClick(region.id, event)
                         }
                         onKeyDown={(event) =>
-                          handleRegionListKeyDown(
-                            region.id,
-                            event as unknown as KeyboardEvent
-                          )
+                          handleRegionListKeyDown(region.id, event)
                         }
                         onPointerEnter={() =>
                           handleRegionListPointerEnter(region.id)

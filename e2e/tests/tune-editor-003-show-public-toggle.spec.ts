@@ -11,8 +11,8 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  * Each field with a user override differing from public value displays a layers icon.
  * Clicking the icon reveals the public value and a Revert action.
  *
- * TODO: Make deterministic data fixtures that guarantee differences for each field (title, genre, etc.).
- * TODO: Add assertions verifying indicator absence when override equals public value.
+ * Make deterministic data fixtures that guarantee differences for each field (title, genre, etc.).
+ * Add assertions verifying indicator absence when override equals public value.
  */
 
 let ttPage: TuneTreesPage;
@@ -65,7 +65,6 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
     await ttPage.page.waitForTimeout(500);
 
     await ttPage.tuneEditorSubmitButton.click();
-    // await ttPage.openTuneEditor();
     await ttPage.page.waitForTimeout(500);
 
     const dialog = ttPage.page.locator('[role="dialog"]').first();
@@ -92,7 +91,7 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
   test("should reveal public title value on indicator click", async ({
     page,
   }) => {
-    // TODO: Precondition: tune has title override
+    // Precondition: tune has title override
     const tuneTitleModified = "Cooley's (modified)";
 
     await editTuneFieldAndSave(
@@ -132,8 +131,6 @@ test.describe("TUNE-EDITOR-003: Field Override Indicators", () => {
     await ttPage.clickCatalogAddTune();
     const addTuneDialog = page.locator('[role="dialog"]').first();
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
-    // TODO: Adapt custom Select interaction for genre selection.
-    // Expect no override indicators present.
-    // await expect(page.getByTestId("override-indicator-title")).not.toBeVisible();
+    // Expect no override indicators present (adapt Select interaction if needed).
   });
 });

@@ -38,7 +38,7 @@ export async function getUserTags(
   db: SqliteDatabase,
   userId: string
 ): Promise<TagWithUsageCount[]> {
-  const results = await db
+  const results = db
     .select({
       tagText: schema.tag.tagText,
       usageCount: count(schema.tag.tuneRef),
@@ -63,7 +63,7 @@ export async function getTuneTags(
   tuneId: string,
   userId: string
 ): Promise<TuneTag[]> {
-  const results = await db
+  const results = db
     .select({
       tagId: schema.tag.tagId,
       tagText: schema.tag.tagText,
@@ -95,7 +95,7 @@ export async function addTagToTune(
   const now = new Date().toISOString();
 
   try {
-    const result = await db
+    const result = db
       .insert(schema.tag)
       .values({
         tagId: generateId(),
@@ -109,7 +109,7 @@ export async function addTagToTune(
       .returning()
       .get();
 
-    return result as Tag;
+    return result;
   } catch (error) {
     // Unique constraint violation means tag already exists
     // This is fine, just return null
@@ -136,7 +136,7 @@ export async function removeTagFromTune(
   userId: string,
   tagText: string
 ): Promise<boolean> {
-  const result = await db
+  const result = db
     .delete(schema.tag)
     .where(
       and(
@@ -158,7 +158,7 @@ export async function removeTagById(
   db: SqliteDatabase,
   tagId: string
 ): Promise<boolean> {
-  const result = await db
+  const result = db
     .delete(schema.tag)
     .where(eq(schema.tag.tagId, tagId))
     .returning()
@@ -178,7 +178,7 @@ export async function getTagUsageCount(
   userId: string,
   tagText: string
 ): Promise<number> {
-  const result = await db
+  const result = db
     .select({
       count: count(schema.tag.tuneRef),
     })
@@ -201,7 +201,7 @@ export async function deleteTagForUser(
   userId: string,
   tagText: string
 ): Promise<number> {
-  const result = await db
+  const result = db
     .delete(schema.tag)
     .where(and(eq(schema.tag.userRef, userId), eq(schema.tag.tagText, tagText)))
     .returning()
@@ -228,7 +228,7 @@ export async function renameTagForUser(
 ): Promise<number> {
   const now = new Date().toISOString();
 
-  const result = await db
+  const result = db
     .update(schema.tag)
     .set({
       tagText: newTagText.trim().toLowerCase(),
@@ -262,7 +262,7 @@ export async function getTuneIdsByTags(
 
   const normalizedTags = tagTexts.map((t) => t.trim().toLowerCase());
 
-  const results = await db
+  const results = db
     .selectDistinct({
       tuneRef: schema.tag.tuneRef,
     })

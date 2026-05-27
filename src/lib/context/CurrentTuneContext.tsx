@@ -44,7 +44,8 @@ export const CurrentTuneProvider: ParentComponent = (props) => {
   );
 
   const storageKey = () => {
-    if (typeof window === "undefined") return null;
+    if (globalThis === undefined || globalThis.localStorage === undefined)
+      return null;
     const userId = user()?.id;
     if (!userId) return null;
     const repertoireId = currentRepertoireId();

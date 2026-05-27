@@ -299,8 +299,9 @@ const SchedulingOptionsPage: Component = () => {
 
             {/* Auto Schedule New */}
             <div class="space-y-1.5">
-              <label class="flex items-center gap-2">
+              <label for="auto-schedule-new" class="flex items-center gap-2">
                 <input
+                  id="auto-schedule-new"
                   type="checkbox"
                   checked={autoScheduleNew()}
                   onChange={(e) => {

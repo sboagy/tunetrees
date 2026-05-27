@@ -60,10 +60,6 @@ test.describe("AVATAR-001: Avatar Picker", () => {
     await expect(avatarImages.first()).toBeVisible({ timeout: 5000 });
 
     // Count avatar options (10 predefined + 1 upload button area)
-    // const avatarCards = page.locator("div[role='button'], button").filter({
-    //   hasText:
-    //     /accordion|balalaika|banjo|flute|guitarist|harmonica|harp|pianist|singer|violin/i,
-    // });
     const avatarCards = page.getByRole("img", {
       name: /accordion|balalaika|banjo|flute|guitarist|harmonica|harp|pianist|singer|violin/i,
     });
@@ -71,7 +67,6 @@ test.describe("AVATAR-001: Avatar Picker", () => {
   });
 
   test("should select predefined avatar", async ({ page }) => {
-    // const accordionAvatar = page.locator('img[src*="accordion.png"]').first();
     const balalaikaAvatar = page.locator('img[src*="balalaika.png"]').first();
     const preview = page.locator('img[alt="Current avatar"]');
 
@@ -84,7 +79,6 @@ test.describe("AVATAR-001: Avatar Picker", () => {
 
     await expect(balalaikaAvatar).toBeVisible({ timeout: 10000 });
     await balalaikaAvatar.click();
-    // await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Check for success toast
     await expect(page.getByText("Avatar updated!")).toBeVisible({
@@ -117,8 +111,7 @@ test.describe("AVATAR-001: Avatar Picker", () => {
   });
 
   test.skip("should upload custom avatar", async () => {
-    // TODO: Create test image file and upload
-    // This requires filesystem access and file creation
+    // Create test image file and upload - requires filesystem access
     // Skipping for now, implement when needed
   });
 });

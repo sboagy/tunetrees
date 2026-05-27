@@ -87,7 +87,7 @@ const TermsOfService: Component = () => {
             >
               https://github.com/sboagy/tunetrees/issues
             </a>
-            .
+            .{" "}
           </p>
         </section>
 

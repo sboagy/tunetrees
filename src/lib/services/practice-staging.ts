@@ -129,7 +129,7 @@ export async function stagePracticeEvaluation(
 
   // UPSERT to table_transient_data
   const lastModifiedAt = now.toISOString();
-  await db.run(sql`
+  db.run(sql`
     INSERT INTO table_transient_data (
       user_id,
       tune_id,
@@ -215,7 +215,7 @@ export async function clearStagedEvaluation(
   tuneId: string,
   repertoireId: string
 ): Promise<void> {
-  await db.run(sql`
+  db.run(sql`
     DELETE FROM table_transient_data
     WHERE user_id = ${userId}
       AND tune_id = ${tuneId}
@@ -242,7 +242,7 @@ export async function clearAllStagedForRepertoire(
   db: SqliteDatabase,
   repertoireId: string
 ): Promise<void> {
-  await db.run(sql`
+  db.run(sql`
     DELETE FROM table_transient_data
     WHERE repertoire_id = ${repertoireId}
   `);

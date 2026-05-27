@@ -56,7 +56,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   let resizeOriginOffsetX = 0;
   let resizeOriginOffsetY = 0;
   let measureFrame: number | undefined;
-  let dialogRef: HTMLDivElement | undefined;
+  let dialogRef: HTMLDialogElement | undefined;
   let resizeHandleRef: HTMLButtonElement | undefined;
 
   const today = new Date();
@@ -171,9 +171,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
     const minVisibleHeight = Math.min(96, Math.max(56, rect.height * 0.25));
 
     const minX = minVisibleWidth - rect.right;
-    const maxX = window.innerWidth - minVisibleWidth - rect.left;
+    const maxX = globalThis.innerWidth - minVisibleWidth - rect.left;
     const minY = minVisibleHeight - rect.bottom;
-    const maxY = window.innerHeight - minVisibleHeight - rect.top;
+    const maxY = globalThis.innerHeight - minVisibleHeight - rect.top;
 
     return {
       x: Math.min(Math.max(x, minX), maxX),
@@ -182,8 +182,8 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   };
 
   const clampSize = (width: number, height: number) => {
-    const maxWidth = Math.max(280, window.innerWidth - 32);
-    const maxHeight = Math.max(320, window.innerHeight - 32);
+    const maxWidth = Math.max(280, globalThis.innerWidth - 32);
+    const maxHeight = Math.max(320, globalThis.innerHeight - 32);
     const minWidth = Math.min(240, maxWidth);
     const minHeight = Math.min(280, maxHeight);
 
@@ -198,7 +198,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
       cancelAnimationFrame(measureFrame);
     }
 
-    measureFrame = window.requestAnimationFrame(() => {
+    measureFrame = globalThis.requestAnimationFrame(() => {
       measureFrame = undefined;
       const nextOffset = clampOffset(dragOffset().x, dragOffset().y);
       setDragOffset(nextOffset);
@@ -209,9 +209,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
     pointerId = null;
     document.body.style.userSelect = "";
     document.body.style.cursor = "";
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
-    window.removeEventListener("pointercancel", handlePointerUp);
+    globalThis.removeEventListener("pointermove", handlePointerMove);
+    globalThis.removeEventListener("pointerup", handlePointerUp);
+    globalThis.removeEventListener("pointercancel", handlePointerUp);
   };
 
   const stopResize = () => {
@@ -221,9 +221,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
     resizePointerId = null;
     document.body.style.userSelect = "";
     document.body.style.cursor = "";
-    window.removeEventListener("pointermove", handleResizePointerMove);
-    window.removeEventListener("pointerup", handleResizePointerUp);
-    window.removeEventListener("pointercancel", handleResizePointerUp);
+    globalThis.removeEventListener("pointermove", handleResizePointerMove);
+    globalThis.removeEventListener("pointerup", handleResizePointerUp);
+    globalThis.removeEventListener("pointercancel", handleResizePointerUp);
   };
 
   const handlePointerMove = (event: PointerEvent) => {
@@ -280,9 +280,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
 
     document.body.style.userSelect = "none";
     document.body.style.cursor = "grabbing";
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("pointercancel", handlePointerUp);
+    globalThis.addEventListener("pointermove", handlePointerMove);
+    globalThis.addEventListener("pointerup", handlePointerUp);
+    globalThis.addEventListener("pointercancel", handlePointerUp);
   };
 
   const handleResizePointerDown = (event: PointerEvent) => {
@@ -308,9 +308,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
 
     document.body.style.userSelect = "none";
     document.body.style.cursor = "nwse-resize";
-    window.addEventListener("pointermove", handleResizePointerMove);
-    window.addEventListener("pointerup", handleResizePointerUp);
-    window.addEventListener("pointercancel", handleResizePointerUp);
+    globalThis.addEventListener("pointermove", handleResizePointerMove);
+    globalThis.addEventListener("pointerup", handleResizePointerUp);
+    globalThis.addEventListener("pointercancel", handleResizePointerUp);
   };
 
   createEffect(() => {
@@ -320,7 +320,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
       if (measureFrame !== undefined) {
         cancelAnimationFrame(measureFrame);
       }
-      measureFrame = window.requestAnimationFrame(() => {
+      measureFrame = globalThis.requestAnimationFrame(() => {
         measureFrame = undefined;
         if (!dialogRef) return;
         const rect = dialogRef.getBoundingClientRect();
@@ -347,17 +347,16 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
   return (
     <Show when={props.isOpen}>
       <Portal>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Escape key handled via onKeyDown */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay, not a focusable interactive element */}
         <div
+          role="presentation"
           class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
           onClick={handleBackdropClick}
           onKeyDown={handleKeyDown}
         >
-          <div
+          <dialog
             ref={dialogRef}
             class="relative mx-4 flex flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800"
-            role="dialog"
-            aria-modal="true"
             aria-labelledby="queue-date-selector-title"
             style={{
               width:
@@ -492,7 +491,6 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
                     value={customDate()}
                     onInput={(e) => setCustomDate(e.currentTarget.value)}
                     class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                    aria-label="Custom date"
                   />
                   <button
                     type="button"
@@ -513,9 +511,9 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
                   disabled={!canResetTodayQueue()}
                   class="w-full text-left px-4 py-2 rounded-md text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                   title={
-                    !canResetTodayQueue()
-                      ? "Reset is only available when today's queue exists"
-                      : "Reset today's active queue"
+                    canResetTodayQueue()
+                      ? "Reset today's active queue"
+                      : "Reset is only available when today's queue exists"
                   }
                 >
                   <div class="font-medium">Reset Today's Queue</div>
@@ -536,7 +534,7 @@ export const QueueDateSelector: Component<QueueDateSelectorProps> = (props) => {
             >
               <Grip class="h-4 w-4" aria-hidden="true" />
             </button>
-          </div>
+          </dialog>
         </div>
       </Portal>
     </Show>

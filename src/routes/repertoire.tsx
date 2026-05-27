@@ -88,14 +88,16 @@ const RepertoirePage: Component = () => {
   // Get current user ID (supabase UUID)
   const userId = createMemo(() => user()?.id || null);
 
+  type SearchParamValue = string | string[] | undefined;
+
   // Helper to safely get string from searchParams
-  const getParam = (value: string | string[] | undefined): string => {
+  const getParam = (value: SearchParamValue): string => {
     if (Array.isArray(value)) return value[0] || "";
     return value || "";
   };
 
   // Helper to safely get array from searchParams
-  const getParamArray = (value: string | string[] | undefined): string[] => {
+  const getParamArray = (value: SearchParamValue): string[] => {
     if (!value) return [];
     const str = Array.isArray(value) ? value[0] || "" : value;
     return str.split(",").filter(Boolean);
@@ -133,9 +135,12 @@ const RepertoirePage: Component = () => {
 
   createEffect(() => {
     const handleOpenAssistant = () => setIsChatOpen(true);
-    window.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
+    globalThis.addEventListener("tt-open-ai-assistant", handleOpenAssistant);
     onCleanup(() => {
-      window.removeEventListener("tt-open-ai-assistant", handleOpenAssistant);
+      globalThis.removeEventListener(
+        "tt-open-ai-assistant",
+        handleOpenAssistant
+      );
     });
   });
 
@@ -243,7 +248,7 @@ const RepertoirePage: Component = () => {
       repertoires: undefined,
     };
 
-    setSearchParams(params as Record<string, string>, { replace: true });
+    setSearchParams(params, { replace: true });
   });
 
   // Note: persistence is now handled centrally in Home.tsx by saving the tab's
@@ -375,7 +380,7 @@ const RepertoirePage: Component = () => {
         syncVersion: params?.version,
       });
       if (!params) return [];
-      const result = await params.db.select().from(schema.genre).all();
+      const result = params.db.select().from(schema.genre).all();
       log.debug("REPERTOIRE allGenres result:", result.length, "genres");
       return result;
     }
@@ -388,7 +393,7 @@ const RepertoirePage: Component = () => {
     tunes.forEach((tune) => {
       if (tune.tune.type) types.add(tune.tune.type);
     });
-    return Array.from(types).sort();
+    return Array.from(types).sort((a, b) => a.localeCompare(b));
   });
 
   const availableModes = createMemo(() => {
@@ -397,7 +402,7 @@ const RepertoirePage: Component = () => {
     tunes.forEach((tune) => {
       if (tune.tune.mode) modes.add(tune.tune.mode);
     });
-    return Array.from(modes).sort();
+    return Array.from(modes).sort((a, b) => a.localeCompare(b));
   });
 
   const availableGenres = createMemo(() => {
@@ -422,7 +427,7 @@ const RepertoirePage: Component = () => {
       genreNames.add(genreById.get(raw) ?? raw);
     }
 
-    const result = Array.from(genreNames).sort();
+    const result = Array.from(genreNames).sort((a, b) => a.localeCompare(b));
     log.debug("REPERTOIRE Final genre names:", result);
     return result;
   });
@@ -444,19 +449,21 @@ const RepertoirePage: Component = () => {
 
     // If more than one row is selected AND the changed row is among the selected,
     // offer to apply to all selected rows; otherwise single-row update.
-    const selectedIds = selectedRows.map((r) =>
-      String((r.original as any).tune_id ?? (r.original as any).id)
-    );
+    const selectedIds = selectedRows.map((r) => {
+      const orig = r.original as Record<string, unknown>;
+      return String(orig.tune_id ?? orig.id);
+    });
     const isInSelection =
       selectedIds.includes(String(tuneId)) && selectedIds.length > 1;
 
-    const targetIds: string[] = isInSelection
-      ? window.confirm(
-          `Apply goal "${goal ?? "recall"}" to all ${selectedIds.length} selected tunes?`
-        )
-        ? selectedIds
-        : [tuneId]
-      : [tuneId];
+    const getTargetIds = (): string[] => {
+      if (!isInSelection) return [tuneId];
+      const confirmed = globalThis.confirm(
+        `Apply goal "${goal ?? "recall"}" to all ${selectedIds.length} selected tunes?`
+      );
+      return confirmed ? selectedIds : [tuneId];
+    };
+    const targetIds: string[] = getTargetIds();
 
     try {
       suppressNextViewRefresh("repertoire");
@@ -508,6 +515,16 @@ const RepertoirePage: Component = () => {
   const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
     null
   );
+
+  const getFilteredTuneIds = createMemo(() => {
+    if (filterAnyTuneSet()) {
+      return anyTuneSetTuneIds.latest ?? anyTuneSetTuneIds() ?? [];
+    }
+    if (selectedTuneSetIds().length > 0) {
+      return selectedTuneSetTuneIds.latest ?? selectedTuneSetTuneIds() ?? [];
+    }
+    return undefined;
+  });
 
   // Track filter panel expanded state
   const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);
@@ -588,15 +605,7 @@ const RepertoirePage: Component = () => {
                 selectedTypes={selectedTypes()}
                 selectedModes={selectedModes()}
                 selectedGenreNames={selectedGenres()}
-                selectedTuneIds={
-                  filterAnyTuneSet()
-                    ? (anyTuneSetTuneIds.latest ?? anyTuneSetTuneIds() ?? [])
-                    : selectedTuneSetIds().length > 0
-                      ? (selectedTuneSetTuneIds.latest ??
-                        selectedTuneSetTuneIds() ??
-                        [])
-                      : undefined
-                }
+                selectedTuneIds={getFilteredTuneIds()}
                 allGenres={allGenres() || []}
                 onTuneSelect={handleTuneSelect}
                 onGoalChange={handleGoalChange}

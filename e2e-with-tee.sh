@@ -135,7 +135,7 @@ run_full_supabase_reset() {
 
     (
         cd "${rhizome_repo}"
-        npx supabase db reset --local
+        npm exec -- supabase db reset --local
         bash ./scripts/seed-shared-auth-users-local.sh
     )
 
@@ -225,6 +225,6 @@ if command -v code >/dev/null 2>&1; then
 fi
 
 if [ "$SHOW_REPORT" = true ]; then
-    npx playwright show-report
+    npm exec -- playwright show-report
 fi
 

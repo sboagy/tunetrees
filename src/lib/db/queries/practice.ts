@@ -81,7 +81,7 @@ export async function clearStaleStagedEvaluations(
   repertoireId: string,
   windowStartIso19: string
 ): Promise<number> {
-  const result = await db.get<{ count: number }>(sql`
+  const result = db.get<{ count: number }>(sql`
     SELECT COUNT(*) as count
     FROM table_transient_data
     WHERE table_transient_data.user_id = ${userId}
@@ -108,7 +108,7 @@ export async function clearStaleStagedEvaluations(
     return 0;
   }
 
-  await db.run(sql`
+  db.run(sql`
     DELETE FROM table_transient_data
     WHERE table_transient_data.user_id = ${userId}
     AND table_transient_data.repertoire_id = ${repertoireId}
@@ -185,7 +185,7 @@ export async function getPracticeList(
       ? requestedWindow
       : requestedWindow.replace(" ", "T");
   } else {
-    const maxWindow = await db.get<{ max_window: string }>(sql`
+    const maxWindow = db.get<{ max_window: string }>(sql`
       SELECT MAX(window_start_utc) as max_window
       FROM daily_practice_queue
       WHERE user_ref = ${userId}
@@ -214,7 +214,7 @@ export async function getPracticeList(
   // Use GROUP BY to eliminate duplicates (some tunes may exist in both windows)
   // Take the MIN bucket/order_index if duplicates exist
   // The result must include tunes with non-null completed_at values.
-  const rows = await db.all<PracticeListStagedWithQueue>(sql`
+  const rows = db.all<PracticeListStagedWithQueue>(sql`
     SELECT 
       pls.*,
       MIN(dpq.bucket) as bucket,
@@ -257,7 +257,7 @@ export async function getDailyPracticeQueue(
   _repertoireId: string,
   _queueDate: Date = new Date()
 ): Promise<DailyPracticeQueue[]> {
-  // TODO: Implement this function (currently unused)
+  // NOTE: Not yet implemented (currently unused)
   console.warn("getDailyPracticeQueue: Not implemented");
   return [];
 }

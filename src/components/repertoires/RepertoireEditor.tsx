@@ -104,7 +104,7 @@ export const RepertoireEditor: Component<RepertoireEditorProps> = (props) => {
     () => localDb(),
     async (db) => {
       if (!db) return [];
-      return await db.select().from(genre).all();
+      return db.select().from(genre).all();
     }
   );
 
@@ -118,7 +118,7 @@ export const RepertoireEditor: Component<RepertoireEditorProps> = (props) => {
     async (params) => {
       if (!params) return [];
       const { or, isNull, eq } = await import("drizzle-orm");
-      const result = await params.db
+      const result = params.db
         .select()
         .from(instrument)
         .where(
@@ -304,9 +304,9 @@ export const RepertoireEditor: Component<RepertoireEditorProps> = (props) => {
               onChange={(e) => setSrAlgType(e.currentTarget.value)}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
             >
-              {SR_ALG_TYPES.map((alg) => (
-                <option value={alg.value}>{alg.label}</option>
-              ))}
+              <For each={SR_ALG_TYPES}>
+                {(alg) => <option value={alg.value}>{alg.label}</option>}
+              </For>
             </select>
             <p class="text-xs text-gray-500 dark:text-gray-400">
               Choose the spaced repetition algorithm for this repertoire's

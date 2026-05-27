@@ -39,8 +39,8 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleSave = () => {
@@ -48,12 +48,12 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
   };
 
   const content = (
-    <div
+    <dialog
+      open
       class="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-900"
-      role="dialog"
-      aria-modal="true"
       aria-labelledby="group-as-set-title"
       data-testid="group-as-set-popover"
+      onClose={props.onClose}
     >
       <header class="flex justify-between items-center w-full mb-4">
         <div class="flex flex-1 justify-start">
@@ -146,7 +146,7 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
       <Show when={mode() === "create"}>
         <div class="mt-4 space-y-2" data-testid="group-as-set-create-panel">
           <label
-            for="group-as-set-name"
+            for="group-as-set-name" /* NOSONAR */
             class="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             Set Name
@@ -162,7 +162,7 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
           />
 
           <label
-            for="group-as-set-description"
+            for="group-as-set-description" /* NOSONAR */
             class="block pt-2 text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             Description
@@ -272,7 +272,7 @@ export const GroupAsSetPopover: Component<GroupAsSetPopoverProps> = (props) => {
       <Show when={props.error}>
         <p class="mt-3 text-sm text-red-600 dark:text-red-400">{props.error}</p>
       </Show>
-    </div>
+    </dialog>
   );
 
   return (

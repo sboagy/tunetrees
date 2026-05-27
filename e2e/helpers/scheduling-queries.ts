@@ -26,7 +26,7 @@ async function waitForTestApi(page: Page, timeoutMs = 30000): Promise<void> {
     .poll(
       async () => {
         try {
-          return await page.evaluate(() => !!(window as any).__ttTestApi);
+          return await page.evaluate(() => !!(globalThis as any).__ttTestApi);
         } catch (error) {
           if (isTransientTestApiError(error)) {
             return false;
@@ -140,7 +140,7 @@ export async function queryPracticeRecords(
     page,
     () =>
       page.evaluate(async (ids) => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) {
           throw new Error("__ttTestApi not available on window");
         }
@@ -171,7 +171,7 @@ export async function queryTunesByTitles(
     page,
     () =>
       page.evaluate(async (titlesArg) => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) {
           throw new Error("__ttTestApi not available on window");
         }
@@ -211,7 +211,7 @@ export async function queryLatestPracticeRecord(
         page.evaluate(
           async (args) => {
             try {
-              const api = (window as any).__ttTestApi;
+              const api = (globalThis as any).__ttTestApi;
               if (!api) {
                 throw new Error("__ttTestApi not available on window");
               }
@@ -246,15 +246,12 @@ export async function queryLatestPracticeRecord(
 
   const startedAt = Date.now();
   let record: PracticeRecord | null = null;
-  let shouldContinue = true;
-  while (shouldContinue) {
+  while (true) {
     record = await fetchOnce();
     if (record) {
-      shouldContinue = false;
       break;
     }
     if (waitForRecordMs <= 0 || Date.now() - startedAt >= waitForRecordMs) {
-      shouldContinue = false;
       break;
     }
     await page.waitForTimeout(pollIntervalMs);
@@ -282,8 +279,9 @@ export async function queryScheduledDates(
   repertoireId: string,
   tuneIds?: string[]
 ): Promise<Map<string, ScheduledDateInfo>> {
+  const dateSuffix = tuneIds ? ` (${tuneIds.length} tunes)` : "";
   log.debug(
-    `📊 Querying scheduled dates for repertoire ${repertoireId}${tuneIds ? ` (${tuneIds.length} tunes)` : ""}`
+    `📊 Querying scheduled dates for repertoire ${repertoireId}${dateSuffix}`
   );
 
   const result = await withTestApiRetry(
@@ -291,7 +289,7 @@ export async function queryScheduledDates(
     () =>
       page.evaluate(
         async (args) => {
-          const api = (window as any).__ttTestApi;
+          const api = (globalThis as any).__ttTestApi;
           if (!api) {
             throw new Error("__ttTestApi not available on window");
           }
@@ -322,8 +320,9 @@ export async function queryPracticeQueue(
   repertoireId: string,
   windowStartUtc?: string
 ): Promise<PracticeQueueItem[]> {
+  const queueSuffix = windowStartUtc ? ` (window: ${windowStartUtc})` : "";
   log.debug(
-    `📊 Querying practice queue for repertoire ${repertoireId}${windowStartUtc ? ` (window: ${windowStartUtc})` : ""}`
+    `📊 Querying practice queue for repertoire ${repertoireId}${queueSuffix}`
   );
 
   const queue = await withTestApiRetry(
@@ -331,7 +330,7 @@ export async function queryPracticeQueue(
     () =>
       page.evaluate(
         async (args) => {
-          const api = (window as any).__ttTestApi;
+          const api = (globalThis as any).__ttTestApi;
           if (!api) {
             throw new Error("__ttTestApi not available on window");
           }
@@ -449,7 +448,7 @@ export function validateScheduledDatesInFuture(
  */
 export function validateIncreasingIntervals(
   intervals: number[],
-  minGrowthFactor = 1.0
+  minGrowthFactor = 1
 ): void {
   for (let i = 1; i < intervals.length; i++) {
     const ratio = intervals[i] / intervals[i - 1];
@@ -494,7 +493,7 @@ export function calculateIntervalStats(intervals: number[]): {
 
   const stats = {
     min: sorted[0],
-    max: sorted[sorted.length - 1],
+    max: sorted.at(-1) ?? sorted[0],
     avg: intervals.reduce((sum, val) => sum + val, 0) / intervals.length,
     median:
       sorted.length % 2 === 0

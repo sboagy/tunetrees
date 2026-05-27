@@ -125,7 +125,7 @@ function nowIso(): string {
 
 function normalizeDescription(description?: string | null): string | null {
   const trimmed = description?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function normalizeGroupName(name: string): string {

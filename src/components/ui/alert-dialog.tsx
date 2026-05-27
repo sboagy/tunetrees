@@ -13,16 +13,16 @@ import type {
   DialogTitleProps,
   DialogTriggerProps,
 } from "@kobalte/core/dialog";
-import { Dialog as DialogPrimitive } from "@kobalte/core/dialog";
+import { Dialog } from "@kobalte/core/dialog";
 import type { PolymorphicProps } from "@kobalte/core/polymorphic";
 import { X } from "lucide-solid";
 import type { ParentProps, ValidComponent, VoidProps } from "solid-js";
 import { splitProps } from "solid-js";
 import { cn } from "@/lib/utils";
 
-export const AlertDialogTrigger = DialogPrimitive.Trigger;
+export const AlertDialogTrigger = Dialog.Trigger;
 
-export const AlertDialog = DialogPrimitive;
+export const AlertDialog = Dialog;
 
 type AlertDialogContentPropsWithClass<T extends ValidComponent = "div"> =
   ParentProps<DialogContentProps<T> & { class?: string }>;
@@ -36,9 +36,9 @@ export const AlertDialogContent = <T extends ValidComponent = "div">(
   ]);
 
   return (
-    <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay class="fixed inset-0 z-40 bg-black/50 data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0" />
-      <DialogPrimitive.Content
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-40 bg-black/50 data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0" />
+      <Dialog.Content
         class={cn(
           "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-[hsl(var(--background))] p-6 shadow-lg duration-200 data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95 data-[closed]:slide-out-to-left-1/2 data-[closed]:slide-out-to-top-[48%] data-[expanded]:slide-in-from-left-1/2 data-[expanded]:slide-in-from-top-[48%] rounded-lg md:w-full",
           local.class
@@ -46,8 +46,8 @@ export const AlertDialogContent = <T extends ValidComponent = "div">(
         {...rest}
       >
         {local.children}
-      </DialogPrimitive.Content>
-    </DialogPrimitive.Portal>
+      </Dialog.Content>
+    </Dialog.Portal>
   );
 };
 
@@ -99,12 +99,9 @@ export const AlertDialogTitle = <T extends ValidComponent = "h2">(
   ]);
 
   return (
-    <DialogPrimitive.Title
-      class={cn("text-lg font-semibold", local.class)}
-      {...rest}
-    >
+    <Dialog.Title class={cn("text-lg font-semibold", local.class)} {...rest}>
       {local.children}
-    </DialogPrimitive.Title>
+    </Dialog.Title>
   );
 };
 
@@ -120,12 +117,12 @@ export const AlertDialogDescription = <T extends ValidComponent = "p">(
   );
 
   return (
-    <DialogPrimitive.Description
+    <Dialog.Description
       class={cn("text-sm text-muted-foreground", local.class)}
       {...rest}
     >
       {local.children}
-    </DialogPrimitive.Description>
+    </Dialog.Description>
   );
 };
 
@@ -140,7 +137,7 @@ export const AlertDialogCloseButton = <T extends ValidComponent = "button">(
   ]);
 
   return (
-    <DialogPrimitive.CloseButton
+    <Dialog.CloseButton
       class={cn(
         "absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-md bg-background/80 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-[1.5px] focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[expanded]:bg-accent data-[expanded]:text-muted-foreground",
         local.class
@@ -149,6 +146,6 @@ export const AlertDialogCloseButton = <T extends ValidComponent = "button">(
     >
       <X class="h-4 w-4" aria-hidden="true" />
       <span class="sr-only">Close</span>
-    </DialogPrimitive.CloseButton>
+    </Dialog.CloseButton>
   );
 };

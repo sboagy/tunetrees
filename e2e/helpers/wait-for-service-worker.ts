@@ -53,7 +53,7 @@ export async function waitForServiceWorker(
       });
 
       worker = await workerPromise;
-    } catch (_error) {
+    } catch {
       throw new Error(
         `Service Worker for URL ${url} did not register within ${timeoutMs}ms.`
       );
@@ -88,9 +88,9 @@ export async function waitForServiceWorker(
       // Evaluate code within the Service Worker's execution context to get its state.
       currentState = await worker.evaluate(() => {
         // Service Worker globals have access to self.registration
-        return (self as any).registration.active?.state || "unknown";
+        return (globalThis as any).registration.active?.state || "unknown";
       });
-    } catch (_e) {
+    } catch {
       // Handle cases where registration is not immediately available or worker is stopped
       currentState = "unknown";
     }

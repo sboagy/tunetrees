@@ -33,8 +33,9 @@ export const RecallEvalComboBox: Component<RecallEvalComboBoxProps> = (
   const [selectedValue, setSelectedValue] = createSignal(props.value);
 
   createEffect(() => {
-    void props.tuneId;
-    setSelectedValue(props.value);
+    // Re-sync when the virtualized row is reused for a different tune.
+    const currentRow = { tuneId: props.tuneId, value: props.value };
+    setSelectedValue(currentRow.value);
   });
 
   const options = [

@@ -56,7 +56,7 @@ async function tableExists(
   db: SqliteDatabase,
   tableName: string
 ): Promise<boolean> {
-  const rows = await db.all<{ name: string }>(sql`
+  const rows = db.all<{ name: string }>(sql`
     SELECT name
     FROM sqlite_master
     WHERE type = 'table' AND name = ${tableName}
@@ -70,7 +70,7 @@ async function getTableColumns(
   db: SqliteDatabase,
   tableName: string
 ): Promise<Set<string>> {
-  const rows = await db.all<{ name: string }>(
+  const rows = db.all<{ name: string }>(
     sql.raw(`PRAGMA table_info("${tableName}")`)
   );
   return new Set(rows.map((row) => row.name));
@@ -89,7 +89,7 @@ function normalizePatternType(patternType?: string | null): RhythmPatternType {
 }
 
 function escapeSqlStringLiteral(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function toSqlNullableStringLiteral(value?: string | null): string {
@@ -639,7 +639,7 @@ async function queryGenreTempoFallbackRow(
   db: SqliteDatabase,
   context: PatternLoaderContext
 ): Promise<GenreTempoFallbackRow | null> {
-  const rows = await db.all<GenreTempoFallbackRow>(sql`
+  const rows = db.all<GenreTempoFallbackRow>(sql`
     WITH tune_type_match AS (
       SELECT id, name, rhythm
       FROM tune_type
@@ -685,7 +685,7 @@ async function queryTuneTypeFallbackRow(
   db: SqliteDatabase,
   context: PatternLoaderContext
 ): Promise<TuneTypeFallbackRow | null> {
-  const rows = await db.all<TuneTypeFallbackRow>(sql`
+  const rows = db.all<TuneTypeFallbackRow>(sql`
     SELECT id AS tune_type_id, name AS tune_type_name, rhythm AS rhythm_signature
     FROM tune_type
     WHERE (${context.tuneTypeMatchClause})

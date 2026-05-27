@@ -115,7 +115,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
     await page.waitForTimeout(2000);
 
     // Force sync
-    await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+    await page.evaluate(() => (globalThis as any).__forceSyncUpForTest?.());
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // === STEP 3: Verify queue reduced after submission ===
@@ -123,7 +123,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1500);
-    await page.evaluate(() => (window as any).__forceSyncDownForTest?.());
+    await page.evaluate(() => (globalThis as any).__forceSyncDownForTest?.());
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await page.waitForTimeout(700);
@@ -166,7 +166,7 @@ test.describe("SCHEDULING-002: Multi-Tune Queue Management", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     await page.waitForTimeout(2000);
 
-    await page.evaluate(() => (window as any).__forceSyncUpForTest?.());
+    await page.evaluate(() => (globalThis as any).__forceSyncUpForTest?.());
     await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // === STEP 5: Verify practice records exist ===

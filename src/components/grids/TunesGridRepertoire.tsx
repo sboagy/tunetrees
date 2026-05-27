@@ -101,7 +101,7 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
     },
     async (params) => {
       if (!params) return [];
-      return await params.db.select().from(schema.genre).all();
+      return params.db.select().from(schema.genre).all();
     }
   );
 
@@ -239,11 +239,12 @@ export const TunesGridRepertoire: Component<ITunesGridRepertoireProps> = (
   const handleRowDoubleClick = (row: IMixedTuneGridRow): void => {
     if (isTuneSetGridRow(row)) return;
     // Double click: open tune editor via callback
-    props.onTuneSelect?.(row as unknown as ITuneOverview);
+    props.onTuneSelect?.(row as ITuneOverview);
   };
 
   // Selection summary from inner grid
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let innerTable: any | null = null;
 
   // Rhythm dialog state

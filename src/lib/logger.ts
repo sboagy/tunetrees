@@ -23,7 +23,7 @@ log.setLevel(defaultLevel as log.LogLevelDesc);
 
 // Expose logger to window object for console access in development
 if (import.meta.env.DEV) {
-  (window as any).log = log;
+  (globalThis as any).log = log;
 }
 
 // You can override in browser console with:

@@ -138,11 +138,6 @@ export function getSidebarFontClasses(size: SidebarFontSize): {
       };
     default:
       // Fallback to small if invalid value
-      return {
-        text: "text-xs",
-        textSmall: "text-[10px]",
-        icon: "w-3.5 h-3.5",
-        iconSmall: "w-2.5 h-2.5",
-      };
+      return getSidebarFontClasses("small");
   }
 }

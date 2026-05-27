@@ -22,7 +22,7 @@ let ttPage: TuneTreesPage;
 
 async function waitForTestApi(page: import("@playwright/test").Page) {
   await page.waitForFunction(
-    () => typeof (window as any).__ttTestApi === "object",
+    () => typeof (globalThis as any).__ttTestApi === "object",
     undefined,
     {
       timeout: 15000,
@@ -105,7 +105,7 @@ async function getAnnotationCounts(
 ) {
   await waitForTestApi(page);
   return await page.evaluate(async (opts) => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
     return await api.getAnnotationCounts(opts);
   }, options);
@@ -119,7 +119,7 @@ async function getOrphanedAnnotationCounts(
 ) {
   await waitForTestApi(page);
   return await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
     return await api.getOrphanedAnnotationCounts();
   });
@@ -138,33 +138,11 @@ async function seedAnnotations(
 ) {
   await waitForTestApi(page);
   return await page.evaluate(async (seedInput) => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
     return await api.seedAnnotations(seedInput);
   }, input);
 }
-
-/**
- * Helper to get a tune ID from catalog by genre
- */
-// async function getTuneIdByGenre(
-//   page: import("@playwright/test").Page,
-//   genreName: string
-// ): Promise<string | null> {
-//   return await page.evaluate(async (genre) => {
-//     const api = (window as any).__ttTestApi;
-//     if (!api) throw new Error("__ttTestApi not available");
-
-//     // Query local DB for a tune in this genre
-//     const db = await api.ensureDb();
-//     const result = await db.execute({
-//       sql: "SELECT id FROM tune WHERE genre = ? AND deleted = 0 LIMIT 1",
-//       args: [genre],
-//     });
-
-//     return result.rows[0]?.id ?? null;
-//   }, genreName);
-// }
 
 test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
   // This suite does a full local DB reset + initial sync in beforeEach.
@@ -183,8 +161,8 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     // Ensure test API user resolution is deterministic even if browser auth
     // storage/session is stale between local runs.
     await page.evaluate((userId: string) => {
-      (window as any).__ttTestUserId = userId;
-      (window as any).__ttTestApi?.setTestUserId?.(userId);
+      (globalThis as any).__ttTestUserId = userId;
+      (globalThis as any).__ttTestApi?.setTestUserId?.(userId);
     }, testUser.userId);
 
     await waitForTestApi(page);
@@ -311,7 +289,7 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     let tuneId: string | null = null;
     for (let attempt = 0; attempt < 30; attempt++) {
       tuneId = await page.evaluate(async (genre: string) => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         return await api.getTuneIdByGenre(genre);
       }, genreToTest);
 
@@ -388,7 +366,7 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
 
     // Get current user ID using test API
     const userId = await page.evaluate(async () => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getCurrentUserId();
     });
@@ -401,7 +379,7 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     // Create a private tune in the unselected genre (local-only for this test)
     const privateTuneId = await page.evaluate(
       async (opts: { genre: string; uid: string }) => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) throw new Error("__ttTestApi not available");
         return await api.findOrCreatePrivateTune(opts.genre, opts.uid);
       },

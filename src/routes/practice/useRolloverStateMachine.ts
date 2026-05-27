@@ -29,9 +29,9 @@ export interface RolloverStateMachineState {
 }
 
 function getRolloverIntervalMs(): number {
-  if (typeof window !== "undefined") {
+  if (typeof globalThis !== "undefined") {
     const override = (
-      window as unknown as {
+      globalThis as unknown as {
         __TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__?: number;
       }
     ).__TUNETREES_TEST_DATE_ROLLOVER_INTERVAL_MS__;

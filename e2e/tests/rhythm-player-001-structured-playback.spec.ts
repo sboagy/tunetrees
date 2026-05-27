@@ -72,7 +72,7 @@ test.describe
       testUser,
     }) => {
       await page.addInitScript(() => {
-        const audioContextPrototype = window.AudioContext?.prototype;
+        const audioContextPrototype = globalThis.AudioContext?.prototype;
         if (!audioContextPrototype) {
           return;
         }
@@ -82,14 +82,14 @@ test.describe
           this: AudioContext,
           audioData: ArrayBuffer
         ) {
-          void audioData;
+          audioData;
           return Promise.resolve(this.createBuffer(1, 1, 44_100));
         };
 
         // Preserve a reference for debugging if the browser test needs to inspect
         // whether audio decoding was stubbed.
         (
-          window as Window & {
+          globalThis as unknown as Window & {
             __ttOriginalDecodeAudioData?: typeof originalDecodeAudioData;
           }
         ).__ttOriginalDecodeAudioData = originalDecodeAudioData;

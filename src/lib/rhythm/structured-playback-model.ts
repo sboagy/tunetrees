@@ -27,7 +27,7 @@ export function resolveEffectivePlaybackParts(
 
   const hasLabeledSections = fullAbc
     .split("\n")
-    .some((line) => /^P:/.test(line.trim()));
+    .some((line) => line.trim().startsWith("P:"));
   if (hasLabeledSections) {
     return parts;
   }
@@ -103,9 +103,8 @@ export function getStructuredPlaybackPosition(
     const previous = parts[index - 1];
     const current = parts[index];
     if (
-      previous &&
-      current &&
-      (previous.label !== current.label || previous.bars !== current.bars)
+      previous?.label !== current?.label ||
+      previous?.bars !== current?.bars
     ) {
       displaySectionIndex += 1;
     }
@@ -116,10 +115,8 @@ export function getStructuredPlaybackPosition(
     const previous = parts[index];
     const current = parts[activePartIndex];
     if (
-      !previous ||
-      !current ||
-      previous.label !== current.label ||
-      previous.bars !== current.bars
+      previous?.label !== current?.label ||
+      previous?.bars !== current?.bars
     ) {
       break;
     }
@@ -132,7 +129,7 @@ export function getStructuredPlaybackPosition(
     displaySectionIndex,
     remainingBeatIndex,
     sectionPass,
-    part: parts[activePartIndex]!,
+    part: parts[activePartIndex],
   };
 }
 

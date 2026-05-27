@@ -163,7 +163,7 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
         currentDate = nextDue;
 
         // Persist DB before reload
-        await page.evaluate(() => (window as any).__persistDbForTest?.());
+        await page.evaluate(() => (globalThis as any).__persistDbForTest?.());
 
         // Clear Flashcard Mode persistence to ensure we start in Grid Mode
         await page.evaluate(() => {
@@ -217,6 +217,6 @@ test.describe("SCHEDULING-009: Future-Only Due over multi-day Good/Easy chain", 
 
     // Final check on intervals
     console.log("Interval sequence:", intervals);
-    validateIncreasingIntervals(intervals, 1.0);
+    validateIncreasingIntervals(intervals, 1);
   });
 });

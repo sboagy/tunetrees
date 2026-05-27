@@ -26,7 +26,6 @@ test.describe
 
     let ttPage: TuneTreesPage;
     let currentDate: Date;
-    // let currentTestUser: TestUser;
 
     test.beforeEach(async ({ page, context }) => {
       ttPage = new TuneTreesPage(page);
@@ -34,8 +33,6 @@ test.describe
       // Set stable starting date
       currentDate = new Date(STANDARD_TEST_DATE);
       await setStableDate(context, currentDate);
-
-      // currentTestUser = testUser;
     });
 
     test("01. Single tune in flashcard list", async ({ page, testUser }) => {
@@ -73,9 +70,9 @@ test.describe
       page,
       testUser,
     }) => {
-      // FIXME: This scenario remains flaky due to background sync/virtualized grid timing.
+      // This scenario remains flaky due to background sync/virtualized grid timing.
       // Occasionally the evaluation menu or grid count does not update within the timeout window.
-      // Marking as fixme until the underlying UI synchronization is stabilized.
+      // Marked as fixme until the underlying UI synchronization is stabilized.
       test.fixme(!!process.env.CI, "Known timing issue in CI");
 
       await setupForPracticeTestsParallel(page, testUser, {
@@ -169,7 +166,7 @@ test.describe
       text = (await counter.textContent())?.trim() || text;
       const match = text.match(/^(\d+) of (\d+)$/);
       expect(match).not.toBeNull();
-      const total = match ? parseInt(match[2], 10) : 0;
+      const total = match ? Number.parseInt(match[2], 10) : 0;
       if (total < 2) {
         test.fixme(
           true,
@@ -222,7 +219,7 @@ test.describe
 
       const counter = app.flashcardHeaderCounter;
       const initialText = await counter.textContent();
-      const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
+      const total = Number.parseInt(initialText?.split(" of ")[1] || "0", 10);
       // On first card, Prev should be disabled and counter stays on 1
       await expect(counter).toHaveText(new RegExp(`^1 of ${total}$`));
       await expect(app.flashcardPrevButton).toBeDisabled();
@@ -254,7 +251,7 @@ test.describe
       await page.waitForTimeout(800);
       text = (await counter.textContent())?.trim() || text;
       const match = text.match(/^(\d+) of (\d+)$/);
-      const total = match ? parseInt(match[2], 10) : 1;
+      const total = match ? Number.parseInt(match[2], 10) : 1;
       expect(total).toBe(2);
 
       // Evaluate the first card
@@ -366,7 +363,7 @@ test.describe
       const counter = app.flashcardHeaderCounter;
       const text = (await counter.textContent())?.trim() || "";
       const match = text.match(/^(\d+) of (\d+)$/);
-      const total = match ? parseInt(match[2], 10) : 1;
+      const total = match ? Number.parseInt(match[2], 10) : 1;
       await expect(counter).toHaveText(new RegExp(`^1 of ${total}$`));
 
       // Evaluation should still be selected

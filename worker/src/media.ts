@@ -150,9 +150,7 @@ async function verifyJwtLocally(
   env: MediaWorkerEnv
 ): Promise<MediaAuthUser | null> {
   try {
-    const header = decodeProtectedHeader(token) as {
-      alg?: string;
-    };
+    const header = decodeProtectedHeader(token);
     const algorithm = header.alg;
     if (!algorithm) {
       return null;
@@ -162,14 +160,18 @@ async function verifyJwtLocally(
       return null;
     }
 
-    const result = algorithm.startsWith("HS")
-      ? env.SUPABASE_JWT_SECRET
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let result: any | null = null;
+    if (algorithm.startsWith("HS")) {
+      result = env.SUPABASE_JWT_SECRET
         ? await jwtVerify(
             token,
             new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
           )
-        : null
-      : await jwtVerify(token, getJwks(env.SUPABASE_URL));
+        : null;
+    } else {
+      result = await jwtVerify(token, getJwks(env.SUPABASE_URL));
+    }
 
     if (!result) {
       return null;
@@ -248,7 +250,7 @@ async function authenticateMediaRequest(request: Request, env: MediaWorkerEnv) {
 function findUploadedFile(formData: FormData): UploadFileLike | null {
   for (const value of formData.values()) {
     if (value instanceof File) {
-      return value as UploadFileLike;
+      return value;
     }
 
     if (
@@ -257,7 +259,7 @@ function findUploadedFile(formData: FormData): UploadFileLike | null {
     ) {
       // Some test/runtime shims may provide Blob-like file objects that are not
       // actual File instances but still expose a filename. Accept those too.
-      return value as UploadFileLike;
+      return value;
     }
   }
 

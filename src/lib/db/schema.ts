@@ -9,7 +9,3 @@
 
 // Re-export everything from the generated SQLite schema
 export * from "../../../drizzle/schema-sqlite";
-
-import { repertoire, repertoireTune } from "../../../drizzle/schema-sqlite";
-
-export { repertoire, repertoireTune };

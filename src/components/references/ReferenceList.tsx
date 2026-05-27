@@ -192,140 +192,140 @@ export const ReferenceList: Component<ReferenceListProps> = (props) => {
   };
 
   // Render a single reference item
-  const ReferenceItem: Component<{ reference: Reference }> = (itemProps) => (
-    <li
-      class={`list-none flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all group ${
-        draggedRefId() === itemProps.reference.id
-          ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
-          : dragOverRefId() === itemProps.reference.id
-            ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
-            : "border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
-      }`}
-      data-testid={`reference-item-${itemProps.reference.id}`}
-      onDragOver={(e) =>
-        handleDragOver(e as unknown as DragEvent, itemProps.reference.id)
+  const ReferenceItem: Component<{ reference: Reference }> = (itemProps) => {
+    const referenceItemClasses = () => {
+      if (draggedRefId() === itemProps.reference.id) {
+        return "list-none flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all group opacity-50 border-gray-400/50 dark:border-gray-500/50";
       }
-      onDragLeave={handleDragLeave}
-      onDrop={(e) =>
-        handleDrop(e as unknown as DragEvent, itemProps.reference.id)
+      if (dragOverRefId() === itemProps.reference.id) {
+        return "list-none flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all group border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20";
       }
-    >
-      {/* Drag handle */}
-      <Show when={props.onReorder && canReorder()}>
-        <button
-          type="button"
-          draggable={true}
-          onDragStart={(e) =>
-            handleDragStart(e as unknown as DragEvent, itemProps.reference.id)
-          }
-          onDragEnd={handleDragEnd}
-          class="mt-0.5 flex-shrink-0 cursor-grab p-0.5 text-muted-foreground transition-colors hover:text-foreground active:cursor-grabbing"
-          title="Drag to reorder"
-          aria-label="Drag to reorder reference"
-          data-testid={`reference-drag-handle-${itemProps.reference.id}`}
-        >
-          <GripVertical class="w-4 h-4" />
-        </button>
-      </Show>
+      return "list-none flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border transition-all group border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600";
+    };
 
-      {/* Icon */}
-      <div class="text-2xl flex-shrink-0 mt-0.5">
-        {getTypeIcon(itemProps.reference.refType)}
-      </div>
-
-      {/* Content */}
-      <div class="flex-1 min-w-0">
-        {/* Title row with inline actions */}
-        <div class="flex items-center gap-1">
+    return (
+      <li
+        class={referenceItemClasses()}
+        data-testid={`reference-item-${itemProps.reference.id}`}
+        onDragOver={(e) => handleDragOver(e, itemProps.reference.id)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, itemProps.reference.id)}
+      >
+        {/* Drag handle */}
+        <Show when={props.onReorder && canReorder()}>
           <button
             type="button"
-            onClick={() => handleOpenReference(itemProps.reference)}
-            class="flex-1 min-w-0 text-left text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
-            title="Open reference"
-            aria-label="Open reference"
-            data-testid={`reference-link-${itemProps.reference.id}`}
+            draggable={true}
+            onDragStart={(e) => handleDragStart(e, itemProps.reference.id)}
+            onDragEnd={handleDragEnd}
+            class="mt-0.5 flex-shrink-0 cursor-grab p-0.5 text-muted-foreground transition-colors hover:text-foreground active:cursor-grabbing"
+            title="Drag to reorder"
+            aria-label="Drag to reorder reference"
+            data-testid={`reference-drag-handle-${itemProps.reference.id}`}
           >
-            {getReferencePrimaryLabel(itemProps.reference)}
+            <GripVertical class="w-4 h-4" />
           </button>
+        </Show>
 
-          <Show when={showActions() && canEditReference(itemProps.reference)}>
-            <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
-              <Show when={props.onEdit}>
-                <Button
-                  type="button"
-                  onClick={() => props.onEdit!(itemProps.reference)}
-                  variant="ghost"
-                  size="icon"
-                  class="h-7 w-7 !text-blue-600 hover:!text-blue-700 dark:!text-blue-400 dark:hover:!text-blue-300"
-                  title="Edit reference"
-                  aria-label="Edit reference"
-                  data-testid={`reference-edit-button-${itemProps.reference.id}`}
-                >
-                  <SquarePen class="h-4 w-4" />
-                </Button>
-              </Show>
+        {/* Icon */}
+        <div class="text-2xl flex-shrink-0 mt-0.5">
+          {getTypeIcon(itemProps.reference.refType)}
+        </div>
 
-              <Show when={props.onDelete}>
-                <Button
-                  type="button"
-                  onClick={() => props.onDelete!(itemProps.reference.id)}
-                  variant="ghost"
-                  size="icon"
-                  class="h-7 w-7 !text-red-600 hover:!text-red-700 hover:bg-destructive/10 dark:!text-red-400 dark:hover:!text-red-300"
-                  title="Delete reference"
-                  aria-label="Delete reference"
-                  data-testid={`reference-delete-button-${itemProps.reference.id}`}
-                >
-                  <Trash2 class="h-4 w-4" />
-                </Button>
-              </Show>
+        {/* Content */}
+        <div class="flex-1 min-w-0">
+          {/* Title row with inline actions */}
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handleOpenReference(itemProps.reference)}
+              class="flex-1 min-w-0 text-left text-blue-600 dark:text-blue-400 hover:underline font-medium break-words"
+              title="Open reference"
+              aria-label="Open reference"
+              data-testid={`reference-link-${itemProps.reference.id}`}
+            >
+              {getReferencePrimaryLabel(itemProps.reference)}
+            </button>
+
+            <Show when={showActions() && canEditReference(itemProps.reference)}>
+              <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity">
+                <Show when={props.onEdit}>
+                  <Button
+                    type="button"
+                    onClick={() => props.onEdit!(itemProps.reference)}
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7 !text-blue-600 hover:!text-blue-700 dark:!text-blue-400 dark:hover:!text-blue-300"
+                    title="Edit reference"
+                    aria-label="Edit reference"
+                    data-testid={`reference-edit-button-${itemProps.reference.id}`}
+                  >
+                    <SquarePen class="h-4 w-4" />
+                  </Button>
+                </Show>
+
+                <Show when={props.onDelete}>
+                  <Button
+                    type="button"
+                    onClick={() => props.onDelete!(itemProps.reference.id)}
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7 !text-red-600 hover:!text-red-700 hover:bg-destructive/10 dark:!text-red-400 dark:hover:!text-red-300"
+                    title="Delete reference"
+                    aria-label="Delete reference"
+                    data-testid={`reference-delete-button-${itemProps.reference.id}`}
+                  >
+                    <Trash2 class="h-4 w-4" />
+                  </Button>
+                </Show>
+              </div>
+            </Show>
+          </div>
+
+          {/* Type label */}
+          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            {getTypeLabel(itemProps.reference.refType)}
+          </div>
+          <Show when={!canEditReference(itemProps.reference)}>
+            <div
+              class="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300"
+              data-testid={`reference-visibility-badge-${itemProps.reference.id}`}
+            >
+              {(() => {
+                if (itemProps.reference.public) return "Public";
+                if (itemProps.reference.userRef) return "Shared";
+                return "System";
+              })()}
             </div>
           </Show>
-        </div>
 
-        {/* Type label */}
-        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          {getTypeLabel(itemProps.reference.refType)}
-        </div>
-        <Show when={!canEditReference(itemProps.reference)}>
-          <div
-            class="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300"
-            data-testid={`reference-visibility-badge-${itemProps.reference.id}`}
+          {/* Comment */}
+          <Show when={itemProps.reference.comment}>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">
+              {itemProps.reference.comment}
+            </p>
+          </Show>
+
+          {/* URL (if title exists and is different) */}
+          <Show
+            when={
+              itemProps.reference.title &&
+              itemProps.reference.title !==
+                getReferenceUrlLabel(itemProps.reference)
+            }
           >
-            {itemProps.reference.public
-              ? "Public"
-              : itemProps.reference.userRef
-                ? "Shared"
-                : "System"}
-          </div>
-        </Show>
-
-        {/* Comment */}
-        <Show when={itemProps.reference.comment}>
-          <p class="text-sm text-gray-600 dark:text-gray-300 mt-2">
-            {itemProps.reference.comment}
-          </p>
-        </Show>
-
-        {/* URL (if title exists and is different) */}
-        <Show
-          when={
-            itemProps.reference.title &&
-            itemProps.reference.title !==
-              getReferenceUrlLabel(itemProps.reference)
-          }
-        >
-          <button
-            type="button"
-            onClick={() => handleOpenReference(itemProps.reference)}
-            class="mt-1 block break-all text-left text-xs text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
-          >
-            {getReferenceUrlLabel(itemProps.reference)}
-          </button>
-        </Show>
-      </div>
-    </li>
-  );
+            <button
+              type="button"
+              onClick={() => handleOpenReference(itemProps.reference)}
+              class="mt-1 block break-all text-left text-xs text-gray-400 hover:text-blue-500 dark:text-gray-500 dark:hover:text-blue-400"
+            >
+              {getReferenceUrlLabel(itemProps.reference)}
+            </button>
+          </Show>
+        </div>
+      </li>
+    );
+  };
 
   return (
     <ul class="space-y-3 list-none" data-testid="references-list">

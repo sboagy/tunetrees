@@ -50,6 +50,78 @@ import {
   shouldCollapseSidebar,
 } from "./sidebarResize";
 
+function getSidebarSizeProperty(horizontal: boolean): "height" | "width" {
+  return horizontal ? "height" : "width";
+}
+
+function getContentPaddingClass(
+  dockPosition: DockPosition,
+  horizontal: boolean
+): string {
+  if (dockPosition === "right") {
+    return "pl-8 md:pl-3";
+  }
+  if (horizontal) {
+    return "";
+  }
+  return "pr-8 md:pr-3";
+}
+
+function getCollapsedEditPositionClass(
+  dockPosition: DockPosition,
+  horizontal: boolean
+): string {
+  if (horizontal) {
+    return "top-4 right-3.5 flex items-center";
+  }
+  return dockPosition === "right"
+    ? "top-3.5 left-1/2 -translate-x-1/2 flex items-center"
+    : "top-3.5 right-1/2 translate-x-1/2 flex items-center";
+}
+
+function getToggleClusterPositionClass(input: {
+  dockPosition: DockPosition;
+  horizontal: boolean;
+  collapsed: boolean;
+}): string {
+  if (input.horizontal && !input.collapsed) {
+    return "hidden";
+  }
+  if (input.horizontal) {
+    return "top-4 left-1/2 -translate-x-1/2 space-x-2";
+  }
+  return input.dockPosition === "right"
+    ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
+    : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2";
+}
+
+function getCollapsedToggleIcon(input: {
+  dockPosition: DockPosition;
+  horizontal: boolean;
+  collapsed: boolean;
+}) {
+  if (input.collapsed) {
+    if (input.horizontal) {
+      return <ChevronLeft class="w-3.5 h-3.5 rotate-90" />;
+    }
+    return input.dockPosition === "right" ? (
+      <ChevronLeft class="w-3.5 h-3.5" />
+    ) : (
+      <ChevronRight class="w-3.5 h-3.5" />
+    );
+  }
+
+  if (input.horizontal) {
+    return <ChevronRight class="w-3.5 h-3.5 rotate-90" />;
+  }
+
+  return input.dockPosition === "right" ? (
+    <ChevronRight class="w-3.5 h-3.5" />
+  ) : (
+    <ChevronLeft class="w-3.5 h-3.5" />
+  );
+}
+
 /**
  * Sidebar Component Props
  */
@@ -231,6 +303,24 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     const startPos = horizontal ? e.clientY : e.clientX;
     const resizeState = beginResize();
 
+    const cleanupMouseDrag = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    const scheduleMouseResize = (moveEvent: MouseEvent) => {
+      const currentPos = horizontal ? moveEvent.clientY : moveEvent.clientX;
+      const delta = normalizeSidebarResizeDelta(
+        currentPos - startPos,
+        props.dockPosition
+      );
+      const requestedSize = resizeState.startSize + delta;
+
+      applyRequestedSize(requestedSize, resizeState, cleanupMouseDrag);
+    };
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       // Cancel any pending RAF
       if (rafId !== null) {
@@ -239,19 +329,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       // Throttle updates using requestAnimationFrame
       rafId = requestAnimationFrame(() => {
-        const currentPos = horizontal ? moveEvent.clientY : moveEvent.clientX;
-        const delta = normalizeSidebarResizeDelta(
-          currentPos - startPos,
-          props.dockPosition
-        );
-        const requestedSize = resizeState.startSize + delta;
-
-        applyRequestedSize(requestedSize, resizeState, () => {
-          document.removeEventListener("mousemove", handleMouseMove);
-          document.removeEventListener("mouseup", handleMouseUp);
-          document.body.style.cursor = "";
-          document.body.style.userSelect = "";
-        });
+        scheduleMouseResize(moveEvent);
       });
     };
 
@@ -270,10 +348,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       // End resizing state
       setIsResizing(false);
 
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      cleanupMouseDrag();
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -291,6 +366,24 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     const startPos = horizontal ? touch.clientY : touch.clientX;
     const resizeState = beginResize();
 
+    const cleanupTouchDrag = () => {
+      document.removeEventListener("touchmove", handleTouchMove);
+      document.removeEventListener("touchend", handleTouchEnd);
+      document.body.style.userSelect = "";
+    };
+
+    const scheduleTouchResize = (moveEvent: TouchEvent) => {
+      const nextTouch = moveEvent.touches[0];
+      const currentPos = horizontal ? nextTouch.clientY : nextTouch.clientX;
+      const delta = normalizeSidebarResizeDelta(
+        currentPos - startPos,
+        props.dockPosition
+      );
+      const requestedSize = resizeState.startSize + delta;
+
+      applyRequestedSize(requestedSize, resizeState, cleanupTouchDrag);
+    };
+
     const handleTouchMove = (moveEvent: TouchEvent) => {
       // Cancel any pending RAF
       if (rafId !== null) {
@@ -299,19 +392,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       // Throttle updates using requestAnimationFrame
       rafId = requestAnimationFrame(() => {
-        const touch = moveEvent.touches[0];
-        const currentPos = horizontal ? touch.clientY : touch.clientX;
-        const delta = normalizeSidebarResizeDelta(
-          currentPos - startPos,
-          props.dockPosition
-        );
-        const requestedSize = resizeState.startSize + delta;
-
-        applyRequestedSize(requestedSize, resizeState, () => {
-          document.removeEventListener("touchmove", handleTouchMove);
-          document.removeEventListener("touchend", handleTouchEnd);
-          document.body.style.userSelect = "";
-        });
+        scheduleTouchResize(moveEvent);
       });
     };
 
@@ -330,9 +411,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       // End resizing state
       setIsResizing(false);
 
-      document.removeEventListener("touchmove", handleTouchMove);
-      document.removeEventListener("touchend", handleTouchEnd);
-      document.body.style.userSelect = "";
+      cleanupTouchDrag();
     };
 
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
@@ -376,28 +455,55 @@ export const Sidebar: Component<SidebarProps> = (props) => {
     }
   };
 
+  const horizontal = () => isHorizontal();
+  const sizeProperty = () => getSidebarSizeProperty(horizontal());
+  const headerClass = () =>
+    horizontal() && !props.collapsed
+      ? "flex items-center justify-between px-2 py-1"
+      : "flex items-center justify-center p-1";
+  const contentPaddingClass = () =>
+    getContentPaddingClass(props.dockPosition, horizontal());
+  const collapsedEditPositionClass = () =>
+    getCollapsedEditPositionClass(props.dockPosition, horizontal());
+  const toggleClusterPositionClass = () =>
+    getToggleClusterPositionClass({
+      dockPosition: props.dockPosition,
+      horizontal: horizontal(),
+      collapsed: props.collapsed,
+    });
+  const collapseToggleIcon = () =>
+    getCollapsedToggleIcon({
+      dockPosition: props.dockPosition,
+      horizontal: horizontal(),
+      collapsed: props.collapsed,
+    });
+  const edgeGripClass = () =>
+    props.dockPosition === "right"
+      ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
+      : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5";
+  const edgeGripIconClass = () =>
+    props.dockPosition === "right"
+      ? "top-1/2 -translate-y-1/2 -left-2"
+      : "top-1/2 -translate-y-1/2 -right-2";
+
   return (
     <aside
       class={`relative bg-gray-50/30 dark:bg-gray-800/30 flex-shrink-0 flex flex-col ${
-        isHorizontal()
+        horizontal()
           ? "border-t border-gray-200/20 dark:border-gray-700/20"
           : "border-r border-gray-200/20 dark:border-gray-700/20"
       } ${isResizing() ? "" : "transition-all duration-300"} z-10`}
       style={{
-        [isHorizontal() ? "height" : "width"]: props.collapsed
+        [sizeProperty()]: props.collapsed
           ? `${SIDEBAR_COLLAPSED_SIZE}px`
           : `${localWidth()}px`,
-        "will-change": isResizing()
-          ? isHorizontal()
-            ? "height"
-            : "width"
-          : "auto",
+        "will-change": isResizing() ? sizeProperty() : "auto",
       }}
     >
       {/* Keep a visible resize affordance on the bottom-docked sidebar even when
           the scheduled-grid footer is absent (for example in flashcard mode).
           The footer can still act as an additional resize target when present. */}
-      <Show when={isHorizontal()}>
+      <Show when={horizontal()}>
         <button
           type="button"
           class="flex-shrink-0 flex justify-center items-center py-0.5 cursor-row-resize select-none touch-none border-b border-gray-200/20 dark:border-gray-700/20 hover:bg-gray-200/20 dark:hover:bg-gray-700/20 transition-colors"
@@ -415,13 +521,9 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           For the bottom-docked expanded sidebar, keep these controls in a
           dedicated header row so they do not overlap the Tune Info toggle. */}
       <header
-        class={`border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20 ${
-          isHorizontal() && !props.collapsed
-            ? "flex items-center justify-between px-2 py-1"
-            : "flex items-center justify-center p-1"
-        }`}
+        class={`border-b border-gray-200/20 dark:border-gray-700/20 flex-shrink-0 relative z-20 ${headerClass()}`}
       >
-        <Show when={isHorizontal() && !props.collapsed}>
+        <Show when={horizontal() && !props.collapsed}>
           <div class="flex items-center">
             <SidebarDragHandle
               onDragStart={props.onDragStart}
@@ -444,16 +546,10 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       {/* Sidebar Content (conditionally rendered) */}
       <div
-        class={`flex-1 overflow-auto p-2 space-y-2 ${
-          props.dockPosition === "right"
-            ? "pl-8 md:pl-3"
-            : !isHorizontal()
-              ? "pr-8 md:pr-3"
-              : ""
-        } ${props.collapsed ? "hidden" : ""}`}
+        class={`flex-1 overflow-auto p-2 space-y-2 ${contentPaddingClass()} ${props.collapsed ? "hidden" : ""}`}
       >
         {/* Current Tune Info Header – collapsible when sidebar is at the bottom */}
-        <Show when={isHorizontal()} fallback={<TuneInfoHeader />}>
+        <Show when={horizontal()} fallback={<TuneInfoHeader />}>
           <div class="border-b border-gray-200/30 dark:border-gray-700/30 pb-1">
             <button
               type="button"
@@ -504,14 +600,10 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Resize Handle with GripVertical indicator (only when expanded and NOT bottom-docked).
           When bottom-docked, the sticky footer in TunesGridScheduled acts as the resize
           handle via SidebarResizeContext, so this button is hidden to avoid confusion. */}
-      <div class={`${isHorizontal() ? "hidden" : ""}`}>
+      <div class={`${horizontal() ? "hidden" : ""}`}>
         <button
           type="button"
-          class={`absolute z-20 select-none ${
-            props.dockPosition === "right"
-              ? "top-0 left-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
-              : "top-0 right-0 h-full w-4 md:w-1 cursor-col-resize hover:bg-blue-500 md:hover:w-1.5"
-          } transition-all group border-0 bg-transparent p-0 touch-none`}
+          class={`absolute z-20 select-none ${edgeGripClass()} transition-all group border-0 bg-transparent p-0 touch-none`}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           title="Drag to resize sidebar"
@@ -520,11 +612,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
         >
           {/* GripVertical icon - centered, always slightly visible on mobile, hover on desktop */}
           <div
-            class={`absolute opacity-60 md:opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none ${
-              props.dockPosition === "right"
-                ? "top-1/2 -translate-y-1/2 -left-2"
-                : "top-1/2 -translate-y-1/2 -right-2"
-            }`}
+            class={`absolute opacity-60 md:opacity-30 group-hover:opacity-100 transition-opacity pointer-events-none ${edgeGripIconClass()}`}
           >
             <GripVertical class="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
           </div>
@@ -534,13 +622,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Edit button - only visible when collapsed and tune is selected - positioned at top (vertical) or far right (horizontal) */}
       <Show when={props.collapsed && currentTuneId()}>
         <div
-          class={`absolute z-30 select-none ${
-            isHorizontal()
-              ? "top-4 right-3.5 flex items-center"
-              : props.dockPosition === "right"
-                ? "top-3.5 left-1/2 -translate-x-1/2 flex items-center"
-                : "top-3.5 right-1/2 translate-x-1/2 flex items-center"
-          }`}
+          class={`absolute z-30 select-none ${collapsedEditPositionClass()}`}
         >
           <button
             type="button"
@@ -557,15 +639,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       {/* Collapse Toggle Button and Drag Handle - positioned based on dock position */}
       <div
-        class={`absolute flex items-center justify-center z-30 select-none ${
-          isHorizontal() && !props.collapsed
-            ? "hidden"
-            : isHorizontal()
-              ? "top-4 left-1/2 -translate-x-1/2 space-x-2"
-              : props.dockPosition === "right"
-                ? "top-1/2 -translate-y-1/2 left-0.5 flex-col space-y-2"
-                : "top-1/2 -translate-y-1/2 right-0.5 flex-col space-y-2"
-        }`}
+        class={`absolute flex items-center justify-center z-30 select-none ${toggleClusterPositionClass()}`}
       >
         <button
           type="button"
@@ -575,21 +649,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
           aria-label={props.collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!props.collapsed}
         >
-          {props.collapsed ? (
-            isHorizontal() ? (
-              <ChevronLeft class="w-3.5 h-3.5 rotate-90" />
-            ) : props.dockPosition === "right" ? (
-              <ChevronLeft class="w-3.5 h-3.5" />
-            ) : (
-              <ChevronRight class="w-3.5 h-3.5" />
-            )
-          ) : isHorizontal() ? (
-            <ChevronRight class="w-3.5 h-3.5 rotate-90" />
-          ) : props.dockPosition === "right" ? (
-            <ChevronRight class="w-3.5 h-3.5" />
-          ) : (
-            <ChevronLeft class="w-3.5 h-3.5" />
-          )}
+          {collapseToggleIcon()}
         </button>
 
         <div class="p-0.5">

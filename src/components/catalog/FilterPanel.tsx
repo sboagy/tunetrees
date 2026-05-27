@@ -10,7 +10,7 @@
  * @module components/catalog/FilterPanel
  */
 
-import { ChevronDown, Filter, X } from "lucide-solid";
+import { ChevronDown, ListFilter, X } from "lucide-solid";
 import {
   type Component,
   createEffect,
@@ -46,6 +46,17 @@ const isPointerEventInside = (
   const target = event.target as Node | null;
   return !!target && element.contains(target);
 };
+
+/**
+ * Shared handler for pointer-down-outside detection used by dropdown components.
+ * Returns true if the event target is outside all provided refs.
+ */
+function isOutsideRefs(
+  event: PointerEvent,
+  ...refs: (Element | undefined | null)[]
+): boolean {
+  return refs.every((ref) => !isPointerEventInside(event, ref));
+}
 
 export interface TuneSetFilterOption {
   id: string;
@@ -99,14 +110,9 @@ const FilterDropdown: Component<{
   let buttonRef: HTMLButtonElement | undefined;
 
   const handlePointerDownOutside = (event: PointerEvent) => {
-    if (
-      isPointerEventInside(event, dropdownRef) ||
-      isPointerEventInside(event, buttonRef)
-    ) {
-      return;
+    if (isOutsideRefs(event, dropdownRef, buttonRef)) {
+      setIsOpen(false);
     }
-
-    setIsOpen(false);
   };
 
   // Setup outside-pointer listener
@@ -245,14 +251,9 @@ const TuneSetFilterDropdown: Component<{
     props.filterAnyTuneSet ? 1 : props.selectedTuneSetIds.length;
 
   const handlePointerDownOutside = (event: PointerEvent) => {
-    if (
-      isPointerEventInside(event, dropdownRef) ||
-      isPointerEventInside(event, buttonRef)
-    ) {
-      return;
+    if (isOutsideRefs(event, dropdownRef, buttonRef)) {
+      setIsOpen(false);
     }
-
-    setIsOpen(false);
   };
 
   createEffect(() => {
@@ -444,7 +445,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
     if (buttonRef && isExpanded()) {
       const rect = buttonRef.getBoundingClientRect();
       const panelWidth = 384; // min-w-96 = 24rem = 384px
-      const viewportWidth = window.innerWidth;
+      const viewportWidth = globalThis.innerWidth;
       const gap = 4;
 
       // On mobile, make it full width with padding
@@ -480,16 +481,16 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
   });
 
   onCleanup(() => {
-    if (typeof window !== "undefined") {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+    if (typeof globalThis !== "undefined") {
+      globalThis.removeEventListener("resize", updatePosition);
+      globalThis.removeEventListener("scroll", updatePosition, true);
     }
   });
 
   createEffect(() => {
     if (isExpanded()) {
-      window.addEventListener("resize", updatePosition);
-      window.addEventListener("scroll", updatePosition, true);
+      globalThis.addEventListener("resize", updatePosition);
+      globalThis.addEventListener("scroll", updatePosition, true);
     }
   });
 
@@ -612,7 +613,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
         aria-haspopup="true"
         data-testid="filters-button"
       >
-        <Filter class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+        <ListFilter class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
         <span class="hidden sm:inline">Filters</span>
         <Show when={totalSelected() > 0}>
           <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium">
@@ -641,7 +642,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   items={props.availableTypes}
                   selectedItems={props.selectedTypes}
                   onSelectionChange={(selected) =>
-                    props.onTypesChange(selected as string[])
+                    props.onTypesChange(selected)
                   }
                 />
 
@@ -650,7 +651,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   items={props.availableModes}
                   selectedItems={props.selectedModes}
                   onSelectionChange={(selected) =>
-                    props.onModesChange(selected as string[])
+                    props.onModesChange(selected)
                   }
                 />
 
@@ -659,7 +660,7 @@ export const FilterPanel: Component<FilterPanelProps> = (props) => {
                   items={props.availableGenres}
                   selectedItems={props.selectedGenres}
                   onSelectionChange={(selected) =>
-                    props.onGenresChange(selected as string[])
+                    props.onGenresChange(selected)
                   }
                   loading={props.loading?.genres}
                 />

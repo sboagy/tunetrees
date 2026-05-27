@@ -70,7 +70,7 @@ export function usePracticeSubmit(
 
       if (result.success) {
         toast.success(
-          `Successfully submitted ${result.count} evaluation${result.count !== 1 ? "s" : ""}`,
+          `Successfully submitted ${result.count} evaluation${result.count === 1 ? "" : "s"}`,
           {
             duration: 3000,
           }
@@ -129,7 +129,7 @@ export function usePracticeSubmit(
 
       if (added.length > 0) {
         toast.success(
-          `Added ${added.length} tune${added.length !== 1 ? "s" : ""} to queue`,
+          `Added ${added.length} tune${added.length === 1 ? "" : "s"} to queue`,
           {
             duration: 3000,
           }
@@ -174,7 +174,7 @@ export function usePracticeSubmit(
         .replace(" ", "T")
         .substring(0, 19);
 
-      await db.run(sql`
+      db.run(sql`
         DELETE FROM daily_practice_queue
         WHERE user_ref = ${userId}
           AND repertoire_ref = ${repertoireId}

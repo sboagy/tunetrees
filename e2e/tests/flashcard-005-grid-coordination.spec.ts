@@ -137,7 +137,7 @@ test.describe
       // Verify flashcard count updated (only 1 unsubmitted tune left)
       const counter = app.flashcardHeaderCounter;
       const counterText = await counter.textContent();
-      const total = parseInt(counterText?.split(" of ")[1] || "0", 10);
+      const total = Number.parseInt(counterText?.split(" of ")[1] || "0", 10);
       expect(total).toBeGreaterThanOrEqual(0);
     });
 
@@ -203,7 +203,7 @@ test.describe
 
       const counter = app.flashcardHeaderCounter;
       let counterText = await counter.textContent();
-      let total = parseInt(counterText?.split(" of ")[1] || "0", 10);
+      let total = Number.parseInt(counterText?.split(" of ")[1] || "0", 10);
       expect(total).toBeGreaterThanOrEqual(0);
 
       // Toggle Show Submitted ON (while flashcard open)
@@ -211,7 +211,7 @@ test.describe
 
       // Verify flashcard list updated (now shows 2 tunes)
       counterText = await counter.textContent();
-      total = parseInt(counterText?.split(" of ")[1] || "0", 10);
+      total = Number.parseInt(counterText?.split(" of ")[1] || "0", 10);
       expect(total).toBeGreaterThanOrEqual(1);
     });
 
@@ -238,7 +238,7 @@ test.describe
       const text = (await counter.textContent())?.trim() || "";
       const match = text.match(/^(\d+) of (\d+)$/);
       expect(match).not.toBeNull();
-      const total = match ? parseInt(match[2], 10) : 0;
+      const total = match ? Number.parseInt(match[2], 10) : 0;
       if (total < 2) {
         test.fixme(
           true,

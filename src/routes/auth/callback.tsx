@@ -8,7 +8,9 @@ export default function AuthCallback() {
   onMount(async () => {
     // Handle the auth callback from Supabase
     // Supabase redirects here with auth tokens in the URL hash
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hashParams = new URLSearchParams(
+      globalThis.location.hash.substring(1)
+    );
     const access_token = hashParams.get("access_token");
     const refresh_token = hashParams.get("refresh_token");
     const type = hashParams.get("type");

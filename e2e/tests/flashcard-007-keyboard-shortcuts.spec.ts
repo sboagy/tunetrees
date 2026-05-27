@@ -150,7 +150,6 @@ test.describe
         true,
         "Escape key does not close flashcard view yet; awaiting implementation."
       );
-      return;
 
       // (placeholder) existing assertions will be re-enabled when Escape is supported
     });

@@ -33,11 +33,11 @@ export interface TuneOverrideInput {
  * Get device ID (browser fingerprint or generate one)
  */
 function getDeviceId(): string {
-  if (typeof window !== "undefined") {
-    let deviceId = localStorage.getItem("tunetrees_device_id");
+  if (globalThis !== undefined && globalThis.localStorage !== undefined) {
+    let deviceId = globalThis.localStorage.getItem("tunetrees_device_id");
     if (!deviceId) {
       deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      localStorage.setItem("tunetrees_device_id", deviceId);
+      globalThis.localStorage.setItem("tunetrees_device_id", deviceId);
     }
     return deviceId;
   }
@@ -220,7 +220,6 @@ export async function clearTuneOverrideFields(
   if (!hasAny) {
     // Soft delete entire override
     await deleteTuneOverride(db, overrideId);
-    return;
   }
 
   // Sync is handled automatically by SQL triggers populating sync_outbox

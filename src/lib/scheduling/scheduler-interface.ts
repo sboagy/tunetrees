@@ -22,10 +22,8 @@ export interface SchedulingServiceOptions {
   repertoireTuneCount?: number | null;
 }
 
-export interface SchedulingServiceConstructor {
-  new (
-    prefs: PrefsSpacedRepetition,
-    scheduling: IUserSchedulingOptions,
-    options?: SchedulingServiceOptions
-  ): SchedulingService;
-}
+export type SchedulingServiceConstructor = new (
+  prefs: PrefsSpacedRepetition,
+  scheduling: IUserSchedulingOptions,
+  options?: SchedulingServiceOptions
+) => SchedulingService;

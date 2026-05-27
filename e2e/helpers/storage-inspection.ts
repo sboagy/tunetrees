@@ -29,7 +29,7 @@ export async function getSQLiteRecord(
 
   const record = await page.evaluate(
     async ({ table, id }) => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getLocalRecord(table, id);
     },
@@ -94,14 +94,15 @@ export async function clearIndexedDB(
     return new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase(db);
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(new Error(String(request.error)));
       request.onblocked = () => {
         console.warn(`IndexedDB ${db} delete blocked`);
         // Force close connections and retry
         setTimeout(() => {
           const retryRequest = indexedDB.deleteDatabase(db);
           retryRequest.onsuccess = () => resolve();
-          retryRequest.onerror = () => reject(retryRequest.error);
+          retryRequest.onerror = () =>
+            reject(new Error(String(retryRequest.error)));
         }, 1000);
       };
     });

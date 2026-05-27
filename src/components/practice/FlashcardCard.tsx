@@ -40,9 +40,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
   });
 
   const handleEvalChange = (newValue: string) => {
-    if (props.onRecallEvalChange) {
-      props.onRecallEvalChange(newValue);
-    }
+    props.onRecallEvalChange?.(newValue);
   };
 
   const formatMode = (mode: string | null): string => {
@@ -208,10 +206,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
                 Release Year
               </h3>
               <p class="text-gray-900 dark:text-gray-100">
-                {props.tune.release_year !== null &&
-                props.tune.release_year !== undefined
-                  ? props.tune.release_year
-                  : "—"}
+                {props.tune.release_year ?? "—"}
               </p>
             </div>
           </Show>
@@ -363,13 +358,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
                     ? `${props.tune.latest_interval} days`
                     : "—"}
                 </p>
-                <p>
-                  Repetitions:{" "}
-                  {props.tune.latest_repetitions !== null &&
-                  props.tune.latest_repetitions !== undefined
-                    ? props.tune.latest_repetitions
-                    : "—"}
-                </p>
+                <p>Repetitions: {props.tune.latest_repetitions ?? "—"}</p>
               </div>
             </div>
           </Show>

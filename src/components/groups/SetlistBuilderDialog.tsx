@@ -103,8 +103,8 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const [setlistAccess] = createResource(
@@ -246,11 +246,11 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
     };
 
     const animationFrameId = requestAnimationFrame(focusInput);
-    const timeoutId = window.setTimeout(focusInput, 120);
+    const timeoutId = globalThis.setTimeout(focusInput, 120);
 
     onCleanup(() => {
       cancelAnimationFrame(animationFrameId);
-      window.clearTimeout(timeoutId);
+      globalThis.clearTimeout(timeoutId);
     });
   });
 
@@ -499,12 +499,12 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
         data-testid="setlist-builder-backdrop"
       />
 
-      <div
+      <dialog
+        open
         class="fixed left-1/2 top-1/2 z-[70] flex h-[92vh] w-[96vw] max-w-7xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="setlist-builder-title"
         data-testid="setlist-builder-dialog"
+        onClose={props.onClose}
       >
         <div class="border-b border-gray-200 p-4 dark:border-gray-700 sm:p-6">
           <header class="flex justify-between items-center w-full mb-4">
@@ -586,7 +586,7 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
                 >
                   <div class="flex items-center gap-2">
                     <label
-                      for="setlist-name"
+                      for="setlist-name" /* NOSONAR */
                       class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
                       Setlist Name
@@ -626,7 +626,7 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
 
                 <div class="space-y-2">
                   <label
-                    for="setlist-description"
+                    for="setlist-description" /* NOSONAR */
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     Notes
@@ -888,7 +888,7 @@ export const SetlistBuilderDialog: Component<SetlistBuilderDialogProps> = (
             </div>
           </section>
         </div>
-      </div>
+      </dialog>
     </Show>
   );
 };

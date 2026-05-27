@@ -10,7 +10,7 @@ async function setInjectedTestUserId(
   userId: string
 ) {
   await page.addInitScript((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
   await setCurrentTestUserId(page, userId);
 }
@@ -20,7 +20,7 @@ async function setCurrentTestUserId(
   userId: string
 ) {
   await page.evaluate((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
 }
 
@@ -116,7 +116,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
 
     // Wait for the test API to be registered.
     await page.waitForFunction(
-      () => !!(window as { __ttTestApi?: unknown }).__ttTestApi,
+      () => !!(globalThis as { __ttTestApi?: unknown }).__ttTestApi,
       { timeout: 20_000 }
     );
   });
@@ -128,7 +128,7 @@ test.describe("SYNC-004: Manual localStorage date does not override DB window", 
     // Ask the test API what window the app loaded.
     const queueInfo = await page.evaluate(async (repertoireId: string) => {
       const api = (
-        window as {
+        globalThis as {
           __ttTestApi?: {
             getQueueInfo: (id: string) => Promise<{
               windowStartUtc: string;

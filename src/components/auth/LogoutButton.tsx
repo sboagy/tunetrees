@@ -7,7 +7,7 @@
  * @module components/auth/LogoutButton
  */
 
-import { Loader2, LogOut } from "lucide-solid";
+import { LoaderCircle, LogOut } from "lucide-solid";
 import { type Component, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
 
@@ -71,7 +71,7 @@ export const LogoutButton: Component<LogoutButtonProps> = (props) => {
           when={!isLoggingOut() && !loading()}
           fallback={
             <span class="flex items-center gap-2">
-              <Loader2 class="animate-spin h-4 w-4" aria-hidden="true" />
+              <LoaderCircle class="animate-spin h-4 w-4" aria-hidden="true" />
               <Show when={!props.iconOnly}>Signing out...</Show>
             </span>
           }

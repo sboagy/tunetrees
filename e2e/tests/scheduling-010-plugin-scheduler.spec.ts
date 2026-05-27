@@ -55,7 +55,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       ) => {
         const payload = {
           event,
-          href: window.location.href,
+          href: globalThis.location.href,
           ts: new Date().toISOString(),
           details: details ?? null,
           stack: stackTrace(),
@@ -70,7 +70,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
         }
       };
 
-      const locationProto = Object.getPrototypeOf(window.location) as {
+      const locationProto = Object.getPrototypeOf(globalThis.location) as {
         reload?: (...args: unknown[]) => unknown;
         assign?: (...args: unknown[]) => unknown;
         replace?: (...args: unknown[]) => unknown;
@@ -78,9 +78,11 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
       } | null;
 
       if (locationProto && !locationProto.__ttReloadDiagPatched) {
-        const originalReload = locationProto.reload?.bind(window.location);
-        const originalAssign = locationProto.assign?.bind(window.location);
-        const originalReplace = locationProto.replace?.bind(window.location);
+        const originalReload = locationProto.reload?.bind(globalThis.location);
+        const originalAssign = locationProto.assign?.bind(globalThis.location);
+        const originalReplace = locationProto.replace?.bind(
+          globalThis.location
+        );
 
         if (typeof originalReload === "function") {
           locationProto.reload = (...args: unknown[]) => {
@@ -107,16 +109,18 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
         logReloadDiag("location-hooks-installed");
       }
 
-      const historyAny = window.history as {
+      const historyAny = globalThis.history as {
         pushState?: (...args: unknown[]) => unknown;
         replaceState?: (...args: unknown[]) => unknown;
         __ttReloadDiagPatched?: boolean;
       };
 
       if (!historyAny.__ttReloadDiagPatched) {
-        const originalPushState = historyAny.pushState?.bind(window.history);
+        const originalPushState = historyAny.pushState?.bind(
+          globalThis.history
+        );
         const originalReplaceState = historyAny.replaceState?.bind(
-          window.history
+          globalThis.history
         );
 
         if (typeof originalPushState === "function") {
@@ -137,7 +141,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
         logReloadDiag("history-hooks-installed");
       }
 
-      window.addEventListener(
+      globalThis.addEventListener(
         "beforeunload",
         () => {
           logReloadDiag("event.beforeunload");
@@ -145,7 +149,7 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
         { capture: true }
       );
 
-      window.addEventListener(
+      globalThis.addEventListener(
         "pagehide",
         (event) => {
           const persisted = (event as { persisted?: boolean }).persisted;

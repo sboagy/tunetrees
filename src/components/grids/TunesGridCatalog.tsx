@@ -14,7 +14,7 @@
 
 import type { VisibilityState } from "@tanstack/solid-table";
 import { eq } from "drizzle-orm";
-// import { GripVertical } from "lucide-solid";
+
 import {
   type Component,
   createEffect,
@@ -53,8 +53,6 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
       props.onColumnVisibilityChange(columnVisibility());
     }
   });
-
-  // (Drag state removed; reordering not handled at wrapper level)
 
   // Fetch tunes data
   // CRITICAL: Must wait for initialSyncComplete before fetching tunes.
@@ -230,6 +228,7 @@ export const TunesGridCatalog: Component<IGridBaseProps> = (props) => {
 
   // Selection count provided by TunesGrid
   const [selectedCount, setSelectedCount] = createSignal<number>(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let innerTable: any | null = null;
 
   // Rhythm dialog state

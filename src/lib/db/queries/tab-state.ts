@@ -29,7 +29,7 @@ export async function getTabState(
   db: SqliteDatabase,
   userId: string
 ): Promise<TabState> {
-  const result = await db
+  const result = db
     .select({
       whichTab: tabGroupMainState.whichTab,
       repertoireId: tabGroupMainState.repertoireId,
@@ -62,7 +62,7 @@ export async function saveActiveTab(
   userId: string,
   tabId: TabId
 ): Promise<void> {
-  const existing = await db
+  const existing = db
     .select({ id: tabGroupMainState.id })
     .from(tabGroupMainState)
     .where(eq(tabGroupMainState.userId, userId))
@@ -70,8 +70,7 @@ export async function saveActiveTab(
     .all();
 
   if (existing.length > 0) {
-    await db
-      .update(tabGroupMainState)
+    db.update(tabGroupMainState)
       .set({
         whichTab: tabId,
         lastModifiedAt: new Date().toISOString(),
@@ -79,8 +78,7 @@ export async function saveActiveTab(
       .where(eq(tabGroupMainState.userId, userId))
       .run();
   } else {
-    await db
-      .insert(tabGroupMainState)
+    db.insert(tabGroupMainState)
       .values({
         id: generateId(),
         userId,

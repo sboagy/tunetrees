@@ -129,11 +129,14 @@ const EditTunePage: Component = () => {
       const tuneId = params.id;
       const uid = userIdInt();
       const repertoireId = currentRepertoireId();
-      return db && tuneId && uid && repertoireId
-        ? { db, tuneId, uid, repertoireId }
-        : db && tuneId && uid
-          ? { db, tuneId, uid }
-          : null;
+
+      if (db && tuneId && uid && repertoireId) {
+        return { db, tuneId, uid, repertoireId };
+      }
+      if (db && tuneId && uid) {
+        return { db, tuneId, uid };
+      }
+      return null;
     },
     async (params) => {
       if (!params) return null;

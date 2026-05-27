@@ -37,7 +37,7 @@ function isNetworkSyncError(error: unknown): boolean {
 }
 
 function escapeSqlString(value: string): string {
-  return value.replace(/'/g, "''");
+  return value.replaceAll("'", "''");
 }
 
 function quoteSqlString(value: string): string {

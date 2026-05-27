@@ -50,6 +50,154 @@ export interface UserProfileData {
   phoneVerified: string | null;
 }
 
+function resolveOptionalUpdate<T>(
+  incoming: T | null | undefined,
+  existing: T | null
+): T | undefined {
+  if (incoming === null) {
+    return undefined;
+  }
+  if (incoming !== undefined) {
+    return incoming;
+  }
+  return existing ?? undefined;
+}
+
+function resolveOptionalInsert<T>(
+  incoming: T | null | undefined,
+  fallback?: T
+): T | undefined {
+  if (incoming === null) {
+    return undefined;
+  }
+  if (incoming !== undefined) {
+    return incoming;
+  }
+  return fallback;
+}
+
+function toDbBool(
+  value: boolean | null | undefined,
+  fallback?: 0 | 1
+): 0 | 1 | undefined {
+  if (value === undefined) {
+    return fallback;
+  }
+  return value ? 1 : 0;
+}
+
+function buildSchedulingOptionsUpdateSet(
+  data: Partial<SchedulingOptions> & { userId: string },
+  existing: SchedulingOptions,
+  now: string
+) {
+  return {
+    acceptableDelinquencyWindow: resolveOptionalUpdate(
+      data.acceptableDelinquencyWindow,
+      existing.acceptableDelinquencyWindow
+    ),
+    minReviewsPerDay: resolveOptionalUpdate(
+      data.minReviewsPerDay,
+      existing.minReviewsPerDay
+    ),
+    maxReviewsPerDay: resolveOptionalUpdate(
+      data.maxReviewsPerDay,
+      existing.maxReviewsPerDay
+    ),
+    daysPerWeek: resolveOptionalUpdate(data.daysPerWeek, existing.daysPerWeek),
+    weeklyRules: resolveOptionalUpdate(data.weeklyRules, existing.weeklyRules),
+    exceptions: resolveOptionalUpdate(data.exceptions, existing.exceptions),
+    autoScheduleNew: toDbBool(data.autoScheduleNew),
+    lastModifiedAt: now,
+  };
+}
+
+function buildSchedulingOptionsInsertSet(
+  data: Partial<SchedulingOptions> & { userId: string },
+  now: string
+) {
+  return {
+    userId: data.userId,
+    acceptableDelinquencyWindow: resolveOptionalInsert(
+      data.acceptableDelinquencyWindow,
+      21
+    ),
+    minReviewsPerDay: resolveOptionalInsert(data.minReviewsPerDay),
+    maxReviewsPerDay: resolveOptionalInsert(data.maxReviewsPerDay),
+    daysPerWeek: resolveOptionalInsert(data.daysPerWeek),
+    weeklyRules: resolveOptionalInsert(data.weeklyRules),
+    exceptions: resolveOptionalInsert(data.exceptions),
+    autoScheduleNew: toDbBool(data.autoScheduleNew, 1),
+    lastModifiedAt: now,
+  };
+}
+
+function buildSpacedRepetitionUpdateSet(
+  data: Partial<SpacedRepetitionPrefs> & { userId: string; algType: string },
+  existing: SpacedRepetitionPrefs,
+  now: string
+) {
+  return {
+    fsrsWeights: resolveOptionalUpdate(data.fsrsWeights, existing.fsrsWeights),
+    requestRetention: resolveOptionalUpdate(
+      data.requestRetention,
+      existing.requestRetention
+    ),
+    maximumInterval: resolveOptionalUpdate(
+      data.maximumInterval,
+      existing.maximumInterval
+    ),
+    lastModifiedAt: now,
+  };
+}
+
+function buildSpacedRepetitionInsertSet(
+  data: Partial<SpacedRepetitionPrefs> & { userId: string; algType: string },
+  now: string
+) {
+  return {
+    userId: data.userId,
+    algType: data.algType,
+    fsrsWeights: resolveOptionalInsert(data.fsrsWeights),
+    requestRetention: resolveOptionalInsert(data.requestRetention, 0.9),
+    maximumInterval: resolveOptionalInsert(data.maximumInterval, 365),
+    lastModifiedAt: now,
+  };
+}
+
+function buildUserProfileUpdateSet(
+  data: Partial<UserProfileData> & { id: string },
+  existing: UserProfileData,
+  now: string
+) {
+  return {
+    name: resolveOptionalUpdate(data.name, existing.name),
+    email: resolveOptionalUpdate(data.email, existing.email),
+    avatarUrl: resolveOptionalUpdate(data.avatarUrl, existing.avatarUrl),
+    phone: resolveOptionalUpdate(data.phone, existing.phone),
+    phoneVerified: resolveOptionalUpdate(
+      data.phoneVerified,
+      existing.phoneVerified
+    ),
+    lastModifiedAt: now,
+  };
+}
+
+function buildUserProfileInsertSet(
+  data: Partial<UserProfileData> & { id: string },
+  now: string
+) {
+  return {
+    id: data.id,
+    name: resolveOptionalInsert(data.name),
+    email: resolveOptionalInsert(data.email),
+    avatarUrl: resolveOptionalInsert(data.avatarUrl),
+    phone: resolveOptionalInsert(data.phone),
+    phoneVerified: resolveOptionalInsert(data.phoneVerified),
+    lastModifiedAt: now,
+  };
+}
+
 // ============================================================================
 // Scheduling Options Queries
 // ============================================================================
@@ -99,75 +247,13 @@ export async function updateSchedulingOptions(
     // Update existing record
     await db
       .update(prefsSchedulingOptions)
-      .set({
-        acceptableDelinquencyWindow:
-          data.acceptableDelinquencyWindow === null
-            ? undefined
-            : (data.acceptableDelinquencyWindow ??
-              (existing.acceptableDelinquencyWindow === null
-                ? undefined
-                : existing.acceptableDelinquencyWindow)),
-        minReviewsPerDay:
-          data.minReviewsPerDay === null
-            ? undefined
-            : (data.minReviewsPerDay ??
-              (existing.minReviewsPerDay === null
-                ? undefined
-                : existing.minReviewsPerDay)),
-        maxReviewsPerDay:
-          data.maxReviewsPerDay === null
-            ? undefined
-            : (data.maxReviewsPerDay ??
-              (existing.maxReviewsPerDay === null
-                ? undefined
-                : existing.maxReviewsPerDay)),
-        daysPerWeek:
-          data.daysPerWeek === null
-            ? undefined
-            : (data.daysPerWeek ??
-              (existing.daysPerWeek === null
-                ? undefined
-                : existing.daysPerWeek)),
-        weeklyRules:
-          data.weeklyRules === null
-            ? undefined
-            : (data.weeklyRules ??
-              (existing.weeklyRules === null
-                ? undefined
-                : existing.weeklyRules)),
-        exceptions:
-          data.exceptions === null
-            ? undefined
-            : (data.exceptions ??
-              (existing.exceptions === null ? undefined : existing.exceptions)),
-        autoScheduleNew:
-          data.autoScheduleNew !== undefined
-            ? data.autoScheduleNew
-              ? 1
-              : 0
-            : undefined,
-        lastModifiedAt: now,
-      })
+      .set(buildSchedulingOptionsUpdateSet(data, existing, now))
       .where(eq(prefsSchedulingOptions.userId, data.userId));
   } else {
     // Insert new record
-    await db.insert(prefsSchedulingOptions).values({
-      userId: data.userId,
-      acceptableDelinquencyWindow:
-        data.acceptableDelinquencyWindow === null
-          ? undefined
-          : (data.acceptableDelinquencyWindow ?? 21),
-      minReviewsPerDay:
-        data.minReviewsPerDay === null ? undefined : data.minReviewsPerDay,
-      maxReviewsPerDay:
-        data.maxReviewsPerDay === null ? undefined : data.maxReviewsPerDay,
-      daysPerWeek: data.daysPerWeek === null ? undefined : data.daysPerWeek,
-      weeklyRules: data.weeklyRules === null ? undefined : data.weeklyRules,
-      exceptions: data.exceptions === null ? undefined : data.exceptions,
-      autoScheduleNew:
-        data.autoScheduleNew !== undefined ? (data.autoScheduleNew ? 1 : 0) : 1,
-      lastModifiedAt: now,
-    });
+    await db
+      .insert(prefsSchedulingOptions)
+      .values(buildSchedulingOptionsInsertSet(data, now));
   }
 
   // Return updated data
@@ -234,30 +320,7 @@ export async function updateSpacedRepetitionPrefs(
     // Update existing record
     await db
       .update(prefsSpacedRepetition)
-      .set({
-        fsrsWeights:
-          data.fsrsWeights === null
-            ? undefined
-            : (data.fsrsWeights ??
-              (existing.fsrsWeights === null
-                ? undefined
-                : existing.fsrsWeights)),
-        requestRetention:
-          data.requestRetention === null
-            ? undefined
-            : (data.requestRetention ??
-              (existing.requestRetention === null
-                ? undefined
-                : existing.requestRetention)),
-        maximumInterval:
-          data.maximumInterval === null
-            ? undefined
-            : (data.maximumInterval ??
-              (existing.maximumInterval === null
-                ? undefined
-                : existing.maximumInterval)),
-        lastModifiedAt: now,
-      })
+      .set(buildSpacedRepetitionUpdateSet(data, existing, now))
       .where(
         and(
           eq(prefsSpacedRepetition.userId, data.userId),
@@ -266,20 +329,9 @@ export async function updateSpacedRepetitionPrefs(
       );
   } else {
     // Insert new record
-    await db.insert(prefsSpacedRepetition).values({
-      userId: data.userId,
-      algType: data.algType,
-      fsrsWeights: data.fsrsWeights === null ? undefined : data.fsrsWeights,
-      requestRetention:
-        data.requestRetention === null
-          ? undefined
-          : (data.requestRetention ?? 0.9),
-      maximumInterval:
-        data.maximumInterval === null
-          ? undefined
-          : (data.maximumInterval ?? 365),
-      lastModifiedAt: now,
-    });
+    await db
+      .insert(prefsSpacedRepetition)
+      .values(buildSpacedRepetitionInsertSet(data, now));
   }
 
   // Return updated data
@@ -337,49 +389,11 @@ export async function updateUserProfile(
     // Update existing record
     await db
       .update(userProfile)
-      .set({
-        name:
-          data.name === null
-            ? undefined
-            : (data.name ??
-              (existing.name === null ? undefined : existing.name)),
-        email:
-          data.email === null
-            ? undefined
-            : (data.email ??
-              (existing.email === null ? undefined : existing.email)),
-        avatarUrl:
-          data.avatarUrl === null
-            ? undefined
-            : (data.avatarUrl ??
-              (existing.avatarUrl === null ? undefined : existing.avatarUrl)),
-        phone:
-          data.phone === null
-            ? undefined
-            : (data.phone ??
-              (existing.phone === null ? undefined : existing.phone)),
-        phoneVerified:
-          data.phoneVerified === null
-            ? undefined
-            : (data.phoneVerified ??
-              (existing.phoneVerified === null
-                ? undefined
-                : existing.phoneVerified)),
-        lastModifiedAt: now,
-      })
+      .set(buildUserProfileUpdateSet(data, existing, now))
       .where(eq(userProfile.id, data.id));
   } else {
     // Insert new record (should rarely happen with proper auth flow)
-    await db.insert(userProfile).values({
-      id: data.id,
-      name: data.name === null ? undefined : data.name,
-      email: data.email === null ? undefined : data.email,
-      avatarUrl: data.avatarUrl === null ? undefined : data.avatarUrl,
-      phone: data.phone === null ? undefined : data.phone,
-      phoneVerified:
-        data.phoneVerified === null ? undefined : data.phoneVerified,
-      lastModifiedAt: now,
-    });
+    await db.insert(userProfile).values(buildUserProfileInsertSet(data, now));
   }
 
   // Return updated data
