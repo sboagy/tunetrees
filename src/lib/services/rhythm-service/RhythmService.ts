@@ -41,6 +41,12 @@ import {
   parseRhythmSignatureParts,
 } from "@/lib/services/rhythm-service/playback-helpers";
 import {
+  clearStoredRhythmSwing,
+  readStoredRhythmSwing,
+  writeStoredRhythmSwing,
+} from "@/lib/services/rhythm-service/swing-storage";
+import {
+  clearStoredRhythmTempo,
   readStoredRhythmTempo,
   writeStoredRhythmTempo,
 } from "@/lib/services/rhythm-service/tempo-storage";
@@ -123,7 +129,9 @@ export interface RhythmService {
   restart: (options?: PlaybackStartOptions) => Promise<void>;
   togglePlayback: () => Promise<void>;
   setTempoQpm: (nextQpm: number) => Promise<void>;
+  resetTempoToDefault: () => Promise<void>;
   setSwingPercentage: (nextSwingPercentage: number) => Promise<void>;
+  resetSwingToDefault: () => Promise<void>;
   updateRhythmAbc: (nextRhythmAbc: string) => void;
 }
 
@@ -218,6 +226,10 @@ export function createRhythmService(
   let activePlaybackRhythmAbc: string | null = null;
   let remainingDebugPlaybackPasses = getRequestedRhythmPlaybackDebugPasses();
   let tempoPreferenceKey: {
+    userId: string | null | undefined;
+    tuneTypeName: string;
+  } | null = null;
+  let swingPreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
@@ -732,6 +744,7 @@ export function createRhythmService(
   ): Promise<RhythmPatternMetadata | null> {
     stopPlayback();
     tempoPreferenceKey = null;
+    swingPreferenceKey = null;
     lastKnownPositionMs = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
@@ -749,6 +762,10 @@ export function createRhythmService(
         userId: request.userId,
         tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
       };
+      swingPreferenceKey = {
+        userId: request.userId,
+        tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
+      };
       setTempoQpmSignal(
         readStoredRhythmTempo(
           tempoPreferenceKey.userId,
@@ -756,7 +773,10 @@ export function createRhythmService(
         ) ?? clampTempo(nextMetadata.tempoQpm)
       );
       setSwingPercentageSignal(
-        clampSwingPercentage(nextMetadata.swingPercentage)
+        readStoredRhythmSwing(
+          swingPreferenceKey.userId,
+          swingPreferenceKey.tuneTypeName
+        ) ?? clampSwingPercentage(nextMetadata.swingPercentage)
       );
       setIsReady(false);
     }
@@ -892,9 +912,53 @@ export function createRhythmService(
     }
   }
 
+  async function resetTempoToDefault() {
+    const defaultTempo = clampTempo(metadata()?.tempoQpm ?? 100);
+    setTempoQpmSignal(defaultTempo);
+    if (tempoPreferenceKey) {
+      clearStoredRhythmTempo(
+        tempoPreferenceKey.userId,
+        tempoPreferenceKey.tuneTypeName
+      );
+    }
+    if (!metadata() || !isPlaying()) {
+      return;
+    }
+
+    lastKnownPositionMs =
+      timingCallbacks?.currentMillisecond() ?? lastKnownPositionMs;
+    try {
+      await beginPlayback(lastKnownPositionMs);
+    } catch (cause: unknown) {
+      setError(
+        cause instanceof Error ? cause.message : "Failed to reset tempo."
+      );
+      stopPlayback();
+    }
+  }
+
   async function setSwingPercentage(nextSwingPercentage: number) {
-    setSwingPercentageSignal(clampSwingPercentage(nextSwingPercentage));
+    const clamped = clampSwingPercentage(nextSwingPercentage);
+    setSwingPercentageSignal(clamped);
+    if (swingPreferenceKey) {
+      writeStoredRhythmSwing(
+        swingPreferenceKey.userId,
+        swingPreferenceKey.tuneTypeName,
+        clamped
+      );
+    }
     // Swing changes take effect on next play/restart — no in-flight restart needed
+  }
+
+  async function resetSwingToDefault() {
+    const defaultSwing = clampSwingPercentage(metadata()?.swingPercentage ?? 0);
+    setSwingPercentageSignal(defaultSwing);
+    if (swingPreferenceKey) {
+      clearStoredRhythmSwing(
+        swingPreferenceKey.userId,
+        swingPreferenceKey.tuneTypeName
+      );
+    }
   }
 
   onCleanup(() => {
@@ -982,7 +1046,9 @@ export function createRhythmService(
       }
     },
     setTempoQpm,
+    resetTempoToDefault,
     setSwingPercentage,
+    resetSwingToDefault,
     updateRhythmAbc,
   };
 }

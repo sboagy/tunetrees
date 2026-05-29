@@ -83,7 +83,9 @@ const mocked = vi.hoisted(() => {
       restart: vi.fn(async (_options) => undefined),
       togglePlayback: vi.fn(async () => undefined),
       setTempoQpm: vi.fn(async () => undefined),
+      resetTempoToDefault: vi.fn(async () => undefined),
       setSwingPercentage: vi.fn(async () => undefined),
+      resetSwingToDefault: vi.fn(async () => undefined),
       updateRhythmAbc: updateRhythmAbcMock,
     } satisfies RhythmService,
   };
@@ -205,6 +207,7 @@ describe("RhythmPlayer", () => {
     mocked.getEditableRhythmPatternByIdMock.mockClear();
     mocked.serviceStub.metadata = () => null;
     mocked.serviceStub.tempoQpm = () => 100;
+    mocked.serviceStub.swingPercentage = () => 0;
     mocked.serviceStub.isPlaying = () => false;
     mocked.serviceStub.isPaused = () => false;
     mocked.serviceStub.isCountIn = () => false;
@@ -216,6 +219,9 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.pause = vi.fn();
     mocked.serviceStub.resume = vi.fn(async () => undefined);
     mocked.serviceStub.restart = vi.fn(async (_options) => undefined);
+    mocked.serviceStub.resetTempoToDefault = vi.fn(async () => undefined);
+    mocked.serviceStub.setSwingPercentage = vi.fn(async () => undefined);
+    mocked.serviceStub.resetSwingToDefault = vi.fn(async () => undefined);
   });
 
   afterEach(() => {
@@ -1883,6 +1889,10 @@ describe("RhythmPlayer", () => {
         view.getByTestId("rhythm-player-current-section-badge").textContent
       ).toContain("A2");
     });
+
+    expect(
+      view.getByTestId("rhythm-player-current-section-badge").className
+    ).toContain("whitespace-normal");
   });
 
   it("wraps the current section badge correctly after starting from a later AABB section", async () => {
@@ -2673,6 +2683,242 @@ describe("RhythmPlayer", () => {
       ...Array.from({ length: 8 }, () => "C2 A2 C2 A2"),
       ...Array.from({ length: 8 }, () => "C2 c2 C2 c2"),
     ]);
+  });
+
+  it("updates swing from desktop controls and resets to the pattern default", async () => {
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: "X:1\nM:6/8\nL:1/8\nK:clef=perc\n|: C2 c C c c :|",
+      rhythmSignature: "6/8",
+      patternType: "seed",
+      tempoQpm: 112,
+      swingPercentage: 0.17,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: "X:1\nM:6/8\nL:1/8\nK:clef=perc\n|: C2 c C c c :|",
+      rhythmSignature: "6/8",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      swingPercentage: 0.17,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+    mocked.serviceStub.swingPercentage = () => 0.25;
+
+    render(() => <RhythmPlayer tuneTypeName="Jig" />);
+
+    await screen.findByTestId("rhythm-player-swing-reset");
+    const swingInput = screen.getByTestId(
+      "rhythm-player-swing-input"
+    ) as HTMLInputElement;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("rhythm-player-swing-input")).toBeTruthy();
+    });
+
+    expect(swingInput.disabled).toBe(false);
+
+    fireEvent.input(screen.getByTestId("rhythm-player-swing-input"), {
+      target: { value: "25" },
+    });
+
+    await waitFor(() => {
+      expect(mocked.serviceStub.setSwingPercentage).toHaveBeenCalledWith(0.25);
+    });
+
+    await waitFor(() => {
+      expect(
+        (screen.getByTestId("rhythm-player-swing-reset") as HTMLButtonElement)
+          .disabled
+      ).toBe(false);
+    });
+
+    fireEvent.click(screen.getByTestId("rhythm-player-swing-reset"));
+
+    await waitFor(() => {
+      expect(mocked.serviceStub.resetSwingToDefault).toHaveBeenCalled();
+    });
+  });
+
+  it("shows inline validation for invalid swing percentages", async () => {
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Hornpipe",
+      rhythmAbc: "X:1\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 z2 C2 z2 :|",
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      swingPercentage: 0.33,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Hornpipe",
+      rhythmAbc: "X:1\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 z2 C2 z2 :|",
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      swingPercentage: 0.33,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+    mocked.serviceStub.swingPercentage = () => 0.33;
+
+    render(() => <RhythmPlayer tuneTypeName="Hornpipe" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("rhythm-player-swing-input")).toBeTruthy();
+    });
+
+    fireEvent.input(screen.getByTestId("rhythm-player-swing-input"), {
+      target: { value: "120" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("rhythm-player-swing-error").textContent).toBe(
+        "Enter a whole number from 0 to 100."
+      );
+    });
+    expect(mocked.serviceStub.setSwingPercentage).not.toHaveBeenCalled();
+  });
+
+  it("renders compact preference controls in the mobile overflow menu", async () => {
+    Object.defineProperty(globalThis, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: "X:1\nM:6/8\nL:1/8\nK:clef=perc\n|: C2 c C c c :|",
+      rhythmSignature: "6/8",
+      patternType: "seed",
+      tempoQpm: 112,
+      swingPercentage: 0.17,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Jig",
+      rhythmAbc: "X:1\nM:6/8\nL:1/8\nK:clef=perc\n|: C2 c C c c :|",
+      rhythmSignature: "6/8",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      swingPercentage: 0.17,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+    mocked.serviceStub.swingPercentage = () => 0.17;
+
+    render(() => <RhythmPlayer tuneTypeName="Jig" />);
+
+    const overflowButton = await screen.findByTestId(
+      "rhythm-player-overflow-button"
+    );
+    fireEvent.pointerDown(overflowButton);
+    fireEvent.click(overflowButton);
+
+    expect(screen.getByTestId("rhythm-player-tempo-reset")).toBeTruthy();
+    expect(screen.getByTestId("rhythm-player-swing-reset")).toBeTruthy();
+
+    fireEvent.input(screen.getByTestId("rhythm-player-swing-input"), {
+      target: { value: "21" },
+    });
+
+    await waitFor(() => {
+      expect(mocked.serviceStub.setSwingPercentage).toHaveBeenCalledWith(0.21);
+    });
+  });
+
+  it("resets tempo to the metadata default", async () => {
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: "X:1\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 z2 C2 z2 :|",
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: "X:1\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 z2 C2 z2 :|",
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+    mocked.serviceStub.tempoQpm = () => 128;
+
+    render(() => <RhythmPlayer tuneTypeName="Reel" />);
+
+    await waitFor(() => {
+      expect(
+        (screen.getByTestId("rhythm-player-tempo-reset") as HTMLButtonElement)
+          .disabled
+      ).toBe(false);
+    });
+
+    fireEvent.click(await screen.findByTestId("rhythm-player-tempo-reset"));
+
+    await waitFor(() => {
+      expect(mocked.serviceStub.resetTempoToDefault).toHaveBeenCalled();
+    });
   });
 
   it("trims extra labeled accompaniment parts to the tune structure", async () => {
