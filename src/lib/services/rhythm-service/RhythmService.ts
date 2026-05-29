@@ -41,14 +41,16 @@ import {
   parseRhythmSignatureParts,
 } from "@/lib/services/rhythm-service/playback-helpers";
 import {
-  clampSwingPercentage,
-  readStoredRhythmSwing,
-  writeStoredRhythmSwing,
-} from "@/lib/services/rhythm-service/swing-storage";
-import {
   readStoredRhythmTempo,
   writeStoredRhythmTempo,
 } from "@/lib/services/rhythm-service/tempo-storage";
+
+function clampSwingPercentage(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
 
 export type {
   RhythmPatternCandidate,
@@ -216,10 +218,6 @@ export function createRhythmService(
   let activePlaybackRhythmAbc: string | null = null;
   let remainingDebugPlaybackPasses = getRequestedRhythmPlaybackDebugPasses();
   let tempoPreferenceKey: {
-    userId: string | null | undefined;
-    tuneTypeName: string;
-  } | null = null;
-  let swingPreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
@@ -734,7 +732,6 @@ export function createRhythmService(
   ): Promise<RhythmPatternMetadata | null> {
     stopPlayback();
     tempoPreferenceKey = null;
-    swingPreferenceKey = null;
     lastKnownPositionMs = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
@@ -758,15 +755,8 @@ export function createRhythmService(
           tempoPreferenceKey.tuneTypeName
         ) ?? clampTempo(nextMetadata.tempoQpm)
       );
-      swingPreferenceKey = {
-        userId: request.userId,
-        tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
-      };
       setSwingPercentageSignal(
-        readStoredRhythmSwing(
-          swingPreferenceKey.userId,
-          swingPreferenceKey.tuneTypeName
-        ) ?? clampSwingPercentage(nextMetadata.swingPercentage)
+        clampSwingPercentage(nextMetadata.swingPercentage)
       );
       setIsReady(false);
     }
@@ -903,15 +893,7 @@ export function createRhythmService(
   }
 
   async function setSwingPercentage(nextSwingPercentage: number) {
-    const clamped = clampSwingPercentage(nextSwingPercentage);
-    setSwingPercentageSignal(clamped);
-    if (swingPreferenceKey) {
-      writeStoredRhythmSwing(
-        swingPreferenceKey.userId,
-        swingPreferenceKey.tuneTypeName,
-        clamped
-      );
-    }
+    setSwingPercentageSignal(clampSwingPercentage(nextSwingPercentage));
     // Swing changes take effect on next play/restart — no in-flight restart needed
   }
 
