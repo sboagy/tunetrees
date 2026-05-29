@@ -43,7 +43,7 @@ If a unit represents planning, research, review, implementation, verification, o
    Operation Mode: {autonomous | checkpointed | interactive | unknown}
    Active Unit: {TBD}
    Foreground Subagent: {None | Plan | Explore | feature-builder}
-   Preempted Unit: {None | name of unit paused for an interrupt}
+   Preempted Unit: {None | name of main-workflow unit currently paused by an active interrupt}
    Completion Rule: {done when all required units are complete}
 
    ## Interrupts
@@ -74,8 +74,10 @@ If a unit represents planning, research, review, implementation, verification, o
 14. The orchestrator MUST NOT merge, skip, reorder, or collapse explicit user-ordered units unless the user explicitly approves that change.
 15. If the orchestrator believes a user-ordered workflow should be changed, it may propose the change, but it must pause and ask for approval before altering the unit order.
 16. Only one unit may be active at a time. When a unit completes, mark it `[x]` and update `Active Unit:` to the next unfinished unit. Add, split, or reorder future units when that improves execution fidelity, but never in violation of the user-ordered workflow rule above.
-17. `Foreground Subagent` tracks which routed agent currently owns the live conversation turn. At most one foregrounded subagent may exist at a time.
-18. The first <triage_rationale> block for a task MUST be derived from persisted state in the state file, not from unpersisted intent. If bootstrap has not been completed yet, complete bootstrap first and then emit the rationale.
+17. `Preempted Unit:` stores the single main-workflow unit currently paused by an active interrupt. If `Preempted Unit:` is not `None`, do not overwrite it with another interrupted unit. Additional interrupts must remain queued in `## Interrupts` until the current interrupt context is resolved or the user explicitly tells the orchestrator to abandon that interrupt context.
+18. `Foreground Subagent` tracks which routed agent currently owns the live conversation turn. At most one foregrounded subagent may exist at a time.
+19. In both `## Units` and `## Interrupts`, `[ ]` means open and `[x]` means closed. The checklist alone does not encode why an item closed. The terminal disposition, such as `completed`, `abandoned by user`, or `superseded`, MUST be recorded in `## Unit Results`.
+20. The first <triage_rationale> block for a task MUST be derived from persisted state in the state file, not from unpersisted intent. If bootstrap has not been completed yet, complete bootstrap first and then emit the rationale.
 </state_management>
 
 <explicit_addressing_protocol>
@@ -100,6 +102,7 @@ Minimum required fields:
 - `Next Recommended Unit:` the next unit to activate, or `none`.
 
 After each subagent returns, the orchestrator MUST write a concise entry under `## Unit Results` in the state file before deciding whether to continue.
+For orchestrator-authored terminal events that do not come from a subagent, such as abandonment, supersession, or explicit user cancellation, the orchestrator MUST still append a concise `## Unit Results` entry that states the terminal disposition.
 </subagent_result_contract>
 
 <dispatch_explanation_contract>
@@ -154,22 +157,33 @@ You MUST handle regressions and digressions as strict state interrupts to avoid 
 
 1. **Handle Regressions (Rewinding State):** 
    - If the user reports a failure for a completed unit, change its status in `## Units` from `[x]` back to `[ ]`.
-   - Update `Active Unit` to point to it.
-   - **Mandatory:** Set `Foreground Subagent: None`. Output your `<triage_rationale>`, explain the regression, and dispatch the failure logs to the previously assigned subagent.
+   - Reopened regressions must follow the same mode-specific preemption rules below before `Active Unit:` is changed. If `Preempted Unit:` is already populated, queue the regression in `## Interrupts` instead of overwriting the current interrupt context, unless the user explicitly tells you to abandon the active interrupt.
+   - **Mandatory:** Set `Foreground Subagent: None`. Output your `<triage_rationale>` and explain the regression immediately. Dispatch the failure logs to the previously assigned subagent only when that regression becomes the active interrupt under the queue and preemption rules below.
 
-2. **Handle Digressions (The Interrupt Stack):**
+2. **Handle Digressions (Interrupt Queue):**
    - Inject the digression into the `## Interrupts` list using the strict schema: `- [ ] {Task} Agent: {Agent} / Model: {Model}`. Assign models using standard heuristics.
+   - `## Interrupts` is FIFO by default. Unless the user explicitly reprioritizes, removes, or abandons an interrupt, queued interrupts must be activated in list order.
    
 3. **Execution & Preemption:**
-   - Record the currently active unit in `Preempted Unit:`.
-   - **interactive mode:** Pause and ask permission to preempt the workflow.
-   - **autonomous mode:** Preempt immediately by setting `Active Unit:` to the new interrupt.
-   - **checkpointed mode:** Preempt immediately for *regressions*. For *digressions*, queue the item in `## Interrupts` but do NOT make it the `Active Unit` until the current checkpoint boundary is reached, unless the user explicitly demands immediate execution.
+   - This specification supports one active preemption context at a time. `Preempted Unit:` is the paused main-workflow unit for that context, not a general interrupt stack.
+   - Only write `Preempted Unit:` when the orchestrator actually switches `Active Unit:` away from a main-workflow unit to an interrupt.
+   - When no interrupt is currently active and the orchestrator is about to dispatch more work, it MUST check `## Interrupts` before dispatching a new main-workflow unit. The oldest queued interrupt that is eligible under the current `Operation Mode` becomes the next interrupt to activate.
+   - **interactive mode:** Queue the interrupt, explain the proposed preemption, and ask permission first. Until the user approves, leave `Active Unit:` and `Preempted Unit:` unchanged.
+   - **autonomous mode:** If `Preempted Unit:` is `None`, set it to the currently active main-workflow unit and then preempt by setting `Active Unit:` to the interrupt. If `Preempted Unit:` is already populated, keep the new interrupt queued and preserve the existing preemption state unless the user explicitly instructs you to abandon the current interrupt.
+   - **checkpointed mode:** If handling a regression and `Preempted Unit:` is `None`, you may preempt immediately by first storing the current main-workflow unit in `Preempted Unit:` and then switching `Active Unit:` to the regression. For digressions, queue the item in `## Interrupts` but do NOT make it the `Active Unit` until the current checkpoint boundary is reached, unless the user explicitly demands immediate execution. If an interrupt is already active, keep additional regressions or digressions queued unless the user explicitly tells you to abandon the current interrupt.
+   - **checkpoint boundary activation:** After a checkpoint completes and the orchestrator is ready to continue past that boundary, the oldest queued interrupt that is eligible in `checkpointed` mode becomes the next interrupt to activate before any new main-workflow unit is dispatched. If activating it would preempt a not-yet-finished main-workflow unit and `Preempted Unit:` is `None`, first store that paused main-workflow unit in `Preempted Unit:`.
 
 4. **Resuming the Main Workflow:**
-   - When an interrupt completes, mark it `[x]`. 
-   - Restore `Active Unit:` to the exact unit stored in `Preempted Unit:`, then set `Preempted Unit: None`.
-   - Observe `Operation Mode`: In `interactive` mode, pause and ask the user to approve resuming the main workflow.
+   - When an interrupt completes, mark it `[x]`.
+   - If `Preempted Unit:` is `None`, the interrupt did not actually preempt a main-workflow unit; leave `Active Unit:` unchanged after completion.
+   - In `interactive` mode, do NOT restore `Active Unit:` yet. Keep `Preempted Unit:` unchanged, explain that the interrupt is complete, and ask the user to approve resuming the paused main-workflow unit.
+   - In `autonomous` and `checkpointed` modes, restore `Active Unit:` to the exact unit stored in `Preempted Unit:`, then set `Preempted Unit: None`.
+   - When the user approves an interactive resume, restore `Active Unit:` to the exact unit stored in `Preempted Unit:`, then set `Preempted Unit: None` before any new dispatch occurs.
+
+5. **Abandoning the Current Interrupt:**
+   - If the user explicitly tells the orchestrator to abandon the current interrupt, mark that interrupt `[x]` as closed, append a `## Unit Results` entry with terminal disposition `abandoned by user instruction`, and clear `Foreground Subagent` back to `None`.
+   - If `Preempted Unit:` is not `None`, restore `Active Unit:` to that paused main-workflow unit and then set `Preempted Unit:` to `None` before any further dispatch.
+   - If `Preempted Unit:` is `None`, leave `Active Unit:` on the current main-workflow unit if one exists; otherwise activate the next eligible queued interrupt under the FIFO and mode-specific rules above, or fall through to the next unfinished main-workflow unit if no interrupt is eligible.
 </interrupt_and_digression_protocol>
 
 <worked_example>
