@@ -8,9 +8,6 @@ import {
   type SampleKitEntry,
 } from "@/lib/services/rhythm-service/kits";
 
-const HORNPIPE_SWING_DELAY_MULTIPLIER = 1 / 3;
-const JIG_LILT_DELAY_MULTIPLIER = 1 / 6;
-
 export interface PlaybackEventMarker {
   measureIndex: number;
   noteIndex: number;
@@ -299,9 +296,10 @@ function isJigTuneType(tuneTypeName: string): boolean {
 
 export function getPlaybackDelaySeconds(
   currentMetadata: RhythmPatternMetadata | null,
-  event: NoteTimingEvent
+  event: NoteTimingEvent,
+  swingPercentage = 0
 ): number {
-  if (!currentMetadata) {
+  if (!currentMetadata || swingPercentage <= 0) {
     return 0;
   }
 
@@ -339,7 +337,7 @@ export function getPlaybackDelaySeconds(
       return 0;
     }
 
-    return (eighthDurationMs * HORNPIPE_SWING_DELAY_MULTIPLIER) / 1000;
+    return (eighthDurationMs * swingPercentage) / 1000;
   }
 
   if (
@@ -358,7 +356,7 @@ export function getPlaybackDelaySeconds(
       return 0;
     }
 
-    return (eighthDurationMs * JIG_LILT_DELAY_MULTIPLIER) / 1000;
+    return (eighthDurationMs * swingPercentage) / 1000;
   }
 
   return 0;

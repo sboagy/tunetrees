@@ -41,6 +41,11 @@ import {
   parseRhythmSignatureParts,
 } from "@/lib/services/rhythm-service/playback-helpers";
 import {
+  clampSwingPercentage,
+  readStoredRhythmSwing,
+  writeStoredRhythmSwing,
+} from "@/lib/services/rhythm-service/swing-storage";
+import {
   readStoredRhythmTempo,
   writeStoredRhythmTempo,
 } from "@/lib/services/rhythm-service/tempo-storage";
@@ -94,6 +99,7 @@ export interface PlaybackStartOptions {
 export interface RhythmService {
   metadata: Accessor<RhythmPatternMetadata | null>;
   tempoQpm: Accessor<number>;
+  swingPercentage: Accessor<number>;
   isPlaying: Accessor<boolean>;
   isPaused: Accessor<boolean>;
   isReady: Accessor<boolean>;
@@ -115,6 +121,7 @@ export interface RhythmService {
   restart: (options?: PlaybackStartOptions) => Promise<void>;
   togglePlayback: () => Promise<void>;
   setTempoQpm: (nextQpm: number) => Promise<void>;
+  setSwingPercentage: (nextSwingPercentage: number) => Promise<void>;
   updateRhythmAbc: (nextRhythmAbc: string) => void;
 }
 
@@ -179,6 +186,7 @@ export function createRhythmService(
     null
   );
   const [tempoQpm, setTempoQpmSignal] = createSignal(100);
+  const [swingPercentage, setSwingPercentageSignal] = createSignal(0);
   const [isPlaying, setIsPlaying] = createSignal(false);
   const [isPaused, setIsPaused] = createSignal(false);
   const [isReady, setIsReady] = createSignal(false);
@@ -208,6 +216,10 @@ export function createRhythmService(
   let activePlaybackRhythmAbc: string | null = null;
   let remainingDebugPlaybackPasses = getRequestedRhythmPlaybackDebugPasses();
   let tempoPreferenceKey: {
+    userId: string | null | undefined;
+    tuneTypeName: string;
+  } | null = null;
+  let swingPreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
@@ -439,7 +451,11 @@ export function createRhythmService(
     }
 
     const activeSampleKit = normalizeSampleKit(metadata()?.sampleKit);
-    const playbackDelaySeconds = getPlaybackDelaySeconds(metadata(), event);
+    const playbackDelaySeconds = getPlaybackDelaySeconds(
+      metadata(),
+      event,
+      swingPercentage()
+    );
     const hasAccent = eventHasAccent(event);
     const selection = getPlaybackPitchSelection(activeSampleKit, event);
     const resolvedPitches = selection.playbackPitches.map((playbackPitch) =>
@@ -718,6 +734,7 @@ export function createRhythmService(
   ): Promise<RhythmPatternMetadata | null> {
     stopPlayback();
     tempoPreferenceKey = null;
+    swingPreferenceKey = null;
     lastKnownPositionMs = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
@@ -740,6 +757,16 @@ export function createRhythmService(
           tempoPreferenceKey.userId,
           tempoPreferenceKey.tuneTypeName
         ) ?? clampTempo(nextMetadata.tempoQpm)
+      );
+      swingPreferenceKey = {
+        userId: request.userId,
+        tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
+      };
+      setSwingPercentageSignal(
+        readStoredRhythmSwing(
+          swingPreferenceKey.userId,
+          swingPreferenceKey.tuneTypeName
+        ) ?? clampSwingPercentage(nextMetadata.swingPercentage)
       );
       setIsReady(false);
     }
@@ -875,6 +902,19 @@ export function createRhythmService(
     }
   }
 
+  async function setSwingPercentage(nextSwingPercentage: number) {
+    const clamped = clampSwingPercentage(nextSwingPercentage);
+    setSwingPercentageSignal(clamped);
+    if (swingPreferenceKey) {
+      writeStoredRhythmSwing(
+        swingPreferenceKey.userId,
+        swingPreferenceKey.tuneTypeName,
+        clamped
+      );
+    }
+    // Swing changes take effect on next play/restart — no in-flight restart needed
+  }
+
   onCleanup(() => {
     stopPlayback();
     if (ownedAudioContext && ownedAudioContext.state !== "closed") {
@@ -887,6 +927,7 @@ export function createRhythmService(
   return {
     metadata,
     tempoQpm,
+    swingPercentage,
     isPlaying,
     isPaused,
     isReady,
@@ -959,6 +1000,7 @@ export function createRhythmService(
       }
     },
     setTempoQpm,
+    setSwingPercentage,
     updateRhythmAbc,
   };
 }

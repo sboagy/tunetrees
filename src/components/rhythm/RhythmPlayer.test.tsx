@@ -63,6 +63,7 @@ const mocked = vi.hoisted(() => {
     serviceStub: {
       metadata: () => null as RhythmPatternMetadata | null,
       tempoQpm: () => 100,
+      swingPercentage: () => 0,
       isPlaying: (): boolean => false,
       isPaused: (): boolean => false,
       isReady: () => false,
@@ -82,6 +83,7 @@ const mocked = vi.hoisted(() => {
       restart: vi.fn(async (_options) => undefined),
       togglePlayback: vi.fn(async () => undefined),
       setTempoQpm: vi.fn(async () => undefined),
+      setSwingPercentage: vi.fn(async () => undefined),
       updateRhythmAbc: updateRhythmAbcMock,
     } satisfies RhythmService,
   };

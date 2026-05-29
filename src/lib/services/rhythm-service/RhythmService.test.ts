@@ -4178,6 +4178,8 @@ K:clef=perc
       tuneTypeName: "Hornpipe",
     });
 
+    await service.setSwingPercentage(1 / 3);
+
     await service.play();
 
     expect(bufferSources).toHaveLength(2);
@@ -4342,6 +4344,8 @@ K:clef=perc
       genreName: "Irish Traditional",
       tuneTypeName: "Jig",
     });
+
+    await service.setSwingPercentage(1 / 6);
 
     await service.play();
 
