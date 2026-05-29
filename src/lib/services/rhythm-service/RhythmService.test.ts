@@ -4191,7 +4191,7 @@ K:clef=perc
     dispose();
   });
 
-  it("delays the middle eighth in each jig triplet group during playback", async () => {
+  it("delays the second and third eighths in each jig triplet group during playback", async () => {
     const db = createFallbackJigRhythmDb();
     const fetchMock = vi.fn();
 
@@ -4288,6 +4288,15 @@ K:clef=perc
           type: "event",
           measureStart: false,
           measureNumber: 1,
+          milliseconds: 200,
+          millisecondsPerMeasure: 600,
+          midiPitches: [{ pitch: 60 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
           milliseconds: 300,
           millisecondsPerMeasure: 600,
           midiPitches: [{ pitch: 60 }],
@@ -4300,6 +4309,15 @@ K:clef=perc
           milliseconds: 400,
           millisecondsPerMeasure: 600,
           midiPitches: [{ pitch: 69 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          milliseconds: 500,
+          millisecondsPerMeasure: 600,
+          midiPitches: [{ pitch: 60 }],
           elements: [[]],
         });
       }
@@ -4349,14 +4367,20 @@ K:clef=perc
 
     await service.play();
 
-    expect(bufferSources).toHaveLength(4);
+    expect(bufferSources).toHaveLength(6);
     expect(bufferSources[0]?.start).toHaveBeenCalledWith();
     expect(bufferSources[1]?.start).toHaveBeenCalledWith(
       expect.closeTo(20 + 0.1 / 6, 5)
     );
-    expect(bufferSources[2]?.start).toHaveBeenCalledWith();
-    expect(bufferSources[3]?.start).toHaveBeenCalledWith(
+    expect(bufferSources[2]?.start).toHaveBeenCalledWith(
+      expect.closeTo(20 + 0.1 / 12, 5)
+    );
+    expect(bufferSources[3]?.start).toHaveBeenCalledWith();
+    expect(bufferSources[4]?.start).toHaveBeenCalledWith(
       expect.closeTo(20 + 0.1 / 6, 5)
+    );
+    expect(bufferSources[5]?.start).toHaveBeenCalledWith(
+      expect.closeTo(20 + 0.1 / 12, 5)
     );
 
     dispose();

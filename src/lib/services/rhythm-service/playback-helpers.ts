@@ -349,14 +349,32 @@ export function getPlaybackDelaySeconds(
     const tripletDurationMs = eighthDurationMs * 3;
     const positionWithinTriplet = normalizedElapsed % tripletDurationMs;
     const toleranceMs = Math.max(2, eighthDurationMs * 0.12);
-    const isMiddleTripletEighth =
-      Math.abs(positionWithinTriplet - eighthDurationMs) <= toleranceMs;
+    const tripletSlotIndex = [
+      0,
+      eighthDurationMs,
+      eighthDurationMs * 2,
+    ].findIndex(
+      (slotStartMs) =>
+        Math.abs(positionWithinTriplet - slotStartMs) <= toleranceMs
+    );
 
-    if (!isMiddleTripletEighth) {
+    if (tripletSlotIndex <= 0) {
       return 0;
     }
 
-    return (eighthDurationMs * swingPercentage) / 1000;
+    const liltedFirstDurationMs = Math.min(
+      tripletDurationMs,
+      eighthDurationMs * (1 + swingPercentage)
+    );
+    const liltedSecondDurationMs =
+      (tripletDurationMs - liltedFirstDurationMs) / 2;
+    const slotOffsetsMs = [
+      0,
+      liltedFirstDurationMs - eighthDurationMs,
+      liltedFirstDurationMs + liltedSecondDurationMs - eighthDurationMs * 2,
+    ];
+
+    return slotOffsetsMs[tripletSlotIndex] / 1000;
   }
 
   return 0;
