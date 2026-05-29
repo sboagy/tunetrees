@@ -1,5 +1,8 @@
 import type { NoteTimingEvent } from "abcjs";
-import type { RhythmPatternMetadata } from "@/lib/rhythm/pattern-loader";
+import type {
+  RhythmPatternMetadata,
+  SwingDescriptor,
+} from "@/lib/rhythm/pattern-loader";
 import { normalizeTuneTypeName } from "@/lib/rhythm/tune-type-lookup";
 import {
   DEFAULT_SAMPLE_KIT,
@@ -294,6 +297,116 @@ function isJigTuneType(tuneTypeName: string): boolean {
   );
 }
 
+function getLegacySwingDescriptor(
+  currentMetadata: RhythmPatternMetadata
+): SwingDescriptor | null {
+  const tuneType = normalizeTuneTypeName(currentMetadata.tuneTypeName);
+  const signature = parseRhythmSignatureParts(currentMetadata.rhythmSignature);
+  if (!signature) {
+    return null;
+  }
+
+  if (
+    tuneType === "hornpipe" &&
+    signature.numerator === 4 &&
+    signature.denominator === 4
+  ) {
+    return {
+      timeSignature: "4/4",
+      macroBeatDivision: 2,
+      defaultSwingFactor: 1.33,
+      balanceRemainingNotes: false,
+      velocityPattern: [110, 75],
+      humanizationDeltaMs: 0,
+    };
+  }
+
+  if (
+    isJigTuneType(currentMetadata.tuneTypeName) &&
+    signature.denominator === 8
+  ) {
+    return {
+      timeSignature:
+        tuneType === "slip jig" && signature.numerator === 9 ? "9/8" : "6/8",
+      macroBeatDivision: 3,
+      defaultSwingFactor: 1.15,
+      balanceRemainingNotes: true,
+      velocityPattern:
+        signature.numerator === 9 ? [110, 75, 60] : [100, 80, 60],
+      humanizationDeltaMs: 0,
+    };
+  }
+
+  return null;
+}
+
+function getActiveSwingDescriptor(
+  currentMetadata: RhythmPatternMetadata
+): SwingDescriptor | null {
+  return (
+    currentMetadata.swingDescriptor ?? getLegacySwingDescriptor(currentMetadata)
+  );
+}
+
+function getSwingSubunitCountPerMeasure(signature: {
+  numerator: number;
+  denominator: number;
+}): number | null {
+  const eighthNoteRatio = 8 / signature.denominator;
+  const subunitCount = signature.numerator * eighthNoteRatio;
+
+  return Number.isFinite(subunitCount) && subunitCount > 0
+    ? subunitCount
+    : null;
+}
+
+function getSlotDurationsMs(
+  slotCount: number,
+  baseSlotDurationMs: number,
+  groupDurationMs: number,
+  swingFactor: number,
+  balanceRemainingNotes: boolean
+): number[] | null {
+  if (slotCount <= 1) {
+    return [groupDurationMs];
+  }
+
+  const firstSlotDurationMs = Math.min(
+    groupDurationMs,
+    Math.max(0, baseSlotDurationMs * swingFactor)
+  );
+
+  if (balanceRemainingNotes) {
+    const remainingDurationMs = groupDurationMs - firstSlotDurationMs;
+    if (remainingDurationMs < 0) {
+      return null;
+    }
+
+    const remainingSlotDurationMs = remainingDurationMs / (slotCount - 1);
+    return [
+      firstSlotDurationMs,
+      ...Array.from({ length: slotCount - 1 }, () => remainingSlotDurationMs),
+    ];
+  }
+
+  const slotDurationsMs = [
+    firstSlotDurationMs,
+    ...Array.from({ length: slotCount - 2 }, () => baseSlotDurationMs),
+  ];
+  const usedDurationMs = slotDurationsMs.reduce(
+    (totalDurationMs, durationMs) => totalDurationMs + durationMs,
+    0
+  );
+  const finalSlotDurationMs = groupDurationMs - usedDurationMs;
+
+  if (finalSlotDurationMs < 0) {
+    return null;
+  }
+
+  slotDurationsMs.push(finalSlotDurationMs);
+  return slotDurationsMs;
+}
+
 export function getPlaybackDelaySeconds(
   currentMetadata: RhythmPatternMetadata | null,
   event: NoteTimingEvent,
@@ -315,69 +428,69 @@ export function getPlaybackDelaySeconds(
   }
 
   const normalizedElapsed = ((elapsedMs % measureMs) + measureMs) % measureMs;
-  const tuneType = normalizeTuneTypeName(currentMetadata.tuneTypeName);
   const signature = parseRhythmSignatureParts(currentMetadata.rhythmSignature);
   if (!signature) {
     return 0;
   }
 
-  if (
-    tuneType === "hornpipe" &&
-    signature.numerator === 4 &&
-    signature.denominator === 4
-  ) {
-    const beatDurationMs = measureMs / signature.numerator;
-    const eighthDurationMs = beatDurationMs / 2;
-    const positionWithinBeat = normalizedElapsed % beatDurationMs;
-    const toleranceMs = Math.max(2, beatDurationMs * 0.08);
-    const isOffBeatEighth =
-      Math.abs(positionWithinBeat - eighthDurationMs) <= toleranceMs;
-
-    if (!isOffBeatEighth) {
-      return 0;
-    }
-
-    return (eighthDurationMs * swingPercentage) / 1000;
+  const swingDescriptor = getActiveSwingDescriptor(currentMetadata);
+  if (!swingDescriptor) {
+    return 0;
   }
 
+  const normalizedTimeSignature = swingDescriptor.timeSignature.trim();
+  const expectedTimeSignature = `${signature.numerator}/${signature.denominator}`;
   if (
-    isJigTuneType(currentMetadata.tuneTypeName) &&
-    signature.denominator === 8 &&
-    signature.numerator % 3 === 0
+    normalizedTimeSignature &&
+    normalizedTimeSignature !== expectedTimeSignature
   ) {
-    const eighthDurationMs = measureMs / signature.numerator;
-    const tripletDurationMs = eighthDurationMs * 3;
-    const positionWithinTriplet = normalizedElapsed % tripletDurationMs;
-    const toleranceMs = Math.max(2, eighthDurationMs * 0.12);
-    const tripletSlotIndex = [
-      0,
-      eighthDurationMs,
-      eighthDurationMs * 2,
-    ].findIndex(
-      (slotStartMs) =>
-        Math.abs(positionWithinTriplet - slotStartMs) <= toleranceMs
-    );
-
-    if (tripletSlotIndex <= 0) {
-      return 0;
-    }
-
-    const liltedFirstDurationMs = Math.min(
-      tripletDurationMs,
-      eighthDurationMs * (1 + swingPercentage)
-    );
-    const liltedSecondDurationMs =
-      (tripletDurationMs - liltedFirstDurationMs) / 2;
-    const slotOffsetsMs = [
-      0,
-      liltedFirstDurationMs - eighthDurationMs,
-      liltedFirstDurationMs + liltedSecondDurationMs - eighthDurationMs * 2,
-    ];
-
-    return slotOffsetsMs[tripletSlotIndex] / 1000;
+    return 0;
   }
 
-  return 0;
+  const subunitCountPerMeasure = getSwingSubunitCountPerMeasure(signature);
+  if (subunitCountPerMeasure == null || subunitCountPerMeasure <= 0) {
+    return 0;
+  }
+
+  const baseSlotDurationMs = measureMs / subunitCountPerMeasure;
+  const groupDurationMs =
+    baseSlotDurationMs * swingDescriptor.macroBeatDivision;
+  if (groupDurationMs <= 0) {
+    return 0;
+  }
+
+  const positionWithinGroup = normalizedElapsed % groupDurationMs;
+  const toleranceMs = Math.max(2, baseSlotDurationMs * 0.12);
+  const slotIndex = Array.from(
+    { length: swingDescriptor.macroBeatDivision },
+    (_value, index) => index
+  ).findIndex(
+    (index) =>
+      Math.abs(positionWithinGroup - baseSlotDurationMs * index) <= toleranceMs
+  );
+
+  if (slotIndex <= 0) {
+    return 0;
+  }
+
+  const slotDurationsMs = getSlotDurationsMs(
+    swingDescriptor.macroBeatDivision,
+    baseSlotDurationMs,
+    groupDurationMs,
+    1 + swingPercentage,
+    swingDescriptor.balanceRemainingNotes
+  );
+
+  if (!slotDurationsMs) {
+    return 0;
+  }
+
+  const actualSlotStartMs = slotDurationsMs
+    .slice(0, slotIndex)
+    .reduce((totalDurationMs, durationMs) => totalDurationMs + durationMs, 0);
+  const expectedSlotStartMs = baseSlotDurationMs * slotIndex;
+
+  return (actualSlotStartMs - expectedSlotStartMs) / 1000;
 }
 
 export function getCountInPulseIndices(

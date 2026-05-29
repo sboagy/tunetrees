@@ -9,6 +9,7 @@ import type {
   RhythmPatternMetadata,
   RhythmPatternRequest,
   RhythmPatternType,
+  SwingDescriptor,
 } from "./pattern-types";
 
 export type {
@@ -17,6 +18,7 @@ export type {
   RhythmPatternMetadata,
   RhythmPatternRequest,
   RhythmPatternType,
+  SwingDescriptor,
 } from "./pattern-types";
 
 const DEFAULT_SAMPLE_BASE_URL = (
@@ -89,7 +91,7 @@ function normalizePatternType(patternType?: string | null): RhythmPatternType {
 }
 
 function escapeSqlStringLiteral(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function toSqlNullableStringLiteral(value?: string | null): string {
@@ -257,6 +259,7 @@ type PatternLoaderSchemaCapabilities = {
   hasUserIdColumn: boolean;
   hasPatternTypeColumn: boolean;
   hasSwingPercentageColumn: boolean;
+  hasSwingDescColumn: boolean;
   canUseHierarchicalOverrides: boolean;
 };
 
@@ -285,6 +288,7 @@ type RhythmPatternQueryRow = {
   rhythm_signature: string | null;
   tempo_qpm: number | null;
   swing_percentage: number | null;
+  swing_desc: string | null;
   pattern_id: string | null;
   pattern_name: string | null;
   abc_string: string | null;
@@ -363,8 +367,69 @@ async function detectPatternLoaderSchemaCapabilities(
     hasUserIdColumn,
     hasPatternTypeColumn: rhythmPatternColumns.has("pattern_type"),
     hasSwingPercentageColumn: rhythmPatternColumns.has("swing_percentage"),
+    hasSwingDescColumn: rhythmPatternColumns.has("swing_desc"),
     canUseHierarchicalOverrides: hasTuneIdColumn && hasUserIdColumn,
   };
+}
+
+function parseSwingDescriptor(value?: string | null): SwingDescriptor | null {
+  const trimmedValue = value?.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmedValue) as Record<string, unknown>;
+    const timeSignature =
+      typeof parsed.timeSignature === "string"
+        ? parsed.timeSignature.trim()
+        : "";
+    const macroBeatDivision =
+      typeof parsed.macroBeatDivision === "number"
+        ? parsed.macroBeatDivision
+        : Number.NaN;
+    const defaultSwingFactor =
+      typeof parsed.defaultSwingFactor === "number"
+        ? parsed.defaultSwingFactor
+        : Number.NaN;
+    const balanceRemainingNotes = parsed.balanceRemainingNotes;
+    const velocityPattern = Array.isArray(parsed.velocityPattern)
+      ? parsed.velocityPattern.filter(
+          (entry): entry is number =>
+            typeof entry === "number" && Number.isFinite(entry)
+        )
+      : [];
+    const humanizationDeltaMs =
+      typeof parsed.humanizationDeltaMs === "number"
+        ? parsed.humanizationDeltaMs
+        : Number.NaN;
+
+    if (
+      !timeSignature ||
+      !Number.isFinite(macroBeatDivision) ||
+      macroBeatDivision <= 1 ||
+      !Number.isInteger(macroBeatDivision) ||
+      !Number.isFinite(defaultSwingFactor) ||
+      defaultSwingFactor <= 0 ||
+      typeof balanceRemainingNotes !== "boolean" ||
+      velocityPattern.length === 0 ||
+      !Number.isFinite(humanizationDeltaMs) ||
+      humanizationDeltaMs < 0
+    ) {
+      return null;
+    }
+
+    return {
+      timeSignature,
+      macroBeatDivision,
+      defaultSwingFactor,
+      balanceRemainingNotes,
+      velocityPattern,
+      humanizationDeltaMs,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function buildPatternLoaderFilters(
@@ -520,6 +585,11 @@ async function queryRhythmPatternRows(
             : sql`CAST('seed' AS TEXT)`
         } AS pattern_type,
         ${
+          capabilities.hasSwingDescColumn
+            ? sql`rp.swing_desc`
+            : sql`CAST(NULL AS TEXT)`
+        } AS swing_desc,
+        ${
           capabilities.hasTuneIdColumn
             ? sql`rp.tune_id`
             : sql`CAST(NULL AS TEXT)`
@@ -574,6 +644,7 @@ async function queryRhythmPatternRows(
           ? sql`tm.swing_percentage`
           : sql`CAST(NULL AS REAL)`
       } AS swing_percentage,
+      sp.swing_desc AS swing_desc,
       sp.id AS pattern_id,
       sp.name AS pattern_name,
       sp.abc_string AS abc_string,
@@ -627,6 +698,7 @@ function mapRhythmPatternMetadata(
     Number.isFinite(row.swing_percentage)
       ? row.swing_percentage
       : 0;
+  const resolvedSwingDescriptor = parseSwingDescriptor(row.swing_desc);
   const premiumLoop = selectPremiumLoop(context.sampleBaseUrl, {
     explicitUrl: selectedPatternRow.premium_audio_url,
     tempoQpm: resolvedTempoQpm,
@@ -645,6 +717,7 @@ function mapRhythmPatternMetadata(
     patternType: normalizePatternType(selectedPatternRow.pattern_type),
     tempoQpm: resolvedTempoQpm,
     swingPercentage: resolvedSwingPercentage,
+    swingDescriptor: resolvedSwingDescriptor,
     sampleKit: normalizeSampleKit(selectedPatternRow.sample_kit),
     premiumAudioUrl: premiumLoop?.url ?? null,
     premiumAudioTrimMs: premiumLoop?.trimMs ?? 0,
@@ -752,6 +825,7 @@ function buildTuneTypeFallbackMetadata(
     patternType: "seed",
     tempoQpm: options.tempoQpm,
     swingPercentage: 0,
+    swingDescriptor: null,
     sampleKit: DEFAULT_SAMPLE_KIT,
     premiumAudioUrl: null,
     premiumAudioTrimMs: 0,

@@ -9,6 +9,15 @@ export interface RhythmPatternRequest {
 
 export type RhythmPatternType = "seed" | "full_track";
 
+export interface SwingDescriptor {
+  timeSignature: string;
+  macroBeatDivision: number;
+  defaultSwingFactor: number;
+  balanceRemainingNotes: boolean;
+  velocityPattern: number[];
+  humanizationDeltaMs: number;
+}
+
 export type RhythmPatternCandidateScope =
   | "user_tune"
   | "tune_default"
@@ -36,6 +45,7 @@ export interface RhythmPatternMetadata {
   patternType: RhythmPatternType;
   tempoQpm: number;
   swingPercentage: number;
+  swingDescriptor?: SwingDescriptor | null;
   sampleKit: string;
   premiumAudioUrl: string | null;
   premiumAudioTrimMs: number;
