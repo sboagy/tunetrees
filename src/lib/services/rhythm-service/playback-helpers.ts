@@ -25,6 +25,13 @@ export type PlaybackPitchSelection = {
   playbackPitches: number[];
 };
 
+type SwingSlotContext = {
+  descriptor: SwingDescriptor;
+  slotIndex: number;
+  baseSlotDurationMs: number;
+  groupDurationMs: number;
+};
+
 export function normalizeSampleKit(sampleKit?: string | null): string {
   const normalizedSampleKit = sampleKit?.trim();
   return normalizedSampleKit && SAMPLE_KITS[normalizedSampleKit]
@@ -175,12 +182,18 @@ export function normalizePlaybackPitch(
 export function getPitchPlaybackGain(
   sampleKit: string,
   resolvedPitch: number,
-  event: NoteTimingEvent
+  event: NoteTimingEvent,
+  currentMetadata?: RhythmPatternMetadata | null
 ): number {
   const hasAccent = eventHasAccent(event);
   const baseGain = hasAccent ? 1 : 0.8;
+  const velocityMultiplier = getVelocityPatternGainMultiplier(
+    currentMetadata ?? null,
+    event
+  );
   return (
     baseGain *
+    velocityMultiplier *
     (getSampleKitDefinition(sampleKit).getPlaybackGainMultiplier?.(
       resolvedPitch
     ) ?? 1)
@@ -348,6 +361,161 @@ function getActiveSwingDescriptor(
   );
 }
 
+function getSwingSlotContext(
+  currentMetadata: RhythmPatternMetadata | null,
+  event: NoteTimingEvent
+): SwingSlotContext | null {
+  if (!currentMetadata) {
+    return null;
+  }
+
+  const elapsedMs = event.milliseconds;
+  const measureMs = event.millisecondsPerMeasure;
+  if (
+    !Number.isFinite(elapsedMs) ||
+    !Number.isFinite(measureMs) ||
+    measureMs == null ||
+    measureMs <= 0
+  ) {
+    return null;
+  }
+
+  const normalizedElapsed = ((elapsedMs % measureMs) + measureMs) % measureMs;
+  const signature = parseRhythmSignatureParts(currentMetadata.rhythmSignature);
+  if (!signature) {
+    return null;
+  }
+
+  const swingDescriptor = getActiveSwingDescriptor(currentMetadata);
+  if (!swingDescriptor) {
+    return null;
+  }
+
+  const normalizedTimeSignature = swingDescriptor.timeSignature.trim();
+  const expectedTimeSignature = `${signature.numerator}/${signature.denominator}`;
+  if (
+    normalizedTimeSignature &&
+    normalizedTimeSignature !== expectedTimeSignature
+  ) {
+    return null;
+  }
+
+  const subunitCountPerMeasure = getSwingSubunitCountPerMeasure(signature);
+  if (subunitCountPerMeasure == null || subunitCountPerMeasure <= 0) {
+    return null;
+  }
+
+  const baseSlotDurationMs = measureMs / subunitCountPerMeasure;
+  const groupDurationMs =
+    baseSlotDurationMs * swingDescriptor.macroBeatDivision;
+  if (groupDurationMs <= 0) {
+    return null;
+  }
+
+  const positionWithinGroup = normalizedElapsed % groupDurationMs;
+  const toleranceMs = Math.max(2, baseSlotDurationMs * 0.12);
+  const slotIndex = Array.from(
+    { length: swingDescriptor.macroBeatDivision },
+    (_value, index) => index
+  ).findIndex(
+    (index) =>
+      Math.abs(positionWithinGroup - baseSlotDurationMs * index) <= toleranceMs
+  );
+
+  if (slotIndex < 0) {
+    return null;
+  }
+
+  return {
+    descriptor: swingDescriptor,
+    slotIndex,
+    baseSlotDurationMs,
+    groupDurationMs,
+  };
+}
+
+function getHumanizationSeed(
+  event: NoteTimingEvent,
+  slotIndex: number
+): number {
+  const measureNumber = Number.isFinite(event.measureNumber)
+    ? (event.measureNumber ?? 0)
+    : 0;
+  const elapsedMs = Number.isFinite(event.milliseconds)
+    ? Math.round(event.milliseconds ?? 0)
+    : 0;
+  const pitchSeed = (event.midiPitches ?? []).reduce(
+    (totalPitch, pitch) =>
+      totalPitch + (Number.isFinite(pitch.pitch) ? pitch.pitch : 0),
+    0
+  );
+
+  return (
+    measureNumber * 73_856_093 +
+    elapsedMs * 19_349_663 +
+    slotIndex * 83_492_791 +
+    pitchSeed
+  );
+}
+
+export function getVelocityPatternGainMultiplier(
+  currentMetadata: RhythmPatternMetadata | null,
+  event: NoteTimingEvent
+): number {
+  const swingSlotContext = getSwingSlotContext(currentMetadata, event);
+  if (!swingSlotContext) {
+    return 1;
+  }
+
+  const velocityValue =
+    swingSlotContext.descriptor.velocityPattern[swingSlotContext.slotIndex] ??
+    swingSlotContext.descriptor.velocityPattern.at(-1) ??
+    100;
+
+  return Math.max(0, velocityValue / 100);
+}
+
+export function getHumanizationDelaySeconds(
+  currentMetadata: RhythmPatternMetadata | null,
+  event: NoteTimingEvent
+): number {
+  const swingSlotContext = getSwingSlotContext(currentMetadata, event);
+  if (
+    !swingSlotContext ||
+    swingSlotContext.descriptor.humanizationDeltaMs <= 0
+  ) {
+    return 0;
+  }
+
+  const seed = getHumanizationSeed(event, swingSlotContext.slotIndex);
+  const jitter = Math.sin(seed) * 10_000;
+  const normalizedJitter = jitter - Math.floor(jitter);
+  const signedJitterMs =
+    (normalizedJitter * 2 - 1) *
+    swingSlotContext.descriptor.humanizationDeltaMs;
+
+  return signedJitterMs / 1000;
+}
+
+export function getDefaultSwingPercentage(
+  currentMetadata: RhythmPatternMetadata | null
+): number {
+  if (!currentMetadata) {
+    return 0;
+  }
+
+  const swingDescriptor = getActiveSwingDescriptor(currentMetadata);
+  if (
+    swingDescriptor &&
+    Number.isFinite(swingDescriptor.defaultSwingFactor) &&
+    swingDescriptor.defaultSwingFactor > 0
+  ) {
+    return Math.max(0, swingDescriptor.defaultSwingFactor - 1);
+  }
+
+  return currentMetadata.swingPercentage;
+}
+
 function getSwingSubunitCountPerMeasure(signature: {
   numerator: number;
   denominator: number;
@@ -416,69 +584,21 @@ export function getPlaybackDelaySeconds(
     return 0;
   }
 
-  const elapsedMs = event.milliseconds;
-  const measureMs = event.millisecondsPerMeasure;
-  if (
-    !Number.isFinite(elapsedMs) ||
-    !Number.isFinite(measureMs) ||
-    measureMs == null ||
-    measureMs <= 0
-  ) {
+  const swingSlotContext = getSwingSlotContext(currentMetadata, event);
+  if (!swingSlotContext) {
     return 0;
   }
 
-  const normalizedElapsed = ((elapsedMs % measureMs) + measureMs) % measureMs;
-  const signature = parseRhythmSignatureParts(currentMetadata.rhythmSignature);
-  if (!signature) {
-    return 0;
-  }
-
-  const swingDescriptor = getActiveSwingDescriptor(currentMetadata);
-  if (!swingDescriptor) {
-    return 0;
-  }
-
-  const normalizedTimeSignature = swingDescriptor.timeSignature.trim();
-  const expectedTimeSignature = `${signature.numerator}/${signature.denominator}`;
-  if (
-    normalizedTimeSignature &&
-    normalizedTimeSignature !== expectedTimeSignature
-  ) {
-    return 0;
-  }
-
-  const subunitCountPerMeasure = getSwingSubunitCountPerMeasure(signature);
-  if (subunitCountPerMeasure == null || subunitCountPerMeasure <= 0) {
-    return 0;
-  }
-
-  const baseSlotDurationMs = measureMs / subunitCountPerMeasure;
-  const groupDurationMs =
-    baseSlotDurationMs * swingDescriptor.macroBeatDivision;
-  if (groupDurationMs <= 0) {
-    return 0;
-  }
-
-  const positionWithinGroup = normalizedElapsed % groupDurationMs;
-  const toleranceMs = Math.max(2, baseSlotDurationMs * 0.12);
-  const slotIndex = Array.from(
-    { length: swingDescriptor.macroBeatDivision },
-    (_value, index) => index
-  ).findIndex(
-    (index) =>
-      Math.abs(positionWithinGroup - baseSlotDurationMs * index) <= toleranceMs
-  );
-
-  if (slotIndex <= 0) {
+  if (swingSlotContext.slotIndex <= 0) {
     return 0;
   }
 
   const slotDurationsMs = getSlotDurationsMs(
-    swingDescriptor.macroBeatDivision,
-    baseSlotDurationMs,
-    groupDurationMs,
+    swingSlotContext.descriptor.macroBeatDivision,
+    swingSlotContext.baseSlotDurationMs,
+    swingSlotContext.groupDurationMs,
     1 + swingPercentage,
-    swingDescriptor.balanceRemainingNotes
+    swingSlotContext.descriptor.balanceRemainingNotes
   );
 
   if (!slotDurationsMs) {
@@ -486,9 +606,10 @@ export function getPlaybackDelaySeconds(
   }
 
   const actualSlotStartMs = slotDurationsMs
-    .slice(0, slotIndex)
+    .slice(0, swingSlotContext.slotIndex)
     .reduce((totalDurationMs, durationMs) => totalDurationMs + durationMs, 0);
-  const expectedSlotStartMs = baseSlotDurationMs * slotIndex;
+  const expectedSlotStartMs =
+    swingSlotContext.baseSlotDurationMs * swingSlotContext.slotIndex;
 
   return (actualSlotStartMs - expectedSlotStartMs) / 1000;
 }

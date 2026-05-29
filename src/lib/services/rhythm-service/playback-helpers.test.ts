@@ -1,7 +1,11 @@
 import type { NoteTimingEvent } from "abcjs";
 import { describe, expect, it } from "vitest";
 import type { RhythmPatternMetadata } from "@/lib/rhythm/pattern-loader";
-import { getPlaybackDelaySeconds } from "./playback-helpers";
+import {
+  getHumanizationDelaySeconds,
+  getPitchPlaybackGain,
+  getPlaybackDelaySeconds,
+} from "./playback-helpers";
 
 const JIG_SWING_DESCRIPTOR = {
   timeSignature: "6/8",
@@ -119,5 +123,47 @@ describe("getPlaybackDelaySeconds jig swing", () => {
         1 / 3
       )
     ).toBeCloseTo(0.25 / 3, 5);
+  });
+
+  it("scales playback gain by the descriptor velocity pattern", () => {
+    const firstSlotGain = getPitchPlaybackGain(
+      "generic_click",
+      60,
+      createTimingEvent(0),
+      JIG_METADATA
+    );
+    const secondSlotGain = getPitchPlaybackGain(
+      "generic_click",
+      60,
+      createTimingEvent(100),
+      JIG_METADATA
+    );
+    const thirdSlotGain = getPitchPlaybackGain(
+      "generic_click",
+      60,
+      createTimingEvent(200),
+      JIG_METADATA
+    );
+
+    expect(secondSlotGain / firstSlotGain).toBeCloseTo(0.8, 5);
+    expect(thirdSlotGain / firstSlotGain).toBeCloseTo(0.6, 5);
+  });
+
+  it("returns deterministic bounded humanization from the descriptor", () => {
+    const firstSlotDelay = getHumanizationDelaySeconds(
+      JIG_METADATA,
+      createTimingEvent(0)
+    );
+    const secondSlotDelay = getHumanizationDelaySeconds(
+      JIG_METADATA,
+      createTimingEvent(100)
+    );
+
+    expect(
+      getHumanizationDelaySeconds(JIG_METADATA, createTimingEvent(0))
+    ).toBeCloseTo(firstSlotDelay, 10);
+    expect(Math.abs(firstSlotDelay)).toBeLessThanOrEqual(0.015);
+    expect(Math.abs(secondSlotDelay)).toBeLessThanOrEqual(0.015);
+    expect(secondSlotDelay).not.toBeCloseTo(firstSlotDelay, 10);
   });
 });

@@ -26,7 +26,9 @@ import {
   createCountInBuffers,
   eventHasAccent,
   getCountInPulseIndices,
+  getDefaultSwingPercentage,
   getEventPulseIndex,
+  getHumanizationDelaySeconds,
   getPitchPlaybackGain,
   getPitchPlaybackRate,
   getPlaybackDelaySeconds,
@@ -460,12 +462,11 @@ export function createRhythmService(
       return;
     }
 
-    const activeSampleKit = normalizeSampleKit(metadata()?.sampleKit);
-    const playbackDelaySeconds = getPlaybackDelaySeconds(
-      metadata(),
-      event,
-      swingPercentage()
-    );
+    const currentMetadata = metadata();
+    const activeSampleKit = normalizeSampleKit(currentMetadata?.sampleKit);
+    const playbackDelaySeconds =
+      getPlaybackDelaySeconds(currentMetadata, event, swingPercentage()) +
+      getHumanizationDelaySeconds(currentMetadata, event);
     const hasAccent = eventHasAccent(event);
     const selection = getPlaybackPitchSelection(activeSampleKit, event);
     const resolvedPitches = selection.playbackPitches.map((playbackPitch) =>
@@ -478,7 +479,8 @@ export function createRhythmService(
       const gainValue = getPitchPlaybackGain(
         activeSampleKit,
         resolvedPitch,
-        event
+        event,
+        currentMetadata
       );
       const playbackRate = getPitchPlaybackRate(activeSampleKit, resolvedPitch);
       const buffer = sampleBuffers.get(resolvedPitch);
@@ -776,7 +778,7 @@ export function createRhythmService(
         readStoredRhythmSwing(
           swingPreferenceKey.userId,
           swingPreferenceKey.tuneTypeName
-        ) ?? clampSwingPercentage(nextMetadata.swingPercentage)
+        ) ?? clampSwingPercentage(getDefaultSwingPercentage(nextMetadata))
       );
       setIsReady(false);
     }
@@ -951,7 +953,9 @@ export function createRhythmService(
   }
 
   async function resetSwingToDefault() {
-    const defaultSwing = clampSwingPercentage(metadata()?.swingPercentage ?? 0);
+    const defaultSwing = clampSwingPercentage(
+      getDefaultSwingPercentage(metadata())
+    );
     setSwingPercentageSignal(defaultSwing);
     if (swingPreferenceKey) {
       clearStoredRhythmSwing(

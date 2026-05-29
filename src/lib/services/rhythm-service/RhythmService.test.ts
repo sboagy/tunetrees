@@ -185,6 +185,25 @@ K:clef=perc
   ]);
 }
 
+function createMismatchedSwingDefaultRhythmDb() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('system-default', 'ITRAD', 'JigD', 'Mismatched Jig Default', '*', 'X:1
+T:Mismatched Jig Default
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed', 0.33, '{"timeSignature":"6/8","macroBeatDivision":3,"defaultSwingFactor":1.15,"balanceRemainingNotes":true,"velocityPattern":[100,80,60],"humanizationDeltaMs":15}')`,
+  ]);
+}
+
 function createRhythmDbWithoutPatternRow() {
   return createDb([
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
@@ -887,6 +906,35 @@ describe("rhythm pattern sqlite migrations", () => {
 });
 
 describe("createRhythmService", () => {
+  it("prefers swing_desc.defaultSwingFactor over stored swing_percentage when no local override exists", async () => {
+    const db = createMismatchedSwingDefaultRhythmDb();
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        sampleBaseUrl: "",
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Irish Traditional",
+      tuneTypeName: "JigD",
+      userId: "user-1",
+    });
+
+    expect(service.swingPercentage()).toBeCloseTo(0.15, 5);
+
+    await service.setSwingPercentage(0.4);
+    expect(service.swingPercentage()).toBeCloseTo(0.4, 5);
+
+    await service.resetSwingToDefault();
+    expect(service.swingPercentage()).toBeCloseTo(0.15, 5);
+
+    dispose();
+  });
+
   it("plays mapped bodhran samples and restarts timing callbacks when tempo changes", async () => {
     const db = createSampleKitRhythmDb();
     const fetchMock = vi.fn(async (_url: string) => ({
