@@ -35,6 +35,7 @@ export interface RhythmPatternMetadata {
   tuneStructure?: string | null;
   patternType: RhythmPatternType;
   tempoQpm: number;
+  swingPercentage: number;
   sampleKit: string;
   premiumAudioUrl: string | null;
   premiumAudioTrimMs: number;

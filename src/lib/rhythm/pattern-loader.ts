@@ -256,6 +256,7 @@ type PatternLoaderSchemaCapabilities = {
   hasTuneIdColumn: boolean;
   hasUserIdColumn: boolean;
   hasPatternTypeColumn: boolean;
+  hasSwingPercentageColumn: boolean;
   canUseHierarchicalOverrides: boolean;
 };
 
@@ -283,6 +284,7 @@ type RhythmPatternQueryRow = {
   tune_type_id: string | null;
   rhythm_signature: string | null;
   tempo_qpm: number | null;
+  swing_percentage: number | null;
   pattern_id: string | null;
   pattern_name: string | null;
   abc_string: string | null;
@@ -360,6 +362,7 @@ async function detectPatternLoaderSchemaCapabilities(
     hasTuneIdColumn,
     hasUserIdColumn,
     hasPatternTypeColumn: rhythmPatternColumns.has("pattern_type"),
+    hasSwingPercentageColumn: rhythmPatternColumns.has("swing_percentage"),
     canUseHierarchicalOverrides: hasTuneIdColumn && hasUserIdColumn,
   };
 }
@@ -468,9 +471,23 @@ async function queryRhythmPatternRows(
     ),
     tempo_match AS (
       SELECT gtt.default_bpm
+      ${
+        capabilities.hasSwingPercentageColumn
+          ? sql`, rp_swing.swing_percentage`
+          : sql``
+      }
       FROM tune_type_match ttm
       JOIN genre_tune_type gtt ON gtt.tune_type_id = ttm.id
       LEFT JOIN genre_match gm ON 1 = 1
+      ${
+        capabilities.hasSwingPercentageColumn
+          ? sql`LEFT JOIN (
+        SELECT tune_type_id, swing_percentage
+        FROM rhythm_patterns
+        WHERE user_id IS NULL AND tune_id IS NULL
+      ) rp_swing ON rp_swing.tune_type_id = ttm.id`
+          : sql``
+      }
       WHERE gm.id IS NULL OR gtt.genre_id = gm.id
       ORDER BY
         CASE
@@ -552,6 +569,11 @@ async function queryRhythmPatternRows(
           ? sql`tm.default_bpm`
           : sql`CAST(NULL AS INTEGER)`
       } AS tempo_qpm,
+      ${
+        capabilities.hasSwingPercentageColumn
+          ? sql`tm.swing_percentage`
+          : sql`CAST(NULL AS REAL)`
+      } AS swing_percentage,
       sp.id AS pattern_id,
       sp.name AS pattern_name,
       sp.abc_string AS abc_string,
@@ -600,6 +622,11 @@ function mapRhythmPatternMetadata(
     typeof row.tempo_qpm === "number" && Number.isFinite(row.tempo_qpm)
       ? row.tempo_qpm
       : getDefaultTempoForTuneType(row.tune_type_name);
+  const resolvedSwingPercentage =
+    typeof row.swing_percentage === "number" &&
+    Number.isFinite(row.swing_percentage)
+      ? row.swing_percentage
+      : 0;
   const premiumLoop = selectPremiumLoop(context.sampleBaseUrl, {
     explicitUrl: selectedPatternRow.premium_audio_url,
     tempoQpm: resolvedTempoQpm,
@@ -617,6 +644,7 @@ function mapRhythmPatternMetadata(
     rhythmAbc: selectedPatternRow.abc_string.trim(),
     patternType: normalizePatternType(selectedPatternRow.pattern_type),
     tempoQpm: resolvedTempoQpm,
+    swingPercentage: resolvedSwingPercentage,
     sampleKit: normalizeSampleKit(selectedPatternRow.sample_kit),
     premiumAudioUrl: premiumLoop?.url ?? null,
     premiumAudioTrimMs: premiumLoop?.trimMs ?? 0,
@@ -723,6 +751,7 @@ function buildTuneTypeFallbackMetadata(
     ),
     patternType: "seed",
     tempoQpm: options.tempoQpm,
+    swingPercentage: 0,
     sampleKit: DEFAULT_SAMPLE_KIT,
     premiumAudioUrl: null,
     premiumAudioTrimMs: 0,
