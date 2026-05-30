@@ -411,7 +411,12 @@ export const TunesGrid = (<T extends { id: string | number }>(
     localStorage.setItem(key, String(scrollPos));
     setTargetScroll(scrollPos);
 
-    if (!inRestoreGuard || scrollPos > 2) {
+    // A just-saved non-zero position can still be briefly snapped back to the
+    // top by post-render virtualizer churn. Keep a short guard window so that
+    // transient reset is treated as noise instead of becoming the new target.
+    if (scrollPos > 2) {
+      setRestoreGuardUntil(Date.now() + 2000);
+    } else if (!inRestoreGuard) {
       setRestoreGuardUntil(0);
     }
   };
@@ -1033,75 +1038,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
         );
       }
 
-      const handleScroll = () => {
-        if (scrollTimeout) clearTimeout(scrollTimeout);
-
-        // During stabilization, if scroll is wrong, re-apply target instead of saving
-        const target = targetScroll();
-        const stabilizing = isStabilizing();
-        const loading = props.isLoading ?? false;
-
-        const inRestoreGuard = restoreGuardUntil() > Date.now();
-
-        if (
-          (stabilizing || inRestoreGuard || loading) &&
-          containerRef &&
-          target > 0
-        ) {
-          const currentScroll = containerRef.scrollTop;
-          // During refresh/update churn, virtualizer/layout can briefly snap to top.
-          // Prevent that transient 0 from overwriting a just-restored non-zero target.
-          if (currentScroll <= 2) {
-            console.log(
-              `[TunesGrid ${props.tablePurpose}] Scroll reset detected during stabilization/restore guard: ${currentScroll}px, re-applying ${target}px`
-            );
-            containerRef.scrollTop = target;
-            return; // Don't save during stabilization
-          }
-        }
-
-        scrollTimeout = setTimeout(() => {
-          const key = scrollKey();
-          if (containerRef && key && !isStabilizing()) {
-            const scrollPos = containerRef.scrollTop;
-            const loading = props.isLoading ?? false;
-
-            const inRestoreGuard = restoreGuardUntil() > Date.now();
-            const target = targetScroll();
-            if (loading && target > 0 && scrollPos <= 2) {
-              console.log(
-                `[TunesGrid ${props.tablePurpose}] Skipping top save while loading (target=${target}px)`
-              );
-              containerRef.scrollTop = target;
-              return;
-            }
-            if (inRestoreGuard && target > 0 && scrollPos <= 2) {
-              console.log(
-                `[TunesGrid ${props.tablePurpose}] Skipping transient top save during restore guard (target=${target}px)`
-              );
-              containerRef.scrollTop = target;
-              return;
-            }
-
-            console.log(
-              `[TunesGrid ${props.tablePurpose}] Saving scroll position: ${scrollPos}px`
-            );
-            localStorage.setItem(key, String(scrollPos));
-            setTargetScroll(scrollPos); // Update target to current position
-
-            // A just-saved non-zero position can still be briefly snapped back to the
-            // top by post-render virtualizer churn. Keep a short guard window so that
-            // transient reset is treated as noise instead of becoming the new target.
-            if (scrollPos > 2) {
-              setRestoreGuardUntil(Date.now() + 2000);
-            } else if (!inRestoreGuard) {
-              setRestoreGuardUntil(0);
-            }
-          }
-        }, 150);
-      };
-
-      containerRef.addEventListener("scroll", handleScroll, { passive: true });
+      containerRef.addEventListener("scroll", handleContainerScroll, {
+        passive: true,
+      });
 
       // Store cleanup function to be called on component unmount
       cleanupScrollListener = () => {
