@@ -910,7 +910,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
   });
 
   onMount(() => {
-    let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+    const scrollTimeout: ReturnType<typeof setTimeout> | null = null;
     let cleanupScrollListener: (() => void) | null = null;
 
     const waitForContainer = () => {
