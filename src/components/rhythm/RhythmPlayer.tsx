@@ -62,6 +62,13 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import { RhythmPatternPicker } from "./RhythmPatternPicker";
+import {
+  createSwingDescriptorDraft,
+  parseStoredSwingDescriptor,
+  parseSwingDescriptorDraft,
+  type SwingDescriptorDraft,
+  SwingDescriptorEditor,
+} from "./SwingDescriptorEditor";
 import "./rhythm-player.css";
 
 export interface RhythmPlayerProps {
@@ -159,6 +166,28 @@ function validateCustomPatternDraft(input: {
   return null;
 }
 
+function extractRhythmSignatureFromAbc(
+  abcString?: string | null
+): string | null {
+  const match = abcString?.match(/^\s*M:\s*([^\n\r]+)/m);
+  const value = match?.[1]?.trim();
+  return value || null;
+}
+
+function buildCustomPatternSwingDescriptorDraft(
+  abcString: string,
+  rhythmSignature?: string | null,
+  swingDescriptorValue?: string | null,
+  fallbackDescriptor?: RhythmPatternMetadata["swingDescriptor"]
+): SwingDescriptorDraft {
+  return createSwingDescriptorDraft(
+    parseStoredSwingDescriptor(swingDescriptorValue) ??
+      fallbackDescriptor ??
+      null,
+    extractRhythmSignatureFromAbc(abcString) ?? rhythmSignature
+  );
+}
+
 function clampSwingPercentage(value: number): number {
   if (!Number.isFinite(value)) {
     return 0;
@@ -202,7 +231,6 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     null
   );
   const [selectedStartSection, setSelectedStartSection] = createSignal("start");
-  const [swingInputValue, setSwingInputValue] = createSignal("0");
   const [swingInputError, setSwingInputError] = createSignal<string | null>(
     null
   );
@@ -225,6 +253,14 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     createSignal<EditableRhythmPatternScope>(
       props.tuneId?.trim() ? "user_tune" : "user_default"
     );
+  const [
+    customPatternUseInheritedSwingDesc,
+    setCustomPatternUseInheritedSwingDesc,
+  ] = createSignal(true);
+  const [
+    customPatternSwingDescriptorDraft,
+    setCustomPatternSwingDescriptorDraft,
+  ] = createSignal<SwingDescriptorDraft>(createSwingDescriptorDraft());
   const [customPatternError, setCustomPatternError] = createSignal<
     string | null
   >(null);
@@ -264,6 +300,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   );
   const currentSwingPercentText = createMemo(() =>
     formatSwingPercentage(swingPercentage())
+  );
+  const [swingInputValue, setSwingInputValue] = createSignal(
+    currentSwingPercentText()
   );
   const isTempoAtDefault = createMemo(() => tempoQpm() === defaultTempoQpm());
   const isSwingAtDefault = createMemo(
@@ -424,20 +463,29 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     const baseName = selectedCandidateName
       ? `${selectedCandidateName} copy`
       : `My ${tuneTypeName} pattern`;
+    const baseAbc =
+      activePatternMetadata()?.rhythmAbc ??
+      buildCustomPatternTemplate(
+        baseName,
+        rhythmPatternContext().rhythmSignature
+      );
 
     setCustomPatternMode("create");
     setCustomPatternId(null);
     setCustomPatternScope(props.tuneId?.trim() ? "user_tune" : "user_default");
     setCustomPatternName(baseName);
-    setCustomPatternAbc(
-      activePatternMetadata()?.rhythmAbc ??
-        buildCustomPatternTemplate(
-          baseName,
-          rhythmPatternContext().rhythmSignature
-        )
-    );
+    setCustomPatternAbc(baseAbc);
     setCustomPatternPatternType(rhythmPatternContext().patternType);
     setCustomPatternSampleKit(rhythmPatternContext().sampleKit);
+    setCustomPatternUseInheritedSwingDesc(true);
+    setCustomPatternSwingDescriptorDraft(
+      buildCustomPatternSwingDescriptorDraft(
+        baseAbc,
+        rhythmPatternContext().rhythmSignature,
+        null,
+        activePatternMetadata()?.swingDescriptor
+      )
+    );
     setCustomPatternError(null);
     setIsCustomPatternEditorOpen(true);
   };
@@ -476,6 +524,15 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         existingPattern.patternType === "full_track" ? "full_track" : "seed"
       );
       setCustomPatternSampleKit(existingPattern.sampleKit);
+      setCustomPatternUseInheritedSwingDesc(!existingPattern.swingDesc?.trim());
+      setCustomPatternSwingDescriptorDraft(
+        buildCustomPatternSwingDescriptorDraft(
+          existingPattern.abcString,
+          rhythmPatternContext().rhythmSignature,
+          existingPattern.swingDesc,
+          activePatternMetadata()?.swingDescriptor
+        )
+      );
       setIsCustomPatternEditorOpen(true);
     } catch (error) {
       const message =
@@ -511,6 +568,29 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       return;
     }
 
+    const swingDescriptorResult = customPatternUseInheritedSwingDesc()
+      ? { descriptor: null, error: null }
+      : parseSwingDescriptorDraft(customPatternSwingDescriptorDraft());
+    if (swingDescriptorResult.error) {
+      setCustomPatternError(swingDescriptorResult.error);
+      return;
+    }
+
+    const expectedRhythmSignature =
+      extractRhythmSignatureFromAbc(customPatternAbc()) ??
+      rhythmPatternContext().rhythmSignature;
+    if (
+      swingDescriptorResult.descriptor &&
+      expectedRhythmSignature?.trim() &&
+      swingDescriptorResult.descriptor.timeSignature !==
+        expectedRhythmSignature.trim()
+    ) {
+      setCustomPatternError(
+        `Swing shape time signature must match the ABC M: header (${expectedRhythmSignature.trim()}).`
+      );
+      return;
+    }
+
     setIsCustomPatternSaving(true);
     setCustomPatternError(null);
 
@@ -527,6 +607,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         userId: currentUserId,
         scope: customPatternScope(),
         tuneId: props.tuneId?.trim() || null,
+        swingDesc: customPatternUseInheritedSwingDesc()
+          ? null
+          : JSON.stringify(swingDescriptorResult.descriptor),
       };
 
       const savedPattern =
@@ -1641,18 +1724,28 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                 </label>
               </div>
 
-              <label class="mt-5 flex flex-col gap-2 text-sm text-muted-foreground">
-                <span class="font-medium text-foreground">ABC notation</span>
-                <textarea
-                  value={customPatternAbc()}
-                  onInput={(event) =>
-                    setCustomPatternAbc(event.currentTarget.value)
+              <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,1fr)]">
+                <SwingDescriptorEditor
+                  draft={customPatternSwingDescriptorDraft()}
+                  useInheritedDefault={customPatternUseInheritedSwingDesc()}
+                  onDraftChange={setCustomPatternSwingDescriptorDraft}
+                  onUseInheritedDefaultChange={
+                    setCustomPatternUseInheritedSwingDesc
                   }
-                  rows="10"
-                  class="min-h-[14rem] rounded-md border border-input bg-background px-3 py-3 font-mono text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
-                  data-testid="rhythm-player-custom-pattern-abc-input"
                 />
-              </label>
+                <label class="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <span class="font-medium text-foreground">ABC notation</span>
+                  <textarea
+                    value={customPatternAbc()}
+                    onInput={(event) =>
+                      setCustomPatternAbc(event.currentTarget.value)
+                    }
+                    rows="10"
+                    class="min-h-[14rem] rounded-md border border-input bg-background px-3 py-3 font-mono text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                    data-testid="rhythm-player-custom-pattern-abc-input"
+                  />
+                </label>
+              </div>
 
               <Show when={customPatternError()}>
                 {(message) => (

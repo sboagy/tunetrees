@@ -204,6 +204,32 @@ K:clef=perc
   ]);
 }
 
+function createInheritedSwingDescriptorRhythmDb() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('system-default', 'ITRAD', 'JigD', 'Standard Double Jig', '*', 'X:1
+T:Standard Double Jig
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed', 0.15, '{"timeSignature":"6/8","macroBeatDivision":3,"defaultSwingFactor":1.15,"balanceRemainingNotes":true,"velocityPattern":[100,80,60],"humanizationDeltaMs":15}')`,
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('user-default', 'ITRAD', 'JigD', 'My Jig Pattern', '*', 'X:1
+T:My Jig Pattern
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 z C z z :|', 0, NULL, 'generic_click', NULL, 'user-1', 'seed', 0.15, NULL)`,
+  ]);
+}
+
 function createRhythmDbWithoutPatternRow() {
   return createDb([
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
@@ -536,6 +562,33 @@ describe("loadRhythmPattern", () => {
     );
 
     expect(metadata?.swingPercentage).toBeCloseTo(0.15, 5);
+    expect(metadata?.swingDescriptor).toEqual({
+      timeSignature: "6/8",
+      macroBeatDivision: 3,
+      defaultSwingFactor: 1.15,
+      balanceRemainingNotes: true,
+      velocityPattern: [100, 80, 60],
+      humanizationDeltaMs: 15,
+    });
+  });
+
+  it("inherits swing_desc from the default row when the selected custom row leaves it null", async () => {
+    const db = createInheritedSwingDescriptorRhythmDb();
+
+    const metadata = await loadRhythmPattern(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "JigD",
+        userId: "user-1",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata?.selectedPatternId).toBe("user-default");
+    expect(metadata?.sampleKit).toBe("generic_click");
     expect(metadata?.swingDescriptor).toEqual({
       timeSignature: "6/8",
       macroBeatDivision: 3,
@@ -996,7 +1049,7 @@ describe("createRhythmService", () => {
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       startedWith: Array<{ position?: number; units?: string }> = [];
       paused = false;
       stopped = false;
@@ -1222,7 +1275,7 @@ describe("createRhythmService", () => {
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       readonly startedWith: Array<{ position?: number; units?: string }> = [];
       readonly options: {
         qpm?: number;
@@ -1897,7 +1950,7 @@ K:clef=perc
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       startedWith: Array<{ position?: number; units?: string }> = [];
       paused = false;
       currentPositionMs = 0;
@@ -4844,7 +4897,7 @@ K:clef=perc
     }
 
     class FakeTimingCallbacks {
-      static instances: FakeTimingCallbacks[] = [];
+      static readonly instances: FakeTimingCallbacks[] = [];
       startedWith: Array<{ position?: number; units?: string }> = [];
       readonly options: {
         qpm?: number;

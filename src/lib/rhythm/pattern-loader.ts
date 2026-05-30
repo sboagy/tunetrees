@@ -58,7 +58,7 @@ async function tableExists(
   db: SqliteDatabase,
   tableName: string
 ): Promise<boolean> {
-  const rows = await db.all<{ name: string }>(sql`
+  const rows = db.all<{ name: string }>(sql`
     SELECT name
     FROM sqlite_master
     WHERE type = 'table' AND name = ${tableName}
@@ -72,7 +72,7 @@ async function getTableColumns(
   db: SqliteDatabase,
   tableName: string
 ): Promise<Set<string>> {
-  const rows = await db.all<{ name: string }>(
+  const rows = db.all<{ name: string }>(
     sql.raw(`PRAGMA table_info("${tableName}")`)
   );
   return new Set(rows.map((row) => row.name));
@@ -627,6 +627,25 @@ async function queryRhythmPatternRows(
             `
             : sql`1 = 1`
         }
+    ),
+    default_pattern AS (
+      SELECT
+        ${
+          capabilities.hasSwingDescColumn
+            ? sql`rp.swing_desc`
+            : sql`CAST(NULL AS TEXT)`
+        } AS swing_desc
+      FROM rhythm_patterns rp
+      JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
+      LEFT JOIN genre_match gm ON 1 = 1
+      WHERE (gm.id IS NULL OR rp.genre_id = gm.id)
+        AND rp.user_id IS NULL
+        AND rp.tune_id IS NULL
+      ORDER BY
+        CASE WHEN rp.is_default THEN 0 ELSE 1 END,
+        CASE WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0 ELSE 1 END,
+        rp.name
+      LIMIT 1
     )
     SELECT
       gm.name AS genre_name,
@@ -644,7 +663,7 @@ async function queryRhythmPatternRows(
           ? sql`tm.swing_percentage`
           : sql`CAST(NULL AS REAL)`
       } AS swing_percentage,
-      sp.swing_desc AS swing_desc,
+      COALESCE(sp.swing_desc, dp.swing_desc) AS swing_desc,
       sp.id AS pattern_id,
       sp.name AS pattern_name,
       sp.abc_string AS abc_string,
@@ -659,6 +678,7 @@ async function queryRhythmPatternRows(
     LEFT JOIN genre_match gm ON 1 = 1
     LEFT JOIN tempo_match tm ON 1 = 1
     LEFT JOIN selected_pattern sp ON 1 = 1
+    LEFT JOIN default_pattern dp ON 1 = 1
     ORDER BY sp.row_num
   `);
 }
@@ -740,7 +760,7 @@ async function queryGenreTempoFallbackRow(
   db: SqliteDatabase,
   context: PatternLoaderContext
 ): Promise<GenreTempoFallbackRow | null> {
-  const rows = await db.all<GenreTempoFallbackRow>(sql`
+  const rows = db.all<GenreTempoFallbackRow>(sql`
     WITH tune_type_match AS (
       SELECT id, name, rhythm
       FROM tune_type
@@ -786,7 +806,7 @@ async function queryTuneTypeFallbackRow(
   db: SqliteDatabase,
   context: PatternLoaderContext
 ): Promise<TuneTypeFallbackRow | null> {
-  const rows = await db.all<TuneTypeFallbackRow>(sql`
+  const rows = db.all<TuneTypeFallbackRow>(sql`
     SELECT id AS tune_type_id, name AS tune_type_name, rhythm AS rhythm_signature
     FROM tune_type
     WHERE (${context.tuneTypeMatchClause})
