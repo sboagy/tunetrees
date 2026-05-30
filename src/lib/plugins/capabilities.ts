@@ -13,7 +13,10 @@ export interface ParsedCapabilities {
   goals?: string[];
 }
 
-const CAPABILITY_KEYS: PluginCapability[] = ["parseImport", "scheduleGoal"];
+const CAPABILITY_KEYS: ReadonlySet<PluginCapability> = new Set([
+  "parseImport",
+  "scheduleGoal",
+]);
 
 export function parseCapabilities(raw: string | null): ParsedCapabilities {
   if (!raw) return {};
@@ -24,7 +27,7 @@ export function parseCapabilities(raw: string | null): ParsedCapabilities {
       const result: ParsedCapabilities = {};
       for (const item of parsed) {
         if (typeof item !== "string") continue;
-        if (CAPABILITY_KEYS.includes(item as PluginCapability)) {
+        if (CAPABILITY_KEYS.has(item as PluginCapability)) {
           result[item as PluginCapability] = true;
         }
       }

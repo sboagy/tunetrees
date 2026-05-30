@@ -36,7 +36,7 @@ describe("AboutDialog", () => {
     const details = await screen.findByTestId("about-license-wavesurfer-js");
     expect(details.hasAttribute("open")).toBe(false);
 
-    await fireEvent.click(screen.getByText("View BSD 3-Clause License"));
+    fireEvent.click(screen.getByText("View BSD 3-Clause License"));
 
     expect(details.hasAttribute("open")).toBe(true);
     expect(

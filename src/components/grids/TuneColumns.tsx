@@ -14,14 +14,28 @@ import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
-/**
- * Sorting function for datetime strings (reserved for future use)
- */
-// const datetimeSortingFn = (rowA: any, rowB: any, columnId: string) => {
-//   const dateA = new Date(rowA.getValue(columnId) || 0);
-//   const dateB = new Date(rowB.getValue(columnId) || 0);
-//   return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
-// };
+type CellScalar = string | number | null;
+type NullableId = string | number | null;
+type RowRecord = Record<string, unknown>;
+
+function getTuneIdFromRow(row: unknown): string {
+  const rec = row as RowRecord;
+  const nestedTune = rec.tune as RowRecord | undefined;
+  const rawId = rec.tune_id ?? nestedTune?.id ?? rec.tuneRef ?? rec.id;
+  return typeof rawId === "string" || typeof rawId === "number"
+    ? String(rawId)
+    : "";
+}
+
+function getNullableRowField<T>(
+  row: unknown,
+  snakeCaseKey: string,
+  camelCaseKey: string
+): T | null {
+  const rec = row as RowRecord;
+  const value = rec[snakeCaseKey] ?? rec[camelCaseKey];
+  return (value as T | null | undefined) ?? null;
+}
 
 /**
  * Sorting function for numeric values
@@ -29,7 +43,9 @@ import type { ICellEditorCallbacks, TablePurpose } from "./types";
 const numericSortingFn = (rowA: any, rowB: any, columnId: string) => {
   const numA = Number(rowA.getValue(columnId)) || 0;
   const numB = Number(rowB.getValue(columnId)) || 0;
-  return numA < numB ? -1 : numA > numB ? 1 : 0;
+  if (numA < numB) return -1;
+  if (numA > numB) return 1;
+  return 0;
 };
 
 const noSortingFn = (_rowA: any, _rowB: any, _columnId: string) => {
@@ -79,22 +95,18 @@ function getRelativeScheduledDisplay(value: string): {
     (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  let colorClass = "text-gray-600 dark:text-gray-400";
+  let colorClass: string;
   if (diffDays < 0) colorClass = "text-red-600 dark:text-red-400";
   else if (diffDays === 0) colorClass = "text-orange-600 dark:text-orange-400";
   else if (diffDays <= 7) colorClass = "text-yellow-600 dark:text-yellow-400";
   else colorClass = "text-green-600 dark:text-green-400";
 
-  const label =
-    diffDays === 0
-      ? "Today"
-      : diffDays === -1
-        ? "Yesterday"
-        : diffDays < 0
-          ? `${Math.abs(diffDays)}d overdue`
-          : diffDays === 1
-            ? "Tomorrow"
-            : `In ${diffDays}d`;
+  let label: string;
+  if (diffDays === 0) label = "Today";
+  else if (diffDays === -1) label = "Yesterday";
+  else if (diffDays < 0) label = `${Math.abs(diffDays)}d overdue`;
+  else if (diffDays === 1) label = "Tomorrow";
+  else label = `In ${diffDays}d`;
 
   return {
     label,
@@ -211,7 +223,7 @@ export function getCatalogColumns(
       meta: { headerLabel: "ID" },
       header: ({ column }) => <SortableHeader column={column} title="ID" />,
       cell: (info) => {
-        const value = info.getValue() as string | number | null;
+        const value = info.getValue() as CellScalar;
         const text = value == null ? "" : String(value);
         return (
           <span
@@ -240,12 +252,21 @@ export function getCatalogColumns(
         // Row shape differs by grid:
         // - Repertoire/Scheduled: raw VIEW row (snake_case)
         // - Catalog: Tune row from Drizzle (camelCase)
-        const favoriteUrl =
-          (tune as any).favorite_url ?? (tune as any).favoriteUrl ?? null;
-        const primaryOrigin =
-          (tune as any).primary_origin ?? (tune as any).primaryOrigin ?? null;
-        const idForeign =
-          (tune as any).id_foreign ?? (tune as any).idForeign ?? null;
+        const favoriteUrl = getNullableRowField<string>(
+          tune,
+          "favorite_url",
+          "favoriteUrl"
+        );
+        const primaryOrigin = getNullableRowField<string>(
+          tune,
+          "primary_origin",
+          "primaryOrigin"
+        );
+        const idForeign = getNullableRowField<string>(
+          tune,
+          "id_foreign",
+          "idForeign"
+        );
 
         // Use favorite_url if available, otherwise fallback to irishtune.info
         // Note: id_foreign is used as the irishtune.info tune id (not a general URL)
@@ -286,8 +307,9 @@ export function getCatalogColumns(
         const handleClick = () => {
           if (!onClick || !value) return;
           const row = info.row.original as Record<string, unknown>;
+          const tuneId = getTuneIdFromRow(row);
           onClick({
-            tuneId: String(row.id ?? ""),
+            tuneId,
             tuneTypeName: value,
             genreId: (row.genre as string) ?? null,
             genreName: null,
@@ -470,7 +492,7 @@ export function getCatalogColumns(
       id: "release_year",
       meta: { headerLabel: "Year" },
       accessorFn: (row) =>
-        (row as any).release_year ?? (row as any).releaseYear ?? null,
+        getNullableRowField<number>(row, "release_year", "releaseYear"),
       header: ({ column }) => <SortableHeader column={column} title="Year" />,
       cell: (info) => {
         const value = info.getValue() as number | null;
@@ -493,7 +515,7 @@ export function getCatalogColumns(
       id: "id_foreign",
       meta: { headerLabel: "External ID" },
       accessorFn: (row) =>
-        (row as any).id_foreign ?? (row as any).idForeign ?? null,
+        getNullableRowField<string>(row, "id_foreign", "idForeign"),
       header: ({ column }) => (
         <SortableHeader column={column} title="External ID" />
       ),
@@ -520,7 +542,7 @@ export function getCatalogColumns(
       id: "private_for",
       meta: { headerLabel: "Ownership" },
       accessorFn: (row) =>
-        (row as any).private_for ?? (row as any).privateFor ?? null,
+        getNullableRowField<string>(row, "private_for", "privateFor"),
       header: ({ column }) => (
         <SortableHeader column={column} title="Ownership" />
       ),
@@ -608,12 +630,12 @@ export function getRepertoireColumns(
       ),
       cell: (info) => {
         const value = info.getValue() as string | null;
-        return value !== null ? (
+        return value === null ? (
+          <span class="text-gray-400">—</span>
+        ) : (
           <span class="text-sm text-gray-600 dark:text-gray-400">
             {formatJustDate(value)}
           </span>
-        ) : (
-          <span class="text-gray-400">—</span>
         );
       },
       size: 80,
@@ -662,10 +684,10 @@ export function getRepertoireColumns(
         // picker itself only edits the raw scheduled override.
         const row = info.cell.row.original as {
           scheduled?: string | null;
-          tune_id?: string | number | null;
-          tune?: { id?: string | number | null } | null;
-          tuneRef?: string | number | null;
-          id?: string | number | null;
+          tune_id?: NullableId;
+          tune?: { id?: NullableId } | null;
+          tuneRef?: NullableId;
+          id?: NullableId;
         };
         const scheduledOverride = row.scheduled || null;
         const latestDue =
@@ -807,10 +829,10 @@ export function getRepertoireColumns(
       ),
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
-        ) : (
+        return value === null ? (
           <span class="text-gray-400">—</span>
+        ) : (
+          <span class="text-sm text-gray-600 dark:text-gray-400">{value}</span>
         );
       },
       size: 80,
@@ -827,12 +849,12 @@ export function getRepertoireColumns(
       ),
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
+        return value === null ? (
+          <span class="text-gray-400">—</span>
+        ) : (
           <span class="text-sm text-gray-600 dark:text-gray-400">
             {value.toFixed(2)}
           </span>
-        ) : (
-          <span class="text-gray-400">—</span>
         );
       },
       size: 90,
@@ -849,12 +871,12 @@ export function getRepertoireColumns(
       ),
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
+        return value === null ? (
+          <span class="text-gray-400">—</span>
+        ) : (
           <span class="text-sm text-gray-600 dark:text-gray-400">
             {value.toFixed(1)}
           </span>
-        ) : (
-          <span class="text-gray-400">—</span>
         );
       },
       size: 90,
@@ -871,10 +893,10 @@ export function getRepertoireColumns(
       ),
       cell: (info) => {
         const value = info.getValue() as number | null;
-        return value !== null ? (
-          <span class="text-sm text-gray-600 dark:text-gray-400">{value}d</span>
-        ) : (
+        return value === null ? (
           <span class="text-gray-400">—</span>
+        ) : (
+          <span class="text-sm text-gray-600 dark:text-gray-400">{value}d</span>
         );
       },
       size: 80,
@@ -1057,7 +1079,6 @@ export function getRepertoireColumns(
 export function getScheduledColumns(
   callbacks?: ICellEditorCallbacks
 ): ColumnDef<any>[] {
-  // const baseColumns = getCatalogColumns(callbacks);
   const baseColumns = getRepertoireColumns(callbacks);
 
   // Practice-specific columns with Evaluation

@@ -13,12 +13,10 @@ render(() => <App />, root!);
 
 // In development mode, unregister any existing service workers to prevent caching issues
 if (import.meta.env.DEV && "serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister().then(() => {
-        console.log("[PWA] Unregistered service worker in dev mode");
-      });
-    }
-  });
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  for (const registration of registrations) {
+    await registration.unregister();
+    console.log("[PWA] Unregistered service worker in dev mode");
+  }
 }
 // Note: Service worker registration is now handled by the UpdatePrompt component

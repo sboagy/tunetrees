@@ -157,7 +157,11 @@ export const NotesPanel: Component = () => {
   const getVisibilityLabel = (note: {
     public: number | null;
     userRef: string | null;
-  }) => (note.public === 1 ? "Public" : note.userRef ? "Shared" : "System");
+  }) => {
+    if (note.public === 1) return "Public";
+    if (note.userRef) return "Shared";
+    return "System";
+  };
 
   // Format date for display
   const formatDate = (isoString: string | null) => {
@@ -462,22 +466,23 @@ export const NotesPanel: Component = () => {
         <For each={notes()}>
           {(note) => {
             const isEditing = () => editingNoteId() === note.id;
+            const noteItemClasses = () => {
+              if (draggedNoteId() === note.id) {
+                return "group p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all opacity-50 border-gray-400/50 dark:border-gray-500/50";
+              }
+              if (dragOverNoteId() === note.id) {
+                return "group p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20";
+              }
+              return "group p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all border-gray-200/30 dark:border-gray-700/30";
+            };
 
             return (
               <li
-                class={`group p-2 bg-white/50 dark:bg-gray-800/50 rounded border transition-all ${
-                  draggedNoteId() === note.id
-                    ? "opacity-50 border-gray-400/50 dark:border-gray-500/50"
-                    : dragOverNoteId() === note.id
-                      ? "border-blue-400 dark:border-blue-500 bg-blue-50/30 dark:bg-blue-900/20"
-                      : "border-gray-200/30 dark:border-gray-700/30"
-                }`}
+                class={noteItemClasses()}
                 data-testid={`note-item-${note.id}`}
-                onDragOver={(e) =>
-                  handleDragOver(e as unknown as DragEvent, note.id)
-                }
+                onDragOver={(e) => handleDragOver(e, note.id)}
                 onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e as unknown as DragEvent, note.id)}
+                onDrop={(e) => handleDrop(e, note.id)}
               >
                 {/* Note metadata */}
                 <div class="flex items-center justify-between mb-1.5">
@@ -487,9 +492,7 @@ export const NotesPanel: Component = () => {
                       <button
                         type="button"
                         draggable={true}
-                        onDragStart={(e) =>
-                          handleDragStart(e as unknown as DragEvent, note.id)
-                        }
+                        onDragStart={(e) => handleDragStart(e, note.id)}
                         onDragEnd={handleDragEnd}
                         class="cursor-grab active:cursor-grabbing p-0.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                         title="Drag to reorder"

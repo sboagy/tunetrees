@@ -63,11 +63,11 @@ export const AudioPlayerOverlay: Component = () => {
             }}
             class="absolute inset-0 h-full w-full bg-transparent"
           />
-          <div
-            role="dialog"
+          <dialog
             aria-modal="true"
             aria-label="Audio player"
             class="relative z-10 flex h-[min(44rem,calc(100dvh-2rem))] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            open
           >
             <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
               <div class="min-w-0">
@@ -121,7 +121,7 @@ export const AudioPlayerOverlay: Component = () => {
                 />
               </Suspense>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </Show>

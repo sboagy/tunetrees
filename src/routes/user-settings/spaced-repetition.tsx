@@ -52,7 +52,6 @@ const SpacedRepetitionPage: Component = () => {
             setAlgType(prefs.algType as "SM2" | "FSRS");
             setFsrsWeights(prefs.fsrsWeights ?? DEFAULT_FSRS_WEIGHTS);
             setRequestRetention(prefs.requestRetention?.toString() ?? "0.9");
-            // setMaximumInterval(prefs.maximumInterval?.toString() ?? "365");
           }
         })
         .catch((error) => {
@@ -106,13 +105,11 @@ const SpacedRepetitionPage: Component = () => {
     // Validate FSRS weights if FSRS is selected
     if (algType() === "FSRS") {
       const weights = fsrsWeights().trim();
-      if (!weights) {
-        errors.fsrsWeights = "FSRS weights are required";
-      } else {
+      if (weights) {
         // Check if it's a valid comma-separated list of numbers
         const parts = weights.split(",").map((s) => s.trim());
-        const allNumbers = parts.every(
-          (part) => !Number.isNaN(Number.parseFloat(part))
+        const allNumbers = parts.every((part) =>
+          Number.isFinite(Number.parseFloat(part))
         );
         if (!allNumbers) {
           errors.fsrsWeights =
@@ -170,8 +167,7 @@ const SpacedRepetitionPage: Component = () => {
     setErrorMessage(null);
 
     try {
-      // TODO: Implement FSRS optimization API call
-      // For now, just show a message that this feature is coming soon
+      // Placeholder: FSRS optimization API is not yet available; show a feature-not-implemented message when triggered.
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setErrorMessage(
         "FSRS optimization API not yet implemented. This feature will be added in a future update."
@@ -203,38 +199,6 @@ const SpacedRepetitionPage: Component = () => {
           }
         >
           <form onSubmit={handleSubmit} class="space-y-6">
-            {/* Maximum Interval */}
-            {/* For right now, the max interval is automatically */}
-            {/* calculateded from max_interval = (3 * (TOTAL_TUNES / MAX_DAILY_TUNES)) */}
-            {/* <div class="space-y-1.5">
-              <label
-                for="maximum-interval"
-                class="block text-sm font-medium text-gray-700 dark:text-gray-300"
-              >
-                Maximum Interval (days)
-              </label>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                Maximum number of days between reviews
-              </p>
-              <input
-                id="maximum-interval"
-                type="number"
-                min="1"
-                placeholder="365"
-                value={maximumInterval()}
-                onInput={(e) => {
-                  setMaximumInterval(e.currentTarget.value);
-                  markDirty();
-                }}
-                class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-              />
-              <Show when={validationErrors().maximumInterval}>
-                <p class="text-xs text-red-600">
-                  {validationErrors().maximumInterval}
-                </p>
-              </Show>
-            </div> */}
-
             {/* Algorithm Type */}
             <div class="space-y-1.5">
               <label

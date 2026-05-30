@@ -27,6 +27,13 @@ interface AboutDialogProps {
   onClose: () => void;
 }
 
+/** Get the label for the update/check-for-update button. */
+function getUpdateButtonLabel(checking: boolean, needRefresh: boolean): string {
+  if (checking) return "Checking...";
+  if (needRefresh) return "Update Now";
+  return "Check for Update";
+}
+
 /**
  * About TuneTrees Dialog
  *
@@ -282,11 +289,7 @@ export const AboutDialog: Component<AboutDialogProps> = (props) => {
             disabled={checking()}
             data-testid="about-check-update-button"
           >
-            {checking()
-              ? "Checking..."
-              : needRefresh()
-                ? "Update Now"
-                : "Check for Update"}
+            {getUpdateButtonLabel(checking(), needRefresh())}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

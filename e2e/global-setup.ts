@@ -50,10 +50,7 @@ async function globalSetup(_config: FullConfig) {
       }
     }
 
-    // TODO: Add any global setup needed for TuneTrees
-    // - Seed test data
-    // - Setup test user authentication
-    // - Clear any existing test data
+    // Global setup placeholder: seed test data, setup auth, clear existing data
   } finally {
     await context.close();
     await browser.close();

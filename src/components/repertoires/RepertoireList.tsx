@@ -110,7 +110,7 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
     }
 
     // Confirm deletion
-    const confirmed = window.confirm(
+    const confirmed = globalThis.confirm(
       "Are you sure you want to delete this repertoire? All associated tune assignments will be removed."
     );
     if (!confirmed) return;

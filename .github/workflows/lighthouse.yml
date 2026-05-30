@@ -48,11 +48,14 @@ jobs:
 
       # 3. Install dependencies
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Apply required postinstall patches
+        run: node scripts/patch-supabase-sourcemaps.js
 
       # 4. Build production bundle
       - name: Build Application
-        run: npx tsc -b && npx vite build
+        run: ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build
         env:
           # Use placeholder values for build (not accessing real Supabase)
           VITE_SUPABASE_URL: https://placeholder.supabase.co
@@ -68,7 +71,7 @@ jobs:
       # 5. Run Lighthouse CI
       - name: Run Lighthouse CI
         run: |
-          npm install -g @lhci/cli@0.13.x
+          npm install -g --ignore-scripts @lhci/cli@0.13.0
           lhci autorun
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ github.token }}

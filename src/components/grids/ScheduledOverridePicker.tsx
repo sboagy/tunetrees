@@ -203,8 +203,8 @@ export const ScheduledOverridePicker: Component<
     startOfMonth(new Date())
   );
 
-  const syncFromProps = () => {
-    const parts = toLocalParts(props.value);
+  const syncFromProps = (value: string) => {
+    const parts = toLocalParts(value);
     setDraftDate(parts.date);
     setDraftHour(parts.hour);
     setDraftMinute(parts.minute);
@@ -217,11 +217,10 @@ export const ScheduledOverridePicker: Component<
   // Auto-close and re-sync when the virtual list reuses this cell for a
   // different row (tuneId changes) or the underlying data refreshes.
   createEffect(() => {
-    const _value = props.value;
+    const currentValue = props.value;
     setOpen(false);
     untrack(() => {
-      void _value;
-      syncFromProps();
+      syncFromProps(currentValue);
     });
   });
 
@@ -256,7 +255,7 @@ export const ScheduledOverridePicker: Component<
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen || open()) {
-      syncFromProps();
+      syncFromProps(props.value);
     }
     setOpen(nextOpen);
   };
@@ -275,9 +274,16 @@ export const ScheduledOverridePicker: Component<
   };
 
   const handleClear = () => {
-    syncFromProps();
+    syncFromProps(props.value);
     props.onChange?.(null);
     setOpen(false);
+  };
+
+  const triggerAriaLabel = () => {
+    if (props.triggerLabel) {
+      return undefined;
+    }
+    return props.value ? "Edit schedule override" : "Set schedule override";
   };
 
   // ── Read-only fallback ────────────────────────────────────────────────────
@@ -304,15 +310,10 @@ export const ScheduledOverridePicker: Component<
       >
         <PopoverPrimitive.Trigger
           data-testid={`scheduled-override-trigger-${props.tuneId}`}
-          aria-label={
-            props.triggerLabel
-              ? undefined
-              : props.value
-                ? "Edit schedule override"
-                : "Set schedule override"
-          }
+          aria-label={triggerAriaLabel()}
           title={props.triggerTitle}
           class="flex min-h-6 w-full min-w-0 items-center justify-between gap-2 rounded px-1 text-sm cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          onClick={(event) => event.stopPropagation()}
         >
           <Show
             when={props.triggerLabel ?? props.value}

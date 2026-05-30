@@ -50,7 +50,6 @@ import {
   ensureSyncRuntimeConfigured,
   SyncInProgressError,
   type SyncService,
-  startSyncWorker,
 } from "../sync";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +101,7 @@ export interface AuthState {
   incrementRepertoireListChanged: () => void;
   /** Suppress the next sync-complete view refresh for a category (used for local-write sync echoes) */
   suppressNextViewRefresh: (
-    category: "repertoire" | "practice" | "catalog",
+    category: ViewRefreshCategory,
     count?: number
   ) => void;
   /** Sign in with email and password */
@@ -154,6 +153,8 @@ export interface AuthState {
   syncPracticeScope: () => Promise<void>;
 }
 
+type ViewRefreshCategory = "repertoire" | "practice" | "catalog";
+
 // ---------------------------------------------------------------------------
 // Context - used by useAuth() in AuthContext.tsx
 // ---------------------------------------------------------------------------
@@ -177,12 +178,14 @@ function formatSyncErrorToast(message: string): {
   title: string;
   description: string;
 } {
-  const attemptMatch = message.match(/Sync upload failed \(attempt (\d+)\)/i);
-  const title = attemptMatch?.[1]
-    ? `Sync upload failed (attempt ${attemptMatch[1]})`
-    : /Background sync error/i.test(message)
-      ? "Background sync error"
-      : "Sync error";
+  const attemptMatch = /Sync upload failed \(attempt (\d+)\)/i.exec(message);
+
+  let title = "Sync error";
+  if (attemptMatch?.[1]) {
+    title = `Sync upload failed (attempt ${attemptMatch[1]})`;
+  } else if (/Background sync error/i.test(message)) {
+    title = "Background sync error";
+  }
 
   if (
     /constraint=tune_set_kind_check/i.test(message) ||
@@ -251,7 +254,7 @@ const TTInner: ParentComponent = (props) => {
   const [catalogListChanged, setCatalogListChanged] = createSignal(0);
   const [repertoireListChanged, setRepertoireListChanged] = createSignal(0);
   const suppressedViewRefreshCounts: Partial<
-    Record<"repertoire" | "practice" | "catalog", number>
+    Record<ViewRefreshCategory, number>
   > = {};
 
   // Sync worker cleanup and service instance
@@ -323,6 +326,15 @@ const TTInner: ParentComponent = (props) => {
     await offlineMediaMaintenancePromise;
   };
 
+  const persistDbAfterSync = async () => {
+    try {
+      const { persistDb } = await import("@/lib/db/client-sqlite");
+      await persistDb();
+    } catch (e) {
+      console.warn("⚠️ [TTAuthProvider] Failed to persist after sync:", e);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Suppress / consume view refresh tokens
   // ---------------------------------------------------------------------------
@@ -339,7 +351,7 @@ const TTInner: ParentComponent = (props) => {
   };
 
   const consumeSuppressedViewRefresh = (
-    category: "repertoire" | "practice" | "catalog"
+    category: ViewRefreshCategory
   ): boolean => {
     const remaining = suppressedViewRefreshCounts[category] ?? 0;
     if (remaining <= 0) return false;
@@ -357,7 +369,7 @@ const TTInner: ParentComponent = (props) => {
   async function runSyncDiagnostics(db: SqliteDatabase): Promise<void> {
     try {
       const now = new Date().toISOString();
-      const totals = await db.all<{ table: string; count: number }>(sql`
+      const totals = db.all<{ table: string; count: number }>(sql`
         SELECT 'user_profile' AS table, COUNT(*) AS count FROM user_profile
         UNION ALL SELECT 'repertoire', COUNT(*) FROM repertoire
         UNION ALL SELECT 'repertoire_tune', COUNT(*) FROM repertoire_tune
@@ -365,7 +377,7 @@ const TTInner: ParentComponent = (props) => {
         UNION ALL SELECT 'practice_record', COUNT(*) FROM practice_record
         UNION ALL SELECT 'daily_practice_queue', COUNT(*) FROM daily_practice_queue
       `);
-      const repertoireSummary = await db.all<{
+      const repertoireSummary = db.all<{
         repertoire_id: string;
         name: string | null;
         user_ref: string;
@@ -422,8 +434,8 @@ const TTInner: ParentComponent = (props) => {
   // ---------------------------------------------------------------------------
   const arraysEqual = (a: string[], b: string[]) => {
     if (a.length !== b.length) return false;
-    const aSorted = [...a].sort();
-    const bSorted = [...b].sort();
+    const aSorted = [...a].sort((x, y) => x.localeCompare(y));
+    const bSorted = [...b].sort((x, y) => x.localeCompare(y));
     return aSorted.every((id, index) => id === bSorted[index]);
   };
 
@@ -459,10 +471,18 @@ const TTInner: ParentComponent = (props) => {
         params.userId
       );
 
-      const selectedKey = [...selected].sort().join(",");
-      const requiredKey = [...required].sort().join(",");
-      const repertoireDefaultsKey = [...repertoireDefaults].sort().join(",");
-      const tuneGenresKey = [...tuneGenres].sort().join(",");
+      const selectedKey = [...selected]
+        .sort((a, b) => a.localeCompare(b))
+        .join(",");
+      const requiredKey = [...required]
+        .sort((a, b) => a.localeCompare(b))
+        .join(",");
+      const repertoireDefaultsKey = [...repertoireDefaults]
+        .sort((a, b) => a.localeCompare(b))
+        .join(",");
+      const tuneGenresKey = [...tuneGenres]
+        .sort((a, b) => a.localeCompare(b))
+        .join(",");
       const reconcileKey = [
         params.userId,
         `selected:${selectedKey}`,
@@ -492,7 +512,7 @@ const TTInner: ParentComponent = (props) => {
             new Set([...tuneGenres, ...repertoireDefaults])
           );
         } else {
-          effectiveSelected = Array.from(new Set([...repertoireDefaults]));
+          effectiveSelected = Array.from(new Set(repertoireDefaults));
         }
       } else {
         effectiveSelected = [];
@@ -602,20 +622,18 @@ const TTInner: ParentComponent = (props) => {
           const shouldRunMetadataPrefetch =
             !metadataPrefetchCompleted && !lastSyncAt;
           if (shouldRunMetadataPrefetch) {
-            if (!metadataPrefetchPromise) {
-              metadataPrefetchPromise = preSyncMetadataViaWorker({
-                db,
-                supabase,
-                lastSyncAt,
-                userId: debugUserId ?? undefined,
+            metadataPrefetchPromise ??= preSyncMetadataViaWorker({
+              db,
+              supabase,
+              lastSyncAt,
+              userId: debugUserId ?? undefined,
+            })
+              .then(() => {
+                metadataPrefetchCompleted = true;
               })
-                .then(() => {
-                  metadataPrefetchCompleted = true;
-                })
-                .finally(() => {
-                  metadataPrefetchPromise = null;
-                });
-            }
+              .finally(() => {
+                metadataPrefetchPromise = null;
+              });
             await metadataPrefetchPromise;
           }
         }
@@ -734,7 +752,13 @@ const TTInner: ParentComponent = (props) => {
       );
     }
 
-    const syncWorker = startSyncWorker(db, {
+    const syncModule = await import("@oosync/sync");
+    const startWorker = (syncModule as any).startSyncWorker as (
+      db: SqliteDatabase,
+      config: unknown
+    ) => { service: SyncService; stop: () => void };
+
+    const syncWorker = startWorker(db, {
       supabase,
       userId: authUserId,
       realtimeEnabled:
@@ -812,15 +836,7 @@ const TTInner: ParentComponent = (props) => {
           });
 
           setInitialSyncComplete(true);
-
-          import("@/lib/db/client-sqlite").then(({ persistDb }) => {
-            persistDb().catch((e) => {
-              console.warn(
-                "⚠️ [TTAuthProvider] Failed to persist after sync:",
-                e
-              );
-            });
-          });
+          void persistDbAfterSync();
         }
 
         if (!isFirstSyncCompletion) {
@@ -853,8 +869,8 @@ const TTInner: ParentComponent = (props) => {
     });
 
     // E2E-only: expose sync control surface for Playwright
-    if (typeof window !== "undefined" && (window as any).__ttTestApi) {
-      (window as any).__ttSyncControl = {
+    if ((globalThis.window as any)?.__ttTestApi) {
+      (globalThis.window as any).__ttSyncControl = {
         stop: async () => {
           try {
             await syncWorker.service.destroy();
@@ -883,10 +899,7 @@ const TTInner: ParentComponent = (props) => {
   // DB init helpers
   // ---------------------------------------------------------------------------
   function isE2eDbClearInProgress(): boolean {
-    return (
-      typeof window !== "undefined" &&
-      (window as any).__ttE2eIsClearing === true
-    );
+    return (globalThis.window as any)?.__ttE2eIsClearing === true;
   }
 
   function isDbInitAbortError(error: unknown): boolean {
@@ -1037,7 +1050,12 @@ const TTInner: ParentComponent = (props) => {
       setUserIdInt(anonymousUserId);
       setInitialSyncComplete(true);
 
-      if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
+      const isSyncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
+      if (isSyncDisabled) {
+        log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
+        setUserIdInt(anonymousUserId);
+        setInitialSyncComplete(true);
+      } else {
         const syncWorker = await startSyncWorkerForUser(
           db,
           anonymousUserId,
@@ -1045,10 +1063,6 @@ const TTInner: ParentComponent = (props) => {
         );
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
-      } else {
-        log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
-        setUserIdInt(anonymousUserId);
-        setInitialSyncComplete(true);
       }
     } catch (error) {
       if (isTransientDbInitError(error)) {
@@ -1095,14 +1109,15 @@ const TTInner: ParentComponent = (props) => {
       }
       autoPersistCleanup = setupAutoPersist();
 
-      if (import.meta.env.VITE_DISABLE_SYNC !== "true") {
+      const isSyncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
+      if (isSyncDisabled) {
+        log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
+        setInitialSyncComplete(true);
+      } else {
         const syncWorker = await startSyncWorkerForUser(db, userId, false);
         stopSyncWorker = syncWorker.stop;
         syncServiceInstance = syncWorker.service;
         log.info("Sync worker started for authenticated user");
-      } else {
-        log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
-        setInitialSyncComplete(true);
       }
     } catch (error) {
       if (isTransientDbInitError(error)) {
@@ -1166,9 +1181,9 @@ const TTInner: ParentComponent = (props) => {
   );
 
   createEffect(() => {
-    void localDb();
-    void rhizome.user();
-    void rhizome.session();
+    localDb();
+    rhizome.user();
+    rhizome.session();
     void runOfflineMediaMaintenance();
   });
 
@@ -1177,13 +1192,13 @@ const TTInner: ParentComponent = (props) => {
       void runOfflineMediaMaintenance();
     };
 
-    if (typeof window === "undefined") {
+    if (globalThis.window === undefined) {
       return;
     }
 
-    window.addEventListener("online", handleOnline);
+    globalThis.addEventListener("online", handleOnline);
     onCleanup(() => {
-      window.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("online", handleOnline);
     });
   });
 
@@ -1208,7 +1223,7 @@ const TTInner: ParentComponent = (props) => {
   const signInWithOAuth = async (provider: "google" | "github") => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${globalThis.location.origin}/auth/callback` },
     });
     return { error };
   };
@@ -1430,11 +1445,7 @@ const TTInner: ParentComponent = (props) => {
       catalogSelectionReconciledKey = null;
       reconcileRunCount = 0;
 
-      const serviceWithDestroy = syncServiceInstance as
-        | (SyncService & {
-            destroy?: () => Promise<void>;
-          })
-        | null;
+      const serviceWithDestroy = syncServiceInstance;
       if (serviceWithDestroy?.destroy) {
         try {
           await serviceWithDestroy.destroy();
@@ -1585,8 +1596,8 @@ const TTInner: ParentComponent = (props) => {
   };
 
   // TEST HOOKS: Expose manual sync controls for Playwright
-  if (typeof window !== "undefined") {
-    const w = window as any;
+  if (globalThis.window !== undefined) {
+    const w = globalThis.window as any;
     if (!w.__forceSyncUpForTest) {
       w.__forceSyncUpForTest = async () => {
         try {
@@ -1625,7 +1636,7 @@ const TTInner: ParentComponent = (props) => {
           const sess = data?.session || null;
           const expEpoch = sess?.expires_at ? sess.expires_at * 1000 : null;
           const nowMs = Date.now();
-          const msUntilExpiry = expEpoch !== null ? expEpoch - nowMs : null;
+          const msUntilExpiry = expEpoch === null ? null : expEpoch - nowMs;
           const diag = {
             label: label || "",
             hasSession: !!sess,

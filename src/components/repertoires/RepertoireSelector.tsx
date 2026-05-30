@@ -162,7 +162,7 @@ export const RepertoireSelector: Component<RepertoireSelectorProps> = (
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400">
               {selectedRepertoire()?.tuneCount || 0} tune
-              {selectedRepertoire()?.tuneCount !== 1 ? "s" : ""}
+              {selectedRepertoire()?.tuneCount === 1 ? "" : "s"}
             </div>
           </div>
         </Show>

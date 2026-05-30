@@ -17,7 +17,7 @@ const getErrorMessage = (error: unknown): string | null => {
   try {
     return JSON.stringify(error);
   } catch {
-    return String(error);
+    return String(error); // Fallback: JSON.stringify failed, use default stringification
   }
 };
 

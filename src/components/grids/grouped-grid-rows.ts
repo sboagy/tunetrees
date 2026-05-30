@@ -162,15 +162,12 @@ export function buildMixedTuneGridRows(
       groupedTuneIds.add(tune.id);
     }
 
-    const subRows = visibleEntries
-      .sort((left, right) => left.item.position - right.item.position)
-      .map(({ tune }) => {
-        return createLeafRow(
-          tune,
-          `set-${source.id}-tune-${tune.id}`,
-          source.id
-        );
-      });
+    const sorted = [...visibleEntries].sort(
+      (left, right) => left.item.position - right.item.position
+    );
+    const subRows = sorted.map(({ tune }) => {
+      return createLeafRow(tune, `set-${source.id}-tune-${tune.id}`, source.id);
+    });
 
     const parentRow = createTuneSetRow(source, visibleEntries[0].tune, subRows);
     setRows.push(parentRow);

@@ -32,52 +32,45 @@ function openDatabase(): Promise<IDBDatabase> {
     return Promise.reject(new Error("IndexedDB is not available."));
   }
 
-  if (!dbPromise) {
-    dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(
-        MEDIA_VAULT_DB_NAME,
-        MEDIA_VAULT_DB_VERSION
-      );
+  dbPromise ??= new Promise((resolve, reject) => {
+    const request = indexedDB.open(MEDIA_VAULT_DB_NAME, MEDIA_VAULT_DB_VERSION);
 
-      request.onupgradeneeded = () => {
-        const db = request.result;
+    request.onupgradeneeded = () => {
+      const db = request.result;
 
-        if (!db.objectStoreNames.contains(MEDIA_VAULT_STORE)) {
-          const store = db.createObjectStore(MEDIA_VAULT_STORE, {
-            keyPath: "key",
-          });
+      if (db.objectStoreNames.contains(MEDIA_VAULT_STORE)) {
+        const transaction = request.transaction;
+        const store = transaction?.objectStore(MEDIA_VAULT_STORE);
+        if (store && !store.indexNames.contains("kind")) {
           store.createIndex("kind", "kind", { unique: false });
-        } else {
-          const transaction = request.transaction;
-          const store = transaction?.objectStore(MEDIA_VAULT_STORE);
-          if (store && !store.indexNames.contains("kind")) {
-            store.createIndex("kind", "kind", { unique: false });
-          }
         }
+      } else {
+        const store = db.createObjectStore(MEDIA_VAULT_STORE, {
+          keyPath: "key",
+        });
+        store.createIndex("kind", "kind", { unique: false });
+      }
 
-        if (!db.objectStoreNames.contains(MEDIA_DRAFT_STORE)) {
-          db.createObjectStore(MEDIA_DRAFT_STORE, { keyPath: "id" });
-        }
-      };
+      if (!db.objectStoreNames.contains(MEDIA_DRAFT_STORE)) {
+        db.createObjectStore(MEDIA_DRAFT_STORE, { keyPath: "id" });
+      }
+    };
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => {
-        // Clear the cached open attempt so a later call can retry.
-        dbPromise = null;
-        reject(request.error ?? new Error("Failed to open media vault."));
-      };
-      request.onblocked = () => {
-        // A blocked open cannot make progress; clear the cache so callers
-        // are not permanently stuck with this failed attempt.
-        dbPromise = null;
-        reject(
-          new Error(
-            "Failed to open media vault because the database is blocked."
-          )
-        );
-      };
-    });
-  }
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => {
+      // Clear the cached open attempt so a later call can retry.
+      dbPromise = null;
+      reject(request.error ?? new Error("Failed to open media vault."));
+    };
+    request.onblocked = () => {
+      // A blocked open cannot make progress; clear the cache so callers
+      // are not permanently stuck with this failed attempt.
+      dbPromise = null;
+      reject(
+        new Error("Failed to open media vault because the database is blocked.")
+      );
+    };
+  });
 
   return dbPromise;
 }
@@ -174,11 +167,12 @@ export async function listMediaVaultKeysByKind(
     return [];
   }
 
-  const records = ((await runTransaction<MediaVaultRecord[]>(
-    MEDIA_VAULT_STORE,
-    "readonly",
-    (store) => store.index("kind").getAll(kind)
-  )) ?? []) as MediaVaultRecord[];
+  const records =
+    (await runTransaction<MediaVaultRecord[]>(
+      MEDIA_VAULT_STORE,
+      "readonly",
+      (store) => store.index("kind").getAll(kind)
+    )) ?? [];
 
   return records.map((record) => record.key);
 }
@@ -225,11 +219,11 @@ export async function listMediaDrafts(): Promise<MediaDraftRecord[]> {
   }
 
   return (
-    ((await runTransaction<MediaDraftRecord[]>(
+    (await runTransaction<MediaDraftRecord[]>(
       MEDIA_DRAFT_STORE,
       "readonly",
       (store) => store.getAll()
-    )) as MediaDraftRecord[] | undefined) ?? []
+    )) ?? []
   );
 }
 

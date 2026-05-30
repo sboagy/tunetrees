@@ -126,6 +126,27 @@ function daysFromNow(days: number): Date {
   return new Date(utcDate);
 }
 
+// Helper to insert a queue row directly for testing (shared across describe blocks)
+function insertQueueRow(
+  id: string,
+  tuneRef: string,
+  windowStartUtc: string,
+  completedAt: string | null = null,
+  active = 1
+) {
+  db.run(sql`
+    INSERT INTO daily_practice_queue (
+      id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
+      window_start_utc, window_end_utc, active, completed_at,
+      snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
+    ) VALUES (
+      ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
+      1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
+      datetime('now'), datetime('now'), datetime('now'), 1
+    )
+  `);
+}
+
 describe("computeSchedulingWindows", () => {
   it("should compute correct UTC windows without timezone offset", () => {
     const sitdown = new Date("2025-10-16T14:30:00Z");
@@ -368,7 +389,9 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     // Should be ordered by ID (alphabetically for UUIDs)
     // Catalog UUIDs don't sort in the same order as their integer keys
     // Actual sorted order: tuneId(7), tuneId(8), tuneId(5)
-    const sortedIds = [tuneId(2), tuneId(5), tuneId(8)].sort();
+    const sortedIds = [tuneId(2), tuneId(5), tuneId(8)].sort((a, b) =>
+      a.localeCompare(b)
+    );
     expect(queue.map((r) => r.tuneRef)).toEqual(sortedIds);
   });
 
@@ -400,10 +423,9 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     // First 2 should be Q3 (new/unscheduled)
     expect(queue[0].bucket).toBe(3);
     expect(queue[1].bucket).toBe(3);
-    expect([queue[0].tuneRef, queue[1].tuneRef].sort()).toEqual([
-      tuneId(1),
-      tuneId(2),
-    ]);
+    expect(
+      [queue[0].tuneRef, queue[1].tuneRef].sort((a, b) => a.localeCompare(b))
+    ).toEqual([tuneId(1), tuneId(2)]);
 
     // Last 2 should be Q4 (old scheduled)
     expect(queue[2].bucket).toBe(4);
@@ -429,7 +451,9 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
 
     // Should get first 10 by alphabetical ID order
     // Catalog UUIDs don't sort in the same order as their integer keys
-    const allIds = Array.from({ length: 15 }, (_, i) => tuneId(i + 1)).sort();
+    const allIds = Array.from({ length: 15 }, (_, i) => tuneId(i + 1)).sort(
+      (a, b) => a.localeCompare(b)
+    );
     const expectedIds = allIds.slice(0, 10);
     expect(queue.map((r) => r.tuneRef)).toEqual(expectedIds);
   });
@@ -486,7 +510,9 @@ describe("generateOrGetPracticeQueue - Bucket 3 (New/Unscheduled)", () => {
     expect(queue.every((r) => r.bucket === 3)).toBe(true);
 
     // Both are Q3 (unscheduled), ordered by ID
-    const tuneIds = queue.map((r) => r.tuneRef).sort();
+    const tuneIds = queue
+      .map((r) => r.tuneRef)
+      .sort((a, b) => a.localeCompare(b));
     expect(tuneIds).toEqual([tuneId(1), tuneId(2)]);
   });
 });
@@ -813,27 +839,6 @@ describe("addTunesToQueue - Refill Functionality", () => {
 });
 
 describe("getLatestActiveQueueWindow", () => {
-  // Helper to insert a queue row directly for testing
-  function insertQueueRow(
-    id: string,
-    tuneRef: string,
-    windowStartUtc: string,
-    completedAt: string | null = null,
-    active = 1
-  ) {
-    db.run(sql`
-      INSERT INTO daily_practice_queue (
-        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
-        window_start_utc, window_end_utc, active, completed_at,
-        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
-      ) VALUES (
-        ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
-        1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
-        datetime('now'), datetime('now'), datetime('now'), 1
-      )
-    `);
-  }
-
   it("should return the chronologically latest window even when fully complete", async () => {
     // Old queue (2/25) with an incomplete row
     insertQueueRow("q1", tuneId(1), "2026-02-25 00:00:00", null);
@@ -956,26 +961,6 @@ describe("getLatestActiveQueueWindow", () => {
 });
 
 describe("getRecentActiveQueueWindows", () => {
-  function insertQueueRow(
-    id: string,
-    tuneRef: string,
-    windowStartUtc: string,
-    completedAt: string | null = null,
-    active = 1
-  ) {
-    db.run(sql`
-      INSERT INTO daily_practice_queue (
-        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
-        window_start_utc, window_end_utc, active, completed_at,
-        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
-      ) VALUES (
-        ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
-        1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
-        datetime('now'), datetime('now'), datetime('now'), 1
-      )
-    `);
-  }
-
   it("should return newest distinct active queue windows first", async () => {
     insertQueueRow("q1", tuneId(1), "2026-03-01 00:00:00", null);
     insertQueueRow("q2", tuneId(2), "2026-03-07 00:00:00", null);
@@ -1161,27 +1146,6 @@ describe("getRecentActiveQueueWindows", () => {
 });
 
 describe("addSpecificTunesToExistingQueue - Add To Review without regenerating queue", () => {
-  // Helper to insert a queue row directly (reused from getLatestActiveQueueWindow tests)
-  function insertQueueRow(
-    id: string,
-    tuneRef: string,
-    windowStartUtc: string,
-    completedAt: string | null = null,
-    active = 1
-  ) {
-    db.run(sql`
-      INSERT INTO daily_practice_queue (
-        id, user_ref, repertoire_ref, tune_ref, bucket, order_index,
-        window_start_utc, window_end_utc, active, completed_at,
-        snapshot_coalesced_ts, generated_at, last_modified_at, sync_version
-      ) VALUES (
-        ${id}, ${TEST_USER_UUID}, ${TEST_REPERTOIRE_UUID}, ${tuneRef},
-        1, 0, ${windowStartUtc}, ${windowStartUtc}, ${active}, ${completedAt},
-        datetime('now'), datetime('now'), datetime('now'), 1
-      )
-    `);
-  }
-
   it("should add specific tune to existing queue without regenerating it", async () => {
     // Setup: 2 practiced tunes already in an existing (completed) queue for today
     const windows = computeSchedulingWindows(new Date(), 7, null);

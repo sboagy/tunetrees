@@ -233,7 +233,7 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
         // DEBUG: Log practice record and queue state after time advance
         const debugInfo = await page.evaluate(
           async (args) => {
-            const api = (window as any).__ttTestApi;
+            const api = (globalThis as any).__ttTestApi;
             if (!api) return { error: "no test api" };
 
             // Get latest practice record
@@ -301,6 +301,5 @@ test.describe("SCHEDULING-001: Basic FSRS Progression", () => {
 
     // I don't think this assertion holds now... the intervals will flatten out
     // Ensure at least one growth event (max > initial)
-    // expect(Math.max(...intervals)).toBeGreaterThan(intervals[0]);
   });
 });

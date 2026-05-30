@@ -15,13 +15,14 @@ import { usePWAUpdate } from "@/lib/hooks/usePWAUpdate";
 const PERSISTENT_TOAST_DURATION = Number.POSITIVE_INFINITY;
 
 export const UpdatePrompt: Component = () => {
-  // In dev mode, don't render anything
-  if (import.meta.env.DEV) {
-    return null;
-  }
-
   const [toastShown, setToastShown] = createSignal(false);
   const { needRefresh, updateServiceWorker } = usePWAUpdate();
+
+  // In dev mode, skip update prompts (HMR handles refreshes)
+  if (import.meta.env.DEV) {
+    // Dev mode: update prompt is unnecessary since HMR handles refreshes
+    return null;
+  }
 
   // Show toast when update is available (only once)
   createEffect(() => {
@@ -50,6 +51,5 @@ export const UpdatePrompt: Component = () => {
     }
   });
 
-  // This component doesn't render anything - it only shows toasts
   return null;
 };

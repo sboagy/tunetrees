@@ -31,8 +31,9 @@ export type ScreenSize = "small" | "full";
  * Matches the breakpoint used by the mobile-detection hook (< 768 px).
  */
 export function getScreenSize(): ScreenSize {
-  if (typeof window === "undefined") return "full";
-  return window.innerWidth < 768 ? "small" : "full";
+  if (globalThis === undefined || globalThis.innerWidth === undefined)
+    return "full";
+  return globalThis.innerWidth < 768 ? "small" : "full";
 }
 
 /**

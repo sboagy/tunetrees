@@ -10,7 +10,7 @@ import type { Page } from "@playwright/test";
  * Clear all browser storage including IndexedDB
  */
 export async function clearAllStorage(page: Page): Promise<void> {
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     // Clear localStorage
     localStorage.clear();
 
@@ -18,31 +18,26 @@ export async function clearAllStorage(page: Page): Promise<void> {
     sessionStorage.clear();
 
     // Clear all IndexedDB databases
-    return new Promise<void>((resolve) => {
-      if (!window.indexedDB) {
-        resolve();
-        return;
-      }
+    if (!globalThis.indexedDB) {
+      return;
+    }
 
-      // Get all databases and delete them
-      window.indexedDB.databases().then((databases) => {
-        const deletePromises = databases.map((db) => {
-          if (db.name) {
-            return new Promise<void>((deleteResolve) => {
-              const request = window.indexedDB.deleteDatabase(db.name!);
-              request.onsuccess = () => deleteResolve();
-              request.onerror = () => deleteResolve(); // Continue even on error
-            });
-          }
-          return Promise.resolve();
-        });
+    const databases = await globalThis.indexedDB.databases();
+    const deletePromises: Promise<void>[] = [];
 
-        Promise.all(deletePromises).then(() => {
-          console.log("✅ Cleared all IndexedDB databases");
-          resolve();
-        });
-      });
-    });
+    for (const db of databases) {
+      if (!db.name) continue;
+      deletePromises.push(
+        new Promise<void>((resolve) => {
+          const request = globalThis.indexedDB.deleteDatabase(db.name!);
+          request.onsuccess = () => resolve();
+          request.onerror = () => resolve(); // Continue even on error
+        })
+      );
+    }
+
+    await Promise.all(deletePromises);
+    console.log("✅ Cleared all IndexedDB databases");
   });
 }
 
@@ -55,7 +50,7 @@ export async function clearIndexedDB(
 ): Promise<void> {
   await page.evaluate((name) => {
     return new Promise<void>((resolve, reject) => {
-      const request = window.indexedDB.deleteDatabase(name);
+      const request = globalThis.indexedDB.deleteDatabase(name);
       request.onsuccess = () => {
         console.log(`✅ Deleted IndexedDB: ${name}`);
         resolve();

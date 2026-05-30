@@ -12,14 +12,14 @@ import {
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
-// Inject window.__ttTestUserId so test-api.ts can resolve the user after
+// Inject globalThis.__ttTestUserId so test-api.ts can resolve the user after
 // page reloads (Supabase session may not be available immediately after resync).
 async function setInjectedTestUserId(page: Page, userId: string) {
   await page.addInitScript((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
   await page.evaluate((id) => {
-    (window as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
+    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
   }, userId);
 }
 
@@ -172,13 +172,13 @@ test.describe("SYNC-005: UTC-midnight window_start_utc regression (timezone bug)
 
     // --- Secondary assertion: resolved queue window date is the correct calendar day ---
     await page.waitForFunction(
-      () => !!(window as unknown as { __ttTestApi?: unknown }).__ttTestApi,
+      () => !!(globalThis as unknown as { __ttTestApi?: unknown }).__ttTestApi,
       { timeout: 20_000 }
     );
 
     const queueInfo = await page.evaluate(async (rid) => {
       const api = (
-        window as unknown as {
+        globalThis as unknown as {
           __ttTestApi?: {
             getQueueInfo: (id: string) => Promise<{
               windowStartUtc: string;

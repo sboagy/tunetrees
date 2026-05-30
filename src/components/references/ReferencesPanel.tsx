@@ -434,122 +434,116 @@ export const ReferencesPanel: Component = () => {
   };
 
   return (
-    <>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: panel acts as a drag-and-drop target for audio files while its keyboard interactions remain with contained controls */}
-      <div
-        class="references-panel rounded-lg border border-transparent transition-colors"
-        classList={{
-          "bg-blue-50/30 dark:bg-blue-950/15 border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/60 dark:ring-blue-700/60":
-            isPanelDragActive(),
-        }}
-        onDragOver={(event) =>
-          handlePanelDragOver(event as unknown as DragEvent)
-        }
-        onDragLeave={(event) =>
-          handlePanelDragLeave(event as unknown as DragEvent)
-        }
-        onDrop={(event) => handlePanelDrop(event as unknown as DragEvent)}
-        data-testid="references-panel"
-      >
-        {/* Header with icon and Add Reference button */}
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-1.5">
-            <Link
-              class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
-            />
-            <h4
-              class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
-              data-testid="references-count"
-            >
-              {references()?.length || 0}{" "}
-              {references()?.length === 1 ? "reference" : "references"}
-            </h4>
-          </div>
-          <Show when={currentTuneId() && !isAdding() && !editingReference()}>
-            <button
-              type="button"
-              onClick={() => openAddForm()}
-              class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
-              title="Add new reference"
-              data-testid="references-add-button"
-            >
-              Add
-              <Plus class={fontClasses().iconSmall} />
-            </button>
-          </Show>
+    <section
+      class="references-panel rounded-lg border border-transparent transition-colors"
+      classList={{
+        "bg-blue-50/30 dark:bg-blue-950/15 border-blue-400 dark:border-blue-500 ring-2 ring-blue-300/60 dark:ring-blue-700/60":
+          isPanelDragActive(),
+      }}
+      onDragOver={(event) => handlePanelDragOver(event)}
+      onDragLeave={(event) => handlePanelDragLeave(event)}
+      onDrop={(event) => handlePanelDrop(event)}
+      aria-label="References drag and drop area"
+      data-testid="references-panel"
+    >
+      {/* Header with icon and Add Reference button */}
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5">
+          <Link
+            class={`${fontClasses().iconSmall} text-gray-600 dark:text-gray-400`}
+          />
+          <h4
+            class={`${fontClasses().text} font-medium text-gray-700 dark:text-gray-300`}
+            data-testid="references-count"
+          >
+            {references()?.length || 0}{" "}
+            {references()?.length === 1 ? "reference" : "references"}
+          </h4>
         </div>
+        <Show when={currentTuneId() && !isAdding() && !editingReference()}>
+          <button
+            type="button"
+            onClick={() => openAddForm()}
+            class={`inline-flex items-center gap-1 ${fontClasses().textSmall} px-1.5 py-0.5 text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm transition-colors border border-gray-200/50 dark:border-gray-700/50`}
+            title="Add new reference"
+            data-testid="references-add-button"
+          >
+            Add
+            <Plus class={fontClasses().iconSmall} />
+          </button>
+        </Show>
+      </div>
 
-        {/* Add reference form */}
-        <Show when={isAdding()}>
+      {/* Add reference form */}
+      <Show when={isAdding()}>
+        <div
+          class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
+          data-testid="references-add-form"
+        >
+          <ReferenceForm
+            initialData={addDraft()}
+            autoOpenTypeSelect={!addDraft()}
+            onSubmit={handleCreateReference}
+            onCancel={handleCancel}
+          />
+        </div>
+      </Show>
+
+      {/* Edit reference form */}
+      <Show when={editingReference()}>
+        {(ref) => (
           <div
             class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
-            data-testid="references-add-form"
+            data-testid="references-edit-form"
           >
             <ReferenceForm
-              initialData={addDraft()}
-              autoOpenTypeSelect={!addDraft()}
-              onSubmit={handleCreateReference}
+              reference={ref()}
+              onSubmit={handleUpdateReference}
               onCancel={handleCancel}
             />
           </div>
-        </Show>
+        )}
+      </Show>
 
-        {/* Edit reference form */}
-        <Show when={editingReference()}>
-          {(ref) => (
-            <div
-              class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
-              data-testid="references-edit-form"
-            >
-              <ReferenceForm
-                reference={ref()}
-                onSubmit={handleUpdateReference}
-                onCancel={handleCancel}
-              />
-            </div>
-          )}
-        </Show>
+      {/* No tune selected */}
+      <Show when={!currentTuneId()}>
+        <p
+          class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
+          data-testid="references-no-tune-message"
+        >
+          Select a tune to view references
+        </p>
+      </Show>
 
-        {/* No tune selected */}
-        <Show when={!currentTuneId()}>
-          <p
-            class={`${fontClasses().text} italic text-gray-500 dark:text-gray-400`}
-            data-testid="references-no-tune-message"
-          >
-            Select a tune to view references
-          </p>
-        </Show>
+      {/* Loading state */}
+      <Show when={references.loading}>
+        <p
+          class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
+          data-testid="references-loading"
+        >
+          Loading references...
+        </p>
+      </Show>
 
-        {/* Loading state */}
-        <Show when={references.loading}>
-          <p
-            class={`${fontClasses().text} text-gray-500 dark:text-gray-400`}
-            data-testid="references-loading"
-          >
-            Loading references...
-          </p>
-        </Show>
-
-        {/* References list */}
-        <Show when={!isAdding() && !editingReference()}>
-          <div data-testid="references-list-drop-target">
-            <ReferenceList
-              references={references() || []}
-              onEdit={handleEditClick}
-              onDelete={handleDeleteReference}
-              onOpenReference={handleOpenReference}
-              onReorder={
-                canReorderReferences() ? handleReorderReferences : undefined
-              }
-              urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
-              showActions={true}
-              groupByType={false}
-              canEditReference={canManageReference}
-              canReorder={canReorderReferences()}
-            />
-          </div>
-        </Show>
-      </div>
-    </>
+      {/* References list */}
+      <Show when={!isAdding() && !editingReference()}>
+        <div data-testid="references-list-drop-target">
+          <ReferenceList
+            references={references() || []}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteReference}
+            onOpenReference={handleOpenReference}
+            onReorder={
+              canReorderReferences() ? handleReorderReferences : undefined
+            }
+            urlLabelByReferenceId={mediaUrlLabelsByReferenceId()}
+            showActions={true}
+            groupByType={false}
+            canEditReference={canManageReference}
+            canReorder={canReorderReferences()}
+          />
+        </div>
+      </Show>
+    </section>
   );
 };

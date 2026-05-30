@@ -227,7 +227,7 @@ export function AvatarPicker() {
                 alt="Current avatar"
                 class="h-24 w-24 rounded-full border-2 border-border object-cover"
               />
-              <Show when={url() && !url()!.startsWith("/avatars/")}>
+              <Show when={url() && !url().startsWith("/avatars/")}>
                 <Button
                   size="sm"
                   variant="ghost"

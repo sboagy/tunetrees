@@ -24,8 +24,8 @@ export const TuneSetManagerDialog: Component<TuneSetManagerDialogProps> = (
         props.onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleTuneSetSelect = (tuneSet: TuneSetWithSummary) => {
@@ -53,12 +53,12 @@ export const TuneSetManagerDialog: Component<TuneSetManagerDialogProps> = (
         data-testid="tune-set-manager-backdrop"
       />
 
-      <div
-        class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-4xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-        role="dialog"
+      <dialog
+        class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-4xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col m-0"
         aria-modal="true"
         aria-labelledby="tune-set-manager-title"
         data-testid="tune-set-manager-dialog"
+        open
       >
         <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <div class="min-w-0 flex-1">
@@ -99,7 +99,7 @@ export const TuneSetManagerDialog: Component<TuneSetManagerDialogProps> = (
         <div class="flex-1 overflow-auto p-4 sm:p-6">
           <TuneSetList onTuneSetSelect={handleTuneSetSelect} />
         </div>
-      </div>
+      </dialog>
 
       <TuneSetEditorDialog
         isOpen={showEditorDialog()}

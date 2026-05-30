@@ -43,15 +43,15 @@ let currentDate: Date;
 
 async function setInjectedTestUserId(page: Page, userId: string) {
   await page.addInitScript((id) => {
-    window.__ttTestUserId = id;
+    globalThis.__ttTestUserId = id;
   }, userId);
   await page.evaluate((id) => {
-    window.__ttTestUserId = id;
+    globalThis.__ttTestUserId = id;
   }, userId);
 }
 
 async function waitForTestApi(page: Page) {
-  await page.waitForFunction(() => !!(window as any).__ttTestApi, {
+  await page.waitForFunction(() => !!(globalThis as any).__ttTestApi, {
     timeout: 20000,
   });
 }
@@ -61,7 +61,7 @@ async function getRepertoireCount(
   repertoireId: string
 ): Promise<number> {
   return await page.evaluate(async (rid) => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api || typeof api.getRepertoireCount !== "function") {
       throw new Error("__ttTestApi.getRepertoireCount is not available");
     }
@@ -86,7 +86,7 @@ async function getQueueRows(
   }>
 > {
   return await page.evaluate(async (rid) => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api || typeof api.getPracticeQueue !== "function") {
       throw new Error("__ttTestApi.getPracticeQueue is not available");
     }
@@ -120,9 +120,9 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
 
     await waitForTestApi(page);
     await page.evaluate(async () => {
-      const syncDown = (window as any).__forceSyncDownForTest;
+      const syncDown = (globalThis as any).__forceSyncDownForTest;
       if (typeof syncDown !== "function") {
-        throw new Error("__forceSyncDownForTest is not available");
+        throw new TypeError("__forceSyncDownForTest is not available");
       }
       await syncDown();
     });

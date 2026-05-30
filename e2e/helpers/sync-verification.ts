@@ -25,7 +25,7 @@ function isRealAppUrl(currentUrl: string, baseUrl: string): boolean {
 }
 
 async function waitForTestApi(page: Page): Promise<void> {
-  await page.waitForFunction(() => !!(window as any).__ttTestApi, {
+  await page.waitForFunction(() => !!(globalThis as any).__ttTestApi, {
     timeout: 20_000,
   });
 }
@@ -33,12 +33,12 @@ async function waitForTestApi(page: Page): Promise<void> {
 async function waitForInitializedApp(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const url = window.location.href;
-      const api = (window as any).__ttTestApi;
-      const authMarker = document.querySelector("[data-auth-initialized]");
-      const isAuthInitialized = authMarker?.getAttribute(
-        "data-auth-initialized"
+      const url = globalThis.location.href;
+      const api = (globalThis as any).__ttTestApi;
+      const authMarker = document.querySelector<HTMLElement>(
+        "[data-auth-initialized]"
       );
+      const isAuthInitialized = authMarker?.dataset.authInitialized;
 
       return (
         Boolean(api) &&
@@ -108,7 +108,7 @@ async function readSyncOutboxCount(page: Page): Promise<number> {
 
     try {
       return await page.evaluate(async () => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) throw new Error("__ttTestApi not available");
         return await api.getSyncOutboxCount();
       });
@@ -152,26 +152,23 @@ async function readSyncState(page: Page): Promise<{
 
     try {
       return await page.evaluate(async () => {
-        const api = (window as any).__ttTestApi;
+        const api = (globalThis as any).__ttTestApi;
         if (!api) throw new Error("__ttTestApi not available");
 
         return {
           count: await api.getSyncOutboxCount(),
           isSyncComplete: Boolean(api.isSyncComplete?.() ?? false),
-          url: window.location.href,
+          url: globalThis.location.href,
           pendingItems: await api.getPendingSyncOutboxItems?.(),
           syncErrorCount:
-            document
-              .querySelector("[data-auth-initialized]")
-              ?.getAttribute("data-sync-error-count") ?? "",
+            document.querySelector<HTMLElement>("[data-auth-initialized]")
+              ?.dataset.syncErrorCount ?? "",
           syncErrorSummary:
-            document
-              .querySelector("[data-auth-initialized]")
-              ?.getAttribute("data-sync-error-summary") ?? "",
+            document.querySelector<HTMLElement>("[data-auth-initialized]")
+              ?.dataset.syncErrorSummary ?? "",
           syncSuccess:
-            document
-              .querySelector("[data-auth-initialized]")
-              ?.getAttribute("data-sync-success") ?? "",
+            document.querySelector<HTMLElement>("[data-auth-initialized]")
+              ?.dataset.syncSuccess ?? "",
         };
       });
     } catch (error) {
@@ -377,7 +374,7 @@ export async function triggerManualSync(page: Page): Promise<void> {
 
   const usedTestHook = await page
     .evaluate(async () => {
-      const forceSyncUp = (window as any).__forceSyncUpForTest;
+      const forceSyncUp = (globalThis as any).__forceSyncUpForTest;
       if (!forceSyncUp) {
         return false;
       }
@@ -430,7 +427,7 @@ export async function verifySupabaseRecord(
 
   const record = await page.evaluate(
     async ({ table, recordId }) => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getSupabaseRecord(table, recordId);
     },
@@ -465,7 +462,7 @@ export async function verifyLocalRecord(
 
   const record = await page.evaluate(
     async ({ table, recordId }) => {
-      const api = (window as any).__ttTestApi;
+      const api = (globalThis as any).__ttTestApi;
       if (!api) throw new Error("__ttTestApi not available");
       return await api.getLocalRecord(table, recordId);
     },
@@ -510,7 +507,7 @@ export async function verifySyncSuccess(page: Page): Promise<void> {
   log.info("🔍 Verifying sync completed successfully...");
 
   const hasErrors = await page.evaluate(async () => {
-    const api = (window as any).__ttTestApi;
+    const api = (globalThis as any).__ttTestApi;
     if (!api) throw new Error("__ttTestApi not available");
     return await api.getSyncErrors();
   });

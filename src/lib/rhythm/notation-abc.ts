@@ -26,7 +26,7 @@ function normalizeDisplayHeaderLine(line: string): string | null {
 
 function wrapDisplayBodyLine(line: string, maxBarsPerLine = 4): string[] {
   const trimmed = line.trim();
-  if (!trimmed || /^P:/.test(trimmed)) {
+  if (!trimmed || trimmed.startsWith("P:")) {
     return trimmed ? [trimmed] : [];
   }
 
@@ -35,7 +35,7 @@ function wrapDisplayBodyLine(line: string, maxBarsPerLine = 4): string[] {
     return [trimmed];
   }
 
-  const hasRepeatStart = /^\|:/.test(trimmed);
+  const hasRepeatStart = trimmed.startsWith("|:");
   const hasRepeatEnd = /:\|\s*$/.test(trimmed);
   const wrappedLines: string[] = [];
 
@@ -58,7 +58,7 @@ export function buildNotationRhythmAbc(input: NotationRhythmAbcInput): string {
     .map((line) => line.trimEnd())
     .filter(Boolean)
     .flatMap((line) => {
-      if (/^P:/.test(line)) {
+      if (line.startsWith("P:")) {
         return [];
       }
 

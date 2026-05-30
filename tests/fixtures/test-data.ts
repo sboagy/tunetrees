@@ -22,13 +22,8 @@ import {
   CATALOG_TUNE_54_ID,
   CATALOG_TUNE_55_ID,
   CATALOG_TUNE_66_ID,
-  CATALOG_TUNE_70_ID,
-  CATALOG_TUNE_72_ID,
   CATALOG_TUNE_113_ID,
-  CATALOG_TUNE_ID_MAP,
   CATALOG_TUNE_MORRISON_ID,
-  type CatalogTuneId,
-  getCatalogTuneUuid,
 } from "../../src/lib/db/catalog-tune-ids.js";
 
 // Re-export catalog tune mappings for convenience
@@ -43,7 +38,7 @@ export {
   CATALOG_TUNE_MORRISON_ID,
   type CatalogTuneId,
   getCatalogTuneUuid,
-};
+} from "../../src/lib/db/catalog-tune-ids.js";
 
 // Alias for backwards compatibility with existing tests
 export const TEST_TUNE_MORRISON_ID = CATALOG_TUNE_MORRISON_ID;

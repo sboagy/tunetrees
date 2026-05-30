@@ -14,7 +14,7 @@ export async function enqueueMediaDraftUpload(
   db: SqliteDatabase,
   entry: MediaDraftOutboxEntry
 ): Promise<void> {
-  await db.run(sql`
+  db.run(sql`
     INSERT INTO media_draft_outbox (
       id,
       user_ref,
@@ -46,7 +46,7 @@ export async function listMediaDraftUploads(
   db: SqliteDatabase,
   userId: string
 ): Promise<MediaDraftOutboxEntry[]> {
-  return await db.all<MediaDraftOutboxEntry>(sql`
+  return db.all<MediaDraftOutboxEntry>(sql`
     SELECT
       id as id,
       user_ref as userRef,
@@ -64,6 +64,6 @@ export async function deleteMediaDraftUpload(
   db: SqliteDatabase,
   id: string
 ): Promise<void> {
-  await db.run(sql`DELETE FROM media_draft_outbox WHERE id = ${id}`);
+  db.run(sql`DELETE FROM media_draft_outbox WHERE id = ${id}`);
   await persistDb();
 }

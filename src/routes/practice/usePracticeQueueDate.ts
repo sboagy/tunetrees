@@ -272,8 +272,7 @@ export function usePracticeQueueDate(
 
       // Wait for first remote sync before resolving, unless we already have a manual
       // stored date (matches the original hasManualStoredQueueDate fast-path).
-      const isOnline =
-        typeof navigator !== "undefined" ? navigator.onLine : true;
+      const isOnline = typeof navigator !== "undefined" && navigator.onLine;
       const syncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
       const remoteSyncReady = syncVersion > 0 || !isOnline || syncDisabled;
       if (!remoteSyncReady) {

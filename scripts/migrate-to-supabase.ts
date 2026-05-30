@@ -199,7 +199,7 @@ async function migrateTunes() {
     genre_ref: tune.genre_ref,
     deleted: false,
     private_for: tune.private_for
-      ? mapUserId(parseInt(tune.private_for, 10))
+      ? mapUserId(Number.parseInt(tune.private_for, 10))
       : null,
     sync_version: 0,
     last_modified_at: now(),

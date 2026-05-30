@@ -13,7 +13,7 @@ function listMigrationFiles(): string[] {
   return fs
     .readdirSync(MIGRATIONS_DIR)
     .filter((entry) => entry.endsWith(".sql"))
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((entry) => path.join(MIGRATIONS_DIR, entry));
 }
 
@@ -27,9 +27,8 @@ function extractTablesWithSyncChangeLogTriggers(sql: string): string[] {
         /sync_change_log_update/i.test(statement)
     )
     .map((statement) => {
-      const tableMatch = statement.match(
-        /ON\s+(?:(?:public|"public")\.)?"?([a-z0-9_]+)"?/i
-      );
+      const tableMatch =
+        /ON\s+(?:(?:public|"public")\.)?"?([a-z0-9_]+)"?/i.exec(statement);
       return tableMatch?.[1] ?? "";
     })
     .filter(Boolean);
@@ -50,7 +49,7 @@ function getConfiguredSqliteMigrations(): {
 }
 
 function extractMigrationVersion(filePath: string): number {
-  const match = path.basename(filePath).match(/^(\d{4})_/);
+  const match = /^(\d{4})_/.exec(path.basename(filePath));
   if (!match) {
     throw new Error(
       `Expected sqlite migration file name to start with ####_: ${filePath}`

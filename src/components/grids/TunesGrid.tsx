@@ -347,12 +347,106 @@ export const TunesGrid = (<T extends { id: string | number }>(
     if (props.disableListMode) return "grid";
     return mode;
   };
+  const compareStrings = (a: string, b: string) => a.localeCompare(b);
+
+  const getDefaultViewMode = (): TableViewMode => {
+    if (props.disableListMode) return "grid";
+    if (isMobile()) return "list";
+    return "grid";
+  };
+
+  const getSortLabel = (sortState: false | "asc" | "desc") => {
+    if (sortState === "asc") {
+      return "Sorted ascending - click to sort descending";
+    }
+    if (sortState === "desc") {
+      return "Sorted descending - click to clear sort";
+    }
+    return "Not sorted - click to sort ascending";
+  };
+
+  const getSortSymbol = (sortState: false | "asc" | "desc") => {
+    if (sortState === "asc") return "↑";
+    if (sortState === "desc") return "↓";
+    return "↕";
+  };
+
+  const getColumnDescriptionFromMeta = (meta: unknown): string | undefined => {
+    if (!meta || typeof meta !== "object") return undefined;
+    const record = meta as Record<string, unknown>;
+    return typeof record.description === "string"
+      ? record.description
+      : undefined;
+  };
+
+  let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  const persistScrollPosition = () => {
+    const key = scrollKey();
+    if (!containerRef || !key || isStabilizing()) return;
+
+    const scrollPos = containerRef.scrollTop;
+    const loading = props.isLoading ?? false;
+    const inRestoreGuard = restoreGuardUntil() > Date.now();
+    const target = targetScroll();
+
+    if (loading && target > 0 && scrollPos <= 2) {
+      console.log(
+        `[TunesGrid ${props.tablePurpose}] Skipping top save while loading (target=${target}px)`
+      );
+      containerRef.scrollTop = target;
+      return;
+    }
+    if (inRestoreGuard && target > 0 && scrollPos <= 2) {
+      console.log(
+        `[TunesGrid ${props.tablePurpose}] Skipping transient top save during restore guard (target=${target}px)`
+      );
+      containerRef.scrollTop = target;
+      return;
+    }
+
+    console.log(
+      `[TunesGrid ${props.tablePurpose}] Saving scroll position: ${scrollPos}px`
+    );
+    localStorage.setItem(key, String(scrollPos));
+    setTargetScroll(scrollPos);
+
+    if (!inRestoreGuard || scrollPos > 2) {
+      setRestoreGuardUntil(0);
+    }
+  };
+
+  const handleContainerScroll = () => {
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+
+    const target = targetScroll();
+    const stabilizing = isStabilizing();
+    const loading = props.isLoading ?? false;
+    const inRestoreGuard = restoreGuardUntil() > Date.now();
+
+    if (
+      (stabilizing || inRestoreGuard || loading) &&
+      containerRef &&
+      target > 0
+    ) {
+      const currentScroll = containerRef.scrollTop;
+      if (currentScroll <= 2) {
+        console.log(
+          `[TunesGrid ${props.tablePurpose}] Scroll reset detected during stabilization/restore guard: ${currentScroll}px, re-applying ${target}px`
+        );
+        containerRef.scrollTop = target;
+        return;
+      }
+    }
+
+    scrollTimeout = setTimeout(() => {
+      persistScrollPosition();
+    }, 150);
+  };
   const [viewModeOverride, setViewModeOverride] = createSignal<
     TableViewMode | undefined
   >(normalizeViewMode(initialState.viewMode));
-  const defaultViewMode = createMemo<TableViewMode>(() =>
-    props.disableListMode ? "grid" : isMobile() ? "list" : "grid"
-  );
+  const defaultViewMode = createMemo<TableViewMode>(() => getDefaultViewMode());
   const effectiveViewMode = createMemo<TableViewMode>(() => {
     return viewModeOverride() ?? defaultViewMode();
   });
@@ -403,8 +497,8 @@ export const TunesGrid = (<T extends { id: string | number }>(
       setColumnVisibility((prev) => {
         const merged = { ...prev, ...v };
         // Only update if actually different to prevent infinite loop
-        const prevKeys = Object.keys(prev).sort();
-        const mergedKeys = Object.keys(merged).sort();
+        const prevKeys = Object.keys(prev).sort(compareStrings);
+        const mergedKeys = Object.keys(merged).sort(compareStrings);
         if (
           prevKeys.length !== mergedKeys.length ||
           prevKeys.some((k, i) => k !== mergedKeys[i]) ||
@@ -440,8 +534,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     setLastDefaultExpandedSignature(signature);
 
     setExpanded((prev) => {
-      const nextExpanded: ExpandedState =
-        prev === true ? {} : { ...(prev ?? {}) };
+      const nextExpanded: ExpandedState = prev === true ? {} : { ...prev };
       for (const rowId of defaultIds) {
         nextExpanded[rowId] = true;
       }
@@ -586,11 +679,11 @@ export const TunesGrid = (<T extends { id: string | number }>(
   // Clear resize state on mouseup/touchend globally
   onMount(() => {
     const up = () => setIsResizing(false);
-    window.addEventListener("mouseup", up, { passive: true });
-    window.addEventListener("touchend", up, { passive: true });
+    globalThis.addEventListener("mouseup", up, { passive: true });
+    globalThis.addEventListener("touchend", up, { passive: true });
     onCleanup(() => {
-      window.removeEventListener("mouseup", up);
-      window.removeEventListener("touchend", up);
+      globalThis.removeEventListener("mouseup", up);
+      globalThis.removeEventListener("touchend", up);
     });
   });
 
@@ -828,7 +921,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     const uid = props.userId;
     if (!uid) return null;
     const repertoireId = activeRepertoireId();
-    const suffix = repertoireId !== "0" ? `_${repertoireId}` : "";
+    const suffix = repertoireId === "0" ? "" : `_${repertoireId}`;
     return `TT_${props.tablePurpose.toUpperCase()}_SCROLL_${uid}${suffix}`;
   });
 
@@ -910,7 +1003,6 @@ export const TunesGrid = (<T extends { id: string | number }>(
   });
 
   onMount(() => {
-    let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
     let cleanupScrollListener: (() => void) | null = null;
 
     const waitForContainer = () => {
@@ -1014,7 +1106,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
       // Store cleanup function to be called on component unmount
       cleanupScrollListener = () => {
         if (containerRef) {
-          containerRef.removeEventListener("scroll", handleScroll);
+          containerRef.removeEventListener("scroll", handleContainerScroll);
         }
       };
     };
@@ -1087,6 +1179,13 @@ export const TunesGrid = (<T extends { id: string | number }>(
     );
   };
 
+  const getPinnedCellBgClass = (cell: Cell<T, unknown>, rowOriginal: T) => {
+    if (!cell.column.getIsPinned()) return "";
+    return rowBelongsToSet(rowOriginal)
+      ? " bg-emerald-100/80 dark:bg-emerald-950/45"
+      : " bg-white dark:bg-gray-900";
+  };
+
   return (
     <div class="h-full flex flex-col">
       {/* List mode: stacked list view, either by mobile default or explicit override. */}
@@ -1144,20 +1243,13 @@ export const TunesGrid = (<T extends { id: string | number }>(
                           typeof header.column.columnDef.header === "string"
                             ? header.column.columnDef.header
                             : header.column.id;
-                        const columnMeta = header.column.columnDef.meta as
-                          | { description?: string }
-                          | undefined;
+                        const columnMeta = header.column.columnDef.meta;
                         const columnDescription =
                           props.columnDescriptions?.[header.column.id] ??
-                          columnMeta?.description;
+                          getColumnDescriptionFromMeta(columnMeta);
                         const canSort = () => header.column.getCanSort();
                         const sortState = () => header.column.getIsSorted();
-                        const sortLabel = () =>
-                          sortState() === "asc"
-                            ? "Sorted ascending - click to sort descending"
-                            : sortState() === "desc"
-                              ? "Sorted descending - click to clear sort"
-                              : "Not sorted - click to sort ascending";
+                        const sortLabel = () => getSortLabel(sortState());
                         const headerContent = flexRender(
                           header.column.columnDef.header,
                           header.getContext()
@@ -1181,17 +1273,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
                               header.getSize()
                             )}
                             onDragOver={(e) =>
-                              handleDragOver(
-                                e as unknown as DragEvent,
-                                header.column.id
-                              )
+                              handleDragOver(e, header.column.id)
                             }
-                            onDrop={(e) =>
-                              handleDrop(
-                                e as unknown as DragEvent,
-                                header.column.id
-                              )
-                            }
+                            onDrop={(e) => handleDrop(e, header.column.id)}
                           >
                             <div class="flex items-center gap-1">
                               <div class="flex items-center gap-1 min-w-0 flex-1">
@@ -1271,11 +1355,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                                   }}
                                 >
                                   <span aria-hidden="true">
-                                    {sortState() === "asc"
-                                      ? "↑"
-                                      : sortState() === "desc"
-                                        ? "↓"
-                                        : "↕"}
+                                    {getSortSymbol(sortState())}
                                   </span>
                                   <span class="sr-only">{sortLabel()}</span>
                                 </button>
@@ -1291,10 +1371,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
                                   type="button"
                                   draggable={true}
                                   onDragStart={(e) =>
-                                    handleDragStart(
-                                      e as unknown as DragEvent,
-                                      header.column.id
-                                    )
+                                    handleDragStart(e, header.column.id)
                                   }
                                   onDragEnd={handleDragEnd}
                                   onClick={(event) => event.stopPropagation()}
@@ -1352,55 +1429,72 @@ export const TunesGrid = (<T extends { id: string | number }>(
               <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualRow) => {
                   const row = () => currentRows()[virtualRow.index];
-                  const rowProps = () => props.getRowProps?.(row()!.original);
+                  const getProps = (r: ReturnType<typeof row>) => {
+                    if (!r) return undefined;
+                    return props.getRowProps?.(r.original);
+                  };
 
                   return (
-                    <Show when={row()}>
-                      {/* Read the current row through an accessor so filtering can swap
-                            row content without requiring a full table remount. */}
-                      <tr
-                        class={`${
-                          props.currentRowId === row()!.original.id
+                    <Show when={row()} keyed>
+                      {(currentRow) => {
+                        if (!currentRow) return null;
+                        const currentRowProps = () => getProps(currentRow);
+                        const currentRowMatchId = () => {
+                          const original = currentRow.original as T & {
+                            tune_id?: string | number | null;
+                          };
+                          return original.tune_id ?? currentRow.original.id;
+                        };
+                        const currentRowIsSelected = () =>
+                          props.currentRowId === currentRowMatchId();
+                        const highlightClass = () =>
+                          currentRowIsSelected()
                             ? "cursor-pointer transition-colors dark:bg-blue-900/25 bg-blue-50 hover:bg-blue-100 dark:hover:bg-gray-800/50 border-t-2 border-b-2 border-blue-200 dark:border-blue-600/25"
-                            : rowBelongsToSet(row()!.original)
-                              ? "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60"
-                              : ROW_CLASSES
-                        } ${rowProps()?.class ?? ""}`.trim()}
-                        onClick={() => props.onRowClick?.(row()!.original)}
-                        onDblClick={() =>
-                          props.onRowDoubleClick?.(row()!.original)
-                        }
-                        data-index={virtualRow.index}
-                        draggable={rowProps()?.draggable}
-                        data-testid={rowProps()?.["data-testid"]}
-                        data-setlist-item-id={
-                          rowProps()?.["data-setlist-item-id"]
-                        }
-                        onDragStart={rowProps()?.onDragStart}
-                        onDragEnd={rowProps()?.onDragEnd}
-                        onDragOver={rowProps()?.onDragOver}
-                        onDrop={rowProps()?.onDrop}
-                      >
-                        <For each={row()!.getVisibleCells()}>
-                          {(cell) => (
-                            <td
-                              class={`${CELL_CLASSES}${
-                                cell.column.getIsPinned()
-                                  ? rowBelongsToSet(row()!.original)
-                                    ? " bg-emerald-100/80 dark:bg-emerald-950/45"
-                                    : " bg-white dark:bg-gray-900"
-                                  : ""
-                              }${getPinnedBorderClass(cell.column)}`}
-                              style={getPinnedCellStyle(
-                                cell.column,
-                                cell.column.getSize()
+                            : "cursor-pointer transition-colors bg-emerald-100/80 hover:bg-emerald-100 border-t border-b border-emerald-200/70 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/60";
+                        const trClass = () =>
+                          rowBelongsToSet(currentRow.original) ||
+                          currentRowIsSelected()
+                            ? highlightClass()
+                            : ROW_CLASSES;
+                        return (
+                          <tr
+                            class={`${trClass()} ${currentRowProps()?.class ?? ""}`.trim()}
+                            onClick={() =>
+                              props.onRowClick?.(currentRow.original)
+                            }
+                            onDblClick={() =>
+                              props.onRowDoubleClick?.(currentRow.original)
+                            }
+                            data-index={virtualRow.index}
+                            draggable={currentRowProps()?.draggable}
+                            data-testid={currentRowProps()?.["data-testid"]}
+                            data-setlist-item-id={
+                              currentRowProps()?.["data-setlist-item-id"]
+                            }
+                            onDragStart={currentRowProps()?.onDragStart}
+                            onDragEnd={currentRowProps()?.onDragEnd}
+                            onDragOver={currentRowProps()?.onDragOver}
+                            onDrop={currentRowProps()?.onDrop}
+                          >
+                            <For each={currentRow.getVisibleCells()}>
+                              {(cell) => (
+                                <td
+                                  class={`${CELL_CLASSES}${getPinnedCellBgClass(
+                                    cell,
+                                    currentRow.original
+                                  )}${getPinnedBorderClass(cell.column)}`}
+                                  style={getPinnedCellStyle(
+                                    cell.column,
+                                    cell.column.getSize()
+                                  )}
+                                >
+                                  {renderCellContent(cell)}
+                                </td>
                               )}
-                            >
-                              {renderCellContent(cell)}
-                            </td>
-                          )}
-                        </For>
-                      </tr>
+                            </For>
+                          </tr>
+                        );
+                      }}
                     </Show>
                   );
                 }}

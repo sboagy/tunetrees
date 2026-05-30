@@ -5,7 +5,7 @@ export async function getViewColumnDescriptions(
   db: SqliteDatabase,
   viewName: string
 ): Promise<Record<string, string>> {
-  const rows = await db.all<{
+  const rows = db.all<{
     column_name: string;
     description: string;
   }>(sql`

@@ -135,7 +135,7 @@ export function getUUIDv7Timestamp(uuid: string): Date | null {
   const timestampHex = hex.slice(0, 12);
 
   // Convert hex to milliseconds since epoch
-  const timestamp = parseInt(timestampHex, 16);
+  const timestamp = Number.parseInt(timestampHex, 16);
 
   return new Date(timestamp);
 }

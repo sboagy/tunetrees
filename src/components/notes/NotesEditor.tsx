@@ -48,13 +48,11 @@ interface NotesEditorProps {
 /**
  * Get the current theme from the document
  */
-const getCurrentTheme = (): "light" | "dark" => {
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
-};
+const getCurrentTheme = (): "light" | "dark" =>
+  document.documentElement.classList.contains("dark") ? "dark" : "light";
 
-const getJoditTheme = (theme: "light" | "dark"): "default" | "dark" => {
-  return theme === "dark" ? "dark" : "default";
-};
+const getJoditTheme = (theme: "light" | "dark"): "default" | "dark" =>
+  theme === "dark" ? "dark" : "default";
 
 const NOTES_EDITOR_MENU_THEME = {
   light: {
@@ -349,24 +347,22 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
       ...upload,
       data: {
         ...upload.data,
-        files: upload.data.files.map((url) =>
-          url.startsWith("blob:")
-            ? url
-            : accessToken
-              ? attachMediaAuthTokenToUrl(url, accessToken)
-              : url
-        ),
+        files: upload.data.files.map((url) => {
+          if (url.startsWith("blob:")) return url;
+          if (accessToken) return attachMediaAuthTokenToUrl(url, accessToken);
+          return url;
+        }),
       },
     };
   };
 
   const dataUrlToFile = (dataUrl: string, index: number) => {
-    const matches = dataUrl.match(/^data:(image\/[^;,]+)(;base64)?,(.*)$/);
-    if (!matches) {
+    const execResult = /^data:(image\/[^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
+    if (!execResult) {
       return null;
     }
 
-    const [, mimeType, encodingFlag, payload] = matches;
+    const [, mimeType, encodingFlag, payload] = execResult;
     if (!mimeType || !payload) {
       return null;
     }
@@ -375,8 +371,9 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
     const binaryPayload = encodingFlag
       ? atob(payload)
       : decodeURIComponent(payload);
-    const bytes = Uint8Array.from(binaryPayload, (character) =>
-      character.charCodeAt(0)
+    const bytes = Uint8Array.from(
+      binaryPayload,
+      (character) => character.codePointAt(0) ?? 0
     );
 
     return new File([bytes], `pasted-image-${index + 1}.${extension}`, {
@@ -475,7 +472,7 @@ export const NotesEditor: Component<NotesEditorProps> = (props) => {
         showProgress: (progress: number) => void
       ) => {
         if (!(requestData instanceof FormData)) {
-          throw new Error("Unexpected media upload payload.");
+          throw new TypeError("Unexpected media upload payload.");
         }
 
         return uploadMediaFormData(requestData, showProgress);

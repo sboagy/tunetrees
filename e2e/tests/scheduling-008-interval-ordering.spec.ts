@@ -130,7 +130,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         const searchInput = document.querySelector(
           '[data-testid="search-box-panel"]'
         ) as HTMLInputElement | null;
-        const url = window.location.href;
+        const url = globalThis.location.href;
         return { rows, firstCells, searchValue: searchInput?.value, url };
       });
       console.log(
@@ -268,11 +268,12 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
             toastCloser.click();
           }
           await page.waitForTimeout(500);
-        } catch (_e) {}
+        } catch {
+          // Toast may already be closed; proceed regardless
+        }
         await ttPage.navigateToTab("practice");
         const rows = await ttPage.getRows("scheduled");
 
-        // await ttPage.searchForTune(meta.title, ttPage.practiceGrid);
         const row = rows.getByText(meta.title);
         await expect(row).toBeVisible({ timeout: 60000 });
         await ttPage.enableFlashcardMode();

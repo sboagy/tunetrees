@@ -66,7 +66,7 @@ type WorkerMessage = WorkerResponse | QueryRequest | FsrsRequest;
 interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
-  timeoutId: number;
+  timeoutId: ReturnType<typeof globalThis.setTimeout>;
   startedAt: number;
   timeoutMs: number;
   functionName: PluginFunctionName;
@@ -307,7 +307,7 @@ export async function runQuickJsPlugin(params: {
   const pluginMeta = extractPluginMeta(params.meta);
 
   return await new Promise((resolve, reject) => {
-    const timeoutId = window.setTimeout(() => {
+    const timeoutId = globalThis.setTimeout(() => {
       const elapsedMs = performance.now() - startedAt;
       console.warn("[QuickJS][host] invoke timeout", {
         id,

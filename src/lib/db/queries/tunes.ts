@@ -42,13 +42,13 @@ export async function getTuneById(
   db: SqliteDatabase,
   tuneId: string
 ): Promise<Tune | null> {
-  const result = await db
+  const result = db
     .select()
     .from(schema.tune)
     .where(and(eq(schema.tune.id, tuneId), eq(schema.tune.deleted, 0)))
-    .limit(1);
+    .get();
 
-  return result[0] || null;
+  return result || null;
 }
 
 /**
@@ -56,7 +56,7 @@ export async function getTuneById(
  * For MVP - will add user filtering later with proper user ID mapping
  */
 export async function getAllTunes(db: SqliteDatabase): Promise<Tune[]> {
-  return await db
+  return db
     .select()
     .from(schema.tune)
     .where(and(eq(schema.tune.deleted, 0), isNull(schema.tune.privateFor)))
@@ -97,14 +97,14 @@ export async function getTunesForUser(
         )
       )
       .orderBy(asc(schema.tune.title));
-    return await query.all();
+    return query.all();
   } else {
     // When showPublic=false (default), merge tune + tune_override with COALESCE
     // Note: Due to limitations with Drizzle + raw SQL needed for COALESCE,
     // we use a raw SQL query
     if (selectedGenreIds.length > 0) {
       const genreParams = selectedGenreIds.map((id) =>
-        sql.raw(`'${id.replace(/'/g, "''")}'`)
+        sql.raw(`'${id.replaceAll("'", "''")}'`)
       );
       const query = sql`
         SELECT 
@@ -135,7 +135,7 @@ export async function getTunesForUser(
         ORDER BY COALESCE(o.title, t.title)
       `;
 
-      return await db.all<Tune>(query);
+      return db.all<Tune>(query);
     }
 
     const query = sql`
@@ -166,7 +166,7 @@ export async function getTunesForUser(
       ORDER BY COALESCE(o.title, t.title)
     `;
 
-    return await db.all<Tune>(query);
+    return db.all<Tune>(query);
   }
 }
 
@@ -231,7 +231,7 @@ export async function getTuneForUserById(
         LIMIT 1
       `;
 
-  const rows = await db.all<Tune>(query);
+  const rows = db.all<Tune>(query);
   return rows[0] || null;
 }
 /**
@@ -336,15 +336,15 @@ export async function updateTuneIfOwned(
   input: Partial<CreateTuneInput>
 ): Promise<boolean> {
   // Fetch current tune to verify ownership
-  const current = await db
+  const current = db
     .select()
     .from(schema.tune)
     .where(eq(schema.tune.id, tuneId))
-    .limit(1);
+    .all();
 
   if (!current || current.length === 0) return false;
 
-  const record = current[0] as Tune;
+  const record = current[0];
   const isOwned = !!record.privateFor && record.privateFor === ownerUserId;
   if (!isOwned) return false;
 
@@ -387,11 +387,11 @@ export async function deleteTune(
  */
 function getDeviceId(): string {
   if (
-    typeof window !== "undefined" &&
-    typeof window.localStorage?.getItem === "function" &&
-    typeof window.localStorage?.setItem === "function"
+    globalThis.window !== undefined &&
+    typeof globalThis.localStorage?.getItem === "function" &&
+    typeof globalThis.localStorage?.setItem === "function"
   ) {
-    const storage = window.localStorage;
+    const storage = globalThis.localStorage;
     let deviceId = storage.getItem("tunetrees_device_id");
     if (!deviceId) {
       deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -432,7 +432,7 @@ export async function searchTunes(
     conditions.push(
       or(
         isNull(schema.tune.privateFor),
-        eq(schema.tune.privateFor, userId as any) // FIXME: Need UUID to integer mapping
+        eq(schema.tune.privateFor, userId as any) // Need UUID to integer mapping
       ) as any
     );
   } else {
@@ -468,7 +468,7 @@ export async function searchTunes(
   }
 
   // Execute query
-  return await db
+  return db
     .select()
     .from(schema.tune)
     .where(and(...conditions) as any)
@@ -502,7 +502,7 @@ export async function getCatalogTuneIdsByFilter(
   const filterColumn =
     filterType === "genre" ? sql.raw("genre") : sql.raw("primary_origin");
 
-  const rows = await db.all<{ id: string }>(sql`
+  const rows = db.all<{ id: string }>(sql`
     SELECT id
     FROM tune
     WHERE deleted = 0

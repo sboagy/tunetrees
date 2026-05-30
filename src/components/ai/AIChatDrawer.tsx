@@ -7,7 +7,7 @@
  * @module components/ai/AIChatDrawer
  */
 
-import { Loader2, MessageCircle, Music, Send, X } from "lucide-solid";
+import { LoaderCircle, MessageCircle, Music, Send, X } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { toast } from "solid-sonner";
@@ -25,6 +25,17 @@ export interface AIChatDrawerProps {
   setSelectedModes?: (modes: string[]) => void;
   setSelectedGenres?: (genres: string[]) => void;
   currentRepertoireId?: string;
+}
+
+/** Get CSS class for a chat message bubble based on its role. */
+function getMessageClass(role: string): string {
+  if (role === "user") {
+    return "bg-blue-500 text-white rounded-lg px-4 py-2 max-w-[80%]";
+  }
+  if (role === "system") {
+    return "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-lg px-4 py-2 max-w-[80%] text-sm";
+  }
+  return "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg px-4 py-2 max-w-[80%]";
 }
 
 export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
@@ -56,7 +67,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
   // Handle tool calls
   createEffect(() => {
     const messages = state().messages;
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages.at(-1);
 
     if (
       lastMessage?.toolCall &&
@@ -133,11 +144,11 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
       />
 
       {/* Drawer */}
-      <div
-        class="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-700"
-        role="dialog"
+      <dialog
+        class="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-50 flex flex-col border-l border-gray-200 dark:border-gray-700 m-0 max-h-full"
         aria-modal="true"
         aria-labelledby="chat-title"
+        open
       >
         {/* Header */}
         <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -190,15 +201,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
                     : "flex justify-start"
                 }
               >
-                <div
-                  class={
-                    message.role === "user"
-                      ? "bg-blue-500 text-white rounded-lg px-4 py-2 max-w-[80%]"
-                      : message.role === "system"
-                        ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-lg px-4 py-2 max-w-[80%] text-sm"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg px-4 py-2 max-w-[80%]"
-                  }
-                >
+                <div class={getMessageClass(message.role)}>
                   <p class="whitespace-pre-wrap break-words">
                     {message.content}
                   </p>
@@ -215,7 +218,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
           <Show when={state().isLoading}>
             <div class="flex justify-start">
               <div class="bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-2">
-                <Loader2 class="animate-spin text-gray-500" size={16} />
+                <LoaderCircle class="animate-spin text-gray-500" size={16} />
               </div>
             </div>
           </Show>
@@ -266,7 +269,7 @@ export const AIChatDrawer: Component<AIChatDrawerProps> = (props) => {
             </button>
           </Show>
         </form>
-      </div>
+      </dialog>
     </Show>
   );
 };

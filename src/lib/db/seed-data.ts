@@ -27,9 +27,6 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
   try {
     const now = new Date().toISOString();
 
-    // Seed reference data first
-    // seedReferenceData(db);
-
     // Create user_profile entry
     // Note: We need to insert and get the auto-generated ID
     db.run(
@@ -179,50 +176,3 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
     throw error;
   }
 }
-
-// /**
-//  * Seed reference data (genres, tune types, etc.)
-//  * This provides the lookup tables that tunes reference
-//  */
-// function seedReferenceData(db: SqlJsDatabase): void {
-//   console.log("🌱 Seeding reference data...");
-
-//   // Seed genres
-//   const genres = [
-//     { id: "irish", name: "Irish Traditional" },
-//     { id: "scottish", name: "Scottish Traditional" },
-//     { id: "bluegrass", name: "Bluegrass" },
-//     { id: "old-time", name: "Old Time" },
-//     { id: "french", name: "French/Quebecois" },
-//   ];
-
-//   for (const genre of genres) {
-//     db.run(`INSERT OR IGNORE INTO genre (id, name) VALUES (?, ?)`, [
-//       genre.id,
-//       genre.name,
-//     ]);
-//   }
-
-//   // Seed tune types
-//   const tuneTypes = [
-//     { id: "jig", name: "Jig" },
-//     { id: "reel", name: "Reel" },
-//     { id: "hornpipe", name: "Hornpipe" },
-//     { id: "strathspey", name: "Strathspey" },
-//     { id: "march", name: "March" },
-//     { id: "waltz", name: "Waltz" },
-//     { id: "polka", name: "Polka" },
-//     { id: "air", name: "Air" },
-//   ];
-
-//   for (const tuneType of tuneTypes) {
-//     db.run(`INSERT OR IGNORE INTO tune_type (id, name) VALUES (?, ?)`, [
-//       tuneType.id,
-//       tuneType.name,
-//     ]);
-//   }
-
-//   console.log(
-//     `✅ Seeded ${genres.length} genres and ${tuneTypes.length} tune types`
-//   );
-// }

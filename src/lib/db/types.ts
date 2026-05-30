@@ -44,9 +44,6 @@ export type Genre = InferSelectModel<typeof schema.genre>;
 export type Instrument = InferSelectModel<typeof schema.instrument>;
 export type TuneType = InferSelectModel<typeof schema.tuneType>;
 export type Plugin = InferSelectModel<typeof schema.plugin>;
-// export type UserAnnotationSet = InferSelectModel<
-//   typeof schema.userAnnotationSet
-// >;
 
 // Insert types (creating new records)
 export type NewUser = InferInsertModel<typeof schema.userProfile>;
@@ -78,9 +75,7 @@ export type NewGenre = InferInsertModel<typeof schema.genre>;
 export type NewInstrument = InferInsertModel<typeof schema.instrument>;
 export type NewTuneType = InferInsertModel<typeof schema.tuneType>;
 export type NewPlugin = InferInsertModel<typeof schema.plugin>;
-// export type NewUserAnnotationSet = InferInsertModel<
-//   typeof schema.userAnnotationSet
-// >;
+
 // Normalized user scheduling options used across services
 export interface IUserSchedulingOptions {
   userId: string;
@@ -126,14 +121,16 @@ export interface RepertoireWithSummary extends Repertoire {
   genreName?: string;
 }
 
+type GroupRole = "owner" | "admin" | "member";
+
 export interface UserGroupWithSummary extends UserGroup {
   memberCount: number;
   tuneSetCount: number;
-  role: "owner" | "admin" | "member";
+  role: GroupRole;
 }
 
 export interface GroupMemberWithProfile extends GroupMember {
-  effectiveRole: "owner" | "admin" | "member";
+  effectiveRole: GroupRole;
   isOwner: boolean;
   profileName?: string | null;
   profileEmail?: string | null;

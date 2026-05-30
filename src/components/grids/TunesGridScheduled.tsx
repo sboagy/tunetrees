@@ -119,8 +119,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
   // Notify parent when tunes change (for flashcard view)
   createEffect(() => {
     if (props.onTunesChange) {
-      // Cast to ITuneOverview[] since the shape matches
-      props.onTunesChange(tunes() as unknown as ITuneOverview[]);
+      props.onTunesChange(tunes() as ITuneOverview[]);
     }
   });
 
@@ -140,7 +139,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
 
   const handleRowDoubleClick = (row: ReturnType<typeof tunes>[0]) => {
     // Double click: open tune editor via callback
-    props.onTuneSelect?.(row as any);
+    props.onTuneSelect?.(row);
   };
 
   const isLoading = createMemo(() => props.isLoading ?? false);
@@ -158,35 +157,42 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
     }
   );
 
+  // Extract grid status values to avoid nested ternaries (S3358)
+  const gridStatusVariant = () => {
+    if (loadError()) return "error" as const;
+    if (isLoading()) return "loading" as const;
+    return "success" as const;
+  };
+  const gridStatusTitle = () => {
+    if (loadError()) return "Unable to load practice queue";
+    if (isLoading()) return "Loading practice queue...";
+    return "All Caught Up!";
+  };
+  const gridStatusDescription = () => {
+    if (loadError()) return "There was a problem syncing your scheduled tunes.";
+    if (isLoading()) return "Syncing your scheduled tunes.";
+    return "No tunes are due for practice right now.";
+  };
+  const gridStatusHint = () => {
+    if (loadError())
+      return "Refresh the page. If this keeps happening, open the Sync menu and run Force Full Sync Down.";
+    return undefined;
+  };
+
+  // Positive-named computed to avoid negated condition in Show's when prop
+  const gridReady = () => !isLoading() && !loadError() && hasTunes();
+
   return (
     <div class="h-full flex flex-col">
       {/* Show grid when data is available */}
       <Show
-        when={!isLoading() && !loadError() && hasTunes()}
+        when={gridReady()}
         fallback={
           <GridStatusMessage
-            variant={
-              loadError() ? "error" : isLoading() ? "loading" : "success"
-            }
-            title={
-              loadError()
-                ? "Unable to load practice queue"
-                : isLoading()
-                  ? "Loading practice queue..."
-                  : "All Caught Up!"
-            }
-            description={
-              loadError()
-                ? "There was a problem syncing your scheduled tunes."
-                : isLoading()
-                  ? "Syncing your scheduled tunes."
-                  : "No tunes are due for practice right now."
-            }
-            hint={
-              loadError()
-                ? "Refresh the page. If this keeps happening, open the Sync menu and run Force Full Sync Down."
-                : undefined
-            }
+            variant={gridStatusVariant()}
+            title={gridStatusTitle()}
+            description={gridStatusDescription()}
+            hint={gridStatusHint()}
             error={loadError()}
           />
         }
@@ -200,8 +206,8 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           currentRowId={currentTuneId() || undefined}
           enableColumnReorder={true}
           enableRowSelection={false}
-          onRowClick={(row) => handleRowClick(row as any)}
-          onRowDoubleClick={(row) => handleRowDoubleClick(row as any)}
+          onRowClick={(row) => handleRowClick(row)}
+          onRowDoubleClick={(row) => handleRowDoubleClick(row)}
           columnVisibility={columnVisibility()}
           onColumnVisibilityChange={setColumnVisibility}
           cellCallbacks={{
@@ -231,7 +237,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           <div class="sticky bottom-0 z-10 bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-600 px-4 py-2">
             <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
               <span>
-                {tunes().length} tune{tunes().length !== 1 ? "s" : ""} due
+                {tunes().length} tune{tunes().length === 1 ? "" : "s"} due
               </span>
             </div>
           </div>
@@ -248,7 +254,7 @@ export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {
           >
             <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
               <span>
-                {tunes().length} tune{tunes().length !== 1 ? "s" : ""} due
+                {tunes().length} tune{tunes().length === 1 ? "" : "s"} due
               </span>
             </div>
           </button>

@@ -15,7 +15,7 @@ import {
   Database,
   Download,
   FileText,
-  Home,
+  House,
   Info,
   LogOut,
   MessageCircle,
@@ -354,7 +354,7 @@ const LogoDropdown: Component<{
               class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
               onClick={() => setShowDropdown(false)}
             >
-              <Home class="w-4 h-4" aria-hidden="true" />
+              <House class="w-4 h-4" aria-hidden="true" />
               Home
             </a>
 
@@ -665,7 +665,7 @@ const RepertoireDropdown: Component<{
                       </div>
                       <div class="text-xs text-gray-500 dark:text-gray-400">
                         {repertoire.tuneCount} tune
-                        {repertoire.tuneCount !== 1 ? "s" : ""}
+                        {repertoire.tuneCount === 1 ? "" : "s"}
                         {repertoire.genreDefault &&
                           ` • ${repertoire.genreDefault}`}
                       </div>
@@ -743,7 +743,7 @@ export const TopNav: Component = () => {
   });
 
   const handleOpenAssistant = () => {
-    window.dispatchEvent(new CustomEvent("tt-open-ai-assistant"));
+    globalThis.dispatchEvent(new CustomEvent("tt-open-ai-assistant"));
   };
 
   let userMenuContainerRef: HTMLDivElement | undefined;
@@ -752,7 +752,7 @@ export const TopNav: Component = () => {
   const getPendingDeleteCount = async (): Promise<number> => {
     const db = localDb();
     if (!db) return 0;
-    const rows = await db.all<{ count: number }>(
+    const rows = db.all<{ count: number }>(
       "SELECT COUNT(*) as count FROM sync_push_queue WHERE status IN ('pending','in_progress') AND lower(operation) = 'delete';"
     );
     return Number(rows[0]?.count ?? 0);
@@ -843,12 +843,12 @@ export const TopNav: Component = () => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    globalThis.addEventListener("online", handleOnline);
+    globalThis.addEventListener("offline", handleOffline);
 
     onCleanup(() => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      globalThis.removeEventListener("online", handleOnline);
+      globalThis.removeEventListener("offline", handleOffline);
     });
   });
 
@@ -858,7 +858,7 @@ export const TopNav: Component = () => {
     // In Playwright E2E runs, avoid polling SQLite WASM in the UI.
     // This has caused browser OOMs under heavy parallelism.
     const isE2E =
-      typeof window !== "undefined" && !!(window as any).__ttTestApi;
+      globalThis.window !== undefined && !!(globalThis as any).__ttTestApi;
 
     if (!db || isAnonymous() || isE2E) {
       setPendingCount(0); // Reset count for anonymous users
@@ -1077,7 +1077,7 @@ export const TopNav: Component = () => {
                           class="w-full px-4 py-2 text-left text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 font-medium"
                           onClick={() => {
                             setShowUserMenu(false);
-                            window.location.href = "/login?convert=true";
+                            globalThis.location.href = "/login?convert=true";
                           }}
                           data-testid="create-account-button"
                         >
@@ -1124,7 +1124,7 @@ export const TopNav: Component = () => {
                         onClick={async () => {
                           setShowUserMenu(false);
                           await signOut();
-                          window.location.href = "/login";
+                          globalThis.location.href = "/login";
                         }}
                       >
                         <LogOut class="w-4 h-4" aria-hidden="true" />
@@ -1426,8 +1426,8 @@ export const TopNav: Component = () => {
                     </div>
 
                     {/* Database Browser (Temporarily enabled for production) */}
-                    {/* TODO: Restore dev-only condition: <Show when={import.meta.env.DEV}> */}
-                    {/* TODO: Switch back to target="_blank" after https://github.com/sboagy/tunetrees/issues/321 is resolved */}
+                    {/* NOTE: Restore dev-only condition: <Show when={import.meta.env.DEV}> */}
+                    {/* NOTE: Switch back to target="_blank" after https://github.com/sboagy/tunetrees/issues/321 is resolved */}
                     <Show when={true}>
                       <a
                         href="/debug/db"

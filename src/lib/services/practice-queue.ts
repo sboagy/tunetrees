@@ -40,6 +40,21 @@ type QueueCandidateRow = Pick<
   "id" | "scheduled" | "latest_due"
 >;
 
+interface QueueRowsBuildConfig {
+  mode: string;
+  localTzOffsetMinutes: number | null;
+  forceBucket?: number;
+}
+
+interface QueueBuckets {
+  q1Rows: QueueCandidateRow[];
+  q2Rows: QueueCandidateRow[];
+  q3Rows: QueueCandidateRow[];
+  q4Rows: QueueCandidateRow[];
+  maxReviews: number;
+  effectiveMaxReviews: number;
+}
+
 const HARD_QUEUE_ROW_CAP = 5000;
 
 // Type alias to support both sql.js (production) and better-sqlite3 (testing)
@@ -104,10 +119,8 @@ async function getUserSchedulingPrefs(
       .where(eq(prefsSchedulingOptions.userId, userId))
       .limit(1);
 
-    const testAutoScheduleNewOverride =
-      typeof window !== "undefined"
-        ? (window as any).__TUNETREES_TEST_AUTO_SCHEDULE_NEW__
-        : undefined;
+    const testAutoScheduleNewOverride = (globalThis.window as any)
+      ?.__TUNETREES_TEST_AUTO_SCHEDULE_NEW__;
     const effectiveAutoScheduleNew = testAutoScheduleNewOverride ?? true; // just fall back to global default
 
     if (rows[0]) {
@@ -202,7 +215,7 @@ async function fetchExistingActiveQueue(
   windowStartKey: string
 ): Promise<DailyPracticeQueueRow[]> {
   const variants = buildWindowStartUtcVariants(windowStartKey);
-  const results = await db
+  const results = db
     .select()
     .from(dailyPracticeQueue)
     .where(
@@ -216,7 +229,7 @@ async function fetchExistingActiveQueue(
     .orderBy(dailyPracticeQueue.orderIndex) // ← ADD THIS
     .all();
 
-  return results as DailyPracticeQueueRow[];
+  return results;
 }
 
 export interface LatestActiveQueueWindow {
@@ -242,30 +255,48 @@ async function fetchActiveQueueWindowSummaries(
 ): Promise<ActiveQueueWindowSummary[]> {
   const normalizedLimit = Math.max(1, Math.trunc(limit));
   const normalizedOffset = Math.max(0, Math.trunc(offset));
-  const dateFilter = maxQueueDateInclusive
-    ? sql`AND substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) <= ${maxQueueDateInclusive}`
-    : sql``;
-  const rows = await db.all<{
-    queueDate: string;
-    windowStartUtc: string;
-    totalCount: number;
-    incompleteCount: number;
-  }>(sql`
-    SELECT
-      substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) as queueDate,
-      MAX(substr(replace(window_start_utc, 'T', ' '), 1, 19)) as windowStartUtc,
-      COUNT(*) as totalCount,
-      SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) as incompleteCount
-    FROM daily_practice_queue
-    WHERE user_ref = ${userRef}
-      AND repertoire_ref = ${repertoireRef}
-      AND active = 1
-      ${dateFilter}
-    GROUP BY substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10)
-    ORDER BY queueDate DESC
-    LIMIT ${normalizedLimit}
-    OFFSET ${normalizedOffset}
-  `);
+  const rows = maxQueueDateInclusive
+    ? db.all<{
+        queueDate: string;
+        windowStartUtc: string;
+        totalCount: number;
+        incompleteCount: number;
+      }>(sql`
+        SELECT
+          substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) as queueDate,
+          MAX(substr(replace(window_start_utc, 'T', ' '), 1, 19)) as windowStartUtc,
+          COUNT(*) as totalCount,
+          SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) as incompleteCount
+        FROM daily_practice_queue
+        WHERE user_ref = ${userRef}
+          AND repertoire_ref = ${repertoireRef}
+          AND active = 1
+          AND substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) <= ${maxQueueDateInclusive}
+        GROUP BY substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10)
+        ORDER BY queueDate DESC
+        LIMIT ${normalizedLimit}
+        OFFSET ${normalizedOffset}
+      `)
+    : db.all<{
+        queueDate: string;
+        windowStartUtc: string;
+        totalCount: number;
+        incompleteCount: number;
+      }>(sql`
+        SELECT
+          substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10) as queueDate,
+          MAX(substr(replace(window_start_utc, 'T', ' '), 1, 19)) as windowStartUtc,
+          COUNT(*) as totalCount,
+          SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) as incompleteCount
+        FROM daily_practice_queue
+        WHERE user_ref = ${userRef}
+          AND repertoire_ref = ${repertoireRef}
+          AND active = 1
+        GROUP BY substr(replace(COALESCE(queue_date, window_start_utc), 'T', ' '), 1, 10)
+        ORDER BY queueDate DESC
+        LIMIT ${normalizedLimit}
+        OFFSET ${normalizedOffset}
+      `);
 
   return rows.map((row) => ({
     queueDate: String(row.queueDate),
@@ -359,9 +390,7 @@ function buildQueueRows(
   prefs: PrefsSchedulingOptions,
   userRef: string,
   repertoireRef: string,
-  mode: string,
-  localTzOffsetMinutes: number | null,
-  forceBucket?: number
+  config: QueueRowsBuildConfig
 ): Omit<DailyPracticeQueueRow, "id">[] {
   const results: Omit<DailyPracticeQueueRow, "id">[] = [];
   const now = new Date();
@@ -385,13 +414,15 @@ function buildQueueRows(
     const scheduledVal = normalizeTimestamp(row.scheduled);
     const latestVal = normalizeTimestamp(row.latest_due);
     const coalescedRaw = scheduledVal ?? latestVal ?? windows.startTs;
-    const bucket = forceBucket ?? classifyQueueBucket(coalescedRaw, windows);
+    const bucket =
+      config.forceBucket ?? classifyQueueBucket(coalescedRaw, windows);
 
     results.push({
       userRef,
       repertoireRef: repertoireRef,
-      mode,
-      queueDate: mode === "per_day" ? windows.startTs.substring(0, 10) : null,
+      mode: config.mode,
+      queueDate:
+        config.mode === "per_day" ? windows.startTs.substring(0, 10) : null,
       windowStartUtc: windows.startTs,
       windowEndUtc: windows.endTs,
       tuneRef: row.id,
@@ -401,7 +432,7 @@ function buildQueueRows(
       scheduledSnapshot: scheduledVal,
       latestDueSnapshot: latestVal,
       acceptableDelinquencyWindowSnapshot: prefs.acceptableDelinquencyWindow,
-      tzOffsetMinutesSnapshot: localTzOffsetMinutes,
+      tzOffsetMinutesSnapshot: config.localTzOffsetMinutes,
       generatedAt,
       completedAt: null,
       exposuresRequired: null,
@@ -447,7 +478,7 @@ async function persistQueueRows(
 
       // Insert into local database
       // Sync is handled automatically by SQL triggers populating sync_outbox
-      await db.insert(dailyPracticeQueue).values(fullRow).run();
+      db.insert(dailyPracticeQueue).values(fullRow).run();
     }
 
     // Fetch back the inserted rows
@@ -470,6 +501,282 @@ async function persistQueueRows(
       windows.startTs
     );
   }
+}
+
+function pushUniqueRows(
+  source: QueueCandidateRow[],
+  destination: QueueCandidateRow[],
+  seenTuneIds: Set<string>
+): void {
+  for (const row of source) {
+    if (!seenTuneIds.has(row.id)) {
+      destination.push(row);
+      seenTuneIds.add(row.id);
+    }
+  }
+}
+
+function hasRemainingCapacity(
+  maxReviews: number,
+  currentCount: number
+): boolean {
+  return maxReviews === 0 || currentCount < maxReviews;
+}
+
+function getRemainingCapacity(
+  maxReviews: number,
+  effectiveMaxReviews: number,
+  currentCount: number
+): number {
+  return maxReviews === 0
+    ? Math.max(0, effectiveMaxReviews - currentCount)
+    : maxReviews - currentCount;
+}
+
+function fetchQ1Rows(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  windows: SchedulingWindows,
+  limit: number
+): QueueCandidateRow[] {
+  return db.all<QueueCandidateRow>(sql`
+    SELECT id, scheduled, latest_due
+    FROM (
+      SELECT
+        id,
+        scheduled,
+        latest_due,
+        ROW_NUMBER() OVER (
+          PARTITION BY id
+          ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
+        ) as rn
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND repertoire_id = ${repertoireRef}
+        AND deleted = 0
+        AND repertoire_deleted = 0
+        AND (
+          (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
+          OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
+        )
+    ) dedup
+    WHERE rn = 1
+    ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
+    LIMIT ${limit}
+  `);
+}
+
+function fetchQ2Rows(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  windows: SchedulingWindows,
+  limit: number
+): QueueCandidateRow[] {
+  return db.all<QueueCandidateRow>(sql`
+    SELECT id, scheduled, latest_due
+    FROM (
+      SELECT
+        id,
+        scheduled,
+        latest_due,
+        ROW_NUMBER() OVER (
+          PARTITION BY id
+          ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
+        ) as rn
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND repertoire_id = ${repertoireRef}
+        AND deleted = 0
+        AND repertoire_deleted = 0
+        AND (
+          (scheduled IS NOT NULL AND scheduled >= ${windows.windowFloorTs} AND scheduled < ${windows.startTs})
+          OR (scheduled IS NULL AND latest_due >= ${windows.windowFloorTs} AND latest_due < ${windows.startTs})
+        )
+    ) dedup
+    WHERE rn = 1
+    ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
+    LIMIT ${limit}
+  `);
+}
+
+function fetchQ3Rows(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  windows: SchedulingWindows,
+  limit: number,
+  autoScheduleNew: boolean
+): QueueCandidateRow[] {
+  if (autoScheduleNew) {
+    return db.all<QueueCandidateRow>(sql`
+      SELECT id, scheduled, latest_due
+      FROM (
+        SELECT
+          id,
+          scheduled,
+          latest_due,
+          ROW_NUMBER() OVER (
+            PARTITION BY id
+            ORDER BY id ASC
+          ) as rn
+        FROM practice_list_staged
+        WHERE user_ref = ${userRef}
+          AND repertoire_id = ${repertoireRef}
+          AND deleted = 0
+          AND repertoire_deleted = 0
+          AND scheduled IS NULL
+          AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
+      ) dedup
+      WHERE rn = 1
+      ORDER BY id ASC
+      LIMIT ${limit}
+    `);
+  }
+
+  return db.all<QueueCandidateRow>(sql`
+    SELECT id, scheduled, latest_due
+    FROM (
+      SELECT
+        id,
+        scheduled,
+        latest_due,
+        ROW_NUMBER() OVER (
+          PARTITION BY id
+          ORDER BY id ASC
+        ) as rn
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND repertoire_id = ${repertoireRef}
+        AND deleted = 0
+        AND repertoire_deleted = 0
+        AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
+    ) dedup
+    WHERE rn = 1
+    ORDER BY id ASC
+    LIMIT ${limit}
+  `);
+}
+
+function fetchQ4Rows(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  windows: SchedulingWindows,
+  limit: number
+): QueueCandidateRow[] {
+  return db.all<QueueCandidateRow>(sql`
+    SELECT id, scheduled, latest_due
+    FROM (
+      SELECT
+        id,
+        scheduled,
+        latest_due,
+        ROW_NUMBER() OVER (
+          PARTITION BY id
+          ORDER BY scheduled ASC, id ASC
+        ) as rn
+      FROM practice_list_staged
+      WHERE user_ref = ${userRef}
+        AND repertoire_id = ${repertoireRef}
+        AND deleted = 0
+        AND repertoire_deleted = 0
+        AND scheduled IS NOT NULL
+        AND scheduled < ${windows.windowFloorTs}
+    ) dedup
+    WHERE rn = 1
+    ORDER BY scheduled ASC, id ASC
+    LIMIT ${limit}
+  `);
+}
+
+function collectQueueBuckets(
+  db: AnyDatabase,
+  userRef: string,
+  repertoireRef: string,
+  windows: SchedulingWindows,
+  prefs: PrefsSchedulingOptions
+): QueueBuckets {
+  const maxReviews = prefs.maxReviewsPerDay || 0;
+  const effectiveMaxReviews = maxReviews > 0 ? maxReviews : HARD_QUEUE_ROW_CAP;
+  const seenTuneIds = new Set<string>();
+  const candidateRows: QueueCandidateRow[] = [];
+
+  const q1Limit = maxReviews > 0 ? maxReviews : effectiveMaxReviews;
+  let q1Rows = fetchQ1Rows(db, userRef, repertoireRef, windows, q1Limit);
+  pushUniqueRows(q1Rows, candidateRows, seenTuneIds);
+  console.log(`[PracticeQueue] Q1 (due today): ${q1Rows.length} tunes`);
+
+  let q2Rows: QueueCandidateRow[] = [];
+  if (hasRemainingCapacity(maxReviews, candidateRows.length)) {
+    const remainingCapacity = getRemainingCapacity(
+      maxReviews,
+      effectiveMaxReviews,
+      candidateRows.length
+    );
+    q2Rows = fetchQ2Rows(
+      db,
+      userRef,
+      repertoireRef,
+      windows,
+      remainingCapacity
+    );
+    pushUniqueRows(q2Rows, candidateRows, seenTuneIds);
+    console.log(`[PracticeQueue] Q2 (recently lapsed): ${q2Rows.length} tunes`);
+  }
+
+  let q3Rows: QueueCandidateRow[] = [];
+  if (hasRemainingCapacity(maxReviews, candidateRows.length)) {
+    const remainingCapacity = getRemainingCapacity(
+      maxReviews,
+      effectiveMaxReviews,
+      candidateRows.length
+    );
+    q3Rows = fetchQ3Rows(
+      db,
+      userRef,
+      repertoireRef,
+      windows,
+      remainingCapacity,
+      prefs.autoScheduleNew
+    );
+    pushUniqueRows(q3Rows, candidateRows, seenTuneIds);
+    console.log(`[PracticeQueue] Q3 (new/unscheduled): ${q3Rows.length} tunes`);
+  }
+
+  let q4Rows: QueueCandidateRow[] = [];
+  if (hasRemainingCapacity(maxReviews, candidateRows.length)) {
+    const remainingCapacity = getRemainingCapacity(
+      maxReviews,
+      effectiveMaxReviews,
+      candidateRows.length
+    );
+    q4Rows = fetchQ4Rows(
+      db,
+      userRef,
+      repertoireRef,
+      windows,
+      remainingCapacity
+    );
+    pushUniqueRows(q4Rows, candidateRows, seenTuneIds);
+    console.log(`[PracticeQueue] Q4 (old lapsed): ${q4Rows.length} tunes`);
+  }
+
+  if (candidateRows.length === 0) {
+    const fallbackLimit = maxReviews > 0 ? maxReviews : effectiveMaxReviews;
+    q1Rows = fetchQ1Rows(db, userRef, repertoireRef, windows, fallbackLimit);
+    pushUniqueRows(q1Rows, candidateRows, seenTuneIds);
+    console.log(
+      `[PracticeQueue] Q1 fallback (due later today): ${q1Rows.length} tunes`
+    );
+  }
+
+  console.log(
+    `[PracticeQueue] Generating new queue: ${candidateRows.length} candidate tunes (max: ${maxReviews || "uncapped"})`
+  );
+
+  return { q1Rows, q2Rows, q3Rows, q4Rows, maxReviews, effectiveMaxReviews };
 }
 
 /**
@@ -514,7 +821,7 @@ export async function ensureDailyQueue(
   // For backward compatibility, also check space-separated format during transition
   // Use an existence check instead of COUNT(*) to reduce memory/CPU for SQL.js,
   // especially during long e2e runs with many user sessions.
-  const existing = await db.all<{ one: number }>(sql`
+  const existing = db.all<{ one: number }>(sql`
     SELECT 1 as one
     FROM daily_practice_queue
     WHERE user_ref = ${userRef}
@@ -612,7 +919,7 @@ export async function generateOrGetPracticeQueue(
   // ⚠️ GUARD: Check if database has been populated yet
   // On fresh login, queue may try to generate before initial sync completes
   // If practice_list_staged is empty, return empty queue and let sync trigger reload
-  const stagedExists = await db.all<{ one: number }>(sql`
+  const stagedExists = db.all<{ one: number }>(sql`
     SELECT 1 as one
     FROM practice_list_staged
     WHERE user_ref = ${userRef} AND repertoire_id = ${repertoireRef}
@@ -646,8 +953,7 @@ export async function generateOrGetPracticeQueue(
   if (forceRegen && existing.length > 0) {
     const variants = buildWindowStartUtcVariants(windowStartKey);
     console.log("[PracticeQueue] Force regen: deleting old queue");
-    await db
-      .delete(dailyPracticeQueue)
+    db.delete(dailyPracticeQueue)
       .where(
         and(
           eq(dailyPracticeQueue.userRef, userRef),
@@ -657,250 +963,12 @@ export async function generateOrGetPracticeQueue(
       )
       .run();
   }
-
-  // Query practice_list_staged using four-bucket logic with capacity limits
-  // Q1 (Due Today) + Q2 (Recently Lapsed) + Q3 (New/Unscheduled) + Q4 (Old Lapsed)
-  // Implements max_reviews capacity constraint across all buckets
-
-  const maxReviews = prefs.maxReviewsPerDay || 0; // 0 = uncapped
-  const effectiveMaxReviews = maxReviews > 0 ? maxReviews : HARD_QUEUE_ROW_CAP;
-  const seenTuneIds = new Set<string>();
-  const candidateRows: QueueCandidateRow[] = [];
-
-  // Q1: Due Today (scheduled or latest_due within [startTs, endTs))
-  let q1Rows: QueueCandidateRow[];
-  const q1Limit = maxReviews > 0 ? maxReviews : effectiveMaxReviews;
-  q1Rows = await db.all<QueueCandidateRow>(sql`
-    SELECT id, scheduled, latest_due
-    FROM (
-      SELECT
-        id,
-        scheduled,
-        latest_due,
-        ROW_NUMBER() OVER (
-          PARTITION BY id
-          ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
-        ) as rn
-      FROM practice_list_staged
-      WHERE user_ref = ${userRef}
-        AND repertoire_id = ${repertoireRef}
-        AND deleted = 0
-        AND repertoire_deleted = 0
-        AND (
-          (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
-          OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
-        )
-    ) dedup
-    WHERE rn = 1
-    ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
-    LIMIT ${q1Limit}
-  `);
-
-  for (const row of q1Rows) {
-    candidateRows.push(row);
-    seenTuneIds.add(row.id);
-  }
-
-  console.log(`[PracticeQueue] Q1 (due today): ${q1Rows.length} tunes`);
-
-  // Q2: Recently Lapsed (if capacity remains)
-  let q2Rows: QueueCandidateRow[] = [];
-  if (maxReviews === 0 || candidateRows.length < maxReviews) {
-    const remainingCapacity =
-      maxReviews === 0
-        ? Math.max(0, effectiveMaxReviews - candidateRows.length)
-        : maxReviews - candidateRows.length;
-    q2Rows = await db.all<QueueCandidateRow>(sql`
-      SELECT id, scheduled, latest_due
-      FROM (
-        SELECT
-          id,
-          scheduled,
-          latest_due,
-          ROW_NUMBER() OVER (
-            PARTITION BY id
-            ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
-          ) as rn
-        FROM practice_list_staged
-        WHERE user_ref = ${userRef}
-          AND repertoire_id = ${repertoireRef}
-          AND deleted = 0
-          AND repertoire_deleted = 0
-          AND (
-            (scheduled IS NOT NULL AND scheduled >= ${windows.windowFloorTs} AND scheduled < ${windows.startTs})
-            OR (scheduled IS NULL AND latest_due >= ${windows.windowFloorTs} AND latest_due < ${windows.startTs})
-          )
-      ) dedup
-      WHERE rn = 1
-      ORDER BY COALESCE(scheduled, latest_due) DESC, id ASC
-      LIMIT ${remainingCapacity}
-    `);
-
-    for (const row of q2Rows) {
-      if (!seenTuneIds.has(row.id)) {
-        candidateRows.push(row);
-        seenTuneIds.add(row.id);
-      }
-    }
-
-    console.log(`[PracticeQueue] Q2 (recently lapsed): ${q2Rows.length} tunes`);
-  }
-
-  // Q3: New/Unscheduled tunes (if capacity still remains)
-  // Never-scheduled tunes (scheduled IS NULL AND latest_due IS NULL)
-  // OR practiced long ago but never scheduled (scheduled IS NULL AND latest_due < windowFloorTs)
-  let q3Rows: QueueCandidateRow[] = [];
-  if (maxReviews === 0 || candidateRows.length < maxReviews) {
-    const remainingCapacity =
-      maxReviews === 0
-        ? Math.max(0, effectiveMaxReviews - candidateRows.length)
-        : maxReviews - candidateRows.length;
-    if (prefs.autoScheduleNew) {
-      q3Rows = await db.all<QueueCandidateRow>(sql`
-        SELECT id, scheduled, latest_due
-        FROM (
-          SELECT
-            id,
-            scheduled,
-            latest_due,
-            ROW_NUMBER() OVER (
-              PARTITION BY id
-              ORDER BY id ASC
-            ) as rn
-          FROM practice_list_staged
-          WHERE user_ref = ${userRef}
-            AND repertoire_id = ${repertoireRef}
-            AND deleted = 0
-            AND repertoire_deleted = 0
-            AND scheduled IS NULL
-            AND (latest_due IS NULL OR latest_due < ${windows.windowFloorTs})
-        ) dedup
-        WHERE rn = 1
-        ORDER BY id ASC
-        LIMIT ${remainingCapacity}
-      `);
-    } else {
-      q3Rows = await db.all<QueueCandidateRow>(sql`
-        SELECT id, scheduled, latest_due
-        FROM (
-          SELECT
-            id,
-            scheduled,
-            latest_due,
-            ROW_NUMBER() OVER (
-              PARTITION BY id
-              ORDER BY id ASC
-            ) as rn
-          FROM practice_list_staged
-          WHERE user_ref = ${userRef}
-            AND repertoire_id = ${repertoireRef}
-            AND deleted = 0
-            AND repertoire_deleted = 0
-            AND (latest_due IS NOT NULL AND latest_due < ${windows.windowFloorTs})
-        ) dedup
-        WHERE rn = 1
-        ORDER BY id ASC
-        LIMIT ${remainingCapacity}
-      `);
-    }
-
-    for (const row of q3Rows) {
-      if (!seenTuneIds.has(row.id)) {
-        candidateRows.push(row);
-        seenTuneIds.add(row.id);
-      }
-    }
-
-    console.log(`[PracticeQueue] Q3 (new/unscheduled): ${q3Rows.length} tunes`);
-  }
-
-  // Q4: Old Lapsed tunes (if capacity still remains)
-  // Very old scheduled tunes (scheduled before windowFloorTs)
-  let q4Rows: QueueCandidateRow[] = [];
-  if (maxReviews === 0 || candidateRows.length < maxReviews) {
-    const remainingCapacity =
-      maxReviews === 0
-        ? Math.max(0, effectiveMaxReviews - candidateRows.length)
-        : maxReviews - candidateRows.length;
-    q4Rows = await db.all<QueueCandidateRow>(sql`
-      SELECT id, scheduled, latest_due
-      FROM (
-        SELECT
-          id,
-          scheduled,
-          latest_due,
-          ROW_NUMBER() OVER (
-            PARTITION BY id
-            ORDER BY scheduled ASC, id ASC
-          ) as rn
-        FROM practice_list_staged
-        WHERE user_ref = ${userRef}
-          AND repertoire_id = ${repertoireRef}
-          AND deleted = 0
-          AND repertoire_deleted = 0
-          AND scheduled IS NOT NULL
-          AND scheduled < ${windows.windowFloorTs}
-      ) dedup
-      WHERE rn = 1
-      ORDER BY scheduled ASC, id ASC
-      LIMIT ${remainingCapacity}
-    `);
-
-    for (const row of q4Rows) {
-      if (!seenTuneIds.has(row.id)) {
-        candidateRows.push(row);
-        seenTuneIds.add(row.id);
-      }
-    }
-
-    console.log(`[PracticeQueue] Q4 (old lapsed): ${q4Rows.length} tunes`);
-  }
-
-  // Fallback: if nothing is currently due, include due-later-today tunes so the
-  // queue still advances to the new window and remains actionable.
-  if (candidateRows.length === 0) {
-    const fallbackLimit = maxReviews > 0 ? maxReviews : effectiveMaxReviews;
-
-    q1Rows = await db.all<QueueCandidateRow>(sql`
-      SELECT id, scheduled, latest_due
-      FROM (
-        SELECT
-          id,
-          scheduled,
-          latest_due,
-          ROW_NUMBER() OVER (
-            PARTITION BY id
-            ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
-          ) as rn
-        FROM practice_list_staged
-        WHERE user_ref = ${userRef}
-          AND repertoire_id = ${repertoireRef}
-          AND deleted = 0
-          AND repertoire_deleted = 0
-          AND (
-            (scheduled IS NOT NULL AND scheduled >= ${windows.startTs} AND scheduled < ${windows.endTs})
-            OR (scheduled IS NULL AND latest_due >= ${windows.startTs} AND latest_due < ${windows.endTs})
-          )
-      ) dedup
-      WHERE rn = 1
-      ORDER BY COALESCE(scheduled, latest_due) ASC, id ASC
-      LIMIT ${fallbackLimit}
-    `);
-
-    for (const row of q1Rows) {
-      if (!seenTuneIds.has(row.id)) {
-        candidateRows.push(row);
-        seenTuneIds.add(row.id);
-      }
-    }
-
-    console.log(
-      `[PracticeQueue] Q1 fallback (due later today): ${q1Rows.length} tunes`
-    );
-  }
-
-  console.log(
-    `[PracticeQueue] Generating new queue: ${candidateRows.length} candidate tunes (max: ${maxReviews || "uncapped"})`
+  const { q1Rows, q2Rows, q3Rows, q4Rows } = collectQueueBuckets(
+    db,
+    userRef,
+    repertoireRef,
+    windows,
+    prefs
   );
 
   // Build queue rows - mark each with its actual bucket
@@ -911,9 +979,7 @@ export async function generateOrGetPracticeQueue(
     prefs,
     userRef,
     repertoireRef,
-    mode,
-    localTzOffsetMinutes,
-    1 // Force bucket 1 (Due Today)
+    { mode, localTzOffsetMinutes, forceBucket: 1 } // Force bucket 1 (Due Today)
   );
 
   const q2Built = buildQueueRows(
@@ -922,9 +988,7 @@ export async function generateOrGetPracticeQueue(
     prefs,
     userRef,
     repertoireRef,
-    mode,
-    localTzOffsetMinutes,
-    2 // Force bucket 2 (Recently Lapsed)
+    { mode, localTzOffsetMinutes, forceBucket: 2 } // Force bucket 2 (Recently Lapsed)
   );
 
   const q3Built = buildQueueRows(
@@ -933,9 +997,7 @@ export async function generateOrGetPracticeQueue(
     prefs,
     userRef,
     repertoireRef,
-    mode,
-    localTzOffsetMinutes,
-    3 // Force bucket 3 (New/Unscheduled)
+    { mode, localTzOffsetMinutes, forceBucket: 3 } // Force bucket 3 (New/Unscheduled)
   );
 
   const q4Built = buildQueueRows(
@@ -944,9 +1006,7 @@ export async function generateOrGetPracticeQueue(
     prefs,
     userRef,
     repertoireRef,
-    mode,
-    localTzOffsetMinutes,
-    4 // Force bucket 4 (Old Lapsed)
+    { mode, localTzOffsetMinutes, forceBucket: 4 } // Force bucket 4 (Old Lapsed)
   );
 
   // Combine and renumber order indices
@@ -1109,8 +1169,7 @@ export async function addSpecificTunesToExistingQueue(
 
   for (let i = 0; i < newTuneIds.length; i++) {
     const tuneRef = newTuneIds[i];
-    await db
-      .insert(dailyPracticeQueue)
+    db.insert(dailyPracticeQueue)
       .values({
         id: generateId(),
         userRef,
@@ -1143,7 +1202,7 @@ export async function addSpecificTunesToExistingQueue(
 
   // Fetch back the inserted rows
   const variants = buildWindowStartUtcVariants(activeWindowStartKey);
-  const added = await db
+  const added = db
     .select()
     .from(dailyPracticeQueue)
     .where(
@@ -1160,7 +1219,7 @@ export async function addSpecificTunesToExistingQueue(
   console.log(
     `[AddSpecificTunes] Successfully added ${added.length} tunes to existing queue`
   );
-  return added as DailyPracticeQueueRow[];
+  return added;
 }
 
 /**
@@ -1238,7 +1297,7 @@ export async function addTunesToQueue(
     Math.max(count * 50, count + existing.length + 25)
   );
 
-  const backlogRows = await db.all<QueueCandidateRow>(sql`
+  const backlogRows = db.all<QueueCandidateRow>(sql`
     SELECT id, scheduled, latest_due
     FROM (
       SELECT
@@ -1294,8 +1353,7 @@ export async function addTunesToQueue(
     prefs,
     userRef,
     repertoireRef,
-    "per_day",
-    localTzOffsetMinutes
+    { mode: "per_day", localTzOffsetMinutes }
   );
 
   // Adjust order indices to append sequentially after existing queue
@@ -1307,8 +1365,7 @@ export async function addTunesToQueue(
   // Persist new rows to database
   const now = new Date().toISOString().replace("T", " ").substring(0, 19);
   for (const row of built) {
-    await db
-      .insert(dailyPracticeQueue)
+    db.insert(dailyPracticeQueue)
       .values({
         id: generateId(),
         ...row,
@@ -1320,7 +1377,7 @@ export async function addTunesToQueue(
   // Fetch back the inserted rows
   const addedTuneIds = built.map((r) => r.tuneRef);
   const variants = buildWindowStartUtcVariants(windowStartKey);
-  const added = await db
+  const added = db
     .select()
     .from(dailyPracticeQueue)
     .where(
@@ -1336,5 +1393,5 @@ export async function addTunesToQueue(
 
   console.log(`[AddTunes] Successfully added ${added.length} tunes to queue`);
 
-  return added as DailyPracticeQueueRow[];
+  return added;
 }

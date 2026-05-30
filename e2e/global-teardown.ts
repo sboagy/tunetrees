@@ -12,10 +12,7 @@ import type { FullConfig } from "@playwright/test";
 async function globalTeardown(_config: FullConfig) {
   console.log("🧹 Playwright Global Teardown");
 
-  // TODO: Add any global cleanup needed for TuneTrees
-  // - Clear test data
-  // - Reset database state
-  // - Cleanup temporary files
+  // Global cleanup placeholder: clear test data, reset database state
 
   console.log("✅ Global teardown complete");
 }

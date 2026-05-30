@@ -189,12 +189,18 @@ test.describe
       // This is to hopefully fix this flaky test.
       await expect(async () => {
         const updatedText = await counter.textContent();
-        const updatedTotal = parseInt(updatedText?.split(" of ")[1] || "0", 10);
+        const updatedTotal = Number.parseInt(
+          updatedText?.split(" of ")[1] || "0",
+          10
+        );
         expect(updatedTotal).toBe(3);
       }).toPass({ timeout: 5000 });
 
       const initialText = await counter.textContent();
-      const initialTotal = parseInt(initialText?.split(" of ")[1] || "0", 10);
+      const initialTotal = Number.parseInt(
+        initialText?.split(" of ")[1] || "0",
+        10
+      );
 
       // Select and submit evaluation
       await app.selectFlashcardEvaluation("good");
@@ -221,7 +227,9 @@ test.describe
           async () => {
             const updatedText = (await counter.textContent()) || "";
             const match = updatedText.match(/\bof\s+(\d+)\b/i);
-            const updatedTotal = match ? parseInt(match[1] || "", 10) : null;
+            const updatedTotal = match
+              ? Number.parseInt(match[1] || "", 10)
+              : null;
             const parsedTotal =
               updatedTotal === null || Number.isNaN(updatedTotal)
                 ? null
@@ -244,7 +252,7 @@ test.describe
       // Ensure we have at least 2 cards
       const counter = app.flashcardHeaderCounter;
       const initialText = await counter.textContent();
-      const total = parseInt(initialText?.split(" of ")[1] || "0", 10);
+      const total = Number.parseInt(initialText?.split(" of ")[1] || "0", 10);
       if (total < 2) {
         test.fixme(
           true,

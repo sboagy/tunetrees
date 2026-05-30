@@ -435,7 +435,7 @@ test.describe("Scroll Position Persistence", () => {
     // Wait for sync to complete BEFORE navigating to tab
     await page.waitForFunction(
       () => {
-        return (window as any).__ttTestApi?.isInitialSyncComplete();
+        return (globalThis as any).__ttTestApi?.isInitialSyncComplete();
       },
       { timeout: 30000 }
     );
@@ -574,7 +574,7 @@ test.describe("Scroll Position Persistence", () => {
     // Wait for sync to complete BEFORE navigating to tab
     await page.waitForFunction(
       () => {
-        return (window as any).__ttTestApi?.isInitialSyncComplete();
+        return (globalThis as any).__ttTestApi?.isInitialSyncComplete();
       },
       { timeout: 30000 }
     );

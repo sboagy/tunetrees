@@ -67,7 +67,7 @@ export const TagInput: Component<TagInputProps> = (props) => {
       props.selectedTags.length > 0
     ) {
       // Remove last tag if input is empty
-      removeTag(props.selectedTags[props.selectedTags.length - 1]);
+      removeTag(props.selectedTags.at(-1)!);
     }
   };
 

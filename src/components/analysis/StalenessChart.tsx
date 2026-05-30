@@ -95,7 +95,7 @@ export const StalenessChart: Component<Props> = (props) => {
               Failed to load data
             </div>
           </Match>
-          <Match when={totalOverdue() === 0 && !buckets.loading}>
+          <Match when={!buckets.loading && totalOverdue() === 0}>
             <div class="flex h-48 flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground">
               <span>🎉 No overdue tunes!</span>
               <span class="text-xs">All your tunes are up to date</span>
@@ -135,7 +135,7 @@ export const StalenessChart: Component<Props> = (props) => {
                           enabled: true,
                           callbacks: {
                             label: (ctx) =>
-                              ` ${ctx.parsed.y} tune${ctx.parsed.y !== 1 ? "s" : ""}`,
+                              ` ${ctx.parsed.y} tune${ctx.parsed.y === 1 ? "" : "s"}`,
                           },
                         },
                       },

@@ -55,22 +55,24 @@ function getRelativeLabel(value: string | null | undefined): {
   const diffDays = Math.round(
     (dateOnly.getTime() - nowOnly.getTime()) / (1000 * 60 * 60 * 24)
   );
-  let colorClass = "text-gray-600 dark:text-gray-400";
+  let colorClass: string;
   if (diffDays < 0) colorClass = "text-red-600 dark:text-red-400";
   else if (diffDays === 0) colorClass = "text-orange-600 dark:text-orange-400";
   else if (diffDays <= 7) colorClass = "text-yellow-600 dark:text-yellow-400";
   else colorClass = "text-green-600 dark:text-green-400";
 
-  const label =
-    diffDays === 0
-      ? "Today"
-      : diffDays === -1
-        ? "Yesterday"
-        : diffDays < 0
-          ? `${Math.abs(diffDays)}d overdue`
-          : diffDays === 1
-            ? "Tomorrow"
-            : `In ${diffDays}d`;
+  let label: string;
+  if (diffDays === 0) {
+    label = "Today";
+  } else if (diffDays === -1) {
+    label = "Yesterday";
+  } else if (diffDays < 0) {
+    label = `${Math.abs(diffDays)}d overdue`;
+  } else if (diffDays === 1) {
+    label = "Tomorrow";
+  } else {
+    label = `In ${diffDays}d`;
+  }
 
   return { label, colorClass };
 }
@@ -94,7 +96,7 @@ const TypeBadge = (props: {
     >
       <button
         type="button"
-        class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer transition-colors"
+        class="pointer-events-auto relative z-20 inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 cursor-pointer transition-colors"
         onClick={(e) => {
           e.stopPropagation();
           props.onClick?.();
@@ -165,7 +167,7 @@ const StateBadge = (props: { value: number | null | undefined }) => {
     },
   };
   const status =
-    props.value != null ? (statuses[props.value] ?? statuses[0]) : null;
+    props.value == null ? null : (statuses[props.value] ?? statuses[0]);
   return (
     <Show when={status}>
       <span class={status!.class}>{status!.label}</span>
@@ -360,6 +362,15 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
             const scheduledDisplay = displayedScheduled
               ? getRelativeLabel(displayedScheduled)
               : null;
+            const rowStateClass = () => {
+              if (isSelected()) {
+                return "bg-blue-50 dark:bg-blue-900/25 border-l-2 border-blue-400 dark:border-blue-500";
+              }
+              if (belongsToSet) {
+                return "bg-emerald-100/80 hover:bg-emerald-100 border-l-2 border-emerald-300/80 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/80";
+              }
+              return "hover:bg-gray-50 dark:hover:bg-gray-800/50";
+            };
 
             const tuneMetadata = (): JSX.Element[] => [
               ...(isColVisible("structure") && item.structure
@@ -460,59 +471,67 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                       : []),
                   ];
 
-            const auxiliaryMetadata = (): JSX.Element[] => [
-              ...(isColVisible("tags") && item.tags
-                ? [renderLabeledValue("Tags", item.tags)]
-                : []),
-              ...(isColVisible("purpose") && item.purpose
-                ? [renderLabeledValue("Purpose", item.purpose)]
-                : []),
-              ...(isColVisible("note_private") && item.note_private
-                ? [renderLabeledValue("Private Note", item.note_private)]
-                : []),
-              ...(isColVisible("note_public") && item.note_public
-                ? [renderLabeledValue("Public Note", item.note_public)]
-                : []),
-              ...(isColVisible("has_override") && item.has_override === 1
-                ? [
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
-                      Override
-                    </span>,
-                  ]
-                : []),
-              ...(isColVisible("has_staged") && item.has_staged === 1
-                ? [
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
-                      Staged
-                    </span>,
-                  ]
-                : []),
-              ...(isColVisible("private_for")
-                ? [
-                    <span>
-                      Ownership: <OwnershipBadge value={privateFor} />
-                    </span>,
-                  ]
-                : []),
-              ...(isColVisible("id_foreign") && idForeign
-                ? [
-                    renderLabeledValue(
-                      "External ID",
-                      idForeign,
-                      "font-mono text-gray-700 dark:text-gray-300"
-                    ),
-                  ]
-                : []),
-              ...(showIdInMetadata()
-                ? [
-                    renderLabeledValue(
-                      "ID",
-                      checkboxIdentifier,
-                      "font-mono text-gray-700 dark:text-gray-300"
-                    ),
-                  ]
-                : []),
-            ];
+            const auxiliaryMetadata = (): JSX.Element[] => {
+              const entries: JSX.Element[] = [];
+
+              if (isColVisible("tags") && item.tags) {
+                entries.push(renderLabeledValue("Tags", item.tags));
+              }
+              if (isColVisible("purpose") && item.purpose) {
+                entries.push(renderLabeledValue("Purpose", item.purpose));
+              }
+              if (isColVisible("note_private") && item.note_private) {
+                entries.push(
+                  renderLabeledValue("Private Note", item.note_private)
+                );
+              }
+              if (isColVisible("note_public") && item.note_public) {
+                entries.push(
+                  renderLabeledValue("Public Note", item.note_public)
+                );
+              }
+              if (isColVisible("has_override") && item.has_override === 1) {
+                entries.push(
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                    Override
+                  </span>
+                );
+              }
+              if (isColVisible("has_staged") && item.has_staged === 1) {
+                entries.push(
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+                    Staged
+                  </span>
+                );
+              }
+              if (isColVisible("private_for")) {
+                entries.push(
+                  <span>
+                    Ownership: <OwnershipBadge value={privateFor} />
+                  </span>
+                );
+              }
+              if (isColVisible("id_foreign") && idForeign) {
+                entries.push(
+                  renderLabeledValue(
+                    "External ID",
+                    idForeign,
+                    "font-mono text-gray-700 dark:text-gray-300"
+                  )
+                );
+              }
+              if (showIdInMetadata()) {
+                entries.push(
+                  renderLabeledValue(
+                    "ID",
+                    checkboxIdentifier,
+                    "font-mono text-gray-700 dark:text-gray-300"
+                  )
+                );
+              }
+
+              return entries;
+            };
 
             const metadataEntries = (): JSX.Element[] => [
               ...tuneMetadata(),
@@ -520,37 +539,46 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
               ...auxiliaryMetadata(),
             ];
 
+            const activateRow = () => {
+              props.onRowClick?.(item);
+            };
+
+            const openRow = () => {
+              props.onRowDoubleClick?.(item);
+            };
+
+            const bindRowDoubleClick = (element: HTMLLIElement) => {
+              element.addEventListener("dblclick", openRow);
+            };
+
+            const rowTestId = `stacked-item-${rowId}`;
+            const rowActivatorTestId = `stacked-row-activate-${rowId}`;
+            const rowAriaLabel = `Select tune ${title}`;
+            const rowPressed = isSelected();
+            const rowSelectedAttr = rowPressed ? "true" : undefined;
+
             return (
               <li
-                class={`px-4 py-3 min-h-[44px] cursor-pointer transition-colors ${
-                  isSelected()
-                    ? "bg-blue-50 dark:bg-blue-900/25 border-l-2 border-blue-400 dark:border-blue-500"
-                    : belongsToSet
-                      ? "bg-emerald-100/80 hover:bg-emerald-100 border-l-2 border-emerald-300/80 dark:bg-emerald-950/45 dark:hover:bg-emerald-900/40 dark:border-emerald-800/80"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                }`}
-                onClick={() => props.onRowClick?.(item)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    props.onRowClick?.(item);
-                  }
-                }}
-                onDblClick={() => props.onRowDoubleClick?.(item)}
-                data-testid={`stacked-item-${rowId}`}
-                data-selected={isSelected() ? "true" : undefined}
+                ref={bindRowDoubleClick}
+                class={`relative ${rowStateClass()}`}
+                data-testid={rowTestId}
+                data-selected={rowSelectedAttr}
               >
-                <div class="flex items-start gap-2.5">
+                <button
+                  type="button"
+                  class="absolute inset-0 z-10 w-full text-left"
+                  data-testid={rowActivatorTestId}
+                  aria-label={rowAriaLabel}
+                  aria-pressed={rowPressed}
+                  onClick={activateRow}
+                />
+                <div class="relative flex min-h-[44px] items-start gap-2.5 px-4 py-3 pointer-events-none">
                   <Show when={showsRowSelection()}>
-                    {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper isolates checkbox interaction from row tap selection */}
-                    {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the checkbox itself */}
-                    <div
-                      class="flex h-10 w-10 flex-shrink-0 items-start justify-center pt-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <div class="pointer-events-auto relative z-20 flex h-10 w-10 flex-shrink-0 items-start justify-center pt-1">
                       <input
                         type="checkbox"
                         checked={isRowChecked()}
+                        onClick={(event) => event.stopPropagation()}
                         onChange={(e) =>
                           props.onRowSelectionChange?.(
                             item,
@@ -582,7 +610,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         >
                           <button
                             type="button"
-                            class="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                            class="pointer-events-auto relative z-20 mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-0 bg-transparent text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                             aria-label={
                               isExpanded ? "Collapse row" : "Expand row"
                             }
@@ -627,8 +655,8 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                                 href={href!}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                class="text-blue-600 dark:text-blue-400 hover:underline"
-                                onClick={(e) => e.stopPropagation()}
+                                class="pointer-events-auto relative z-20 text-blue-600 dark:text-blue-400 hover:underline"
+                                onClick={(event) => event.stopPropagation()}
                               >
                                 {title}
                               </a>
@@ -658,19 +686,21 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                     {/* Row 2: Type + Mode badges + purpose-specific interactive control */}
                     <div class="mt-1 flex flex-wrap items-center gap-1.5">
                       <Show when={isColVisible("type")}>
-                        <TypeBadge
-                          value={item.type}
-                          onClick={() => {
-                            const tuneId = item.tune_id ?? item.id;
-                            props.cellCallbacks?.onTypeBadgeClick?.({
-                              tuneId: String(tuneId),
-                              tuneTypeName: item.type ?? "",
-                              genreId: item.genre ?? null,
-                              genreName: null,
-                              structure: item.structure ?? null,
-                            });
-                          }}
-                        />
+                        <div class="pointer-events-auto relative z-20">
+                          <TypeBadge
+                            value={item.type}
+                            onClick={() => {
+                              const tuneId = item.tune_id ?? item.id;
+                              props.cellCallbacks?.onTypeBadgeClick?.({
+                                tuneId: String(tuneId),
+                                tuneTypeName: item.type ?? "",
+                                genreId: item.genre ?? null,
+                                genreName: null,
+                                structure: item.structure ?? null,
+                              });
+                            }}
+                          />
+                        </div>
                       </Show>
                       <Show when={isColVisible("mode")}>
                         <ModeBadge value={item.mode} />
@@ -691,12 +721,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           isColVisible("goal")
                         }
                       >
-                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper prevents row selection while interacting with goal controls */}
-                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the contained dropdown trigger */}
-                        <div
-                          class="flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div class="pointer-events-auto relative z-20 flex-shrink-0">
                           <GoalBadge
                             value={goalDisplayValue}
                             goals={props.cellCallbacks?.goals}
@@ -716,12 +741,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                           isColVisible("scheduled")
                         }
                       >
-                        {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper prevents row selection while interacting with schedule controls */}
-                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard interaction is handled by the contained picker trigger */}
-                        <div
-                          class="min-w-0 flex-shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div class="pointer-events-auto relative z-20 min-w-0 flex-shrink-0">
                           <Show
                             when={props.cellCallbacks?.onScheduledChange}
                             fallback={
@@ -770,12 +790,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         <Show
                           when={item.completed_at}
                           fallback={
-                            /* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper to prevent row selection when interacting with dropdown */
-                            /* biome-ignore lint/a11y/useKeyWithClickEvents: stop-propagation wrapper only; keyboard events are handled by the contained combobox */
-                            <div
-                              class="ml-auto w-40 flex-shrink-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
+                            <div class="pointer-events-auto relative z-20 ml-auto w-40 flex-shrink-0">
                               <RecallEvalComboBox
                                 tuneId={String(itemId)}
                                 value={item.recall_eval ?? ""}

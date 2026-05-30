@@ -29,7 +29,10 @@ export function computeSchedulingWindows(
 
   let startOfDayUtc: Date;
 
-  if (localTzOffsetMinutes !== null) {
+  if (localTzOffsetMinutes === null) {
+    startOfDayUtc = new Date(sitdownUtc);
+    startOfDayUtc.setUTCHours(0, 0, 0, 0);
+  } else {
     const offsetMs = localTzOffsetMinutes * 60 * 1000;
     const localDt = new Date(sitdownUtc.getTime() + offsetMs);
 
@@ -46,9 +49,6 @@ export function computeSchedulingWindows(
     );
 
     startOfDayUtc = new Date(localStart.getTime() - offsetMs);
-  } else {
-    startOfDayUtc = new Date(sitdownUtc);
-    startOfDayUtc.setUTCHours(0, 0, 0, 0);
   }
 
   const endOfDayUtc = addDays(startOfDayUtc, 1);
@@ -83,19 +83,18 @@ export function classifyQueueBucket(
   let dt: Date | null = null;
 
   try {
-    const match = norm19.match(
-      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-    );
-    if (match) {
-      const [, year, month, day, hour, minute, second] = match;
+    const matchResult =
+      /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(norm19);
+    if (matchResult) {
+      const [, year, month, day, hour, minute, second] = matchResult;
       dt = new Date(
         Date.UTC(
-          parseInt(year, 10),
-          parseInt(month, 10) - 1,
-          parseInt(day, 10),
-          parseInt(hour, 10),
-          parseInt(minute, 10),
-          parseInt(second, 10)
+          Number.parseInt(year, 10),
+          Number.parseInt(month, 10) - 1,
+          Number.parseInt(day, 10),
+          Number.parseInt(hour, 10),
+          Number.parseInt(minute, 10),
+          Number.parseInt(second, 10)
         )
       );
     }

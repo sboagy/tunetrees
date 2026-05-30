@@ -54,6 +54,12 @@ type ColumnCase = {
   matcher: RegExp;
 };
 
+const defaultCellCallbacks: ICellEditorCallbacks = {
+  onGoalChange: vi.fn(),
+  onScheduledChange: vi.fn(),
+  goals: () => [{ id: "goal-1", name: "perform" }],
+};
+
 const baseRow: IStackedListRow = {
   id: "catalog-row-1",
   tune_id: "tune-row-1",
@@ -157,11 +163,7 @@ function renderStackedList(
   tablePurpose: TablePurpose,
   columnIds: string[],
   visibility: Record<string, boolean>,
-  cellCallbacks: ICellEditorCallbacks = {
-    onGoalChange: vi.fn(),
-    onScheduledChange: vi.fn(),
-    goals: () => [{ id: "goal-1", name: "perform" }],
-  }
+  cellCallbacks: ICellEditorCallbacks = defaultCellCallbacks
 ) {
   return render(() => (
     <TuneStackedList
@@ -328,7 +330,7 @@ describe("TuneStackedList column visibility", () => {
       name: "Select row catalog-row-1",
     });
 
-    await fireEvent.click(checkbox);
+    fireEvent.click(checkbox);
 
     expect(onRowSelectionChange).toHaveBeenCalledWith(baseRow, true);
     expect(onRowClick).not.toHaveBeenCalled();
@@ -377,7 +379,7 @@ describe("TuneStackedList column visibility", () => {
       />
     ));
 
-    await fireEvent.click(screen.getByText("Goal control: perform"));
+    fireEvent.click(screen.getByText("Goal control: perform"));
 
     expect(onGoalChange).toHaveBeenCalledWith("tune-row-1", "session_ready");
   });
@@ -399,7 +401,7 @@ describe("TuneStackedList column visibility", () => {
       />
     ));
 
-    await fireEvent.click(screen.getByText(/Scheduled control:/));
+    fireEvent.click(screen.getByText(/Scheduled control:/));
 
     expect(onScheduledChange).toHaveBeenCalledWith(
       "tune-row-1",

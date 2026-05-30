@@ -60,7 +60,7 @@ function normalizeName(name: string): string {
 
 function normalizeDescription(description?: string | null): string | null {
   const trimmed = description?.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 async function touchGroup(
@@ -736,8 +736,10 @@ export async function reorderSetlistItems(
       and(eq(setlistItem.setlistRef, setlistId), eq(setlistItem.deleted, 0))
     );
 
-  const existingIds = existing.map((row) => row.id).sort();
-  const requestedIds = [...itemIdsInOrder].sort();
+  const existingIds = existing
+    .map((row) => row.id)
+    .sort((a, b) => a.localeCompare(b));
+  const requestedIds = [...itemIdsInOrder].sort((a, b) => a.localeCompare(b));
   if (
     existingIds.length !== requestedIds.length ||
     existingIds.some((id, index) => id !== requestedIds[index])

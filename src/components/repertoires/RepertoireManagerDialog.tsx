@@ -58,8 +58,8 @@ export const RepertoireManagerDialog: Component<
         props.onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+    globalThis.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => globalThis.removeEventListener("keydown", handleKeyDown));
   });
 
   const handleRepertoireSelect = (repertoire: RepertoireWithSummary) => {
@@ -105,14 +105,14 @@ export const RepertoireManagerDialog: Component<
       />
 
       {/* Dialog */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Dialog is modal and has backdrop for closing */}
-      <div
+      <dialog
+        open
         class="fixed left-1/2 top-1/2 z-50 w-[95vw] max-w-4xl max-h-[90vh] -translate-x-1/2 -translate-y-1/2 transform rounded-lg bg-white dark:bg-gray-900 shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="repertoire-manager-title"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && props.onClose()}
         data-testid="repertoire-manager-dialog"
+        onClose={props.onClose}
       >
         {/* Header */}
         <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
@@ -158,7 +158,7 @@ export const RepertoireManagerDialog: Component<
             onRepertoireDeleted={handleRepertoireDeleted}
           />
         </div>
-      </div>
+      </dialog>
 
       {/* Nested Editor Dialog */}
       <RepertoireEditorDialog

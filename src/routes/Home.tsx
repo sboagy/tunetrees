@@ -81,9 +81,9 @@ const Home: Component = () => {
     const currentTabId = activeTab(); // Capture the old tab before switching
     try {
       if (typeof window !== "undefined") {
-        // Read DIRECTLY from window.location.search to get the CURRENT URL state
+        // Read DIRECTLY from globalThis.location.search to get the CURRENT URL state
         // (searchParams signal may have been updated by previous setSearchParams calls)
-        const currentParams = new URLSearchParams(window.location.search);
+        const currentParams = new URLSearchParams(globalThis.location.search);
         currentParams.delete("tab"); // Remove tab param
         const queryWithoutTab = currentParams.toString();
 
@@ -93,7 +93,7 @@ const Home: Component = () => {
           localStorage.setItem(CATALOG_URL_KEY, queryWithoutTab);
         }
       }
-    } catch (_e) {
+    } catch {
       // non-fatal: storage might be unavailable
     }
 
@@ -116,7 +116,9 @@ const Home: Component = () => {
       try {
         const saved = localStorage.getItem(CATALOG_URL_KEY);
         if (saved) restoreObj = parseQuery(saved);
-      } catch {}
+      } catch {
+        // Storage access may fail; non-fatal.
+      }
       // Build params: clear repertoire/legacy, restore catalog
       // Only include defined, non-empty values
       const wantedParams: Record<string, string> = { tab: tabId };
@@ -132,7 +134,9 @@ const Home: Component = () => {
       try {
         const saved = localStorage.getItem(REPERTOIRE_URL_KEY);
         if (saved) restoreObj = parseQuery(saved);
-      } catch {}
+      } catch {
+        // Storage access may fail; non-fatal.
+      }
       // Only include defined, non-empty values
       const wantedParams: Record<string, string> = { tab: tabId };
       Object.entries(restoreObj).forEach(([k, v]) => {
