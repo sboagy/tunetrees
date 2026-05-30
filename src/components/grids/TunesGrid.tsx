@@ -411,12 +411,10 @@ export const TunesGrid = (<T extends { id: string | number }>(
     localStorage.setItem(key, String(scrollPos));
     setTargetScroll(scrollPos);
 
-    // A just-saved non-zero position can still be briefly snapped back to the
-    // top by post-render virtualizer churn. Keep a short guard window so that
-    // transient reset is treated as noise instead of becoming the new target.
-    if (scrollPos > 2) {
-      setRestoreGuardUntil(Date.now() + 2000);
-    } else if (!inRestoreGuard) {
+    // Keep restore guards scoped to programmatic scroll restoration. Extending
+    // them after an ordinary user scroll save can block a legitimate scroll
+    // back to the top for the duration of the guard window.
+    if (!inRestoreGuard) {
       setRestoreGuardUntil(0);
     }
   };
