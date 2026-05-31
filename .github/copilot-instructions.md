@@ -35,6 +35,7 @@ Repository-specific architecture, tech stack details, and patterns (including sy
 - **TypeScript:** Prioritize type safety and strictness. Avoid `any`.
 - **Boundary Exceptions:** If a third-party integration forces an escape hatch, isolate it to a narrow boundary and prefer `unknown` + validation/narrowing.
 - **Explicit Assertions When Needed:** Use explicit type assertions for complex spreads/merges when inference loses safety (e.g., `...primaryKey as Partial<T>`), and keep assertions narrowly scoped.
+- **Mandatory Verification:** After generating or modifying any code, you must immediately use the terminal tool to run `npm run typecheck` to verify your changes. Do not finish your turn until the typecheck passes.
 
 ## 4. Self-Correction Workflow
 
@@ -48,13 +49,3 @@ Repository-specific architecture, tech stack details, and patterns (including sy
 - **Validate Changes:** When making code changes, run the smallest relevant checks (typecheck/lint/tests) when practical and report results.
 - **Generated-Output Validation:** If your work touches schema/codegen sources or any generated artifact, run the corresponding generator and its check command before handoff. A failing generator check is a blocker, not a warning.
 - **Keep Architecture Docs Current:** If a task changes architecture, sync boundaries, codegen outputs, runtime wiring, or repository responsibilities, read `ARCHITECTURE.md` before editing and update it in the same change unless the architecture document remains accurate without modification.
-
-## 6. Multi-Repo Agentic Workflow
-
-### 1. Unified Knowledge Access
-* **Single Source of Truth:** Use the Memory MCP server as the primary source for all durable knowledge about the codebase, architecture, and patterns. Avoid using Copilot `/memories` for persistent facts to prevent fragmentation and confusion.
-* **Global Memory Path:** Always utilize the Memory MCP server, if it is available.
-
-### 2. Orchestration Rules
-* **Sequential Thinking:** Mandatory for any task that spans repo boundaries (e.g., changing a schema in oosync and updating the migration in the App).
-* **Dependency Law:** Always trace patterns from the implementation repo (`oosync`) to the usage repo (`App`) using the `relation` tool.

@@ -464,6 +464,9 @@ export const rhythmPatterns = sqliteTable(
     lastModifiedAt: text("last_modified_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
+    swingPercentage: real("swing_percentage").notNull().default(0),
+    swingDesc: text("swing_desc"),
+    bpmOverride: integer("bpm_override"),
   },
   (t) => [index("idx_rhythm_patterns_last_modified_at").on(t.lastModifiedAt)]
 );

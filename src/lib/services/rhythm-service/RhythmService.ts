@@ -26,7 +26,9 @@ import {
   createCountInBuffers,
   eventHasAccent,
   getCountInPulseIndices,
+  getDefaultSwingPercentage,
   getEventPulseIndex,
+  getHumanizationDelaySeconds,
   getPitchPlaybackGain,
   getPitchPlaybackRate,
   getPlaybackDelaySeconds,
@@ -41,9 +43,22 @@ import {
   parseRhythmSignatureParts,
 } from "@/lib/services/rhythm-service/playback-helpers";
 import {
+  clearStoredRhythmSwing,
+  readStoredRhythmSwing,
+  writeStoredRhythmSwing,
+} from "@/lib/services/rhythm-service/swing-storage";
+import {
+  clearStoredRhythmTempo,
   readStoredRhythmTempo,
   writeStoredRhythmTempo,
 } from "@/lib/services/rhythm-service/tempo-storage";
+
+function clampSwingPercentage(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
 
 export type {
   RhythmPatternCandidate,
@@ -94,6 +109,7 @@ export interface PlaybackStartOptions {
 export interface RhythmService {
   metadata: Accessor<RhythmPatternMetadata | null>;
   tempoQpm: Accessor<number>;
+  swingPercentage: Accessor<number>;
   isPlaying: Accessor<boolean>;
   isPaused: Accessor<boolean>;
   isReady: Accessor<boolean>;
@@ -115,6 +131,9 @@ export interface RhythmService {
   restart: (options?: PlaybackStartOptions) => Promise<void>;
   togglePlayback: () => Promise<void>;
   setTempoQpm: (nextQpm: number) => Promise<void>;
+  resetTempoToDefault: () => Promise<void>;
+  setSwingPercentage: (nextSwingPercentage: number) => Promise<void>;
+  resetSwingToDefault: () => Promise<void>;
   updateRhythmAbc: (nextRhythmAbc: string) => void;
 }
 
@@ -179,6 +198,7 @@ export function createRhythmService(
     null
   );
   const [tempoQpm, setTempoQpmSignal] = createSignal(100);
+  const [swingPercentage, setSwingPercentageSignal] = createSignal(0);
   const [isPlaying, setIsPlaying] = createSignal(false);
   const [isPaused, setIsPaused] = createSignal(false);
   const [isReady, setIsReady] = createSignal(false);
@@ -208,6 +228,10 @@ export function createRhythmService(
   let activePlaybackRhythmAbc: string | null = null;
   let remainingDebugPlaybackPasses = getRequestedRhythmPlaybackDebugPasses();
   let tempoPreferenceKey: {
+    userId: string | null | undefined;
+    tuneTypeName: string;
+  } | null = null;
+  let swingPreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
@@ -438,8 +462,11 @@ export function createRhythmService(
       return;
     }
 
-    const activeSampleKit = normalizeSampleKit(metadata()?.sampleKit);
-    const playbackDelaySeconds = getPlaybackDelaySeconds(metadata(), event);
+    const currentMetadata = metadata();
+    const activeSampleKit = normalizeSampleKit(currentMetadata?.sampleKit);
+    const playbackDelaySeconds =
+      getPlaybackDelaySeconds(currentMetadata, event, swingPercentage()) +
+      getHumanizationDelaySeconds(currentMetadata, event);
     const hasAccent = eventHasAccent(event);
     const selection = getPlaybackPitchSelection(activeSampleKit, event);
     const resolvedPitches = selection.playbackPitches.map((playbackPitch) =>
@@ -452,7 +479,8 @@ export function createRhythmService(
       const gainValue = getPitchPlaybackGain(
         activeSampleKit,
         resolvedPitch,
-        event
+        event,
+        currentMetadata
       );
       const playbackRate = getPitchPlaybackRate(activeSampleKit, resolvedPitch);
       const buffer = sampleBuffers.get(resolvedPitch);
@@ -718,6 +746,7 @@ export function createRhythmService(
   ): Promise<RhythmPatternMetadata | null> {
     stopPlayback();
     tempoPreferenceKey = null;
+    swingPreferenceKey = null;
     lastKnownPositionMs = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
@@ -735,11 +764,21 @@ export function createRhythmService(
         userId: request.userId,
         tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
       };
+      swingPreferenceKey = {
+        userId: request.userId,
+        tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
+      };
       setTempoQpmSignal(
         readStoredRhythmTempo(
           tempoPreferenceKey.userId,
           tempoPreferenceKey.tuneTypeName
         ) ?? clampTempo(nextMetadata.tempoQpm)
+      );
+      setSwingPercentageSignal(
+        readStoredRhythmSwing(
+          swingPreferenceKey.userId,
+          swingPreferenceKey.tuneTypeName
+        ) ?? clampSwingPercentage(getDefaultSwingPercentage(nextMetadata))
       );
       setIsReady(false);
     }
@@ -875,6 +914,57 @@ export function createRhythmService(
     }
   }
 
+  async function resetTempoToDefault() {
+    const defaultTempo = clampTempo(metadata()?.tempoQpm ?? 100);
+    setTempoQpmSignal(defaultTempo);
+    if (tempoPreferenceKey) {
+      clearStoredRhythmTempo(
+        tempoPreferenceKey.userId,
+        tempoPreferenceKey.tuneTypeName
+      );
+    }
+    if (!metadata() || !isPlaying()) {
+      return;
+    }
+
+    lastKnownPositionMs =
+      timingCallbacks?.currentMillisecond() ?? lastKnownPositionMs;
+    try {
+      await beginPlayback(lastKnownPositionMs);
+    } catch (cause: unknown) {
+      setError(
+        cause instanceof Error ? cause.message : "Failed to reset tempo."
+      );
+      stopPlayback();
+    }
+  }
+
+  async function setSwingPercentage(nextSwingPercentage: number) {
+    const clamped = clampSwingPercentage(nextSwingPercentage);
+    setSwingPercentageSignal(clamped);
+    if (swingPreferenceKey) {
+      writeStoredRhythmSwing(
+        swingPreferenceKey.userId,
+        swingPreferenceKey.tuneTypeName,
+        clamped
+      );
+    }
+    // Swing changes take effect on next play/restart — no in-flight restart needed
+  }
+
+  async function resetSwingToDefault() {
+    const defaultSwing = clampSwingPercentage(
+      getDefaultSwingPercentage(metadata())
+    );
+    setSwingPercentageSignal(defaultSwing);
+    if (swingPreferenceKey) {
+      clearStoredRhythmSwing(
+        swingPreferenceKey.userId,
+        swingPreferenceKey.tuneTypeName
+      );
+    }
+  }
+
   onCleanup(() => {
     stopPlayback();
     if (ownedAudioContext && ownedAudioContext.state !== "closed") {
@@ -887,6 +977,7 @@ export function createRhythmService(
   return {
     metadata,
     tempoQpm,
+    swingPercentage,
     isPlaying,
     isPaused,
     isReady,
@@ -959,6 +1050,9 @@ export function createRhythmService(
       }
     },
     setTempoQpm,
+    resetTempoToDefault,
+    setSwingPercentage,
+    resetSwingToDefault,
     updateRhythmAbc,
   };
 }
