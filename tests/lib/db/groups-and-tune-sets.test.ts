@@ -86,6 +86,7 @@ beforeEach(() => {
   vi.mocked(supabase.rpc).mockResolvedValue({
     data: [],
     error: null,
+    success: true,
     count: null,
     status: 200,
     statusText: "OK",
@@ -305,6 +306,7 @@ describe("group query helpers", () => {
         },
       ],
       error: null,
+      success: true,
       count: null,
       status: 200,
       statusText: "OK",
@@ -370,6 +372,7 @@ describe("group query helpers", () => {
         },
       ],
       error: null,
+      success: true,
       count: null,
       status: 200,
       statusText: "OK",
