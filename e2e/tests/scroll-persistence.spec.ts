@@ -206,8 +206,10 @@ test.describe("Scroll Position Persistence", () => {
     console.log("[CATALOG TEST] localStorage value:", storedValue);
     await waitToSettle(page);
 
-    // Verify we scrolled (check scrollTop is approximately 1000)
-    const scrollTopBefore = await gridContainer.evaluate((el) => el.scrollTop);
+    // Poll the grid container directly instead of relying on a one-shot read,
+    // because the virtualized catalog can still be settling immediately after the
+    // debounced scroll persistence write completes.
+    const scrollTopBefore = await pollLocatorForScrollValue(page, gridContainer);
     console.log("[CATALOG TEST] scrollTopBefore:", scrollTopBefore);
     expect(scrollTopBefore).toBeGreaterThan(600);
     expect(scrollTopBefore).toBeLessThan(1100);

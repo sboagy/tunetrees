@@ -38,8 +38,8 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 22,
-  schemaVersion: "2.0.15-refresh-public-rhythm-patterns",
+  databaseVersion: 23,
+  schemaVersion: "2.0.16-add-swing-columns",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -64,6 +64,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0020_add_sample_kit_to_rhythm_patterns.sql",
     "/drizzle/migrations/sqlite/0021_add_rhythm_pattern_overrides.sql",
     "/drizzle/migrations/sqlite/0022_add_incremental_sync_timestamps.sql",
+    "/drizzle/migrations/sqlite/0023_add_swing_and_bpm_to_rhythm_patterns.sql",
   ],
   forceResetQueryParams: [
     { key: "reset", value: "true" },
