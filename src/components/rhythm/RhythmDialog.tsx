@@ -64,7 +64,7 @@ export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
             });
           }}
           class={cn(
-            "fixed left-[50%] top-[50%] z-50 h-[min(88vh,960px)] w-[min(94vw,1400px)] -translate-x-1/2 -translate-y-1/2 outline-none md:min-h-[680px] md:min-w-[820px]",
+            "fixed left-[50%] top-[50%] z-50 h-[min(98vh,1120px)] w-[min(99vw,1800px)] -translate-x-1/2 -translate-y-1/2 outline-none md:min-h-[800px] md:min-w-[820px]",
             "data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
             "data-[closed]:slide-out-to-left-1/2 data-[closed]:slide-out-to-top-[48%] data-[expanded]:slide-in-from-left-1/2 data-[expanded]:slide-in-from-top-[48%]",
             ""

@@ -343,6 +343,9 @@ export const rhythmPatterns = pgTable("rhythm_patterns", {
   lastModifiedAt: text("last_modified_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
+  swingPercentage: real("swing_percentage").notNull().default(0),
+  swingDesc: text("swing_desc"),
+  bpmOverride: integer("bpm_override"),
 });
 
 export const setlist = pgTable("setlist", {
