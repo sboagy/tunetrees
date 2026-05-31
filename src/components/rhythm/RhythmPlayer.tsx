@@ -146,7 +146,7 @@ function validateCustomPatternDraft(input: {
 
   const requiredHeaders = ["M:", "L:", "K:"];
   const missingHeader = requiredHeaders.find(
-    (header) => !new RegExp(String.raw`^\s*${header}`, "m").test(abcString)
+    (header) => !new RegExp(String.raw`^[ \t]*${header}`, "m").test(abcString)
   );
   if (missingHeader) {
     return `ABC notation must include a ${missingHeader} header.`;
@@ -169,7 +169,7 @@ function validateCustomPatternDraft(input: {
 function extractRhythmSignatureFromAbc(
   abcString?: string | null
 ): string | null {
-  const match = abcString?.match(/^\s*M:\s*([^\n\r]+)/m);
+  const match = abcString?.match(/^[ \t]*M:\s*([^\n\r]+)/m);
   const value = match?.[1]?.trim();
   return value || null;
 }

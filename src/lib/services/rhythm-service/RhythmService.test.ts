@@ -68,12 +68,15 @@ function createDb(sqlStatements: string[]): SqliteDatabase {
   return db as unknown as SqliteDatabase;
 }
 
+const CURRENT_RHYTHM_PATTERNS_TABLE_SQL =
+  "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)";
+
 function createPremiumLoopRhythmDb() {
   return createDb([
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
@@ -92,7 +95,7 @@ function createSampleKitRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('TEST', 'Session Test')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
@@ -117,8 +120,14 @@ K:clef=perc
 
 function createFallbackRhythmDb() {
   return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Polka', 'Polka', '2/4', 'Polka rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Hornpipe', 'Hornpipe', '4/4', 'Hornpipe rhythm')",
   ]);
 }
 
@@ -127,6 +136,7 @@ function createFallbackJigRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Jig', 115)",
@@ -138,6 +148,7 @@ function createFallbackJigCodeRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
@@ -149,6 +160,7 @@ function createFallbackPolkaRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Polka', 'Polka', '2/4', 'Polka rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Polka', 120)",
@@ -160,6 +172,7 @@ function createFallbackHornpipeRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Hornpipe', 'Hornpipe', '4/4', 'Hornpipe rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Hornpipe', 90)",
@@ -235,7 +248,7 @@ function createRhythmDbWithoutPatternRow() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
@@ -257,7 +270,7 @@ function createHierarchicalRhythmDb(options?: {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
@@ -320,18 +333,6 @@ function applySqliteMigration(db: Database.Database, fileName: string) {
   for (const statement of statements) {
     db.exec(statement);
   }
-}
-
-function createRhythmDbWithLegacyPatternColumns() {
-  return createDb([
-    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
-    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
-    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, tune_type_id TEXT NOT NULL, abc_string TEXT NOT NULL)",
-    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
-    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
-    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
-  ]);
 }
 
 function createMockStorage(): Storage {
@@ -467,32 +468,6 @@ describe("loadRhythmPattern", () => {
       tuneTypeId: "Reel",
       source: "rhythm_patterns",
     });
-  });
-
-  it("falls back when rhythm_patterns exists with an older partial schema", async () => {
-    const db = createRhythmDbWithLegacyPatternColumns();
-
-    const metadata = await loadRhythmPattern(
-      db,
-      {
-        genreName: "Irish Traditional",
-        tuneTypeName: "Reel",
-      },
-      {
-        sampleBaseUrl: "",
-      }
-    );
-
-    expect(metadata).toMatchObject({
-      genreName: "Irish Traditional",
-      tuneTypeName: "Reel",
-      patternType: "seed",
-      tempoQpm: 112,
-      sampleKit: "generic_click",
-      source: "tune_type_fallback",
-    });
-    expect(metadata?.rhythmAbc).toContain("M:4/4");
-    expect(metadata?.premiumAudioUrl).toBeNull();
   });
 
   it("resolves jig metadata without synthesizing a premium loop", async () => {
@@ -643,7 +618,7 @@ describe("loadRhythmPattern", () => {
     );
   });
 
-  it("falls back to generated percussion ABC and default tempo when new tables are absent", async () => {
+  it("falls back to generated percussion ABC and default tempo when the migrated schema has no matching rhythm pattern rows", async () => {
     const db = createFallbackRhythmDb();
 
     const metadata = await loadRhythmPattern(
@@ -810,7 +785,7 @@ describe("loadRhythmPattern", () => {
       "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
       "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
       "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-      "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+      CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
       "INSERT INTO genre (id, name) VALUES ('ALT', 'Alt Genre')",
       "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
       "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
@@ -1395,7 +1370,7 @@ describe("createRhythmService", () => {
       "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
       "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
       "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-      "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+      CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
       "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
       "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
       "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",

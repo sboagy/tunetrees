@@ -21,18 +21,16 @@ export type {
   SwingDescriptor,
 } from "./pattern-types";
 
-const DEFAULT_SAMPLE_BASE_URL = (
+function trimTrailingSlashes(value: string): string {
+  let i = value.length;
+  while (i > 0 && value[i - 1] === "/") i -= 1;
+  return i === value.length ? value : value.slice(0, i);
+}
+
+const DEFAULT_SAMPLE_BASE_URL = trimTrailingSlashes(
   import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
-).replace(/\/+$/, "");
+);
 const DEFAULT_SAMPLE_KIT = "generic_click";
-const REQUIRED_RHYTHM_PATTERN_COLUMNS = [
-  "abc_string",
-  "genre_id",
-  "is_default",
-  "name",
-  "part_target",
-  "tune_type_id",
-] as const;
 
 const DEFAULT_TEMPO_BY_TYPE: Record<string, number> = {
   reel: 100,
@@ -52,30 +50,6 @@ type PremiumLoopSelection = {
 
 function sanitizeAbcTitle(value: string): string {
   return value.replace(/[\r\n:|[\]]+/g, " ").trim() || "Rhythm";
-}
-
-async function tableExists(
-  db: SqliteDatabase,
-  tableName: string
-): Promise<boolean> {
-  const rows = db.all<{ name: string }>(sql`
-    SELECT name
-    FROM sqlite_master
-    WHERE type = 'table' AND name = ${tableName}
-    LIMIT 1
-  `);
-
-  return rows.length > 0;
-}
-
-async function getTableColumns(
-  db: SqliteDatabase,
-  tableName: string
-): Promise<Set<string>> {
-  const rows = db.all<{ name: string }>(
-    sql.raw(`PRAGMA table_info("${tableName}")`)
-  );
-  return new Set(rows.map((row) => row.name));
 }
 
 function getDefaultTempoForTuneType(tuneTypeName: string): number {
@@ -128,7 +102,7 @@ function normalizePremiumAudioUrl(baseUrl: string, value: string): string {
     return trimmed;
   }
 
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
+  const normalizedBase = trimTrailingSlashes(baseUrl);
   return normalizedBase ? `${normalizedBase}/${trimmed}` : `/${trimmed}`;
 }
 
@@ -198,24 +172,20 @@ export async function loadRhythmPattern(
   request: RhythmPatternRequest,
   options?: { sampleBaseUrl?: string }
 ): Promise<RhythmPatternMetadata | null> {
-  const context = await createPatternLoaderContext(db, request, options);
+  const context = createPatternLoaderContext(request, options);
   if (!context) {
     return null;
   }
 
-  const rhythmPatternMetadata = context.capabilities.canUseRhythmPatterns
-    ? mapRhythmPatternMetadata(
-        await queryRhythmPatternRows(db, context),
-        context
-      )
-    : null;
+  const rhythmPatternMetadata = mapRhythmPatternMetadata(
+    await queryRhythmPatternRows(db, context),
+    context
+  );
   if (rhythmPatternMetadata) {
     return rhythmPatternMetadata;
   }
 
-  const genreTempoFallback = context.capabilities.hasGenreDefaultBpmColumn
-    ? await queryGenreTempoFallbackRow(db, context)
-    : null;
+  const genreTempoFallback = await queryGenreTempoFallbackRow(db, context);
   if (genreTempoFallback?.tune_type_name) {
     const resolvedTempoQpm =
       typeof genreTempoFallback.tempo_qpm === "number" &&
@@ -250,19 +220,6 @@ export async function loadRhythmPattern(
   });
 }
 
-type PatternLoaderSchemaCapabilities = {
-  hasGenreDefaultBpmColumn: boolean;
-  canUseRhythmPatterns: boolean;
-  hasSampleKitColumn: boolean;
-  hasPremiumAudioUrlColumn: boolean;
-  hasTuneIdColumn: boolean;
-  hasUserIdColumn: boolean;
-  hasPatternTypeColumn: boolean;
-  hasSwingPercentageColumn: boolean;
-  hasSwingDescColumn: boolean;
-  canUseHierarchicalOverrides: boolean;
-};
-
 type PatternLoaderFilters = {
   genreNameFilter: string | null;
   genreIdFilter: string | null;
@@ -277,7 +234,6 @@ type PatternLoaderContext = {
   tuneTypeMatchClause: ReturnType<typeof sql.raw>;
   sampleBaseUrl: string;
   filters: PatternLoaderFilters;
-  capabilities: PatternLoaderSchemaCapabilities;
 };
 
 type RhythmPatternQueryRow = {
@@ -321,11 +277,10 @@ type TuneTypeFallbackRow = {
   rhythm_signature: string | null;
 };
 
-async function createPatternLoaderContext(
-  db: SqliteDatabase,
+function createPatternLoaderContext(
   request: RhythmPatternRequest,
   options?: { sampleBaseUrl?: string }
-): Promise<PatternLoaderContext | null> {
+): PatternLoaderContext | null {
   const tuneTypeName = request.tuneTypeName?.trim();
   if (!tuneTypeName) {
     return null;
@@ -336,39 +291,6 @@ async function createPatternLoaderContext(
     tuneTypeMatchClause: buildTuneTypeMatchClause(tuneTypeName),
     sampleBaseUrl: options?.sampleBaseUrl ?? DEFAULT_SAMPLE_BASE_URL,
     filters: buildPatternLoaderFilters(request),
-    capabilities: await detectPatternLoaderSchemaCapabilities(db),
-  };
-}
-
-async function detectPatternLoaderSchemaCapabilities(
-  db: SqliteDatabase
-): Promise<PatternLoaderSchemaCapabilities> {
-  const hasGenreDefaultBpmColumn = (await tableExists(db, "genre_tune_type"))
-    ? (await getTableColumns(db, "genre_tune_type")).has("default_bpm")
-    : false;
-  const hasRhythmPatternsTable = await tableExists(db, "rhythm_patterns");
-  const rhythmPatternColumns = hasRhythmPatternsTable
-    ? await getTableColumns(db, "rhythm_patterns")
-    : new Set<string>();
-  const canUseRhythmPatterns =
-    hasRhythmPatternsTable &&
-    REQUIRED_RHYTHM_PATTERN_COLUMNS.every((column) =>
-      rhythmPatternColumns.has(column)
-    );
-  const hasTuneIdColumn = rhythmPatternColumns.has("tune_id");
-  const hasUserIdColumn = rhythmPatternColumns.has("user_id");
-
-  return {
-    hasGenreDefaultBpmColumn,
-    canUseRhythmPatterns,
-    hasSampleKitColumn: rhythmPatternColumns.has("sample_kit"),
-    hasPremiumAudioUrlColumn: rhythmPatternColumns.has("premium_audio_url"),
-    hasTuneIdColumn,
-    hasUserIdColumn,
-    hasPatternTypeColumn: rhythmPatternColumns.has("pattern_type"),
-    hasSwingPercentageColumn: rhythmPatternColumns.has("swing_percentage"),
-    hasSwingDescColumn: rhythmPatternColumns.has("swing_desc"),
-    canUseHierarchicalOverrides: hasTuneIdColumn && hasUserIdColumn,
   };
 }
 
@@ -466,13 +388,11 @@ function buildTuneTypeMatchClause(
 }
 
 function buildSelectedPatternOrderClause(
-  filters: PatternLoaderFilters,
-  canUseHierarchicalOverrides: boolean
+  filters: PatternLoaderFilters
 ): ReturnType<typeof sql.raw> {
   return sql.raw(
     [
-      canUseHierarchicalOverrides
-        ? `CASE
+      `CASE
             WHEN ${toSqlNullableStringLiteral(filters.userIdFilter)} IS NOT NULL
              AND ${toSqlNullableStringLiteral(filters.tuneIdFilter)} IS NOT NULL
              AND rp.user_id = ${toSqlNullableStringLiteral(filters.userIdFilter)}
@@ -489,8 +409,7 @@ function buildSelectedPatternOrderClause(
             WHEN rp.user_id IS NULL
              AND rp.tune_id IS NULL THEN 4
             ELSE 5
-          END`
-        : null,
+          END`,
       "CASE WHEN rp.is_default THEN 0 ELSE 1 END",
       "CASE WHEN rp.part_target IS NULL OR rp.part_target = '*' THEN 0 ELSE 1 END",
       "rp.name",
@@ -504,11 +423,8 @@ async function queryRhythmPatternRows(
   db: SqliteDatabase,
   context: PatternLoaderContext
 ): Promise<RhythmPatternQueryRow[]> {
-  const { capabilities, filters, tuneTypeMatchClause, tuneTypeName } = context;
-  const selectedPatternOrderClause = buildSelectedPatternOrderClause(
-    filters,
-    capabilities.canUseHierarchicalOverrides
-  );
+  const { filters, tuneTypeMatchClause, tuneTypeName } = context;
+  const selectedPatternOrderClause = buildSelectedPatternOrderClause(filters);
 
   return db.all<RhythmPatternQueryRow>(sql`
     WITH tune_type_match AS (
@@ -535,24 +451,15 @@ async function queryRhythmPatternRows(
       LIMIT 1
     ),
     tempo_match AS (
-      SELECT gtt.default_bpm
-      ${
-        capabilities.hasSwingPercentageColumn
-          ? sql`, rp_swing.swing_percentage`
-          : sql``
-      }
+      SELECT gtt.default_bpm, rp_swing.swing_percentage
       FROM tune_type_match ttm
       JOIN genre_tune_type gtt ON gtt.tune_type_id = ttm.id
       LEFT JOIN genre_match gm ON 1 = 1
-      ${
-        capabilities.hasSwingPercentageColumn
-          ? sql`LEFT JOIN (
+      LEFT JOIN (
         SELECT tune_type_id, swing_percentage
         FROM rhythm_patterns
         WHERE user_id IS NULL AND tune_id IS NULL
-      ) rp_swing ON rp_swing.tune_type_id = ttm.id`
-          : sql``
-      }
+      ) rp_swing ON rp_swing.tune_type_id = ttm.id
       WHERE gm.id IS NULL OR gtt.genre_id = gm.id
       ORDER BY
         CASE
@@ -569,36 +476,12 @@ async function queryRhythmPatternRows(
         rp.genre_id,
         rp.tune_type_id,
         rp.abc_string,
-        ${
-          capabilities.hasSampleKitColumn
-            ? sql`rp.sample_kit`
-            : sql`CAST(NULL AS TEXT)`
-        } AS sample_kit,
-        ${
-          capabilities.hasPremiumAudioUrlColumn
-            ? sql`rp.premium_audio_url`
-            : sql`CAST(NULL AS TEXT)`
-        } AS premium_audio_url,
-        ${
-          capabilities.hasPatternTypeColumn
-            ? sql`rp.pattern_type`
-            : sql`CAST('seed' AS TEXT)`
-        } AS pattern_type,
-        ${
-          capabilities.hasSwingDescColumn
-            ? sql`rp.swing_desc`
-            : sql`CAST(NULL AS TEXT)`
-        } AS swing_desc,
-        ${
-          capabilities.hasTuneIdColumn
-            ? sql`rp.tune_id`
-            : sql`CAST(NULL AS TEXT)`
-        } AS tune_id,
-        ${
-          capabilities.hasUserIdColumn
-            ? sql`rp.user_id`
-            : sql`CAST(NULL AS TEXT)`
-        } AS user_id,
+        rp.sample_kit AS sample_kit,
+        rp.premium_audio_url AS premium_audio_url,
+        rp.pattern_type AS pattern_type,
+        rp.swing_desc AS swing_desc,
+        rp.tune_id AS tune_id,
+        rp.user_id AS user_id,
         rp.is_default,
         rp.part_target,
         ROW_NUMBER() OVER (
@@ -608,33 +491,22 @@ async function queryRhythmPatternRows(
       JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
       LEFT JOIN genre_match gm ON 1 = 1
       WHERE (gm.id IS NULL OR rp.genre_id = gm.id)
-        AND ${
-          capabilities.canUseHierarchicalOverrides
-            ? sql`
-              (
-                (${filters.userIdFilter} IS NOT NULL
-                  AND ${filters.tuneIdFilter} IS NOT NULL
-                  AND rp.user_id = ${filters.userIdFilter}
-                  AND rp.tune_id = ${filters.tuneIdFilter})
-                OR (${filters.tuneIdFilter} IS NOT NULL
-                  AND rp.user_id IS NULL
-                  AND rp.tune_id = ${filters.tuneIdFilter})
-                OR (${filters.userIdFilter} IS NOT NULL
-                  AND rp.user_id = ${filters.userIdFilter}
-                  AND rp.tune_id IS NULL)
-                OR (rp.user_id IS NULL AND rp.tune_id IS NULL)
-              )
-            `
-            : sql`1 = 1`
-        }
+        AND (
+          (${filters.userIdFilter} IS NOT NULL
+            AND ${filters.tuneIdFilter} IS NOT NULL
+            AND rp.user_id = ${filters.userIdFilter}
+            AND rp.tune_id = ${filters.tuneIdFilter})
+          OR (${filters.tuneIdFilter} IS NOT NULL
+            AND rp.user_id IS NULL
+            AND rp.tune_id = ${filters.tuneIdFilter})
+          OR (${filters.userIdFilter} IS NOT NULL
+            AND rp.user_id = ${filters.userIdFilter}
+            AND rp.tune_id IS NULL)
+          OR (rp.user_id IS NULL AND rp.tune_id IS NULL)
+        )
     ),
     default_pattern AS (
-      SELECT
-        ${
-          capabilities.hasSwingDescColumn
-            ? sql`rp.swing_desc`
-            : sql`CAST(NULL AS TEXT)`
-        } AS swing_desc
+      SELECT rp.swing_desc AS swing_desc
       FROM rhythm_patterns rp
       JOIN tune_type_match ttm ON rp.tune_type_id = ttm.id
       LEFT JOIN genre_match gm ON 1 = 1
@@ -653,16 +525,8 @@ async function queryRhythmPatternRows(
       ttm.name AS tune_type_name,
       COALESCE(sp.tune_type_id, ttm.id) AS tune_type_id,
       ttm.rhythm AS rhythm_signature,
-      ${
-        capabilities.hasGenreDefaultBpmColumn
-          ? sql`tm.default_bpm`
-          : sql`CAST(NULL AS INTEGER)`
-      } AS tempo_qpm,
-      ${
-        capabilities.hasSwingPercentageColumn
-          ? sql`tm.swing_percentage`
-          : sql`CAST(NULL AS REAL)`
-      } AS swing_percentage,
+      tm.default_bpm AS tempo_qpm,
+      tm.swing_percentage AS swing_percentage,
       COALESCE(sp.swing_desc, dp.swing_desc) AS swing_desc,
       sp.id AS pattern_id,
       sp.name AS pattern_name,
