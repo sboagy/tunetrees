@@ -68,12 +68,15 @@ function createDb(sqlStatements: string[]): SqliteDatabase {
   return db as unknown as SqliteDatabase;
 }
 
+const CURRENT_RHYTHM_PATTERNS_TABLE_SQL =
+  "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)";
+
 function createPremiumLoopRhythmDb() {
   return createDb([
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
@@ -92,7 +95,7 @@ function createSampleKitRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('TEST', 'Session Test')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
@@ -117,8 +120,14 @@ K:clef=perc
 
 function createFallbackRhythmDb() {
   return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Polka', 'Polka', '2/4', 'Polka rhythm')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Hornpipe', 'Hornpipe', '4/4', 'Hornpipe rhythm')",
   ]);
 }
 
@@ -127,6 +136,7 @@ function createFallbackJigRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Jig', 115)",
@@ -138,6 +148,7 @@ function createFallbackJigCodeRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
@@ -149,6 +160,7 @@ function createFallbackPolkaRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Polka', 'Polka', '2/4', 'Polka rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Polka', 120)",
@@ -160,9 +172,74 @@ function createFallbackHornpipeRhythmDb() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Hornpipe', 'Hornpipe', '4/4', 'Hornpipe rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Hornpipe', 90)",
+  ]);
+}
+
+function createSwingDescriptorRhythmDb() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('system-default', 'ITRAD', 'JigD', 'Standard Double Jig', '*', 'X:1
+T:Standard Double Jig
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed', 0.15, '{"timeSignature":"6/8","macroBeatDivision":3,"defaultSwingFactor":1.15,"balanceRemainingNotes":true,"velocityPattern":[100,80,60],"humanizationDeltaMs":15}')`,
+  ]);
+}
+
+function createMismatchedSwingDefaultRhythmDb() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('system-default', 'ITRAD', 'JigD', 'Mismatched Jig Default', '*', 'X:1
+T:Mismatched Jig Default
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed', 0.33, '{"timeSignature":"6/8","macroBeatDivision":3,"defaultSwingFactor":1.15,"balanceRemainingNotes":true,"velocityPattern":[100,80,60],"humanizationDeltaMs":15}')`,
+  ]);
+}
+
+function createInheritedSwingDescriptorRhythmDb() {
+  return createDb([
+    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
+    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
+    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
+    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed', swing_percentage REAL NOT NULL DEFAULT 0, swing_desc TEXT)",
+    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
+    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('JigD', 'Jig', '6/8', 'Double jig rhythm')",
+    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'JigD', 115)",
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('system-default', 'ITRAD', 'JigD', 'Standard Double Jig', '*', 'X:1
+T:Standard Double Jig
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 c C c c :|', 1, NULL, 'bodhran', NULL, NULL, 'seed', 0.15, '{"timeSignature":"6/8","macroBeatDivision":3,"defaultSwingFactor":1.15,"balanceRemainingNotes":true,"velocityPattern":[100,80,60],"humanizationDeltaMs":15}')`,
+    `INSERT INTO rhythm_patterns (id, genre_id, tune_type_id, name, part_target, abc_string, is_default, premium_audio_url, sample_kit, tune_id, user_id, pattern_type, swing_percentage, swing_desc)
+      VALUES ('user-default', 'ITRAD', 'JigD', 'My Jig Pattern', '*', 'X:1
+T:My Jig Pattern
+M:6/8
+L:1/8
+K:clef=perc
+|: C2 z C z z :|', 0, NULL, 'generic_click', NULL, 'user-1', 'seed', 0.15, NULL)`,
   ]);
 }
 
@@ -171,7 +248,7 @@ function createRhythmDbWithoutPatternRow() {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
@@ -193,7 +270,7 @@ function createHierarchicalRhythmDb(options?: {
     "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
     "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
     "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+    CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
     "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
     "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
     "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
@@ -256,18 +333,6 @@ function applySqliteMigration(db: Database.Database, fileName: string) {
   for (const statement of statements) {
     db.exec(statement);
   }
-}
-
-function createRhythmDbWithLegacyPatternColumns() {
-  return createDb([
-    "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
-    "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
-    "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-    "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, tune_type_id TEXT NOT NULL, abc_string TEXT NOT NULL)",
-    "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
-    "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
-    "INSERT INTO genre_tune_type (genre_id, tune_type_id, default_bpm) VALUES ('ITRAD', 'Reel', 112)",
-  ]);
 }
 
 function createMockStorage(): Storage {
@@ -405,32 +470,6 @@ describe("loadRhythmPattern", () => {
     });
   });
 
-  it("falls back when rhythm_patterns exists with an older partial schema", async () => {
-    const db = createRhythmDbWithLegacyPatternColumns();
-
-    const metadata = await loadRhythmPattern(
-      db,
-      {
-        genreName: "Irish Traditional",
-        tuneTypeName: "Reel",
-      },
-      {
-        sampleBaseUrl: "",
-      }
-    );
-
-    expect(metadata).toMatchObject({
-      genreName: "Irish Traditional",
-      tuneTypeName: "Reel",
-      patternType: "seed",
-      tempoQpm: 112,
-      sampleKit: "generic_click",
-      source: "tune_type_fallback",
-    });
-    expect(metadata?.rhythmAbc).toContain("M:4/4");
-    expect(metadata?.premiumAudioUrl).toBeNull();
-  });
-
   it("resolves jig metadata without synthesizing a premium loop", async () => {
     const db = createFallbackJigRhythmDb();
 
@@ -483,6 +522,58 @@ describe("loadRhythmPattern", () => {
     expect(metadata?.rhythmAbc).toContain("|: !accent!C2 c C c c :|");
   });
 
+  it("parses swing_desc JSON from rhythm_patterns into typed metadata", async () => {
+    const db = createSwingDescriptorRhythmDb();
+
+    const metadata = await loadRhythmPattern(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "JigD",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata?.swingPercentage).toBeCloseTo(0.15, 5);
+    expect(metadata?.swingDescriptor).toEqual({
+      timeSignature: "6/8",
+      macroBeatDivision: 3,
+      defaultSwingFactor: 1.15,
+      balanceRemainingNotes: true,
+      velocityPattern: [100, 80, 60],
+      humanizationDeltaMs: 15,
+    });
+  });
+
+  it("inherits swing_desc from the default row when the selected custom row leaves it null", async () => {
+    const db = createInheritedSwingDescriptorRhythmDb();
+
+    const metadata = await loadRhythmPattern(
+      db,
+      {
+        genreName: "Irish Traditional",
+        tuneTypeName: "JigD",
+        userId: "user-1",
+      },
+      {
+        sampleBaseUrl: "",
+      }
+    );
+
+    expect(metadata?.selectedPatternId).toBe("user-default");
+    expect(metadata?.sampleKit).toBe("generic_click");
+    expect(metadata?.swingDescriptor).toEqual({
+      timeSignature: "6/8",
+      macroBeatDivision: 3,
+      defaultSwingFactor: 1.15,
+      balanceRemainingNotes: true,
+      velocityPattern: [100, 80, 60],
+      humanizationDeltaMs: 15,
+    });
+  });
+
   it("resolves polka metadata without synthesizing a premium loop", async () => {
     const db = createFallbackPolkaRhythmDb();
 
@@ -527,7 +618,7 @@ describe("loadRhythmPattern", () => {
     );
   });
 
-  it("falls back to generated percussion ABC and default tempo when new tables are absent", async () => {
+  it("falls back to generated percussion ABC and default tempo when the migrated schema has no matching rhythm pattern rows", async () => {
     const db = createFallbackRhythmDb();
 
     const metadata = await loadRhythmPattern(
@@ -694,7 +785,7 @@ describe("loadRhythmPattern", () => {
       "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
       "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
       "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-      "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+      CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
       "INSERT INTO genre (id, name) VALUES ('ALT', 'Alt Genre')",
       "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
       "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
@@ -843,6 +934,35 @@ describe("rhythm pattern sqlite migrations", () => {
 });
 
 describe("createRhythmService", () => {
+  it("prefers swing_desc.defaultSwingFactor over stored swing_percentage when no local override exists", async () => {
+    const db = createMismatchedSwingDefaultRhythmDb();
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        sampleBaseUrl: "",
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Irish Traditional",
+      tuneTypeName: "JigD",
+      userId: "user-1",
+    });
+
+    expect(service.swingPercentage()).toBeCloseTo(0.15, 5);
+
+    await service.setSwingPercentage(0.4);
+    expect(service.swingPercentage()).toBeCloseTo(0.4, 5);
+
+    await service.resetSwingToDefault();
+    expect(service.swingPercentage()).toBeCloseTo(0.15, 5);
+
+    dispose();
+  });
+
   it("plays mapped bodhran samples and restarts timing callbacks when tempo changes", async () => {
     const db = createSampleKitRhythmDb();
     const fetchMock = vi.fn(async (_url: string) => ({
@@ -1250,7 +1370,7 @@ describe("createRhythmService", () => {
       "CREATE TABLE genre (id TEXT PRIMARY KEY, name TEXT)",
       "CREATE TABLE tune_type (id TEXT PRIMARY KEY, name TEXT, rhythm TEXT, description TEXT)",
       "CREATE TABLE genre_tune_type (genre_id TEXT NOT NULL, tune_type_id TEXT NOT NULL, default_bpm INTEGER, PRIMARY KEY (genre_id, tune_type_id))",
-      "CREATE TABLE rhythm_patterns (id TEXT PRIMARY KEY, genre_id TEXT, tune_type_id TEXT NOT NULL, name TEXT NOT NULL, part_target TEXT DEFAULT '*', abc_string TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0, premium_audio_url TEXT, sample_kit TEXT NOT NULL DEFAULT 'bodhran', tune_id TEXT, user_id TEXT, pattern_type TEXT NOT NULL DEFAULT 'seed')",
+      CURRENT_RHYTHM_PATTERNS_TABLE_SQL,
       "INSERT INTO genre (id, name) VALUES ('ITRAD', 'Irish Traditional')",
       "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Reel', 'Reel', '4/4', 'Reel rhythm')",
       "INSERT INTO tune_type (id, name, rhythm, description) VALUES ('Jig', 'Jig', '6/8', 'Jig rhythm')",
@@ -4178,6 +4298,8 @@ K:clef=perc
       tuneTypeName: "Hornpipe",
     });
 
+    await service.setSwingPercentage(1 / 3);
+
     await service.play();
 
     expect(bufferSources).toHaveLength(2);
@@ -4189,7 +4311,7 @@ K:clef=perc
     dispose();
   });
 
-  it("delays the middle eighth in each jig triplet group during playback", async () => {
+  it("delays the second and third eighths in each jig triplet group during playback", async () => {
     const db = createFallbackJigRhythmDb();
     const fetchMock = vi.fn();
 
@@ -4286,6 +4408,15 @@ K:clef=perc
           type: "event",
           measureStart: false,
           measureNumber: 1,
+          milliseconds: 200,
+          millisecondsPerMeasure: 600,
+          midiPitches: [{ pitch: 60 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
           milliseconds: 300,
           millisecondsPerMeasure: 600,
           midiPitches: [{ pitch: 60 }],
@@ -4298,6 +4429,15 @@ K:clef=perc
           milliseconds: 400,
           millisecondsPerMeasure: 600,
           midiPitches: [{ pitch: 69 }],
+          elements: [[]],
+        });
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: false,
+          measureNumber: 1,
+          milliseconds: 500,
+          millisecondsPerMeasure: 600,
+          midiPitches: [{ pitch: 60 }],
           elements: [[]],
         });
       }
@@ -4343,16 +4483,24 @@ K:clef=perc
       tuneTypeName: "Jig",
     });
 
+    await service.setSwingPercentage(1 / 6);
+
     await service.play();
 
-    expect(bufferSources).toHaveLength(4);
+    expect(bufferSources).toHaveLength(6);
     expect(bufferSources[0]?.start).toHaveBeenCalledWith();
     expect(bufferSources[1]?.start).toHaveBeenCalledWith(
       expect.closeTo(20 + 0.1 / 6, 5)
     );
-    expect(bufferSources[2]?.start).toHaveBeenCalledWith();
-    expect(bufferSources[3]?.start).toHaveBeenCalledWith(
+    expect(bufferSources[2]?.start).toHaveBeenCalledWith(
+      expect.closeTo(20 + 0.1 / 12, 5)
+    );
+    expect(bufferSources[3]?.start).toHaveBeenCalledWith();
+    expect(bufferSources[4]?.start).toHaveBeenCalledWith(
       expect.closeTo(20 + 0.1 / 6, 5)
+    );
+    expect(bufferSources[5]?.start).toHaveBeenCalledWith(
+      expect.closeTo(20 + 0.1 / 12, 5)
     );
 
     dispose();
