@@ -411,7 +411,10 @@ export const TunesGrid = (<T extends { id: string | number }>(
     localStorage.setItem(key, String(scrollPos));
     setTargetScroll(scrollPos);
 
-    if (!inRestoreGuard || scrollPos > 2) {
+    // Keep restore guards scoped to programmatic scroll restoration. Extending
+    // them after an ordinary user scroll save can block a legitimate scroll
+    // back to the top for the duration of the guard window.
+    if (!inRestoreGuard) {
       setRestoreGuardUntil(0);
     }
   };
