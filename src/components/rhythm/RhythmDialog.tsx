@@ -69,6 +69,7 @@ export const RhythmDialog: Component<RhythmDialogProps> = (props) => {
             "data-[closed]:slide-out-to-left-1/2 data-[closed]:slide-out-to-top-[48%] data-[expanded]:slide-in-from-left-1/2 data-[expanded]:slide-in-from-top-[48%]",
             ""
           )}
+          data-testid="rhythm-player-dialog"
         >
           <DialogPrimitive.Title class="sr-only">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Description class="sr-only">
