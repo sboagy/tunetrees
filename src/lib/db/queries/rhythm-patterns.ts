@@ -23,6 +23,7 @@ export interface SaveEditableRhythmPatternInput {
   userId: string;
   scope: EditableRhythmPatternScope;
   tuneId?: string | null;
+  swingDesc?: string | null;
 }
 
 function normalizeLookupValue(value?: string | null): string {
@@ -63,6 +64,11 @@ function normalizeAbcString(abcString: string): string {
     throw new Error("ABC notation must not be empty");
   }
   return trimmed;
+}
+
+function normalizeOptionalText(value?: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed || null;
 }
 
 async function resolveGenreId(
@@ -137,6 +143,7 @@ function buildInsertValues(
     tuneTypeId: resolvedTuneTypeId,
     name: normalizeName(input.name),
     abcString: normalizeAbcString(input.abcString),
+    swingDesc: normalizeOptionalText(input.swingDesc),
     sampleKit: input.sampleKit,
     patternType: input.patternType,
     userId: input.userId,

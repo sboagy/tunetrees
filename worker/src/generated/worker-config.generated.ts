@@ -733,6 +733,18 @@ export const WORKER_SYNC_CONFIG = {
       },
       rhythm_patterns: {
         denyDelete: true,
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "swingPercentage",
+              kind: "float",
+            },
+            {
+              prop: "bpmOverride",
+              kind: "int",
+            },
+          ],
+        },
       },
       setlist: {
         sanitize: {

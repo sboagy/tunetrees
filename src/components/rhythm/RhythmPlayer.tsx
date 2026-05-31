@@ -62,6 +62,13 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 import { RhythmPatternPicker } from "./RhythmPatternPicker";
+import {
+  createSwingDescriptorDraft,
+  parseStoredSwingDescriptor,
+  parseSwingDescriptorDraft,
+  type SwingDescriptorDraft,
+  SwingDescriptorEditor,
+} from "./SwingDescriptorEditor";
 import "./rhythm-player.css";
 
 export interface RhythmPlayerProps {
@@ -139,7 +146,7 @@ function validateCustomPatternDraft(input: {
 
   const requiredHeaders = ["M:", "L:", "K:"];
   const missingHeader = requiredHeaders.find(
-    (header) => !new RegExp(String.raw`^\s*${header}`, "m").test(abcString)
+    (header) => !new RegExp(String.raw`^[ \t]*${header}`, "m").test(abcString)
   );
   if (missingHeader) {
     return `ABC notation must include a ${missingHeader} header.`;
@@ -159,6 +166,54 @@ function validateCustomPatternDraft(input: {
   return null;
 }
 
+function extractRhythmSignatureFromAbc(
+  abcString?: string | null
+): string | null {
+  const match = abcString?.match(/^[ \t]*M:\s*([^\n\r]+)/m);
+  const value = match?.[1]?.trim();
+  return value || null;
+}
+
+function buildCustomPatternSwingDescriptorDraft(
+  abcString: string,
+  rhythmSignature?: string | null,
+  swingDescriptorValue?: string | null,
+  fallbackDescriptor?: RhythmPatternMetadata["swingDescriptor"]
+): SwingDescriptorDraft {
+  return createSwingDescriptorDraft(
+    parseStoredSwingDescriptor(swingDescriptorValue) ??
+      fallbackDescriptor ??
+      null,
+    extractRhythmSignatureFromAbc(abcString) ?? rhythmSignature
+  );
+}
+
+function clampSwingPercentage(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, value));
+}
+
+function formatSwingPercentage(value: number): string {
+  return String(Math.round(clampSwingPercentage(value) * 100));
+}
+
+function parseSwingPercentageInput(value: string): number | null {
+  const normalizedValue = value.trim();
+  if (!/^\d+$/.test(normalizedValue)) {
+    return null;
+  }
+
+  const parsedValue = Number.parseInt(normalizedValue, 10);
+  if (!Number.isFinite(parsedValue) || parsedValue < 0 || parsedValue > 100) {
+    return null;
+  }
+
+  return parsedValue;
+}
+
 export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const { localDb, user } = useAuth();
   const isMobile = createIsMobile();
@@ -176,6 +231,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     null
   );
   const [selectedStartSection, setSelectedStartSection] = createSignal("start");
+  const [swingInputError, setSwingInputError] = createSignal<string | null>(
+    null
+  );
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
   const [patternReloadKey, setPatternReloadKey] = createSignal(0);
   const [isCustomPatternEditorOpen, setIsCustomPatternEditorOpen] =
@@ -195,6 +253,14 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     createSignal<EditableRhythmPatternScope>(
       props.tuneId?.trim() ? "user_tune" : "user_default"
     );
+  const [
+    customPatternUseInheritedSwingDesc,
+    setCustomPatternUseInheritedSwingDesc,
+  ] = createSignal(true);
+  const [
+    customPatternSwingDescriptorDraft,
+    setCustomPatternSwingDescriptorDraft,
+  ] = createSignal<SwingDescriptorDraft>(createSwingDescriptorDraft());
   const [customPatternError, setCustomPatternError] = createSignal<
     string | null
   >(null);
@@ -220,6 +286,28 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const metadata = createMemo(() => service()?.metadata() ?? null);
   const activePatternMetadata = createMemo(() => loadedPattern() ?? metadata());
   const tempoQpm = createMemo(() => service()?.tempoQpm() ?? 100);
+  const defaultTempoQpm = createMemo(
+    () => activePatternMetadata()?.tempoQpm ?? 100
+  );
+  const swingPercentage = createMemo(
+    () =>
+      service()?.swingPercentage() ??
+      activePatternMetadata()?.swingPercentage ??
+      0
+  );
+  const defaultSwingPercentage = createMemo(() =>
+    clampSwingPercentage(activePatternMetadata()?.swingPercentage ?? 0)
+  );
+  const currentSwingPercentText = createMemo(() =>
+    formatSwingPercentage(swingPercentage())
+  );
+  const [swingInputValue, setSwingInputValue] = createSignal(
+    currentSwingPercentText()
+  );
+  const isTempoAtDefault = createMemo(() => tempoQpm() === defaultTempoQpm());
+  const isSwingAtDefault = createMemo(
+    () => swingPercentage() === defaultSwingPercentage()
+  );
   const isPlaying = createMemo(() => service()?.isPlaying() ?? false);
   const isPaused = createMemo(() => service()?.isPaused() ?? false);
   const isReady = createMemo(() => service()?.isReady() ?? false);
@@ -375,20 +463,29 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     const baseName = selectedCandidateName
       ? `${selectedCandidateName} copy`
       : `My ${tuneTypeName} pattern`;
+    const baseAbc =
+      activePatternMetadata()?.rhythmAbc ??
+      buildCustomPatternTemplate(
+        baseName,
+        rhythmPatternContext().rhythmSignature
+      );
 
     setCustomPatternMode("create");
     setCustomPatternId(null);
     setCustomPatternScope(props.tuneId?.trim() ? "user_tune" : "user_default");
     setCustomPatternName(baseName);
-    setCustomPatternAbc(
-      activePatternMetadata()?.rhythmAbc ??
-        buildCustomPatternTemplate(
-          baseName,
-          rhythmPatternContext().rhythmSignature
-        )
-    );
+    setCustomPatternAbc(baseAbc);
     setCustomPatternPatternType(rhythmPatternContext().patternType);
     setCustomPatternSampleKit(rhythmPatternContext().sampleKit);
+    setCustomPatternUseInheritedSwingDesc(true);
+    setCustomPatternSwingDescriptorDraft(
+      buildCustomPatternSwingDescriptorDraft(
+        baseAbc,
+        rhythmPatternContext().rhythmSignature,
+        null,
+        activePatternMetadata()?.swingDescriptor
+      )
+    );
     setCustomPatternError(null);
     setIsCustomPatternEditorOpen(true);
   };
@@ -427,6 +524,15 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         existingPattern.patternType === "full_track" ? "full_track" : "seed"
       );
       setCustomPatternSampleKit(existingPattern.sampleKit);
+      setCustomPatternUseInheritedSwingDesc(!existingPattern.swingDesc?.trim());
+      setCustomPatternSwingDescriptorDraft(
+        buildCustomPatternSwingDescriptorDraft(
+          existingPattern.abcString,
+          rhythmPatternContext().rhythmSignature,
+          existingPattern.swingDesc,
+          activePatternMetadata()?.swingDescriptor
+        )
+      );
       setIsCustomPatternEditorOpen(true);
     } catch (error) {
       const message =
@@ -462,6 +568,29 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       return;
     }
 
+    const swingDescriptorResult = customPatternUseInheritedSwingDesc()
+      ? { descriptor: null, error: null }
+      : parseSwingDescriptorDraft(customPatternSwingDescriptorDraft());
+    if (swingDescriptorResult.error) {
+      setCustomPatternError(swingDescriptorResult.error);
+      return;
+    }
+
+    const expectedRhythmSignature =
+      extractRhythmSignatureFromAbc(customPatternAbc()) ??
+      rhythmPatternContext().rhythmSignature;
+    if (
+      swingDescriptorResult.descriptor &&
+      expectedRhythmSignature?.trim() &&
+      swingDescriptorResult.descriptor.timeSignature !==
+        expectedRhythmSignature.trim()
+    ) {
+      setCustomPatternError(
+        `Swing shape time signature must match the ABC M: header (${expectedRhythmSignature.trim()}).`
+      );
+      return;
+    }
+
     setIsCustomPatternSaving(true);
     setCustomPatternError(null);
 
@@ -478,6 +607,9 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         userId: currentUserId,
         scope: customPatternScope(),
         tuneId: props.tuneId?.trim() || null,
+        swingDesc: customPatternUseInheritedSwingDesc()
+          ? null
+          : JSON.stringify(swingDescriptorResult.descriptor),
       };
 
       const savedPattern =
@@ -554,6 +686,38 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     }
   };
 
+  const resetTempoToDefault = () => {
+    const currentService = service();
+    if (currentService) {
+      void currentService.resetTempoToDefault();
+    }
+  };
+
+  const updateSwingFromInput = (value: string) => {
+    setSwingInputValue(value);
+
+    const parsedPercent = parseSwingPercentageInput(value);
+    if (parsedPercent == null) {
+      setSwingInputError("Enter a whole number from 0 to 100.");
+      return;
+    }
+
+    setSwingInputError(null);
+
+    const currentService = service();
+    if (currentService) {
+      void currentService.setSwingPercentage(parsedPercent / 100);
+    }
+  };
+
+  const resetSwingToDefault = () => {
+    setSwingInputError(null);
+    const currentService = service();
+    if (currentService) {
+      void currentService.resetSwingToDefault();
+    }
+  };
+
   const handlePatternSelectionChange = (value: string) => {
     const nextPatternId = value.trim() || null;
 
@@ -573,6 +737,12 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     if (!options.some((option) => option.value === selectedStartSection())) {
       setSelectedStartSection(options[0]?.value ?? "start");
     }
+  });
+
+  createEffect(() => {
+    const nextSwingPercentText = currentSwingPercentText();
+    setSwingInputValue(nextSwingPercentText);
+    setSwingInputError(null);
   });
 
   createEffect<string | undefined>((previousRequestKey) => {
@@ -620,6 +790,114 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       }
     }
     activeBeatTargets = [];
+  };
+
+  const swingControls = () => {
+    const controlsDisabled =
+      !service() || !activePatternMetadata() || isPatternLoading();
+    const inputClass =
+      "min-h-10 w-20 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+    const resetButtonClass =
+      "inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900";
+
+    return (
+      <div class="flex flex-col gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+        <div class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60">
+          <span class="font-medium text-slate-900 dark:text-slate-100">
+            Swing
+          </span>
+          <div class="ml-auto flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={swingInputValue()}
+              onInput={(event) => {
+                updateSwingFromInput(event.currentTarget.value);
+              }}
+              disabled={controlsDisabled}
+              class={inputClass}
+              data-testid="rhythm-player-swing-input"
+              aria-invalid={Boolean(swingInputError())}
+            />
+            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
+              %
+            </span>
+            <button
+              type="button"
+              onClick={resetSwingToDefault}
+              disabled={controlsDisabled || isSwingAtDefault()}
+              class={resetButtonClass}
+              data-testid="rhythm-player-swing-reset"
+              aria-label="Reset swing to default"
+              title="Reset swing to default"
+            >
+              <RotateCcw class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <Show when={swingInputError()}>
+          {(message) => (
+            <p
+              class="text-xs text-red-600 dark:text-red-400"
+              data-testid="rhythm-player-swing-error"
+            >
+              {message()}
+            </p>
+          )}
+        </Show>
+      </div>
+    );
+  };
+
+  const tempoControls = () => {
+    const controlsDisabled =
+      !service() || !activePatternMetadata() || isPatternLoading();
+    const inputClass =
+      "min-h-10 w-20 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100";
+    const resetButtonClass =
+      "inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900";
+
+    return (
+      <div class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+        <span class="font-medium text-slate-900 dark:text-slate-100">
+          Tempo
+        </span>
+        <div class="ml-auto flex items-center gap-2">
+          <input
+            type="number"
+            min="30"
+            max="240"
+            step="1"
+            inputMode="numeric"
+            value={tempoQpm()}
+            onChange={(event) => {
+              updateTempo(event.currentTarget.value);
+            }}
+            disabled={controlsDisabled}
+            class={inputClass}
+            data-testid="rhythm-player-tempo-input"
+          />
+          <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
+            QPM
+          </span>
+          <button
+            type="button"
+            onClick={resetTempoToDefault}
+            disabled={controlsDisabled || isTempoAtDefault()}
+            class={resetButtonClass}
+            data-testid="rhythm-player-tempo-reset"
+            aria-label="Reset tempo to default"
+            title="Reset tempo to default"
+          >
+            <RotateCcw class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const getNotationContainer = (): HTMLDivElement | null => {
@@ -810,8 +1088,12 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         props.class
       )}
     >
-      <CardHeader class="space-y-3">
-        <div class="space-y-3">
+      <CardHeader
+        class={cn(
+          props.onClose ? "space-y-2 px-4 py-4 sm:px-5 sm:py-5" : "space-y-3"
+        )}
+      >
+        <div class={cn(props.onClose ? "space-y-2" : "space-y-3")}>
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p
@@ -875,36 +1157,11 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
                         <div class="h-px bg-slate-200 dark:bg-slate-800" />
 
-                        <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
-                          <span class="font-medium text-slate-900 dark:text-slate-100">
-                            Tempo {tempoQpm()} QPM
-                          </span>
-                          <input
-                            type="number"
-                            min="30"
-                            max="240"
-                            step="1"
-                            inputMode="numeric"
-                            value={tempoQpm()}
-                            onChange={(event) => {
-                              updateTempo(event.currentTarget.value);
-                            }}
-                            class="min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            data-testid="rhythm-player-tempo-input"
-                          />
-                          <input
-                            type="range"
-                            min="30"
-                            max="240"
-                            step="1"
-                            value={tempoQpm()}
-                            onInput={(event) => {
-                              updateTempo(event.currentTarget.value);
-                            }}
-                            class="w-full accent-blue-600"
-                            data-testid="rhythm-player-tempo-slider"
-                          />
-                        </label>
+                        {tempoControls()}
+
+                        <div class="h-px bg-slate-200 dark:bg-slate-800" />
+
+                        {swingControls()}
                       </div>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
@@ -1073,37 +1330,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
               </button>
 
               <Show when={!isMobile()}>
-                <div class="ml-auto items-center gap-3 md:flex">
-                  <label class="flex flex-col gap-2 text-sm text-slate-600 dark:text-slate-300">
-                    <span class="font-medium text-slate-900 dark:text-slate-100">
-                      Tempo {tempoQpm()} QPM
-                    </span>
-                    <input
-                      type="number"
-                      min="30"
-                      max="240"
-                      step="1"
-                      inputMode="numeric"
-                      value={tempoQpm()}
-                      onChange={(event) => {
-                        updateTempo(event.currentTarget.value);
-                      }}
-                      class="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                      data-testid="rhythm-player-tempo-input"
-                    />
-                    <input
-                      type="range"
-                      min="30"
-                      max="240"
-                      step="1"
-                      value={tempoQpm()}
-                      onInput={(event) => {
-                        updateTempo(event.currentTarget.value);
-                      }}
-                      class="w-full accent-blue-600 md:w-56"
-                      data-testid="rhythm-player-tempo-slider"
-                    />
-                  </label>
+                <div class="ml-auto items-start gap-4 md:flex">
+                  {tempoControls()}
+
+                  {swingControls()}
                 </div>
               </Show>
             </div>
@@ -1112,7 +1342,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
         <Show when={activePatternMetadata()}>
           {(currentMetadata) => (
-            <div class="space-y-3">
+            <div class={cn(props.onClose ? "space-y-2" : "space-y-3")}>
               <RhythmPatternPicker
                 value={currentPatternChoiceId() || null}
                 candidates={patternCandidates()}
@@ -1192,7 +1422,12 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
         </Show>
       </CardHeader>
 
-      <CardContent class="flex min-h-0 flex-1 flex-col">
+      <CardContent
+        class={cn(
+          "flex min-h-0 flex-1 flex-col",
+          props.onClose ? "px-4 pb-4 pt-0 sm:px-5 sm:pb-5" : undefined
+        )}
+      >
         <Show
           when={localDb()}
           fallback={
@@ -1209,14 +1444,24 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
               </p>
             }
           >
-            <div class="flex min-h-0 flex-1 flex-col gap-4">
+            <div
+              class={cn(
+                "flex min-h-0 flex-1 flex-col",
+                props.onClose ? "gap-3" : "gap-4"
+              )}
+            >
               <Show when={error()}>
                 <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                   {error()}
                 </div>
               </Show>
 
-              <div class="relative flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-300 bg-white p-4 shadow-sm">
+              <div
+                class={cn(
+                  "relative flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-300 bg-white shadow-sm",
+                  props.onClose ? "p-3" : "p-4"
+                )}
+              >
                 <Show when={isCountIn()}>
                   <div
                     class="pointer-events-none absolute left-4 right-4 top-4 z-10 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
@@ -1251,22 +1496,27 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                     </div>
                   </div>
                 </Show>
-                <div class="mb-3 flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div
+                  class={cn(
+                    "flex flex-wrap items-start justify-between gap-3 border-b border-slate-200",
+                    props.onClose ? "mb-2 pb-2" : "mb-3 pb-3"
+                  )}
+                >
+                  <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    <span class="shrink-0 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Live Section
                     </span>
                     <Show
                       when={currentSectionLabel()}
                       fallback={
-                        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-semibold text-slate-400">
+                        <span class="inline-flex max-w-full whitespace-normal break-words rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm leading-5 font-semibold text-slate-400">
                           Waiting
                         </span>
                       }
                     >
                       {(sectionLabel) => (
                         <span
-                          class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700"
+                          class="inline-flex max-w-full whitespace-normal break-words rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm leading-5 font-semibold text-blue-700"
                           data-testid="rhythm-player-current-section-badge"
                         >
                           {sectionLabel()}
@@ -1277,7 +1527,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
                   <Show when={effectiveStructure()}>
                     {(structure) => (
-                      <span class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                      <span class="max-w-full whitespace-normal break-words text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         {structure()}
                       </span>
                     )}
@@ -1290,8 +1540,11 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                 >
                   <AbcNotation
                     notation={displayAbc() ?? ""}
-                    class="h-full w-full"
+                    class="w-full"
                     scale={0.62}
+                    paddingTop={0}
+                    paddingBottom={0}
+                    fitToContainer={Boolean(props.onClose)}
                   />
                 </div>
               </div>
@@ -1471,18 +1724,28 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                 </label>
               </div>
 
-              <label class="mt-5 flex flex-col gap-2 text-sm text-muted-foreground">
-                <span class="font-medium text-foreground">ABC notation</span>
-                <textarea
-                  value={customPatternAbc()}
-                  onInput={(event) =>
-                    setCustomPatternAbc(event.currentTarget.value)
+              <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,1fr)]">
+                <SwingDescriptorEditor
+                  draft={customPatternSwingDescriptorDraft()}
+                  useInheritedDefault={customPatternUseInheritedSwingDesc()}
+                  onDraftChange={setCustomPatternSwingDescriptorDraft}
+                  onUseInheritedDefaultChange={
+                    setCustomPatternUseInheritedSwingDesc
                   }
-                  rows="10"
-                  class="min-h-[14rem] rounded-md border border-input bg-background px-3 py-3 font-mono text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
-                  data-testid="rhythm-player-custom-pattern-abc-input"
                 />
-              </label>
+                <label class="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <span class="font-medium text-foreground">ABC notation</span>
+                  <textarea
+                    value={customPatternAbc()}
+                    onInput={(event) =>
+                      setCustomPatternAbc(event.currentTarget.value)
+                    }
+                    rows="10"
+                    class="min-h-[14rem] rounded-md border border-input bg-background px-3 py-3 font-mono text-sm text-foreground shadow-sm transition-[color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-[1.5px] focus-visible:ring-ring"
+                    data-testid="rhythm-player-custom-pattern-abc-input"
+                  />
+                </label>
+              </div>
 
               <Show when={customPatternError()}>
                 {(message) => (

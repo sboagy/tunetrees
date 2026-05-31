@@ -198,3 +198,5 @@ _notes
 report-task.txt
 issues.json
 sonar_issues.json
+
+.github/triage_states
