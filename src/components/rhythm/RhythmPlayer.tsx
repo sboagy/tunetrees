@@ -43,6 +43,7 @@ import {
   updateStructuredDisplayPartLabels,
 } from "@/lib/rhythm/structured-display-sync";
 import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
+import { getDefaultSwingPercentage } from "@/lib/services/rhythm-service/playback-helpers";
 import type {
   RhythmPatternMetadata,
   RhythmPatternType,
@@ -296,7 +297,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       0
   );
   const defaultSwingPercentage = createMemo(() =>
-    clampSwingPercentage(activePatternMetadata()?.swingPercentage ?? 0)
+    clampSwingPercentage(getDefaultSwingPercentage(activePatternMetadata()))
   );
   const currentSwingPercentText = createMemo(() =>
     formatSwingPercentage(swingPercentage())

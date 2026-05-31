@@ -11,6 +11,7 @@ import {
   getDb,
   getSqliteInstance,
   initializeDb,
+  persistDb,
   type SqliteDatabase,
 } from "@/lib/db/client-sqlite";
 import { createGroup } from "@/lib/db/queries/groups";
@@ -28,6 +29,7 @@ import {
   practiceRecord,
   reference,
   repertoireTune,
+  rhythmPatterns,
   userProfile,
 } from "@/lib/db/schema";
 import { serializeCapabilities } from "@/lib/plugins/capabilities";
@@ -1406,6 +1408,7 @@ declare global {
         referenceCount?: number;
         userId?: string;
       }) => Promise<{ notesCreated: number; referencesCreated: number }>;
+      clearUserRhythmPatterns: (userId?: string) => Promise<number>;
     };
   }
 }
@@ -1914,6 +1917,17 @@ if (globalThis.window !== undefined) {
           notesCreated: input.noteCount ?? 0,
           referencesCreated: input.referenceCount ?? 0,
         };
+      },
+      clearUserRhythmPatterns: async (userId?: string) => {
+        const db = await ensureDb();
+        const resolvedUserId = userId ?? (await resolveUserId(db));
+        const deletedRows = await db
+          .delete(rhythmPatterns)
+          .where(eq(rhythmPatterns.userId, resolvedUserId))
+          .returning({ id: rhythmPatterns.id });
+
+        await persistDb();
+        return deletedRows.length;
       },
     };
     // eslint-disable-next-line no-console
