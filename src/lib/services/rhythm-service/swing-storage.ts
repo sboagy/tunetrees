@@ -1,9 +1,8 @@
 import { normalizeTuneTypeName } from "@/lib/rhythm/tune-type-lookup";
-import { clampTempo } from "@/lib/services/rhythm-service/playback-helpers";
 
-const RHYTHM_TEMPO_STORAGE_KEY_PREFIX = "tunetrees.rhythm-tempo";
+const RHYTHM_SWING_STORAGE_KEY_PREFIX = "tunetrees.rhythm-swing";
 
-function getRhythmTempoStorage(): Storage | null {
+function getRhythmSwingStorage(): Storage | null {
   if (typeof globalThis === "undefined") {
     return null;
   }
@@ -26,62 +25,72 @@ function getRhythmTempoStorage(): Storage | null {
   }
 }
 
-function buildRhythmTempoStorageKey(
+function clampStoredSwingPercentage(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, value));
+}
+
+function buildRhythmSwingStorageKey(
   userId: string | null | undefined,
   tuneTypeName: string
 ): string {
   const normalizedUserId = userId?.trim() || "anonymous";
   return [
-    RHYTHM_TEMPO_STORAGE_KEY_PREFIX,
+    RHYTHM_SWING_STORAGE_KEY_PREFIX,
     normalizedUserId,
     normalizeTuneTypeName(tuneTypeName),
   ].join(":");
 }
 
-export function readStoredRhythmTempo(
+export function readStoredRhythmSwing(
   userId: string | null | undefined,
   tuneTypeName: string
 ): number | null {
-  const storage = getRhythmTempoStorage();
+  const storage = getRhythmSwingStorage();
   if (!storage) {
     return null;
   }
 
   const rawValue = storage.getItem(
-    buildRhythmTempoStorageKey(userId, tuneTypeName)
+    buildRhythmSwingStorageKey(userId, tuneTypeName)
   );
   if (!rawValue) {
     return null;
   }
 
-  const parsedValue = Number.parseInt(rawValue, 10);
-  return Number.isFinite(parsedValue) ? clampTempo(parsedValue) : null;
+  const parsedValue = Number.parseFloat(rawValue);
+  return Number.isFinite(parsedValue)
+    ? clampStoredSwingPercentage(parsedValue)
+    : null;
 }
 
-export function writeStoredRhythmTempo(
+export function writeStoredRhythmSwing(
   userId: string | null | undefined,
   tuneTypeName: string,
-  tempoQpm: number
+  swingPercentage: number
 ): void {
-  const storage = getRhythmTempoStorage();
+  const storage = getRhythmSwingStorage();
   if (!storage) {
     return;
   }
 
   storage.setItem(
-    buildRhythmTempoStorageKey(userId, tuneTypeName),
-    String(clampTempo(tempoQpm))
+    buildRhythmSwingStorageKey(userId, tuneTypeName),
+    String(clampStoredSwingPercentage(swingPercentage))
   );
 }
 
-export function clearStoredRhythmTempo(
+export function clearStoredRhythmSwing(
   userId: string | null | undefined,
   tuneTypeName: string
 ): void {
-  const storage = getRhythmTempoStorage();
+  const storage = getRhythmSwingStorage();
   if (!storage) {
     return;
   }
 
-  storage.removeItem(buildRhythmTempoStorageKey(userId, tuneTypeName));
+  storage.removeItem(buildRhythmSwingStorageKey(userId, tuneTypeName));
 }
