@@ -13,6 +13,16 @@ interface AbcNotationProps {
   class?: string;
   /** Show error messages */
   showErrors?: boolean;
+  /** abcjs top padding */
+  paddingTop?: number;
+  /** abcjs bottom padding */
+  paddingBottom?: number;
+  /** abcjs left padding */
+  paddingLeft?: number;
+  /** abcjs right padding */
+  paddingRight?: number;
+  /** Scale rendered notation to stay visible within the nearest notation viewport */
+  fitToContainer?: boolean;
 }
 
 /**
@@ -32,6 +42,58 @@ interface AbcNotationProps {
 export const AbcNotation: Component<AbcNotationProps> = (props) => {
   let containerRef: HTMLDivElement | undefined;
   const [error, setError] = createSignal<string | null>(null);
+
+  const clearFittedLayout = () => {
+    if (!containerRef) {
+      return;
+    }
+
+    const svg = containerRef.querySelector<SVGSVGElement>("svg");
+    if (svg) {
+      svg.style.transform = "";
+      svg.style.transformOrigin = "";
+    }
+  };
+
+  const fitRenderedNotation = () => {
+    if (!containerRef || !props.fitToContainer) {
+      clearFittedLayout();
+      return;
+    }
+
+    const viewport = containerRef.closest(".rhythm-player-notation");
+    const svg = containerRef.querySelector<SVGSVGElement>("svg");
+
+    if (!(viewport instanceof HTMLDivElement) || !svg) {
+      clearFittedLayout();
+      return;
+    }
+
+    clearFittedLayout();
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    const contentWidth = Math.max(containerRef.scrollWidth, svgRect.width);
+    const contentHeight = Math.max(containerRef.scrollHeight, svgRect.height);
+
+    if (
+      viewportRect.width <= 0 ||
+      viewportRect.height <= 0 ||
+      contentWidth <= 0 ||
+      contentHeight <= 0
+    ) {
+      return;
+    }
+
+    const nextScale = Math.min(
+      viewportRect.width / contentWidth,
+      viewportRect.height / contentHeight,
+      1
+    );
+
+    svg.style.transformOrigin = "top left";
+    svg.style.transform = `scale(${nextScale})`;
+  };
 
   createEffect(() => {
     if (containerRef && props.notation) {
@@ -54,10 +116,10 @@ export const AbcNotation: Component<AbcNotationProps> = (props) => {
           add_classes: true,
 
           // Tightens up the blank space around the sheet music
-          paddingtop: 15,
-          paddingbottom: 15,
-          paddingleft: 0,
-          paddingright: 0,
+          paddingtop: props.paddingTop ?? 15,
+          paddingbottom: props.paddingBottom ?? 15,
+          paddingleft: props.paddingLeft ?? 0,
+          paddingright: props.paddingRight ?? 0,
         });
       } catch (err) {
         const errorMessage =
@@ -66,6 +128,56 @@ export const AbcNotation: Component<AbcNotationProps> = (props) => {
         console.error("ABC rendering error:", err);
       }
     }
+  });
+
+  createEffect(() => {
+    const notation = props.notation;
+    const fitToContainer = props.fitToContainer ?? false;
+
+    if (!containerRef || !notation) {
+      clearFittedLayout();
+      return;
+    }
+
+    if (!fitToContainer) {
+      clearFittedLayout();
+      return;
+    }
+
+    let frameId: number | null = null;
+    const scheduleFit = () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = requestAnimationFrame(() => {
+        fitRenderedNotation();
+        frameId = null;
+      });
+    };
+
+    scheduleFit();
+
+    const viewport = containerRef.closest(".rhythm-player-notation");
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" &&
+      viewport instanceof HTMLDivElement
+        ? new ResizeObserver(() => {
+            scheduleFit();
+          })
+        : null;
+
+    if (resizeObserver && viewport instanceof HTMLDivElement) {
+      resizeObserver.observe(viewport);
+    }
+
+    onCleanup(() => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+      resizeObserver?.disconnect();
+      clearFittedLayout();
+    });
   });
 
   onCleanup(() => {

@@ -314,6 +314,8 @@ const TABLE_EXTRAS: Record<
     columnDescriptions: {
       abc_string:
         "The 2-bar or 4-bar ABC notation string used by the abcjs TimingCallbacks engine to generate the metronome loop (e.g., |: C2 c C c c :|).",
+      bpm_override:
+        "Per-pattern BPM override. When set, supersedes genre_tune_type.default_bpm. Null means use the default.",
       genre_id: "Foreign key component referencing the genre (e.g., ITRAD).",
       id: "Unique identifier for the rhythm pattern variation.",
       is_default:
@@ -327,6 +329,10 @@ const TABLE_EXTRAS: Record<
         "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
       sample_kit:
         'The identifier for the audio sample kit used by the frontend registry (e.g., "bodhran", "spoons") to map MIDI pitches to Cloudflare R2 audio URLs.',
+      swing_desc:
+        'Future use: describes which beats get swung for this pattern (e.g., "off-beat 8ths", "middle triplet").',
+      swing_percentage:
+        "Swing amount as a fraction (0.0–1.0). Applied as a delay multiplier during playback. Hornpipe defaults to 0.33, jig to ~0.167, others to 0.",
       tune_id:
         "If set, this pattern specifically overrides the default for a single tune.",
       tune_type_id:

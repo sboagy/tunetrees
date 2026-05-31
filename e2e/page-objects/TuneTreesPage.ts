@@ -1971,23 +1971,50 @@ export class TuneTreesPage {
     );
 
     const menu = this.getColumnVisibilityMenu();
-    const label = menu
-      .locator("button span")
-      .filter({ hasText: new RegExp(String.raw`^\s*${escapedLabel}\s*$`, "i") })
-      .first();
-    const option = label.locator("xpath=ancestor::button[1]");
-    const checkbox = option.locator('input[type="checkbox"]').first();
+    const labelPattern = new RegExp(String.raw`^\s*${escapedLabel}\s*$`, "i");
+    const getLabel = () =>
+      menu.locator("button span").filter({ hasText: labelPattern }).first();
+    const getOption = () => getLabel().locator("xpath=ancestor::button[1]");
+    const getCheckbox = () =>
+      getOption().locator('input[type="checkbox"]').first();
 
-    await expect(option).toBeVisible({ timeout: 5000 });
-    const isChecked = await checkbox.isChecked().catch(() => false);
+    await expect(getOption()).toBeVisible({ timeout: 5000 });
+    const isChecked = await getCheckbox()
+      .isChecked()
+      .catch(() => false);
     if (isChecked !== visible) {
-      await option.click();
+      await getOption().click();
     }
 
+    // Column toggles rerender their row and nested checkbox immediately after
+    // the click, so re-query during the assertion instead of holding a stale
+    // element handle chain across the state update.
     if (visible) {
-      await expect(checkbox).toBeChecked({ timeout: 5000 });
+      await expect
+        .poll(
+          async () =>
+            await getCheckbox()
+              .isChecked()
+              .catch(() => null),
+          {
+            timeout: 5000,
+            intervals: [100, 250, 500],
+          }
+        )
+        .toBe(true);
     } else {
-      await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+      await expect
+        .poll(
+          async () =>
+            await getCheckbox()
+              .isChecked()
+              .catch(() => null),
+          {
+            timeout: 5000,
+            intervals: [100, 250, 500],
+          }
+        )
+        .toBe(false);
     }
 
     await this.closeColumnVisibilityMenu(menu);
@@ -3829,26 +3856,55 @@ export class TuneTreesPage {
     await this.openColumnVisibilityMenu(columnsButton);
 
     const menu = this.getColumnVisibilityMenu();
+    const labelPattern = new RegExp(String.raw`^\s*${escapedLabel}\s*$`, "i");
+    const getLabel = () =>
+      menu.locator("button span").filter({ hasText: labelPattern }).first();
+    const getOption = () => getLabel().locator("xpath=ancestor::button[1]");
+    const getCheckbox = () =>
+      getOption().locator('input[type="checkbox"]').first();
 
-    const label = menu
-      .locator("button span")
-      .filter({ hasText: new RegExp(String.raw`^\s*${escapedLabel}\s*$`, "i") })
-      .first();
-    const option = label.locator("xpath=ancestor::button[1]");
-    const checkbox = option.locator('input[type="checkbox"]').first();
+    await expect(getLabel()).toBeVisible({ timeout: 5000 });
+    await getOption()
+      .scrollIntoViewIfNeeded()
+      .catch(() => undefined);
+    await expect(getOption()).toBeVisible({ timeout: 5000 });
+    await expect(getCheckbox()).toBeVisible({ timeout: 5000 });
 
-    await expect(label).toBeVisible({ timeout: 5000 });
-    await option.scrollIntoViewIfNeeded().catch(() => undefined);
-    await expect(option).toBeVisible({ timeout: 5000 });
-    await expect(checkbox).toBeVisible({ timeout: 5000 });
-
-    const isChecked = await checkbox.isChecked().catch(() => false);
+    const isChecked = await getCheckbox()
+      .isChecked()
+      .catch(() => false);
     if (isChecked !== visible) {
-      await option.click();
+      await getOption().click();
+
+      // The column menu rerenders the row immediately after a visibility
+      // toggle, so re-query the checkbox state instead of asserting against a
+      // locator chain captured before the click.
       if (visible) {
-        await expect(checkbox).toBeChecked({ timeout: 5000 });
+        await expect
+          .poll(
+            async () =>
+              await getCheckbox()
+                .isChecked()
+                .catch(() => null),
+            {
+              timeout: 5000,
+              intervals: [100, 250, 500],
+            }
+          )
+          .toBe(true);
       } else {
-        await expect(checkbox).not.toBeChecked({ timeout: 5000 });
+        await expect
+          .poll(
+            async () =>
+              await getCheckbox()
+                .isChecked()
+                .catch(() => null),
+            {
+              timeout: 5000,
+              intervals: [100, 250, 500],
+            }
+          )
+          .toBe(false);
       }
     }
 
