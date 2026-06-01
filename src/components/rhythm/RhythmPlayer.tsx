@@ -1391,7 +1391,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                 </span>
                 <Show when={currentPattern()}>
                   {(pattern) => (
-                    <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                    <span
+                      class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      data-testid="rhythm-player-current-pattern-badge"
+                    >
                       {pattern().name}
                     </span>
                   )}

@@ -101,15 +101,25 @@ async function closeRhythmOverflowIfNeeded(
 }
 
 async function readSelectedPatternLabel(page: Page): Promise<string> {
-  return await page
-    .getByTestId("rhythm-player-pattern-select")
-    .evaluate((element) => {
+  const patternSelect = page.getByTestId("rhythm-player-pattern-select");
+  if (await patternSelect.isVisible().catch(() => false)) {
+    return await patternSelect.evaluate((element) => {
       if (!(element instanceof HTMLSelectElement)) {
         return "";
       }
 
       return element.selectedOptions[0]?.textContent?.trim() ?? "";
     });
+  }
+
+  const currentPatternBadge = page.getByTestId(
+    "rhythm-player-current-pattern-badge"
+  );
+  if (await currentPatternBadge.isVisible().catch(() => false)) {
+    return (await currentPatternBadge.textContent())?.trim() ?? "";
+  }
+
+  return "";
 }
 
 async function clearUserRhythmPatterns(page: Page): Promise<void> {
@@ -279,12 +289,15 @@ test.describe("RHYTHM-002: Rhythm player controls and custom pattern editor", ()
     await page.getByTestId("rhythm-player-custom-pattern-save-button").click();
     await expect(editor).toBeHidden({ timeout: 10_000 });
 
-    // The selected-option label rerenders after the async save/load cycle, so
-    // poll the live `<select>` text instead of asserting a one-shot snapshot.
+    await expect(
+      page.getByTestId("rhythm-player-current-pattern-badge")
+    ).toBeVisible({ timeout: 10_000 });
+
+    // Poll for the saved pattern name to surface after the async save/reload cycle.
     await expect
       .poll(async () => await readSelectedPatternLabel(page), {
-        timeout: 15_000,
-        intervals: [100, 250, 500, 1000],
+        timeout: 10_000,
+        intervals: [100, 250, 500],
       })
       .toContain(patternName);
 
