@@ -253,7 +253,7 @@ export default defineConfig(() => {
         targets: [
           {
             src: "drizzle/migrations/sqlite/*.sql",
-            dest: "drizzle/migrations/sqlite",
+            dest: ".",
           },
         ],
       }),
