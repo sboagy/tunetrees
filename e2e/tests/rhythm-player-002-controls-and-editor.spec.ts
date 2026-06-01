@@ -122,8 +122,11 @@ async function readSelectedPatternLabel(page: Page): Promise<string> {
   return "";
 }
 
-async function clearUserRhythmPatterns(page: Page): Promise<void> {
-  await page.evaluate(async () => {
+async function clearUserRhythmPatterns(
+  page: Page,
+  userId: string
+): Promise<void> {
+  await page.evaluate(async (currentUserId) => {
     const api = (
       globalThis as unknown as {
         __ttTestApi?: {
@@ -138,8 +141,8 @@ async function clearUserRhythmPatterns(page: Page): Promise<void> {
       );
     }
 
-    await api.clearUserRhythmPatterns();
-  });
+    await api.clearUserRhythmPatterns(currentUserId);
+  }, userId);
 }
 
 test.describe("RHYTHM-002: Rhythm player controls and custom pattern editor", () => {
@@ -259,8 +262,9 @@ test.describe("RHYTHM-002: Rhythm player controls and custom pattern editor", ()
 
   test("saves swing_desc overrides and inherits default swing when descriptor is null", async ({
     page,
+    testUser,
   }) => {
-    await clearUserRhythmPatterns(page);
+    await clearUserRhythmPatterns(page, testUser.userId);
     await openRhythmPlayerForTune(page, ttPage, TEST_TUNE_BANISH_TITLE);
 
     const controls = await ensureRhythmControlsVisible(page);
