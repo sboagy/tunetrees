@@ -65,7 +65,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
 
     // Verify user's private tune row exists
-    const userPrivateTune = await ttPage.getTuneRowById(
+    const userPrivateTune = ttPage.getTuneRowById(
       privateTune1Id,
       ttPage.catalogGrid
     );
@@ -87,7 +87,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
 
     // Check if user's private tune row exists
-    const userPrivateTune = await ttPage.getTuneRowById(
+    const userPrivateTune = ttPage.getTuneRowById(
       privateTune1Id,
       ttPage.catalogGrid
     );
