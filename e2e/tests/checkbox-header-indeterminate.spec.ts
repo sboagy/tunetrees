@@ -11,7 +11,7 @@
  * 4. Catalog: Deselect one row, verify header returns to indeterminate
  */
 
-import { expect } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import {
   getPrivateTuneIds,
   TEST_TUNE_MORRISON_ID,
@@ -20,7 +20,37 @@ import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
+type GridTab = "catalog" | "repertoire";
+
+async function expectCheckboxIndeterminate(
+  checkbox: Locator,
+  expected: boolean
+) {
+  // The indeterminate flag is a DOM property, not an attribute, so poll it
+  // directly instead of sleeping and hoping Solid has flushed the update.
+  await expect
+    .poll(
+      () =>
+        checkbox.evaluate((element: HTMLInputElement) => element.indeterminate),
+      {
+        timeout: 5000,
+        intervals: [100, 250, 500],
+      }
+    )
+    .toBe(expected);
+}
+
+async function navigateToGridTab(ttPage: TuneTreesPage, tab: GridTab) {
+  await ttPage.navigateToTab(tab);
+  await ttPage.ensureGridView(tab);
+}
+
 test.describe("Checkbox Header Indeterminate State", () => {
+  // This suite resets remote state, clears IndexedDB, waits for initial sync,
+  // and normalizes two table view modes in beforeEach. CI browsers can exceed
+  // the default 30s test budget before the actual checkbox assertion runs.
+  test.describe.configure({ timeout: 90_000 });
+
   let ttPage: TuneTreesPage;
 
   test.beforeEach(async ({ page, testUser }) => {
@@ -32,17 +62,13 @@ test.describe("Checkbox Header Indeterminate State", () => {
     });
 
     ttPage = new TuneTreesPage(page);
-    await ttPage.navigateToTab("catalog");
-    await ttPage.ensureGridView("catalog");
-    await ttPage.navigateToTab("repertoire");
-    await ttPage.ensureGridView("repertoire");
   });
 
   test("Catalog: header checkbox shows indeterminate when some rows selected", async ({
     page,
   }) => {
     // Navigate to Catalog tab
-    await ttPage.navigateToTab("catalog");
+    await navigateToGridTab(ttPage, "catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -63,17 +89,12 @@ test.describe("Checkbox Header Indeterminate State", () => {
     const checkboxes = page.locator(
       '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
     );
+    await expect(checkboxes.nth(2)).toBeVisible({ timeout: 10000 });
     await checkboxes.nth(1).check();
     await checkboxes.nth(2).check();
 
-    // Wait a bit for reactivity to update
-    await page.waitForTimeout(200);
-
     // Verify header checkbox is now indeterminate (this is the bug fix verification)
-    const isIndeterminate = await headerCheckbox.evaluate(
-      (el: HTMLInputElement) => el.indeterminate
-    );
-    expect(isIndeterminate).toBe(true);
+    await expectCheckboxIndeterminate(headerCheckbox, true);
 
     // Verify header is not checked (only indeterminate)
     await expect(headerCheckbox).not.toBeChecked();
@@ -83,7 +104,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Catalog tab
-    await ttPage.navigateToTab("catalog");
+    await navigateToGridTab(ttPage, "catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -94,23 +115,19 @@ test.describe("Checkbox Header Indeterminate State", () => {
 
     // Click header checkbox to select all
     await headerCheckbox.click();
-    await page.waitForTimeout(200);
 
     // Verify header is checked
-    await expect(headerCheckbox).toBeChecked();
+    await expect(headerCheckbox).toBeChecked({ timeout: 5000 });
 
     // Verify header is NOT indeterminate
-    const isIndeterminate = await headerCheckbox.evaluate(
-      (el: HTMLInputElement) => el.indeterminate
-    );
-    expect(isIndeterminate).toBe(false);
+    await expectCheckboxIndeterminate(headerCheckbox, false);
   });
 
   test("Catalog: header returns to indeterminate when one row deselected", async ({
     page,
   }) => {
     // Navigate to Catalog tab
-    await ttPage.navigateToTab("catalog");
+    await navigateToGridTab(ttPage, "catalog");
     await page.waitForSelector('[data-testid="tunes-grid-catalog"]', {
       timeout: 5000,
     });
@@ -121,21 +138,17 @@ test.describe("Checkbox Header Indeterminate State", () => {
     const checkboxes = page.locator(
       '[data-testid="tunes-grid-catalog"] input[type="checkbox"]'
     );
+    await expect(checkboxes.nth(1)).toBeVisible({ timeout: 10000 });
 
     // Select all via header
     await headerCheckbox.click();
-    await page.waitForTimeout(200);
-    await expect(headerCheckbox).toBeChecked();
+    await expect(headerCheckbox).toBeChecked({ timeout: 5000 });
 
     // Deselect one row
     await checkboxes.nth(1).click();
-    await page.waitForTimeout(200);
 
     // Verify header is now indeterminate
-    const isIndeterminate = await headerCheckbox.evaluate(
-      (el: HTMLInputElement) => el.indeterminate
-    );
-    expect(isIndeterminate).toBe(true);
+    await expectCheckboxIndeterminate(headerCheckbox, true);
     await expect(headerCheckbox).not.toBeChecked();
   });
 
@@ -143,7 +156,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    await ttPage.navigateToTab("repertoire");
+    await navigateToGridTab(ttPage, "repertoire");
     await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
       timeout: 5000,
     });
@@ -170,13 +183,9 @@ test.describe("Checkbox Header Indeterminate State", () => {
       '[data-testid="tunes-grid-repertoire"] input[type="checkbox"]'
     );
     await checkboxes.nth(1).check();
-    await page.waitForTimeout(200);
 
     // Verify header checkbox is now indeterminate
-    const isIndeterminate = await headerCheckbox.evaluate(
-      (el: HTMLInputElement) => el.indeterminate
-    );
-    expect(isIndeterminate).toBe(true);
+    await expectCheckboxIndeterminate(headerCheckbox, true);
     await expect(headerCheckbox).not.toBeChecked();
   });
 
@@ -184,7 +193,7 @@ test.describe("Checkbox Header Indeterminate State", () => {
     page,
   }) => {
     // Navigate to Repertoire tab
-    await ttPage.navigateToTab("repertoire");
+    await navigateToGridTab(ttPage, "repertoire");
     await page.waitForSelector('[data-testid="tunes-grid-repertoire"]', {
       timeout: 5000,
     });
@@ -200,13 +209,9 @@ test.describe("Checkbox Header Indeterminate State", () => {
 
     // Click header to select all
     await headerCheckbox.click();
-    await page.waitForTimeout(200);
 
     // Verify header is checked and not indeterminate
-    await expect(headerCheckbox).toBeChecked();
-    const isIndeterminate = await headerCheckbox.evaluate(
-      (el: HTMLInputElement) => el.indeterminate
-    );
-    expect(isIndeterminate).toBe(false);
+    await expect(headerCheckbox).toBeChecked({ timeout: 5000 });
+    await expectCheckboxIndeterminate(headerCheckbox, false);
   });
 });
