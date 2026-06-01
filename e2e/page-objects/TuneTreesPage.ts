@@ -26,6 +26,15 @@ type OnboardingRepertoireArgs = {
 
 const OVERFLOW_MENU_MAX_RETRIES = 3;
 const OVERFLOW_MENU_RETRY_DELAY_MS = 150;
+const VIEW_MODE_DIAGNOSTICS =
+  process.env.E2E_VIEW_MODE_DIAGNOSTICS === "true" ||
+  process.env.E2E_VIEW_MODE_DIAGNOSTICS === "1";
+
+function logViewModeDiagnostic(message: string): void {
+  if (VIEW_MODE_DIAGNOSTICS) {
+    console.log(`[ViewModeDiag] ${message}`);
+  }
+}
 
 function trimTrailingSlashes(value: string): string {
   let normalized = value;
@@ -1601,7 +1610,7 @@ export class TuneTreesPage {
 
   private async waitForTabContent(tabId: TabId) {
     const startTime = Date.now();
-    console.log(`[ViewModeDiag] waitForTabContent:start tabId=${tabId}`);
+    logViewModeDiagnostic(`waitForTabContent:start tabId=${tabId}`);
 
     const sentinel = this.getSentinelForTab(tabId);
     if (sentinel) {
@@ -1609,23 +1618,23 @@ export class TuneTreesPage {
       await expect(sentinel)
         .toBeVisible({ timeout: 5_000 })
         .catch(() => {
-          console.log(
-            `[ViewModeDiag] waitForTabContent:sentinelTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+          logViewModeDiagnostic(
+            `waitForTabContent:sentinelTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
           );
         });
     }
 
     const grid = this.getGridForTabId(tabId);
     if (!grid) {
-      console.log(
-        `[ViewModeDiag] waitForTabContent:noGrid tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+      logViewModeDiagnostic(
+        `waitForTabContent:noGrid tabId=${tabId} elapsed=${Date.now() - startTime}ms`
       );
       return;
     }
 
     const initialCount = await grid.count().catch(() => 0);
-    console.log(
-      `[ViewModeDiag] waitForTabContent:initialCount tabId=${tabId} count=${initialCount} elapsed=${Date.now() - startTime}ms`
+    logViewModeDiagnostic(
+      `waitForTabContent:initialCount tabId=${tabId} count=${initialCount} elapsed=${Date.now() - startTime}ms`
     );
 
     if (initialCount === 0) {
@@ -1634,8 +1643,8 @@ export class TuneTreesPage {
           async () => {
             const count = await grid.count().catch(() => 0);
             if (count > 0) {
-              console.log(
-                `[ViewModeDiag] waitForTabContent:gridAppeared tabId=${tabId} count=${count} elapsed=${Date.now() - startTime}ms`
+              logViewModeDiagnostic(
+                `waitForTabContent:gridAppeared tabId=${tabId} count=${count} elapsed=${Date.now() - startTime}ms`
               );
             }
             return count > 0;
@@ -1647,29 +1656,29 @@ export class TuneTreesPage {
         )
         .toBe(true)
         .catch(() => {
-          console.log(
-            `[ViewModeDiag] waitForTabContent:gridAppearTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+          logViewModeDiagnostic(
+            `waitForTabContent:gridAppearTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
           );
         });
     }
 
     const finalCount = await grid.count().catch(() => 0);
-    console.log(
-      `[ViewModeDiag] waitForTabContent:finalCount tabId=${tabId} count=${finalCount} elapsed=${Date.now() - startTime}ms`
+    logViewModeDiagnostic(
+      `waitForTabContent:finalCount tabId=${tabId} count=${finalCount} elapsed=${Date.now() - startTime}ms`
     );
 
     if (finalCount > 0) {
       await expect(grid)
         .toBeVisible({ timeout: 20_000 })
         .catch(() => {
-          console.log(
-            `[ViewModeDiag] waitForTabContent:gridVisibleTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+          logViewModeDiagnostic(
+            `waitForTabContent:gridVisibleTimeout tabId=${tabId} elapsed=${Date.now() - startTime}ms`
           );
         });
     }
 
-    console.log(
-      `[ViewModeDiag] waitForTabContent:done tabId=${tabId} elapsed=${Date.now() - startTime}ms`
+    logViewModeDiagnostic(
+      `waitForTabContent:done tabId=${tabId} elapsed=${Date.now() - startTime}ms`
     );
   }
 
@@ -2705,8 +2714,8 @@ export class TuneTreesPage {
     const columnsButton = this.getColumnsButtonForTab(tab);
     const startTime = Date.now();
 
-    console.log(
-      `[ViewModeDiag] waitForViewModeSurfaceReady:start tab=${tab} timeout=${timeout}`
+    logViewModeDiagnostic(
+      `waitForViewModeSurfaceReady:start tab=${tab} timeout=${timeout}`
     );
 
     // Catalog setup can still be settling after the test helper lands on the tab.
@@ -2716,8 +2725,8 @@ export class TuneTreesPage {
       .poll(
         async () => {
           if (this.page.isClosed()) {
-            console.log(
-              `[ViewModeDiag] waitForViewModeSurfaceReady:pageClosed elapsed=${Date.now() - startTime}ms`
+            logViewModeDiagnostic(
+              `waitForViewModeSurfaceReady:pageClosed elapsed=${Date.now() - startTime}ms`
             );
             return false;
           }
@@ -2728,8 +2737,8 @@ export class TuneTreesPage {
             !currentUrl.includes("e2e-origin.html") &&
             currentUrl !== "about:blank";
           if (!urlOk) {
-            console.log(
-              `[ViewModeDiag] waitForViewModeSurfaceReady:badUrl elapsed=${Date.now() - startTime}ms url=${currentUrl}`
+            logViewModeDiagnostic(
+              `waitForViewModeSurfaceReady:badUrl elapsed=${Date.now() - startTime}ms url=${currentUrl}`
             );
             return false;
           }
@@ -2738,8 +2747,8 @@ export class TuneTreesPage {
             .isVisible({ timeout: 250 })
             .catch(() => false);
           if (!buttonVisible) {
-            console.log(
-              `[ViewModeDiag] waitForViewModeSurfaceReady:buttonHidden elapsed=${Date.now() - startTime}ms tab=${tab}`
+            logViewModeDiagnostic(
+              `waitForViewModeSurfaceReady:buttonHidden elapsed=${Date.now() - startTime}ms tab=${tab}`
             );
             return false;
           }
@@ -2748,8 +2757,8 @@ export class TuneTreesPage {
             .isEnabled()
             .catch(() => false);
           if (!buttonEnabled) {
-            console.log(
-              `[ViewModeDiag] waitForViewModeSurfaceReady:buttonDisabled elapsed=${Date.now() - startTime}ms tab=${tab}`
+            logViewModeDiagnostic(
+              `waitForViewModeSurfaceReady:buttonDisabled elapsed=${Date.now() - startTime}ms tab=${tab}`
             );
             return false;
           }
@@ -2757,8 +2766,8 @@ export class TuneTreesPage {
           const renderedMode = await this.getRenderedViewMode(tab);
           const modeReady = renderedMode !== null;
           if (!modeReady) {
-            console.log(
-              `[ViewModeDiag] waitForViewModeSurfaceReady:noRenderedMode elapsed=${Date.now() - startTime}ms tab=${tab}`
+            logViewModeDiagnostic(
+              `waitForViewModeSurfaceReady:noRenderedMode elapsed=${Date.now() - startTime}ms tab=${tab}`
             );
           }
           return modeReady;
@@ -2770,8 +2779,8 @@ export class TuneTreesPage {
       )
       .toBe(true);
 
-    console.log(
-      `[ViewModeDiag] waitForViewModeSurfaceReady:done elapsed=${Date.now() - startTime}ms tab=${tab}`
+    logViewModeDiagnostic(
+      `waitForViewModeSurfaceReady:done elapsed=${Date.now() - startTime}ms tab=${tab}`
     );
   }
 
