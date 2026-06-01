@@ -14,7 +14,10 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
  */
 
 test.describe("CATALOG-001: Public + Private Tunes Display", () => {
-  test.setTimeout(90000);
+  // Catalog setup clears user state, resets IndexedDB, waits for initial sync,
+  // then some cases exercise the responsive Display Options menu. Local runs
+  // with multiple browser workers can exceed the default/90s test budget.
+  test.describe.configure({ timeout: 120_000 });
 
   let ttPage: TuneTreesPage;
   let currentTestUser: TestUser;
