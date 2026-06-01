@@ -614,6 +614,18 @@ ctx.addEventListener("message", (event: MessageEvent<AnyMessage>) => {
   // See: https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/message_event
   if (!(event instanceof MessageEvent)) return;
 
+  // Verify the origin of the message
+  if (
+    typeof event.origin === "string" &&
+    event.origin !== self.location.origin
+  ) {
+    console.warn("[QuickJS][worker] Message received from untrusted origin", {
+      receivedOrigin: event.origin,
+      expectedOrigin: self.location.origin,
+    });
+    return;
+  }
+
   const message = event.data;
   if (message.type === "invoke") {
     executeInvoke(message)
