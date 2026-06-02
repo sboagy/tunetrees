@@ -48,8 +48,9 @@ async function navigateToGridTab(ttPage: TuneTreesPage, tab: GridTab) {
 test.describe("Checkbox Header Indeterminate State", () => {
   // This suite resets remote state, clears IndexedDB, waits for initial sync,
   // and normalizes two table view modes in beforeEach. CI browsers can exceed
-  // the default 30s test budget before the actual checkbox assertion runs.
-  test.describe.configure({ timeout: 90_000 });
+  // 90s before the actual checkbox assertion runs, especially when this file is
+  // retried after a previous worker has just cleaned the same browser context.
+  test.describe.configure({ timeout: 120_000 });
 
   let ttPage: TuneTreesPage;
 
