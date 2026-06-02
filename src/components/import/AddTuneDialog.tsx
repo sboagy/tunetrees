@@ -533,7 +533,12 @@ export const AddTuneDialog: Component<AddTuneDialogProps> = (props) => {
               <AlertDialogTitle class="text-center">Add Tune</AlertDialogTitle>
             </div>
             <div class="flex flex-1 justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={handleNew}>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="add-tune-new-button"
+                onClick={handleNew}
+              >
                 <Plus class="h-4 w-4" />
                 New
               </Button>
