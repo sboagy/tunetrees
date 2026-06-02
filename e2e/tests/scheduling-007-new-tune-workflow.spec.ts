@@ -176,9 +176,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
       await expect(ttPage.addTuneDialog).toBeVisible({ timeout: 5000 });
 
       // Click "New" to create empty tune
-      const newButton = page.getByRole("button", { name: /^new$/i });
-      await newButton.click();
-      await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await ttPage.clickAddTuneNew();
 
       // Should navigate to tune editor
       await expect(ttPage.tuneEditorForm).toBeVisible({ timeout: 10000 });
@@ -378,9 +376,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     await ttPage.clickCatalogAddTune();
     await expect(ttPage.addTuneDialog).toBeVisible({ timeout: 5000 });
 
-    const newButton = page.getByRole("button", { name: /^new$/i });
-    await newButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.clickAddTuneNew();
 
     const titleField = ttPage.page.getByTestId("tune-editor-input-title");
     const easyTestTitle = `Easy Skip Learning ${currentDate}`;
@@ -506,9 +502,7 @@ test.describe("SCHEDULING-007: New Tune Workflow & FSRS NEW State", () => {
     // Create tune (condensed)
     await ttPage.navigateToTab("catalog");
     await ttPage.clickCatalogAddTune();
-    const newButton = page.getByRole("button", { name: /^new$/i });
-    await newButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.clickAddTuneNew();
 
     const titleField = ttPage.page.getByTestId("tune-editor-input-title");
 

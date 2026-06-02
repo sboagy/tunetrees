@@ -43,10 +43,7 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
 
     // ACT: Click "New" to create empty tune
-    const newButton = page.getByRole("button", { name: /^new$/i });
-    await expect(newButton).toBeVisible({ timeout: 5000 });
-    await newButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.clickAddTuneNew();
 
     // Should navigate to tune editor
     const tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -92,10 +89,7 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
 
     // ACT: Click "New" to create empty tune
-    const newButton = page.getByRole("button", { name: /^new$/i });
-    await expect(newButton).toBeVisible({ timeout: 5000 });
-    await newButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.clickAddTuneNew();
 
     // Fill in all available fields
     const tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -167,10 +161,7 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
     await urlOrTitleInput.fill(prefillTitle);
 
     // ACT: Click "New" - title should be pre-filled
-    const newButton = page.getByRole("button", { name: /^new$/i });
-    await expect(newButton).toBeVisible({ timeout: 5000 });
-    await newButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.clickAddTuneNew();
 
     // Verify title is pre-filled
     const tuneEditorForm = page.getByTestId("tune-editor-form");
@@ -217,10 +208,7 @@ test.describe("TUNE-EDITOR-002: Create New Tune", () => {
     const addTuneDialog = ttPage.addTuneDialog;
     await expect(addTuneDialog).toBeVisible({ timeout: 5000 });
 
-    const newButton = page.getByRole("button", { name: /^new$/i });
-    await expect(newButton).toBeVisible({ timeout: 5000 });
-    await newButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.clickAddTuneNew();
 
     // ACT: Fill in data but then cancel
     const tuneEditorForm = page.getByTestId("tune-editor-form");

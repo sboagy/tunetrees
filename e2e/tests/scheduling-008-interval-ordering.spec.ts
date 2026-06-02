@@ -94,9 +94,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
       await page.evaluate(() => localStorage.removeItem("tt:url:catalog"));
       await ttPage.navigateToTab("catalog");
       await ttPage.clickCatalogAddTune();
-      const newButton = page.getByRole("button", { name: /^new$/i });
-      await newButton.click();
-      await page.waitForLoadState("networkidle", { timeout: 15000 });
+      await ttPage.clickAddTuneNew();
       const titleField = ttPage.tuneEditorForm.getByTestId(
         "tune-editor-input-title"
       );

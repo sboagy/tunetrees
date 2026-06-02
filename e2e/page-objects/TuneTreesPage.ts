@@ -195,6 +195,7 @@ export class TuneTreesPage {
 
   readonly settingsMenuToggle: Locator;
   readonly addTuneDialog: Locator;
+  readonly addTuneNewButton: Locator;
   readonly sidebarEditTuneButton: Locator;
   readonly sidebarTuneInfoToggle: Locator;
   readonly sidebarExpandButton: Locator;
@@ -540,6 +541,9 @@ export class TuneTreesPage {
     // Match either explicit test id (if component provides it) or the role-based alertdialog
     // this.addTuneDialog = page.locator('[data-testid="add-tune-dialog"], [role="alertdialog"]');
     this.addTuneDialog = page.getByTestId("add-tune-dialog");
+    this.addTuneNewButton = this.addTuneDialog.getByTestId(
+      "add-tune-new-button"
+    );
 
     // Match either expanded or collapsed sidebar edit button with a single locator
     this.sidebarEditTuneButton = page
@@ -3662,6 +3666,13 @@ export class TuneTreesPage {
 
   async clickCatalogAddTune() {
     await this.clickToolbarAction("catalog", this.catalogAddTuneButton);
+  }
+
+  async clickAddTuneNew() {
+    await expect(this.addTuneDialog).toBeVisible({ timeout: 5000 });
+    await expect(this.addTuneNewButton).toBeVisible({ timeout: 5000 });
+    await this.addTuneNewButton.click();
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 });
   }
 
   async clickCatalogDelete() {
