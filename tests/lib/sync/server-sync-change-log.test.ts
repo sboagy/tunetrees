@@ -88,11 +88,16 @@ describe("server sync change log coverage", () => {
     const configuredVersions = migrationFiles.map(extractMigrationVersion);
     const latestMigrationVersion = Math.max(...configuredVersions);
 
+    expect(databaseVersion).toBeLessThanOrEqual(latestMigrationVersion + 1);
+
     if (databaseVersion === latestMigrationVersion) {
       expect(databaseVersion).toBe(latestMigrationVersion);
       return;
     }
 
+    // The only accepted +1 case is an engine-reset version bump, such as the
+    // sql.js to sqlite-wasm swap, where existing browser blobs must be discarded
+    // even though the logical migration list has not advanced.
     expect(schemaVersion).toContain("sqlite-wasm-engine");
     expect(databaseVersion).toBe(latestMigrationVersion + 1);
   });

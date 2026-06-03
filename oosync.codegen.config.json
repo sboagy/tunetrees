@@ -21,6 +21,9 @@
     "schemaVersion": "2.1.0-sqlite-wasm-engine",
     "databaseVersion": 24,
     "migrationDirectory": "drizzle/migrations/sqlite",
+    "migrationFileNotes": {
+      "0004_true_union_jack.sql": "Intentionally skipped for browser SQLite: 0002 already creates user_profile.avatar_url, so replaying 0004 on fresh databases would fail on the duplicate column; 0004's sync_queue rebuild applies only to the legacy sync_queue path."
+    },
     "migrationFiles": [
       "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
       "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -45,7 +48,8 @@
       "/drizzle/migrations/sqlite/0020_add_sample_kit_to_rhythm_patterns.sql",
       "/drizzle/migrations/sqlite/0021_add_rhythm_pattern_overrides.sql",
       "/drizzle/migrations/sqlite/0022_add_incremental_sync_timestamps.sql",
-      "/drizzle/migrations/sqlite/0023_add_swing_and_bpm_to_rhythm_patterns.sql"
+      "/drizzle/migrations/sqlite/0023_add_swing_and_bpm_to_rhythm_patterns.sql",
+      "/drizzle/migrations/sqlite/0024_add_user_genre_selection_and_media_draft_outbox.sql"
     ],
     "forceResetQueryParams": [
       { "key": "reset", "value": "true" },

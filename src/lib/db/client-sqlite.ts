@@ -62,6 +62,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0021_add_rhythm_pattern_overrides.sql",
     "/drizzle/migrations/sqlite/0022_add_incremental_sync_timestamps.sql",
     "/drizzle/migrations/sqlite/0023_add_swing_and_bpm_to_rhythm_patterns.sql",
+    "/drizzle/migrations/sqlite/0024_add_user_genre_selection_and_media_draft_outbox.sql",
   ],
   forceResetQueryParams: [
     { key: "reset", value: "true" },
