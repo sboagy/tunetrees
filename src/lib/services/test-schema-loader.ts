@@ -28,7 +28,7 @@ export function applyMigrations(db: BetterSQLite3Database): void {
   // Load migration files in order (keeps test schema aligned with production migrations)
   // We only consider top-level numbered migration SQL files.
   const migrations = readdirSync(migrationsDir)
-    .filter((name) => /^\d{4}_.+\.sql$/.test(name))
+    .filter((name) => /^\d{4}[a-z]?_.+\.sql$/.test(name))
     .sort((a, b) => a.localeCompare(b));
 
   for (const migrationFile of migrations) {

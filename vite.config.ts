@@ -290,6 +290,13 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
           // Cache all static assets INCLUDING WASM and SQL files for offline
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,wasm,sql}"],
+          // SQLite worker/OPFS helpers may be emitted by @sqlite.org/sqlite-wasm,
+          // but this branch intentionally uses the in-memory OO1 path with
+          // IndexedDB blob persistence. Keep unused worker assets out of precache.
+          globIgnores: [
+            "**/sqlite3-worker1-*",
+            "**/sqlite3-opfs-async-proxy-*",
+          ],
           // Runtime caching strategies
           runtimeCaching: [
             {

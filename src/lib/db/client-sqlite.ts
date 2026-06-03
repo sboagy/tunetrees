@@ -47,7 +47,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
     "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
     "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
-    "/drizzle/migrations/sqlite/0009_add_plugins.sql",
+    "/drizzle/migrations/sqlite/0009b_add_plugins.sql",
     "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
     "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
     "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
