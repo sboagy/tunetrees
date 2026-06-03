@@ -5,7 +5,7 @@
  */
 
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
-import type { Database } from "sql.js";
+import type { SqliteRawDatabase as Database } from "oosync/runtime/browser-sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   areSyncTriggersInstalled,
@@ -18,19 +18,19 @@ import {
   suppressSyncTriggers,
   verifySyncTriggers,
 } from "../../../src/lib/db/install-triggers";
-import { getTestSqlJs } from "./sqljs-test-utils";
+import { getTestSqlite } from "./sqlite-wasm-test-utils";
 
 let db: Database;
 
 // Initialize SQL.js once for all tests
-let SQL: Awaited<ReturnType<typeof getTestSqlJs>>;
+let SQL: Awaited<ReturnType<typeof getTestSqlite>>;
 
 beforeEach(async () => {
   if (!SQL) {
-    SQL = await getTestSqlJs();
+    SQL = await getTestSqlite();
   }
   // Create a fresh in-memory database for each test
-  db = new SQL.Database();
+  db = SQL.createDatabase();
 
   // Create minimal schema for testing (just the tables that triggers depend on)
   db.run(`

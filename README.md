@@ -65,7 +65,7 @@ See [Developer Setup](docs/development/setup.md) and [Deployment](docs/developme
 | Layer | Technology |
 |-------|------------|
 | Frontend | SolidJS, TypeScript, Tailwind CSS |
-| Local DB | SQLite WASM (sql.js) + Drizzle ORM |
+| Local DB | SQLite WASM (@sqlite.org/sqlite-wasm) + Drizzle ORM |
 | Cloud | Supabase (PostgreSQL, Auth, Realtime) |
 | PWA | Vite PWA + Workbox |
 | Deploy | Cloudflare Pages |

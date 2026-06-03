@@ -7,8 +7,6 @@
 
 import type { BrowserSqliteDatabase } from "oosync/runtime/browser-sqlite";
 import { createBrowserSqliteClient } from "oosync/runtime/browser-sqlite";
-// eslint-disable-next-line import/no-unresolved
-import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as schema from "../../../drizzle/schema-sqlite";
 import {
   SYNCABLE_TABLES,
@@ -27,7 +25,6 @@ export const browserSqliteClient = createBrowserSqliteClient({
     tableSyncOrder: TABLE_SYNC_ORDER,
     tableToSchemaKey: TABLE_TO_SCHEMA_KEY,
   },
-  sqlWasmUrl,
   hooks: browserSqliteHooks,
   diagnosticsEnabled: import.meta.env.VITE_SYNC_DIAGNOSTICS === "true",
   storage: {
@@ -38,8 +35,8 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 23,
-  schemaVersion: "2.0.16-add-swing-columns",
+  databaseVersion: 24,
+  schemaVersion: "2.1.0-sqlite-wasm-engine",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -84,7 +81,7 @@ export const closeDb = browserSqliteClient.closeDb;
 export const clearDb = browserSqliteClient.clearDb;
 export const setupAutoPersist = browserSqliteClient.setupAutoPersist;
 export const getSqliteInstance = browserSqliteClient.getSqliteInstance;
-export const getSqlJsDebugInfo = browserSqliteClient.getSqlJsDebugInfo;
+export const getSqliteDebugInfo = browserSqliteClient.getSqliteDebugInfo;
 export const getClientSqliteDebugState = browserSqliteClient.getDebugState;
 export const loadOutboxBackupForUser =
   browserSqliteClient.loadOutboxBackupForUser;

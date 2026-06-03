@@ -85,7 +85,7 @@ export default defineConfig(() => {
     "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
     "vendor-supabase": ["@supabase/supabase-js"],
     "vendor-drizzle": ["drizzle-orm"],
-    "vendor-sql": ["sql.js"],
+    "vendor-sqlite": ["@sqlite.org/sqlite-wasm"],
   } as const;
 
   const resolveManualChunk = (moduleId: string) => {
@@ -235,6 +235,7 @@ export default defineConfig(() => {
     test: {
       exclude: [
         "**/node_modules/**",
+        "**/.yalc/**",
         "**/dist/**",
         "**/e2e/**", // Exclude Playwright E2E tests
         "**/legacy/**", // Exclude legacy code
@@ -398,6 +399,9 @@ export default defineConfig(() => {
           manualChunks: resolveManualChunk,
         },
       },
+    },
+    optimizeDeps: {
+      exclude: ["@sqlite.org/sqlite-wasm", "oosync/runtime/browser-sqlite"],
     },
     // Define global constants
     define: {

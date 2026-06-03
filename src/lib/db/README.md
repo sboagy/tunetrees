@@ -165,14 +165,10 @@ await initializeSqliteDb();
 const db = getSqliteDb(); // Now safe to use
 ```
 
-### "sql-wasm.wasm not found"
+### "sqlite3.wasm not found"
 
-**Solution:** Ensure WASM files are in `public/sql-wasm/`:
-
-```bash
-mkdir -p public/sql-wasm
-cp node_modules/sql.js/dist/sql-wasm.* public/sql-wasm/
-```
+**Solution:** Ensure `@sqlite.org/sqlite-wasm` is installed and Vite is bundling the
+WASM asset from `node_modules`. Do not copy WASM files into `public/`.
 
 ### IndexedDB quota exceeded
 
@@ -202,6 +198,6 @@ See `_notes/schema-migration-strategy.md` for full migration details.
 ## References
 
 - [Drizzle ORM Docs](https://orm.drizzle.team/)
-- [sql.js Docs](https://sql.js.org/)
+- [SQLite WASM Docs](https://sqlite.org/wasm/doc/trunk/index.md)
 - [Supabase Docs](https://supabase.com/docs)
 - [IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)

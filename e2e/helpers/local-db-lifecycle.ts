@@ -89,7 +89,7 @@ export async function clearTunetreesClientStorage(
         }
       }
 
-      // 4) IndexedDB: delete the sql.js persistence DB.
+      // 4) IndexedDB: delete the SQLite WASM persistence DB.
       const deleteDbWithRetry = async (dbName: string): Promise<void> => {
         const maxAttempts = 5;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {

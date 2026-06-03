@@ -17,14 +17,14 @@
  */
 
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
-import type { Database as SqlJsDatabase } from "sql.js";
+import type { SqliteRawDatabase } from "oosync/runtime/browser-sqlite";
 
 /**
  * Create the sync trigger control table.
  * This table has exactly one row with a 'disabled' flag.
  * When disabled = 1, triggers will NOT add entries to sync_push_queue.
  */
-export function createSyncTriggerControlTable(db: SqlJsDatabase): void {
+export function createSyncTriggerControlTable(db: SqliteRawDatabase): void {
   db.run(`
     CREATE TABLE IF NOT EXISTS sync_trigger_control (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -41,7 +41,7 @@ export function createSyncTriggerControlTable(db: SqlJsDatabase): void {
 /**
  * Create the sync_push_queue table if it doesn't exist
  */
-export function createSyncPushQueueTable(db: SqlJsDatabase): void {
+export function createSyncPushQueueTable(db: SqliteRawDatabase): void {
   db.run(`
     CREATE TABLE IF NOT EXISTS sync_push_queue (
       id TEXT PRIMARY KEY NOT NULL,
@@ -136,7 +136,7 @@ function generatePkWhereClause(
  * sync propagation works correctly even when code forgets to set it.
  */
 function createTriggersForTable(
-  db: SqlJsDatabase,
+  db: SqliteRawDatabase,
   config: TableTriggerConfig
 ): void {
   const { tableName, primaryKey, supportsIncremental } = config;
@@ -232,9 +232,9 @@ function createTriggersForTable(
  * 4. Creates INSERT/UPDATE/DELETE triggers for all syncable tables
  * 5. Creates auto_modified triggers for tables with last_modified_at
  *
- * @param db - The sql.js Database instance
+ * @param db - The raw SQLite database instance
  */
-export function installSyncTriggers(db: SqlJsDatabase): void {
+export function installSyncTriggers(db: SqliteRawDatabase): void {
   console.log("🔧 Installing sync push queue triggers...");
 
   // First ensure the control table exists (for trigger suppression)
@@ -272,9 +272,9 @@ export function installSyncTriggers(db: SqlJsDatabase): void {
  * Call this before syncDown operations to prevent creating queue entries
  * for data that already exists on the server.
  *
- * @param db - The sql.js Database instance
+ * @param db - The raw SQLite database instance
  */
-export function suppressSyncTriggers(db: SqlJsDatabase): void {
+export function suppressSyncTriggers(db: SqliteRawDatabase): void {
   db.run(`UPDATE sync_trigger_control SET disabled = 1 WHERE id = 1`);
 }
 
@@ -282,19 +282,19 @@ export function suppressSyncTriggers(db: SqlJsDatabase): void {
  * Enable sync triggers (resume push queue population).
  * Call this after syncDown operations to resume normal trigger behavior.
  *
- * @param db - The sql.js Database instance
+ * @param db - The raw SQLite database instance
  */
-export function enableSyncTriggers(db: SqlJsDatabase): void {
+export function enableSyncTriggers(db: SqliteRawDatabase): void {
   db.run(`UPDATE sync_trigger_control SET disabled = 0 WHERE id = 1`);
 }
 
 /**
  * Check if sync triggers are currently suppressed.
  *
- * @param db - The sql.js Database instance
+ * @param db - The raw SQLite database instance
  * @returns true if triggers are suppressed, false otherwise
  */
-export function areSyncTriggersSuppressed(db: SqlJsDatabase): boolean {
+export function areSyncTriggersSuppressed(db: SqliteRawDatabase): boolean {
   const result = db.exec(
     `SELECT disabled FROM sync_trigger_control WHERE id = 1`
   );
@@ -307,7 +307,7 @@ export function areSyncTriggersSuppressed(db: SqlJsDatabase): boolean {
 /**
  * Check if triggers are already installed by looking for a known trigger.
  */
-export function areSyncTriggersInstalled(db: SqlJsDatabase): boolean {
+export function areSyncTriggersInstalled(db: SqliteRawDatabase): boolean {
   try {
     const result = db.exec(`
       SELECT name FROM sqlite_master
@@ -322,7 +322,7 @@ export function areSyncTriggersInstalled(db: SqlJsDatabase): boolean {
 /**
  * Get count of installed sync triggers.
  */
-export function getSyncTriggerCount(db: SqlJsDatabase): number {
+export function getSyncTriggerCount(db: SqliteRawDatabase): number {
   try {
     const result = db.exec(`
       SELECT COUNT(*) FROM sqlite_master
@@ -342,7 +342,7 @@ export function getSyncTriggerCount(db: SqlJsDatabase): number {
 /**
  * Verify all expected triggers are installed.
  */
-export function verifySyncTriggers(db: SqlJsDatabase): {
+export function verifySyncTriggers(db: SqliteRawDatabase): {
   installed: boolean;
   missingTables: string[];
 } {

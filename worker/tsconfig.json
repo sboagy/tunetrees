@@ -19,7 +19,9 @@
       "@shared-generated/*": ["../shared/generated/*"],
       "@sync-schema/*": ["../shared/sync-schema/*"],
       "drizzle-orm": ["../node_modules/drizzle-orm"],
-      "drizzle-orm/*": ["../node_modules/drizzle-orm/*"]
+      "drizzle-orm/*": ["../node_modules/drizzle-orm/*"],
+      "postgres": ["../node_modules/postgres"],
+      "postgres/*": ["../node_modules/postgres/*"]
     }
   },
   "include": [

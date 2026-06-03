@@ -68,7 +68,7 @@ dist/assets/reset-password...js            2.67 KB │ gzip:   1.16 KB  ✅ OK
 
 **Static Assets:**
 ```
-sql-wasm.wasm                          1,024 KB (SQLite runtime)
+sqlite3.wasm                          bundled SQLite runtime
 jodit.min.css                            163 KB (Rich text editor)
 logo4.png                                475 KB (Branding)
 logo3.png                                409 KB (Branding)
@@ -246,7 +246,7 @@ const tunes = await getTunesForUser.execute({ userId });
 **Add to index.html:**
 ```html
 <!-- Preload WASM -->
-<link rel="preload" href="/sql-wasm/sql-wasm.wasm" as="fetch" crossorigin>
+Vite-managed `@sqlite.org/sqlite-wasm` asset
 
 <!-- Preload critical fonts -->
 <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
@@ -474,7 +474,7 @@ export default defineConfig({
 **Solutions:**
 1. Verify service worker registered: DevTools → Application → Service Workers
 2. Check precache: Application → Cache Storage → workbox-precache-*
-3. Preload WASM: Add `<link rel="preload" href="/sql-wasm/sql-wasm.wasm">`
+3. Verify Vite bundled the `@sqlite.org/sqlite-wasm` asset and the service worker precached it.
 
 ### Issue 2: Laggy Scrolling
 

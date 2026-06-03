@@ -41,7 +41,7 @@ TuneTrees implements an **offline-first architecture** using a multi-layer data 
 │           │ TypeScript API (type-safe queries)  │              │
 │           ▼                                     │              │
 │  ┌──────────────────────────────────────────────┴──────────┐   │
-│  │           SQLite WASM (sql.js)                          │   │
+│  │           SQLite WASM (@sqlite.org/sqlite-wasm)                          │   │
 │  │      In-Memory Relational Database (Heap)               │   │
 │  │  • 20+ tables with referential integrity                │   │
 │  │  • Complex VIEWs for practice scheduling                │   │
@@ -219,7 +219,7 @@ setupAutoPersist(); // Saves every 5 seconds if dirty flag set
 **Purpose:** Full relational database engine running in browser memory (JavaScript heap).
 
 **Key Characteristics:**
-- **Engine:** sql.js (SQLite 3.41.0 compiled to WebAssembly)
+- **Engine:** official SQLite WASM (`@sqlite.org/sqlite-wasm`)
 - **Storage:** In-memory (fast reads/writes)
 - **Schema:** 20+ tables with foreign keys, indexes, and complex VIEWs
 - **Size:** Typically 5-10 MB serialized for active user data
@@ -237,8 +237,8 @@ setupAutoPersist(); // Saves every 5 seconds if dirty flag set
 
 **Initialization Flow:**
 ```typescript
-// 1. Load WASM module
-const SQL = await initSqlJs({ locateFile: (file) => `/sql-wasm/${file}` });
+// 1. Load the official SQLite WASM module through oosync's browser runtime
+const sqlite3 = await initSqliteWasm();
 
 // 2. Check for existing DB in IndexedDB
 const existingBlob = await loadFromIndexedDB(DB_KEY);

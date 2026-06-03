@@ -36,11 +36,13 @@ function extractTablesWithSyncChangeLogTriggers(sql: string): string[] {
 
 function getConfiguredSqliteMigrations(): {
   databaseVersion: number;
+  schemaVersion: string;
   migrationFiles: string[];
 } {
   const config = JSON.parse(fs.readFileSync(CODEGEN_CONFIG_PATH, "utf8")) as {
     browserSqlite: {
       databaseVersion: number;
+      schemaVersion: string;
       migrationFiles: string[];
     };
   };
@@ -80,10 +82,18 @@ describe("server sync change log coverage", () => {
     ).toEqual([]);
   });
 
-  it("keeps browser sqlite databaseVersion aligned with the latest configured migration", () => {
-    const { databaseVersion, migrationFiles } = getConfiguredSqliteMigrations();
+  it("keeps browser sqlite databaseVersion at or one reset ahead of the latest configured migration", () => {
+    const { databaseVersion, migrationFiles, schemaVersion } =
+      getConfiguredSqliteMigrations();
     const configuredVersions = migrationFiles.map(extractMigrationVersion);
+    const latestMigrationVersion = Math.max(...configuredVersions);
 
-    expect(Math.max(...configuredVersions)).toBe(databaseVersion);
+    if (databaseVersion === latestMigrationVersion) {
+      expect(databaseVersion).toBe(latestMigrationVersion);
+      return;
+    }
+
+    expect(schemaVersion).toContain("sqlite-wasm-engine");
+    expect(databaseVersion).toBe(latestMigrationVersion + 1);
   });
 });

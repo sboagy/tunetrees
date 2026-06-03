@@ -18,7 +18,7 @@ import { getCatalogTuneIdsByFilter } from "../db/queries/tunes";
 import type { StarterRepertoireTemplate } from "../db/starter-repertoire-templates";
 import type { Repertoire } from "../db/types";
 
-// Support both sql.js (production) and better-sqlite3 (testing)
+// Support both SQLite WASM (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 const SELECTED_REPERTOIRE_KEY_PREFIX = "tunetrees:selectedRepertoire";

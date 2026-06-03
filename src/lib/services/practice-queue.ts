@@ -57,7 +57,7 @@ interface QueueBuckets {
 
 const HARD_QUEUE_ROW_CAP = 5000;
 
-// Type alias to support both sql.js (production) and better-sqlite3 (testing)
+// Type alias to support both SQLite WASM (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 function buildWindowStartUtcVariants(windowStart: string): string[] {
@@ -104,7 +104,7 @@ const DEFAULT_PREFS: PrefsSchedulingOptions = {
 /**
  * Get user scheduling options from database, falling back to defaults.
  *
- * @param db - Database instance (sql.js or better-sqlite3)
+ * @param db - Database instance (SQLite WASM or better-sqlite3)
  * @param userId - User ID
  * @returns Scheduling preferences for queue generation
  */
@@ -1026,7 +1026,7 @@ export async function generateOrGetPracticeQueue(
     windows
   );
   if (forceRegen || built.length > 0) {
-    // Queue rows are visible immediately from the in-memory sql.js DB. Flush now so
+    // Queue rows are visible immediately from the in-memory SQLite WASM DB. Flush now so
     // Refresh Now replacements, empty forced regenerations, and first-time queue
     // creation all survive a hard browser reload.
     if (typeof indexedDB !== "undefined") {

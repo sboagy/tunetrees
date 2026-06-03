@@ -20,7 +20,7 @@ TuneTrees uses Drizzle ORM with SQLite WASM for offline-first, client-side data 
 │         ↓                                               │
 │  Drizzle ORM Client (client-sqlite.ts)                  │
 │         ↓                                               │
-│  SQLite WASM (sql.js)                                   │
+│  SQLite WASM (@sqlite.org/sqlite-wasm)                                   │
 │         ↓                                               │
 │  IndexedDB (Persistence Layer)                          │
 │                                                         │
@@ -65,7 +65,7 @@ Key characteristics:
 **Location:** `src/lib/db/client-sqlite.ts`
 
 Core functionality:
-- Initializes SQLite WASM with sql.js
+- Initializes SQLite WASM with `@sqlite.org/sqlite-wasm`
 - Loads migrations from `/drizzle/migrations/sqlite/*.sql`
 - Persists to IndexedDB for offline access
 - Manages schema versioning (current: v3)
@@ -525,7 +525,7 @@ await navigator.storage.persist();
 ## Resources
 
 - [Drizzle ORM Documentation](https://orm.drizzle.team/)
-- [sql.js Documentation](https://sql.js.org/)
+- [SQLite WASM Documentation](https://sqlite.org/wasm/doc/trunk/index.md)
 - [SQLite Documentation](https://www.sqlite.org/docs.html)
 - [IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 
