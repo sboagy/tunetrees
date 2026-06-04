@@ -243,11 +243,10 @@ const tunes = await getTunesForUser.execute({ userId });
 
 #### 10. Preload Critical Resources
 
+SQLite WASM is imported by the browser runtime and emitted by Vite as a hashed `@sqlite.org/sqlite-wasm` asset; verify it is included in the production build and service-worker precache instead of hard-coding a preload URL in `index.html`.
+
 **Add to index.html:**
 ```html
-<!-- Preload WASM -->
-Vite-managed `@sqlite.org/sqlite-wasm` asset
-
 <!-- Preload critical fonts -->
 <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
 
