@@ -48,12 +48,15 @@ export function seedDatabase(db: SqliteRawDatabase, userId: string): void {
     const userProfileStmt = db.prepare(
       `SELECT id FROM user_profile WHERE id = ?`
     );
-    userProfileStmt.bind([userId]);
     const userProfileResult = [];
-    while (userProfileStmt.step()) {
-      userProfileResult.push(userProfileStmt.get());
+    try {
+      userProfileStmt.bind([userId]);
+      while (userProfileStmt.step()) {
+        userProfileResult.push(userProfileStmt.get());
+      }
+    } finally {
+      userProfileStmt.free();
     }
-    userProfileStmt.free();
 
     if (
       !userProfileResult ||
