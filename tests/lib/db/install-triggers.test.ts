@@ -501,6 +501,26 @@ describe("trigger functionality", () => {
     expect(row?.[3]).toBe("UPDATE"); // operation
   });
 
+  it("does not double-enqueue when auto_modified updates last_modified_at", () => {
+    db.run(
+      "INSERT INTO tune (id, title, genre, last_modified_at) VALUES ('tune-auto', 'Test Tune', 'irish', '2025-01-01T00:00:00Z')"
+    );
+    db.run("DELETE FROM sync_push_queue"); // Clear INSERT entry
+
+    db.run("UPDATE tune SET title = 'Updated Tune' WHERE id = 'tune-auto'");
+
+    const outbox = db.exec(
+      "SELECT row_id, operation FROM sync_push_queue WHERE table_name = 'tune'"
+    );
+    expect(outbox[0]?.values).toHaveLength(1);
+    expect(outbox[0]?.values[0]).toEqual(["tune-auto", "UPDATE"]);
+
+    const rows = db.exec(
+      "SELECT last_modified_at FROM tune WHERE id = 'tune-auto'"
+    );
+    expect(rows[0]?.values[0]?.[0]).not.toBe("2025-01-01T00:00:00Z");
+  });
+
   it("creates push queue entry on DELETE", () => {
     db.run(
       "INSERT INTO tune (id, title, genre) VALUES ('tune-3', 'Test Tune', 'irish')"

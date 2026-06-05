@@ -142,6 +142,11 @@ function createTriggersForTable(
   const { tableName, primaryKey, supportsIncremental } = config;
   const newRowId = generateRowIdExpression(primaryKey, "NEW");
   const oldRowId = generateRowIdExpression(primaryKey, "OLD");
+  const updateTriggerWhen = supportsIncremental
+    ? `(SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
+      AND NEW.last_modified_at IS NOT OLD.last_modified_at
+      AND NEW.last_modified_at IS NOT NULL`
+    : `(SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0`;
 
   // Drop existing triggers (including new auto-modified trigger)
   db.run(`DROP TRIGGER IF EXISTS trg_${tableName}_insert`);
@@ -191,7 +196,7 @@ function createTriggersForTable(
   db.run(`
     CREATE TRIGGER trg_${tableName}_update
     AFTER UPDATE ON ${tableName}
-    WHEN (SELECT disabled FROM sync_trigger_control WHERE id = 1) = 0
+    WHEN ${updateTriggerWhen}
     BEGIN
       INSERT INTO sync_push_queue (id, table_name, row_id, operation, changed_at)
       VALUES (

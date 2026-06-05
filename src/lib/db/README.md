@@ -169,6 +169,10 @@ const db = getSqliteDb(); // Now safe to use
 
 **Solution:** Ensure `@sqlite.org/sqlite-wasm` is installed and Vite is bundling the
 WASM asset from `node_modules`. Do not copy WASM files into `public/`.
+After changing `@sqlite.org/sqlite-wasm` or `oosync/runtime/browser-sqlite`
+during development, run `npm run dev:force`; rebuild before
+`npm run preview:local` so Vite's optimized dependency cache does not serve stale
+WASM/runtime assets.
 
 ### IndexedDB quota exceeded
 

@@ -55,14 +55,17 @@ function getExistingColumns(
 ): Set<string> {
   const stmt = db.prepare(`PRAGMA table_info("${tableName}")`);
   const columns = new Set<string>();
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as Record<string, unknown>;
-    const name = row.name;
-    if (typeof name === "string") {
-      columns.add(name);
+  try {
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as Record<string, unknown>;
+      const name = row.name;
+      if (typeof name === "string") {
+        columns.add(name);
+      }
     }
+  } finally {
+    stmt.free();
   }
-  stmt.free();
   return columns;
 }
 
