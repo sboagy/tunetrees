@@ -2,14 +2,26 @@ import type { Page } from "@playwright/test";
 import log from "loglevel";
 import { BASE_URL } from "../test-config";
 
-function resolveBaseUrl(path: string = ""): string {
-  const normalizedBase = `${String(BASE_URL).replace(/\/+$/, "")}/`;
+function getPageOrigin(page: Page): string | null {
+  try {
+    const url = new URL(page.url());
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.origin
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveBaseUrl(page: Page, path: string = ""): string {
+  const base = getPageOrigin(page) ?? String(BASE_URL);
+  const normalizedBase = `${base.replace(/\/+$/, "")}/`;
   const normalizedPath = path.replace(/^\/+/, "");
   return new URL(normalizedPath, normalizedBase).toString();
 }
 
-function isRealAppUrl(currentUrl: string): boolean {
-  const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+function isRealAppUrl(currentUrl: string, appOrigin: string): boolean {
+  const baseUrl = appOrigin.replace(/\/+$/, "");
   return (
     currentUrl.startsWith(baseUrl) &&
     !currentUrl.includes("e2e-origin.html") &&
@@ -19,7 +31,7 @@ function isRealAppUrl(currentUrl: string): boolean {
 }
 
 export async function gotoE2eOrigin(page: Page): Promise<void> {
-  await page.goto(resolveBaseUrl("e2e-origin.html"), {
+  await page.goto(resolveBaseUrl(page, "e2e-origin.html"), {
     waitUntil: "domcontentloaded",
   });
 }
@@ -174,6 +186,14 @@ export async function waitForSyncComplete(
 ): Promise<void> {
   const startTime = Date.now();
   let didRetryAfterRecoverableFailure = false;
+  let lastStatus: {
+    url: string;
+    version: number;
+    successStr: string;
+    errorCount: number;
+    errorSummary: string;
+    initialSyncComplete: boolean;
+  } | null = null;
 
   log.debug("⏳ Waiting for initial sync to complete...");
 
@@ -201,14 +221,16 @@ export async function waitForSyncComplete(
   };
 
   while (Date.now() - startTime < timeoutMs) {
+    const appOrigin = getPageOrigin(page) ?? String(BASE_URL);
+
     // Initial sync status only exists on the real app page. Setup can
     // transiently bounce through e2e-origin.html while storage is being reset,
     // so recover to the app before polling instead of timing out on the helper page.
-    if (!isRealAppUrl(page.url())) {
+    if (!isRealAppUrl(page.url(), appOrigin)) {
       log.debug(
         `⏳ waitForSyncComplete is on ${page.url() || "<empty>"}; navigating back to app root`
       );
-      await page.goto(resolveBaseUrl(), { waitUntil: "domcontentloaded" });
+      await page.goto(resolveBaseUrl(page), { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(200);
       continue;
     }
@@ -219,6 +241,7 @@ export async function waitForSyncComplete(
       success: boolean;
       errorCount: number;
       errorSummary: string;
+      initialSyncComplete: boolean;
     };
 
     try {
@@ -230,12 +253,20 @@ export async function waitForSyncComplete(
         const successStr = el?.dataset.syncSuccess ?? "";
         const errorCountStr = el?.dataset.syncErrorCount ?? "0";
         const errorSummary = el?.dataset.syncErrorSummary ?? "";
+        const initialSyncComplete = el?.dataset.initialSyncComplete === "true";
 
         const version = Number.parseInt(versionStr, 10) || 0;
         const errorCount = Number.parseInt(errorCountStr, 10) || 0;
         const success = successStr === "true";
 
-        return { version, successStr, success, errorCount, errorSummary };
+        return {
+          version,
+          successStr,
+          success,
+          errorCount,
+          errorSummary,
+          initialSyncComplete,
+        };
       });
     } catch (error) {
       if (isRecoverableNavigationError(error)) {
@@ -248,6 +279,15 @@ export async function waitForSyncComplete(
       }
       throw error;
     }
+
+    lastStatus = {
+      url: page.url(),
+      version: status.version,
+      successStr: status.successStr,
+      errorCount: status.errorCount,
+      errorSummary: status.errorSummary,
+      initialSyncComplete: status.initialSyncComplete,
+    };
 
     if (status.version >= 1 && (!status.success || status.errorCount > 0)) {
       if (!didRetryAfterRecoverableFailure) {
@@ -268,7 +308,12 @@ export async function waitForSyncComplete(
       );
     }
 
-    if (status.version >= 1 && status.success && status.errorCount === 0) {
+    if (
+      status.version >= 1 &&
+      status.success &&
+      status.errorCount === 0 &&
+      status.initialSyncComplete
+    ) {
       log.debug("✅ Initial sync complete (success) detected");
       return;
     }
@@ -277,7 +322,9 @@ export async function waitForSyncComplete(
   }
 
   throw new Error(
-    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail`
+    `⚠️ Initial sync did not complete within ${timeoutMs}ms - tests may fail. Last status: ${JSON.stringify(
+      lastStatus ?? { url: page.url() }
+    )}`
   );
 }
 
@@ -289,6 +336,6 @@ export async function resetLocalDbAndResync(
 ): Promise<void> {
   await gotoE2eOrigin(page);
   await clearTunetreesClientStorage(page, { preserveAuth: opts.preserveAuth });
-  await page.goto(resolveBaseUrl(), { waitUntil: "domcontentloaded" });
+  await page.goto(resolveBaseUrl(page), { waitUntil: "domcontentloaded" });
   await waitForSyncComplete(page);
 }
