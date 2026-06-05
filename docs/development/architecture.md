@@ -14,7 +14,7 @@ TuneTrees is an **offline-first Progressive Web App** built with SolidJS. All us
 │   SolidJS UI ←──────── Reactive Signals                 │
 │       │                                                  │
 │       ▼                                                  │
-│   Drizzle ORM ────────► SQLite WASM (sql.js)            │
+│   Drizzle ORM ────────► SQLite WASM (@sqlite.org/sqlite-wasm)            │
 │       │                      │                           │
 │       │                      ▼                           │
 │       │               IndexedDB (persistence)            │
@@ -40,7 +40,7 @@ TuneTrees is an **offline-first Progressive Web App** built with SolidJS. All us
 | Routing | @solidjs/router |
 | UI Components | shadcn-solid, @kobalte/core |
 | Styling | Tailwind CSS 4.x |
-| Local Database | SQLite WASM (sql.js) |
+| Local Database | SQLite WASM (@sqlite.org/sqlite-wasm) |
 | ORM | Drizzle ORM |
 | Cloud Database | Supabase PostgreSQL |
 | Authentication | Supabase Auth |

@@ -111,6 +111,6 @@ sequenceDiagram
 - `EF`: Supabase Edge Function (`ai-chat`)
 - `GM`: Gemini model API (returns text or function call)
 - `EX`: Client-side tool executor (`executeToolCall`)
-- `DB`: Local SQLite via Drizzle/sql.js
+- `DB`: Local SQLite via Drizzle/SQLite
 - `text` response: assistant message only (no local side effects)
 - `tool_call` response: executes local app action (filters, practice log, notes, details)

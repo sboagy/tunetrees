@@ -7,8 +7,6 @@
 
 import type { BrowserSqliteDatabase } from "oosync/runtime/browser-sqlite";
 import { createBrowserSqliteClient } from "oosync/runtime/browser-sqlite";
-// eslint-disable-next-line import/no-unresolved
-import sqlWasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import * as schema from "../../../drizzle/schema-sqlite";
 import {
   SYNCABLE_TABLES,
@@ -27,7 +25,6 @@ export const browserSqliteClient = createBrowserSqliteClient({
     tableSyncOrder: TABLE_SYNC_ORDER,
     tableToSchemaKey: TABLE_TO_SCHEMA_KEY,
   },
-  sqlWasmUrl,
   hooks: browserSqliteHooks,
   diagnosticsEnabled: import.meta.env.VITE_SYNC_DIAGNOSTICS === "true",
   storage: {
@@ -38,8 +35,8 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 23,
-  schemaVersion: "2.0.16-add-swing-columns",
+  databaseVersion: 24,
+  schemaVersion: "2.1.0-sqlite-wasm-engine",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -50,7 +47,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0007_add_hybrid_fields.sql",
     "/drizzle/migrations/sqlite/0008_add_sync_change_log.sql",
     "/drizzle/migrations/sqlite/0009_add_view_column_meta.sql",
-    "/drizzle/migrations/sqlite/0009_add_plugins.sql",
+    "/drizzle/migrations/sqlite/0009b_add_plugins.sql",
     "/drizzle/migrations/sqlite/0010_add_plugin_goals.sql",
     "/drizzle/migrations/sqlite/0011_rename_user_profile_id.sql",
     "/drizzle/migrations/sqlite/0012_rename_playlist_to_repertoire.sql",
@@ -65,6 +62,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0021_add_rhythm_pattern_overrides.sql",
     "/drizzle/migrations/sqlite/0022_add_incremental_sync_timestamps.sql",
     "/drizzle/migrations/sqlite/0023_add_swing_and_bpm_to_rhythm_patterns.sql",
+    "/drizzle/migrations/sqlite/0024_add_user_genre_selection_and_media_draft_outbox.sql",
   ],
   forceResetQueryParams: [
     { key: "reset", value: "true" },
@@ -84,7 +82,7 @@ export const closeDb = browserSqliteClient.closeDb;
 export const clearDb = browserSqliteClient.clearDb;
 export const setupAutoPersist = browserSqliteClient.setupAutoPersist;
 export const getSqliteInstance = browserSqliteClient.getSqliteInstance;
-export const getSqlJsDebugInfo = browserSqliteClient.getSqlJsDebugInfo;
+export const getSqliteDebugInfo = browserSqliteClient.getSqliteDebugInfo;
 export const getClientSqliteDebugState = browserSqliteClient.getDebugState;
 export const loadOutboxBackupForUser =
   browserSqliteClient.loadOutboxBackupForUser;

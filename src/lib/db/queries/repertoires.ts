@@ -38,7 +38,7 @@ import type {
   RepertoireWithSummary,
 } from "../types";
 
-// Support both sql.js (production) and better-sqlite3 (testing)
+// Support both SQLite WASM (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
 
 export type {

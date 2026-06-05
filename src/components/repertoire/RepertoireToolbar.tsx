@@ -39,7 +39,10 @@ import {
   createTuneSetFromTunes,
   getPersonalTuneSets,
 } from "../../lib/db/queries/tune-sets";
-import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
+import {
+  addSpecificTunesToExistingQueue,
+  generateOrGetPracticeQueue,
+} from "../../lib/services/practice-queue";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -231,12 +234,18 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
 
       props.table.resetRowSelection();
 
-      // Add the newly scheduled tunes to the existing queue (if one exists for today)
-      // without regenerating the whole queue.
+      // Ensure Add To Review makes explicitly selected tunes available in the
+      // current practice session. If no queue exists yet, generate today's
+      // normal queue first, then append any selected tunes not already included.
       const currentUserId = user()?.id;
       if (currentUserId && props.repertoireId && result.tuneIds.length > 0) {
         try {
           const db2 = getDb();
+          await generateOrGetPracticeQueue(
+            db2,
+            currentUserId,
+            props.repertoireId
+          );
           await addSpecificTunesToExistingQueue(
             db2,
             currentUserId,

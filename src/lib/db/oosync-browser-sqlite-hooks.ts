@@ -144,6 +144,9 @@ export const browserSqliteHooks: IBrowserSqliteHooks = {
     await initializeViewColumnMeta(db);
     ensureTuneTreesCompatibilityObjects(context.rawDb);
   },
+  onDatabaseClosed: () => {
+    latestRawDb = null;
+  },
   clearLocalDataForMigration: (db) =>
     clearLocalDatabaseForMigration(db, { rawDb: latestRawDb ?? undefined }),
 };

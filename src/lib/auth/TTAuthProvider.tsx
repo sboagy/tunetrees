@@ -801,8 +801,6 @@ const TTInner: ParentComponent = (props) => {
           setLastSyncErrorSummary(null);
         }
 
-        setRemoteSyncDownCompletionVersion((prev) => prev + 1);
-
         if (syncServiceInstance) {
           const ts = syncServiceInstance.getLastSyncDownTimestamp();
           if (ts) setLastSyncTimestamp(ts);
@@ -838,6 +836,8 @@ const TTInner: ParentComponent = (props) => {
           setInitialSyncComplete(true);
           void persistDbAfterSync();
         }
+
+        setRemoteSyncDownCompletionVersion((prev) => prev + 1);
 
         if (!isFirstSyncCompletion) {
           setTimeout(() => {
@@ -1668,6 +1668,7 @@ const TTInner: ParentComponent = (props) => {
         }
         data-sync-error-count={String(lastSyncErrorCount())}
         data-sync-error-summary={lastSyncErrorSummary() ?? ""}
+        data-initial-sync-complete={String(initialSyncComplete())}
         style={{ display: "contents" }}
       >
         {props.children}
