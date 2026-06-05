@@ -36,11 +36,13 @@ function extractTablesWithSyncChangeLogTriggers(sql: string): string[] {
 
 function getConfiguredSqliteMigrations(): {
   databaseVersion: number;
+  schemaVersion: string;
   migrationFiles: string[];
 } {
   const config = JSON.parse(fs.readFileSync(CODEGEN_CONFIG_PATH, "utf8")) as {
     browserSqlite: {
       databaseVersion: number;
+      schemaVersion: string;
       migrationFiles: string[];
     };
   };
@@ -49,10 +51,10 @@ function getConfiguredSqliteMigrations(): {
 }
 
 function extractMigrationVersion(filePath: string): number {
-  const match = /^(\d{4})_/.exec(path.basename(filePath));
+  const match = /^(\d{4})[a-z]?_/.exec(path.basename(filePath));
   if (!match) {
     throw new Error(
-      `Expected sqlite migration file name to start with ####_: ${filePath}`
+      `Expected sqlite migration file name to start with ####_ or ####x_: ${filePath}`
     );
   }
   return Number.parseInt(match[1], 10);
@@ -80,10 +82,23 @@ describe("server sync change log coverage", () => {
     ).toEqual([]);
   });
 
-  it("keeps browser sqlite databaseVersion aligned with the latest configured migration", () => {
-    const { databaseVersion, migrationFiles } = getConfiguredSqliteMigrations();
+  it("keeps browser sqlite databaseVersion at or one reset ahead of the latest configured migration", () => {
+    const { databaseVersion, migrationFiles, schemaVersion } =
+      getConfiguredSqliteMigrations();
     const configuredVersions = migrationFiles.map(extractMigrationVersion);
+    const latestMigrationVersion = Math.max(...configuredVersions);
 
-    expect(Math.max(...configuredVersions)).toBe(databaseVersion);
+    expect(databaseVersion).toBeLessThanOrEqual(latestMigrationVersion + 1);
+
+    if (databaseVersion === latestMigrationVersion) {
+      expect(databaseVersion).toBe(latestMigrationVersion);
+      return;
+    }
+
+    // The only accepted +1 case is an engine-reset version bump, such as the
+    // sql.js to sqlite-wasm swap, where existing browser blobs must be discarded
+    // even though the logical migration list has not advanced.
+    expect(schemaVersion).toContain("sqlite-wasm-engine");
+    expect(databaseVersion).toBe(latestMigrationVersion + 1);
   });
 });

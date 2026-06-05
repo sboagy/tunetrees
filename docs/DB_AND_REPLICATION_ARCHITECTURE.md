@@ -41,7 +41,7 @@ TuneTrees implements an **offline-first architecture** using a multi-layer data 
 │           │ TypeScript API (type-safe queries)  │              │
 │           ▼                                     │              │
 │  ┌──────────────────────────────────────────────┴──────────┐   │
-│  │           SQLite WASM (sql.js)                          │   │
+│  │           SQLite WASM (@sqlite.org/sqlite-wasm)                          │   │
 │  │      In-Memory Relational Database (Heap)               │   │
 │  │  • 20+ tables with referential integrity                │   │
 │  │  • Complex VIEWs for practice scheduling                │   │
@@ -113,10 +113,10 @@ sequenceDiagram
     Drizzle->>IDB: Load existing DB blob?
     alt DB exists in IndexedDB
         IDB-->>Drizzle: Return Uint8Array blob
-        Drizzle->>SQLite: new SQL.Database(blob)
+        Drizzle->>SQLite: createSqliteWasmDatabase(sqlite3, existingBlob)
         SQLite->>SQLite: Recreate VIEWs
     else New Database
-        Drizzle->>SQLite: new SQL.Database()
+        Drizzle->>SQLite: createSqliteWasmDatabase(sqlite3)
         Drizzle->>SQLite: Apply migration SQL files
         SQLite->>SQLite: Create tables, indexes, VIEWs
     end
@@ -219,7 +219,7 @@ setupAutoPersist(); // Saves every 5 seconds if dirty flag set
 **Purpose:** Full relational database engine running in browser memory (JavaScript heap).
 
 **Key Characteristics:**
-- **Engine:** sql.js (SQLite 3.41.0 compiled to WebAssembly)
+- **Engine:** official SQLite WASM (`@sqlite.org/sqlite-wasm`)
 - **Storage:** In-memory (fast reads/writes)
 - **Schema:** 20+ tables with foreign keys, indexes, and complex VIEWs
 - **Size:** Typically 5-10 MB serialized for active user data
@@ -237,21 +237,27 @@ setupAutoPersist(); // Saves every 5 seconds if dirty flag set
 
 **Initialization Flow:**
 ```typescript
-// 1. Load WASM module
-const SQL = await initSqlJs({ locateFile: (file) => `/sql-wasm/${file}` });
+import { drizzle } from "drizzle-orm/sql-js";
+import {
+  createSqliteWasmDatabase,
+  initSqliteWasm,
+} from "oosync/runtime/sqlite-wasm-adapter";
+
+// 1. Load the official SQLite WASM module through oosync's browser runtime
+const sqlite3 = await initSqliteWasm();
 
 // 2. Check for existing DB in IndexedDB
 const existingBlob = await loadFromIndexedDB(DB_KEY);
 
 // 3a. Load existing DB
 if (existingBlob) {
-  sqliteDb = new SQL.Database(existingBlob);
+  sqliteDb = createSqliteWasmDatabase(sqlite3, existingBlob);
   await recreateViews(drizzleDb); // VIEWs not persisted in blob
 }
 
 // 3b. Create new DB with migrations
 else {
-  sqliteDb = new SQL.Database();
+  sqliteDb = createSqliteWasmDatabase(sqlite3);
   await applyMigrations(sqliteDb); // Run .sql files in order
   await initializeViews(drizzleDb);
 }

@@ -5,7 +5,7 @@
  */
 
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
-import type { Database } from "sql.js";
+import type { SqliteRawDatabase as Database } from "oosync/runtime/browser-sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   areSyncTriggersInstalled,
@@ -18,19 +18,19 @@ import {
   suppressSyncTriggers,
   verifySyncTriggers,
 } from "../../../src/lib/db/install-triggers";
-import { getTestSqlJs } from "./sqljs-test-utils";
+import { getTestSqlite } from "./sqlite-wasm-test-utils";
 
 let db: Database;
 
 // Initialize SQL.js once for all tests
-let SQL: Awaited<ReturnType<typeof getTestSqlJs>>;
+let SQL: Awaited<ReturnType<typeof getTestSqlite>>;
 
 beforeEach(async () => {
   if (!SQL) {
-    SQL = await getTestSqlJs();
+    SQL = await getTestSqlite();
   }
   // Create a fresh in-memory database for each test
-  db = new SQL.Database();
+  db = SQL.createDatabase();
 
   // Create minimal schema for testing (just the tables that triggers depend on)
   db.run(`
@@ -499,6 +499,26 @@ describe("trigger functionality", () => {
     const row = outbox[0]?.values[0];
     expect(row?.[2]).toBe("tune-2"); // row_id
     expect(row?.[3]).toBe("UPDATE"); // operation
+  });
+
+  it("does not double-enqueue when auto_modified updates last_modified_at", () => {
+    db.run(
+      "INSERT INTO tune (id, title, genre, last_modified_at) VALUES ('tune-auto', 'Test Tune', 'irish', '2025-01-01T00:00:00Z')"
+    );
+    db.run("DELETE FROM sync_push_queue"); // Clear INSERT entry
+
+    db.run("UPDATE tune SET title = 'Updated Tune' WHERE id = 'tune-auto'");
+
+    const outbox = db.exec(
+      "SELECT row_id, operation FROM sync_push_queue WHERE table_name = 'tune'"
+    );
+    expect(outbox[0]?.values).toHaveLength(1);
+    expect(outbox[0]?.values[0]).toEqual(["tune-auto", "UPDATE"]);
+
+    const rows = db.exec(
+      "SELECT last_modified_at FROM tune WHERE id = 'tune-auto'"
+    );
+    expect(rows[0]?.values[0]?.[0]).not.toBe("2025-01-01T00:00:00Z");
   });
 
   it("creates push queue entry on DELETE", () => {

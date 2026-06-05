@@ -7,7 +7,7 @@ Repository-specific architecture, tech stack details, and scoped patterns live i
 - Frontend: SolidJS + TypeScript (Vite)
 - Styling/UI: Tailwind + shadcn-solid + `@kobalte/core` primitives
 - Data grids: `@tanstack/solid-table` + `@tanstack/solid-virtual`
-- Local DB: SQLite WASM via `sql.js` + IndexedDB (Drizzle ORM)
+- Local DB: SQLite WASM via `@sqlite.org/sqlite-wasm` + IndexedDB blob persistence (Drizzle ORM)
 - Remote DB (browser): Supabase JS wrapped by Drizzle (`src/lib/db/client-postgres-browser.ts`)
 - Remote: Supabase (Auth + Postgres + Realtime)
 - Sync: outbox-driven bidirectional sync via Cloudflare Worker + `oosync`
@@ -25,6 +25,7 @@ npm run test               # Unit tests (Vitest)
 npm run test:e2e           # E2E tests (Playwright)
 npm run codegen:schema     # Regenerate all sync/schema artifacts
 npm run codegen:schema:check
+npm run deps:oosync:update -- <sha-or-tag> # Pin TuneTrees to a landed oosync ref
 npm run db:local:reset     # Reset local Supabase + auth fixtures
 ```
 
@@ -69,6 +70,8 @@ Any file whose header says `AUTO-GENERATED`, `GENERATED`, or `DO NOT EDIT` is of
 - Stop on error: if an edit causes a syntax error, type error, or failing test, stop, explain the failure, re-read the file from disk, and propose a corrected patch.
 - After 2 failed edit attempts on the same file without new information, stop and ask for guidance.
 - Never append code that already exists. Check for duplicate imports, exports, helpers, and config blocks before finalizing.
+- After changing `@sqlite.org/sqlite-wasm` or `oosync/runtime/browser-sqlite`, run Vite dev with `--force` and rebuild `dist` before using `vite preview`. Stale optimized bundles can hide WASM path and worker-asset changes.
+- Before merging a TuneTrees branch that depends on oosync runtime changes, land/push oosync first and run `npm run deps:oosync:update -- <sha-or-tag>` so TuneTrees no longer depends on a moving feature branch.
 
 ## Process Guardrails
 

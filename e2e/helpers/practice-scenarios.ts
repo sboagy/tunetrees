@@ -94,7 +94,7 @@ export async function navigateToTabForTest(
  * Fast local seeding via browser Test API (preferred for E2E)
  *
  * This avoids slow remote DB resets by writing directly to the app's
- * local SQLite (sql.js) database and regenerating the daily queue.
+ * local SQLite database and regenerating the daily queue.
  */
 export async function seedAddToReviewLocally(
   page: Page,

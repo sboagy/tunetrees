@@ -96,6 +96,19 @@ async function openCatalogSync(page: import("@playwright/test").Page) {
   });
 }
 
+async function waitForCatalogSelectionSaved(
+  page: import("@playwright/test").Page
+) {
+  await expect(
+    page.getByText("Catalog selection saved successfully")
+  ).toBeVisible({
+    timeout: 60000,
+  });
+  await expect(page.getByTestId("settings-genre-save")).toBeDisabled({
+    timeout: 5000,
+  });
+}
+
 /**
  * Helper to get annotation counts using test API
  */
@@ -277,6 +290,7 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     const saveButton = page.getByTestId("settings-genre-save");
     await expect(saveButton).toBeEnabled({ timeout: 5000 });
     await saveButton.click();
+    await waitForCatalogSelectionSaved(page);
 
     // Close Settings modal
     await page.getByTestId("settings-close-button").click();
@@ -308,11 +322,17 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
 
     // Record initial counts (should include our seeded annotations)
     const beforeCounts = await getAnnotationCounts(page);
+    const beforeTuneCounts = await getAnnotationCounts(page, {
+      tuneId: tuneId!,
+    });
     console.log("After genre addition and seeding:", beforeCounts);
+    console.log("Seeded tune annotation counts:", beforeTuneCounts);
 
     // Verify seeded annotations exist
     expect(beforeCounts.notes).toBeGreaterThanOrEqual(3);
     expect(beforeCounts.references).toBeGreaterThanOrEqual(2);
+    expect(beforeTuneCounts.notes).toBeGreaterThanOrEqual(3);
+    expect(beforeTuneCounts.references).toBeGreaterThanOrEqual(2);
 
     // Re-open Settings → Catalog & Sync to remove the genre
     await openCatalogSync(page);
@@ -332,17 +352,20 @@ test.describe("ANNOTATIONS-FILTER-001: RPC-Based Genre Filtering", () => {
     // Save changes
     await expect(saveButton).toBeEnabled({ timeout: 5000 });
     await saveButton.click();
+    await waitForCatalogSelectionSaved(page);
 
     // Wait for sync to complete (includes purge of orphaned annotations)
     await waitForSyncComplete(page);
 
-    // Record after counts
-    const afterCounts = await getAnnotationCounts(page);
-    console.log("After genre removal:", afterCounts);
-
-    // Verify counts decreased (orphaned rows purged)
-    expect(afterCounts.notes).toBeLessThan(beforeCounts.notes);
-    expect(afterCounts.references).toBeLessThan(beforeCounts.references);
+    // Verify the annotations for the removed-genre tune were purged. Total
+    // annotation counts are intentionally not used here because sync may pull
+    // unrelated references while the settings save is completing.
+    await expect
+      .poll(async () => await getAnnotationCounts(page, { tuneId: tuneId! }), {
+        timeout: 15000,
+        intervals: [100, 250, 500, 1000],
+      })
+      .toEqual({ notes: 0, references: 0 });
 
     // Verify no orphaned annotations remain
     await expect

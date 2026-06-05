@@ -4,7 +4,7 @@ import type {
 } from "@oosync/shared/protocol";
 import { applyRemoteChangesToLocalDb, WorkerClient } from "@oosync/sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database as SqlJsDatabase } from "sql.js";
+import type { SqliteRawDatabase } from "oosync/runtime/browser-sqlite";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
 import {
   areSyncTriggersSuppressed,
@@ -44,21 +44,21 @@ function quoteSqlString(value: string): string {
   return `'${escapeSqlString(value)}'`;
 }
 
-function readFirstColumn(sqliteDb: SqlJsDatabase, query: string): string[] {
+function readFirstColumn(sqliteDb: SqliteRawDatabase, query: string): string[] {
   const result = sqliteDb.exec(query);
   return (result[0]?.values ?? [])
     .map((row) => row[0])
     .filter((value): value is string => typeof value === "string");
 }
 
-function readCount(sqliteDb: SqlJsDatabase, query: string): number {
+function readCount(sqliteDb: SqliteRawDatabase, query: string): number {
   const result = sqliteDb.exec(query);
   const rawCount = result[0]?.values?.[0]?.[0];
   return typeof rawCount === "number" ? rawCount : Number(rawCount ?? 0);
 }
 
 function deleteRowsWithoutSyncArtifacts(
-  sqliteDb: SqlJsDatabase,
+  sqliteDb: SqliteRawDatabase,
   tableName: string,
   rowIds: string[]
 ): number {
@@ -77,7 +77,7 @@ function deleteRowsWithoutSyncArtifacts(
 }
 
 export function repairPendingMediaAssetSyncStateInSqlite(
-  sqliteDb: SqlJsDatabase
+  sqliteDb: SqliteRawDatabase
 ): {
   requeuedReferenceCount: number;
   prunedMediaAssetCount: number;
@@ -253,7 +253,7 @@ export async function repairPendingMediaAssetSyncState(): Promise<{
   return result;
 }
 
-function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
+function collectPendingSetlistDependencyRepairs(sqliteDb: SqliteRawDatabase): {
   setlistRequiredAt: Map<string, string>;
   tuneSetRequiredAt: Map<string, string>;
   groupRequiredAt: Map<string, string>;
@@ -353,7 +353,7 @@ function collectPendingSetlistDependencyRepairs(sqliteDb: SqlJsDatabase): {
 }
 
 function ensurePendingOutboxEntry(
-  sqliteDb: SqlJsDatabase,
+  sqliteDb: SqliteRawDatabase,
   tableName: "setlist" | "tune_set" | "user_group",
   rowId: string,
   requiredChangedAt: string
@@ -411,7 +411,7 @@ function ensurePendingOutboxEntry(
 }
 
 export function repairPendingSetlistSyncStateInSqlite(
-  sqliteDb: SqlJsDatabase
+  sqliteDb: SqliteRawDatabase
 ): {
   requeuedSetlistCount: number;
   requeuedTuneSetCount: number;
