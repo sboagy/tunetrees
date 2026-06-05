@@ -99,7 +99,7 @@ Duration   2.22s
 
 **Database Client:**
 - `src/lib/db/client-sqlite.ts` - Fully functional (533 lines)
-- Uses `sql.js` for SQLite WASM
+- Uses `@sqlite.org/sqlite-wasm` for SQLite WASM
 - IndexedDB persistence working
 - Auto-save on visibility change/page unload
 - Migration system with version tracking (v3)
@@ -271,7 +271,7 @@ While all requirements are met, these could enhance the system:
 | Package | Version | Purpose |
 |---------|---------|---------|
 | drizzle-orm | 0.44.6 | ORM layer |
-| sql.js | 1.13.0 | SQLite WASM |
+| @sqlite.org/sqlite-wasm | 3.53.0-build1 | SQLite WASM |
 | drizzle-kit | 0.31.6 | Schema tools |
 | vitest | 3.2.4 | Testing |
 | better-sqlite3 | 12.4.1 | Test DB |
@@ -282,7 +282,7 @@ While all requirements are met, these could enhance the system:
 
 ### Documentation
 - [Drizzle ORM Docs](https://orm.drizzle.team/)
-- [sql.js Docs](https://sql.js.org/)
+- [SQLite WASM Docs](https://sqlite.org/wasm/doc/trunk/index.md)
 - [SQLite Docs](https://www.sqlite.org/docs.html)
 
 ### Project Docs

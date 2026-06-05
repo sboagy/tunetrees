@@ -157,11 +157,11 @@ INSERT INTO
 		"device_id"
 	)
 SELECT
-	"id",
+	"playlist_id",
 	"user_ref",
-	"name",
+	NULL,
 	"instrument_ref",
-	"genre_default",
+	NULL,
 	"sr_alg_type",
 	"deleted",
 	"sync_version",
@@ -543,7 +543,7 @@ SELECT
 	"tab_spec",
 	"practice_show_submitted",
 	"practice_mode_flashcard",
-	"sidebar_dock_position",
+	'left',
 	"sync_version",
 	"last_modified_at",
 	"device_id"
@@ -798,8 +798,8 @@ INSERT INTO
 	)
 SELECT
 	"id",
-	"id_foreign",
-	"primary_origin",
+	NULL,
+	'irishtune.info',
 	"title",
 	"type",
 	"structure",

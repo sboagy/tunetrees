@@ -1,20 +1,20 @@
-import type { Database } from "sql.js";
+import type { SqliteRawDatabase as Database } from "oosync/runtime/browser-sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createOutboxBackup,
   type IOutboxBackup,
   replayOutboxBackup,
 } from "../../../src/lib/db/outbox-backup";
-import { getTestSqlJs } from "./sqljs-test-utils";
+import { getTestSqlite } from "./sqlite-wasm-test-utils";
 
 let db: Database;
-let SQL: Awaited<ReturnType<typeof getTestSqlJs>>;
+let SQL: Awaited<ReturnType<typeof getTestSqlite>>;
 
 beforeEach(async () => {
   if (!SQL) {
-    SQL = await getTestSqlJs();
+    SQL = await getTestSqlite();
   }
-  db = new SQL.Database();
+  db = SQL.createDatabase();
 
   db.run(`
     CREATE TABLE sync_push_queue (

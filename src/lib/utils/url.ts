@@ -6,6 +6,30 @@ export function parseAbsoluteUrl(value: string): URL | null {
   }
 }
 
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+}
+
+export function trimLeadingSlashes(value: string): string {
+  let start = 0;
+  while (start < value.length && value.codePointAt(start) === 47) {
+    start += 1;
+  }
+  return start === 0 ? value : value.slice(start);
+}
+
+function trimTrailingDots(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.codePointAt(end - 1) === 46) {
+    end -= 1;
+  }
+  return end === value.length ? value : value.slice(0, end);
+}
+
 export function hasHttpProtocol(value: string): boolean {
   const parsedUrl = parseAbsoluteUrl(value);
   return (
@@ -22,8 +46,8 @@ export function matchesHostname(
     typeof urlOrHostname === "string" ? urlOrHostname : urlOrHostname.hostname;
 
   // Some fully-qualified hostnames may legally include a trailing dot.
-  const normalizedHostname = hostname.toLowerCase().replace(/\.+$/, "");
-  const normalizedExpected = expectedHostname.toLowerCase();
+  const normalizedHostname = trimTrailingDots(hostname.toLowerCase());
+  const normalizedExpected = trimTrailingDots(expectedHostname.toLowerCase());
   const exactMatch = normalizedHostname === normalizedExpected;
   const subdomainMatch = normalizedHostname.endsWith(`.${normalizedExpected}`);
 
