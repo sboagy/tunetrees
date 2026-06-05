@@ -47,7 +47,7 @@ export function matchesHostname(
 
   // Some fully-qualified hostnames may legally include a trailing dot.
   const normalizedHostname = trimTrailingDots(hostname.toLowerCase());
-  const normalizedExpected = expectedHostname.toLowerCase();
+  const normalizedExpected = trimTrailingDots(expectedHostname.toLowerCase());
   const exactMatch = normalizedHostname === normalizedExpected;
   const subdomainMatch = normalizedHostname.endsWith(`.${normalizedExpected}`);
 
