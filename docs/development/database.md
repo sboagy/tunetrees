@@ -8,7 +8,7 @@ TuneTrees uses a dual-database architecture for offline-first functionality.
 ┌─────────────────────────────────────────────────────────┐
 │                    Browser                               │
 │                                                          │
-│   SQLite WASM (sql.js)  ←→  IndexedDB (persistence)     │
+│   SQLite WASM (@sqlite.org/sqlite-wasm)  ←→  IndexedDB (persistence)     │
 │         ↑                                                │
 │         │ Drizzle ORM                                    │
 │         │                                                │
@@ -25,7 +25,7 @@ TuneTrees uses a dual-database architecture for offline-first functionality.
 
 ### Technology
 
-- **Engine:** sql.js (SQLite compiled to WebAssembly)
+- **Engine:** official SQLite WASM (`@sqlite.org/sqlite-wasm`)
 - **ORM:** Drizzle ORM
 - **Persistence:** Serialized to IndexedDB blob
 

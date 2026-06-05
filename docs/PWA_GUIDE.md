@@ -93,7 +93,7 @@ User Device
 ```
 - HTML, CSS, JavaScript bundles
 - Icons and logos
-- SQL WASM runtime (sql-wasm.wasm, sql-wasm.js)
+- Official SQLite WASM runtime bundled from `@sqlite.org/sqlite-wasm`
 - SQLite migration files (*.sql)
 - Font files (woff, woff2)
 ```

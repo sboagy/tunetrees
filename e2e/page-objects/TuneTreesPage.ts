@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { trimTrailingSlashes } from "../../src/lib/utils/url";
 import { applyDeterministicFsrsConfig } from "../helpers/fsrs-test-config";
 import {
   clearTunetreesClientStorage,
@@ -34,14 +35,6 @@ function logViewModeDiagnostic(message: string): void {
   if (VIEW_MODE_DIAGNOSTICS) {
     console.log(`[ViewModeDiag] ${message}`);
   }
-}
-
-function trimTrailingSlashes(value: string): string {
-  let normalized = value;
-  while (normalized.endsWith("/")) {
-    normalized = normalized.slice(0, -1);
-  }
-  return normalized;
 }
 
 /**

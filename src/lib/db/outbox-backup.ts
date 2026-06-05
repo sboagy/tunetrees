@@ -2,7 +2,7 @@ import {
   type SyncableTableName,
   TABLE_REGISTRY,
 } from "@sync-schema/table-meta";
-import type { Database as SqlJsDatabase } from "sql.js";
+import type { SqliteRawDatabase } from "oosync/runtime/browser-sqlite";
 
 export interface IOutboxBackupItem {
   tableName: SyncableTableName;
@@ -49,17 +49,23 @@ function parseRowIdToPkObject(
   return { [primaryKey]: rowId };
 }
 
-function getExistingColumns(db: SqlJsDatabase, tableName: string): Set<string> {
+function getExistingColumns(
+  db: SqliteRawDatabase,
+  tableName: string
+): Set<string> {
   const stmt = db.prepare(`PRAGMA table_info("${tableName}")`);
   const columns = new Set<string>();
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as Record<string, unknown>;
-    const name = row.name;
-    if (typeof name === "string") {
-      columns.add(name);
+  try {
+    while (stmt.step()) {
+      const row = stmt.getAsObject() as Record<string, unknown>;
+      const name = row.name;
+      if (typeof name === "string") {
+        columns.add(name);
+      }
     }
+  } finally {
+    stmt.free();
   }
-  stmt.free();
   return columns;
 }
 
@@ -81,7 +87,7 @@ function toSqlValue(value: unknown): SqlValue {
 }
 
 function selectRowByPk(
-  db: SqlJsDatabase,
+  db: SqliteRawDatabase,
   tableName: string,
   pk: Record<string, unknown>
 ): Record<string, unknown> | null {
@@ -113,7 +119,7 @@ function filterRowDataToExistingColumns(
   return filtered;
 }
 
-export function createOutboxBackup(db: SqlJsDatabase): IOutboxBackup {
+export function createOutboxBackup(db: SqliteRawDatabase): IOutboxBackup {
   const createdAt = new Date().toISOString();
   const items: IOutboxBackupItem[] = [];
 
@@ -182,7 +188,7 @@ export function createOutboxBackup(db: SqlJsDatabase): IOutboxBackup {
 }
 
 export function replayOutboxBackup(
-  db: SqlJsDatabase,
+  db: SqliteRawDatabase,
   backup: IOutboxBackup
 ): { applied: number; skipped: number; errors: string[] } {
   const errors: string[] = [];

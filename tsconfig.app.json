@@ -33,7 +33,6 @@
       "drizzle-orm": ["./node_modules/drizzle-orm"],
       "drizzle-orm/*": ["./node_modules/drizzle-orm/*"],
       "@supabase/supabase-js": ["./node_modules/@supabase/supabase-js"],
-      "sql.js": ["./node_modules/@types/sql.js/index.d.ts"],
       "solid-sonner": ["./node_modules/solid-sonner"]
     }
   },

@@ -96,7 +96,7 @@ type ITuneTreesFixtures = TestUserFixture & {
  * Also sets the correct auth state for the assigned user
  */
 export const test = base.extend<ITuneTreesFixtures>({
-  // Auto-cleanup: ensure we clear local IndexedDB/sql.js state after every test.
+  // Auto-cleanup: ensure we clear local IndexedDB/SQLite WASM state after every test.
   // This reduces cross-test leakage and prevents unbounded IndexedDB growth.
   autoCleanupDb: [
     async (
@@ -110,7 +110,7 @@ export const test = base.extend<ITuneTreesFixtures>({
         if (page.isClosed()) return;
 
         // Canonical cleanup: hop to a same-origin static page (unloads the SPA),
-        // then clear IndexedDB/sql.js persistence and other transient storage.
+        // then clear IndexedDB/SQLite WASM persistence and other transient storage.
         await gotoE2eOrigin(page);
         await clearTunetreesClientStorage(page);
       } catch (e) {

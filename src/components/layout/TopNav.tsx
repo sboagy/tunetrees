@@ -110,7 +110,7 @@ type TopNavDbSnapshot = {
     totalBytes: number;
     limitBytes: number;
   };
-  wasmHeapBytes?: number;
+  sqliteWasmVersion?: string;
   dbApproxBytes?: number;
   pageCount?: number;
   pageSize?: number;
@@ -119,7 +119,7 @@ type TopNavDbSnapshot = {
   errors?: string[];
 };
 
-type SqliteInstance = import("sql.js").Database;
+type SqliteInstance = import("oosync/runtime/browser-sqlite").SqliteRawDatabase;
 
 type PerformanceWithMemory = Performance & {
   memory?: {
@@ -154,16 +154,16 @@ const captureTopNavJsHeap = (snapshot: TopNavDbSnapshot, errors: string[]) => {
   }
 };
 
-const captureTopNavWasmHeap = async (
+const captureTopNavSqliteWasm = async (
   snapshot: TopNavDbSnapshot,
   errors: string[]
 ) => {
   try {
-    const { getSqlJsDebugInfo } = await import("../../lib/db/client-sqlite");
-    const dbg = getSqlJsDebugInfo();
-    if (dbg.wasmHeapBytes) snapshot.wasmHeapBytes = dbg.wasmHeapBytes;
+    const { getSqliteDebugInfo } = await import("../../lib/db/client-sqlite");
+    const dbg = getSqliteDebugInfo();
+    if (dbg.version) snapshot.sqliteWasmVersion = dbg.version;
   } catch (error) {
-    appendTopNavSnapshotError(errors, "wasmHeap", error);
+    appendTopNavSnapshotError(errors, "sqliteWasm", error);
   }
 };
 
@@ -237,7 +237,7 @@ const captureTopNavSqliteSnapshot = async (
       return;
     }
 
-    await captureTopNavWasmHeap(snapshot, errors);
+    await captureTopNavSqliteWasm(snapshot, errors);
     captureTopNavPragmas(sqliteDb, snapshot, errors);
     captureTopNavTableCounts(sqliteDb, snapshot, errors);
   } catch (error) {
@@ -254,7 +254,7 @@ const emitTopNavSnapshot = (snapshot: TopNavDbSnapshot) => {
       at: snapshot.at,
       hasSqliteInstance: snapshot.hasSqliteInstance,
       jsHeap: snapshot.jsHeap,
-      wasmHeapBytes: snapshot.wasmHeapBytes,
+      sqliteWasmVersion: snapshot.sqliteWasmVersion,
       pageSize: snapshot.pageSize,
       pageCount: snapshot.pageCount,
       freelistCount: snapshot.freelistCount,

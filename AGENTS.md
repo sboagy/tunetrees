@@ -17,7 +17,7 @@ The `legacy/` directory is reference-only. Do not modify legacy code for new wor
 - Frontend: SolidJS + TypeScript (Vite)
 - Styling/UI: Tailwind + shadcn-solid + `@kobalte/core` primitives
 - Data grids: `@tanstack/solid-table` + `@tanstack/solid-virtual`
-- Local DB: SQLite WASM via `sql.js` with IndexedDB persistence (Drizzle ORM)
+- Local DB: SQLite WASM via `@sqlite.org/sqlite-wasm` with IndexedDB blob persistence (Drizzle ORM)
 - Remote DB access (browser): Supabase JS wrapped by Drizzle (see `src/lib/db/client-postgres-browser.ts`)
 - Remote: Supabase (Auth + Postgres + Realtime)
 - Sync: outbox-driven, bidirectional sync via Cloudflare Worker + `oosync`
@@ -35,12 +35,14 @@ The `legacy/` directory is reference-only. Do not modify legacy code for new wor
 
 Default conflict policy is last-write-wins, with explicit conflict tracking in the sync layer.
 
-## Local SQLite (sql.js) + Drizzle Patterns
+## Local SQLite (sqlite-wasm) + Drizzle Patterns
 
 - Browser SQLite client + initialization/migration logic live in `src/lib/db/client-sqlite.ts`.
 - Local schema and relations come from Drizzle artifacts under `drizzle/`.
 - The local DB is per-user (namespaced keys in IndexedDB/localStorage).
 - Sync triggers/outbox tables are installed as part of DB initialization.
+- After changing `@sqlite.org/sqlite-wasm` or `oosync/runtime/browser-sqlite`, use `npm run dev:force` for dev and rebuild before `npm run preview:local`; Vite's optimized dependency cache can otherwise serve stale WASM/runtime assets.
+- Before merging TuneTrees changes that depend on oosync runtime changes, land/push oosync first, then pin TuneTrees with `npm run deps:oosync:update -- <sha-or-tag>`.
 
 ## Sync System Overview
 

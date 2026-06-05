@@ -4,6 +4,7 @@ import {
   getTuneTypeLookupCandidates,
   normalizeTuneTypeName,
 } from "@/lib/rhythm/tune-type-lookup";
+import { trimTrailingSlashes } from "@/lib/utils/url";
 import type {
   RhythmPatternCandidateScope,
   RhythmPatternMetadata,
@@ -20,12 +21,6 @@ export type {
   RhythmPatternType,
   SwingDescriptor,
 } from "./pattern-types";
-
-function trimTrailingSlashes(value: string): string {
-  let i = value.length;
-  while (i > 0 && value[i - 1] === "/") i -= 1;
-  return i === value.length ? value : value.slice(0, i);
-}
 
 const DEFAULT_SAMPLE_BASE_URL = trimTrailingSlashes(
   import.meta.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? ""
