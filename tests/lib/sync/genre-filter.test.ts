@@ -1,4 +1,4 @@
-import type { Database } from "sql.js";
+import type { SqliteRawDatabase as Database } from "oosync/runtime/browser-sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   createSyncPushQueueTable,
@@ -8,10 +8,10 @@ import {
   repairPendingMediaAssetSyncStateInSqlite,
   repairPendingSetlistSyncStateInSqlite,
 } from "@/lib/sync/genre-filter";
-import { getTestSqlJs } from "../db/sqljs-test-utils";
+import { getTestSqlite } from "../db/sqlite-wasm-test-utils";
 
 let db: Database;
-let SQL: Awaited<ReturnType<typeof getTestSqlJs>>;
+let SQL: Awaited<ReturnType<typeof getTestSqlite>>;
 
 function firstColumn(query: string): string[] {
   const result = db.exec(query);
@@ -29,10 +29,10 @@ function scalar(query: string): number {
 describe("repairPendingMediaAssetSyncStateInSqlite", () => {
   beforeEach(async () => {
     if (!SQL) {
-      SQL = await getTestSqlJs();
+      SQL = await getTestSqlite();
     }
 
-    db = new SQL.Database();
+    db = SQL.createDatabase();
     createSyncTriggerControlTable(db);
     createSyncPushQueueTable(db);
 
@@ -145,10 +145,10 @@ describe("repairPendingMediaAssetSyncStateInSqlite", () => {
 describe("repairPendingSetlistSyncStateInSqlite", () => {
   beforeEach(async () => {
     if (!SQL) {
-      SQL = await getTestSqlJs();
+      SQL = await getTestSqlite();
     }
 
-    db = new SQL.Database();
+    db = SQL.createDatabase();
     createSyncTriggerControlTable(db);
     createSyncPushQueueTable(db);
 

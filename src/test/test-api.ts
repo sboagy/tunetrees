@@ -1,7 +1,7 @@
 /**
  * Test API (browser-exposed) for fast, deterministic E2E setup
  *
- * Provides helpers to seed local SQLite (sql.js) directly during Playwright tests,
+ * Provides helpers to seed local SQLite directly during Playwright tests,
  * bypassing slow remote DB resets. Attached as globalThis.__ttTestApi.
  */
 
@@ -1464,6 +1464,18 @@ if (globalThis.window !== undefined) {
         }
 
         const tuneId = generateId();
+
+        db.run(sql`
+          INSERT OR IGNORE INTO genre (
+            id,
+            name,
+            last_modified_at
+          ) VALUES (
+            ${genre},
+            ${genre},
+            ${now}
+          )
+        `);
 
         db.run(sql`
           INSERT INTO tune (

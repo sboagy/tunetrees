@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import solid from "vite-plugin-solid";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { trimTrailingSlashes } from "./src/lib/utils/url";
 
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
@@ -65,14 +66,6 @@ export default defineConfig(() => {
     return runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"]) ?? "unknown";
   };
 
-  const trimTrailingSlashes = (value: string): string => {
-    let normalized = value;
-    while (normalized.endsWith("/")) {
-      normalized = normalized.slice(0, -1);
-    }
-    return normalized;
-  };
-
   const manualChunkGroups = {
     "vendor-solid": ["solid-js", "@solidjs/router"],
     "vendor-ui": [
@@ -85,7 +78,7 @@ export default defineConfig(() => {
     "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
     "vendor-supabase": ["@supabase/supabase-js"],
     "vendor-drizzle": ["drizzle-orm"],
-    "vendor-sql": ["sql.js"],
+    "vendor-sqlite": ["@sqlite.org/sqlite-wasm"],
   } as const;
 
   const resolveManualChunk = (moduleId: string) => {
@@ -235,6 +228,7 @@ export default defineConfig(() => {
     test: {
       exclude: [
         "**/node_modules/**",
+        "**/.yalc/**",
         "**/dist/**",
         "**/e2e/**", // Exclude Playwright E2E tests
         "**/legacy/**", // Exclude legacy code
@@ -289,6 +283,13 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
           // Cache all static assets INCLUDING WASM and SQL files for offline
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,wasm,sql}"],
+          // SQLite worker/OPFS helpers may be emitted by @sqlite.org/sqlite-wasm,
+          // but this branch intentionally uses the in-memory OO1 path with
+          // IndexedDB blob persistence. Keep unused worker assets out of precache.
+          globIgnores: [
+            "**/sqlite3-worker1-*",
+            "**/sqlite3-opfs-async-proxy-*",
+          ],
           // Runtime caching strategies
           runtimeCaching: [
             {
@@ -398,6 +399,9 @@ export default defineConfig(() => {
           manualChunks: resolveManualChunk,
         },
       },
+    },
+    optimizeDeps: {
+      exclude: ["@sqlite.org/sqlite-wasm", "oosync/runtime/browser-sqlite"],
     },
     // Define global constants
     define: {

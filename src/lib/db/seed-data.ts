@@ -7,7 +7,7 @@
  * @module lib/db/seed-data
  */
 
-import type { Database as SqlJsDatabase } from "sql.js";
+import type { SqliteRawDatabase } from "oosync/runtime/browser-sqlite";
 
 /**
  * Seed the database with test data
@@ -21,7 +21,7 @@ import type { Database as SqlJsDatabase } from "sql.js";
  *
  * @param db - SQL.js database instance
  */
-export function seedDatabase(db: SqlJsDatabase, userId: string): void {
+export function seedDatabase(db: SqliteRawDatabase, userId: string): void {
   console.log("🌱 Seeding database with test data...");
 
   try {
@@ -45,20 +45,28 @@ export function seedDatabase(db: SqlJsDatabase, userId: string): void {
 
     // userId IS the canonical user identifier (user_profile.id).
     // Verify user_profile exists
-    const userProfileResult = db.exec(
-      `SELECT id FROM user_profile WHERE id = ?`,
-      [userId]
+    const userProfileStmt = db.prepare(
+      `SELECT id FROM user_profile WHERE id = ?`
     );
+    const userProfileResult = [];
+    try {
+      userProfileStmt.bind([userId]);
+      while (userProfileStmt.step()) {
+        userProfileResult.push(userProfileStmt.get());
+      }
+    } finally {
+      userProfileStmt.free();
+    }
 
     if (
       !userProfileResult ||
       userProfileResult.length === 0 ||
-      !userProfileResult[0].values.length
+      !userProfileResult[0]?.length
     ) {
       throw new Error("Failed to create user_profile entry");
     }
 
-    const userProfileId = userProfileResult[0].values[0][0] as number;
+    const userProfileId = String(userProfileResult[0]?.[0] ?? "");
 
     // Create repertoire (note: instrument_ref is INTEGER, not TEXT)
     // For now, we'll leave instrument_ref as NULL since we don't have instrument data

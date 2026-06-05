@@ -69,7 +69,7 @@ type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
  * format mismatches). It is intentionally safe to call on every practice list
  * load; a no-op when no stale rows exist.
  *
- * @param db - SQLite database instance (sql.js in app or better-sqlite3 in tests)
+ * @param db - SQLite database instance (SQLite WASM in app or better-sqlite3 in tests)
  * @param userId - Supabase Auth UUID
  * @param repertoireId - Repertoire ID
  * @param windowStartIso19 - Window start timestamp normalized to ISO (YYYY-MM-DDTHH:MM:SS)
