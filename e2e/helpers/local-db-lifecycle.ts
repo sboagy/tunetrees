@@ -1,5 +1,9 @@
 import type { Page } from "@playwright/test";
 import log from "loglevel";
+import {
+  trimLeadingSlashes,
+  trimTrailingSlashes,
+} from "../../src/lib/utils/url";
 import { BASE_URL } from "../test-config";
 
 function getPageOrigin(page: Page): string | null {
@@ -15,13 +19,13 @@ function getPageOrigin(page: Page): string | null {
 
 function resolveBaseUrl(page: Page, path: string = ""): string {
   const base = getPageOrigin(page) ?? String(BASE_URL);
-  const normalizedBase = `${base.replace(/\/+$/, "")}/`;
-  const normalizedPath = path.replace(/^\/+/, "");
+  const normalizedBase = `${trimTrailingSlashes(base)}/`;
+  const normalizedPath = trimLeadingSlashes(path);
   return new URL(normalizedPath, normalizedBase).toString();
 }
 
 function isRealAppUrl(currentUrl: string, appOrigin: string): boolean {
-  const baseUrl = appOrigin.replace(/\/+$/, "");
+  const baseUrl = trimTrailingSlashes(appOrigin);
   return (
     currentUrl.startsWith(baseUrl) &&
     !currentUrl.includes("e2e-origin.html") &&

@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import solid from "vite-plugin-solid";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { trimTrailingSlashes } from "./src/lib/utils/url";
 
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
@@ -63,14 +64,6 @@ export default defineConfig(() => {
     }
 
     return runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"]) ?? "unknown";
-  };
-
-  const trimTrailingSlashes = (value: string): string => {
-    let normalized = value;
-    while (normalized.endsWith("/")) {
-      normalized = normalized.slice(0, -1);
-    }
-    return normalized;
   };
 
   const manualChunkGroups = {
