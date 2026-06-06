@@ -21,7 +21,6 @@ import {
 } from "@/lib/rhythm/structured-display-sync";
 import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import type {
-  MetronomeMode,
   PlaybackEventMarker,
   RhythmPatternMetadata,
   RhythmService,
@@ -33,6 +32,7 @@ const mocked = vi.hoisted(() => {
   const parseOnlyMock = vi.fn(() => [{}]);
   const loadPatternMock = vi.fn<RhythmService["loadPattern"]>(async () => null);
   const updateRhythmAbcMock = vi.fn<RhythmService["updateRhythmAbc"]>();
+  const defaultMetronomeMode: RhythmService["metronomeMode"] = () => "off";
   const buildEditableRhythmPattern = (
     overrides: Partial<EditableRhythmPattern> = {}
   ): EditableRhythmPattern => ({
@@ -88,7 +88,7 @@ const mocked = vi.hoisted(() => {
       metadata: () => null as RhythmPatternMetadata | null,
       tempoQpm: () => 100,
       swingPercentage: () => 0,
-      metronomeMode: () => "off" as MetronomeMode,
+      metronomeMode: defaultMetronomeMode,
       isPlaying: (): boolean => false,
       isPaused: (): boolean => false,
       isReady: () => false,
@@ -234,7 +234,7 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.metadata = () => null;
     mocked.serviceStub.tempoQpm = () => 100;
     mocked.serviceStub.swingPercentage = () => 0;
-    mocked.serviceStub.metronomeMode = () => "off" as MetronomeMode;
+    mocked.serviceStub.metronomeMode = () => "off";
     mocked.serviceStub.isPlaying = () => false;
     mocked.serviceStub.isPaused = () => false;
     mocked.serviceStub.isCountIn = () => false;
