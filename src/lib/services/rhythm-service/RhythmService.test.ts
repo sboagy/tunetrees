@@ -963,6 +963,307 @@ describe("createRhythmService", () => {
     dispose();
   });
 
+  it("defaults metronome mode to off", () => {
+    const db = createSampleKitRhythmDb();
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        sampleBaseUrl: "",
+      });
+    });
+
+    expect(service.metronomeMode()).toBe("off");
+
+    service.setMetronomeMode("on");
+    expect(service.metronomeMode()).toBe("on");
+
+    dispose();
+  });
+
+  it("mixes metronome clicks with rhythm samples when metronome mode is on", async () => {
+    const db = createSampleKitRhythmDb();
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(16),
+    }));
+
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      start: ReturnType<typeof vi.fn>;
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "running";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      decodeAudioData = vi.fn(async () => ({
+        duration: 0.25,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => undefined);
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        qpm?: number;
+        beatCallback?: (beatNumber: number) => void;
+        eventCallback?: (event: {
+          type: "event";
+          measureStart: boolean;
+          measureNumber: number;
+          milliseconds: number;
+          millisecondsPerMeasure: number;
+          midiPitches: Array<{ pitch: number }>;
+          elements: HTMLElement[][];
+        }) => void;
+      };
+
+      constructor(
+        _visualObj: unknown,
+        options: FakeTimingCallbacks["options"]
+      ) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.beatCallback?.(1);
+        this.options.beatCallback?.(2);
+        this.options.eventCallback?.({
+          type: "event",
+          measureStart: true,
+          measureNumber: 1,
+          milliseconds: 0,
+          millisecondsPerMeasure: 2000,
+          midiPitches: [{ pitch: 60 }],
+          elements: [[]],
+        });
+      }
+
+      pause() {
+        noop();
+      }
+
+      reset() {
+        noop();
+      }
+
+      stop() {
+        noop();
+      }
+
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext: new FakeAudioContext() as unknown as AudioContext,
+        sampleBaseUrl: "",
+        fetchImpl: asFetch(fetchMock),
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Session Test",
+      tuneTypeName: "Reel",
+    });
+    service.setMetronomeMode("on");
+
+    await service.play();
+
+    expect(bufferSources.map((source) => source.buffer?.length)).toEqual(
+      expect.arrayContaining([882, 882, 1])
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(EXPECTED_BODHRAN_FETCH_COUNT);
+
+    dispose();
+  });
+
+  it("plays metronome-only clicks without samples or premium loops", async () => {
+    const db = createPremiumLoopRhythmDb();
+    const fetchMock = vi.fn(async (_url: string) => ({
+      ok: true,
+      arrayBuffer: async () => new ArrayBuffer(16),
+    }));
+    const premiumPlay = vi.fn(async () => undefined);
+    const bufferSources: Array<{
+      buffer: AudioBuffer | null;
+      start: ReturnType<typeof vi.fn>;
+    }> = [];
+
+    class FakeAudioContext {
+      state: AudioContextState = "running";
+      currentTime = 0;
+      sampleRate = 44_100;
+      destination = {};
+      resume = vi.fn(async () => undefined);
+      decodeAudioData = vi.fn(async () => ({
+        duration: 0.25,
+        length: 1,
+        numberOfChannels: 1,
+        sampleRate: 44_100,
+      })) as unknown as typeof AudioContext.prototype.decodeAudioData;
+      createBuffer = vi.fn(
+        (_channels: number, length: number, sampleRate: number) => {
+          const data = new Float32Array(length);
+          return {
+            duration: length / sampleRate,
+            length,
+            numberOfChannels: 1,
+            sampleRate,
+            getChannelData: vi.fn(() => data),
+          } as unknown as AudioBuffer;
+        }
+      );
+      createBufferSource = vi.fn(() => {
+        const source = {
+          buffer: null as AudioBuffer | null,
+          connect: vi.fn(),
+          start: vi.fn(),
+        };
+        bufferSources.push(source);
+        return source as unknown as AudioBufferSourceNode;
+      });
+      createGain = vi.fn(
+        () =>
+          ({
+            gain: { value: 1 },
+            connect: vi.fn(),
+          }) as unknown as GainNode
+      );
+      close = vi.fn(async () => undefined);
+    }
+
+    class FakeTimingCallbacks {
+      readonly options: {
+        beatCallback?: (beatNumber: number) => void;
+      };
+
+      constructor(
+        _visualObj: unknown,
+        options: FakeTimingCallbacks["options"]
+      ) {
+        this.options = options;
+      }
+
+      start() {
+        this.options.beatCallback?.(1);
+        this.options.beatCallback?.(2);
+      }
+
+      pause() {
+        noop();
+      }
+
+      reset() {
+        noop();
+      }
+
+      stop() {
+        noop();
+      }
+
+      currentMillisecond() {
+        return 0;
+      }
+    }
+
+    const fakeAbcjs = {
+      renderAbc: vi.fn(
+        () => [{}] as unknown as ReturnType<typeof import("abcjs").renderAbc>
+      ),
+      TimingCallbacks:
+        FakeTimingCallbacks as unknown as typeof import("abcjs").TimingCallbacks,
+    };
+
+    let dispose = () => {};
+    const service = createRoot((nextDispose) => {
+      dispose = nextDispose;
+      return createRhythmService({
+        db,
+        abcjsModule: fakeAbcjs,
+        audioContext: new FakeAudioContext() as unknown as AudioContext,
+        audioElementFactory: () => ({
+          crossOrigin: "",
+          currentTime: 0,
+          loop: false,
+          pause: vi.fn(),
+          play: premiumPlay,
+          playbackRate: 1,
+          preload: "",
+          src: "",
+        }),
+        fetchImpl: asFetch(fetchMock),
+        preferPremiumLoop: () => true,
+        sampleBaseUrl: "",
+      });
+    });
+
+    await service.loadPattern({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+    });
+    service.setMetronomeMode("metronome-only");
+
+    await service.play();
+
+    expect(bufferSources.map((source) => source.buffer?.length)).toEqual([
+      882, 882,
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(premiumPlay).not.toHaveBeenCalled();
+
+    dispose();
+  });
+
   it("plays mapped bodhran samples and restarts timing callbacks when tempo changes", async () => {
     const db = createSampleKitRhythmDb();
     const fetchMock = vi.fn(async (_url: string) => ({
@@ -1198,6 +1499,96 @@ describe("createRhythmService", () => {
     });
 
     expect(secondService.tempoQpm()).toBe(136);
+  });
+
+  it("restores the stored metronome mode per user and rhythm type", async () => {
+    const db = createPremiumLoopRhythmDb();
+    vi.stubGlobal("localStorage", createMockStorage());
+
+    const firstService = createRoot(() =>
+      createRhythmService({
+        db,
+      })
+    );
+
+    await firstService.loadPattern({
+      userId: "user-1",
+      tuneTypeName: "Reel",
+    });
+    firstService.setMetronomeMode("metronome-only");
+
+    const secondService = createRoot(() =>
+      createRhythmService({
+        db,
+      })
+    );
+
+    await secondService.loadPattern({
+      userId: "user-1",
+      tuneTypeName: "Reel",
+    });
+
+    expect(secondService.metronomeMode()).toBe("metronome-only");
+  });
+
+  it("keeps stored metronome modes isolated by user", async () => {
+    const db = createPremiumLoopRhythmDb();
+    vi.stubGlobal("localStorage", createMockStorage());
+
+    const firstService = createRoot(() =>
+      createRhythmService({
+        db,
+      })
+    );
+
+    await firstService.loadPattern({
+      userId: "user-1",
+      tuneTypeName: "Reel",
+    });
+    firstService.setMetronomeMode("metronome-only");
+
+    const secondService = createRoot(() =>
+      createRhythmService({
+        db,
+      })
+    );
+
+    await secondService.loadPattern({
+      userId: "user-2",
+      tuneTypeName: "Reel",
+    });
+
+    expect(secondService.metronomeMode()).toBe("off");
+  });
+
+  it("keeps stored metronome modes isolated by rhythm type", async () => {
+    const db = createSampleKitRhythmDb();
+    vi.stubGlobal("localStorage", createMockStorage());
+
+    const firstService = createRoot(() =>
+      createRhythmService({
+        db,
+      })
+    );
+
+    await firstService.loadPattern({
+      userId: "user-1",
+      tuneTypeName: "Reel",
+    });
+    firstService.setMetronomeMode("metronome-only");
+
+    const secondService = createRoot(() =>
+      createRhythmService({
+        db,
+      })
+    );
+
+    await secondService.loadPattern({
+      userId: "user-1",
+      tuneTypeName: "Jig",
+    });
+
+    expect(secondService.metronomeMode()).toBe("off");
   });
 
   it("starts playback from a structured beat and measure offset", async () => {

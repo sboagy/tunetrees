@@ -45,6 +45,7 @@ import {
 import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import { getDefaultSwingPercentage } from "@/lib/services/rhythm-service/playback-helpers";
 import type {
+  MetronomeMode,
   RhythmPatternMetadata,
   RhythmPatternType,
 } from "@/lib/services/rhythm-service/RhythmService";
@@ -100,6 +101,14 @@ const CUSTOM_PATTERN_SCOPE_OPTIONS = {
   user_default: "All tunes of this type",
   user_tune: "This tune only",
 } as const;
+const METRONOME_MODE_OPTIONS: Array<{
+  value: MetronomeMode;
+  label: string;
+}> = [
+  { value: "off", label: "Off" },
+  { value: "on", label: "On" },
+  { value: "metronome-only", label: "Metronome-only" },
+];
 
 function getBeatNoteTargets(container: HTMLDivElement): SVGElement[] {
   return Array.from(container.querySelectorAll<SVGElement>(".abcjs-notehead"));
@@ -296,6 +305,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
       activePatternMetadata()?.swingPercentage ??
       0
   );
+  const metronomeMode = createMemo(() => service()?.metronomeMode() ?? "off");
   const defaultSwingPercentage = createMemo(() =>
     clampSwingPercentage(getDefaultSwingPercentage(activePatternMetadata()))
   );
@@ -901,6 +911,38 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     );
   };
 
+  const metronomeControls = () => {
+    const controlsDisabled =
+      !service() || !activePatternMetadata() || isPatternLoading();
+
+    return (
+      <div
+        class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+        data-testid="rhythm-player-metronome-mode"
+      >
+        <span class="font-medium text-slate-900 dark:text-slate-100">
+          Metronome
+        </span>
+        <select
+          value={metronomeMode()}
+          disabled={controlsDisabled}
+          class="ml-auto min-h-10 min-w-[11rem] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          data-testid="rhythm-player-metronome-select"
+          aria-label="Metronome mode"
+          onChange={(event) => {
+            service()?.setMetronomeMode(
+              event.currentTarget.value as MetronomeMode
+            );
+          }}
+        >
+          <For each={METRONOME_MODE_OPTIONS}>
+            {(option) => <option value={option.value}>{option.label}</option>}
+          </For>
+        </select>
+      </div>
+    );
+  };
+
   const getNotationContainer = (): HTMLDivElement | null => {
     const host = notationHostRef();
     if (!host) {
@@ -1163,6 +1205,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                         <div class="h-px bg-slate-200 dark:bg-slate-800" />
 
                         {swingControls()}
+
+                        <div class="h-px bg-slate-200 dark:bg-slate-800" />
+
+                        {metronomeControls()}
                       </div>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
@@ -1335,6 +1381,8 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   {tempoControls()}
 
                   {swingControls()}
+
+                  {metronomeControls()}
                 </div>
               </Show>
             </div>
