@@ -21,6 +21,7 @@ import {
 } from "@/lib/rhythm/structured-display-sync";
 import { getStructuredSectionLabel } from "@/lib/rhythm/structured-playback-model";
 import type {
+  MetronomeMode,
   PlaybackEventMarker,
   RhythmPatternMetadata,
   RhythmService,
@@ -87,6 +88,7 @@ const mocked = vi.hoisted(() => {
       metadata: () => null as RhythmPatternMetadata | null,
       tempoQpm: () => 100,
       swingPercentage: () => 0,
+      metronomeMode: () => "off" as MetronomeMode,
       isPlaying: (): boolean => false,
       isPaused: (): boolean => false,
       isReady: () => false,
@@ -109,6 +111,7 @@ const mocked = vi.hoisted(() => {
       resetTempoToDefault: vi.fn(async () => undefined),
       setSwingPercentage: vi.fn(async () => undefined),
       resetSwingToDefault: vi.fn(async () => undefined),
+      setMetronomeMode: vi.fn(),
       updateRhythmAbc: updateRhythmAbcMock,
     } satisfies RhythmService,
   };
@@ -231,6 +234,7 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.metadata = () => null;
     mocked.serviceStub.tempoQpm = () => 100;
     mocked.serviceStub.swingPercentage = () => 0;
+    mocked.serviceStub.metronomeMode = () => "off" as MetronomeMode;
     mocked.serviceStub.isPlaying = () => false;
     mocked.serviceStub.isPaused = () => false;
     mocked.serviceStub.isCountIn = () => false;
@@ -245,6 +249,7 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.resetTempoToDefault = vi.fn(async () => undefined);
     mocked.serviceStub.setSwingPercentage = vi.fn(async () => undefined);
     mocked.serviceStub.resetSwingToDefault = vi.fn(async () => undefined);
+    mocked.serviceStub.setMetronomeMode = vi.fn();
   });
 
   afterEach(() => {
@@ -3189,6 +3194,66 @@ describe("RhythmPlayer", () => {
     expect(mocked.serviceStub.setSwingPercentage).not.toHaveBeenCalled();
   });
 
+  it("renders metronome mode selector and updates the service selection", async () => {
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: "X:1\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 z2 C2 z2 :|",
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 112,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: "X:1\nM:4/4\nL:1/8\nK:clef=perc\n|: C2 z2 C2 z2 :|",
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 112,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    });
+    mocked.serviceStub.metronomeMode = () => "on";
+
+    render(() => <RhythmPlayer tuneTypeName="Reel" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("rhythm-player-metronome-mode")).toBeTruthy();
+    });
+
+    const metronomeSelect = screen.getByTestId(
+      "rhythm-player-metronome-select"
+    ) as HTMLSelectElement;
+    expect(metronomeSelect.value).toBe("on");
+    expect(
+      Array.from(metronomeSelect.options).map((option) => option.textContent)
+    ).toEqual(["Off", "On", "Metronome-only"]);
+
+    fireEvent.change(metronomeSelect, {
+      target: { value: "off" },
+    });
+    fireEvent.change(metronomeSelect, {
+      target: { value: "metronome-only" },
+    });
+
+    expect(mocked.serviceStub.setMetronomeMode).toHaveBeenCalledWith("off");
+    expect(mocked.serviceStub.setMetronomeMode).toHaveBeenCalledWith(
+      "metronome-only"
+    );
+  });
+
   it("renders compact preference controls in the mobile overflow menu", async () => {
     Object.defineProperty(globalThis, "matchMedia", {
       writable: true,
@@ -3247,6 +3312,8 @@ describe("RhythmPlayer", () => {
 
     expect(screen.getByTestId("rhythm-player-tempo-reset")).toBeTruthy();
     expect(screen.getByTestId("rhythm-player-swing-reset")).toBeTruthy();
+    expect(screen.getByTestId("rhythm-player-metronome-mode")).toBeTruthy();
+    expect(screen.getByTestId("rhythm-player-metronome-select")).toBeTruthy();
 
     fireEvent.input(screen.getByTestId("rhythm-player-swing-input"), {
       target: { value: "21" },

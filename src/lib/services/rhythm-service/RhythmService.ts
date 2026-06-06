@@ -22,6 +22,10 @@ import {
   waitForMilliseconds,
 } from "@/lib/services/rhythm-service/audio-helpers";
 import {
+  readStoredRhythmMetronomeMode,
+  writeStoredRhythmMetronomeMode,
+} from "@/lib/services/rhythm-service/metronome-storage";
+import {
   clampTempo,
   createCountInBuffers,
   eventHasAccent,
@@ -59,6 +63,8 @@ function clampSwingPercentage(value: number): number {
   }
   return Math.min(1, Math.max(0, value));
 }
+
+export type MetronomeMode = "off" | "on" | "metronome-only";
 
 export type {
   RhythmPatternCandidate,
@@ -110,6 +116,7 @@ export interface RhythmService {
   metadata: Accessor<RhythmPatternMetadata | null>;
   tempoQpm: Accessor<number>;
   swingPercentage: Accessor<number>;
+  metronomeMode: Accessor<MetronomeMode>;
   isPlaying: Accessor<boolean>;
   isPaused: Accessor<boolean>;
   isReady: Accessor<boolean>;
@@ -134,6 +141,7 @@ export interface RhythmService {
   resetTempoToDefault: () => Promise<void>;
   setSwingPercentage: (nextSwingPercentage: number) => Promise<void>;
   resetSwingToDefault: () => Promise<void>;
+  setMetronomeMode: (nextMode: MetronomeMode) => void;
   updateRhythmAbc: (nextRhythmAbc: string) => void;
 }
 
@@ -199,6 +207,8 @@ export function createRhythmService(
   );
   const [tempoQpm, setTempoQpmSignal] = createSignal(100);
   const [swingPercentage, setSwingPercentageSignal] = createSignal(0);
+  const [metronomeMode, setMetronomeModeSignal] =
+    createSignal<MetronomeMode>("off");
   const [isPlaying, setIsPlaying] = createSignal(false);
   const [isPaused, setIsPaused] = createSignal(false);
   const [isReady, setIsReady] = createSignal(false);
@@ -218,6 +228,7 @@ export function createRhythmService(
   let pendingStartPlayback: Promise<void> | null = null;
   let ownedAudioContext: AudioContext | null = null;
   let sampleBuffers = new Map<number, AudioBuffer>();
+  let metronomeBuffer: AudioBuffer | null = null;
   let loadedSampleKit: string | null = null;
   let premiumLoopAudio: PremiumLoopAudio | null = null;
   let premiumLoopUrl: string | null = null;
@@ -226,12 +237,17 @@ export function createRhythmService(
   let playbackStartBeatIndex = 0;
   let playbackStartMeasure = 0;
   let activePlaybackRhythmAbc: string | null = null;
+  let lastMetronomeBeatNumber = -1;
   let remainingDebugPlaybackPasses = getRequestedRhythmPlaybackDebugPasses();
   let tempoPreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
   let swingPreferenceKey: {
+    userId: string | null | undefined;
+    tuneTypeName: string;
+  } | null = null;
+  let metronomePreferenceKey: {
     userId: string | null | undefined;
     tuneTypeName: string;
   } | null = null;
@@ -454,6 +470,48 @@ export function createRhythmService(
     setIsReady(true);
   }
 
+  async function ensureMetronomeBuffersLoaded(): Promise<void> {
+    if (metronomeBuffer) {
+      setIsReady(true);
+      return;
+    }
+
+    const audioContext = await ensureAudioContext();
+    metronomeBuffer =
+      createCountInBuffers((entry) =>
+        createSyntheticClickBuffer(audioContext, entry)
+      )?.secondaryBuffer ?? null;
+    setIsReady(true);
+  }
+
+  function playMetronomePulse(
+    beatNumber: number,
+    audioContext: AudioContext
+  ): void {
+    if (metronomeMode() === "off" || !metronomeBuffer) {
+      return;
+    }
+
+    const normalizedBeatNumber = Math.floor(beatNumber);
+    if (
+      !Number.isFinite(normalizedBeatNumber) ||
+      normalizedBeatNumber < 0 ||
+      normalizedBeatNumber === lastMetronomeBeatNumber
+    ) {
+      return;
+    }
+    lastMetronomeBeatNumber = normalizedBeatNumber;
+
+    const source = audioContext.createBufferSource();
+    const gainNode = audioContext.createGain();
+
+    source.buffer = metronomeBuffer;
+    gainNode.gain.value = 0.72;
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    source.start();
+  }
+
   function playEventPitches(
     event: NoteTimingEvent,
     audioContext: AudioContext
@@ -565,7 +623,8 @@ export function createRhythmService(
   function buildTimingCallbacks(
     rhythmAbc: string,
     audioContext: AudioContext,
-    shouldPlayEventSamples: boolean
+    shouldPlayEventSamples: boolean,
+    shouldPlayMetronome: boolean
   ): TimingCallbacksInstance {
     if (typeof document === "undefined") {
       throw new TypeError("ABC rhythm playback requires a browser document.");
@@ -584,6 +643,9 @@ export function createRhythmService(
 
     const beatCallback: BeatCallback = (beatNumber) => {
       setCurrentPulse(Math.max(0, Math.floor(beatNumber)));
+      if (shouldPlayMetronome) {
+        playMetronomePulse(beatNumber, audioContext);
+      }
     };
 
     const animationOptions: AnimationOptions = {
@@ -667,9 +729,20 @@ export function createRhythmService(
     setCurrentPulse(0);
     setIsPaused(false);
     setCurrentMeasure(playbackStartMeasure);
+    lastMetronomeBeatNumber = -1;
 
-    if (!resolvePremiumLoopSelection(currentMetadata)) {
+    const currentMetronomeMode = metronomeMode();
+    const shouldSuppressRhythmAudio = currentMetronomeMode === "metronome-only";
+    const shouldPlayMetronome = currentMetronomeMode !== "off";
+    const premiumLoopSelection = shouldSuppressRhythmAudio
+      ? null
+      : resolvePremiumLoopSelection(currentMetadata);
+
+    if (!shouldSuppressRhythmAudio && !premiumLoopSelection) {
       await ensureSamplesLoaded();
+    }
+    if (shouldPlayMetronome) {
+      await ensureMetronomeBuffersLoaded();
     }
 
     const audioContext = await ensureAudioContext();
@@ -686,7 +759,6 @@ export function createRhythmService(
     }
 
     let usingPremiumLoop = false;
-    const premiumLoopSelection = resolvePremiumLoopSelection(currentMetadata);
     if (premiumLoopSelection) {
       try {
         await startPremiumLoopAudio(
@@ -702,7 +774,11 @@ export function createRhythmService(
         stopPremiumLoopAudio(true);
       }
     }
-    if (!usingPremiumLoop && sampleBuffers.size === 0) {
+    if (
+      !shouldSuppressRhythmAudio &&
+      !usingPremiumLoop &&
+      sampleBuffers.size === 0
+    ) {
       await ensureSamplesLoaded();
     }
 
@@ -710,7 +786,8 @@ export function createRhythmService(
     timingCallbacks = buildTimingCallbacks(
       activePlaybackRhythmAbc || currentMetadata.rhythmAbc,
       audioContext,
-      !usingPremiumLoop
+      !shouldSuppressRhythmAudio && !usingPremiumLoop,
+      shouldPlayMetronome
     );
     timingCallbacks.start(
       positionMs == null ? undefined : msToSeconds(positionMs),
@@ -747,6 +824,7 @@ export function createRhythmService(
     stopPlayback();
     tempoPreferenceKey = null;
     swingPreferenceKey = null;
+    metronomePreferenceKey = null;
     lastKnownPositionMs = 0;
     resetCountInState();
     setCurrentBeatIndex(0);
@@ -768,6 +846,10 @@ export function createRhythmService(
         userId: request.userId,
         tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
       };
+      metronomePreferenceKey = {
+        userId: request.userId,
+        tuneTypeName: request.tuneTypeName?.trim() || nextMetadata.tuneTypeName,
+      };
       setTempoQpmSignal(
         readStoredRhythmTempo(
           tempoPreferenceKey.userId,
@@ -779,6 +861,12 @@ export function createRhythmService(
           swingPreferenceKey.userId,
           swingPreferenceKey.tuneTypeName
         ) ?? clampSwingPercentage(getDefaultSwingPercentage(nextMetadata))
+      );
+      setMetronomeModeSignal(
+        readStoredRhythmMetronomeMode(
+          metronomePreferenceKey.userId,
+          metronomePreferenceKey.tuneTypeName
+        ) ?? "off"
       );
       setIsReady(false);
     }
@@ -965,6 +1053,17 @@ export function createRhythmService(
     }
   }
 
+  function setMetronomeMode(nextMode: MetronomeMode): void {
+    setMetronomeModeSignal(nextMode);
+    if (metronomePreferenceKey) {
+      writeStoredRhythmMetronomeMode(
+        metronomePreferenceKey.userId,
+        metronomePreferenceKey.tuneTypeName,
+        nextMode
+      );
+    }
+  }
+
   onCleanup(() => {
     stopPlayback();
     if (ownedAudioContext && ownedAudioContext.state !== "closed") {
@@ -978,6 +1077,7 @@ export function createRhythmService(
     metadata,
     tempoQpm,
     swingPercentage,
+    metronomeMode,
     isPlaying,
     isPaused,
     isReady,
@@ -1053,6 +1153,7 @@ export function createRhythmService(
     resetTempoToDefault,
     setSwingPercentage,
     resetSwingToDefault,
+    setMetronomeMode,
     updateRhythmAbc,
   };
 }
