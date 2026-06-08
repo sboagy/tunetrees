@@ -22,9 +22,8 @@ on:
     inputs:
       skip_staging_data_refresh:
         description: "Skip production-to-staging database refresh before staging smoke tests"
-        required: false
-        default: false
         type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -849,8 +848,13 @@ jobs:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
+      # Pinned to a full commit SHA (not @v5) because this job has access to
+      # deploy secrets via 1Password; persist-credentials: false so the token
+      # is not left on disk for subsequent steps or a compromised action to read.
       - name: Checkout TuneTrees
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
 
       - name: Resolve shared repo refs
         id: shared_refs
@@ -908,12 +912,14 @@ jobs:
 
           echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
 
+      # Also SHA-pinned with persist-credentials: false (deploy job).
       - name: Checkout oosync
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           repository: sboagy/oosync
           ref: ${{ steps.shared_refs.outputs.oosync_ref }}
           path: oosync
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -956,11 +962,11 @@ jobs:
               --branch=staging
 
       - name: Back up production before staging refresh
-        if: ${{ github.event.inputs.skip_staging_data_refresh != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: npm run db:remote:backup
 
       - name: Refresh staging data from production
-        if: ${{ github.event.inputs.skip_staging_data_refresh != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: npm run db:staging:refresh
 
       - name: Install Playwright browser for staging smoke

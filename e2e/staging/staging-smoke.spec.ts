@@ -16,7 +16,20 @@ test.describe("STAGING-001: deployed staging smoke", () => {
     request,
   }) => {
     await page.goto(STAGING_BASE_URL);
-    await expect(page).toHaveURL(/staging\.tunetrees\.com/);
+    // Validate URL before attempting regex construction
+    if (!STAGING_BASE_URL) {
+      throw new Error("STAGING_BASE_URL environment variable is not set");
+    }
+    let origin: string;
+    try {
+      origin = new URL(STAGING_BASE_URL).origin;
+    } catch (err) {
+      throw new Error(
+        `Invalid STAGING_BASE_URL: ${STAGING_BASE_URL}. ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    const escapedOrigin = origin.replaceAll(".", String.raw`\.`);
+    await expect(page).toHaveURL(new RegExp(`^${escapedOrigin}`));
     await expect(page.locator("body")).toBeVisible();
 
     const health = await request.get(`${WORKER_URL}/health`);

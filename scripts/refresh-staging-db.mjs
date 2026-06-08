@@ -5,10 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
 
+// Hash for a deliberately disabled staging account — not a live credential.
 const DISABLED_PASSWORD_HASH =
-  "$2b$10$yu1qMLlp6nvy/RyZ55VF/O/UMK.UpzqO0dTH3pO/.KBUi4Um4NKBe";
+  "$2b$10$yu1qMLlp6nvy/RyZ55VF/O/UMK.UpzqO0dTH3pO/.KBUi4Um4NKBe"; // NOSONAR: hash for a deliberately disabled account, not a live credential
 const STAGING_EMAIL_DOMAIN = "staging.tunetrees.com";
-const EMAIL_REGEX = "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}";
+const EMAIL_REGEX = String.raw`[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}`;
 
 function env(name, fallback) {
   return process.env[name] ?? fallback;
@@ -57,12 +58,12 @@ async function readWhitelist(filePath) {
   const raw = await readFile(filePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) {
-    throw new Error("Staging whitelist must be a JSON array.");
+    throw new TypeError("Staging whitelist must be a JSON array.");
   }
 
   return parsed.map((entry, index) => {
     if (entry == null || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new Error(`Whitelist entry ${index} must be an object.`);
+      throw new TypeError(`Whitelist entry ${index} must be an object.`);
     }
 
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
@@ -85,12 +86,12 @@ function whitelistValuesSql(whitelist) {
   }
 
   const rows = whitelist
-    .map(
-      (entry) =>
-        `(${entry.id ? `${sqlLiteral(entry.id)}::uuid` : "NULL::uuid"}, ${sqlLiteral(
-          entry.email || null
-        )}, ${regexLiteral(entry.regex || null)})`
-    )
+    .map((entry) => {
+      const idPart = entry.id ? `${sqlLiteral(entry.id)}::uuid` : "NULL::uuid";
+      return `(${idPart}, ${sqlLiteral(
+        entry.email || null
+      )}, ${regexLiteral(entry.regex || null)})`;
+    })
     .join(",\n    ");
 
   return `VALUES\n    ${rows}`;
@@ -169,15 +170,32 @@ async function verifySmtpSafety(stagingSupabaseUrl) {
     throw new Error("Could not parse staging Supabase project ref.");
   }
 
-  const response = await fetch(
-    `https://api.supabase.com/v1/projects/${projectRef}/config/auth`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000); // 10-second timeout
+
+  let response;
+  try {
+    response = await fetch(
+      `https://api.supabase.com/v1/projects/${projectRef}/config/auth`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+      }
+    );
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(
+        "Supabase auth config preflight timed out after 10 seconds."
+      );
     }
-  );
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -295,7 +313,7 @@ BEGIN
   INTO bad_count
   FROM auth.users AS u
   WHERE NOT (${userWhitelistMatch})
-    AND u.email !~* ('^[^@]+@${STAGING_EMAIL_DOMAIN.replaceAll(".", "\\.")}$');
+    AND u.email !~* ('^[^@]+@${STAGING_EMAIL_DOMAIN.replaceAll(".", String.raw`\.`)}$');
   IF bad_count > 0 THEN
     RAISE EXCEPTION 'Non-whitelisted auth.users rows retained unsafe emails: %', bad_count;
   END IF;
@@ -317,7 +335,7 @@ BEGIN
   FROM public.user_profile AS p
   WHERE NOT (${profileWhitelistMatch})
     AND (
-      p.email !~* ('^[^@]+@${STAGING_EMAIL_DOMAIN.replaceAll(".", "\\.")}$')
+      p.email !~* ('^[^@]+@${STAGING_EMAIL_DOMAIN.replaceAll(".", String.raw`\.`)}')
       OR p.phone IS NOT NULL
       OR p.phone_verified IS NOT NULL
       OR p.avatar_url IS NOT NULL
@@ -495,15 +513,17 @@ async function main() {
     }
     throw error;
   } finally {
-    if (process.env.KEEP_STAGING_REFRESH_WORKDIR !== "true") {
-      await rm(workDir, { recursive: true, force: true });
-    } else {
+    if (process.env.KEEP_STAGING_REFRESH_WORKDIR === "true") {
       console.log(`Keeping staging refresh work directory: ${workDir}`);
+    } else {
+      await rm(workDir, { recursive: true, force: true });
     }
   }
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
-});
+}
