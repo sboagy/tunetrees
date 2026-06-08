@@ -22,6 +22,19 @@ name = "tunetrees-sync-worker-staging"
 binding = "HYPERDRIVE"
 id = "9514b1eccf354ebcb33d7ca490d5cbde"
 
+[[env.staging.r2_buckets]]
+binding = "TUNETREES_VAULT"
+bucket_name = "tunetrees-vault-staging"
+
+[env.staging.vars]
+# The deploy script overrides this with the real staging URL from
+# .env.staging.template via `wrangler deploy --var SUPABASE_URL:$SUPABASE_URL`.
+# Keep this explicit non-production placeholder so env.staging never inherits
+# the top-level production SUPABASE_URL on direct/manual Wrangler invocation.
+SUPABASE_URL = "https://staging-supabase-url.invalid"
+SYNC_DIAGNOSTICS = "true"
+SYNC_DIAGNOSTICS_USER_ID = ""
+
 [vars]
 # Production URL. For local dev, SUPABASE_URL is overridden by worker/.dev.vars
 # (http://127.0.0.1:54321). See worker/.dev.vars.example.
