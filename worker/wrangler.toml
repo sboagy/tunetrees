@@ -13,6 +13,15 @@ binding = "HYPERDRIVE"
 id = "541252cc94ca43cf83aa01ec4936726f"
 localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
+# --- STAGING SETTINGS (Overrides) ---
+[env.staging]
+name = "tunetrees-sync-worker-staging"
+
+# Staging Hyperdrive ID
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "9514b1eccf354ebcb33d7ca490d5cbde"
+
 [vars]
 # Production URL. For local dev, SUPABASE_URL is overridden by worker/.dev.vars
 # (http://127.0.0.1:54321). See worker/.dev.vars.example.
