@@ -121,6 +121,20 @@ function whitelistMatchSql(alias, emailExpression = `${alias}.email`) {
   )`;
 }
 
+function whitelistMatchesUser(whitelist, id, email) {
+  return whitelist.some((entry) => {
+    if (entry.id && id === entry.id) {
+      return true;
+    }
+    if (entry.email && email?.toLowerCase() === entry.email.toLowerCase()) {
+      return true;
+    }
+    return Boolean(
+      entry.regex && email && new RegExp(entry.regex, "i").test(email)
+    );
+  });
+}
+
 function whitelistTempTableSql(whitelist) {
   return `
 CREATE TEMP TABLE staging_whitelist (
@@ -207,6 +221,279 @@ function verifySmtpSafety() {
   );
 }
 
+function unescapeCopyValue(value) {
+  if (value === String.raw`\N`) {
+    return null;
+  }
+
+  return value.replace(/\\([bfnrtv\\])/g, (_match, escaped) => {
+    switch (escaped) {
+      case "b":
+        return "\b";
+      case "f":
+        return "\f";
+      case "n":
+        return "\n";
+      case "r":
+        return "\r";
+      case "t":
+        return "\t";
+      case "v":
+        return "\v";
+      case "\\":
+        return "\\";
+      default:
+        return escaped;
+    }
+  });
+}
+
+function escapeCopyValue(value) {
+  if (value == null) {
+    return String.raw`\N`;
+  }
+
+  return String(value)
+    .replaceAll("\\", String.raw`\\`)
+    .replaceAll("\b", String.raw`\b`)
+    .replaceAll("\f", String.raw`\f`)
+    .replaceAll("\n", String.raw`\n`)
+    .replaceAll("\r", String.raw`\r`)
+    .replaceAll("\t", String.raw`\t`)
+    .replaceAll("\v", String.raw`\v`);
+}
+
+function parseCopyColumns(copyHeader) {
+  const match =
+    /^COPY\s+(?:(?:"auth"|auth)\.)?(?:"users"|users)\s+\((.*)\)\s+FROM\s+stdin;$/i.exec(
+      copyHeader
+    );
+  if (!match) {
+    return null;
+  }
+
+  return match[1].split(",").map((column) => {
+    const trimmed = column.trim();
+    return trimmed.startsWith('"') && trimmed.endsWith('"')
+      ? trimmed.slice(1, -1).replaceAll('""', '"')
+      : trimmed;
+  });
+}
+
+function parseCopyTable(copyHeader) {
+  // Two-step parse to stay under the Sonar regex-complexity limit:
+  //  1) capture the non-whitespace identifier before the opening paren
+  //  2) split on '.' and unquote each part
+  // Also reject lines missing the FROM stdin; suffix.
+  const identMatch = /^COPY\s+(\S+)\s+\(/i.exec(copyHeader);
+  if (!identMatch || !/FROM\s+stdin;$/i.test(copyHeader)) {
+    return null;
+  }
+
+  const ident = identMatch[1];
+  const dotIdx = ident.indexOf(".");
+  if (dotIdx < 0) {
+    return { schema: "public", table: unquoteIdent(ident) };
+  }
+
+  return {
+    schema: unquoteIdent(ident.slice(0, dotIdx)),
+    table: unquoteIdent(ident.slice(dotIdx + 1)),
+  };
+}
+
+/** Strip surrounding double-quotes and unescape embedded "". */
+function unquoteIdent(value) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replaceAll('""', '"');
+  }
+  return trimmed;
+}
+
+function extractCopyTables(sql) {
+  const seen = new Set();
+  const tables = [];
+
+  for (const line of sql.split("\n")) {
+    const table = parseCopyTable(line);
+    if (!table) {
+      continue;
+    }
+
+    const key = `${table.schema}.${table.table}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      tables.push(table);
+    }
+  }
+
+  return tables;
+}
+
+function schemaPreflightSql(tables) {
+  const rows = tables
+    .map(
+      ({ schema, table }) =>
+        `(${sqlLiteral(schema)}, ${sqlLiteral(table)}, ${sqlLiteral(
+          `${schema}.${table}`
+        )})`
+    )
+    .join(",\n    ");
+
+  return `
+DO $$
+DECLARE
+  missing_tables text;
+BEGIN
+  WITH expected(schema_name, table_name, regclass_name) AS (
+    VALUES
+    ${rows}
+  )
+  SELECT string_agg(format('%I.%I', schema_name, table_name), ', ')
+  INTO missing_tables
+  FROM expected
+  WHERE to_regclass(regclass_name) IS NULL;
+
+  IF missing_tables IS NOT NULL THEN
+    RAISE EXCEPTION 'Staging schema is missing required table(s): %. Apply TuneTrees migrations to staging before running db:staging:refresh.', missing_tables;
+  END IF;
+END $$;
+`;
+}
+
+function setCopyField(row, columnIndexes, columnName, value) {
+  const index = columnIndexes.get(columnName);
+  if (index !== undefined) {
+    row[index] = value;
+  }
+}
+
+/** Build a Map from column name to array index. */
+function columnIndexMap(columns) {
+  return new Map(columns.map((column, index) => [column, index]));
+}
+
+/** Throw if any required column is missing from the parsed COPY header. */
+function assertRequiredColumns(columnIndexes, required) {
+  for (const column of required) {
+    if (!columnIndexes.has(column)) {
+      throw new Error(
+        `auth.users dump is missing required sanitization column: ${column}`
+      );
+    }
+  }
+}
+
+/** Overwrite row fields with scrubbed staging-safe values in-place. */
+function scrubAuthRow(row, colIdx, userId) {
+  setCopyField(
+    row,
+    colIdx,
+    "email",
+    `scrubbed-${userId}@${STAGING_EMAIL_DOMAIN}`
+  );
+  setCopyField(row, colIdx, "phone", null);
+  setCopyField(row, colIdx, "phone_change", null);
+  setCopyField(row, colIdx, "raw_user_meta_data", "{}");
+  setCopyField(
+    row,
+    colIdx,
+    "raw_app_meta_data",
+    '{"provider":"email","providers":["email"]}'
+  );
+  setCopyField(row, colIdx, "email_change", null);
+  setCopyField(row, colIdx, "encrypted_password", DISABLED_PASSWORD_HASH);
+  setCopyField(row, colIdx, "confirmation_token", null);
+  setCopyField(row, colIdx, "recovery_token", null);
+  setCopyField(row, colIdx, "email_change_token_new", null);
+  setCopyField(row, colIdx, "email_change_token_current", null);
+  setCopyField(row, colIdx, "reauthentication_token", null);
+  setCopyField(row, colIdx, "phone_change_token", null);
+}
+
+function sanitizeAuthUsersDump(authSql, whitelist) {
+  const lines = authSql.split("\n");
+  const output = [];
+  let columns = null;
+  let columnIndexes = null;
+  let foundAuthUsersCopy = false;
+  let sanitizedRows = 0;
+  const requiredColumns = [
+    "id",
+    "email",
+    "phone",
+    "raw_user_meta_data",
+    "raw_app_meta_data",
+    "email_change",
+    "encrypted_password",
+    "confirmation_token",
+    "recovery_token",
+    "email_change_token_new",
+    "email_change_token_current",
+    "reauthentication_token",
+  ];
+
+  for (const line of lines) {
+    if (!columns) {
+      const parsedColumns = parseCopyColumns(line);
+      if (parsedColumns) {
+        columns = parsedColumns;
+        columnIndexes = columnIndexMap(parsedColumns);
+        foundAuthUsersCopy = true;
+        assertRequiredColumns(columnIndexes, requiredColumns);
+      }
+      output.push(line);
+      continue;
+    }
+
+    if (line === String.raw`\.`) {
+      columns = null;
+      columnIndexes = null;
+      output.push(line);
+      continue;
+    }
+
+    if (line === "") {
+      output.push(line);
+      continue;
+    }
+
+    if (processAuthCopyRow(line, columns, columnIndexes, whitelist, output)) {
+      sanitizedRows += 1;
+    }
+  }
+
+  if (!foundAuthUsersCopy) {
+    throw new Error("Could not find auth.users COPY block in auth dump.");
+  }
+
+  if (sanitizedRows > 0) {
+    console.log(`Sanitized ${sanitizedRows} auth.users rows before restore.`);
+  }
+
+  return output.join("\n");
+}
+
+/** Parse a single COPY data line, optionally scrub, and append to output.
+ *  Returns true if the row was scrubbed. */
+function processAuthCopyRow(line, columns, columnIndexes, whitelist, output) {
+  const row = line.split("\t").map(unescapeCopyValue);
+  if (row.length !== columns.length) {
+    throw new Error("auth.users COPY row does not match column count.");
+  }
+
+  const id = row[columnIndexes.get("id")] ?? "";
+  const email = row[columnIndexes.get("email")] ?? "";
+  const scrubbed = !whitelistMatchesUser(whitelist, id, email);
+  if (scrubbed) {
+    scrubAuthRow(row, columnIndexes, id);
+  }
+
+  output.push(row.map(escapeCopyValue).join("\t"));
+  return scrubbed;
+}
+
 function preRestoreSql() {
   return `
 BEGIN;
@@ -229,13 +516,8 @@ BEGIN
 END $$;
 
 TRUNCATE TABLE auth.users CASCADE;
-ALTER TABLE auth.users DISABLE TRIGGER ALL;
 COMMIT;
 `;
-}
-
-function disableAuthTriggersSql() {
-  return "ALTER TABLE auth.users DISABLE TRIGGER ALL;\n";
 }
 
 function sanitizeAndValidateSql(whitelist) {
@@ -246,24 +528,6 @@ function sanitizeAndValidateSql(whitelist) {
 BEGIN;
 ${whitelistTempTableSql(whitelist)}
 
-ALTER TABLE auth.users DISABLE TRIGGER ALL;
-
-UPDATE auth.users AS u
-SET
-  email = 'scrubbed-' || u.id::text || '@${STAGING_EMAIL_DOMAIN}',
-  phone = NULL,
-  raw_user_meta_data = '{}'::jsonb,
-  raw_app_meta_data = '{"provider":"email","providers":["email"]}'::jsonb,
-  email_change = NULL,
-  encrypted_password = ${sqlLiteral(DISABLED_PASSWORD_HASH)},
-  confirmation_token = NULL,
-  recovery_token = NULL,
-  email_change_token_new = NULL,
-  email_change_token_current = NULL,
-  reauthentication_token = NULL,
-  updated_at = now()
-WHERE NOT (${userWhitelistMatch});
-
 UPDATE public.user_profile AS p
 SET
   name = 'Staging User ' || left(p.id::text, 8),
@@ -271,7 +535,7 @@ SET
   phone = NULL,
   phone_verified = NULL,
   avatar_url = NULL,
-  last_modified_at = now()::text
+  last_modified_at = now()
 WHERE NOT (${profileWhitelistMatch});
 
 DO $$
@@ -323,8 +587,6 @@ BEGIN
     RAISE EXCEPTION 'auth.identities contains non-whitelisted rows after restore: %', bad_count;
   END IF;
 END $$;
-
-ALTER TABLE auth.users ENABLE TRIGGER ALL;
 COMMIT;
 `;
 }
@@ -334,10 +596,8 @@ function cleanupSql(whitelist) {
   return `
 BEGIN;
 ${whitelistTempTableSql(whitelist)}
-ALTER TABLE auth.users DISABLE TRIGGER ALL;
 DELETE FROM auth.users AS u
 WHERE NOT (${userWhitelistMatch});
-ALTER TABLE auth.users ENABLE TRIGGER ALL;
 COMMIT;
 `;
 }
@@ -401,14 +661,13 @@ async function main() {
   const publicDump = join(workDir, "public.sql");
   const authUsersDump = join(workDir, "auth-users.sql");
   const combinedDump = join(workDir, "combined.sql");
+  const schemaPreflightPath = join(workDir, "schema-preflight.sql");
   const preRestorePath = join(workDir, "pre-restore.sql");
-  const disablePath = join(workDir, "disable-auth-triggers.sql");
   const sanitizePath = join(workDir, "sanitize.sql");
   const cleanupPath = join(workDir, "cleanup.sql");
 
   try {
     await writeFile(preRestorePath, preRestoreSql());
-    await writeFile(disablePath, disableAuthTriggersSql());
     await writeFile(sanitizePath, sanitizeAndValidateSql(whitelist));
     await writeFile(cleanupPath, cleanupSql(whitelist));
 
@@ -416,9 +675,9 @@ async function main() {
       "--data-only",
       "--no-owner",
       "--no-acl",
-      "--disable-triggers",
       "-n",
       "public",
+      "--exclude-table=public.sync_change_log",
       "--file",
       publicDump,
       sourceDatabaseUrl,
@@ -427,7 +686,6 @@ async function main() {
       "--data-only",
       "--no-owner",
       "--no-acl",
-      "--disable-triggers",
       "-t",
       "auth.users",
       "--file",
@@ -435,10 +693,25 @@ async function main() {
       sourceDatabaseUrl,
     ]);
 
-    const authSql = await readFile(authUsersDump, "utf8");
+    const authSql = sanitizeAuthUsersDump(
+      await readFile(authUsersDump, "utf8"),
+      whitelist
+    );
     const publicSql = await readFile(publicDump, "utf8");
+    const expectedTables = [
+      { schema: "auth", table: "users" },
+      ...extractCopyTables(publicSql).filter(
+        ({ schema }) => schema === "public"
+      ),
+    ];
+    await writeFile(schemaPreflightPath, schemaPreflightSql(expectedTables));
     await writeFile(combinedDump, `${authSql}\n${publicSql}`);
 
+    await runPsql(
+      targetDatabaseUrl,
+      schemaPreflightPath,
+      "staging schema preflight"
+    );
     await runPsql(
       targetDatabaseUrl,
       preRestorePath,
@@ -453,11 +726,6 @@ async function main() {
       "--file",
       combinedDump,
     ]);
-    await runPsql(
-      targetDatabaseUrl,
-      disablePath,
-      "post-restore auth trigger isolation"
-    );
     await runPsql(
       targetDatabaseUrl,
       sanitizePath,
