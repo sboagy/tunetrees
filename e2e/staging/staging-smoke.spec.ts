@@ -1,10 +1,28 @@
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
-const STAGING_BASE_URL =
-  process.env.STAGING_BASE_URL ?? "https://staging.tunetrees.com";
-const WORKER_URL =
-  process.env.VITE_WORKER_URL ?? "https://staging-api.tunetrees.com";
+const normalizePublicUrl = (value: string, name: string): string => {
+  const trimmed = value.trim();
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    return new URL(withScheme).origin;
+  } catch (err) {
+    throw new Error(
+      `Invalid ${name}: ${value}. ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+};
+const STAGING_BASE_URL = normalizePublicUrl(
+  process.env.STAGING_BASE_URL ?? "https://staging.tunetrees.com",
+  "STAGING_BASE_URL"
+);
+const WORKER_URL = normalizePublicUrl(
+  process.env.VITE_WORKER_URL ?? "https://staging-api.tunetrees.com",
+  "VITE_WORKER_URL"
+);
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
@@ -12,25 +30,13 @@ const ALICE_EMAIL = "alice.test@tunetrees.test";
 
 test.describe("STAGING-001: deployed staging smoke", () => {
   test("anonymous app shell and worker health are reachable", async ({
-    page,
     request,
   }) => {
-    await page.goto(STAGING_BASE_URL);
-    // Validate URL before attempting regex construction
-    if (!STAGING_BASE_URL) {
-      throw new Error("STAGING_BASE_URL environment variable is not set");
-    }
-    let origin: string;
-    try {
-      origin = new URL(STAGING_BASE_URL).origin;
-    } catch (err) {
-      throw new Error(
-        `Invalid STAGING_BASE_URL: ${STAGING_BASE_URL}. ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-    const escapedOrigin = origin.replaceAll(".", String.raw`\.`);
-    await expect(page).toHaveURL(new RegExp(`^${escapedOrigin}`));
-    await expect(page.locator("body")).toBeVisible();
+    const appShell = await request.get(STAGING_BASE_URL);
+    expect(appShell.status()).toBe(200);
+    const appHtml = await appShell.text();
+    expect(appHtml).toContain('<main id="root"></main>');
+    expect(appHtml).toContain('type="module"');
 
     const health = await request.get(`${WORKER_URL}/health`);
     expect(health.status()).toBe(200);
