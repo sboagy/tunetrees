@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
+import bcrypt from "bcryptjs";
 
 // Hash for a deliberately disabled staging account — not a live credential.
 const DISABLED_PASSWORD_HASH =
@@ -146,6 +147,100 @@ CREATE TEMP TABLE staging_whitelist (
 INSERT INTO staging_whitelist (id, email, regex)
 SELECT id, email, regex
 FROM (${whitelistValuesSql(whitelist)}) AS entries(id, email, regex);
+`;
+}
+
+function whitelistSeedSql(whitelist, passwordHash) {
+  const seedUsers = whitelist.filter((entry) => entry.id && entry.email);
+  if (seedUsers.length === 0) {
+    return "";
+  }
+
+  const rows = seedUsers
+    .map(
+      (entry) =>
+        `(${sqlLiteral(entry.id)}::uuid, ${sqlLiteral(entry.email)}, ${sqlLiteral(
+          passwordHash
+        )})`
+    )
+    .join(",\n    ");
+
+  return `
+CREATE TEMP TABLE staging_seed_users (
+  id uuid PRIMARY KEY,
+  email text NOT NULL,
+  password_hash text NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO staging_seed_users (id, email, password_hash)
+VALUES
+    ${rows};
+
+INSERT INTO auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  confirmation_token,
+  recovery_token,
+  email_change_token_new,
+  email_change_token_current,
+  email_change,
+  reauthentication_token,
+  phone_change,
+  phone_change_token,
+  created_at,
+  updated_at,
+  is_sso_user,
+  is_anonymous
+)
+SELECT
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  s.id,
+  'authenticated',
+  'authenticated',
+  s.email,
+  s.password_hash,
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  jsonb_build_object('email', s.email),
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  '',
+  now(),
+  now(),
+  false,
+  false
+FROM staging_seed_users AS s
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.user_profile (
+  id,
+  name,
+  email,
+  sync_version,
+  last_modified_at,
+  deleted
+)
+SELECT
+  s.id,
+  initcap(split_part(s.email, '@', 1)),
+  s.email,
+  1,
+  now(),
+  false
+FROM staging_seed_users AS s
+ON CONFLICT (id) DO NOTHING;
 `;
 }
 
@@ -394,7 +489,7 @@ function scrubAuthRow(row, colIdx, userId) {
     `scrubbed-${userId}@${STAGING_EMAIL_DOMAIN}`
   );
   setCopyField(row, colIdx, "phone", null);
-  setCopyField(row, colIdx, "phone_change", null);
+  setCopyField(row, colIdx, "phone_change", "");
   setCopyField(row, colIdx, "raw_user_meta_data", "{}");
   setCopyField(
     row,
@@ -402,14 +497,14 @@ function scrubAuthRow(row, colIdx, userId) {
     "raw_app_meta_data",
     '{"provider":"email","providers":["email"]}'
   );
-  setCopyField(row, colIdx, "email_change", null);
+  setCopyField(row, colIdx, "email_change", "");
   setCopyField(row, colIdx, "encrypted_password", DISABLED_PASSWORD_HASH);
-  setCopyField(row, colIdx, "confirmation_token", null);
-  setCopyField(row, colIdx, "recovery_token", null);
-  setCopyField(row, colIdx, "email_change_token_new", null);
-  setCopyField(row, colIdx, "email_change_token_current", null);
-  setCopyField(row, colIdx, "reauthentication_token", null);
-  setCopyField(row, colIdx, "phone_change_token", null);
+  setCopyField(row, colIdx, "confirmation_token", "");
+  setCopyField(row, colIdx, "recovery_token", "");
+  setCopyField(row, colIdx, "email_change_token_new", "");
+  setCopyField(row, colIdx, "email_change_token_current", "");
+  setCopyField(row, colIdx, "reauthentication_token", "");
+  setCopyField(row, colIdx, "phone_change_token", "");
 }
 
 function sanitizeAuthUsersDump(authSql, whitelist) {
@@ -427,6 +522,8 @@ function sanitizeAuthUsersDump(authSql, whitelist) {
     "raw_app_meta_data",
     "email_change",
     "encrypted_password",
+    "phone_change",
+    "phone_change_token",
     "confirmation_token",
     "recovery_token",
     "email_change_token_new",
@@ -520,13 +617,14 @@ COMMIT;
 `;
 }
 
-function sanitizeAndValidateSql(whitelist) {
+function sanitizeAndValidateSql(whitelist, stagingPasswordHash) {
   const userWhitelistMatch = whitelistMatchSql("u");
   const profileWhitelistMatch = whitelistMatchSql("p", "p.email");
 
   return `
 BEGIN;
 ${whitelistTempTableSql(whitelist)}
+${whitelistSeedSql(whitelist, stagingPasswordHash)}
 
 UPDATE public.user_profile AS p
 SET
@@ -537,6 +635,33 @@ SET
   avatar_url = NULL,
   last_modified_at = now()
 WHERE NOT (${profileWhitelistMatch});
+
+INSERT INTO auth.identities (
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  created_at,
+  updated_at
+)
+SELECT
+  u.id::text,
+  u.id,
+  jsonb_build_object(
+    'sub', u.id::text,
+    'email', u.email,
+    'email_verified', true,
+    'phone_verified', false
+  ),
+  'email',
+  coalesce(u.created_at, now()),
+  now()
+FROM auth.users AS u
+ON CONFLICT (provider_id, provider) DO UPDATE
+SET
+  user_id = excluded.user_id,
+  identity_data = excluded.identity_data,
+  updated_at = excluded.updated_at;
 
 DO $$
 DECLARE
@@ -565,6 +690,21 @@ BEGIN
 
   SELECT count(*)
   INTO bad_count
+  FROM auth.users AS u
+  WHERE u.confirmation_token IS NULL
+     OR u.recovery_token IS NULL
+     OR u.email_change_token_new IS NULL
+     OR u.email_change_token_current IS NULL
+     OR u.email_change IS NULL
+     OR u.reauthentication_token IS NULL
+     OR u.phone_change IS NULL
+     OR u.phone_change_token IS NULL;
+  IF bad_count > 0 THEN
+    RAISE EXCEPTION 'auth.users contains NULL GoTrue string token fields that break password login: %', bad_count;
+  END IF;
+
+  SELECT count(*)
+  INTO bad_count
   FROM public.user_profile AS p
   WHERE NOT (${profileWhitelistMatch})
     AND (
@@ -581,10 +721,28 @@ BEGIN
   SELECT count(*)
   INTO bad_count
   FROM auth.identities AS i
-  LEFT JOIN staging_whitelist AS sw ON sw.id IS NOT NULL AND i.user_id = sw.id
-  WHERE sw.id IS NULL;
+  LEFT JOIN auth.users AS u ON u.id = i.user_id
+  WHERE u.id IS NULL
+    OR i.provider <> 'email'
+    OR i.provider_id <> i.user_id::text
+    OR i.identity_data->>'email' IS DISTINCT FROM u.email
+    OR i.identity_data::text ~* ${sqlLiteral(EMAIL_REGEX)}
+       AND i.identity_data->>'email' !~* ('^[^@]+@${STAGING_EMAIL_DOMAIN.replaceAll(".", String.raw`\.`)}$')
+       AND NOT (${whitelistMatchSql("u")});
   IF bad_count > 0 THEN
-    RAISE EXCEPTION 'auth.identities contains non-whitelisted rows after restore: %', bad_count;
+    RAISE EXCEPTION 'auth.identities contains unsafe or non-email staging rows: %', bad_count;
+  END IF;
+
+  SELECT count(*)
+  INTO bad_count
+  FROM auth.users AS u
+  LEFT JOIN auth.identities AS i
+    ON i.user_id = u.id
+   AND i.provider = 'email'
+   AND i.provider_id = u.id::text
+  WHERE i.id IS NULL;
+  IF bad_count > 0 THEN
+    RAISE EXCEPTION 'auth.users rows missing synthesized email identities: %', bad_count;
   END IF;
 END $$;
 COMMIT;
@@ -655,6 +813,19 @@ async function main() {
     process.env.STAGING_WHITELIST_PATH ?? "config/staging-whitelist.json"
   );
   const whitelist = await readWhitelist(whitelistPath);
+  const stagingTestUserPassword = env(
+    "STAGING_TEST_USER_PASSWORD",
+    process.env.ALICE_TEST_PASSWORD
+  );
+  if (!stagingTestUserPassword) {
+    throw new Error(
+      "Missing STAGING_TEST_USER_PASSWORD or ALICE_TEST_PASSWORD for whitelisted staging test users."
+    );
+  }
+  const stagingTestUserPasswordHash = bcrypt.hashSync(
+    stagingTestUserPassword,
+    10
+  );
   verifySmtpSafety();
 
   const workDir = await mkdtemp(join(tmpdir(), "tunetrees-staging-refresh-"));
@@ -668,7 +839,10 @@ async function main() {
 
   try {
     await writeFile(preRestorePath, preRestoreSql());
-    await writeFile(sanitizePath, sanitizeAndValidateSql(whitelist));
+    await writeFile(
+      sanitizePath,
+      sanitizeAndValidateSql(whitelist, stagingTestUserPasswordHash)
+    );
     await writeFile(cleanupPath, cleanupSql(whitelist));
 
     await run("pg_dump", [

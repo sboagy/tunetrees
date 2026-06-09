@@ -6,7 +6,6 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import solid from "vite-plugin-solid";
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import { trimTrailingSlashes } from "./src/lib/utils/url";
 
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
@@ -14,6 +13,23 @@ export default defineConfig(() => {
   const disableHmrForE2E = process.env.VITE_DISABLE_HMR_FOR_E2E === "true";
   const MEDIA_AUTH_TOKEN_QUERY_PARAM = "token";
   const rhythmAssetsBaseUrl = process.env.VITE_R2_AUDIO_BASE_URL?.trim() ?? "";
+  const normalizePublicUrl = (name: string, fallback: string): string => {
+    const rawValue = process.env[name]?.trim() || fallback;
+    const valueWithScheme = /^https?:\/\//i.test(rawValue)
+      ? rawValue
+      : `https://${rawValue}`;
+
+    try {
+      const url = new URL(valueWithScheme);
+      return url.origin;
+    } catch {
+      throw new Error(`${name} must be an absolute http(s) URL or hostname.`);
+    }
+  };
+  const workerUrl = normalizePublicUrl(
+    "VITE_WORKER_URL",
+    "http://localhost:8787"
+  );
   const e2eArtifactWatchIgnore = [
     "**/logs/**",
     "**/test-results/**",
@@ -119,7 +135,13 @@ export default defineConfig(() => {
   };
 
   const matchesRhythmAssetUrl = ({ url }: { url: URL }) => {
-    const normalizedPath = trimTrailingSlashes(url.pathname);
+    // This predicate is serialized into the generated service worker, so keep
+    // dependencies self-contained instead of referencing Vite-scope imports.
+    // Strip trailing slashes without a regex vulnerable to backtracking.
+    let normalizedPath = url.pathname;
+    while (normalizedPath.endsWith("/")) {
+      normalizedPath = normalizedPath.slice(0, -1);
+    }
     const isKnownRhythmAssetPath =
       normalizedPath.startsWith("/audio/kits/") ||
       normalizedPath.startsWith("/audio/loops/");
@@ -412,6 +434,16 @@ export default defineConfig(() => {
       __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
       __GIT_COMMIT__: JSON.stringify(getGitCommit()),
       __GIT_BRANCH__: JSON.stringify(getGitBranch()),
+      "import.meta.env.VITE_WORKER_URL": JSON.stringify(workerUrl),
+    },
+    // Replace %VITE_SUPABASE_URL% placeholder in index.html with the actual
+    // Supabase URL at build time (Vite doesn't natively expand %VAR% tokens).
+    transformIndexHtml(html: string) {
+      return html.replaceAll(
+        "%VITE_SUPABASE_URL%",
+        process.env.VITE_SUPABASE_URL ??
+          "https://pjxuonglsvouttihjven.supabase.co"
+      );
     },
   };
 });
