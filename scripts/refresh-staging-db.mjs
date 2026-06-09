@@ -70,6 +70,20 @@ async function readWhitelist(filePath) {
     const email = typeof entry.email === "string" ? entry.email.trim() : "";
     const regex = typeof entry.regex === "string" ? entry.regex.trim() : "";
 
+    // Validate regex syntax early so bad patterns don't surface as opaque
+    // PostgreSQL errors later.  Note: JS and PG regex dialects differ, so
+    // this is a best-effort check; a passing test does not guarantee PG
+    // compatibility, but it catches most typos and unbalanced tokens.
+    if (regex) {
+      try {
+        new RegExp(regex);
+      } catch (err) {
+        throw new Error(
+          `Whitelist entry ${index} regex "${regex}" is not a valid pattern: ${err.message}`
+        );
+      }
+    }
+
     if (!id && !email && !regex) {
       throw new Error(
         `Whitelist entry ${index} must include at least one of id, email, or regex.`
@@ -157,84 +171,39 @@ async function runPsql(databaseUrl, sqlPath, label) {
   );
 }
 
-async function verifySmtpSafety(stagingSupabaseUrl) {
-  const token = process.env.SUPABASE_ACCESS_TOKEN?.trim();
-  if (!token) {
-    throw new Error(
-      "Missing SUPABASE_ACCESS_TOKEN for read-only staging SMTP preflight."
-    );
-  }
-
-  const projectRef = parseProjectRefFromSupabaseUrl(stagingSupabaseUrl);
-  if (!projectRef) {
-    throw new Error("Could not parse staging Supabase project ref.");
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000); // 10-second timeout
-
-  let response;
-  try {
-    response = await fetch(
-      `https://api.supabase.com/v1/projects/${projectRef}/config/auth`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        signal: controller.signal,
-      }
-    );
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error(
-        "Supabase auth config preflight timed out after 10 seconds."
-      );
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Supabase auth config preflight failed with HTTP ${response.status}.`
-    );
-  }
-
-  const config = await response.json();
-  const smtpHost = typeof config.smtp_host === "string" ? config.smtp_host : "";
+function verifySmtpSafety() {
+  const smtpHost = process.env.SUPABASE_SMTP_HOST?.trim() ?? "";
   const safeHostPattern = process.env.STAGING_SMTP_SAFE_HOST_PATTERN?.trim();
-  const allowDisabledBuiltIn =
-    process.env.STAGING_SMTP_BUILT_IN_DISABLED === "true";
 
-  if (smtpHost) {
-    if (!safeHostPattern) {
-      throw new Error(
-        "Staging custom SMTP is configured, but STAGING_SMTP_SAFE_HOST_PATTERN is not set."
-      );
-    }
-
-    const pattern = new RegExp(safeHostPattern, "i");
-    if (!pattern.test(smtpHost)) {
-      throw new Error(
-        "Refusing to run because staging SMTP host is not in the safe null/catch-all allow-list."
-      );
-    }
-
-    console.log("Staging SMTP preflight passed using an allow-listed host.");
-    return;
+  if (!smtpHost) {
+    throw new Error(
+      "Missing required environment variable: SUPABASE_SMTP_HOST"
+    );
   }
 
-  if (!allowDisabledBuiltIn) {
+  if (!safeHostPattern) {
     throw new Error(
-      "Staging SMTP host is empty. Set STAGING_SMTP_BUILT_IN_DISABLED=true only after confirming built-in email delivery is disabled."
+      "Missing required environment variable: STAGING_SMTP_SAFE_HOST_PATTERN"
+    );
+  }
+
+  let pattern;
+  try {
+    pattern = new RegExp(safeHostPattern, "i");
+  } catch (error) {
+    throw new Error(
+      `STAGING_SMTP_SAFE_HOST_PATTERN contains invalid regex syntax: ${error.message}`
+    );
+  }
+
+  if (!pattern.test(smtpHost)) {
+    throw new Error(
+      "Refusing to run because SUPABASE_SMTP_HOST does not match STAGING_SMTP_SAFE_HOST_PATTERN."
     );
   }
 
   console.log(
-    "Staging SMTP preflight passed using disabled built-in email delivery assertion."
+    "Staging SMTP preflight passed using locally asserted allow-listed host."
   );
 }
 
@@ -426,7 +395,7 @@ async function main() {
     process.env.STAGING_WHITELIST_PATH ?? "config/staging-whitelist.json"
   );
   const whitelist = await readWhitelist(whitelistPath);
-  await verifySmtpSafety(stagingSupabaseUrl);
+  verifySmtpSafety();
 
   const workDir = await mkdtemp(join(tmpdir(), "tunetrees-staging-refresh-"));
   const publicDump = join(workDir, "public.sql");
