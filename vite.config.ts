@@ -439,11 +439,17 @@ export default defineConfig(() => {
     // Replace %VITE_SUPABASE_URL% placeholder in index.html with the actual
     // Supabase URL at build time (Vite doesn't natively expand %VAR% tokens).
     transformIndexHtml(html: string) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl && process.env.NODE_ENV === "production") {
+        throw new Error(
+          "VITE_SUPABASE_URL must be set for production/staging builds."
+        );
+      }
       return html.replaceAll(
         "%VITE_SUPABASE_URL%",
-        process.env.VITE_SUPABASE_URL ??
-          "https://pjxuonglsvouttihjven.supabase.co"
+        supabaseUrl ?? "https://pjxuonglsvouttihjven.supabase.co"
       );
+    },
     },
   };
 });
