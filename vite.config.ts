@@ -6,7 +6,6 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import solid from "vite-plugin-solid";
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import { trimTrailingSlashes } from "./src/lib/utils/url";
 
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
@@ -119,7 +118,9 @@ export default defineConfig(() => {
   };
 
   const matchesRhythmAssetUrl = ({ url }: { url: URL }) => {
-    const normalizedPath = trimTrailingSlashes(url.pathname);
+    // This predicate is serialized into the generated service worker, so keep
+    // dependencies self-contained instead of referencing Vite-scope imports.
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
     const isKnownRhythmAssetPath =
       normalizedPath.startsWith("/audio/kits/") ||
       normalizedPath.startsWith("/audio/loops/");
