@@ -961,6 +961,9 @@ jobs:
               --project-name=tunetrees-pwa \
               --branch=staging
 
+      - name: Verify rhythm asset R2 CORS
+        run: npm run r2:rhythm-assets:cors:check
+
       - name: Back up production before staging refresh
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: npm run db:remote:backup

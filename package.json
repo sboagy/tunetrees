@@ -87,6 +87,8 @@
     "r2:local:list:notes": "cd worker && sqlite3 -header -column \"$(find .wrangler/state/v3/r2/miniflare-R2BucketObject -name '*.sqlite' | head -n 1)\" \"select key, size, datetime(uploaded/1000,'unixepoch') as uploaded_utc from _mf_objects where key like '%/notes/%' order by uploaded desc;\"",
     "r2:local:list:audio": "cd worker && sqlite3 -header -column \"$(find .wrangler/state/v3/r2/miniflare-R2BucketObject -name '*.sqlite' | head -n 1)\" \"select key, size, datetime(uploaded/1000,'unixepoch') as uploaded_utc from _mf_objects where key like '%/audio/%' order by uploaded desc;\"",
     "r2:local:head": "sh -c 'cd worker && test -n \"$1\" || { echo \"Usage: npm run r2:local:head -- <key>\"; exit 1; }; npx wrangler r2 object get tunetrees-vault-preview/\"$1\" --local --pipe | wc -c' --",
+    "r2:rhythm-assets:cors:apply": "FORCE_COLOR=1 op run --env-file=\".env.staging.template\" -- node scripts/ensure-rhythm-assets-cors.mjs --apply",
+    "r2:rhythm-assets:cors:check": "FORCE_COLOR=1 op run --env-file=\".env.staging.template\" -- node scripts/ensure-rhythm-assets-cors.mjs --check",
     "worker:deploy:staging": "npm --prefix worker run deploy:staging",
     "worker:deploy:staging:dry-run": "npm --prefix worker run deploy:staging:dry-run",
     "worker:deploy:production": "npm --prefix worker run deploy:production",
