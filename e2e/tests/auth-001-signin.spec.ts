@@ -45,7 +45,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await page.reload({ waitUntil: "networkidle" });
 
     // Verify redirect to login page
-    await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
 
     // Verify login form is visible
     await expect(page.getByLabel("Email")).toBeVisible();
@@ -67,7 +67,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await page.reload({ waitUntil: "networkidle" });
 
     // Wait for URL to be /login
-    await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
 
     // Wait for login form to be visible and interactive
     await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10000 });
@@ -117,7 +117,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await page.reload();
 
     // Wait for URL to be /login
-    await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
 
     // Wait for login form to be visible - this is the reliable signal
     await expect(page.getByLabel("Email")).toBeVisible({ timeout: 10000 });
@@ -133,7 +133,7 @@ test.describe("AUTH-001: User Authentication", () => {
     await page.waitForTimeout(1000);
 
     // Should stay on login page
-    await expect(page).toHaveURL(/.*\/login/, { timeout: 3000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 3000 });
 
     // Supabase returns "Invalid login credentials" for wrong password
     // The error should be in a red background div
