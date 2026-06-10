@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { trimTrailingSlashes } from "../../src/lib/utils/url";
 import type { TuneTreesPage } from "../page-objects/TuneTreesPage";
 import { BASE_URL } from "../test-config";
 
@@ -159,7 +160,7 @@ export async function waitForPracticeViewSettled(
   const practiceRows = ttPage.getRows("scheduled");
   let latestRowCount = 0;
 
-  const baseUrl = String(BASE_URL).replace(/\/+$/, "");
+  const baseUrl = trimTrailingSlashes(String(BASE_URL));
   const currentUrl = page.url();
   const isRealAppUrl =
     currentUrl.startsWith(baseUrl) &&
