@@ -450,6 +450,5 @@ export default defineConfig(() => {
         supabaseUrl ?? "https://pjxuonglsvouttihjven.supabase.co"
       );
     },
-    },
   };
 });
