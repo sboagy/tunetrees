@@ -28,6 +28,28 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 const ALICE_PASSWORD = process.env.ALICE_TEST_PASSWORD;
 const ALICE_EMAIL = "alice.test@tunetrees.test";
 
+async function signInAsAlice() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !ALICE_PASSWORD) {
+    throw new Error(
+      "Missing staging Supabase URL, anon key, or ALICE_TEST_PASSWORD."
+    );
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false },
+  });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: ALICE_EMAIL,
+    password: ALICE_PASSWORD,
+  });
+
+  if (error || !data.session?.access_token) {
+    throw new Error(`Staging email/password sign-in failed: ${error?.message}`);
+  }
+
+  return data.session.access_token;
+}
+
 test.describe("STAGING-001: deployed staging smoke", () => {
   test("anonymous app shell and worker health are reachable", async ({
     request,
@@ -46,29 +68,11 @@ test.describe("STAGING-001: deployed staging smoke", () => {
   test("email/password token authenticates against sync worker via JWKS", async ({
     request,
   }) => {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !ALICE_PASSWORD) {
-      throw new Error(
-        "Missing staging Supabase URL, anon key, or ALICE_TEST_PASSWORD."
-      );
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: false },
-    });
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: ALICE_EMAIL,
-      password: ALICE_PASSWORD,
-    });
-
-    if (error || !data.session?.access_token) {
-      throw new Error(
-        `Staging email/password sign-in failed: ${error?.message}`
-      );
-    }
+    const accessToken = await signInAsAlice();
 
     const syncResponse = await request.post(`${WORKER_URL}/api/sync`, {
       headers: {
-        Authorization: `Bearer ${data.session.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       data: {
         changes: [],
@@ -81,5 +85,48 @@ test.describe("STAGING-001: deployed staging smoke", () => {
     expect(syncResponse.status()).toBe(200);
     const body = (await syncResponse.json()) as { changes?: unknown[] };
     expect(Array.isArray(body.changes)).toBe(true);
+  });
+
+  test("note media uploads and reads through staging R2 vault", async ({
+    request,
+  }) => {
+    const accessToken = await signInAsAlice();
+    const content = `TuneTrees staging media smoke ${Date.now()}`;
+    const uploadResponse = await request.post(`${WORKER_URL}/api/media/upload`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      multipart: {
+        mediaKind: "notes",
+        file: {
+          name: "staging-smoke.txt",
+          mimeType: "text/plain",
+          buffer: Buffer.from(content, "utf8"),
+        },
+      },
+    });
+
+    expect(uploadResponse.status()).toBe(200);
+    const uploadBody = (await uploadResponse.json()) as {
+      file?: { key?: string; contentType?: string; size?: number };
+    };
+    const key = uploadBody.file?.key;
+    expect(key).toBeTruthy();
+    expect(key).toContain("/notes/");
+    expect(uploadBody.file?.contentType).toBe("text/plain");
+    expect(uploadBody.file?.size).toBe(Buffer.byteLength(content));
+
+    const viewResponse = await request.get(`${WORKER_URL}/api/media/view`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      params: {
+        key: key ?? "",
+      },
+    });
+
+    expect(viewResponse.status()).toBe(200);
+    expect(viewResponse.headers()["content-type"]).toContain("text/plain");
+    expect(await viewResponse.text()).toBe(content);
   });
 });
