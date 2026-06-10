@@ -92,19 +92,22 @@ test.describe("STAGING-001: deployed staging smoke", () => {
   }) => {
     const accessToken = await signInAsAlice();
     const content = `TuneTrees staging media smoke ${Date.now()}`;
-    const uploadResponse = await request.post(`${WORKER_URL}/api/media/upload`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      multipart: {
-        mediaKind: "notes",
-        file: {
-          name: "staging-smoke.txt",
-          mimeType: "text/plain",
-          buffer: Buffer.from(content, "utf8"),
+    const uploadResponse = await request.post(
+      `${WORKER_URL}/api/media/upload`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
-      },
-    });
+        multipart: {
+          mediaKind: "notes",
+          file: {
+            name: "staging-smoke.txt",
+            mimeType: "text/plain",
+            buffer: Buffer.from(content, "utf8"),
+          },
+        },
+      }
+    );
 
     expect(uploadResponse.status()).toBe(200);
     const uploadBody = (await uploadResponse.json()) as {
