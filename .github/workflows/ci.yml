@@ -911,7 +911,17 @@ jobs:
             printf 'main\n'
           }
 
+          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
           echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
+      # Also SHA-pinned with persist-credentials: false (deploy job).
+      - name: Checkout rhizome (shared Supabase config + DB scripts)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: sboagy/rhizome
+          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
+          path: rhizome
+          persist-credentials: false
 
       # Also SHA-pinned with persist-credentials: false (deploy job).
       - name: Checkout oosync
