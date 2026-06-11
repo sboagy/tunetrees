@@ -20,10 +20,18 @@ function env(name, fallback) {
 
 function parseOrigins() {
   const raw = env("RHYTHM_ASSETS_CORS_ORIGINS", DEFAULT_ORIGINS.join(","));
-  return raw
+  const origins = raw
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  if (origins.length === 0) {
+    throw new Error(
+      `RHYTHM_ASSETS_CORS_ORIGINS produced no valid origins from input: ${JSON.stringify(raw)}`
+    );
+  }
+
+  return origins;
 }
 
 function normalizeBaseUrl(value) {
