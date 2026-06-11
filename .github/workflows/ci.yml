@@ -846,6 +846,7 @@ jobs:
       deployments: write
     env:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+      RHIZOME_REPO_PATH: ${{ github.workspace }}/rhizome
 
     steps:
       # Pinned to a full commit SHA (not @v5) because this job has access to
