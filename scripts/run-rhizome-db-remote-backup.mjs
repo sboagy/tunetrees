@@ -27,6 +27,7 @@ function findRhizomeRepo(repoRoot) {
   const parent = path.resolve(repoRoot, "..");
   const grandparent = path.resolve(repoRoot, "..", "..");
   const directCandidates = [
+    path.join(repoRoot, "rhizome"),
     path.join(parent, "rhizome"),
     path.join(grandparent, "rhizome"),
   ];
