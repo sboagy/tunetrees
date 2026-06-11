@@ -979,6 +979,14 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: npm run db:remote:backup
 
+      - name: Upload production backup as artifact
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: db-backup-${{ github.sha }}
+          path: rhizome/backups/
+          retention-days: 30
+
       - name: Refresh staging data from production
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: npm run db:staging:refresh
