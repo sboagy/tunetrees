@@ -1,6 +1,18 @@
-import { spawnSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
+
+/** Resolve a command name to its absolute path so spawnSync never searches PATH. */
+function resolveBin(name) {
+  const resolved = execSync(`command -v ${name}`, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  if (!resolved) {
+    throw new Error(`Could not resolve binary: ${name}`);
+  }
+  return resolved;
+}
 
 function repoHasPackageJson(dirPath) {
   return existsSync(path.join(dirPath, "package.json"));
@@ -49,8 +61,9 @@ function main() {
     `[tunetrees] Delegating remote DB backup to rhizome at ${rhizomeRepo}`
   );
 
+  const npmPath = resolveBin("npm");
   const result = spawnSync(
-    "npm",
+    npmPath,
     ["run", "db:remote:backup", "--", ...forwardedArgs],
     {
       cwd: rhizomeRepo,
