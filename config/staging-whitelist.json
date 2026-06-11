@@ -1,0 +1,38 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000009001",
+    "email": "alice.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009002",
+    "email": "bob.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009004",
+    "email": "dave.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009005",
+    "email": "eve.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009006",
+    "email": "frank.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009007",
+    "email": "grace.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009008",
+    "email": "henry.test@tunetrees.test"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000009009",
+    "email": "iris.test@tunetrees.test"
+  },
+  {
+    "id": "a70ead77-2dcc-4f12-b543-f24c9b4c0812",
+    "email": "sboagy@gmail.com"
+  }
+]

@@ -19,11 +19,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    # <-- This is your manual trigger
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    inputs:
+      skip_staging_data_refresh:
+        description: "Skip production-to-staging database refresh before staging smoke tests"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,6 +45,9 @@ jobs:
   quality:
     name: Run Quality Checks
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-fast-quality-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout TuneTrees
@@ -80,6 +83,9 @@ jobs:
     timeout-minutes: 30
     needs: [quality]
     environment: tunetrees_ci_env
+    concurrency:
+      group: ci-fast-unit-${{ github.ref }}
+      cancel-in-progress: true
     env:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
@@ -115,6 +121,9 @@ jobs:
     name: Run Playwright Tests
     runs-on: ubuntu-latest
     needs: [quality]
+    concurrency:
+      group: ci-fast-e2e-${{ github.ref }}-${{ matrix.shard }}
+      cancel-in-progress: true
     permissions:
       actions: write
       contents: read
@@ -428,6 +437,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [quality]
+    concurrency:
+      group: ci-fast-pwa-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       actions: write
       contents: read
@@ -817,66 +829,97 @@ jobs:
           retention-days: 30
 
   # --------------------------------------------------------------------------
-  # JOB 5: DEPLOY (Pages + Worker)
+  # JOB 5: STAGING DEPLOY + DATA REFRESH + SMOKE TESTS
   # --------------------------------------------------------------------------
-  deploy:
-    name: Deploy to Cloudflare Pages
+  deploy-staging:
+    name: Deploy staging and verify
     runs-on: ubuntu-latest
     needs: [test-unit, test, test-pwa-offline]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/tt_rz_refactor')
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
     environment: tunetrees_ci_env
+    concurrency:
+      group: staging-deploy-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      deployments: write
     env:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
+      # Pinned to a full commit SHA (not @v5) because this job has access to
+      # deploy secrets via 1Password; persist-credentials: false so the token
+      # is not left on disk for subsequent steps or a compromised action to read.
       - name: Checkout TuneTrees
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
-          node-version: "24"
-          cache: "npm"
-          cache-dependency-path: |
-            package-lock.json
-            worker/package-lock.json
+          persist-credentials: false
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
-
-      - name: Build Application
-        run: npm run build
-
-      - name: Deploy to Cloudflare Pages
-        # Use `op run` instead of wrangler-action so secrets come from
-        # 1Password and never need to be stored as individual GitHub secrets.
-        run: |
-          op run --env-file=".env.prod.template" -- \
-            npx wrangler pages deploy dist \
-              --project-name=tunetrees-pwa \
-              --branch=${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      - name: Resolve shared repo refs
+        id: shared_refs
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          has_remote_branch() {
+            local repo="$1"
+            local branch="$2"
+            git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$branch" >/dev/null 2>&1
+          }
 
-      - name: Output deployment URL
-        if: success()
-        run: echo "🚀 Deployment complete!"
+          repo_prefix() {
+            case "$1" in
+              sboagy/tunetrees) printf 'tt' ;;
+              sboagy/cubefsrs) printf 'cf' ;;
+              sboagy/oosync) printf 'os' ;;
+              sboagy/rhizome) printf 'rz' ;;
+              *) return 1 ;;
+            esac
+          }
 
-  deploy-worker:
-    name: Deploy Cloudflare Worker
-    runs-on: ubuntu-latest
-    needs: [test-unit, test, test-pwa-offline]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/tt_rz_refactor')
-    environment: tunetrees_ci_env
+          resolve_ref() {
+            local repo="$1"
+            local candidate="$2"
+            local target_prefix
+            local shared_suffix
+            local prefixed_candidate
 
-    steps:
-      - name: Checkout TuneTrees
-        uses: actions/checkout@v5
+            if has_remote_branch "$repo" "$candidate"; then
+              printf '%s\n' "$candidate"
+              return
+            fi
+
+            target_prefix="$(repo_prefix "$repo")" || {
+              printf 'main\n'
+              return
+            }
+
+            shared_suffix="$candidate"
+            case "$candidate" in
+              tt-*|cf-*|os-*|rz-*)
+                shared_suffix="${candidate#*-}"
+                ;;
+            esac
+
+            prefixed_candidate="${target_prefix}-${shared_suffix}"
+            if has_remote_branch "$repo" "$prefixed_candidate"; then
+              printf '%s\n' "$prefixed_candidate"
+              return
+            fi
+
+            printf 'main\n'
+          }
+
+          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
+      # Also SHA-pinned with persist-credentials: false (deploy job).
+      - name: Checkout oosync
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: sboagy/oosync
+          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
+          path: oosync
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -891,15 +934,79 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Install Worker Dependencies
-        run: cd worker && npm ci --ignore-scripts
+        run: npm ci --prefix worker --ignore-scripts
+
+      - name: Overlay checked-out oosync package
+        run: |
+          npm install --ignore-scripts --no-save --no-package-lock ./oosync
+          cd worker
+          npm install --ignore-scripts --no-save --no-package-lock ../oosync
 
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
-      - name: Deploy Worker
-        # The worker JWT secret must exist as a Cloudflare Worker secret binding.
-        # Loading it into the deploy shell via `op run` is not enough by itself.
-        run: npm run deploy
-        working-directory: worker
+      - name: Verify staging Worker dry run
+        run: npm run worker:deploy:staging:dry-run
+
+      - name: Deploy staging Worker
+        run: npm run worker:deploy:staging
+
+      - name: Build staging Pages bundle
+        run: npm run build:staging
+
+      - name: Deploy staging Pages
+        run: |
+          op run --env-file=".env.staging.template" -- \
+            npx wrangler pages deploy dist \
+              --project-name=tunetrees-pwa \
+              --branch=staging
+
+      - name: Verify rhythm asset R2 CORS
+        run: npm run r2:rhythm-assets:cors:check
+
+      - name: Back up production before staging refresh
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
+        run: npm run db:remote:backup
+
+      - name: Refresh staging data from production
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
+        run: npm run db:staging:refresh
+
+      - name: Install Playwright browser for staging smoke
+        run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
+
+      - name: Run staging smoke tests
+        run: npm run test:e2e:staging
+
+      - name: Create successful staging Deployment record
+        run: |
+          deployment_id="$(
+            jq -n \
+              --arg ref "${GITHUB_SHA}" \
+              --arg environment "staging" \
+              --arg description "TuneTrees staging deploy verified by CI" \
+              '{ref: $ref, environment: $environment, auto_merge: false, required_contexts: [], description: $description}' \
+            | gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+              --method POST \
+              --input - \
+              --jq '.id'
+          )"
+
+          gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
+            --method POST \
+            -f state="success" \
+            -f environment="staging" \
+            -f environment_url="https://staging.tunetrees.com" \
+            -f log_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            -f description="Staging deploy, data refresh, and smoke tests passed"
+
+          {
+            echo "### Staging deployment proof"
+            echo
+            echo "- SHA: \`${GITHUB_SHA}\`"
+            echo "- Deployment ID: \`${deployment_id}\`"
+            echo "- Environment: \`staging\`"
+            echo "- Status: \`success\`"
+          } >> "$GITHUB_STEP_SUMMARY"
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
