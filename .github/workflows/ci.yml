@@ -975,6 +975,18 @@ jobs:
       - name: Verify rhythm asset R2 CORS
         run: npm run r2:rhythm-assets:cors:check
 
+      - name: Install PostgreSQL 17 client
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+
       - name: Back up production before staging refresh
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: npm run db:remote:backup
