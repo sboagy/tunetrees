@@ -155,7 +155,7 @@
     "drizzle-kit": "^0.31.10",
     "jsdom": "^29.1.1",
     "postgres": "^3.4.9",
-    "prettier": "^3.8.1",
+    "prettier": "^3.8.4",
     "shadcn-solid": "^0.7.7",
     "supabase": "^2.98.2",
     "tailwindcss": "^4.3.0",
