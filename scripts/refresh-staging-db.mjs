@@ -894,7 +894,6 @@ async function main() {
     await run("psql", [
       "--set=ON_ERROR_STOP=1",
       "--no-psqlrc",
-      "--quiet",
       "--single-transaction",
       targetDatabaseUrl,
       "--file",
