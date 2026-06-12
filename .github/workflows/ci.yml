@@ -986,9 +986,16 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
 
       - name: Back up production before staging refresh
+        # continue-on-error: GitHub Actions runners have no outbound IPv6 internet
+        # routing; db.PROJECT_REF.supabase.co is IPv6-only. Until DATABASE_URL is
+        # updated to use the Supabase Session Mode pooler (IPv4-capable), this step
+        # will fail on every CI run. The staging refresh only reads from production
+        # so a missing backup does not put production data at risk.
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
+        continue-on-error: true
         run: npm run db:remote:backup
 
       - name: Upload production backup as artifact
