@@ -1,0 +1,222 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# yamllint disable rule:line-length
+#
+# Secrets required in the `production` environment, or as repository secrets:
+#   OP_SERVICE_ACCOUNT_TOKEN  — 1Password Service Account token (for op run)
+#
+# Production app, Worker, Supabase, and Cloudflare values are resolved at runtime
+# through `.env.prod.template` and 1Password `op://rhizome/shared-production/...`
+# references. Do not duplicate those values directly into GitHub secrets.
+
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: "Exact 40-character TuneTrees commit SHA to deploy"
+        required: true
+        type: string
+      override_staging_check:
+        description: "Emergency override: deploy even without matching staging proof"
+        required: true
+        type: boolean
+        default: false
+      override_reason:
+        description: "Required human-readable reason when override_staging_check is true"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Opt into Node.js 24 for JavaScript actions.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NPM_CONFIG_LEGACY_PEER_DEPS: "true"
+
+jobs:
+  deploy-production:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: production-promotion
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      deployments: read
+      issues: write
+    env:
+      DEPLOY_SHA: ${{ inputs.deploy_sha }}
+      OVERRIDE_STAGING_CHECK: ${{ inputs.override_staging_check }}
+      OVERRIDE_REASON: ${{ inputs.override_reason }}
+
+    steps:
+      - name: Validate deploy SHA input
+        run: |
+          if [[ ! "${DEPLOY_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "deploy_sha must be an exact 40-character commit SHA." >&2
+            exit 1
+          fi
+
+          normalized_sha="$(printf '%s' "${DEPLOY_SHA}" | tr '[:upper:]' '[:lower:]')"
+          echo "DEPLOY_SHA=${normalized_sha}" >> "$GITHUB_ENV"
+
+      - name: Verify staging Deployment proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Production promotion release train"
+            echo
+            echo "- Deploy SHA: \`${DEPLOY_SHA}\`"
+            echo "- Staging lock: treat staging as locked for \`${DEPLOY_SHA}\` until this production workflow completes or is explicitly aborted."
+            echo "- Actor: \`${GITHUB_ACTOR}\`"
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${OVERRIDE_STAGING_CHECK}" == "true" ]]; then
+            reason="${OVERRIDE_REASON}"
+            reason="${reason#"${reason%%[![:space:]]*}"}"
+            reason="${reason%"${reason##*[![:space:]]}"}"
+            if [[ -z "${reason}" ]]; then
+              echo "override_reason is required when override_staging_check is true." >&2
+              exit 1
+            fi
+
+            {
+              echo "### Staging proof override"
+              echo
+              echo "- SHA: \`${DEPLOY_SHA}\`"
+              echo "- Actor: \`${GITHUB_ACTOR}\`"
+              echo "- Timestamp: \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`"
+              echo "- Reason: ${reason}"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            {
+              echo "Production staging-proof override by \`${GITHUB_ACTOR}\` for \`${DEPLOY_SHA}\` at \`$(date -u +"%Y-%m-%dT%H:%M:%SZ")\`."
+              echo
+              echo "Reason: ${reason}"
+              echo
+              echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            } > override-audit.md
+            gh issue comment 337 --body-file override-audit.md
+            exit 0
+          fi
+
+          mapfile -t deployment_ids < <(
+            gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+              -F environment="staging" \
+              -F ref="${DEPLOY_SHA}" \
+              --paginate \
+              --jq '.[] | select((.sha == env.DEPLOY_SHA) or (.ref == env.DEPLOY_SHA)) | .id'
+          )
+
+          if [[ "${#deployment_ids[@]}" -eq 0 ]]; then
+            echo "No staging Deployment exists for exact SHA ${DEPLOY_SHA}." >&2
+            exit 1
+          fi
+
+          proof_deployment_id=""
+          proof_status_id=""
+          for deployment_id in "${deployment_ids[@]}"; do
+            status_id="$(
+              gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
+                --jq 'map(select(.state == "success")) | first | .id // empty'
+            )"
+            if [[ -n "${status_id}" ]]; then
+              proof_deployment_id="${deployment_id}"
+              proof_status_id="${status_id}"
+              break
+            fi
+          done
+
+          if [[ -z "${proof_deployment_id}" ]]; then
+            echo "No successful staging Deployment status exists for exact SHA ${DEPLOY_SHA}." >&2
+            exit 1
+          fi
+
+          {
+            echo "### Staging deployment proof"
+            echo
+            echo "- SHA: \`${DEPLOY_SHA}\`"
+            echo "- Deployment ID: \`${proof_deployment_id}\`"
+            echo "- Status ID: \`${proof_status_id}\`"
+            echo "- Environment: \`staging\`"
+            echo "- Result: \`success\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # SHA-pinned because this job has access to deploy secrets via 1Password;
+      # persist-credentials: false keeps the token off disk for later steps.
+      - name: Checkout TuneTrees at deploy SHA
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      # SHA-pinned actions/setup-node@v5.0.0
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Worker dependencies
+        run: npm ci --prefix worker --ignore-scripts
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
+
+      - name: Apply production Supabase migrations
+        timeout-minutes: 30
+        run: npm run db:production:schema:push
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Deploy production Worker
+        run: npm run worker:deploy:production
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Build production Pages bundle
+        run: npm run build:production
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Deploy production Pages
+        run: |
+          op run --env-file=".env.prod.template" -- \
+            npx wrangler pages deploy dist \
+              --project-name=tunetrees-pwa \
+              --branch=main
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Install Playwright browser for production smoke
+        run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
+
+      - name: Run production smoke tests
+        run: npm run test:e2e:production
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Record production deployment summary
+        if: always()
+        run: |
+          {
+            echo "### Production deployment result"
+            echo
+            echo "- SHA: \`${DEPLOY_SHA}\`"
+            echo "- Status: \`${{ job.status }}\`"
+            echo "- Production URL: https://tunetrees.com"
+          } >> "$GITHUB_STEP_SUMMARY"
