@@ -4,6 +4,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "postinstall": "node scripts/patch-supabase-sourcemaps.js",
     "dev": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vite",
@@ -56,6 +59,7 @@
     "test:unit": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vitest run tests/ src/",
     "test:e2e": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list",
     "test:e2e:staging": "FORCE_COLOR=1 op run --env-file=\".env.staging.template\" -- playwright test --config=playwright.staging.config.ts --reporter=list",
+    "test:e2e:production": "FORCE_COLOR=1 op run --env-file=\".env.prod.template\" -- playwright test --config=playwright.production.config.ts --reporter=list",
     "test:e2e:both:ci": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --project=chromium-auth --project=chromium --project='Mobile Chrome'",
     "test:e2e:offline": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --project=chromium-pwa-offline --reporter=list",
     "test:e2e:offline:ci": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --project=chromium-pwa-offline",

@@ -4,7 +4,7 @@ Get TuneTrees running locally for development.
 
 ## Prerequisites
 
-- **Node.js 20+** (LTS recommended)
+- **Node.js 24+** (LTS recommended)
 - **npm** or **pnpm**
 - **Git**
 
