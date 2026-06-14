@@ -11,11 +11,14 @@ Provide consolidated history & scheduling rollups (e.g., effective due via `COAL
 ## Change Workflow
 
 When schema fields change (added/renamed/removed):
+
 1. Identify affected views (practice history, scheduling list, staged variants).
 2. Update corresponding `.sql` files here.
 3. Adjust consuming queries (see `tunetrees/app/AGENTS.md`).
 4. Run tests validating counts & effective due correctness.
 5. Document migration rationale in `_notes/`.
+
+Before generating or approving any SQL/schema change, apply the root `AGENTS.md` Schema Compatibility Gate. Prefer additive compatible changes; use expand/contract for renames, type changes, nullability tightening, destructive drops, RLS/trigger changes, or any change that old app/Worker/browser bundles might still depend on. If no backward-compatible SQL path is clear, stop and alert the developer with the incompatibility and a safer migration option.
 
 ## Consistency Rules
 
@@ -43,4 +46,5 @@ Tests should validate: row counts stable (or explained), uniqueness preserved, e
 Models invariants: `tunetrees/models/AGENTS.md`. Query consumption: `tunetrees/app/AGENTS.md`. Global architecture & scheduling: root `AGENTS.md`.
 
 ---
+
 Update views only with corresponding model & service changes; keep minimal & performant.

@@ -20,6 +20,8 @@ User → Cloudflare Pages (Static SolidJS PWA)
 - Supabase project with schema deployed
 - GitHub repository connected to Cloudflare Pages
 
+For schema-changing releases, follow the [Supabase Schema Promotion Runbook](schema-promotion.md). Production promotion must apply migrations only after the exact SHA has passed the staging deployment proof gate, and before production Worker/Pages deploy.
+
 ## Cloudflare Pages Setup
 
 ### 1. Connect Repository
@@ -31,12 +33,12 @@ User → Cloudflare Pages (Static SolidJS PWA)
 
 ### 2. Build Configuration
 
-| Setting | Value |
-|---------|-------|
-| Framework preset | None |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Root directory | `/` |
+| Setting                | Value           |
+| ---------------------- | --------------- |
+| Framework preset       | None            |
+| Build command          | `npm run build` |
+| Build output directory | `dist`          |
+| Root directory         | `/`             |
 
 ### 3. Environment Variables
 
@@ -105,6 +107,7 @@ To see these worker diagnostics in your browser console, enable both:
 - `SYNC_DIAGNOSTICS=true` (worker)
 
 **Verify secrets are set**:
+
 ```bash
 npx wrangler secret list
 ```
@@ -117,6 +120,7 @@ npx wrangler deploy
 ```
 
 **Test deployment**:
+
 ```bash
 # Health check
 curl https://tunetrees-sync-worker.sboagy.workers.dev/health
@@ -175,6 +179,7 @@ Cloudflare Pages keeps deployment history. To rollback:
 ### Cloudflare Analytics
 
 Pages dashboard shows:
+
 - Request counts
 - Bandwidth usage
 - Cache hit rates

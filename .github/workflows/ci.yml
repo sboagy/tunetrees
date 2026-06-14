@@ -956,6 +956,19 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
+      - name: Apply staging Supabase migrations
+        run: npm run db:staging:schema:push
+
+      - name: Validate generated schema contract against staging
+        run: |
+          op run --env-file=".env.staging.template" -- \
+            npx tsx node_modules/oosync/src/codegen-schema.ts \
+              --check \
+              --databaseUrl="$DATABASE_URL"
+          npm run typecheck
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
       - name: Verify staging Worker dry run
         run: npm run worker:deploy:staging:dry-run
 

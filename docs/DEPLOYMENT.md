@@ -103,12 +103,13 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 ### 2. Update Supabase Redirect URLs
 
 In Supabase dashboard:
+
 - Authentication → URL Configuration
 - Add production domain to allowed redirect URLs
 
 ### 3. Update Environment Variables
 
-- No changes needed (VITE_SUPABASE_* stays same)
+- No changes needed (`VITE_SUPABASE_*` stays same)
 
 ---
 
@@ -155,5 +156,7 @@ If deployment fails:
 ---
 
 **See Also:**
+
 - [Setup Guide](SETUP.md)
 - [Database Migration Guide](DATABASE_MIGRATION.md)
+- [Supabase Schema Promotion Runbook](development/schema-promotion.md)

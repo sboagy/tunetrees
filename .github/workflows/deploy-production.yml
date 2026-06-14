@@ -177,6 +177,12 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
+      - name: Apply production Supabase migrations
+        timeout-minutes: 30
+        run: npm run db:production:schema:push
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
       - name: Deploy production Worker
         run: npm run worker:deploy:production
         env:
