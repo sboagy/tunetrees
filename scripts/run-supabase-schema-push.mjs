@@ -1,8 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const SUPABASE_CLI_VERSION = "2.98.2";
+// Absolute path avoids PATH-search command injection (SonarQube S4036).
+const NPX = join(dirname(process.execPath), "npx");
 
 function fail(message) {
   console.error(message);
@@ -104,7 +107,7 @@ function assertTargetEnvironment({ targetEnv, databaseUrl, supabaseUrl }) {
 function runSupabase(args, label) {
   console.log(`Running ${label}...`);
   const result = spawnSync(
-    "npx",
+    NPX,
     ["--yes", `supabase@${SUPABASE_CLI_VERSION}`, ...args],
     {
       env: process.env,
