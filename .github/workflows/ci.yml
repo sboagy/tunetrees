@@ -376,9 +376,11 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright Browsers
-        # A cache hit does not guarantee every required browser binary is
-        # present for the current Playwright package, so always verify/install.
-        run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
+        # Use the local playwright CLI from @playwright/test to guarantee the
+        # binary hash matches the installed package version. Avoids stale-cache
+        # false-positives that occur when npx downloads a separate copy and sees
+        # no project context.
+        run: node_modules/.bin/playwright install --with-deps chromium
 
       - name: Setup Cloudflare Worker
         run: |
@@ -677,9 +679,11 @@ jobs:
           echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> .dev.vars
 
       - name: Install Playwright Browsers
-        # A cache hit does not guarantee every required browser binary is
-        # present for the current Playwright package, so always verify/install.
-        run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
+        # Use the local playwright CLI from @playwright/test to guarantee the
+        # binary hash matches the installed package version. Avoids stale-cache
+        # false-positives that occur when npx downloads a separate copy and sees
+        # no project context.
+        run: node_modules/.bin/playwright install --with-deps chromium
 
       - name: Build PWA
         run: |
@@ -818,7 +822,7 @@ jobs:
 
       - name: Merge into HTML Report
         if: steps.blob-reports.outputs.found == 'true'
-        run: npx --ignore-scripts playwright@1.60.0 merge-reports --reporter html ./all-blob-reports
+        run: node_modules/.bin/playwright merge-reports --reporter html ./all-blob-reports
 
       - name: Upload merged HTML report
         if: steps.blob-reports.outputs.found == 'true'
@@ -1006,7 +1010,7 @@ jobs:
         run: npm run db:staging:refresh
 
       - name: Install Playwright browser for staging smoke
-        run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
+        run: node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run staging smoke tests
         run: npm run test:e2e:staging
