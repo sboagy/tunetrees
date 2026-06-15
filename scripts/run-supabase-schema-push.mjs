@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { appendFileSync } from "node:fs";
 
 const SUPABASE_CLI_VERSION = "2.98.2";
 
@@ -76,8 +76,16 @@ function redactedDatabaseTarget(databaseUrl) {
 
 function assertTargetEnvironment({ targetEnv, databaseUrl, supabaseUrl }) {
   const projectRef = parseProjectRefFromSupabaseUrl(supabaseUrl);
-  const dbText = databaseUrl.toLowerCase();
-  if (!dbText.includes(projectRef.toLowerCase())) {
+  const url = new URL(databaseUrl);
+  const ref = projectRef.toLowerCase();
+
+  // Direct connections embed the ref as a hostname segment (db.{ref}.supabase.co);
+  // pooler connections embed it as a username segment (postgres.{ref}).
+  // Split on "." so a ref that is a prefix/suffix of another segment can't match.
+  const inHostname = url.hostname.toLowerCase().split(".").includes(ref);
+  const inUsername = url.username.toLowerCase().split(".").includes(ref);
+
+  if (!inHostname && !inUsername) {
     fail(
       `DATABASE_URL does not appear to target the ${targetEnv} Supabase project ref ${projectRef}.`
     );
