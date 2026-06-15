@@ -23,6 +23,12 @@ const WORKER_URL = normalizePublicUrl(
   process.env.VITE_WORKER_URL ?? "https://api.tunetrees.com",
   "VITE_WORKER_URL"
 );
+const SUPABASE_ANON_KEY: string = (() => {
+  const key = process.env.VITE_SUPABASE_ANON_KEY;
+  if (!key)
+    throw new Error("Missing VITE_SUPABASE_ANON_KEY for production smoke.");
+  return key;
+})();
 test.describe("PROD-001: deployed production smoke", () => {
   test("anonymous app shell, service worker, and worker health are reachable", async ({
     request,
@@ -49,15 +55,11 @@ test.describe("PROD-001: deployed production smoke", () => {
       process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
       "VITE_SUPABASE_URL or SUPABASE_URL"
     );
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
-    if (!supabaseAnonKey) {
-      throw new Error("Missing VITE_SUPABASE_ANON_KEY for production smoke.");
-    }
 
     const response = await request.get(`${supabaseUrl}/auth/v1/settings`, {
       headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${supabaseAnonKey}`,
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
     });
 

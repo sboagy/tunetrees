@@ -103,7 +103,7 @@ jobs:
               echo
               echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             } > override-audit.md
-            gh issue comment 337 --body-file override-audit.md
+            gh issue comment 337 --repo "${GITHUB_REPOSITORY}" --body-file override-audit.md
             exit 0
           fi
 
