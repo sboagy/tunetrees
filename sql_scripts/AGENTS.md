@@ -18,7 +18,17 @@ When schema fields change (added/renamed/removed):
 4. Run tests validating counts & effective due correctness.
 5. Document migration rationale in `_notes/`.
 
-Before generating or approving any SQL/schema change, apply the root `AGENTS.md` Schema Compatibility Gate. Prefer additive compatible changes; use expand/contract for renames, type changes, nullability tightening, destructive drops, RLS/trigger changes, or any change that old app/Worker/browser bundles might still depend on. If no backward-compatible SQL path is clear, stop and alert the developer with the incompatibility and a safer migration option.
+Before generating or approving any SQL/schema change, apply the root `AGENTS.md` Schema Compatibility Gate:
+
+- Prefer additive, backward-compatible changes.
+- Use expand/contract migrations for any of the following:
+  - column or table renames
+  - column type changes
+  - nullability tightening
+  - destructive drops (columns, tables, views, functions, enum values)
+  - RLS or trigger changes
+  - any change that old app/Worker/browser bundles might still depend on
+- If no backward-compatible SQL path is clear, stop and alert the developer with the specific incompatibility and a safer migration option before proceeding.
 
 ## Consistency Rules
 

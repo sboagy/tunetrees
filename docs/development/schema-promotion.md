@@ -41,11 +41,11 @@ The intended flow for schema-changing releases is:
 
 4. Manual production promotion
    - Operator triggers `Deploy Production` with the exact SHA.
-   - Workflow verifies the matching successful `staging` Deployment proof.
-   - Workflow runs a production migration preflight.
-   - Workflow applies production migrations.
-   - Workflow deploys production Worker and Pages.
-   - Workflow runs production-safe smoke tests.
+   - Verify the matching successful `staging` Deployment proof.
+   - Run a production migration preflight.
+   - Apply production migrations.
+   - Deploy production Worker and Pages.
+   - Run production-safe smoke tests.
 
 Existing staging proofs created before the staging migration gate was added are valid only for app-only releases with no Supabase migrations.
 
@@ -149,12 +149,12 @@ If no backward-compatible solution is obvious, stop and call it out. Do not quie
 
 ### Usually Safe In One Release
 
-- Add a new table unused by old code.
-- Add a nullable column.
-- Add a column with a safe default.
-- Add a non-breaking index.
-- Add a view/function that old code ignores.
-- Add non-breaking triggers that preserve old behavior.
+- New table unused by old code.
+- Nullable column.
+- Column with a safe default.
+- Non-breaking index.
+- View or function that old code ignores.
+- Non-breaking triggers that preserve old behavior.
 
 ### Requires Care
 
