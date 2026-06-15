@@ -29,9 +29,9 @@ The `legacy/` directory is reference-only. Do not modify legacy code for new wor
 
 ## Offline-First Data Flow
 
-1) User action writes to local SQLite immediately.
-2) Writes enqueue into outbox; sync engine pushes to Supabase via worker.
-3) Remote changes flow back via worker (and/or Realtime) and are applied to local SQLite.
+1. User action writes to local SQLite immediately.
+2. Writes enqueue into outbox; sync engine pushes to Supabase via worker.
+3. Remote changes flow back via worker (and/or Realtime) and are applied to local SQLite.
 
 Default conflict policy is last-write-wins, with explicit conflict tracking in the sync layer.
 
@@ -82,6 +82,38 @@ Primary components:
   3. Verify: `npm run codegen:schema:check && npm run typecheck && npm run lint && npm run test:unit`
 - If generated output is wrong, fix the **source** (Supabase migration, `oosync.codegen.config.json`, or the codegen generator itself) and regenerate — never patch generated files.
 - Boundary rules are enforced in the standalone `oosync` repo `AGENTS.md` (core must not import app `src/**`; worker must not import app `src/**`; shared/generated is contract-only).
+
+## Schema Compatibility Gate
+
+Agents must treat production schema compatibility as a code-review gate for every Supabase migration, SQL view change, generated-contract change, sync table change, and browser/Worker query change.
+
+Canonical runbook: `docs/development/schema-promotion.md`.
+
+Default rule: every migration that can be promoted through the standard staging-to-production workflow must be backward-compatible with the currently deployed production app and Worker until the new Worker and Pages deployment completes. CI can verify that migrations apply and generated contracts match, but it cannot prove semantic compatibility; agents must reason about it explicitly when generating or reviewing changes.
+
+When generating schema changes:
+
+- Prefer additive, backward-compatible changes: new tables, new nullable columns, new columns with safe defaults, new indexes, new views/functions, and non-breaking triggers.
+- Adding a `NOT NULL` column requires a safe default or a backfill path that keeps old code working. Otherwise split it into add nullable, backfill, then enforce.
+- Adding constraints, unique indexes, foreign keys, or stricter checks requires validating/backfilling existing production data first; use low-risk patterns such as `NOT VALID` plus later validation where appropriate.
+- Treat column type changes, renames, semantic changes, nullability tightening, primary-key changes, RLS changes, and trigger behavior changes as potentially breaking unless proven otherwise.
+- Never delete columns, tables, views/functions used by existing code, enum values, or compatibility triggers in the same release that removes their last code use. Use expand/contract.
+
+Expand/contract is required for potentially breaking changes:
+
+1. Expand: add the new schema shape while the old shape still works; backfill if needed.
+2. Switch: deploy app/Worker/codegen changes that use the new shape while keeping old compatibility.
+3. Contract: in a later release, after old service workers/clients/workers are no longer expected to use the old shape, remove old schema and compatibility code.
+
+When reviewing schema-related changes, agents must call out:
+
+- whether the change is additive or potentially breaking;
+- what old app/Worker/browser bundle behavior must continue to work during deployment;
+- whether generated artifacts were regenerated from the source migration rather than hand-edited;
+- whether synced-table changes require adapter, metadata, view, Worker, or E2E updates;
+- whether the PWA/service-worker overlap makes old browser bundles a risk.
+
+If no backward-compatible solution is obvious, do not quietly generate a destructive migration. Stop and alert the developer with the incompatibility, the likely production risk, and at least one expand/contract or manual migration option.
 
 ## UI Principles (Pointers)
 
