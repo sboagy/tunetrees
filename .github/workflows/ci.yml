@@ -264,17 +264,36 @@ jobs:
         id: cache-supabase
         uses: actions/cache@v5
         with:
-          path: /usr/local/bin/supabase
-          key: ${{ runner.os }}-supabase-cli-v1.200.0
+          path: |
+            /usr/local/bin/supabase
+            /usr/local/bin/supabase-go
+          key: ${{ runner.os }}-supabase-cli-v2.106.0
           restore-keys: |
-            ${{ runner.os }}-supabase-cli-v1.
+            ${{ runner.os }}-supabase-cli-v2.
 
       - name: Install Supabase CLI
         if: steps.cache-supabase.outputs.cache-hit != 'true'
         run: |
-          mkdir -p /tmp/supabase-cli
-          curl -fsSL --proto "=https" --tlsv1.2 https://github.com/supabase/cli/releases/download/v1.200.0/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
-          sudo mv -f /tmp/supabase-cli/supabase /usr/local/bin/
+          for attempt in 1 2 3; do
+            echo "Supabase CLI install attempt $attempt/3..."
+            rm -rf /tmp/supabase-cli && mkdir -p /tmp/supabase-cli
+            if timeout 120 curl -fsSL --proto "=https" --tlsv1.2 \
+                https://github.com/supabase/cli/releases/download/v2.106.0/supabase_2.106.0_linux_amd64.tar.gz \
+                | tar -xz -C /tmp/supabase-cli \
+              && test -x /tmp/supabase-cli/supabase \
+              && test -x /tmp/supabase-cli/supabase-go; then
+              echo "✅ Install succeeded on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "⚠️ Install failed/timed out on attempt $attempt, retrying in 10s..."
+              sleep 10
+            else
+              echo "❌ Install failed after 3 attempts"
+              exit 1
+            fi
+          done
+          sudo mv -f /tmp/supabase-cli/supabase /tmp/supabase-cli/supabase-go /usr/local/bin/
           rm -rf /tmp/supabase-cli
 
       - name: Cache Supabase Docker Images
@@ -282,7 +301,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/supabase-docker-images.tar
-          key: ${{ runner.os }}-supabase-docker-v1.200.0
+          key: ${{ runner.os }}-supabase-docker-v2.106.0
           restore-keys: |
             ${{ runner.os }}-supabase-docker-
 
@@ -564,22 +583,41 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
-      # --- Supabase Setup (shared multi-tenant from Rhizome) ---
+      # --- Supabase Setup (from Rhizome — the shared multi-tenant instance) ---
       - name: Cache Supabase CLI
         id: cache-supabase
         uses: actions/cache@v5
         with:
-          path: /usr/local/bin/supabase
-          key: ${{ runner.os }}-supabase-cli-v1.200.0
+          path: |
+            /usr/local/bin/supabase
+            /usr/local/bin/supabase-go
+          key: ${{ runner.os }}-supabase-cli-v2.106.0
           restore-keys: |
-            ${{ runner.os }}-supabase-cli-v1.
+            ${{ runner.os }}-supabase-cli-v2.
 
       - name: Install Supabase CLI
         if: steps.cache-supabase.outputs.cache-hit != 'true'
         run: |
-          mkdir -p /tmp/supabase-cli
-          curl -fsSL --proto "=https" --tlsv1.2 https://github.com/supabase/cli/releases/download/v1.200.0/supabase_linux_amd64.tar.gz | tar -xz -C /tmp/supabase-cli
-          sudo mv -f /tmp/supabase-cli/supabase /usr/local/bin/
+          for attempt in 1 2 3; do
+            echo "Supabase CLI install attempt $attempt/3..."
+            rm -rf /tmp/supabase-cli && mkdir -p /tmp/supabase-cli
+            if timeout 120 curl -fsSL --proto "=https" --tlsv1.2 \
+                https://github.com/supabase/cli/releases/download/v2.106.0/supabase_2.106.0_linux_amd64.tar.gz \
+                | tar -xz -C /tmp/supabase-cli \
+              && test -x /tmp/supabase-cli/supabase \
+              && test -x /tmp/supabase-cli/supabase-go; then
+              echo "✅ Install succeeded on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "⚠️ Install failed/timed out on attempt $attempt, retrying in 10s..."
+              sleep 10
+            else
+              echo "❌ Install failed after 3 attempts"
+              exit 1
+            fi
+          done
+          sudo mv -f /tmp/supabase-cli/supabase /tmp/supabase-cli/supabase-go /usr/local/bin/
           rm -rf /tmp/supabase-cli
 
       - name: Cache Supabase Docker Images
@@ -587,7 +625,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/supabase-docker-images.tar
-          key: ${{ runner.os }}-supabase-docker-v1.200.0
+          key: ${{ runner.os }}-supabase-docker-v2.106.0
           restore-keys: |
             ${{ runner.os }}-supabase-docker-
 
