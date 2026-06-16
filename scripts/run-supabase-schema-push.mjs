@@ -77,6 +77,17 @@ function redactedDatabaseTarget(databaseUrl) {
   };
 }
 
+function databaseUrlForSupabaseCli(databaseUrl) {
+  const url = new URL(databaseUrl);
+  if (!url.searchParams.has("default_query_exec_mode")) {
+    // Supabase remote URLs may use the IPv4-capable pooler in CI. Supabase CLI
+    // uses pgx, and pgx's default prepared statement cache can collide with
+    // pooler connections as "prepared statement lrupsc_* already exists".
+    url.searchParams.set("default_query_exec_mode", "describe_exec");
+  }
+  return url.toString();
+}
+
 function assertTargetEnvironment({ targetEnv, databaseUrl, supabaseUrl }) {
   const projectRef = parseProjectRefFromSupabaseUrl(supabaseUrl);
   const url = new URL(databaseUrl);
@@ -159,17 +170,19 @@ function classifyPushOutput(output) {
 function main() {
   const { targetEnv } = parseArgs(process.argv.slice(2));
   const databaseUrl = requireEnv("DATABASE_URL");
+  const supabaseCliDatabaseUrl = databaseUrlForSupabaseCli(databaseUrl);
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   if (!supabaseUrl) {
     fail("Missing SUPABASE_URL or VITE_SUPABASE_URL.");
   }
 
   mask(databaseUrl);
+  mask(supabaseCliDatabaseUrl);
   assertTargetEnvironment({ targetEnv, databaseUrl, supabaseUrl });
 
   try {
     const migrationListOutput = runSupabase(
-      ["migration", "list", "--db-url", databaseUrl],
+      ["migration", "list", "--db-url", supabaseCliDatabaseUrl],
       `${targetEnv} migration preflight`
     );
     appendSummary(`
@@ -181,7 +194,7 @@ ${migrationListOutput.trim() || "(no output)"}
 `);
 
     const pushOutput = runSupabase(
-      ["db", "push", "--db-url", databaseUrl],
+      ["db", "push", "--db-url", supabaseCliDatabaseUrl],
       `${targetEnv} schema push`
     );
     const status = classifyPushOutput(pushOutput);
