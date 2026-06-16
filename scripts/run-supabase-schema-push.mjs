@@ -1,9 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import postgres from "postgres";
 
 const SUPABASE_CLI_VERSION = "2.98.2";
+const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
 // Absolute path avoids PATH-search command injection (SonarQube S4036).
 const NPX = join(dirname(process.execPath), "npx");
 
@@ -149,25 +152,99 @@ function runSupabase(args, label) {
   return `${stdout}\n${stderr}`;
 }
 
-function classifyPushOutput(output) {
-  if (
-    /No migrations to apply|database is up to date|remote database is up to date/i.test(
-      output
-    )
-  ) {
-    return "skipped: no pending migrations";
-  }
-  if (
-    /Applying migration|Applied migration|Pushing migration|Finished supabase db push/i.test(
-      output
-    )
-  ) {
-    return "applied or confirmed by Supabase CLI";
-  }
-  return "unknown";
+async function getLocalMigrations() {
+  const entries = await readdir(MIGRATIONS_DIR, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => {
+      const match = entry.name.match(/^(\d{14})_(.+)\.sql$/);
+      if (!match) {
+        return null;
+      }
+      const [, version, name] = match;
+      return {
+        version,
+        name,
+        path: join(MIGRATIONS_DIR, entry.name),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.version.localeCompare(right.version));
 }
 
-function main() {
+async function ensureMigrationTable(sql) {
+  await sql`CREATE SCHEMA IF NOT EXISTS supabase_migrations`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
+      version text NOT NULL PRIMARY KEY
+    )
+  `;
+  await sql`
+    ALTER TABLE supabase_migrations.schema_migrations
+    ADD COLUMN IF NOT EXISTS statements text[]
+  `;
+  await sql`
+    ALTER TABLE supabase_migrations.schema_migrations
+    ADD COLUMN IF NOT EXISTS name text
+  `;
+}
+
+async function getRemoteMigrationVersions(sql) {
+  await ensureMigrationTable(sql);
+  const rows = await sql`
+    SELECT version
+    FROM supabase_migrations.schema_migrations
+    ORDER BY version
+  `;
+  return new Set(rows.map((row) => row.version));
+}
+
+async function applyPendingMigrations(databaseUrl) {
+  const sql = postgres(databaseUrl, {
+    max: 1,
+    prepare: false,
+    idle_timeout: 5,
+  });
+
+  try {
+    const localMigrations = await getLocalMigrations();
+    const remoteVersions = await getRemoteMigrationVersions(sql);
+    const pendingMigrations = localMigrations.filter(
+      ({ version }) => !remoteVersions.has(version)
+    );
+
+    if (pendingMigrations.length === 0) {
+      return {
+        status: "skipped: no pending migrations",
+        applied: [],
+      };
+    }
+
+    const applied = [];
+    for (const migration of pendingMigrations) {
+      console.log(
+        `Applying migration ${migration.version}_${migration.name}...`
+      );
+      const contents = await readFile(migration.path, "utf8");
+      await sql.unsafe(contents);
+      await sql`
+        INSERT INTO supabase_migrations.schema_migrations(version, name, statements)
+        VALUES(${migration.version}, ${migration.name}, ${[contents]})
+        ON CONFLICT (version) DO NOTHING
+      `;
+      applied.push(`${migration.version}_${migration.name}`);
+    }
+
+    return {
+      status: "applied pending migrations",
+      applied,
+    };
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function main() {
   const { targetEnv } = parseArgs(process.argv.slice(2));
   const databaseUrl = requireEnv("DATABASE_URL");
   const supabaseCliDatabaseUrl = databaseUrlForSupabaseCli(databaseUrl);
@@ -193,37 +270,26 @@ ${migrationListOutput.trim() || "(no output)"}
 \`\`\`
 `);
 
-    const pushOutput = runSupabase(
-      ["db", "push", "--db-url", supabaseCliDatabaseUrl],
-      `${targetEnv} schema push`
-    );
-    const status = classifyPushOutput(pushOutput);
-    if (status === "unknown") {
-      appendSummary(`
-### Supabase schema push (${targetEnv})
-
-- Result: \`unknown output format\`
-- Action: workflow failed closed; update schema-push output parsing before retrying.
-`);
-      fail(
-        "Supabase schema push succeeded, but the output format was not recognized. Failing closed."
-      );
-    }
+    console.log(`Running ${targetEnv} schema push...`);
+    const { status, applied } = await applyPendingMigrations(databaseUrl);
 
     appendSummary(`
 ### Supabase schema push (${targetEnv})
 
 - Result: \`${status}\`
+- Applied migrations: \`${applied.length ? applied.join(", ") : "(none)"}\`
 `);
   } catch (err) {
     appendSummary(`
 ### Supabase schema push (${targetEnv})
 
 - Result: \`failed\`
-- Action: inspect \`supabase migration list --db-url "$DATABASE_URL"\` before retrying.
+- Action: inspect \`npm run db:${targetEnv}:schema:push\` output before retrying.
 `);
     fail(err instanceof Error ? err.message : String(err));
   }
 }
 
-main();
+main().catch((err) => {
+  fail(err instanceof Error ? err.message : String(err));
+});
