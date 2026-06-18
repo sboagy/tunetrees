@@ -70,7 +70,7 @@ Staging schema push:
 - production: `op://rhizome/shared-production/Supabase/DATABASE_URL`
 - staging: `op://rhizome/shared-staging/Supabase/DATABASE_URL`
 
-Remote schema pushes must use `scripts/run-supabase-schema-push.mjs`, which masks `DATABASE_URL`, checks the target environment, runs migration-list preflight, invokes pinned `supabase@2.98.2`, and records migration status in the GitHub job summary.
+Remote schema pushes must use `scripts/run-supabase-schema-push.mjs`, which masks `DATABASE_URL`, checks the target environment, runs Supabase CLI migration-list preflight, applies pending migrations with `postgres` using prepared statements disabled for Supabase pooler URLs, and records migration status in the GitHub job summary. The wrapper intentionally does not use `supabase db push` for remote apply because Supabase CLI can fail through the pooler with `prepared statement "lrupsc_*" already exists`.
 
 ## Workflow Requirements
 
@@ -298,7 +298,11 @@ If production migration fails or times out:
 2. Inspect applied state:
 
 ```sh
-npx supabase@2.98.2 migration list --db-url "$DATABASE_URL"
+case "$DATABASE_URL" in
+  *\?*) DB_URL="${DATABASE_URL}&default_query_exec_mode=describe_exec" ;;
+  *) DB_URL="${DATABASE_URL}?default_query_exec_mode=describe_exec" ;;
+esac
+npx supabase@2.98.2 migration list --db-url "$DB_URL"
 ```
 
 3. Inspect affected database objects directly if needed.

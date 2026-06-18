@@ -1001,10 +1001,11 @@ jobs:
 
       - name: Validate generated schema contract against staging
         run: |
-          op run --env-file=".env.staging.template" -- \
+          op run --env-file=".env.staging.template" -- sh -c '
             npx tsx node_modules/oosync/src/codegen-schema.ts \
               --check \
-              --databaseUrl='$DATABASE_URL'
+              --databaseUrl="$DATABASE_URL"
+          '
           npm run typecheck
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
