@@ -13,7 +13,7 @@
     "start": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260611.1",
+    "@cloudflare/workers-types": "^4.20260617.1",
     "typescript": "6.0.3",
     "wrangler": "^4.99.0"
   },
