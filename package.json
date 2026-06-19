@@ -172,7 +172,7 @@
     "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.7",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.93.1"
+    "wrangler": "^4.102.0"
   },
   "overrides": {
     "axios": "^1.16.0",
