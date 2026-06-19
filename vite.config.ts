@@ -62,6 +62,16 @@ export default defineConfig(() => {
 
   // Get build-time constants
   const getGitCommit = () => {
+    const explicitBuildCommit = process.env.VITE_BUILD_GIT_COMMIT?.slice(0, 7);
+    if (explicitBuildCommit) {
+      return explicitBuildCommit;
+    }
+
+    const gitHeadCommit = runGitCommand(["rev-parse", "--short", "HEAD"]);
+    if (gitHeadCommit) {
+      return gitHeadCommit;
+    }
+
     const ciCommit =
       process.env.GITHUB_SHA?.slice(0, 7) ??
       process.env.CI_COMMIT_SHA?.slice(0, 7);

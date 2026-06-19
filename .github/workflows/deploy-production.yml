@@ -219,6 +219,7 @@ jobs:
         run: npm run build:production
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          VITE_BUILD_GIT_COMMIT: ${{ env.DEPLOY_SHA }}
 
       - name: Deploy production Pages
         run: |
