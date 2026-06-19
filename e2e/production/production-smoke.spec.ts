@@ -29,6 +29,14 @@ const SUPABASE_ANON_KEY: string = (() => {
     throw new Error("Missing VITE_SUPABASE_ANON_KEY for production smoke.");
   return key;
 })();
+const SUPABASE_URL: string = (() => {
+  const url = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  if (!url)
+    throw new Error(
+      "Missing VITE_SUPABASE_URL or SUPABASE_URL for production smoke."
+    );
+  return normalizePublicUrl(url, "VITE_SUPABASE_URL or SUPABASE_URL");
+})();
 test.describe("PROD-001: deployed production smoke", () => {
   test("anonymous app shell, service worker, and worker health are reachable", async ({
     request,
@@ -51,12 +59,7 @@ test.describe("PROD-001: deployed production smoke", () => {
   test("Supabase auth endpoint is reachable without mutating production", async ({
     request,
   }) => {
-    const supabaseUrl = normalizePublicUrl(
-      process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
-      "VITE_SUPABASE_URL or SUPABASE_URL"
-    );
-
-    const response = await request.get(`${supabaseUrl}/auth/v1/settings`, {
+    const response = await request.get(`${SUPABASE_URL}/auth/v1/settings`, {
       headers: {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
