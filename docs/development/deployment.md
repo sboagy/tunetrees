@@ -22,6 +22,89 @@ User → Cloudflare Pages (Static SolidJS PWA)
 
 For schema-changing releases, follow the [Supabase Schema Promotion Runbook](schema-promotion.md). Production promotion must apply migrations only after the exact SHA has passed the staging deployment proof gate, and before production Worker/Pages deploy.
 
+## Manual Production Promotion
+
+Use this runbook to promote an already-verified staging build to production. Do not use it to introduce new code: the production deploy must use the exact `main` commit SHA that already passed the staging deploy job.
+
+### Before You Start
+
+- Confirm the `main` branch CI run for the target commit completed successfully, including the staging deploy, staging database refresh, staging smoke tests, and `Create successful staging Deployment record`.
+- Treat staging as locked for this SHA while production promotion is running. Do not merge another deploy-bound change until the production workflow finishes or is explicitly abandoned.
+- If the release includes Supabase migrations, confirm the schema compatibility review in `AGENTS.md` and [schema-promotion.md](schema-promotion.md) has been done. The production workflow applies migrations before deploying the Worker and Pages.
+- Confirm the GitHub `production` environment has `OP_SERVICE_ACCOUNT_TOKEN` and that the 1Password production item values are current.
+
+### Get The Exact SHA
+
+1. Open GitHub → `sboagy/tunetrees` → Actions.
+2. Open the successful `CI` run on `main` that deployed staging.
+3. Copy the full 40-character commit SHA for that run. Do not use a branch name, short SHA, tag, or "latest main" by memory.
+4. In the same CI run, open the `Create successful staging Deployment record` step and confirm it created a `success` status for environment `staging`.
+
+Optional CLI verification:
+
+```sh
+DEPLOY_SHA=<40-character-sha>
+gh api repos/sboagy/tunetrees/deployments \
+  -F environment=staging \
+  -F ref="$DEPLOY_SHA" \
+  --jq '.[] | {id, sha, ref, environment}'
+```
+
+Then check at least one returned deployment has a successful status:
+
+```sh
+DEPLOYMENT_ID=<deployment-id>
+gh api repos/sboagy/tunetrees/deployments/"$DEPLOYMENT_ID"/statuses \
+  --jq 'map({state, created_at, description})'
+```
+
+### Trigger Production
+
+1. Open GitHub → `sboagy/tunetrees` → Actions → `Deploy Production`.
+2. Select `Run workflow`.
+3. Use branch `main`.
+4. Set `deploy_sha` to the exact 40-character SHA that passed staging.
+5. Leave `override_staging_check` unchecked.
+6. Leave `override_reason` blank.
+7. Start the workflow.
+
+Use `override_staging_check` only for an emergency. If it is enabled, `override_reason` is required and the workflow writes an audit entry to the job summary and issue comment.
+
+### What The Workflow Does
+
+In order, the workflow:
+
+1. Validates that `deploy_sha` is exactly 40 hex characters.
+2. Verifies a successful GitHub Deployment record for environment `staging` on that exact SHA.
+3. Checks out TuneTrees at that exact SHA.
+4. Installs app and Worker dependencies.
+5. Resolves production secrets from `.env.prod.template` through 1Password.
+6. Runs `npm run db:production:schema:push`.
+7. Deploys the production Worker.
+8. Builds the production Pages bundle.
+9. Deploys Cloudflare Pages project `tunetrees-pwa` on branch `main`.
+10. Runs production-safe Playwright smoke tests.
+11. Writes the result to the GitHub job summary.
+
+The workflow does not copy staging database data, staging R2 objects, or staging schema artifacts into production. Production database changes occur only through committed migrations applied by `db:production:schema:push`.
+
+### After It Finishes
+
+If the workflow succeeds:
+
+- Open `https://tunetrees.com/`.
+- Hard refresh or use a clean browser profile if service worker caching looks suspicious.
+- Verify login.
+- Verify sync reaches the production Worker.
+- Verify rhythm playback and the R2-backed media paths that matter for the release.
+- Check the workflow summary for the deployed SHA and production URL.
+
+If the workflow fails before Worker/Pages deploy, production code was not promoted. Check the failing migration/preflight step before retrying.
+
+If the workflow fails after Worker deploy but before Pages deploy, production may have a new Worker with the previous Pages bundle. Prefer fixing forward by rerunning the same SHA after resolving the cause. If needed, redeploy the prior known-good Worker.
+
+If the workflow fails after Pages deploy, inspect production manually. Cloudflare Pages can roll back to a previous deployment from the Pages dashboard, but schema migrations are not automatically rolled back. For schema-related failures, follow the recovery guidance in [schema-promotion.md](schema-promotion.md).
+
 ## Cloudflare Pages Setup
 
 ### 1. Connect Repository
