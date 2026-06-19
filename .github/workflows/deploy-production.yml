@@ -67,6 +67,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           {
             echo "### Production promotion release train"
             echo
@@ -107,12 +109,24 @@ jobs:
             exit 0
           fi
 
+          deployments_response="$(mktemp)"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+            --method GET \
+            -F environment="staging" \
+            -F ref="${DEPLOY_SHA}" \
+            --paginate \
+            --slurp \
+            > "${deployments_response}"; then
+            echo "Failed to list staging Deployments for exact SHA ${DEPLOY_SHA}." >&2
+            jq . "${deployments_response}" >&2 || cat "${deployments_response}" >&2
+            exit 1
+          fi
+
           mapfile -t deployment_ids < <(
-            gh api "repos/${GITHUB_REPOSITORY}/deployments" \
-              -F environment="staging" \
-              -F ref="${DEPLOY_SHA}" \
-              --paginate \
-              --jq '.[] | select((.sha == env.DEPLOY_SHA) or (.ref == env.DEPLOY_SHA)) | .id'
+            jq -r \
+              --arg deploy_sha "${DEPLOY_SHA}" \
+              'add | .[] | select((.sha == $deploy_sha) or (.ref == $deploy_sha)) | .id' \
+              "${deployments_response}"
           )
 
           if [[ "${#deployment_ids[@]}" -eq 0 ]]; then
@@ -123,9 +137,22 @@ jobs:
           proof_deployment_id=""
           proof_status_id=""
           for deployment_id in "${deployment_ids[@]}"; do
+            if [[ ! "${deployment_id}" =~ ^[0-9]+$ ]]; then
+              echo "GitHub Deployments lookup returned a nonnumeric deployment id: ${deployment_id}" >&2
+              exit 1
+            fi
+
+            statuses_response="$(mktemp)"
+            if ! gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
+              > "${statuses_response}"; then
+              echo "Failed to list statuses for staging Deployment ${deployment_id}." >&2
+              jq . "${statuses_response}" >&2 || cat "${statuses_response}" >&2
+              exit 1
+            fi
+
             status_id="$(
-              gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
-                --jq 'map(select(.state == "success")) | first | .id // empty'
+              jq -r 'map(select(.state == "success")) | first | .id // empty' \
+                "${statuses_response}"
             )"
             if [[ -n "${status_id}" ]]; then
               proof_deployment_id="${deployment_id}"
@@ -192,6 +219,7 @@ jobs:
         run: npm run build:production
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          VITE_BUILD_GIT_COMMIT: ${{ env.DEPLOY_SHA }}
 
       - name: Deploy production Pages
         run: |

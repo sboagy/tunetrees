@@ -45,6 +45,7 @@ Optional CLI verification:
 ```sh
 DEPLOY_SHA=<40-character-sha>
 gh api repos/sboagy/tunetrees/deployments \
+  --method GET \
   -F environment=staging \
   -F ref="$DEPLOY_SHA" \
   --jq '.[] | {id, sha, ref, environment}'
