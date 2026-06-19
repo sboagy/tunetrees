@@ -1054,17 +1054,34 @@ jobs:
 
       - name: Create successful staging Deployment record
         run: |
-          deployment_id="$(
-            jq -n \
-              --arg ref "${GITHUB_SHA}" \
-              --arg environment "staging" \
-              --arg description "TuneTrees staging deploy verified by CI" \
-              '{ref: $ref, environment: $environment, auto_merge: false, required_contexts: [], description: $description}' \
-            | gh api "repos/${GITHUB_REPOSITORY}/deployments" \
-              --method POST \
-              --input - \
-              --jq '.id'
-          )"
+          set -euo pipefail
+
+          deployment_request="$(mktemp)"
+          deployment_response="$(mktemp)"
+
+          jq -n \
+            --arg ref "${GITHUB_SHA}" \
+            --arg environment "staging" \
+            --arg description "TuneTrees staging deploy verified by CI" \
+            '{ref: $ref, environment: $environment, auto_merge: false, required_contexts: [], description: $description}' \
+            > "${deployment_request}"
+
+          if ! gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+            --method POST \
+            --input "${deployment_request}" \
+            > "${deployment_response}"; then
+            echo "Failed to create staging Deployment record." >&2
+            echo "Confirm this job has job-level permissions.deployments: write and that repository Actions settings allow write tokens." >&2
+            jq . "${deployment_response}" >&2 || cat "${deployment_response}" >&2
+            exit 1
+          fi
+
+          deployment_id="$(jq -r '.id // empty' "${deployment_response}")"
+          if [[ -z "${deployment_id}" || ! "${deployment_id}" =~ ^[0-9]+$ ]]; then
+            echo "GitHub deployment creation did not return a numeric deployment id." >&2
+            jq . "${deployment_response}" >&2 || cat "${deployment_response}" >&2
+            exit 1
+          fi
 
           gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses" \
             --method POST \
