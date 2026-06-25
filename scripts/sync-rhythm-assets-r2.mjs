@@ -166,7 +166,7 @@ async function responseText(response) {
   }
 }
 
-async function listObjects(context, bucket) {
+async function listObjects(context, bucket, prefix = "") {
   const objects = [];
   let continuationToken;
   do {
@@ -177,6 +177,7 @@ async function listObjects(context, bucket) {
         "list-type": "2",
         "max-keys": "1000",
         "continuation-token": continuationToken,
+        prefix: prefix || undefined,
       },
     });
     const body = await responseText(response);
@@ -197,6 +198,16 @@ async function listObjects(context, bucket) {
     continuationToken = truncated ? xmlText(body, "NextContinuationToken") : "";
   } while (continuationToken);
   return objects;
+}
+
+function parseLimit(rawValue) {
+  const limit = Number(rawValue);
+  if (!Number.isInteger(limit) || limit < 0) {
+    fail(
+      `--limit must be a non-negative integer, got: ${rawValue ?? "<missing>"}`
+    );
+  }
+  return limit;
 }
 
 async function headObject(context, bucket, key) {
@@ -246,7 +257,7 @@ function parseArgs(argv) {
     if (arg === "--apply") args.apply = true;
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--prefix") args.prefix = argv[++index] ?? "";
-    else if (arg === "--limit") args.limit = Number(argv[++index] ?? "0");
+    else if (arg === "--limit") args.limit = parseLimit(argv[++index]);
     else if (arg === "--help" || arg === "-h") {
       console.log(
         "Usage: node scripts/sync-rhythm-assets-r2.mjs [--dry-run|--apply] [--prefix audio/kits/] [--limit N]"
@@ -279,6 +290,10 @@ function getContext() {
   };
 }
 
+function isMultipartEtag(etag) {
+  return etag.includes("-");
+}
+
 function objectNeedsCopy(sourceObject, sourceHead, targetHead) {
   if (!targetHead) return { needed: true, reason: "missing" };
   if (sourceObject.size !== targetHead.size)
@@ -286,6 +301,8 @@ function objectNeedsCopy(sourceObject, sourceHead, targetHead) {
   if (
     sourceObject.etag &&
     targetHead.etag &&
+    !isMultipartEtag(sourceObject.etag) &&
+    !isMultipartEtag(targetHead.etag) &&
     sourceObject.etag !== targetHead.etag
   ) {
     return { needed: true, reason: "etag" };
@@ -317,10 +334,11 @@ function getBuckets() {
 }
 
 async function getSourceObjects(context, sourceBucket, args) {
-  const listedObjects = await listObjects(context, sourceBucket);
-  const sourceObjects = listedObjects
-    .filter((object) => !args.prefix || object.key.startsWith(args.prefix))
-    .slice(0, args.limit > 0 ? args.limit : undefined);
+  const listedObjects = await listObjects(context, sourceBucket, args.prefix);
+  const sourceObjects = listedObjects.slice(
+    0,
+    args.limit > 0 ? args.limit : undefined
+  );
   return { listedObjects, sourceObjects };
 }
 
