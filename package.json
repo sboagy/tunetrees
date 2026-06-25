@@ -147,7 +147,7 @@
     "@playwright/test": "^1.61.0",
     "@solidjs/testing-library": "^0.8.10",
     "@sonar/scan": "^4.3.6",
-    "@tailwindcss/vite": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.1",
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.6.0",
