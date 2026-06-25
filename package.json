@@ -122,7 +122,7 @@
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
     "@supabase/supabase-js": "^2.106.2",
     "@tanstack/solid-table": "^8.21.3",
-    "@tanstack/solid-virtual": "^3.13.28",
+    "@tanstack/solid-virtual": "^3.13.29",
     "abcjs": "^6.6.3",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
