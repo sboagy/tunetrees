@@ -1016,6 +1016,12 @@ jobs:
       - name: Deploy staging Worker
         run: npm run worker:deploy:staging
 
+      - name: Sync staging rhythm assets from production R2
+        run: npm run r2:rhythm-assets:sync:apply
+
+      - name: Apply and verify staging rhythm asset R2 CORS
+        run: npm run r2:rhythm-assets:cors:apply
+
       - name: Build staging Pages bundle
         run: npm run build:staging
 
@@ -1025,9 +1031,6 @@ jobs:
             npx wrangler pages deploy dist \
               --project-name=tunetrees-pwa \
               --branch=staging
-
-      - name: Verify rhythm asset R2 CORS
-        run: npm run r2:rhythm-assets:cors:check
 
       - name: Install PostgreSQL 17 client
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
