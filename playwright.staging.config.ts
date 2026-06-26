@@ -6,7 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
 // `op run --env-file=".env.staging.template"` which injects env vars
 // (including STAGING_BASE_URL) at runtime. The hardcoded fallback below
 // only applies when running outside op run (e.g. quick local smoke tests).
-const baseURL = process.env.STAGING_BASE_URL ?? "https://staging.tunetrees.com";
+const baseURL =
+  process.env.STAGING_BASE_URL ?? "https://staging.tunetrees-pwa.pages.dev";
 
 export default defineConfig({
   testDir: "./e2e/staging",
