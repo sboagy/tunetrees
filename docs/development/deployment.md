@@ -176,6 +176,36 @@ Create the configured buckets before deploying if they do not already exist:
 ```bash
 npx wrangler r2 bucket create tunetrees-vault
 npx wrangler r2 bucket create tunetrees-vault-preview
+npx wrangler r2 bucket create tunetrees-vault-staging
+```
+
+### Rhythm Asset R2 Sync
+
+Staging rhythm playback uses a separate public R2 bucket when
+`VITE_R2_AUDIO_BASE_URL` points at the staging rhythm asset URL. Keep the bucket
+contents in sync from production with the Phase 4 helper:
+
+```bash
+npm run r2:rhythm-assets:sync:dry-run
+npm run r2:rhythm-assets:sync:apply
+```
+
+Defaults:
+
+- source bucket: `tunetrees-rhythm-assets`
+- target bucket: `tunetrees-rhythm-assets-staging`
+- credentials: `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and
+  `R2_SECRET_ACCESS_KEY` from `.env.staging.template`
+
+The sync uses Cloudflare R2's S3-compatible API to list source objects, compare
+target objects by size and ETag, and copy changed objects server-side without
+downloading media through CI. It refuses to run if source and target buckets are
+the same.
+
+For a partial test run:
+
+```bash
+npm run r2:rhythm-assets:sync:dry-run -- --prefix audio/kits/bodhran/ --limit 5
 ```
 
 ### Worker Diagnostics (Optional)
