@@ -3,7 +3,7 @@
     "collect": {
       "numberOfRuns": 3,
       "startServerCommand": "VITE_SUPABASE_URL=https://placeholder.supabase.co VITE_SUPABASE_ANON_KEY=placeholder-key-for-build-only VITE_WORKER_URL=https://example.invalid/tunetrees-worker npx vite preview",
-      "startServerReadyPattern": "Local:.*http://localhost:4173",
+      "startServerReadyPattern": "Local.*http://localhost:.*4173",
       "startServerReadyTimeout": 30000,
       "url": ["http://localhost:4173/"],
       "settings": {
