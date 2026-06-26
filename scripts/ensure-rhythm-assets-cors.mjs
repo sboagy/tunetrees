@@ -12,6 +12,8 @@ const DEFAULT_ORIGINS = [
   "https://staging.tunetrees.com",
   "https://tunetrees.com",
 ];
+const VERIFY_ATTEMPTS = 6;
+const VERIFY_RETRY_DELAY_MS = 10_000;
 
 function env(name, fallback) {
   const value = process.env[name]?.trim();
@@ -112,13 +114,22 @@ async function applyCors(bucket, origins) {
   }
 }
 
-async function verifyCors(baseUrl, origins, samplePath) {
-  const sampleUrl = new URL(`${baseUrl}/${samplePath.replace(/^\/+/, "")}`);
-  sampleUrl.searchParams.set("cors-check", String(Date.now()));
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
+function buildSampleUrl(baseUrl, samplePath, origin) {
+  const sampleUrl = new URL(`${baseUrl}/${samplePath.replace(/^\/+/, "")}`);
+  sampleUrl.searchParams.set("cors-check", `${Date.now()}-${origin}`);
+  return sampleUrl;
+}
+
+async function verifyCors(baseUrl, origins, samplePath) {
   for (const origin of origins) {
+    const sampleUrl = buildSampleUrl(baseUrl, samplePath, origin);
     const response = await fetch(sampleUrl, {
       headers: {
+        "Cache-Control": "no-cache",
         Origin: origin,
         Range: "bytes=0-0",
       },
@@ -136,6 +147,28 @@ async function verifyCors(baseUrl, origins, samplePath) {
       );
     }
   }
+}
+
+async function verifyCorsWithRetry(baseUrl, origins, samplePath) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= VERIFY_ATTEMPTS; attempt += 1) {
+    try {
+      await verifyCors(baseUrl, origins, samplePath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === VERIFY_ATTEMPTS) {
+        break;
+      }
+      console.warn(
+        `Rhythm asset CORS verification attempt ${attempt}/${VERIFY_ATTEMPTS} failed; retrying in ${VERIFY_RETRY_DELAY_MS / 1000}s.`
+      );
+      await delay(VERIFY_RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError;
 }
 
 async function main() {
@@ -156,7 +189,7 @@ async function main() {
     await applyCors(bucket, origins);
   }
 
-  await verifyCors(baseUrl, origins, samplePath);
+  await verifyCorsWithRetry(baseUrl, origins, samplePath);
   console.log(
     `Rhythm asset CORS ${shouldApply ? "applied and " : ""}verified for ${origins.join(", ")}.`
   );
