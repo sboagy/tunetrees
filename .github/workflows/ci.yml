@@ -879,7 +879,7 @@ jobs:
       github.event_name == 'workflow_dispatch'
     environment: tunetrees_ci_env
     concurrency:
-      group: staging-deploy-${{ github.ref }}
+      group: staging-deploy
       cancel-in-progress: false
     permissions:
       contents: read

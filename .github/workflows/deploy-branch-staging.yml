@@ -1,0 +1,227 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+# yamllint disable rule:line-length
+#
+# Manually deploy an arbitrary TuneTrees ref to the shared staging environment.
+#
+# This workflow intentionally does NOT create a GitHub Deployment record for the
+# `staging` environment. Production promotion proof remains reserved for the
+# normal main-branch staging deploy in ci.yml.
+#
+# Secrets required in the `tunetrees_ci_env` environment:
+#   OP_SERVICE_ACCOUNT_TOKEN  — 1Password Service Account token (for op run)
+
+name: Deploy Branch to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_ref:
+        description: "TuneTrees branch, tag, or SHA to deploy to shared staging"
+        required: true
+        type: string
+      skip_staging_data_refresh:
+        description: "Skip production-to-staging database refresh before staging smoke tests"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NPM_CONFIG_LEGACY_PEER_DEPS: "true"
+
+jobs:
+  deploy-branch-staging:
+    name: Deploy branch to staging
+    runs-on: ubuntu-latest
+    environment: tunetrees_ci_env
+    concurrency:
+      group: staging-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      DEPLOY_REF: ${{ inputs.deploy_ref }}
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+      RHIZOME_REPO_PATH: ${{ github.workspace }}/rhizome
+
+    steps:
+      - name: Checkout TuneTrees
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ inputs.deploy_ref }}
+          persist-credentials: false
+
+      - name: Record checked out TuneTrees SHA
+        id: tunetrees_ref
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve shared repo refs
+        id: shared_refs
+        env:
+          CANDIDATE_REF: ${{ inputs.deploy_ref }}
+        run: |
+          has_remote_branch() {
+            local repo="$1"
+            local branch="$2"
+            git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$branch" >/dev/null 2>&1
+          }
+
+          repo_prefix() {
+            case "$1" in
+              sboagy/tunetrees) printf 'tt' ;;
+              sboagy/cubefsrs) printf 'cf' ;;
+              sboagy/oosync) printf 'os' ;;
+              sboagy/rhizome) printf 'rz' ;;
+              *) return 1 ;;
+            esac
+          }
+
+          resolve_ref() {
+            local repo="$1"
+            local candidate="$2"
+            local target_prefix
+            local shared_suffix
+            local prefixed_candidate
+
+            if has_remote_branch "$repo" "$candidate"; then
+              printf '%s\n' "$candidate"
+              return
+            fi
+
+            target_prefix="$(repo_prefix "$repo")" || {
+              printf 'main\n'
+              return
+            }
+
+            shared_suffix="$candidate"
+            case "$candidate" in
+              tt-*|cf-*|os-*|rz-*)
+                shared_suffix="${candidate#*-}"
+                ;;
+            esac
+
+            prefixed_candidate="${target_prefix}-${shared_suffix}"
+            if has_remote_branch "$repo" "$prefixed_candidate"; then
+              printf '%s\n' "$prefixed_candidate"
+              return
+            fi
+
+            printf 'main\n'
+          }
+
+          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout rhizome (shared Supabase config + DB scripts)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: sboagy/rhizome
+          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
+          path: rhizome
+          persist-credentials: false
+
+      - name: Checkout oosync
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          repository: sboagy/oosync
+          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
+          path: oosync
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Worker Dependencies
+        run: npm ci --prefix worker --ignore-scripts
+
+      - name: Overlay checked-out oosync package
+        run: |
+          npm install --ignore-scripts --no-save --no-package-lock ./oosync
+          cd worker
+          npm install --ignore-scripts --no-save --no-package-lock ../oosync
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
+
+      - name: Apply staging Supabase migrations
+        run: npm run db:staging:schema:push
+
+      - name: Validate generated schema contract against staging
+        run: |
+          op run --env-file=".env.staging.template" -- sh -c '
+            npx tsx node_modules/oosync/src/codegen-schema.ts \
+              --check \
+              --databaseUrl="$DATABASE_URL"
+          '
+          npm run typecheck
+
+      - name: Verify staging Worker dry run
+        run: npm run worker:deploy:staging:dry-run
+
+      - name: Deploy staging Worker
+        run: npm run worker:deploy:staging
+
+      - name: Sync staging rhythm assets from production R2
+        run: npm run r2:rhythm-assets:sync:apply
+
+      - name: Apply and verify staging rhythm asset R2 CORS
+        run: npm run r2:rhythm-assets:cors:apply
+
+      - name: Build staging Pages bundle
+        run: npm run build:staging
+
+      - name: Deploy staging Pages
+        run: |
+          op run --env-file=".env.staging.template" -- \
+            npx wrangler pages deploy dist \
+              --project-name=tunetrees-pwa \
+              --branch=staging
+
+      - name: Install PostgreSQL 17 client
+        if: ${{ !inputs.skip_staging_data_refresh }}
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Refresh staging data from production
+        if: ${{ !inputs.skip_staging_data_refresh }}
+        run: npm run db:staging:refresh
+
+      - name: Install Playwright browser for staging smoke
+        run: node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Run staging smoke tests
+        run: npm run test:e2e:staging
+
+      - name: Summarize branch staging deployment
+        run: |
+          {
+            echo "### Branch staging deployment"
+            echo
+            echo "- Requested ref: \`${DEPLOY_REF}\`"
+            echo "- Checked out SHA: \`${{ steps.tunetrees_ref.outputs.sha }}\`"
+            echo "- Rhizome ref: \`${{ steps.shared_refs.outputs.rhizome_ref }}\`"
+            echo "- oosync ref: \`${{ steps.shared_refs.outputs.oosync_ref }}\`"
+            echo "- Production promotion proof: not created"
+            echo
+            echo "After branch testing, run the normal main staging deploy before production promotion."
+          } >> "$GITHUB_STEP_SUMMARY"
