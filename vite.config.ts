@@ -103,7 +103,6 @@ export default defineConfig(() => {
     ],
     "vendor-data": ["@tanstack/solid-table", "@tanstack/solid-virtual"],
     "vendor-supabase": ["@supabase/supabase-js"],
-    "vendor-drizzle": ["drizzle-orm"],
     "vendor-sqlite": ["@sqlite.org/sqlite-wasm"],
   } as const;
 
