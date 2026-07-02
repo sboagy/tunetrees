@@ -709,7 +709,10 @@ const TTInner: ParentComponent = (props) => {
             db,
             supabase,
             userId: internalId,
-            isInitialSync,
+            // Anonymous onboarding writes genre selections locally before the
+            // first catalog pull. Use that local selection even when the sync
+            // service has not recorded an initial down timestamp yet.
+            isInitialSync: false,
           });
           return { ...catalogTablesOverride, ...genreOverrides };
         }
@@ -1133,12 +1136,10 @@ const TTInner: ParentComponent = (props) => {
 
       // Offline-first: local SQLite is immediately usable
       setUserIdInt(anonymousUserId);
-      setInitialSyncComplete(true);
 
       const isSyncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
       if (isSyncDisabled) {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
-        setUserIdInt(anonymousUserId);
         setInitialSyncComplete(true);
       } else {
         const syncWorker = await startSyncWorkerForUser(
