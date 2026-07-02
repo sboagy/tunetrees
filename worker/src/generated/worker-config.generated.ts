@@ -105,53 +105,9 @@ export const WORKER_SYNC_CONFIG = {
   },
   pull: {
     tableRules: {
-      daily_practice_queue: {
-        kind: "eqUserId",
-        column: "user_ref",
-      },
-      event: {
-        kind: "orNullEqUserId",
-        column: "user_ref",
-      },
-      goal: {
-        kind: "compound",
-        operator: "or",
-        rules: [
-          {
-            kind: "publicOnly",
-            column: "private_for",
-          },
-          {
-            kind: "eqUserId",
-            column: "private_for",
-          },
-        ],
-      },
-      group_member: {
+      rhythm_patterns: {
         kind: "rpc",
-        functionName: "sync_get_group_members",
-        paramMap: {
-          p_user_id: {
-            source: "authUserId",
-          },
-          p_after_timestamp: {
-            source: "lastSyncAt",
-          },
-          p_limit: {
-            source: "pageLimit",
-          },
-          p_offset: {
-            source: "pageOffset",
-          },
-        },
-      },
-      instrument: {
-        kind: "orNullEqUserId",
-        column: "private_to_user",
-      },
-      media_asset: {
-        kind: "rpc",
-        functionName: "sync_get_user_media_assets",
+        functionName: "sync_get_rhythm_patterns",
         paramMap: {
           p_user_id: {
             source: "authUserId",
@@ -170,6 +126,78 @@ export const WORKER_SYNC_CONFIG = {
             source: "pageOffset",
           },
         },
+      },
+      daily_practice_queue: {
+        kind: "eqUserId",
+        column: "user_ref",
+      },
+      goal: {
+        kind: "compound",
+        operator: "or",
+        rules: [
+          {
+            kind: "publicOnly",
+            column: "private_for",
+          },
+          {
+            kind: "eqUserId",
+            column: "private_for",
+          },
+        ],
+      },
+      instrument: {
+        kind: "orNullEqUserId",
+        column: "private_to_user",
+      },
+      plugin: {
+        kind: "orEqUserIdOrTrue",
+        column: "user_ref",
+        orColumn: "is_public",
+      },
+      prefs_scheduling_options: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
+      prefs_spaced_repetition: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
+      repertoire: {
+        kind: "eqUserId",
+        column: "user_ref",
+      },
+      tab_group_main_state: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
+      table_state: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
+      tune: {
+        kind: "compound",
+        operator: "or",
+        rules: [
+          {
+            kind: "compound",
+            operator: "and",
+            rules: [
+              {
+                kind: "inCollection",
+                column: "genre",
+                collection: "selectedGenres",
+              },
+              {
+                kind: "publicOnly",
+                column: "private_for",
+              },
+            ],
+          },
+          {
+            kind: "eqUserId",
+            column: "private_for",
+          },
+        ],
       },
       note: {
         kind: "rpc",
@@ -193,23 +221,10 @@ export const WORKER_SYNC_CONFIG = {
           },
         },
       },
-      plugin: {
-        kind: "orEqUserIdOrTrue",
-        column: "user_ref",
-        orColumn: "is_public",
-      },
       practice_record: {
         kind: "inCollection",
         column: "repertoire_ref",
         collection: "repertoireIds",
-      },
-      prefs_scheduling_options: {
-        kind: "eqUserId",
-        column: "user_id",
-      },
-      prefs_spaced_repetition: {
-        kind: "eqUserId",
-        column: "user_id",
       },
       reference: {
         kind: "rpc",
@@ -233,18 +248,9 @@ export const WORKER_SYNC_CONFIG = {
           },
         },
       },
-      repertoire: {
-        kind: "eqUserId",
-        column: "user_ref",
-      },
-      repertoire_tune: {
-        kind: "inCollection",
-        column: "repertoire_ref",
-        collection: "repertoireIds",
-      },
-      rhythm_patterns: {
+      media_asset: {
         kind: "rpc",
-        functionName: "sync_get_rhythm_patterns",
+        functionName: "sync_get_user_media_assets",
         paramMap: {
           p_user_id: {
             source: "authUserId",
@@ -252,6 +258,45 @@ export const WORKER_SYNC_CONFIG = {
           p_genre_ids: {
             source: "collection",
             collection: "selectedGenres",
+          },
+          p_after_timestamp: {
+            source: "lastSyncAt",
+          },
+          p_limit: {
+            source: "pageLimit",
+          },
+          p_offset: {
+            source: "pageOffset",
+          },
+        },
+      },
+      repertoire_tune: {
+        kind: "inCollection",
+        column: "repertoire_ref",
+        collection: "repertoireIds",
+      },
+      table_transient_data: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
+      tag: {
+        kind: "eqUserId",
+        column: "user_ref",
+      },
+      tune_override: {
+        kind: "eqUserId",
+        column: "user_ref",
+      },
+      user_genre_selection: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
+      group_member: {
+        kind: "rpc",
+        functionName: "sync_get_group_members",
+        paramMap: {
+          p_user_id: {
+            source: "authUserId",
           },
           p_after_timestamp: {
             source: "lastSyncAt",
@@ -282,6 +327,10 @@ export const WORKER_SYNC_CONFIG = {
           },
         },
       },
+      event: {
+        kind: "orNullEqUserId",
+        column: "user_ref",
+      },
       setlist_item: {
         kind: "rpc",
         functionName: "sync_get_setlist_items",
@@ -304,51 +353,6 @@ export const WORKER_SYNC_CONFIG = {
           },
         },
       },
-      tab_group_main_state: {
-        kind: "eqUserId",
-        column: "user_id",
-      },
-      table_state: {
-        kind: "eqUserId",
-        column: "user_id",
-      },
-      table_transient_data: {
-        kind: "eqUserId",
-        column: "user_id",
-      },
-      tag: {
-        kind: "eqUserId",
-        column: "user_ref",
-      },
-      tune: {
-        kind: "compound",
-        operator: "or",
-        rules: [
-          {
-            kind: "compound",
-            operator: "and",
-            rules: [
-              {
-                kind: "inCollection",
-                column: "genre",
-                collection: "selectedGenres",
-              },
-              {
-                kind: "publicOnly",
-                column: "private_for",
-              },
-            ],
-          },
-          {
-            kind: "eqUserId",
-            column: "private_for",
-          },
-        ],
-      },
-      tune_override: {
-        kind: "eqUserId",
-        column: "user_ref",
-      },
       tune_set_item: {
         kind: "rpc",
         functionName: "sync_get_tune_set_items",
@@ -370,10 +374,6 @@ export const WORKER_SYNC_CONFIG = {
             source: "pageOffset",
           },
         },
-      },
-      user_genre_selection: {
-        kind: "eqUserId",
-        column: "user_id",
       },
       user_group: {
         kind: "rpc",
