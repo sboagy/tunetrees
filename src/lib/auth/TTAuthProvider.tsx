@@ -602,9 +602,6 @@ const TTInner: ParentComponent = (props) => {
     await captureSyncBaselineSnapshot("before-sync-worker", db, authUserId);
 
     let firstSyncCompletionHandled = false;
-    let metadataPrefetchPromise: Promise<void> | null = null;
-    let metadataPrefetchCompleted = false;
-
     const signalAffectedChangeCategories = (affectedTables?: string[]) => {
       try {
         if (!affectedTables || affectedTables.length === 0) {
@@ -642,43 +639,17 @@ const TTInner: ParentComponent = (props) => {
 
     const requestOverridesProvider = async () => {
       try {
-        const { buildGenreFilterOverrides, preSyncMetadataViaWorker } =
-          await import("@/lib/sync/genre-filter");
-
-        if (!isAnonymousUser) {
-          const lastSyncAt =
-            syncServiceInstance?.getLastSyncDownTimestamp?.() ?? null;
-          const debugUserId = await getUserInternalIdFromLocalDb(
-            db,
-            authUserId
-          ).catch(() => null);
-          const shouldRunMetadataPrefetch =
-            !metadataPrefetchCompleted && !lastSyncAt;
-          if (shouldRunMetadataPrefetch) {
-            markSyncBaselineEvent("metadata-prefetch:start", {
-              userId: authUserId,
-              lastSyncAt,
-            });
-            metadataPrefetchPromise ??= preSyncMetadataViaWorker({
-              db,
-              supabase,
-              lastSyncAt,
-              userId: debugUserId ?? undefined,
-            })
-              .then(() => {
-                metadataPrefetchCompleted = true;
-                markSyncBaselineEvent("metadata-prefetch:success", {
-                  userId: authUserId,
-                });
-              })
-              .finally(() => {
-                metadataPrefetchPromise = null;
-              });
-            await metadataPrefetchPromise;
-          }
-        }
-
-        const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
+        const { buildGenreFilterOverrides } = await import(
+          "@/lib/sync/genre-filter"
+        );
+        const isInitialSync =
+          !syncServiceInstance?.getLastSyncDownTimestamp?.();
+        const localInternalId = await getUserInternalIdFromLocalDb(
+          db,
+          authUserId
+        );
+        const internalId =
+          localInternalId ?? (isInitialSync ? authUserId : null);
         if (!internalId) {
           markSyncBaselineEvent("request-overrides:user-profile-missing", {
             userId: authUserId,
@@ -688,9 +659,12 @@ const TTInner: ParentComponent = (props) => {
           );
           return null;
         }
+        if (!localInternalId && isInitialSync) {
+          markSyncBaselineEvent("request-overrides:auth-user-id-fallback", {
+            userId: authUserId,
+          });
+        }
 
-        const isInitialSync =
-          !syncServiceInstance?.getLastSyncDownTimestamp?.();
         markSyncBaselineEvent("request-overrides:resolved", {
           userId: authUserId,
           isInitialSync,

@@ -601,47 +601,30 @@ export async function preSyncMetadataViaWorker(params: {
 }
 
 async function getEffectiveGenreFilterInitialSync(params: {
-  db: SqliteDatabase;
   supabase: SupabaseClient;
   userId: string;
 }): Promise<{ effective: string[] }> {
-  const { db, supabase, userId } = params;
+  const { supabase, userId } = params;
 
-  // Query LOCAL db for user genre selection and repertoire defaults
-  // Note: preSyncMetadataViaWorker already synced user_genre_selection, repertoire, and instrument
-  const [selectedGenres, repertoireDefaultGenres] = await Promise.all([
-    getUserGenreSelection(db, userId),
-    getRepertoireGenreDefaultsForUser(db, userId),
-  ]);
-
-  const { data, error } = await supabase.rpc(
-    "get_repertoire_tune_genres_for_user",
-    {
-      p_user_id: userId,
-    }
-  );
+  const { data, error } = await supabase.rpc("get_effective_genres_for_user", {
+    p_user_id: userId,
+  });
 
   if (error) {
     console.error(`[GenreFilter] RPC error:`, error);
     throw new Error(
-      `[GenreFilter] Failed to query repertoire_tune genres: ${error.message}`
+      `[GenreFilter] Failed to query effective genres: ${error.message}`
     );
   }
 
-  const repertoireTuneGenres = Array.isArray(data)
+  const effective = Array.isArray(data)
     ? data
         .map((genre) => (genre == null ? null : String(genre)))
         .filter((genre): genre is string => typeof genre === "string")
     : [];
 
-  const effective = new Set([
-    ...selectedGenres.map(String),
-    ...repertoireDefaultGenres.map(String),
-    ...repertoireTuneGenres.map(String),
-  ]);
-
   return {
-    effective: Array.from(effective),
+    effective,
   };
 }
 
@@ -678,7 +661,7 @@ export async function buildGenreFilterOverrides(params: {
   const { db, supabase, userId, isInitialSync } = params;
 
   const { effective } = isInitialSync
-    ? await getEffectiveGenreFilterInitialSync({ db, supabase, userId })
+    ? await getEffectiveGenreFilterInitialSync({ supabase, userId })
     : await getEffectiveGenreFilterIncrementalSync({ db, userId });
 
   if (effective.length === 0) {

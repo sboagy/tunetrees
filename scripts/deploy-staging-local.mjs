@@ -23,6 +23,7 @@ function run(command, args) {
   }
 }
 
+run("npm", ["run", "db:staging:schema:push"]);
 run("npm", ["run", "worker:deploy:staging"]);
 run("npm", ["run", "build:staging"]);
 run("op", [
