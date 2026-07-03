@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "deploy": "npm run deploy:production",
-    "deploy:production": "FORCE_COLOR=1 op run --env-file=\"../.env.prod.template\" -- sh -c 'printf \"%s\" \"$SUPABASE_JWT_SECRET\" | npx wrangler secret put SUPABASE_JWT_SECRET && printf \"%s\" \"$SUPABASE_SERVICE_ROLE_KEY\" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY && npx wrangler deploy'",
-    "deploy:staging": "FORCE_COLOR=1 op run --env-file=\"../.env.staging.template\" -- sh -c 'node ../scripts/verify-worker-staging-bindings.mjs && printf \"%s\" \"$SUPABASE_SERVICE_ROLE_KEY\" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env staging && npx wrangler deploy --env staging --var SUPABASE_URL:$SUPABASE_URL'",
+    "deploy:production": "FORCE_COLOR=1 op run --env-file=\"../.env.prod.template\" -- sh -c 'printf \"%s\" \"$SUPABASE_JWT_SECRET\" | npx wrangler secret put SUPABASE_JWT_SECRET && printf \"%s\" \"$SUPABASE_SERVICE_ROLE_KEY\" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY && printf \"%s\" \"$OOSYNC_CURSOR_SECRET\" | npx wrangler secret put OOSYNC_CURSOR_SECRET && npx wrangler deploy'",
+    "deploy:staging": "FORCE_COLOR=1 op run --env-file=\"../.env.staging.template\" -- sh -c 'node ../scripts/verify-worker-staging-bindings.mjs && printf \"%s\" \"$SUPABASE_SERVICE_ROLE_KEY\" | npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --env staging && printf \"%s\" \"$OOSYNC_CURSOR_SECRET\" | npx wrangler secret put OOSYNC_CURSOR_SECRET --env staging && npx wrangler deploy --env staging --var SUPABASE_URL:$SUPABASE_URL'",
     "deploy:staging:dry-run": "FORCE_COLOR=1 op run --env-file=\"../.env.staging.template\" -- sh -c 'node ../scripts/verify-worker-staging-bindings.mjs && npx wrangler deploy --env staging --dry-run --var SUPABASE_URL:$SUPABASE_URL'",
     "dev": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs",
     "dev:local": "WRANGLER_SEND_METRICS=false DO_NOT_TRACK=1 FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs --local",

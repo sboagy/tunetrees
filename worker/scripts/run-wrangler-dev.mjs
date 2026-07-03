@@ -14,6 +14,10 @@ if (process.env.SUPABASE_JWT_SECRET) {
   args.push("--var", `SUPABASE_JWT_SECRET:${process.env.SUPABASE_JWT_SECRET}`);
 }
 
+if (process.env.OOSYNC_CURSOR_SECRET) {
+  args.push("--var", `OOSYNC_CURSOR_SECRET:${process.env.OOSYNC_CURSOR_SECRET}`);
+}
+
 if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
   args.push(
     "--var",
