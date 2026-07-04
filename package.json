@@ -137,7 +137,7 @@
     "jodit": "^4.12.26",
     "loglevel": "^1.9.2",
     "lucide-solid": "^1.20.0",
-    "oosync": "git+https://github.com/sboagy/oosync.git#sync-batch-683",
+    "oosync": "git+https://github.com/sboagy/oosync.git#main",
     "papaparse": "^5.5.3",
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.13",
