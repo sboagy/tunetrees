@@ -413,19 +413,18 @@ const TTInner: ParentComponent = (props) => {
           (SELECT COUNT(*) FROM practice_list_staged pls WHERE pls.repertoire_id = p.repertoire_id AND pls.repertoire_deleted = 0 AND pls.deleted = 0) AS staged_rows
         FROM repertoire p ORDER BY tune_count DESC LIMIT 10
       `);
-      const foreignKeyViolations = db
-        .all<{
-          table: string;
-          rowid: number | string | null;
-          parent: string;
-          fkid: number | string | null;
-        }>("PRAGMA foreign_key_check")
-        .slice(0, 25);
+      const allForeignKeyViolations = db.all<{
+        table: string;
+        rowid: number | string | null;
+        parent: string;
+        fkid: number | string | null;
+      }>("PRAGMA foreign_key_check");
+      const foreignKeyViolations = allForeignKeyViolations.slice(0, 25);
       console.warn("🔎 [SYNC_DIAG] Snapshot", {
         at: now,
         totals,
         topRepertoires: repertoireSummary,
-        foreignKeyViolationCount: foreignKeyViolations.length,
+        foreignKeyViolationCount: allForeignKeyViolations.length,
         foreignKeyViolations,
       });
     } catch (e) {

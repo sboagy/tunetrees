@@ -67,6 +67,7 @@ declare global {
 }
 
 let memoryDiagnostics: SyncBaselineDiagnostics | null = null;
+let runtimeDiagnosticsEnabledOverride: boolean | null = null;
 let requestId = 0;
 
 const DIAGNOSTICS_STORAGE_KEY = "tunetrees:sync-baseline-diagnostics";
@@ -84,10 +85,8 @@ const createDiagnostics = (enabled: boolean): SyncBaselineDiagnostics => ({
 });
 
 export function isSyncBaselineDiagnosticsEnabled(): boolean {
-  return (
-    import.meta.env.VITE_SYNC_DIAGNOSTICS === "true" ||
-    isRuntimeDiagnosticsEnabled()
-  );
+  if (import.meta.env.VITE_SYNC_DIAGNOSTICS === "true") return true;
+  return runtimeDiagnosticsEnabledOverride ?? isRuntimeDiagnosticsEnabled();
 }
 
 export function getSyncBaselineDiagnostics(): SyncBaselineDiagnostics {
@@ -103,6 +102,8 @@ export function getSyncBaselineDiagnostics(): SyncBaselineDiagnostics {
 }
 
 export function setSyncBaselineDiagnosticsEnabled(enabled: boolean): void {
+  runtimeDiagnosticsEnabledOverride = enabled;
+
   if (globalThis.window !== undefined) {
     try {
       globalThis.window.localStorage.setItem(
@@ -140,6 +141,8 @@ export function markSyncBaselineEvent(
   name: string,
   detail?: Record<string, unknown>
 ): void {
+  if (!isSyncBaselineDiagnosticsEnabled()) return;
+
   const diagnostics = getSyncBaselineDiagnostics();
   const event = {
     name,
@@ -155,6 +158,19 @@ function classifyRequest(url: string): "sync" | "media" | null {
   if (url.includes("/api/sync")) return "sync";
   if (url.includes("/api/media/")) return "media";
   return null;
+}
+
+function sanitizeRequestUrl(url: string, category: "sync" | "media"): string {
+  try {
+    const parsed = new URL(url, globalThis.window?.location.origin);
+    if (category === "sync") return "/api/sync";
+    if (parsed.pathname.includes("/api/media/upload"))
+      return "/api/media/upload";
+    if (parsed.pathname.includes("/api/media/view")) return "/api/media/view";
+    return "/api/media/*";
+  } catch {
+    return category === "sync" ? "/api/sync" : "/api/media/*";
+  }
 }
 
 function getRequestUrl(input: RequestInfo | URL): string {
@@ -215,6 +231,7 @@ export function installSyncBaselineFetchDiagnostics(): void {
     }
 
     const diagnostics = getSyncBaselineDiagnostics();
+    const sanitizedUrl = sanitizeRequestUrl(requestUrl, category);
     const method =
       init?.method ??
       (typeof input === "object" && "method" in input ? input.method : "GET");
@@ -223,7 +240,7 @@ export function installSyncBaselineFetchDiagnostics(): void {
     const request: BaselineRequest = {
       id,
       method,
-      url: requestUrl,
+      url: sanitizedUrl,
       category,
       startedAt: nowIso(),
       elapsedStartMs: elapsedMs(),
@@ -231,7 +248,7 @@ export function installSyncBaselineFetchDiagnostics(): void {
     diagnostics.requests.push(request);
     emitBaselineLog(`request:${category}:start #${id}`, {
       method,
-      url: requestUrl,
+      url: sanitizedUrl,
     });
 
     try {

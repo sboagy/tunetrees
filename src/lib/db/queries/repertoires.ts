@@ -41,6 +41,7 @@ import type {
   RepertoireTune,
   RepertoireWithSummary,
 } from "../types";
+import type { PracticeListStagedRow } from "./practice";
 
 // Support both SQLite WASM (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
@@ -702,7 +703,7 @@ export async function getRepertoireTunesStaged(
   const userRef = userId;
 
   // Query the practice_list_staged view directly
-  const result = db.all<any>(sql`
+  const result = db.all<PracticeListStagedRow>(sql`
     SELECT * FROM practice_list_staged
     WHERE repertoire_id = ${repertoireId}
       AND user_ref = ${userRef}
