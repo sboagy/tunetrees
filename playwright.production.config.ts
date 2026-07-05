@@ -4,7 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Production smoke tests are run via `op run --env-file=".env.prod.template"`.
 // The fallback URL is only for quick local checks outside GitHub Actions.
-const baseURL = process.env.PRODUCTION_BASE_URL ?? "https://tunetrees.com";
+const baseURL =
+  process.env.PRODUCTION_BASE_URL ?? "https://tunetrees-pwa.pages.dev";
 
 export default defineConfig({
   testDir: "./e2e/production",

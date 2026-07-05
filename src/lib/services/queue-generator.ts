@@ -175,7 +175,7 @@ async function getQueueGenerationCandidates(
   const windowEnd = new Date(sitdownDate);
   windowEnd.setMinutes(windowEnd.getMinutes() + 1);
 
-  const results = await db.all<QueueGenerationCandidate>(sql`
+  const results = db.all<QueueGenerationCandidate>(sql`
     SELECT
       rt.tune_ref as tuneRef,
       rt.current as scheduled,
