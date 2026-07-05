@@ -24,6 +24,7 @@ import {
 import { addTuneToTuneSet, createTuneSet } from "@/lib/db/queries/tune-sets";
 import {
   dailyPracticeQueue,
+  genre as genreTable,
   note,
   plugin,
   practiceRecord,
@@ -32,6 +33,11 @@ import {
   rhythmPatterns,
   userProfile,
 } from "@/lib/db/schema";
+import {
+  getSyncBaselineDiagnostics,
+  type SyncBaselineDiagnostics,
+  setSyncBaselineDiagnosticsEnabled,
+} from "@/lib/diagnostics/sync-baseline";
 import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
@@ -1213,6 +1219,8 @@ declare global {
       }>;
       getSyncVersion: () => number;
       isInitialSyncComplete: () => boolean;
+      setBaselineDiagnosticsEnabled: (enabled: boolean) => void;
+      getBaselineDiagnostics: () => SyncBaselineDiagnostics;
       dispose: () => Promise<void>;
       // Staging & committing helpers
       stageEvaluation: (
@@ -1465,17 +1473,14 @@ if (globalThis.window !== undefined) {
 
         const tuneId = generateId();
 
-        db.run(sql`
-          INSERT OR IGNORE INTO genre (
-            id,
-            name,
-            last_modified_at
-          ) VALUES (
-            ${genre},
-            ${genre},
-            ${now}
-          )
-        `);
+        await db
+          .insert(genreTable)
+          .values({
+            id: genre,
+            name: genre,
+            lastModifiedAt: now,
+          })
+          .onConflictDoNothing();
 
         db.run(sql`
           INSERT INTO tune (
@@ -1779,6 +1784,9 @@ if (globalThis.window !== undefined) {
         const version = el?.dataset.syncVersion;
         return version ? Number.parseInt(version, 10) >= 1 : false;
       },
+      setBaselineDiagnosticsEnabled: (enabled: boolean) =>
+        setSyncBaselineDiagnosticsEnabled(enabled),
+      getBaselineDiagnostics: () => getSyncBaselineDiagnostics(),
       dispose: async () => {
         try {
           // Best-effort: stop background sync before clearing the local DB.

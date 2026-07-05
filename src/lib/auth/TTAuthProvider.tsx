@@ -43,6 +43,11 @@ import {
   enableSyncTriggers,
   suppressSyncTriggers,
 } from "../db/install-triggers";
+import {
+  captureSyncBaselineSnapshot,
+  installSyncBaselineFetchDiagnostics,
+  markSyncBaselineEvent,
+} from "../diagnostics/sync-baseline";
 import { log } from "../logger";
 import { supabase } from "../supabase/client";
 import {
@@ -272,6 +277,8 @@ const TTInner: ParentComponent = (props) => {
 
   const SYNC_DIAGNOSTICS = import.meta.env.VITE_SYNC_DIAGNOSTICS === "true";
   let syncDiagnosticsRan = false;
+  installSyncBaselineFetchDiagnostics();
+  markSyncBaselineEvent("auth-provider:mounted");
 
   const diagLog = (...args: unknown[]): void => {
     if (SYNC_DIAGNOSTICS) console.log(...args);
@@ -292,11 +299,15 @@ const TTInner: ParentComponent = (props) => {
     }
 
     if (offlineMediaMaintenancePromise) {
+      markSyncBaselineEvent("offline-media:join-existing");
       return await offlineMediaMaintenancePromise;
     }
 
     offlineMediaMaintenancePromise = (async () => {
       try {
+        markSyncBaselineEvent("offline-media:start", {
+          userId: currentUser.id,
+        });
         const [{ processPendingNoteMediaDrafts }, { syncPinnedAudioVault }] =
           await Promise.all([
             import("@/lib/media/offline-note-media"),
@@ -313,7 +324,13 @@ const TTInner: ParentComponent = (props) => {
           userId: currentUser.id,
           accessToken,
         });
+        markSyncBaselineEvent("offline-media:success", {
+          userId: currentUser.id,
+        });
       } catch (error) {
+        markSyncBaselineEvent("offline-media:error", {
+          error: error instanceof Error ? error.message : String(error),
+        });
         console.warn(
           "[TTAuthProvider] Offline media maintenance failed:",
           error
@@ -396,10 +413,19 @@ const TTInner: ParentComponent = (props) => {
           (SELECT COUNT(*) FROM practice_list_staged pls WHERE pls.repertoire_id = p.repertoire_id AND pls.repertoire_deleted = 0 AND pls.deleted = 0) AS staged_rows
         FROM repertoire p ORDER BY tune_count DESC LIMIT 10
       `);
+      const allForeignKeyViolations = db.all<{
+        table: string;
+        rowid: number | string | null;
+        parent: string;
+        fkid: number | string | null;
+      }>("PRAGMA foreign_key_check");
+      const foreignKeyViolations = allForeignKeyViolations.slice(0, 25);
       console.warn("🔎 [SYNC_DIAG] Snapshot", {
         at: now,
         totals,
         topRepertoires: repertoireSummary,
+        foreignKeyViolationCount: allForeignKeyViolations.length,
+        foreignKeyViolations,
       });
     } catch (e) {
       console.warn("⚠️ [SYNC_DIAG] Failed to collect diagnostics", e);
@@ -568,10 +594,13 @@ const TTInner: ParentComponent = (props) => {
     authUserId: string,
     isAnonymousUser: boolean
   ): Promise<{ stop: () => void; service: SyncService }> {
-    let firstSyncCompletionHandled = false;
-    let metadataPrefetchPromise: Promise<void> | null = null;
-    let metadataPrefetchCompleted = false;
+    markSyncBaselineEvent("sync-worker:start", {
+      userId: authUserId,
+      isAnonymousUser,
+    });
+    await captureSyncBaselineSnapshot("before-sync-worker", db, authUserId);
 
+    let firstSyncCompletionHandled = false;
     const signalAffectedChangeCategories = (affectedTables?: string[]) => {
       try {
         if (!affectedTables || affectedTables.length === 0) {
@@ -609,45 +638,37 @@ const TTInner: ParentComponent = (props) => {
 
     const requestOverridesProvider = async () => {
       try {
-        const { buildGenreFilterOverrides, preSyncMetadataViaWorker } =
-          await import("@/lib/sync/genre-filter");
-
-        if (!isAnonymousUser) {
-          const lastSyncAt =
-            syncServiceInstance?.getLastSyncDownTimestamp?.() ?? null;
-          const debugUserId = await getUserInternalIdFromLocalDb(
-            db,
-            authUserId
-          ).catch(() => null);
-          const shouldRunMetadataPrefetch =
-            !metadataPrefetchCompleted && !lastSyncAt;
-          if (shouldRunMetadataPrefetch) {
-            metadataPrefetchPromise ??= preSyncMetadataViaWorker({
-              db,
-              supabase,
-              lastSyncAt,
-              userId: debugUserId ?? undefined,
-            })
-              .then(() => {
-                metadataPrefetchCompleted = true;
-              })
-              .finally(() => {
-                metadataPrefetchPromise = null;
-              });
-            await metadataPrefetchPromise;
-          }
-        }
-
-        const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
+        const { buildGenreFilterOverrides } = await import(
+          "@/lib/sync/genre-filter"
+        );
+        const isInitialSync =
+          !syncServiceInstance?.getLastSyncDownTimestamp?.();
+        const localInternalId = await getUserInternalIdFromLocalDb(
+          db,
+          authUserId
+        );
+        const internalId =
+          localInternalId ?? (isInitialSync ? authUserId : null);
         if (!internalId) {
+          markSyncBaselineEvent("request-overrides:user-profile-missing", {
+            userId: authUserId,
+          });
           console.warn(
             "[TTAuthProvider] Failed to resolve internal user id for genre filtering"
           );
           return null;
         }
+        if (!localInternalId && isInitialSync) {
+          markSyncBaselineEvent("request-overrides:auth-user-id-fallback", {
+            userId: authUserId,
+          });
+        }
 
-        const isInitialSync =
-          !syncServiceInstance?.getLastSyncDownTimestamp?.();
+        markSyncBaselineEvent("request-overrides:resolved", {
+          userId: authUserId,
+          isInitialSync,
+          isAnonymousUser,
+        });
 
         if (isAnonymousUser && isInitialSync && catalogSyncPending()) {
           const pullTablesOverride = {
@@ -687,7 +708,10 @@ const TTInner: ParentComponent = (props) => {
             db,
             supabase,
             userId: internalId,
-            isInitialSync,
+            // Anonymous onboarding writes genre selections locally before the
+            // first catalog pull. Use that local selection even when the sync
+            // service has not recorded an initial down timestamp yet.
+            isInitialSync: false,
           });
           return { ...catalogTablesOverride, ...genreOverrides };
         }
@@ -719,12 +743,19 @@ const TTInner: ParentComponent = (props) => {
     };
 
     try {
+      markSyncBaselineEvent("startup-repair:start", {
+        userId: authUserId,
+      });
       const {
         repairPendingMediaAssetSyncState,
         repairPendingSetlistSyncState,
       } = await import("@/lib/sync/genre-filter");
       const repairResult = await repairPendingMediaAssetSyncState();
       const setlistRepairResult = await repairPendingSetlistSyncState();
+      markSyncBaselineEvent("startup-repair:success", {
+        media: repairResult,
+        setlists: setlistRepairResult,
+      });
       if (
         repairResult.requeuedReferenceCount > 0 ||
         repairResult.prunedMediaAssetCount > 0 ||
@@ -746,6 +777,9 @@ const TTInner: ParentComponent = (props) => {
         );
       }
     } catch (error) {
+      markSyncBaselineEvent("startup-repair:error", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       console.warn(
         "[TTAuthProvider] Failed to repair pending sync state before startup sync",
         error
@@ -753,6 +787,9 @@ const TTInner: ParentComponent = (props) => {
     }
 
     const syncModule = await import("@oosync/sync");
+    markSyncBaselineEvent("sync-module:loaded", {
+      userId: authUserId,
+    });
     const startWorker = (syncModule as any).startSyncWorker as (
       db: SqliteDatabase,
       config: unknown
@@ -781,6 +818,12 @@ const TTInner: ParentComponent = (props) => {
         timestamp?: string;
         affectedTables?: string[];
       }) => {
+        markSyncBaselineEvent("sync-complete:callback:start", {
+          success: result?.success ?? null,
+          errorCount: result?.errors?.length ?? 0,
+          affectedTables: result?.affectedTables ?? [],
+          timestamp: result?.timestamp ?? null,
+        });
         const isFirstSyncCompletion = !firstSyncCompletionHandled;
         if (isFirstSyncCompletion) firstSyncCompletionHandled = true;
 
@@ -814,30 +857,58 @@ const TTInner: ParentComponent = (props) => {
           const internalId = await getUserInternalIdFromLocalDb(db, authUserId);
           if (internalId) {
             setUserIdInt(internalId);
+            markSyncBaselineEvent("initial-sync:user-profile-found", {
+              userId: authUserId,
+              internalId,
+            });
           } else if (isAnonymousUser) {
             setUserIdInt(authUserId);
+            markSyncBaselineEvent("initial-sync:anonymous-user-id", {
+              userId: authUserId,
+            });
             // e2e/tests/anonymous-003-account-conversion.spec.ts depends on this log
             console.log(
               `✅ [TTAuthProvider] Anonymous user - using auth ID as internal ID`
             );
           } else {
+            markSyncBaselineEvent("initial-sync:user-profile-missing", {
+              userId: authUserId,
+            });
             log.warn(
               "User profile not found in local DB after initial sync - this may cause issues"
             );
           }
 
+          markSyncBaselineEvent("catalog-reconcile:first-sync:start", {
+            userId: authUserId,
+          });
           await reconcileCatalogSelection({
             db,
             userId: authUserId,
             isAnonymousUser,
             skipSync: true,
           });
+          markSyncBaselineEvent("catalog-reconcile:first-sync:done", {
+            userId: authUserId,
+          });
 
           setInitialSyncComplete(true);
+          markSyncBaselineEvent("initial-sync:complete-signal-set", {
+            userId: authUserId,
+          });
+          await captureSyncBaselineSnapshot(
+            "after-initial-sync-complete",
+            db,
+            authUserId
+          );
           void persistDbAfterSync();
         }
 
         setRemoteSyncDownCompletionVersion((prev) => prev + 1);
+        markSyncBaselineEvent("sync-version:incremented", {
+          version: remoteSyncDownCompletionVersion(),
+          userId: authUserId,
+        });
 
         if (!isFirstSyncCompletion) {
           setTimeout(() => {
@@ -851,6 +922,9 @@ const TTInner: ParentComponent = (props) => {
 
         if (isFirstSyncCompletion) {
           triggerAllViewSignals();
+          markSyncBaselineEvent("view-signals:trigger-all", {
+            userId: authUserId,
+          });
         }
 
         if (
@@ -865,7 +939,20 @@ const TTInner: ParentComponent = (props) => {
         signalAffectedChangeCategories(result.affectedTables);
 
         await runOfflineMediaMaintenance();
+        await captureSyncBaselineSnapshot(
+          "after-sync-complete-callback",
+          db,
+          authUserId
+        );
+        markSyncBaselineEvent("sync-complete:callback:done", {
+          success: result?.success ?? null,
+          userId: authUserId,
+        });
       },
+    });
+    markSyncBaselineEvent("sync-worker:started", {
+      userId: authUserId,
+      isAnonymousUser,
     });
 
     // E2E-only: expose sync control surface for Playwright
@@ -1048,12 +1135,10 @@ const TTInner: ParentComponent = (props) => {
 
       // Offline-first: local SQLite is immediately usable
       setUserIdInt(anonymousUserId);
-      setInitialSyncComplete(true);
 
       const isSyncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
       if (isSyncDisabled) {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
-        setUserIdInt(anonymousUserId);
         setInitialSyncComplete(true);
       } else {
         const syncWorker = await startSyncWorkerForUser(
@@ -1084,6 +1169,7 @@ const TTInner: ParentComponent = (props) => {
 
     isInitializing = true;
     try {
+      markSyncBaselineEvent("local-db:init:start", { userId });
       log.info("Initializing local database for user", userId);
 
       setInitialSyncComplete(false);
@@ -1091,16 +1177,28 @@ const TTInner: ParentComponent = (props) => {
 
       const db = await initializeSqliteDbWithRetry(userId, "authenticated");
       if (!db) return;
+      markSyncBaselineEvent("local-db:init:ready", { userId });
+      await captureSyncBaselineSnapshot("after-local-db-init", db, userId);
 
       setLocalDb(db);
+      markSyncBaselineEvent("local-db:signal-set", { userId });
 
       const internalId = await getUserInternalIdFromLocalDb(db, userId);
       if (internalId) {
         setUserIdInt(internalId);
         setInitialSyncComplete(true);
+        markSyncBaselineEvent("local-db:existing-user-profile-found", {
+          userId,
+          internalId,
+        });
+      } else {
+        markSyncBaselineEvent("local-db:user-profile-not-yet-local", {
+          userId,
+        });
       }
 
       await clearOldOutboxItems(db);
+      markSyncBaselineEvent("local-db:old-outbox-cleared", { userId });
 
       ensureSyncRuntimeConfigured();
       if (autoPersistCleanup) {
@@ -1113,6 +1211,7 @@ const TTInner: ParentComponent = (props) => {
       if (isSyncDisabled) {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
         setInitialSyncComplete(true);
+        markSyncBaselineEvent("sync:disabled", { userId });
       } else {
         const syncWorker = await startSyncWorkerForUser(db, userId, false);
         stopSyncWorker = syncWorker.stop;
@@ -1125,8 +1224,13 @@ const TTInner: ParentComponent = (props) => {
       } else {
         log.error("Failed to initialize local database:", error);
       }
+      markSyncBaselineEvent("local-db:init:error", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       isInitializing = false;
+      markSyncBaselineEvent("local-db:init:finally", { userId });
     }
   }
 
@@ -1164,6 +1268,10 @@ const TTInner: ParentComponent = (props) => {
     on(rhizome.user, async (currentUser, prevUser) => {
       // User signed in (null → User)
       if (currentUser && !prevUser) {
+        markSyncBaselineEvent("auth:user-signed-in", {
+          userId: currentUser.id,
+          anonymous: isUserAnonymous(currentUser),
+        });
         const isAnon = isUserAnonymous(currentUser);
         if (isAnon) {
           void initializeAnonymousDatabase(currentUser.id);
@@ -1173,6 +1281,9 @@ const TTInner: ParentComponent = (props) => {
       }
       // User signed out (User → null)
       else if (!currentUser && prevUser) {
+        markSyncBaselineEvent("auth:user-signed-out", {
+          previousUserId: prevUser.id,
+        });
         // For anonymous users: the signOut path preserves their session in localStorage;
         // only clean up in-process state (DB close, sync stop).
         await cleanupOnSignOut();
@@ -1207,7 +1318,14 @@ const TTInner: ParentComponent = (props) => {
   // ---------------------------------------------------------------------------
 
   const signIn = async (email: string, password: string) => {
+    markSyncBaselineEvent("auth:password-sign-in:start", {
+      emailDomain: email.includes("@") ? email.split("@").at(-1) : null,
+    });
     const result = await supabase.auth.signInWithPassword({ email, password });
+    markSyncBaselineEvent("auth:password-sign-in:done", {
+      success: !result.error,
+      error: result.error?.message ?? null,
+    });
     return { error: result.error };
   };
 

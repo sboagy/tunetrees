@@ -9,7 +9,6 @@ import {
   type SyncableTableName as GeneratedSyncableTableName,
   SYNCABLE_TABLES as SYNCABLE_TABLES_GENERATED,
   TABLE_REGISTRY_CORE,
-  type TableMetaCore,
 } from "./generated/sync/table-meta.generated";
 
 export type ChangeCategory = string | null;
@@ -55,6 +54,82 @@ const TABLE_EXTRAS: Record<
   SyncableTableName,
   Pick<TableMeta, "changeCategory" | "normalize" | "columnDescriptions">
 > = {
+  genre: {
+    changeCategory: "catalog",
+    columnDescriptions: {
+      description: "Description of the genre.",
+      id: "Primary key (genre identifier).",
+      name: "Genre name.",
+      region: "Geographic region associated with the genre.",
+    },
+  },
+  tune_type: {
+    changeCategory: "catalog",
+    columnDescriptions: {
+      description: "Description of the tune type.",
+      id: "Primary key (tune type identifier).",
+      name: "Tune type name (reel, jig, hornpipe, etc.).",
+      rhythm: "Rhythmic pattern of the tune type.",
+    },
+  },
+  genre_tune_type: {
+    changeCategory: "catalog",
+    columnDescriptions: {
+      default_bpm:
+        "The baseline tempo (Beats/Quarter-notes Per Minute) for this specific genre and tune type combination (e.g., 115 for an ITRAD JigD).",
+      genre_id: "Reference to the genre.",
+      tune_type_id: "Reference to the tune type.",
+    },
+  },
+  rhythm_patterns: {
+    changeCategory: "catalog",
+    columnDescriptions: {
+      abc_string:
+        "The 2-bar or 4-bar ABC notation string used by the abcjs TimingCallbacks engine to generate the metronome loop (e.g., |: C2 c C c c :|).",
+      bpm_override:
+        "Per-pattern BPM override. When set, supersedes genre_tune_type.default_bpm. Null means use the default.",
+      genre_id: "Foreign key component referencing the genre (e.g., ITRAD).",
+      id: "Unique identifier for the rhythm pattern variation.",
+      is_default:
+        "If true, this is the baseline Smart Metronome pattern that loads automatically when the user selects this genre/tune-type combination.",
+      name: 'A human-readable description for the UI dropdown (e.g., "Basic Rolling", "Driving Backbeat").',
+      part_target:
+        'Specifies which structural part this pattern targets. "*" or NULL applies to the whole tune, "A" applies only to the A part, "B" to the B part, allowing the groove to change mid-tune.',
+      pattern_type:
+        'Defines how the frontend should render the abc_string. "seed" means tile/repeat it to match the tune length. "full_track" means play it exactly as written without looping.',
+      premium_audio_url:
+        "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
+      sample_kit:
+        'The identifier for the audio sample kit used by the frontend registry (e.g., "bodhran", "spoons") to map MIDI pitches to Cloudflare R2 audio URLs.',
+      swing_desc:
+        'Future use: describes which beats get swung for this pattern (e.g., "off-beat 8ths", "middle triplet").',
+      swing_percentage:
+        "Swing amount as a fraction (0.0–1.0). Applied as a delay multiplier during playback. Hornpipe defaults to 0.33, jig to ~0.167, others to 0.",
+      tune_id:
+        "If set, this pattern specifically overrides the default for a single tune.",
+      tune_type_id:
+        "Foreign key component referencing the tune type (e.g., JigD).",
+      user_id:
+        "If set, this pattern is a private override created by a specific user.",
+    },
+  },
+  user_profile: {
+    changeCategory: "user",
+    columnDescriptions: {
+      acceptable_delinquency_window: "User default delinquency window in days.",
+      avatar_url: "URL to user avatar/profile picture.",
+      deleted: "Soft-delete flag for the user profile.",
+      device_id: "Device that last modified this record.",
+      email: "User email address.",
+      id: "Primary key for the user profile.",
+      last_modified_at: "Timestamp of last modification.",
+      name: "User display name.",
+      phone: "User phone number.",
+      phone_verified: "Timestamp when phone was verified.",
+      sr_alg_type: "Preferred spaced repetition algorithm (SM2/FSRS).",
+      sync_version: "Sync version for conflict resolution.",
+    },
+  },
   daily_practice_queue: {
     changeCategory: "practice",
     normalize: (row) =>
@@ -92,35 +167,6 @@ const TABLE_EXTRAS: Record<
       window_start_utc: "Start of practice window (UTC).",
     },
   },
-  event: {
-    changeCategory: "group",
-    columnDescriptions: {
-      deleted: "Soft-delete flag for the event.",
-      event_date: "Date and time of the event.",
-      group_ref: "Group that owns this event (if group-scoped).",
-      name: 'Display name for the event (e.g., "Saturday Pub Gig").',
-      setlist_ref: "Optional setlist associated with this event.",
-      user_ref: "User that owns this event (if personal).",
-    },
-  },
-  genre: {
-    changeCategory: "catalog",
-    columnDescriptions: {
-      description: "Description of the genre.",
-      id: "Primary key (genre identifier).",
-      name: "Genre name.",
-      region: "Geographic region associated with the genre.",
-    },
-  },
-  genre_tune_type: {
-    changeCategory: "catalog",
-    columnDescriptions: {
-      default_bpm:
-        "The baseline tempo (Beats/Quarter-notes Per Minute) for this specific genre and tune type combination (e.g., 115 for an ITRAD JigD).",
-      genre_id: "Reference to the genre.",
-      tune_type_id: "Reference to the tune type.",
-    },
-  },
   goal: {
     changeCategory: "user",
     columnDescriptions: {
@@ -132,13 +178,6 @@ const TABLE_EXTRAS: Record<
       private_for:
         "Owner user_profile.id; NULL = system goal visible to all users.",
       sync_version: "Sync version for conflict resolution.",
-    },
-  },
-  group_member: {
-    changeCategory: "group",
-    columnDescriptions: {
-      deleted: "Soft-delete flag for the membership row.",
-      role: "Membership role within the group: owner, admin, or member.",
     },
   },
   instrument: {
@@ -156,74 +195,8 @@ const TABLE_EXTRAS: Record<
       sync_version: "Sync version for conflict resolution.",
     },
   },
-  media_asset: {
-    changeCategory: "repertoire",
-    columnDescriptions: {
-      content_type: "Uploaded media MIME type.",
-      deleted: "Soft-delete flag for the media asset.",
-      device_id: "Device that last modified this record.",
-      duration_seconds: "Decoded audio duration in seconds.",
-      file_size_bytes: "Uploaded media size in bytes.",
-      last_modified_at: "Timestamp of last modification.",
-      original_filename:
-        "Original client-side filename captured at upload time.",
-      reference_ref: "Reference row that owns this uploaded media asset.",
-      regions_json:
-        "JSON-encoded WaveSurfer regions/markers for looping and annotations.",
-      storage_path: "Private R2 object key under the user namespace.",
-      sync_version: "Sync version for conflict resolution.",
-      user_ref: "Owner user_profile.id for auth scoping and sync.",
-    },
-  },
-  note: {
-    changeCategory: "repertoire",
-    columnDescriptions: {
-      created_date: "Timestamp when the note was created.",
-      deleted: "Soft-delete flag for the note.",
-      device_id: "Device that last modified this record.",
-      display_order:
-        "User-defined display order for drag-and-drop reordering in the UI",
-      favorite: "Whether this is marked as a favorite note.",
-      id: "Primary key for the note.",
-      last_modified_at: "Timestamp of last modification.",
-      note_text: "Text content of the note.",
-      public: "Whether the note is public (true) or private (false).",
-      repertoire_ref: "Reference to the playlist (optional).",
-      sync_version: "Sync version for conflict resolution.",
-      tune_ref: "Reference to the tune.",
-      user_ref: "User ID who created this note.",
-    },
-  },
   plugin: {
     changeCategory: "user",
-  },
-  practice_record: {
-    changeCategory: "practice",
-    normalize: (row) =>
-      normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]),
-    columnDescriptions: {
-      backup_practiced: "Backup timestamp (pre-update stored value).",
-      device_id: "Device that last modified this record.",
-      difficulty: "Difficulty rating for FSRS scheduling.",
-      due: "Due date for next review.",
-      easiness: "Easiness factor (SM2) or retention value (FSRS).",
-      elapsed_days: "Days since previous review.",
-      goal: "Practice goal for this record.",
-      id: "Primary key for the practice record.",
-      interval: "Days until next review (interval).",
-      lapses: "Number of times forgotten (lapses).",
-      last_modified_at: "Timestamp of last modification.",
-      practiced: "Timestamp when the tune was practiced.",
-      quality: "Quality rating (0-5) for this practice session.",
-      repertoire_ref: "Reference to the playlist.",
-      repetitions: "Total number of repetitions completed.",
-      stability: "Memory stability value from spaced repetition algorithm.",
-      state: "Scheduler state (0=new, 1=learning, 2=review, 3=relearning).",
-      step: "Current learning step.",
-      sync_version: "Sync version for conflict resolution.",
-      technique: "Technique note for this practice session.",
-      tune_ref: "Reference to the tune practiced.",
-    },
   },
   prefs_scheduling_options: {
     changeCategory: "user",
@@ -259,26 +232,6 @@ const TABLE_EXTRAS: Record<
       user_id: "User ID who owns these preferences.",
     },
   },
-  reference: {
-    changeCategory: "repertoire",
-    columnDescriptions: {
-      comment: "Optional comment about the reference.",
-      deleted: "Soft-delete flag for the reference.",
-      device_id: "Device that last modified this record.",
-      display_order:
-        "User-defined display order for drag-and-drop reordering in the UI",
-      favorite: "Whether this is marked as a favorite reference.",
-      id: "Primary key for the reference.",
-      last_modified_at: "Timestamp of last modification.",
-      public: "Whether the reference is public.",
-      ref_type: "Type of reference (website/audio/video).",
-      sync_version: "Sync version for conflict resolution.",
-      title: "Title/label for the reference.",
-      tune_ref: "Reference to the tune.",
-      url: "URL of the reference.",
-      user_ref: "User ID who created this reference.",
-    },
-  },
   repertoire: {
     changeCategory: "repertoire",
     columnDescriptions: {
@@ -292,70 +245,6 @@ const TABLE_EXTRAS: Record<
       sr_alg_type: "Spaced repetition algorithm type (SM2/FSRS).",
       sync_version: "Sync version for conflict resolution.",
       user_ref: "User ID who owns this playlist.",
-    },
-  },
-  repertoire_tune: {
-    changeCategory: "repertoire",
-    columnDescriptions: {
-      current: "Timestamp when added to current learnings.",
-      deleted: "Soft-delete flag for this playlist entry.",
-      device_id: "Device that last modified this record.",
-      goal: "Practice goal (recall/sight_read/technique).",
-      last_modified_at: "Timestamp of last modification.",
-      learned: "Timestamp when marked as fully learned.",
-      repertoire_ref: "Reference to the playlist.",
-      scheduled: "Manual schedule override for next review.",
-      sync_version: "Sync version for conflict resolution.",
-      tune_ref: "Reference to the tune.",
-    },
-  },
-  rhythm_patterns: {
-    changeCategory: "catalog",
-    columnDescriptions: {
-      abc_string:
-        "The 2-bar or 4-bar ABC notation string used by the abcjs TimingCallbacks engine to generate the metronome loop (e.g., |: C2 c C c c :|).",
-      bpm_override:
-        "Per-pattern BPM override. When set, supersedes genre_tune_type.default_bpm. Null means use the default.",
-      genre_id: "Foreign key component referencing the genre (e.g., ITRAD).",
-      id: "Unique identifier for the rhythm pattern variation.",
-      is_default:
-        "If true, this is the baseline Smart Metronome pattern that loads automatically when the user selects this genre/tune-type combination.",
-      name: 'A human-readable description for the UI dropdown (e.g., "Basic Rolling", "Driving Backbeat").',
-      part_target:
-        'Specifies which structural part this pattern targets. "*" or NULL applies to the whole tune, "A" applies only to the A part, "B" to the B part, allowing the groove to change mid-tune.',
-      pattern_type:
-        'Defines how the frontend should render the abc_string. "seed" means tile/repeat it to match the tune length. "full_track" means play it exactly as written without looping.',
-      premium_audio_url:
-        "Optional URL to a pre-recorded audio loop (e.g., an MP3 hosted on Cloudflare R2). If present, the UI logic should prioritize streaming this file over generating the ABC string.",
-      sample_kit:
-        'The identifier for the audio sample kit used by the frontend registry (e.g., "bodhran", "spoons") to map MIDI pitches to Cloudflare R2 audio URLs.',
-      swing_desc:
-        'Future use: describes which beats get swung for this pattern (e.g., "off-beat 8ths", "middle triplet").',
-      swing_percentage:
-        "Swing amount as a fraction (0.0–1.0). Applied as a delay multiplier during playback. Hornpipe defaults to 0.33, jig to ~0.167, others to 0.",
-      tune_id:
-        "If set, this pattern specifically overrides the default for a single tune.",
-      tune_type_id:
-        "Foreign key component referencing the tune type (e.g., JigD).",
-      user_id:
-        "If set, this pattern is a private override created by a specific user.",
-    },
-  },
-  setlist: {
-    changeCategory: "group",
-    columnDescriptions: {
-      deleted: "Soft-delete flag for the setlist.",
-      group_ref: "Group that owns this setlist (nullable if user-owned).",
-      user_ref: "User that owns this setlist (nullable if group-owned).",
-    },
-  },
-  setlist_item: {
-    changeCategory: "group",
-    columnDescriptions: {
-      item_kind:
-        "Discriminator for whether the item references a tune or a tune set.",
-      position: "Zero-based position of the item within the setlist.",
-      setlist_ref: "Setlist that this item belongs to.",
     },
   },
   tab_group_main_state: {
@@ -391,6 +280,125 @@ const TABLE_EXTRAS: Record<
         "Table settings (column order, sorting, filters) in JSON format.",
       sync_version: "Sync version for conflict resolution.",
       user_id: "User ID who owns this table state.",
+    },
+  },
+  tune: {
+    changeCategory: "catalog",
+    columnDescriptions: {
+      artist: "Artist name for pop/rock/jazz tunes.",
+      composer: "Composer name for classical/choral tunes.",
+      deleted: "Soft-delete flag for the tune.",
+      genre: "Genre identifier assigned to the tune.",
+      id: "Primary key for the tune.",
+      id_foreign: "External tune identifier (e.g. irishtune.info, Spotify).",
+      incipit: "Opening notes or incipit text.",
+      mode: "Musical mode of the tune.",
+      private_for: "User profile ID if the tune is private.",
+      release_year: "Release year for the recording or tune.",
+      structure: "Tune structure shorthand (e.g. AABB).",
+      title: "Tune title as displayed in the UI.",
+      type: "Tune type classification (reel, jig, etc.) used in filtering.",
+    },
+  },
+  note: {
+    changeCategory: "repertoire",
+    columnDescriptions: {
+      created_date: "Timestamp when the note was created.",
+      deleted: "Soft-delete flag for the note.",
+      device_id: "Device that last modified this record.",
+      display_order:
+        "User-defined display order for drag-and-drop reordering in the UI",
+      favorite: "Whether this is marked as a favorite note.",
+      id: "Primary key for the note.",
+      last_modified_at: "Timestamp of last modification.",
+      note_text: "Text content of the note.",
+      public: "Whether the note is public (true) or private (false).",
+      repertoire_ref: "Reference to the playlist (optional).",
+      sync_version: "Sync version for conflict resolution.",
+      tune_ref: "Reference to the tune.",
+      user_ref: "User ID who created this note.",
+    },
+  },
+  practice_record: {
+    changeCategory: "practice",
+    normalize: (row) =>
+      normalizeDatetimeFields(row, ["practiced", "backup_practiced", "due"]),
+    columnDescriptions: {
+      backup_practiced: "Backup timestamp (pre-update stored value).",
+      device_id: "Device that last modified this record.",
+      difficulty: "Difficulty rating for FSRS scheduling.",
+      due: "Due date for next review.",
+      easiness: "Easiness factor (SM2) or retention value (FSRS).",
+      elapsed_days: "Days since previous review.",
+      goal: "Practice goal for this record.",
+      id: "Primary key for the practice record.",
+      interval: "Days until next review (interval).",
+      lapses: "Number of times forgotten (lapses).",
+      last_modified_at: "Timestamp of last modification.",
+      practiced: "Timestamp when the tune was practiced.",
+      quality: "Quality rating (0-5) for this practice session.",
+      repertoire_ref: "Reference to the playlist.",
+      repetitions: "Total number of repetitions completed.",
+      stability: "Memory stability value from spaced repetition algorithm.",
+      state: "Scheduler state (0=new, 1=learning, 2=review, 3=relearning).",
+      step: "Current learning step.",
+      sync_version: "Sync version for conflict resolution.",
+      technique: "Technique note for this practice session.",
+      tune_ref: "Reference to the tune practiced.",
+    },
+  },
+  reference: {
+    changeCategory: "repertoire",
+    columnDescriptions: {
+      comment: "Optional comment about the reference.",
+      deleted: "Soft-delete flag for the reference.",
+      device_id: "Device that last modified this record.",
+      display_order:
+        "User-defined display order for drag-and-drop reordering in the UI",
+      favorite: "Whether this is marked as a favorite reference.",
+      id: "Primary key for the reference.",
+      last_modified_at: "Timestamp of last modification.",
+      public: "Whether the reference is public.",
+      ref_type: "Type of reference (website/audio/video).",
+      sync_version: "Sync version for conflict resolution.",
+      title: "Title/label for the reference.",
+      tune_ref: "Reference to the tune.",
+      url: "URL of the reference.",
+      user_ref: "User ID who created this reference.",
+    },
+  },
+  media_asset: {
+    changeCategory: "repertoire",
+    columnDescriptions: {
+      content_type: "Uploaded media MIME type.",
+      deleted: "Soft-delete flag for the media asset.",
+      device_id: "Device that last modified this record.",
+      duration_seconds: "Decoded audio duration in seconds.",
+      file_size_bytes: "Uploaded media size in bytes.",
+      last_modified_at: "Timestamp of last modification.",
+      original_filename:
+        "Original client-side filename captured at upload time.",
+      reference_ref: "Reference row that owns this uploaded media asset.",
+      regions_json:
+        "JSON-encoded WaveSurfer regions/markers for looping and annotations.",
+      storage_path: "Private R2 object key under the user namespace.",
+      sync_version: "Sync version for conflict resolution.",
+      user_ref: "Owner user_profile.id for auth scoping and sync.",
+    },
+  },
+  repertoire_tune: {
+    changeCategory: "repertoire",
+    columnDescriptions: {
+      current: "Timestamp when added to current learnings.",
+      deleted: "Soft-delete flag for this playlist entry.",
+      device_id: "Device that last modified this record.",
+      goal: "Practice goal (recall/sight_read/technique).",
+      last_modified_at: "Timestamp of last modification.",
+      learned: "Timestamp when marked as fully learned.",
+      repertoire_ref: "Reference to the playlist.",
+      scheduled: "Manual schedule override for next review.",
+      sync_version: "Sync version for conflict resolution.",
+      tune_ref: "Reference to the tune.",
     },
   },
   table_transient_data: {
@@ -433,24 +441,6 @@ const TABLE_EXTRAS: Record<
       user_ref: "User ID who owns this tag.",
     },
   },
-  tune: {
-    changeCategory: "catalog",
-    columnDescriptions: {
-      artist: "Artist name for pop/rock/jazz tunes.",
-      composer: "Composer name for classical/choral tunes.",
-      deleted: "Soft-delete flag for the tune.",
-      genre: "Genre identifier assigned to the tune.",
-      id: "Primary key for the tune.",
-      id_foreign: "External tune identifier (e.g. irishtune.info, Spotify).",
-      incipit: "Opening notes or incipit text.",
-      mode: "Musical mode of the tune.",
-      private_for: "User profile ID if the tune is private.",
-      release_year: "Release year for the recording or tune.",
-      structure: "Tune structure shorthand (e.g. AABB).",
-      title: "Tune title as displayed in the UI.",
-      type: "Tune type classification (reel, jig, etc.) used in filtering.",
-    },
-  },
   tune_override: {
     changeCategory: "repertoire",
     columnDescriptions: {
@@ -469,28 +459,6 @@ const TABLE_EXTRAS: Record<
       user_ref: "User ID who owns this override.",
     },
   },
-  tune_set: {
-    changeCategory: "group",
-    columnDescriptions: {
-      deleted: "Soft-delete flag for the tune set.",
-      set_kind: "practice_set for ordered tune-set groupings.",
-    },
-  },
-  tune_set_item: {
-    changeCategory: "group",
-    columnDescriptions: {
-      position: "Zero-based position of the tune within the set.",
-    },
-  },
-  tune_type: {
-    changeCategory: "catalog",
-    columnDescriptions: {
-      description: "Description of the tune type.",
-      id: "Primary key (tune type identifier).",
-      name: "Tune type name (reel, jig, hornpipe, etc.).",
-      rhythm: "Rhythmic pattern of the tune type.",
-    },
-  },
   user_genre_selection: {
     changeCategory: "user",
   },
@@ -501,21 +469,52 @@ const TABLE_EXTRAS: Record<
       owner_user_ref: "User who owns and administers the group.",
     },
   },
-  user_profile: {
-    changeCategory: "user",
+  group_member: {
+    changeCategory: "group",
     columnDescriptions: {
-      acceptable_delinquency_window: "User default delinquency window in days.",
-      avatar_url: "URL to user avatar/profile picture.",
-      deleted: "Soft-delete flag for the user profile.",
-      device_id: "Device that last modified this record.",
-      email: "User email address.",
-      id: "Primary key for the user profile.",
-      last_modified_at: "Timestamp of last modification.",
-      name: "User display name.",
-      phone: "User phone number.",
-      phone_verified: "Timestamp when phone was verified.",
-      sr_alg_type: "Preferred spaced repetition algorithm (SM2/FSRS).",
-      sync_version: "Sync version for conflict resolution.",
+      deleted: "Soft-delete flag for the membership row.",
+      role: "Membership role within the group: owner, admin, or member.",
+    },
+  },
+  setlist: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the setlist.",
+      group_ref: "Group that owns this setlist (nullable if user-owned).",
+      user_ref: "User that owns this setlist (nullable if group-owned).",
+    },
+  },
+  event: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the event.",
+      event_date: "Date and time of the event.",
+      group_ref: "Group that owns this event (if group-scoped).",
+      name: 'Display name for the event (e.g., "Saturday Pub Gig").',
+      setlist_ref: "Optional setlist associated with this event.",
+      user_ref: "User that owns this event (if personal).",
+    },
+  },
+  tune_set: {
+    changeCategory: "group",
+    columnDescriptions: {
+      deleted: "Soft-delete flag for the tune set.",
+      set_kind: "practice_set for ordered tune-set groupings.",
+    },
+  },
+  setlist_item: {
+    changeCategory: "group",
+    columnDescriptions: {
+      item_kind:
+        "Discriminator for whether the item references a tune or a tune set.",
+      position: "Zero-based position of the item within the setlist.",
+      setlist_ref: "Setlist that this item belongs to.",
+    },
+  },
+  tune_set_item: {
+    changeCategory: "group",
+    columnDescriptions: {
+      position: "Zero-based position of the tune within the set.",
     },
   },
 };
@@ -524,7 +523,7 @@ export const TABLE_REGISTRY_MERGED: Record<SyncableTableName, TableMeta> =
   Object.fromEntries(
     Object.entries(TABLE_REGISTRY_CORE).map(([tableName, core]) => {
       const extras = TABLE_EXTRAS[tableName as SyncableTableName];
-      return [tableName, { ...(core as TableMetaCore), ...extras }];
+      return [tableName, { ...core, ...extras }];
     })
   ) as Record<SyncableTableName, TableMeta>;
 
@@ -598,9 +597,7 @@ export function getNormalizer(
   | ((row: Readonly<Record<string, unknown>>) => Record<string, unknown>)
   | undefined {
   const normalize = TABLE_REGISTRY[tableName]?.normalize;
-  return normalize
-    ? (row) => normalize(row as Record<string, unknown>)
-    : undefined;
+  return normalize ? (row) => normalize(row) : undefined;
 }
 
 export function isRegisteredTable(tableName: string): boolean {

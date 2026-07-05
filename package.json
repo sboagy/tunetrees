@@ -102,6 +102,7 @@
     "worker:deploy:staging": "npm --prefix worker run deploy:staging",
     "worker:deploy:staging:dry-run": "npm --prefix worker run deploy:staging:dry-run",
     "worker:deploy:production": "npm --prefix worker run deploy:production",
+    "deploy:staging:local": "node scripts/deploy-staging-local.mjs",
     "ingest:top500": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx ingest/top500/top500.ts",
     "view:top500": "cd ingest/top500 && python3 -m http.server 8888",
     "clean": "rm -rf dist node_modules .vite .cache logs && cd worker && rm -rf dist node_modules .vite .cache logs",

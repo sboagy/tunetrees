@@ -21,6 +21,10 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getPracticeDate } from "@/lib/utils/practice-date";
 import { generateId } from "@/lib/utils/uuid";
+import {
+  captureSyncBaselineSnapshot,
+  markSyncBaselineEvent,
+} from "../../diagnostics/sync-baseline";
 import type { SqliteDatabase } from "../client-sqlite";
 import { persistDb } from "../client-sqlite";
 import {
@@ -37,6 +41,7 @@ import type {
   RepertoireTune,
   RepertoireWithSummary,
 } from "../types";
+import type { PracticeListStagedRow } from "./practice";
 
 // Support both SQLite WASM (production) and better-sqlite3 (testing)
 type AnyDatabase = SqliteDatabase | BetterSQLite3Database;
@@ -62,11 +67,18 @@ async function resolveUserRef(
   const waitForMs = options?.waitForMs ?? 0;
   const pollEveryMs = options?.pollEveryMs ?? 100;
   const startedAt = Date.now();
+  let attempts = 0;
+  markSyncBaselineEvent("user-profile-resolve:start", {
+    userId,
+    waitForMs,
+    pollEveryMs,
+  });
 
   // On first login, the UI can query before initial syncDown has applied user_profile.
   // Poll briefly to avoid treating this transient state as “no repertoires”.
   // After eliminating user_profile.id, we just verify the row exists and return userId.
   while (true) {
+    attempts += 1;
     const match = await db
       .select({
         id: userProfile.id,
@@ -78,10 +90,20 @@ async function resolveUserRef(
     if (match.length > 0) {
       // userId IS user_profile.id (PK)
       userRefCache.set(userId, userId);
+      markSyncBaselineEvent("user-profile-resolve:found", {
+        userId,
+        attempts,
+        elapsedMs: Date.now() - startedAt,
+      });
       return userId;
     }
 
     if (Date.now() - startedAt >= waitForMs) {
+      markSyncBaselineEvent("user-profile-resolve:missing", {
+        userId,
+        attempts,
+        elapsedMs: Date.now() - startedAt,
+      });
       return null;
     }
 
@@ -119,6 +141,11 @@ export async function getUserRepertoires(
   });
 
   if (!userRef) {
+    await captureSyncBaselineSnapshot(
+      "repertoire-query-user-profile-missing",
+      db,
+      userId
+    );
     console.log(
       `⚠️ User profile not found yet for ${userId}, returning empty repertoires`
     );
@@ -161,6 +188,11 @@ export async function getUserRepertoires(
     .orderBy(repertoire.lastModifiedAt);
 
   // Debug logs removed for cleanliness
+  markSyncBaselineEvent("repertoire-query:result", {
+    userId,
+    count: repertoires.length,
+    includeDeleted,
+  });
 
   return repertoires.map((p) => ({
     ...p,
@@ -671,7 +703,7 @@ export async function getRepertoireTunesStaged(
   const userRef = userId;
 
   // Query the practice_list_staged view directly
-  const result = await db.all<any>(sql`
+  const result = db.all<PracticeListStagedRow>(sql`
     SELECT * FROM practice_list_staged
     WHERE repertoire_id = ${repertoireId}
       AND user_ref = ${userRef}

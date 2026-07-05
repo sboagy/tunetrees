@@ -43,6 +43,9 @@ SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co"
 # worker/.dev.vars (gitignored). In production, use `wrangler secret put`.
 # SUPABASE_JWT_SECRET = ""
 # SUPABASE_SERVICE_ROLE_KEY = ""
+# Optional but recommended: independent secret for signed oosync continuation
+# cursors. Set with `wrangler secret put OOSYNC_CURSOR_SECRET`.
+# OOSYNC_CURSOR_SECRET = ""
 # Optional: bypass Hyperdrive and use DATABASE_URL directly for troubleshooting.
 # Requires `wrangler secret put DATABASE_URL` in the target environment.
 # BYPASS_HYPERDRIVE = "true"
