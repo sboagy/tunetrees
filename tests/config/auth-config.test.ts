@@ -11,6 +11,7 @@ function getSqlFilesRecursively(dir: string): string[] {
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (entry.name.startsWith("_archive")) continue;
       sqlFiles.push(...getSqlFilesRecursively(fullPath));
       continue;
     }
