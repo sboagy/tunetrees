@@ -224,6 +224,78 @@ function formatSyncErrorToast(message: string): {
   };
 }
 
+function getDisplayNameFromAuthUser(authUser: User): string | null {
+  const metadataName = authUser.user_metadata?.name;
+  if (typeof metadataName === "string" && metadataName.trim().length > 0) {
+    return metadataName;
+  }
+  return authUser.email?.split("@")[0] ?? null;
+}
+
+const PROFILE_DEPENDENT_PENDING_TABLES = [
+  "daily_practice_queue",
+  "goal",
+  "group_member",
+  "media_asset",
+  "note",
+  "practice_record",
+  "prefs_scheduling_options",
+  "prefs_spaced_repetition",
+  "reference",
+  "repertoire",
+  "repertoire_tune",
+  "setlist",
+  "table_state",
+  "table_transient_data",
+  "tag",
+  "tune",
+  "tune_override",
+  "tune_set",
+  "user_genre_selection",
+  "user_group",
+] as const;
+
+async function repairMissingUserProfileOutboxItem(
+  db: SqliteDatabase,
+  userId: string
+): Promise<void> {
+  const pendingProfileRows = db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM sync_push_queue
+    WHERE table_name = 'user_profile'
+      AND row_id = ${userId}
+      AND status IN ('pending', 'failed', 'in_progress')
+  `);
+  if (Number(pendingProfileRows[0]?.count ?? 0) > 0) return;
+
+  const dependentTableList = PROFILE_DEPENDENT_PENDING_TABLES.map(
+    (tableName) => `'${tableName}'`
+  ).join(", ");
+  const pendingDependentRows = db.all<{ count: number }>(
+    sql.raw(`
+    SELECT COUNT(*) AS count
+    FROM sync_push_queue
+    WHERE table_name IN (${dependentTableList})
+      AND status IN ('pending', 'failed', 'in_progress')
+  `)
+  );
+  if (Number(pendingDependentRows[0]?.count ?? 0) === 0) return;
+
+  db.run(sql`
+    INSERT INTO sync_push_queue (id, table_name, row_id, operation, changed_at)
+    VALUES (
+      lower(hex(randomblob(16))),
+      'user_profile',
+      ${userId},
+      'UPDATE',
+      strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    )
+  `);
+  markSyncBaselineEvent("local-db:user-profile-outbox-repaired", {
+    userId,
+  });
+}
+
 // ---------------------------------------------------------------------------
 const TTInner: ParentComponent = (props) => {
   // Read user/session/loading/isAnonymous reactively from rhizome's AuthProvider.
@@ -453,6 +525,40 @@ const TTInner: ParentComponent = (props) => {
       log.error("Failed to get user internal ID from local DB:", error);
       return null;
     }
+  }
+
+  async function ensureLocalUserProfileAnchor(
+    db: SqliteDatabase,
+    authUser: User
+  ): Promise<{ id: string; created: boolean }> {
+    const existingId = await getUserInternalIdFromLocalDb(db, authUser.id);
+    if (existingId) {
+      await repairMissingUserProfileOutboxItem(db, existingId);
+      return { id: existingId, created: false };
+    }
+
+    const { userProfile } = await import("@/lib/db/schema");
+    const now = new Date().toISOString();
+    await db.insert(userProfile).values({
+      id: authUser.id,
+      name: getDisplayNameFromAuthUser(authUser),
+      email: authUser.email ?? null,
+      srAlgType: "fsrs",
+      deleted: 0,
+      syncVersion: 1,
+      lastModifiedAt: now,
+      deviceId: "local",
+    });
+
+    markSyncBaselineEvent("local-db:user-profile-anchor-created", {
+      userId: authUser.id,
+    });
+    console.log(
+      "✅ Created local user_profile anchor for authenticated user:",
+      authUser.id
+    );
+
+    return { id: authUser.id, created: true };
   }
 
   // ---------------------------------------------------------------------------
@@ -1160,9 +1266,10 @@ const TTInner: ParentComponent = (props) => {
     }
   }
 
-  async function initializeLocalDatabase(userId: string) {
+  async function initializeLocalDatabase(user: User) {
     if (isE2eDbClearInProgress()) return;
 
+    const userId = user.id;
     const currentUserId = userIdInt();
     if (isInitializing) return;
     if (localDb() && currentUserId && currentUserId === userId) return;
@@ -1180,25 +1287,22 @@ const TTInner: ParentComponent = (props) => {
       markSyncBaselineEvent("local-db:init:ready", { userId });
       await captureSyncBaselineSnapshot("after-local-db-init", db, userId);
 
-      setLocalDb(db);
-      markSyncBaselineEvent("local-db:signal-set", { userId });
-
-      const internalId = await getUserInternalIdFromLocalDb(db, userId);
-      if (internalId) {
-        setUserIdInt(internalId);
+      const userProfileAnchor = await ensureLocalUserProfileAnchor(db, user);
+      setUserIdInt(userProfileAnchor.id);
+      if (!userProfileAnchor.created) {
         setInitialSyncComplete(true);
-        markSyncBaselineEvent("local-db:existing-user-profile-found", {
-          userId,
-          internalId,
-        });
-      } else {
-        markSyncBaselineEvent("local-db:user-profile-not-yet-local", {
-          userId,
-        });
       }
+      markSyncBaselineEvent("local-db:user-profile-ready", {
+        userId,
+        internalId: userProfileAnchor.id,
+        created: userProfileAnchor.created,
+      });
 
       await clearOldOutboxItems(db);
       markSyncBaselineEvent("local-db:old-outbox-cleared", { userId });
+
+      setLocalDb(db);
+      markSyncBaselineEvent("local-db:signal-set", { userId });
 
       ensureSyncRuntimeConfigured();
       if (autoPersistCleanup) {
@@ -1276,7 +1380,7 @@ const TTInner: ParentComponent = (props) => {
         if (isAnon) {
           void initializeAnonymousDatabase(currentUser.id);
         } else {
-          void initializeLocalDatabase(currentUser.id);
+          void initializeLocalDatabase(currentUser);
         }
       }
       // User signed out (User → null)
@@ -1600,7 +1704,7 @@ const TTInner: ParentComponent = (props) => {
       if (isUserAnonymous(currentUser)) {
         await initializeAnonymousDatabase(currentUser.id);
       } else {
-        await initializeLocalDatabase(currentUser.id);
+        await initializeLocalDatabase(currentUser);
       }
 
       if (navigator.onLine && syncServiceInstance) {
