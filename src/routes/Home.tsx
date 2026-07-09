@@ -87,7 +87,7 @@ const Home: Component = () => {
     // BEFORE setActiveTab, save the CURRENT (old) tab's query params
     const currentTabId = activeTab(); // Capture the old tab before switching
     try {
-      if (typeof globalThis.window !== "undefined") {
+      if (globalThis.window !== undefined) {
         // Read DIRECTLY from globalThis.location.search to get the CURRENT URL state
         // (searchParams signal may have been updated by previous setSearchParams calls)
         const currentParams = new URLSearchParams(globalThis.location.search);
