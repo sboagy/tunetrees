@@ -10,7 +10,8 @@
 import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { type Accessor, useContext } from "solid-js";
 import type { SqliteDatabase } from "../db/client-sqlite";
-import { TTAuthContext, TTAuthProvider } from "./TTAuthProvider";
+import { TTAuthContext } from "./TTAuthProvider";
+export { TTAuthProvider as AuthProvider } from "./TTAuthProvider";
 
 /**
  * Authentication state interface
@@ -124,12 +125,6 @@ interface AuthState {
   /** Scoped practice sync (repertoire_tune, practice_record, daily_practice_queue, table_transient_data) */
   syncPracticeScope: () => Promise<void>;
 }
-
-/**
- * AuthProvider is now backed by TTAuthProvider from TTAuthProvider.tsx.
- * All consumers keep importing from this file unchanged.
- */
-export const AuthProvider = TTAuthProvider;
 
 /**
  * Hook to access auth context
