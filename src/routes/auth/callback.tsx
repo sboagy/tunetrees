@@ -40,9 +40,19 @@ function redirectWithConfirmedSession(path = "/") {
   globalThis.location.replace(path);
 }
 
+/** Map known Supabase OTP types to a valid EmailOtpType. */
 function normalizeEmailOtpType(type: string): EmailOtpType {
-  if (type === "signup" || type === "magiclink") return "email";
-  return type;
+  switch (type) {
+    case "signup":
+    case "invite":
+    case "magiclink":
+    case "recovery":
+    case "email_change":
+    case "email":
+      return type;
+    default:
+      return "email";
+  }
 }
 
 function isEmailConfirmationType(type: EmailOtpType | null): boolean {
@@ -64,6 +74,11 @@ function readAuthCallbackParams(): AuthCallbackParams {
   const url = new URL(globalThis.location.href);
   const hashParams = new URLSearchParams(globalThis.location.hash.substring(1));
 
+  const rawType = hashParams.get("type") ?? url.searchParams.get("type");
+  const type: EmailOtpType | null = rawType
+    ? normalizeEmailOtpType(rawType)
+    : null;
+
   return {
     accessToken: hashParams.get("access_token"),
     code: url.searchParams.get("code"),
@@ -74,7 +89,7 @@ function readAuthCallbackParams(): AuthCallbackParams {
     refreshToken: hashParams.get("refresh_token"),
     token: url.searchParams.get("token"),
     tokenHash: url.searchParams.get("token_hash"),
-    type: hashParams.get("type") ?? url.searchParams.get("type"),
+    type,
   };
 }
 

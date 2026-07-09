@@ -160,10 +160,131 @@ export interface AuthState {
 
 type ViewRefreshCategory = "repertoire" | "practice" | "catalog";
 
+type AuthSessionDiagnostic = {
+  label: string;
+  hasSession: boolean;
+  userId: string | null;
+  error: unknown;
+  nowIso: string;
+  expiresAtEpochSec: number | null;
+  msUntilExpiry: number | null;
+  accessTokenLength: number;
+};
+
+type AuthSessionDiagnosticError = {
+  label?: string;
+  error: string;
+};
+
+type AuthSessionDiagnosticResult =
+  | AuthSessionDiagnostic
+  | AuthSessionDiagnosticError;
+
+type TuneTreesTestWindow = Window & {
+  __forceSyncUpForTest?: () => Promise<void>;
+  __forceSyncDownForTest?: () => Promise<void>;
+  __forceCleanLocalResetForTest?: () => Promise<void>;
+  __authSessionDiagForTest?: (
+    label?: string
+  ) => Promise<AuthSessionDiagnosticResult>;
+  __lastAuthDiagHasSession?: boolean;
+};
+
+type AuthTestHooks = {
+  forceSyncUpForTest: () => Promise<void>;
+  forceSyncDownForTest: () => Promise<void>;
+  forceCleanLocalResetForTest: () => Promise<void>;
+  diagLog: (...args: unknown[]) => void;
+};
+
+type SavedAnonymousSession = {
+  refreshToken?: string;
+  userId?: string;
+};
+
 // ---------------------------------------------------------------------------
 // Context - used by useAuth() in AuthContext.tsx
 // ---------------------------------------------------------------------------
 export const TTAuthContext = createContext<AuthState>();
+
+async function createAuthSessionDiagnostic(
+  label?: string
+): Promise<AuthSessionDiagnosticResult> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    const session = data?.session ?? null;
+    const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : null;
+    const nowMs = Date.now();
+    return {
+      label: label ?? "",
+      hasSession: !!session,
+      userId: session?.user?.id ?? null,
+      error,
+      nowIso: new Date(nowMs).toISOString(),
+      expiresAtEpochSec: session?.expires_at ?? null,
+      msUntilExpiry: expiresAtMs === null ? null : expiresAtMs - nowMs,
+      accessTokenLength: session?.access_token?.length ?? 0,
+    };
+  } catch (error) {
+    console.warn("AUTH DIAG ERROR", error);
+    return { label, error: String(error) };
+  }
+}
+
+function installAuthTestHooks(
+  targetWindow: TuneTreesTestWindow,
+  hooks: AuthTestHooks
+) {
+  targetWindow.__forceSyncUpForTest ??= async () => {
+    try {
+      await hooks.forceSyncUpForTest();
+    } catch (error) {
+      console.warn("__forceSyncUpForTest failed", error);
+      throw error;
+    }
+  };
+  targetWindow.__forceSyncDownForTest ??= async () => {
+    try {
+      await hooks.forceSyncDownForTest();
+    } catch (error) {
+      console.warn("__forceSyncDownForTest failed", error);
+      throw error;
+    }
+  };
+  targetWindow.__forceCleanLocalResetForTest ??= async () => {
+    try {
+      await hooks.forceCleanLocalResetForTest();
+    } catch (error) {
+      console.warn("__forceCleanLocalResetForTest failed", error);
+    }
+  };
+  targetWindow.__authSessionDiagForTest ??= async (label?: string) => {
+    const diagnostic = await createAuthSessionDiagnostic(label);
+    if ("hasSession" in diagnostic) {
+      hooks.diagLog("AUTH DIAG", diagnostic);
+      targetWindow.__lastAuthDiagHasSession = diagnostic.hasSession;
+    }
+    return diagnostic;
+  };
+}
+
+function parseSavedAnonymousSession(
+  savedSession: string
+): SavedAnonymousSession | null {
+  const parsed: unknown = JSON.parse(savedSession);
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  const session = parsed as Record<string, unknown>;
+  return {
+    refreshToken:
+      typeof session.refresh_token === "string"
+        ? session.refresh_token
+        : undefined,
+    userId: typeof session.user_id === "string" ? session.user_id : undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: check if a Supabase user is anonymous
@@ -1453,7 +1574,8 @@ const TTInner: ParentComponent = (props) => {
       }
     }
 
-    return { error, needsEmailConfirmation: !error };
+    // needsEmailConfirmation: signup succeeded but no session → confirmation required
+    return { error, needsEmailConfirmation: !error && !data.session };
   };
 
   const signInWithOAuth = async (provider: "google" | "github") => {
@@ -1833,65 +1955,18 @@ const TTInner: ParentComponent = (props) => {
 
   // TEST HOOKS: Expose manual sync controls for Playwright
   if (globalThis.window !== undefined) {
-    const w = globalThis.window as any;
-    if (!w.__forceSyncUpForTest) {
-      w.__forceSyncUpForTest = async () => {
-        try {
-          await waitForSyncService();
-          await forceSyncUp({ allowDeletes: true });
-        } catch (e) {
-          console.warn("__forceSyncUpForTest failed", e);
-          throw e;
-        }
-      };
-    }
-    if (!w.__forceSyncDownForTest) {
-      w.__forceSyncDownForTest = async () => {
-        try {
-          await waitForSyncService();
-          await forceSyncDown({ full: true });
-        } catch (e) {
-          console.warn("__forceSyncDownForTest failed", e);
-          throw e;
-        }
-      };
-    }
-    if (!w.__forceCleanLocalResetForTest) {
-      w.__forceCleanLocalResetForTest = async () => {
-        try {
-          await forceCleanLocalReset();
-        } catch (e) {
-          console.warn("__forceCleanLocalResetForTest failed", e);
-        }
-      };
-    }
-    if (!w.__authSessionDiagForTest) {
-      w.__authSessionDiagForTest = async (label?: string) => {
-        try {
-          const { data, error } = await supabase.auth.getSession();
-          const sess = data?.session || null;
-          const expEpoch = sess?.expires_at ? sess.expires_at * 1000 : null;
-          const nowMs = Date.now();
-          const msUntilExpiry = expEpoch === null ? null : expEpoch - nowMs;
-          const diag = {
-            label: label || "",
-            hasSession: !!sess,
-            userId: sess?.user?.id || null,
-            error,
-            nowIso: new Date(nowMs).toISOString(),
-            expiresAtEpochSec: sess?.expires_at ?? null,
-            msUntilExpiry,
-            accessTokenLength: sess?.access_token?.length ?? 0,
-          };
-          diagLog("AUTH DIAG", diag);
-          w.__lastAuthDiagHasSession = diag.hasSession;
-          return diag;
-        } catch (e) {
-          console.warn("AUTH DIAG ERROR", e);
-          return { label, error: String(e) };
-        }
-      };
-    }
+    installAuthTestHooks(globalThis.window, {
+      forceSyncUpForTest: async () => {
+        await waitForSyncService();
+        await forceSyncUp({ allowDeletes: true });
+      },
+      forceSyncDownForTest: async () => {
+        await waitForSyncService();
+        await forceSyncDown({ full: true });
+      },
+      forceCleanLocalResetForTest: forceCleanLocalReset,
+      diagLog,
+    });
   }
 
   return (
@@ -1933,14 +2008,11 @@ async function ttAnonymousSignIn(): Promise<void> {
   const savedSession = localStorage.getItem(ANONYMOUS_SESSION_KEY);
   if (savedSession) {
     try {
-      const parsed = JSON.parse(savedSession) as {
-        refresh_token?: string;
-        user_id?: string;
-      };
-      if (parsed.refresh_token) {
+      const parsed = parseSavedAnonymousSession(savedSession);
+      if (parsed?.refreshToken) {
         const { data: refreshData, error: refreshError } =
           await supabase.auth.refreshSession({
-            refresh_token: parsed.refresh_token,
+            refresh_token: parsed.refreshToken,
           });
         if (!refreshError && refreshData.session) {
           localStorage.removeItem(ANONYMOUS_SESSION_KEY);

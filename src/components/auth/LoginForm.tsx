@@ -22,6 +22,7 @@ import {
 import { useAuth } from "../../lib/auth/AuthContext";
 import {
   getPendingSignUpConfirmationEmail,
+  hasPendingSignUpConfirmation,
   setPendingSignUpConfirmationEmail,
 } from "../../lib/auth/signup-confirmation-pending";
 import { supabase } from "../../lib/supabase/client";
@@ -82,9 +83,16 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     string | null
   >(getPendingSignUpConfirmationEmail());
 
+  const closeForgotPasswordDialog = () => {
+    setShowForgotPassword(false);
+    setResetSuccess(false);
+    setError(null);
+    setResetEmail("");
+  };
+
   onMount(() => {
     console.info("[SignupConfirmation] LoginForm mounted", {
-      pendingEmail: getPendingSignUpConfirmationEmail(),
+      hasPendingEmail: hasPendingSignUpConfirmation(),
     });
 
     const handleConfirmed = () => {
@@ -204,7 +212,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           console.info("[SignupConfirmation] Starting email/password signup");
           setPendingSignUpConfirmationEmail(emailVal);
           const signUpResult = await signUp(emailVal, passwordVal, nameVal);
-          const { error: signUpError } = signUpResult;
+          const { error: signUpError, needsEmailConfirmation } = signUpResult;
           if (signUpError) {
             console.info("[SignupConfirmation] Signup failed", {
               message: signUpError.message,
@@ -213,11 +221,21 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             setError(signUpError.message);
             return;
           }
-          console.info(
-            "[SignupConfirmation] Signup awaiting email confirmation"
-          );
-          setSignUpConfirmationEmail(emailVal);
-          setPassword("");
+
+          if (needsEmailConfirmation) {
+            console.info(
+              "[SignupConfirmation] Signup awaiting email confirmation"
+            );
+            setSignUpConfirmationEmail(emailVal);
+            setPassword("");
+          } else {
+            // Confirmation not required, proceed to success
+            console.info(
+              "[SignupConfirmation] Signup completed without email confirmation"
+            );
+            setPendingSignUpConfirmationEmail(null);
+            props.onSuccess?.();
+          }
         }
       } else {
         const { error: signInError } = await signIn(emailVal, passwordVal);
@@ -313,17 +331,12 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
       <Show when={showForgotPassword()}>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <dialog
+            open
             class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
             aria-labelledby="reset-password-title"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setShowForgotPassword(false);
-                setResetSuccess(false);
-                setError(null);
-                setResetEmail("");
-              }
-              e.stopPropagation();
+            onCancel={(event) => {
+              event.preventDefault();
+              closeForgotPasswordDialog();
             }}
           >
             <Show
@@ -340,11 +353,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowForgotPassword(false);
-                      setResetSuccess(false);
-                      setResetEmail("");
-                    }}
+                    onClick={closeForgotPasswordDialog}
                     class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md"
                   >
                     Close
@@ -373,14 +382,15 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
               <form onSubmit={handlePasswordReset} class="space-y-4">
                 <div>
-                  <label
-                    for="reset-email"
+                  <span
+                    id="reset-email-label"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                   >
                     Email
-                  </label>
+                  </span>
                   <input
                     id="reset-email"
+                    aria-labelledby="reset-email-label"
                     type="email"
                     value={resetEmail()}
                     onInput={(e) => setResetEmail(e.currentTarget.value)}
@@ -394,11 +404,7 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
                 <div class="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowForgotPassword(false);
-                      setError(null);
-                      setResetEmail("");
-                    }}
+                    onClick={closeForgotPasswordDialog}
                     class="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-medium rounded-md"
                   >
                     Cancel
@@ -569,14 +575,15 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
             {/* Name Field (Sign Up Only) */}
             <Show when={isSignUp()}>
               <div>
-                <label
-                  for="name"
+                <span
+                  id="signup-name-label"
                   class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
                   Name
-                </label>
+                </span>
                 <input
                   id="name"
+                  aria-labelledby="signup-name-label"
                   type="text"
                   value={name()}
                   onInput={(e) => setName(e.currentTarget.value)}
@@ -589,14 +596,15 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
             {/* Email Field */}
             <div>
-              <label
-                for="email"
+              <span
+                id="login-email-label"
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
               >
                 Email
-              </label>
+              </span>
               <input
                 id="email"
+                aria-labelledby="login-email-label"
                 type="email"
                 value={email()}
                 onInput={(e) => setEmail(e.currentTarget.value)}
@@ -609,15 +617,16 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
             {/* Password Field */}
             <div>
-              <label
-                for="password"
+              <span
+                id="login-password-label"
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
               >
                 Password
-              </label>
+              </span>
               <div class="relative">
                 <input
                   id="password"
+                  aria-labelledby="login-password-label"
                   type={showPassword() ? "text" : "password"}
                   value={password()}
                   onInput={(e) => setPassword(e.currentTarget.value)}
