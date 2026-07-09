@@ -11,6 +11,7 @@ import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { type Accessor, useContext } from "solid-js";
 import type { SqliteDatabase } from "../db/client-sqlite";
 import { TTAuthContext } from "./TTAuthProvider";
+
 export { TTAuthProvider as AuthProvider } from "./TTAuthProvider";
 
 /**
