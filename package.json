@@ -149,7 +149,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
-    "@cloudflare/workers-types": "^4.20260516.1",
+    "@cloudflare/workers-types": "^5.20260708.1",
     "@playwright/test": "^1.61.1",
     "@solidjs/testing-library": "^0.8.10",
     "@sonar/scan": "^4.3.6",
