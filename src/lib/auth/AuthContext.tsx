@@ -79,7 +79,7 @@ interface AuthState {
     email: string,
     password: string,
     name: string
-  ) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: AuthError | null; needsEmailConfirmation: boolean }>;
 
   /** Sign in with OAuth provider */
   signInWithOAuth: (

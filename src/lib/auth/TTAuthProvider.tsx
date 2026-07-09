@@ -119,7 +119,7 @@ export interface AuthState {
     email: string,
     password: string,
     name: string
-  ) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: AuthError | null; needsEmailConfirmation: boolean }>;
   /** Sign in with OAuth provider */
   signInWithOAuth: (
     provider: "google" | "github"
@@ -1434,12 +1434,26 @@ const TTInner: ParentComponent = (props) => {
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name } },
+      options: {
+        data: { name },
+        emailRedirectTo: `${globalThis.location.origin}/auth/callback`,
+      },
     });
-    return { error };
+
+    if (!error && data.session) {
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) {
+        log.warn(
+          "Failed to clear provisional signup session before email confirmation:",
+          signOutError
+        );
+      }
+    }
+
+    return { error, needsEmailConfirmation: !error };
   };
 
   const signInWithOAuth = async (provider: "google" | "github") => {

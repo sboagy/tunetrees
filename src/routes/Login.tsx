@@ -11,6 +11,7 @@ import { useNavigate } from "@solidjs/router";
 import type { Component } from "solid-js";
 import { LoginForm } from "../components/auth";
 import { useAuth } from "../lib/auth/AuthContext";
+import { hasPendingSignUpConfirmation } from "../lib/auth/signup-confirmation-pending";
 
 /**
  * Login Page Component
@@ -30,7 +31,11 @@ const Login: Component = () => {
   const { user, loading, isAnonymous } = useAuth();
 
   // Redirect to practice if already logged in or anonymous (only after auth is loaded)
-  if (!loading() && (user() || isAnonymous())) {
+  if (
+    !loading() &&
+    (user() || isAnonymous()) &&
+    !hasPendingSignUpConfirmation()
+  ) {
     navigate("/", { replace: true });
   }
 

@@ -11,9 +11,23 @@
 
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { Eye, EyeOff } from "lucide-solid";
-import { type Component, createEffect, createSignal, Show } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { useAuth } from "../../lib/auth/AuthContext";
+import {
+  getPendingSignUpConfirmationEmail,
+  setPendingSignUpConfirmationEmail,
+} from "../../lib/auth/signup-confirmation-pending";
 import { supabase } from "../../lib/supabase/client";
+
+const AUTH_CONFIRMATION_EVENT_KEY = "tunetrees:auth-confirmed";
+const AUTH_CONFIRMATION_CHANNEL = "tunetrees-auth";
 
 interface LoginFormProps {
   /** Callback after successful login */
@@ -64,6 +78,43 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
   const [showForgotPassword, setShowForgotPassword] = createSignal(false);
   const [resetEmail, setResetEmail] = createSignal("");
   const [resetSuccess, setResetSuccess] = createSignal(false);
+  const [signUpConfirmationEmail, setSignUpConfirmationEmail] = createSignal<
+    string | null
+  >(getPendingSignUpConfirmationEmail());
+
+  onMount(() => {
+    console.info("[SignupConfirmation] LoginForm mounted", {
+      pendingEmail: getPendingSignUpConfirmationEmail(),
+    });
+
+    const handleConfirmed = () => {
+      console.info("[SignupConfirmation] Confirmation observed");
+      setPendingSignUpConfirmationEmail(null);
+      props.onSuccess?.();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === AUTH_CONFIRMATION_EVENT_KEY && event.newValue) {
+        handleConfirmed();
+      }
+    };
+
+    let channel: BroadcastChannel | null = null;
+    if ("BroadcastChannel" in globalThis) {
+      channel = new BroadcastChannel(AUTH_CONFIRMATION_CHANNEL);
+      channel.onmessage = (event) => {
+        if (event.data?.type === "email-confirmed") {
+          handleConfirmed();
+        }
+      };
+    }
+
+    globalThis.addEventListener("storage", handleStorage);
+    onCleanup(() => {
+      globalThis.removeEventListener("storage", handleStorage);
+      channel?.close();
+    });
+  });
 
   // Auto-switch to sign up mode when converting
   createEffect(() => {
@@ -150,17 +201,23 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
           props.onSuccess?.();
         } else {
           // Regular sign up
-          const { error: signUpError } = await signUp(
-            emailVal,
-            passwordVal,
-            nameVal
-          );
+          console.info("[SignupConfirmation] Starting email/password signup");
+          setPendingSignUpConfirmationEmail(emailVal);
+          const signUpResult = await signUp(emailVal, passwordVal, nameVal);
+          const { error: signUpError } = signUpResult;
           if (signUpError) {
+            console.info("[SignupConfirmation] Signup failed", {
+              message: signUpError.message,
+            });
+            setPendingSignUpConfirmationEmail(null);
             setError(signUpError.message);
             return;
           }
-          // Success!
-          props.onSuccess?.();
+          console.info(
+            "[SignupConfirmation] Signup awaiting email confirmation"
+          );
+          setSignUpConfirmationEmail(emailVal);
+          setPassword("");
         }
       } else {
         const { error: signInError } = await signIn(emailVal, passwordVal);
@@ -204,6 +261,8 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
     setError(null);
     setPassword("");
     setName("");
+    setSignUpConfirmationEmail(null);
+    setPendingSignUpConfirmationEmail(null);
     setShowForgotPassword(false);
     setResetSuccess(false);
 
@@ -360,263 +419,308 @@ export const LoginForm: Component<LoginFormProps> = (props) => {
 
       {/* Main Login Form */}
       <div class="w-full max-w-md mx-auto p-5 sm:p-6 [@media(max-height:760px)]:p-4 [@media(max-height:760px)]:text-sm bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-        {/* Header - Only shown when converting */}
-        <Show when={isConverting()}>
-          <div class="mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4 text-center">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Backup Your Data
-            </h1>
-            <p class="text-gray-600 dark:text-gray-400">
-              Create an account to save and sync your tunes across devices
-            </p>
-            <div class="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-              <p class="text-sm text-blue-700 dark:text-blue-300">
-                ✨ Your local data will be preserved and start syncing
-                automatically
+        <Show when={signUpConfirmationEmail()}>
+          {(confirmationEmail) => (
+            <div class="text-center">
+              <div class="text-green-500 text-5xl mb-4">✓</div>
+              <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                Check Your Email
+              </h2>
+              <p class="text-gray-600 dark:text-gray-400 mb-6">
+                We've sent a confirmation link to{" "}
+                <strong>{confirmationEmail()}</strong>. Open that link to finish
+                creating your TuneTrees account.
               </p>
-            </div>
-          </div>
-        </Show>
-
-        {/* Anonymous Sign In Option - at top when not converting */}
-        <Show when={!isConverting()}>
-          <Show when={!isSignUp()}>
-            <div class="relative mb-3">
-              <div class="absolute inset-0 flex items-center">
-                <div class="w-full border-t border-gray-300 dark:border-gray-600" />
-              </div>
-              <div class="relative flex justify-center text-sm">
-                <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                  Run local only, as anonymous
-                </span>
-              </div>
-            </div>{" "}
-            <div class="mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4">
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Keep this tab open while you check your email. Your mail app may
+                open TuneTrees in a new tab; either tab can be used after
+                confirmation.
+              </p>
               <button
                 type="button"
-                onClick={handleAnonymousSignIn}
-                disabled={isSubmitting() || loading()}
-                class="w-full py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                onClick={() => {
+                  setSignUpConfirmationEmail(null);
+                  setPendingSignUpConfirmationEmail(null);
+                  setIsSignUp(false);
+                  setEmail(confirmationEmail());
+                  navigate("/login", { replace: false });
+                }}
+                class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md"
               >
-                <Show
-                  when={!isSubmitting() && !loading()}
-                  fallback={<span>Loading...</span>}
-                >
-                  Use on this Device Only
-                </Show>
+                Back to Sign In
               </button>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                Try TuneTrees without an account. Your data will only be stored
-                on this device and won't sync to other devices.
-              </p>
             </div>
-            {/* Divider - "Or (sign up)" */}
-            <div class="relative mb-3">
+          )}
+        </Show>
+        <Show when={!signUpConfirmationEmail()}>
+          {/* Header - Only shown when converting */}
+          <Show when={isConverting()}>
+            <div class="mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4 text-center">
+              <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Backup Your Data
+              </h1>
+              <p class="text-gray-600 dark:text-gray-400">
+                Create an account to save and sync your tunes across devices
+              </p>
+              <div class="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                <p class="text-sm text-blue-700 dark:text-blue-300">
+                  ✨ Your local data will be preserved and start syncing
+                  automatically
+                </p>
+              </div>
+            </div>
+          </Show>
+
+          {/* Anonymous Sign In Option - at top when not converting */}
+          <Show when={!isConverting()}>
+            <Show when={!isSignUp()}>
+              <div class="relative mb-3">
+                <div class="absolute inset-0 flex items-center">
+                  <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+                </div>
+                <div class="relative flex justify-center text-sm">
+                  <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                    Run local only, as anonymous
+                  </span>
+                </div>
+              </div>{" "}
+              <div class="mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4">
+                <button
+                  type="button"
+                  onClick={handleAnonymousSignIn}
+                  disabled={isSubmitting() || loading()}
+                  class="w-full py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                >
+                  <Show
+                    when={!isSubmitting() && !loading()}
+                    fallback={<span>Loading...</span>}
+                  >
+                    Use on this Device Only
+                  </Show>
+                </button>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                  Try TuneTrees without an account. Your data will only be
+                  stored on this device and won't sync to other devices.
+                </p>
+              </div>
+              {/* Divider - "Or (sign up)" */}
+              <div class="relative mb-3">
+                <div class="absolute inset-0 flex items-center">
+                  <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+                </div>
+                <div class="relative flex justify-center text-sm">
+                  <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
+                    Or sign up
+                  </span>
+                </div>
+              </div>
+            </Show>
+
+            {/* Toggle Sign Up/Sign In - only show when not converting */}
+            <div class="text-center">
+              <button
+                type="button"
+                onClick={toggleMode}
+                class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+              >
+                {isSignUp() ? (
+                  <>
+                    Already have an account?{" "}
+                    <span class="underline">Sign in</span>
+                  </>
+                ) : (
+                  <>
+                    Don't have an account?{" "}
+                    <span class="underline">Sign up</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Divider - "Or sign in" */}
+            <div
+              class={`relative ${isSignUp() ? "mb-4 mt-4" : "mb-5 mt-5 sm:mb-6 sm:mt-6 [@media(max-height:760px)]:mb-4 [@media(max-height:760px)]:mt-4"}`}
+            >
               <div class="absolute inset-0 flex items-center">
                 <div class="w-full border-t border-gray-300 dark:border-gray-600" />
               </div>
               <div class="relative flex justify-center text-sm">
                 <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                  Or sign up
+                  {isSignUp()
+                    ? "Sign up with email"
+                    : "Or sign in with password"}
                 </span>
               </div>
             </div>
           </Show>
 
-          {/* Toggle Sign Up/Sign In - only show when not converting */}
-          <div class="text-center">
-            <button
-              type="button"
-              onClick={toggleMode}
-              class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-            >
-              {isSignUp() ? (
-                <>
-                  Already have an account?{" "}
-                  <span class="underline">Sign in</span>
-                </>
-              ) : (
-                <>
-                  Don't have an account? <span class="underline">Sign up</span>
-                </>
-              )}
-            </button>
-          </div>
+          {/* Error Display */}
+          <Show when={error()}>
+            <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+              <p class="text-sm text-red-600 dark:text-red-400">{error()}</p>
+            </div>
+          </Show>
 
-          {/* Divider - "Or sign in" */}
-          <div
-            class={`relative ${isSignUp() ? "mb-4 mt-4" : "mb-5 mt-5 sm:mb-6 sm:mt-6 [@media(max-height:760px)]:mb-4 [@media(max-height:760px)]:mt-4"}`}
+          {/* Email/Password Form */}
+          <form
+            onSubmit={handleSubmit}
+            class="space-y-3 sm:space-y-4 [@media(max-height:760px)]:space-y-2 mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4"
           >
+            {/* Name Field (Sign Up Only) */}
+            <Show when={isSignUp()}>
+              <div>
+                <label
+                  for="name"
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  Name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name()}
+                  onInput={(e) => setName(e.currentTarget.value)}
+                  placeholder="Your name"
+                  class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  disabled={isSubmitting() || loading()}
+                />
+              </div>
+            </Show>
+
+            {/* Email Field */}
+            <div>
+              <label
+                for="email"
+                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email()}
+                onInput={(e) => setEmail(e.currentTarget.value)}
+                placeholder="you@example.com"
+                class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                disabled={isSubmitting() || loading()}
+                required
+              />
+            </div>
+
+            {/* Password Field */}
+            <div>
+              <label
+                for="password"
+                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                Password
+              </label>
+              <div class="relative">
+                <input
+                  id="password"
+                  type={showPassword() ? "text" : "password"}
+                  value={password()}
+                  onInput={(e) => setPassword(e.currentTarget.value)}
+                  autocomplete={
+                    isSignUp() ? "new-password" : "current-password"
+                  }
+                  placeholder="••••••••"
+                  class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  disabled={isSubmitting() || loading()}
+                  required
+                  minlength="6"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword())}
+                  class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
+                  aria-label={
+                    showPassword() ? "Hide password" : "Show password"
+                  }
+                >
+                  <Show
+                    when={showPassword()}
+                    fallback={<Eye class="w-5 h-5" />}
+                  >
+                    <EyeOff class="w-5 h-5" />
+                  </Show>
+                </button>
+              </div>
+            </div>
+
+            {/* Forgot Password Link (Sign In Only) */}
+            <Show when={!isSignUp()}>
+              <div class="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            </Show>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isSubmitting() || loading()}
+              class="w-full py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              <Show
+                when={!isSubmitting() && !loading()}
+                fallback={<span>Loading...</span>}
+              >
+                {isSignUp() ? "Create Account" : "Sign In"}
+              </Show>
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div class="relative mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4">
             <div class="absolute inset-0 flex items-center">
               <div class="w-full border-t border-gray-300 dark:border-gray-600" />
             </div>
             <div class="relative flex justify-center text-sm">
               <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                {isSignUp() ? "Sign up with email" : "Or sign in with password"}
+                Or sign in with social authentication
               </span>
             </div>
           </div>
-        </Show>
 
-        {/* Error Display */}
-        <Show when={error()}>
-          <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p class="text-sm text-red-600 dark:text-red-400">{error()}</p>
-          </div>
-        </Show>
-
-        {/* Email/Password Form */}
-        <form
-          onSubmit={handleSubmit}
-          class="space-y-3 sm:space-y-4 [@media(max-height:760px)]:space-y-2 mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4"
-        >
-          {/* Name Field (Sign Up Only) */}
-          <Show when={isSignUp()}>
-            <div>
-              <label
-                for="name"
-                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-              >
-                Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name()}
-                onInput={(e) => setName(e.currentTarget.value)}
-                placeholder="Your name"
-                class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                disabled={isSubmitting() || loading()}
-              />
-            </div>
-          </Show>
-
-          {/* Email Field */}
-          <div>
-            <label
-              for="email"
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email()}
-              onInput={(e) => setEmail(e.currentTarget.value)}
-              placeholder="you@example.com"
-              class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          {/* OAuth Buttons */}
+          <div class="space-y-3 mb-4 sm:mb-6 [@media(max-height:760px)]:mb-3">
+            {/* Google Sign In */}
+            <button
+              type="button"
+              onClick={() => handleOAuthSignIn("google")}
               disabled={isSubmitting() || loading()}
-              required
-            />
-          </div>
-
-          {/* Password Field */}
-          <div>
-            <label
-              for="password"
-              class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              class="w-full flex items-center justify-center gap-3 py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Password
-            </label>
-            <div class="relative">
-              <input
-                id="password"
-                type={showPassword() ? "text" : "password"}
-                value={password()}
-                onInput={(e) => setPassword(e.currentTarget.value)}
-                autocomplete={isSignUp() ? "new-password" : "current-password"}
-                placeholder="••••••••"
-                class="w-full px-3 py-2 [@media(max-height:760px)]:py-1.5 pr-10 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                disabled={isSubmitting() || loading()}
-                required
-                minlength="6"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword())}
-                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none"
-                aria-label={showPassword() ? "Hide password" : "Show password"}
-              >
-                <Show when={showPassword()} fallback={<Eye class="w-5 h-5" />}>
-                  <EyeOff class="w-5 h-5" />
-                </Show>
-              </button>
-            </div>
-          </div>
+              <span>Continue with Google</span>
+            </button>
 
-          {/* Forgot Password Link (Sign In Only) */}
-          <Show when={!isSignUp()}>
-            <div class="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-              >
-                Forgot password?
-              </button>
-            </div>
-          </Show>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting() || loading()}
-            class="w-full py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-          >
-            <Show
-              when={!isSubmitting() && !loading()}
-              fallback={<span>Loading...</span>}
+            {/* GitHub Sign In */}
+            <button
+              type="button"
+              onClick={() => handleOAuthSignIn("github")}
+              disabled={isSubmitting() || loading()}
+              class="w-full flex items-center justify-center gap-3 py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSignUp() ? "Create Account" : "Sign In"}
-            </Show>
-          </button>
-        </form>
-
-        {/* Divider */}
-        <div class="relative mb-5 sm:mb-6 [@media(max-height:760px)]:mb-4">
-          <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-gray-300 dark:border-gray-600" />
+              <span>Continue with GitHub</span>
+            </button>
           </div>
-          <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-white dark:bg-gray-800 text-gray-500">
-              Or sign in with social authentication
-            </span>
+
+          <div class="flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+            <A class="hover:underline" href="/privacy">
+              Privacy Policy
+            </A>
+            <span aria-hidden="true">•</span>
+            <A class="hover:underline" href="/terms">
+              Terms of Service
+            </A>
           </div>
-        </div>
-
-        {/* OAuth Buttons */}
-        <div class="space-y-3 mb-4 sm:mb-6 [@media(max-height:760px)]:mb-3">
-          {/* Google Sign In */}
-          <button
-            type="button"
-            onClick={() => handleOAuthSignIn("google")}
-            disabled={isSubmitting() || loading()}
-            class="w-full flex items-center justify-center gap-3 py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-white hover:bg-gray-50 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span>Continue with Google</span>
-          </button>
-
-          {/* GitHub Sign In */}
-          <button
-            type="button"
-            onClick={() => handleOAuthSignIn("github")}
-            disabled={isSubmitting() || loading()}
-            class="w-full flex items-center justify-center gap-3 py-2 [@media(max-height:760px)]:py-1.5 px-4 bg-gray-900 hover:bg-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <span>Continue with GitHub</span>
-          </button>
-        </div>
-
-        <div class="flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-          <A class="hover:underline" href="/privacy">
-            Privacy Policy
-          </A>
-          <span aria-hidden="true">•</span>
-          <A class="hover:underline" href="/terms">
-            Terms of Service
-          </A>
-        </div>
+        </Show>
       </div>
     </>
   );
