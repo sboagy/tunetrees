@@ -2,6 +2,7 @@ import { useNavigate } from "@solidjs/router";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { onMount } from "solid-js";
 import {
+  getPendingSignUpConfirmationEmail,
   hasPendingSignUpConfirmation,
   setPendingSignUpConfirmationEmail,
 } from "@/lib/auth/signup-confirmation-pending";
@@ -9,6 +10,19 @@ import { supabase } from "@/lib/supabase/client";
 
 const AUTH_CONFIRMATION_EVENT_KEY = "tunetrees:auth-confirmed";
 const AUTH_CONFIRMATION_CHANNEL = "tunetrees-auth";
+
+type AuthCallbackParams = {
+  accessToken: string | null;
+  code: string | null;
+  error: string | null;
+  errorDescription: string | null;
+  queryError: string | null;
+  queryErrorDescription: string | null;
+  refreshToken: string | null;
+  token: string | null;
+  tokenHash: string | null;
+  type: EmailOtpType | null;
+};
 
 function publishAuthConfirmed() {
   setPendingSignUpConfirmationEmail(null);
@@ -22,100 +36,194 @@ function publishAuthConfirmed() {
   }
 }
 
+function redirectWithConfirmedSession(path = "/") {
+  globalThis.location.replace(path);
+}
+
+function normalizeEmailOtpType(type: string): EmailOtpType {
+  if (type === "signup" || type === "magiclink") return "email";
+  return type;
+}
+
+function isEmailConfirmationType(type: EmailOtpType | null): boolean {
+  return (
+    type === "signup" ||
+    type === "email" ||
+    type === "magiclink" ||
+    hasPendingSignUpConfirmation()
+  );
+}
+
+function maybePublishAuthConfirmed(type: EmailOtpType | null) {
+  if (isEmailConfirmationType(type)) {
+    publishAuthConfirmed();
+  }
+}
+
+function readAuthCallbackParams(): AuthCallbackParams {
+  const url = new URL(globalThis.location.href);
+  const hashParams = new URLSearchParams(globalThis.location.hash.substring(1));
+
+  return {
+    accessToken: hashParams.get("access_token"),
+    code: url.searchParams.get("code"),
+    error: hashParams.get("error"),
+    errorDescription: hashParams.get("error_description"),
+    queryError: url.searchParams.get("error"),
+    queryErrorDescription: url.searchParams.get("error_description"),
+    refreshToken: hashParams.get("refresh_token"),
+    token: url.searchParams.get("token"),
+    tokenHash: url.searchParams.get("token_hash"),
+    type: hashParams.get("type") ?? url.searchParams.get("type"),
+  };
+}
+
+function navigateToAuthError(
+  navigate: ReturnType<typeof useNavigate>,
+  message: string
+) {
+  navigate(`/login?error=${encodeURIComponent(message)}`);
+}
+
+async function handleHashSession(
+  params: AuthCallbackParams,
+  navigate: ReturnType<typeof useNavigate>
+): Promise<boolean> {
+  if (!params.accessToken) return false;
+
+  if (params.type === "recovery") {
+    navigate("/reset-password");
+    return true;
+  }
+
+  const { error } = await supabase.auth.setSession({
+    access_token: params.accessToken,
+    refresh_token: params.refreshToken || "",
+  });
+
+  if (error) {
+    console.error("Session error:", error);
+    navigate("/login?error=Could not establish session");
+  } else {
+    maybePublishAuthConfirmed(params.type);
+    redirectWithConfirmedSession();
+  }
+
+  return true;
+}
+
+async function handleCodeSession(
+  params: AuthCallbackParams,
+  navigate: ReturnType<typeof useNavigate>
+): Promise<boolean> {
+  if (!params.code) return false;
+
+  const { error } = await supabase.auth.exchangeCodeForSession(params.code);
+
+  if (error) {
+    console.error("Session exchange error:", error);
+    navigate("/login?error=Could not establish session");
+  } else {
+    maybePublishAuthConfirmed(params.type);
+    redirectWithConfirmedSession();
+  }
+
+  return true;
+}
+
+async function handleTokenHashVerification(
+  params: AuthCallbackParams,
+  navigate: ReturnType<typeof useNavigate>
+): Promise<boolean> {
+  if (!params.tokenHash || !params.type) return false;
+
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: params.tokenHash,
+    type: params.type,
+  });
+
+  if (error) {
+    console.error("Email verification error:", error);
+    navigate("/login?error=Could not verify email confirmation");
+  } else if (params.type === "recovery") {
+    navigate("/reset-password");
+  } else {
+    maybePublishAuthConfirmed(params.type);
+    redirectWithConfirmedSession();
+  }
+
+  return true;
+}
+
+async function handlePlainTokenVerification(
+  params: AuthCallbackParams,
+  navigate: ReturnType<typeof useNavigate>
+): Promise<boolean> {
+  if (!params.token || !params.type) return false;
+
+  const pendingEmail = getPendingSignUpConfirmationEmail();
+  if (!pendingEmail) {
+    navigate(
+      "/login?error=Could not verify email confirmation from this browser"
+    );
+    return true;
+  }
+
+  const { error } = await supabase.auth.verifyOtp({
+    email: pendingEmail,
+    token: params.token,
+    type: normalizeEmailOtpType(params.type),
+  });
+
+  if (error) {
+    console.error("Email token verification error:", error);
+    navigate("/login?error=Could not verify email confirmation");
+  } else if (params.type === "recovery") {
+    navigate("/reset-password");
+  } else {
+    publishAuthConfirmed();
+    redirectWithConfirmedSession();
+  }
+
+  return true;
+}
+
+async function handleExistingSession(
+  params: AuthCallbackParams
+): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return false;
+
+  maybePublishAuthConfirmed(params.type);
+  redirectWithConfirmedSession();
+  return true;
+}
+
+async function handleAuthCallback(navigate: ReturnType<typeof useNavigate>) {
+  const params = readAuthCallbackParams();
+  const authError = params.error ?? params.queryError;
+  if (authError) {
+    const description =
+      params.errorDescription ?? params.queryErrorDescription ?? authError;
+    console.error("Auth error:", authError, description);
+    navigateToAuthError(navigate, description);
+    return;
+  }
+
+  if (await handleHashSession(params, navigate)) return;
+  if (await handleCodeSession(params, navigate)) return;
+  if (await handleTokenHashVerification(params, navigate)) return;
+  if (await handlePlainTokenVerification(params, navigate)) return;
+  if (await handleExistingSession(params)) return;
+
+  navigate("/login?error=No authentication tokens received");
+}
+
 export default function AuthCallback() {
   const navigate = useNavigate();
 
-  onMount(async () => {
-    // Handle the auth callback from Supabase
-    // Supabase can redirect here with hash tokens, a PKCE code, or an email
-    // template token_hash depending on the auth flow/project configuration.
-    const url = new URL(globalThis.location.href);
-    const queryError = url.searchParams.get("error");
-    const queryErrorDescription = url.searchParams.get("error_description");
-    const code = url.searchParams.get("code");
-    const tokenHash = url.searchParams.get("token_hash");
-    const queryType = url.searchParams.get("type");
-    const hashParams = new URLSearchParams(
-      globalThis.location.hash.substring(1)
-    );
-    const access_token = hashParams.get("access_token");
-    const refresh_token = hashParams.get("refresh_token");
-    const type = hashParams.get("type") ?? queryType;
-    const error = hashParams.get("error");
-    const error_description = hashParams.get("error_description");
-
-    if (error || queryError) {
-      const authError = error ?? queryError ?? "Authentication failed";
-      const authErrorDescription = error_description ?? queryErrorDescription;
-      console.error("Auth error:", authError, authErrorDescription);
-      navigate(
-        `/login?error=${encodeURIComponent(authErrorDescription || authError)}`
-      );
-      return;
-    }
-
-    if (access_token && type === "recovery") {
-      // Password recovery flow - redirect to password reset page
-      // Session is already set by Supabase, just need to redirect
-      navigate("/reset-password");
-    } else if (access_token) {
-      // Normal login flow - set the session and redirect to home
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token,
-        refresh_token: refresh_token || "",
-      });
-
-      if (sessionError) {
-        console.error("Session error:", sessionError);
-        navigate("/login?error=Could not establish session");
-      } else {
-        if (type === "signup" || type === "email") {
-          publishAuthConfirmed();
-        }
-        navigate("/");
-      }
-    } else if (code) {
-      const { error: sessionError } =
-        await supabase.auth.exchangeCodeForSession(code);
-
-      if (sessionError) {
-        console.error("Session exchange error:", sessionError);
-        navigate("/login?error=Could not establish session");
-      } else {
-        if (
-          type === "signup" ||
-          type === "email" ||
-          hasPendingSignUpConfirmation()
-        ) {
-          publishAuthConfirmed();
-        }
-        navigate("/");
-      }
-    } else if (tokenHash && type) {
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: type as EmailOtpType,
-      });
-
-      if (verifyError) {
-        console.error("Email verification error:", verifyError);
-        navigate("/login?error=Could not verify email confirmation");
-      } else if (type === "recovery") {
-        navigate("/reset-password");
-      } else {
-        if (
-          type === "signup" ||
-          type === "email" ||
-          hasPendingSignUpConfirmation()
-        ) {
-          publishAuthConfirmed();
-        }
-        navigate("/");
-      }
-    } else {
-      // No tokens - something went wrong
-      navigate("/login?error=No authentication tokens received");
-    }
+  onMount(() => {
+    void handleAuthCallback(navigate);
   });
 
   return (
