@@ -3887,38 +3887,46 @@ export class TuneTreesPage {
       .isChecked()
       .catch(() => false);
     if (isChecked !== visible) {
-      await getOption().click();
+      let visibilityUpdated = false;
 
-      // The column menu rerenders the row immediately after a visibility
-      // toggle, so re-query the checkbox state instead of asserting against a
-      // locator chain captured before the click.
-      if (visible) {
-        await expect
+      // This menu is conditionally mounted in a portal. On a reactive rerender,
+      // its option row can detach between Playwright's actionability check and
+      // click. Reopen and re-query it with bounded attempts instead of allowing
+      // one stale action to consume the full test timeout.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (attempt > 0) {
+          await this.openColumnVisibilityMenu(columnsButton);
+        }
+
+        await expect(getOption()).toBeVisible({ timeout: 2000 });
+        const clicked = await getOption()
+          .click({ timeout: 2000 })
+          .then(() => true)
+          .catch(() => false);
+        if (!clicked) {
+          continue;
+        }
+
+        visibilityUpdated = await expect
           .poll(
             async () =>
               await getCheckbox()
                 .isChecked()
                 .catch(() => null),
             {
-              timeout: 5000,
+              timeout: 2000,
               intervals: [100, 250, 500],
             }
           )
-          .toBe(true);
-      } else {
-        await expect
-          .poll(
-            async () =>
-              await getCheckbox()
-                .isChecked()
-                .catch(() => null),
-            {
-              timeout: 5000,
-              intervals: [100, 250, 500],
-            }
-          )
-          .toBe(false);
+          .toBe(visible)
+          .then(() => true)
+          .catch(() => false);
+        if (visibilityUpdated) {
+          break;
+        }
       }
+
+      expect(visibilityUpdated).toBe(true);
     }
 
     await this.closeColumnVisibilityMenu(menu);

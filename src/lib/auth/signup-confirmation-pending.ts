@@ -13,7 +13,13 @@ function readStorage(storage: Storage | undefined): PendingEntry | null {
   try {
     const raw = storage?.getItem(SIGNUP_CONFIRMATION_PENDING_EMAIL_KEY);
     if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Legacy entries were stored as bare email addresses rather than JSON.
+      return { email: raw, ts: 0 };
+    }
     // Defensive: also accept legacy plain-string entries (no expiry)
     if (typeof parsed === "string") return { email: parsed, ts: 0 };
     if (
