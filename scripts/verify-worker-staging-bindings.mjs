@@ -99,6 +99,11 @@ async function main() {
       );
     }
 
+    if (foundR2Bindings.has(binding)) {
+      throw new Error(
+        `Duplicate env.staging R2 binding: ${binding} is declared more than once.`
+      );
+    }
     const expectedBucket = expectedR2Bindings.get(binding);
     if (!expectedBucket || bucketName !== expectedBucket) {
       throw new Error(

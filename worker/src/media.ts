@@ -147,6 +147,12 @@ function isSupportedJwtAlgorithm(algorithm: string) {
   return SUPPORTED_JWT_ALGORITHMS.has(algorithm);
 }
 
+function toMediaAuthUser(userId: unknown): MediaAuthUser | null {
+  return typeof userId === "string" && userId.length > 0
+    ? { id: userId }
+    : null;
+}
+
 async function verifyJwtLocally(
   token: string,
   env: MediaWorkerEnv
@@ -162,27 +168,26 @@ async function verifyJwtLocally(
       return null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let result: any | null = null;
+    let payload: { sub?: unknown } | null = null;
     if (algorithm.startsWith("HS")) {
-      result = env.SUPABASE_JWT_SECRET
-        ? await jwtVerify(
-            token,
-            new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
-          )
-        : null;
+      if (!env.SUPABASE_JWT_SECRET) {
+        return null;
+      }
+      payload = (
+        await jwtVerify(
+          token,
+          new TextEncoder().encode(env.SUPABASE_JWT_SECRET)
+        )
+      ).payload;
     } else {
-      result = await jwtVerify(token, getJwks(env.SUPABASE_URL));
+      payload = (await jwtVerify(token, getJwks(env.SUPABASE_URL))).payload;
     }
 
-    if (!result) {
+    if (!payload) {
       return null;
     }
 
-    const userId = result.payload.sub;
-    return typeof userId === "string" && userId.length > 0
-      ? { id: userId }
-      : null;
+    return toMediaAuthUser(payload.sub);
   } catch (error) {
     console.warn("[media.auth] Local JWT verification failed", error);
     return null;
@@ -208,10 +213,11 @@ async function verifyJwtWithSupabase(
     return null;
   }
 
-  const data = (await response.json()) as { id?: string };
-  return typeof data.id === "string" && data.id.length > 0
-    ? { id: data.id }
-    : null;
+  const data: unknown = await response.json();
+  if (!data || typeof data !== "object" || !("id" in data)) {
+    return null;
+  }
+  return toMediaAuthUser(data.id);
 }
 
 async function authenticateMediaRequest(request: Request, env: MediaWorkerEnv) {
@@ -431,14 +437,16 @@ async function handleMediaView(
     : await env.TUNETREES_VAULT.get(key);
   // The optional production binding exists only in staging. It keeps copied
   // reference rows playable without granting any production write capability.
-  const object =
-    primaryObject?.body || !env.TUNETREES_PRODUCTION_VAULT
-      ? primaryObject
-      : requestedRange
-        ? await env.TUNETREES_PRODUCTION_VAULT.get(key, {
-            range: request.headers,
-          })
-        : await env.TUNETREES_PRODUCTION_VAULT.get(key);
+  let object = primaryObject;
+  if (!object?.body && env.TUNETREES_PRODUCTION_VAULT) {
+    if (requestedRange) {
+      object = await env.TUNETREES_PRODUCTION_VAULT.get(key, {
+        range: request.headers,
+      });
+    } else {
+      object = await env.TUNETREES_PRODUCTION_VAULT.get(key);
+    }
+  }
   if (!object?.body) {
     return errorResponse("Media not found", 404, corsHeaders);
   }
