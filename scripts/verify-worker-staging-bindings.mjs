@@ -6,6 +6,8 @@ const ROOT_CONFIG_PATH = "worker/wrangler.toml";
 const WORKER_CONFIG_PATH = "wrangler.toml";
 const PRODUCTION_BUCKET = "tunetrees-vault";
 const STAGING_BUCKET = "tunetrees-vault-staging";
+const STAGING_WRITE_BINDING = "TUNETREES_VAULT";
+const PRODUCTION_READ_BINDING = "TUNETREES_PRODUCTION_VAULT";
 const PRODUCTION_HYPERDRIVE_ID = "541252cc94ca43cf83aa01ec4936726f";
 const PRODUCTION_SUPABASE_URL = "https://pjxuonglsvouttihjven.supabase.co";
 
@@ -83,22 +85,37 @@ async function main() {
       "worker/wrangler.toml is missing [[env.staging.r2_buckets]]."
     );
   }
+  const expectedR2Bindings = new Map([
+    [STAGING_WRITE_BINDING, STAGING_BUCKET],
+    [PRODUCTION_READ_BINDING, PRODUCTION_BUCKET],
+  ]);
+  const foundR2Bindings = new Set();
   for (const block of stagingR2Blocks) {
-    if (!block.includes(`bucket_name = "${STAGING_BUCKET}"`)) {
+    const binding = /^binding\s*=\s*"([^"]+)"/m.exec(block)?.[1];
+    const bucketName = /^bucket_name\s*=\s*"([^"]+)"/m.exec(block)?.[1];
+    if (!binding || !bucketName) {
       throw new Error(
-        `worker/wrangler.toml must bind every env.staging R2 bucket to ${STAGING_BUCKET}.`
+        'env.staging R2 binding must declare both `binding = "..."` and `bucket_name = "..."`.'
       );
     }
-    if (block.includes(`bucket_name = "${PRODUCTION_BUCKET}"`)) {
+
+    if (foundR2Bindings.has(binding)) {
       throw new Error(
-        "env.staging R2 binding points at the production vault bucket."
+        `Duplicate env.staging R2 binding: ${binding} is declared more than once.`
       );
     }
-    // Also verify that the binding key (name = "...") exists so we don't
-    // silently accept a block with only a bucket_name line.
-    if (!/^binding\s*=\s*"/m.test(block)) {
+    const expectedBucket = expectedR2Bindings.get(binding);
+    if (!expectedBucket || bucketName !== expectedBucket) {
       throw new Error(
-        'env.staging R2 binding is missing a binding key; add `binding = "..."`.'
+        `Unexpected env.staging R2 binding ${binding} -> ${bucketName}.`
+      );
+    }
+    foundR2Bindings.add(binding);
+  }
+  for (const binding of expectedR2Bindings.keys()) {
+    if (!foundR2Bindings.has(binding)) {
+      throw new Error(
+        `env.staging is missing the required R2 binding: ${binding}.`
       );
     }
   }

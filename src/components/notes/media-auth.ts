@@ -10,10 +10,17 @@ const applyAuthTokenToMediaUrl = (
   workerUrl = DEFAULT_WORKER_URL
 ) => {
   try {
-    const url = new URL(rawUrl, workerUrl);
-    if (url.pathname !== MEDIA_VIEW_PATH || !url.searchParams.get("key")) {
+    const sourceUrl = new URL(rawUrl, workerUrl);
+    const key = sourceUrl.searchParams.get("key");
+    if (sourceUrl.pathname !== MEDIA_VIEW_PATH || !key) {
       return rawUrl;
     }
+
+    // Uploaded-media rows historically persisted the absolute Worker URL.
+    // Always use this build's Worker for a managed media key so copied staging
+    // rows are authorized by staging and can use its read fallback.
+    const url = new URL(MEDIA_VIEW_PATH, workerUrl);
+    url.searchParams.set("key", key);
 
     if (token) {
       url.searchParams.set(MEDIA_TOKEN_PARAM, token);

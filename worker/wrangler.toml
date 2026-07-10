@@ -26,6 +26,12 @@ id = "9514b1eccf354ebcb33d7ca490d5cbde"
 binding = "TUNETREES_VAULT"
 bucket_name = "tunetrees-vault-staging"
 
+# Staging may read legacy user media copied from production data, but all
+# uploads and mutations continue to use TUNETREES_VAULT above.
+[[env.staging.r2_buckets]]
+binding = "TUNETREES_PRODUCTION_VAULT"
+bucket_name = "tunetrees-vault"
+
 [env.staging.vars]
 # The deploy script overrides this with the real staging URL from
 # .env.staging.template via `wrangler deploy --var SUPABASE_URL:$SUPABASE_URL`.
