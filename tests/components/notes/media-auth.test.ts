@@ -15,6 +15,21 @@ describe("note media auth helpers", () => {
     );
   });
 
+  it("routes a persisted production media URL through the configured staging Worker", () => {
+    const productionUrl =
+      "https://tunetrees-sync-worker.sboagy.workers.dev/api/media/view?key=users%2Fuser-1%2Faudio%2Fexample.mp3";
+
+    expect(
+      attachMediaAuthTokenToUrl(
+        productionUrl,
+        "runtime-token",
+        "https://tunetrees-sync-worker-staging.sboagy.workers.dev"
+      )
+    ).toBe(
+      "https://tunetrees-sync-worker-staging.sboagy.workers.dev/api/media/view?key=users%2Fuser-1%2Faudio%2Fexample.mp3&token=runtime-token"
+    );
+  });
+
   it("adds and removes runtime media tokens inside note HTML", () => {
     const mediaUrl = buildMediaViewUrl("users/user-1/notes/example.png");
     const html = `<p><img src="${mediaUrl}"></p>`;

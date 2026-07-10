@@ -5,6 +5,8 @@ export interface MediaWorkerEnv {
   SUPABASE_JWT_SECRET?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   TUNETREES_VAULT?: R2Bucket;
+  /** Staging-only read fallback for media keys copied from production data. */
+  TUNETREES_PRODUCTION_VAULT?: R2Bucket;
 }
 
 const MEDIA_UPLOAD_PATH = "/api/media/upload";
@@ -399,7 +401,11 @@ async function handleMediaView(
 
   // For HEAD requests, use head() to fetch metadata only — no bytes streamed.
   if (request.method === "HEAD") {
-    const objectHead = await env.TUNETREES_VAULT.head(key);
+    const objectHead =
+      (await env.TUNETREES_VAULT.head(key)) ??
+      (env.TUNETREES_PRODUCTION_VAULT
+        ? await env.TUNETREES_PRODUCTION_VAULT.head(key)
+        : null);
     if (!objectHead) {
       return errorResponse("Media not found", 404, corsHeaders);
     }
@@ -420,9 +426,19 @@ async function handleMediaView(
   }
 
   const requestedRange = request.headers.get("Range");
-  const object = requestedRange
+  const primaryObject = requestedRange
     ? await env.TUNETREES_VAULT.get(key, { range: request.headers })
     : await env.TUNETREES_VAULT.get(key);
+  // The optional production binding exists only in staging. It keeps copied
+  // reference rows playable without granting any production write capability.
+  const object =
+    primaryObject?.body || !env.TUNETREES_PRODUCTION_VAULT
+      ? primaryObject
+      : requestedRange
+        ? await env.TUNETREES_PRODUCTION_VAULT.get(key, {
+            range: request.headers,
+          })
+        : await env.TUNETREES_PRODUCTION_VAULT.get(key);
   if (!object?.body) {
     return errorResponse("Media not found", 404, corsHeaders);
   }

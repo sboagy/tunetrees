@@ -354,6 +354,47 @@ describe("worker media routes", () => {
     expect(forbiddenResponse?.status).toBe(403);
   });
 
+  it("uses the staging production-vault fallback only when staging media is absent", async () => {
+    const stagingVault = createVault();
+    const productionVault = createVault();
+    const key = "users/user-1/audio/example.mp3";
+    productionVault.objects.set(key, {
+      body: "production-audio",
+      contentType: "audio/mpeg",
+    });
+    const env: MediaWorkerEnv = {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "service-role-key",
+      TUNETREES_VAULT: stagingVault.bucket as unknown as R2Bucket,
+      TUNETREES_PRODUCTION_VAULT: productionVault.bucket as unknown as R2Bucket,
+    };
+
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      writable: true,
+      value: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ id: "user-1" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+      ),
+    });
+
+    const response = await handleMediaRequest(
+      new Request(
+        `https://worker.example.com/api/media/view?key=${encodeURIComponent(key)}&token=view-token`
+      ),
+      env
+    );
+
+    expect(response?.status).toBe(200);
+    expect(await response?.text()).toBe("production-audio");
+    expect(stagingVault.bucket.get).toHaveBeenCalledWith(key);
+    expect(productionVault.bucket.get).toHaveBeenCalledWith(key);
+    expect(productionVault.bucket.put).not.toHaveBeenCalled();
+  });
+
   it("supports ranged media responses for authenticated audio playback", async () => {
     const vault = createVault();
     const key = "users/user-1/audio/example.mp3";
