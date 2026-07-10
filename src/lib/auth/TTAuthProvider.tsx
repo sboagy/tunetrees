@@ -1564,16 +1564,6 @@ const TTInner: ParentComponent = (props) => {
       },
     });
 
-    if (!error && data.session) {
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) {
-        log.warn(
-          "Failed to clear provisional signup session before email confirmation:",
-          signOutError
-        );
-      }
-    }
-
     // needsEmailConfirmation: signup succeeded but no session → confirmation required
     return { error, needsEmailConfirmation: !error && !data.session };
   };
