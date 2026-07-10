@@ -232,10 +232,12 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Check pending before reload
     const beforeReload = await getSyncOutboxCount(page);
-    const beforeReloadStable = await ttPage.getStableSyncOutboxCount();
+    const beforeReloadStableItems = await ttPage.getStableSyncOutboxItems();
+    const beforeReloadStableCount = beforeReloadStableItems.length;
+    const beforeKeys = ttPage.stableOutboxKeys(beforeReloadStableItems);
     expect(beforeReload).toBeGreaterThanOrEqual(3);
     console.log(
-      `📦 Before reload: ${beforeReload} pending (stable=${beforeReloadStable})`
+      `📦 Before reload: ${beforeReload} pending (stable=${beforeReloadStableCount})`
     );
 
     // Reload page (still offline)
@@ -245,17 +247,21 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
     // Check pending after reload
     const afterReload = await getSyncOutboxCount(page);
     console.log(`📦 After reload: ${afterReload} pending`);
+
     // Reload can enqueue extra startup repair/normalization rows while still
     // offline. The regression invariant is preservation of the existing queued
-    // work, not an exact sync_push_queue row count.
-    await expect
-      .poll(async () => await getSyncOutboxCount(page), {
-        timeout: 10_000,
-        intervals: [250, 250, 500, 1000],
-      })
-      .toBeGreaterThanOrEqual(beforeReloadStable);
-    const afterReloadStable = await ttPage.getStableSyncOutboxCount();
-    expect(afterReloadStable).toBeGreaterThanOrEqual(beforeReloadStable);
+    // work, so verify each previously captured stable record still exists.
+    const afterReloadItems = await ttPage.getStableSyncOutboxItems();
+    const afterKeys = ttPage.stableOutboxKeys(afterReloadItems);
+    for (const key of beforeKeys) {
+      expect(afterKeys.has(key)).toBe(true);
+    }
+
+    // Secondary lower-bound count assertion permits additional startup rows.
+    const afterReloadStableCount = afterReloadItems.length;
+    expect(afterReloadStableCount).toBeGreaterThanOrEqual(
+      beforeReloadStableCount
+    );
 
     // Go online
     await goOnline(page);

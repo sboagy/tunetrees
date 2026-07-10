@@ -65,7 +65,9 @@ test.describe("Anonymous User Edge Cases", () => {
     await ttPage.waitForHome({ timeoutMs: 30_000 });
   });
 
-  test("5.2 Regular sign-up flow still works (no anonymous)", async () => {
+  test("5.2 Regular sign-up flow still works (no anonymous)", async ({
+    page,
+  }) => {
     // Navigate to login page fresh
     await ttPage.gotoLogin();
 
@@ -83,6 +85,9 @@ test.describe("Anonymous User Edge Cases", () => {
 
     // Local Supabase disables email confirmation, so a successful signup has an
     // active session and must redirect to the authenticated home route.
+    // Wait for the post-signup navigation and initial data loads to settle
+    // before asserting the home page is visible.
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     await ttPage.waitForHome({ timeoutMs: 30_000 });
   });
 

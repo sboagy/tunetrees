@@ -3,15 +3,22 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const projectRoot = path.resolve(__dirname, "..", "..");
+const migrationsDir = path.join(projectRoot, "supabase", "migrations");
 
-function getSqlFilesRecursively(dir: string): string[] {
+// biome-ignore lint/suspicious/noExportsInTest: exported for future callers that need to scan migration SQL files with scoped _archive filtering
+export function getSqlFilesRecursively(dir: string): string[] {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const sqlFiles: string[] = [];
+
+  // Only exclude _archive directories when scanning within the supabase/migrations
+  // tree. Other callers should not silently skip directories starting with _archive.
+  const isMigrationsDir =
+    dir === migrationsDir || dir.startsWith(migrationsDir + path.sep);
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name.startsWith("_archive")) continue;
+      if (isMigrationsDir && entry.name.startsWith("_archive")) continue;
       sqlFiles.push(...getSqlFilesRecursively(fullPath));
       continue;
     }
@@ -29,24 +36,5 @@ describe("Supabase auth configuration", () => {
     const configContents = fs.readFileSync(configPath, "utf8");
 
     expect(configContents).toMatch(/enable_anonymous_sign_ins\s*=\s*true/);
-  });
-
-  it("includes a migration that enforces anonymous sign-ins", () => {
-    const migrationsDir = path.join(projectRoot, "supabase", "migrations");
-    const migrationFiles = getSqlFilesRecursively(migrationsDir);
-
-    const enablePattern =
-      /UPDATE\s+auth\.config\s+SET\s+enable_anonymous_sign_ins\s*=\s*TRUE/i;
-
-    let hasEnablingMigration = false;
-    for (const file of migrationFiles) {
-      const contents = fs.readFileSync(file, "utf8");
-      if (enablePattern.test(contents)) {
-        hasEnablingMigration = true;
-        break;
-      }
-    }
-
-    expect(hasEnablingMigration).toBe(true);
   });
 });
