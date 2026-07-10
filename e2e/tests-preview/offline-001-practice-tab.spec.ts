@@ -233,11 +233,13 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
 
     // Check pending count before reload
     const beforeReload = await getSyncOutboxCount(page);
-    const beforeReloadStable = await ttPage.getStableSyncOutboxCount();
+    const beforeReloadStableItems = await ttPage.getStableSyncOutboxItems();
+    const beforeReloadStableCount = beforeReloadStableItems.length;
+    const beforeKeys = ttPage.stableOutboxKeys(beforeReloadStableItems);
     console.log(
-      `Pending sync count before reload: ${beforeReload} (stable=${beforeReloadStable})`
+      `Pending sync count before reload: ${beforeReload} (stable=${beforeReloadStableCount})`
     );
-    expect(beforeReloadStable).toBeGreaterThanOrEqual(2);
+    expect(beforeReloadStableCount).toBeGreaterThanOrEqual(2);
 
     // Reload page (still offline)
 
@@ -252,13 +254,21 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
     console.log(
       `Pending sync count after reload: ${afterReload}, immediatelyBeforeReload: ${immediatelyBeforeReload}`
     );
-    await expect
-      .poll(async () => await getSyncOutboxCount(page), {
-        timeout: 10_000,
-        intervals: [250, 250, 500, 1000],
-      })
-      .toBe(beforeReloadStable);
-    expect(afterReload).toBe(beforeReloadStable);
+
+    // Reload can enqueue extra startup repair/normalization rows while still
+    // offline. The regression invariant is that previously queued writes are
+    // not lost, so verify the exact stable records are still present.
+    const afterReloadItems = await ttPage.getStableSyncOutboxItems();
+    const afterKeys = ttPage.stableOutboxKeys(afterReloadItems);
+    for (const key of beforeKeys) {
+      expect(afterKeys.has(key)).toBe(true);
+    }
+
+    // Secondary lower-bound count assertion permits additional startup rows.
+    const afterReloadStableCount = afterReloadItems.length;
+    expect(afterReloadStableCount).toBeGreaterThanOrEqual(
+      beforeReloadStableCount
+    );
 
     // Go online and wait for automatic sync
     await goOnline(page);

@@ -119,7 +119,7 @@ export interface AuthState {
     email: string,
     password: string,
     name: string
-  ) => Promise<{ error: AuthError | null }>;
+  ) => Promise<{ error: AuthError | null; needsEmailConfirmation: boolean }>;
   /** Sign in with OAuth provider */
   signInWithOAuth: (
     provider: "google" | "github"
@@ -160,10 +160,131 @@ export interface AuthState {
 
 type ViewRefreshCategory = "repertoire" | "practice" | "catalog";
 
+type AuthSessionDiagnostic = {
+  label: string;
+  hasSession: boolean;
+  userId: string | null;
+  error: unknown;
+  nowIso: string;
+  expiresAtEpochSec: number | null;
+  msUntilExpiry: number | null;
+  accessTokenLength: number;
+};
+
+type AuthSessionDiagnosticError = {
+  label?: string;
+  error: string;
+};
+
+type AuthSessionDiagnosticResult =
+  | AuthSessionDiagnostic
+  | AuthSessionDiagnosticError;
+
+type TuneTreesTestWindow = Window & {
+  __forceSyncUpForTest?: () => Promise<void>;
+  __forceSyncDownForTest?: () => Promise<void>;
+  __forceCleanLocalResetForTest?: () => Promise<void>;
+  __authSessionDiagForTest?: (
+    label?: string
+  ) => Promise<AuthSessionDiagnosticResult>;
+  __lastAuthDiagHasSession?: boolean;
+};
+
+type AuthTestHooks = {
+  forceSyncUpForTest: () => Promise<void>;
+  forceSyncDownForTest: () => Promise<void>;
+  forceCleanLocalResetForTest: () => Promise<void>;
+  diagLog: (...args: unknown[]) => void;
+};
+
+type SavedAnonymousSession = {
+  refreshToken?: string;
+  userId?: string;
+};
+
 // ---------------------------------------------------------------------------
 // Context - used by useAuth() in AuthContext.tsx
 // ---------------------------------------------------------------------------
 export const TTAuthContext = createContext<AuthState>();
+
+async function createAuthSessionDiagnostic(
+  label?: string
+): Promise<AuthSessionDiagnosticResult> {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    const session = data?.session ?? null;
+    const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : null;
+    const nowMs = Date.now();
+    return {
+      label: label ?? "",
+      hasSession: !!session,
+      userId: session?.user?.id ?? null,
+      error,
+      nowIso: new Date(nowMs).toISOString(),
+      expiresAtEpochSec: session?.expires_at ?? null,
+      msUntilExpiry: expiresAtMs === null ? null : expiresAtMs - nowMs,
+      accessTokenLength: session?.access_token?.length ?? 0,
+    };
+  } catch (error) {
+    console.warn("AUTH DIAG ERROR", error);
+    return { label, error: String(error) };
+  }
+}
+
+function installAuthTestHooks(
+  targetWindow: TuneTreesTestWindow,
+  hooks: AuthTestHooks
+) {
+  targetWindow.__forceSyncUpForTest ??= async () => {
+    try {
+      await hooks.forceSyncUpForTest();
+    } catch (error) {
+      console.warn("__forceSyncUpForTest failed", error);
+      throw error;
+    }
+  };
+  targetWindow.__forceSyncDownForTest ??= async () => {
+    try {
+      await hooks.forceSyncDownForTest();
+    } catch (error) {
+      console.warn("__forceSyncDownForTest failed", error);
+      throw error;
+    }
+  };
+  targetWindow.__forceCleanLocalResetForTest ??= async () => {
+    try {
+      await hooks.forceCleanLocalResetForTest();
+    } catch (error) {
+      console.warn("__forceCleanLocalResetForTest failed", error);
+    }
+  };
+  targetWindow.__authSessionDiagForTest ??= async (label?: string) => {
+    const diagnostic = await createAuthSessionDiagnostic(label);
+    if ("hasSession" in diagnostic) {
+      hooks.diagLog("AUTH DIAG", diagnostic);
+      targetWindow.__lastAuthDiagHasSession = diagnostic.hasSession;
+    }
+    return diagnostic;
+  };
+}
+
+function parseSavedAnonymousSession(
+  savedSession: string
+): SavedAnonymousSession | null {
+  const parsed: unknown = JSON.parse(savedSession);
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  const session = parsed as Record<string, unknown>;
+  return {
+    refreshToken:
+      typeof session.refresh_token === "string"
+        ? session.refresh_token
+        : undefined,
+    userId: typeof session.user_id === "string" ? session.user_id : undefined,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: check if a Supabase user is anonymous
@@ -222,6 +343,78 @@ function formatSyncErrorToast(message: string): {
     title,
     description: message,
   };
+}
+
+function getDisplayNameFromAuthUser(authUser: User): string | null {
+  const metadataName = authUser.user_metadata?.name;
+  if (typeof metadataName === "string" && metadataName.trim().length > 0) {
+    return metadataName;
+  }
+  return authUser.email?.split("@")[0] ?? null;
+}
+
+const PROFILE_DEPENDENT_PENDING_TABLES = [
+  "daily_practice_queue",
+  "goal",
+  "group_member",
+  "media_asset",
+  "note",
+  "practice_record",
+  "prefs_scheduling_options",
+  "prefs_spaced_repetition",
+  "reference",
+  "repertoire",
+  "repertoire_tune",
+  "setlist",
+  "table_state",
+  "table_transient_data",
+  "tag",
+  "tune",
+  "tune_override",
+  "tune_set",
+  "user_genre_selection",
+  "user_group",
+] as const;
+
+async function repairMissingUserProfileOutboxItem(
+  db: SqliteDatabase,
+  userId: string
+): Promise<void> {
+  const pendingProfileRows = db.all<{ count: number }>(sql`
+    SELECT COUNT(*) AS count
+    FROM sync_push_queue
+    WHERE table_name = 'user_profile'
+      AND row_id = ${userId}
+      AND status IN ('pending', 'failed', 'in_progress')
+  `);
+  if (Number(pendingProfileRows[0]?.count ?? 0) > 0) return;
+
+  const dependentTableList = PROFILE_DEPENDENT_PENDING_TABLES.map(
+    (tableName) => `'${tableName}'`
+  ).join(", ");
+  const pendingDependentRows = db.all<{ count: number }>(
+    sql.raw(`
+    SELECT COUNT(*) AS count
+    FROM sync_push_queue
+    WHERE table_name IN (${dependentTableList})
+      AND status IN ('pending', 'failed', 'in_progress')
+  `)
+  );
+  if (Number(pendingDependentRows[0]?.count ?? 0) === 0) return;
+
+  db.run(sql`
+    INSERT INTO sync_push_queue (id, table_name, row_id, operation, changed_at)
+    VALUES (
+      lower(hex(randomblob(16))),
+      'user_profile',
+      ${userId},
+      'UPDATE',
+      strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    )
+  `);
+  markSyncBaselineEvent("local-db:user-profile-outbox-repaired", {
+    userId,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -453,6 +646,40 @@ const TTInner: ParentComponent = (props) => {
       log.error("Failed to get user internal ID from local DB:", error);
       return null;
     }
+  }
+
+  async function ensureLocalUserProfileAnchor(
+    db: SqliteDatabase,
+    authUser: User
+  ): Promise<{ id: string; created: boolean }> {
+    const existingId = await getUserInternalIdFromLocalDb(db, authUser.id);
+    if (existingId) {
+      await repairMissingUserProfileOutboxItem(db, existingId);
+      return { id: existingId, created: false };
+    }
+
+    const { userProfile } = await import("@/lib/db/schema");
+    const now = new Date().toISOString();
+    await db.insert(userProfile).values({
+      id: authUser.id,
+      name: getDisplayNameFromAuthUser(authUser),
+      email: authUser.email ?? null,
+      srAlgType: "fsrs",
+      deleted: 0,
+      syncVersion: 1,
+      lastModifiedAt: now,
+      deviceId: "local",
+    });
+
+    markSyncBaselineEvent("local-db:user-profile-anchor-created", {
+      userId: authUser.id,
+    });
+    console.log(
+      "✅ Created local user_profile anchor for authenticated user:",
+      authUser.id
+    );
+
+    return { id: authUser.id, created: true };
   }
 
   // ---------------------------------------------------------------------------
@@ -1160,9 +1387,10 @@ const TTInner: ParentComponent = (props) => {
     }
   }
 
-  async function initializeLocalDatabase(userId: string) {
+  async function initializeLocalDatabase(user: User) {
     if (isE2eDbClearInProgress()) return;
 
+    const userId = user.id;
     const currentUserId = userIdInt();
     if (isInitializing) return;
     if (localDb() && currentUserId && currentUserId === userId) return;
@@ -1180,25 +1408,22 @@ const TTInner: ParentComponent = (props) => {
       markSyncBaselineEvent("local-db:init:ready", { userId });
       await captureSyncBaselineSnapshot("after-local-db-init", db, userId);
 
-      setLocalDb(db);
-      markSyncBaselineEvent("local-db:signal-set", { userId });
-
-      const internalId = await getUserInternalIdFromLocalDb(db, userId);
-      if (internalId) {
-        setUserIdInt(internalId);
+      const userProfileAnchor = await ensureLocalUserProfileAnchor(db, user);
+      setUserIdInt(userProfileAnchor.id);
+      if (!userProfileAnchor.created) {
         setInitialSyncComplete(true);
-        markSyncBaselineEvent("local-db:existing-user-profile-found", {
-          userId,
-          internalId,
-        });
-      } else {
-        markSyncBaselineEvent("local-db:user-profile-not-yet-local", {
-          userId,
-        });
       }
+      markSyncBaselineEvent("local-db:user-profile-ready", {
+        userId,
+        internalId: userProfileAnchor.id,
+        created: userProfileAnchor.created,
+      });
 
       await clearOldOutboxItems(db);
       markSyncBaselineEvent("local-db:old-outbox-cleared", { userId });
+
+      setLocalDb(db);
+      markSyncBaselineEvent("local-db:signal-set", { userId });
 
       ensureSyncRuntimeConfigured();
       if (autoPersistCleanup) {
@@ -1276,7 +1501,7 @@ const TTInner: ParentComponent = (props) => {
         if (isAnon) {
           void initializeAnonymousDatabase(currentUser.id);
         } else {
-          void initializeLocalDatabase(currentUser.id);
+          void initializeLocalDatabase(currentUser);
         }
       }
       // User signed out (User → null)
@@ -1330,12 +1555,17 @@ const TTInner: ParentComponent = (props) => {
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name } },
+      options: {
+        data: { name },
+        emailRedirectTo: `${globalThis.location.origin}/auth/callback`,
+      },
     });
-    return { error };
+
+    // needsEmailConfirmation: signup succeeded but no session → confirmation required
+    return { error, needsEmailConfirmation: !error && !data.session };
   };
 
   const signInWithOAuth = async (provider: "google" | "github") => {
@@ -1600,7 +1830,7 @@ const TTInner: ParentComponent = (props) => {
       if (isUserAnonymous(currentUser)) {
         await initializeAnonymousDatabase(currentUser.id);
       } else {
-        await initializeLocalDatabase(currentUser.id);
+        await initializeLocalDatabase(currentUser);
       }
 
       if (navigator.onLine && syncServiceInstance) {
@@ -1715,65 +1945,18 @@ const TTInner: ParentComponent = (props) => {
 
   // TEST HOOKS: Expose manual sync controls for Playwright
   if (globalThis.window !== undefined) {
-    const w = globalThis.window as any;
-    if (!w.__forceSyncUpForTest) {
-      w.__forceSyncUpForTest = async () => {
-        try {
-          await waitForSyncService();
-          await forceSyncUp({ allowDeletes: true });
-        } catch (e) {
-          console.warn("__forceSyncUpForTest failed", e);
-          throw e;
-        }
-      };
-    }
-    if (!w.__forceSyncDownForTest) {
-      w.__forceSyncDownForTest = async () => {
-        try {
-          await waitForSyncService();
-          await forceSyncDown({ full: true });
-        } catch (e) {
-          console.warn("__forceSyncDownForTest failed", e);
-          throw e;
-        }
-      };
-    }
-    if (!w.__forceCleanLocalResetForTest) {
-      w.__forceCleanLocalResetForTest = async () => {
-        try {
-          await forceCleanLocalReset();
-        } catch (e) {
-          console.warn("__forceCleanLocalResetForTest failed", e);
-        }
-      };
-    }
-    if (!w.__authSessionDiagForTest) {
-      w.__authSessionDiagForTest = async (label?: string) => {
-        try {
-          const { data, error } = await supabase.auth.getSession();
-          const sess = data?.session || null;
-          const expEpoch = sess?.expires_at ? sess.expires_at * 1000 : null;
-          const nowMs = Date.now();
-          const msUntilExpiry = expEpoch === null ? null : expEpoch - nowMs;
-          const diag = {
-            label: label || "",
-            hasSession: !!sess,
-            userId: sess?.user?.id || null,
-            error,
-            nowIso: new Date(nowMs).toISOString(),
-            expiresAtEpochSec: sess?.expires_at ?? null,
-            msUntilExpiry,
-            accessTokenLength: sess?.access_token?.length ?? 0,
-          };
-          diagLog("AUTH DIAG", diag);
-          w.__lastAuthDiagHasSession = diag.hasSession;
-          return diag;
-        } catch (e) {
-          console.warn("AUTH DIAG ERROR", e);
-          return { label, error: String(e) };
-        }
-      };
-    }
+    installAuthTestHooks(globalThis.window, {
+      forceSyncUpForTest: async () => {
+        await waitForSyncService();
+        await forceSyncUp({ allowDeletes: true });
+      },
+      forceSyncDownForTest: async () => {
+        await waitForSyncService();
+        await forceSyncDown({ full: true });
+      },
+      forceCleanLocalResetForTest: forceCleanLocalReset,
+      diagLog,
+    });
   }
 
   return (
@@ -1815,14 +1998,11 @@ async function ttAnonymousSignIn(): Promise<void> {
   const savedSession = localStorage.getItem(ANONYMOUS_SESSION_KEY);
   if (savedSession) {
     try {
-      const parsed = JSON.parse(savedSession) as {
-        refresh_token?: string;
-        user_id?: string;
-      };
-      if (parsed.refresh_token) {
+      const parsed = parseSavedAnonymousSession(savedSession);
+      if (parsed?.refreshToken) {
         const { data: refreshData, error: refreshError } =
           await supabase.auth.refreshSession({
-            refresh_token: parsed.refresh_token,
+            refresh_token: parsed.refreshToken,
           });
         if (!refreshError && refreshData.session) {
           localStorage.removeItem(ANONYMOUS_SESSION_KEY);

@@ -21,6 +21,7 @@ import { MainLayout } from "../components/layout";
 import type { TabId } from "../components/layout/TabBar";
 import { OnboardingOverlay } from "../components/onboarding";
 import { useAuth } from "../lib/auth/AuthContext";
+import { hasPendingSignUpConfirmation } from "../lib/auth/signup-confirmation-pending";
 import AnalysisPage from "./analysis";
 import CatalogPage from "./catalog";
 import PracticePage from "./practice";
@@ -66,6 +67,12 @@ const Home: Component = () => {
 
   // Redirect unauthenticated users to login (but allow anonymous users)
   createEffect(() => {
+    if (hasPendingSignUpConfirmation()) {
+      console.info("[SignupConfirmation] Home redirected pending signup");
+      navigate("/login?mode=signup", { replace: true });
+      return;
+    }
+
     if (!loading() && !user() && !isAnonymous()) {
       navigate("/login", { replace: true });
     }
@@ -80,7 +87,7 @@ const Home: Component = () => {
     // BEFORE setActiveTab, save the CURRENT (old) tab's query params
     const currentTabId = activeTab(); // Capture the old tab before switching
     try {
-      if (typeof window !== "undefined") {
+      if (globalThis.window !== undefined) {
         // Read DIRECTLY from globalThis.location.search to get the CURRENT URL state
         // (searchParams signal may have been updated by previous setSearchParams calls)
         const currentParams = new URLSearchParams(globalThis.location.search);

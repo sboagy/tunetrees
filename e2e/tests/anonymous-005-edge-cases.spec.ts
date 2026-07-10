@@ -83,19 +83,12 @@ test.describe("Anonymous User Edge Cases", () => {
     // Submit
     await ttPage.signUpButton.click();
 
-    // Wait for potential redirect or success
-    await page.waitForTimeout(3000);
-
-    // Should either be on home page or show email confirmation message
-    const url = page.url();
-    const isOnHome = !url.includes("/login");
-    const hasConfirmationMessage = await page
-      .getByText(/check your email|confirm/i)
-      .isVisible()
-      .catch(() => false);
-
-    // Either outcome is acceptable for sign-up
-    expect(isOnHome || hasConfirmationMessage).toBe(true);
+    // Local Supabase disables email confirmation, so a successful signup has an
+    // active session and must redirect to the authenticated home route.
+    // Wait for the post-signup navigation and initial data loads to settle
+    // before asserting the home page is visible.
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    await ttPage.waitForHome({ timeoutMs: 30_000 });
   });
 
   test("5.3 Banner dismiss state is session-specific", async ({ page }) => {

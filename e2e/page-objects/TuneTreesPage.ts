@@ -3887,38 +3887,55 @@ export class TuneTreesPage {
       .isChecked()
       .catch(() => false);
     if (isChecked !== visible) {
-      await getOption().click();
+      let visibilityUpdated = false;
 
-      // The column menu rerenders the row immediately after a visibility
-      // toggle, so re-query the checkbox state instead of asserting against a
-      // locator chain captured before the click.
-      if (visible) {
-        await expect
-          .poll(
-            async () =>
-              await getCheckbox()
-                .isChecked()
-                .catch(() => null),
-            {
-              timeout: 5000,
-              intervals: [100, 250, 500],
-            }
-          )
-          .toBe(true);
-      } else {
-        await expect
-          .poll(
-            async () =>
-              await getCheckbox()
-                .isChecked()
-                .catch(() => null),
-            {
-              timeout: 5000,
-              intervals: [100, 250, 500],
-            }
-          )
-          .toBe(false);
+      // This menu is conditionally mounted in a portal. On a reactive rerender,
+      // its option row can detach between Playwright's actionability check and
+      // click. Reopen and re-query it with bounded attempts instead of allowing
+      // one stale action to consume the full test timeout.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          if (attempt > 0) {
+            await this.openColumnVisibilityMenu(columnsButton);
+          }
+
+          // Re-check the checkbox before clicking: if a prior attempt already
+          // toggled it (or the menu reopened with the desired state), skip the
+          // click to keep retries idempotent.
+          const alreadyMatches = await getCheckbox()
+            .isChecked()
+            .catch(() => null);
+          if (alreadyMatches === visible) {
+            visibilityUpdated = true;
+            break;
+          }
+
+          await expect(getOption()).toBeVisible({ timeout: 2000 });
+          await getOption().click({ timeout: 2000 });
+
+          visibilityUpdated = await expect
+            .poll(
+              async () =>
+                await getCheckbox()
+                  .isChecked()
+                  .catch(() => null),
+              {
+                timeout: 2000,
+                intervals: [100, 250, 500],
+              }
+            )
+            .toBe(visible)
+            .then(() => true)
+            .catch(() => false);
+          if (visibilityUpdated) {
+            break;
+          }
+        } catch {
+          // Transient detached portal row; continue to next attempt.
+        }
       }
+
+      expect(visibilityUpdated).toBe(true);
     }
 
     await this.closeColumnVisibilityMenu(menu);
@@ -5707,5 +5724,70 @@ export class TuneTreesPage {
     }
 
     return last;
+  }
+
+  /**
+   * Get the full list of pending sync outbox items.
+   * Each item has: tableName, rowId, operation, status, attempts, lastError.
+   * The {operation, tableName, rowId} triple is the stable identifier for a
+   * queued record across reloads.
+   */
+  async getSyncOutboxItems(): Promise<
+    Array<{
+      tableName: string;
+      rowId: string;
+      operation: string;
+      status: string;
+      attempts: number;
+      lastError: string | null;
+    }>
+  > {
+    return await this.page.evaluate(async () => {
+      const api = (globalThis as any).__ttTestApi;
+      if (!api) throw new Error("__ttTestApi not available");
+      if (!api.getPendingSyncOutboxItems) {
+        throw new Error("getPendingSyncOutboxItems not available");
+      }
+      return await api.getPendingSyncOutboxItems();
+    });
+  }
+
+  /**
+   * Get stable outbox items after the count has settled.
+   * Waits for the outbox count to stop changing, then returns the items.
+   */
+  async getStableSyncOutboxItems(opts?: {
+    timeoutMs?: number;
+    stableForMs?: number;
+    pollIntervalMs?: number;
+  }): Promise<
+    Array<{
+      tableName: string;
+      rowId: string;
+      operation: string;
+      status: string;
+      attempts: number;
+      lastError: string | null;
+    }>
+  > {
+    // Wait for the count to stabilize first, then fetch items once.
+    await this.getStableSyncOutboxCount(opts);
+    return await this.getSyncOutboxItems();
+  }
+
+  /**
+   * Derive stable record keys from outbox items for cross-reload comparison.
+   * Returns a Set of `${operation}::${tableName}::${rowId}` strings.
+   */
+  stableOutboxKeys(
+    items: Array<{
+      tableName: string;
+      rowId: string;
+      operation: string;
+    }>
+  ): Set<string> {
+    return new Set(
+      items.map((i) => `${i.operation}::${i.tableName}::${i.rowId}`)
+    );
   }
 }

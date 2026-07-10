@@ -260,7 +260,9 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
       await page.waitForTimeout(500);
     }
     const pendingCountPrevGoto = await getSyncOutboxCount(page);
-    const pendingCountPrevGotoStable = await ttPage.getStableSyncOutboxCount();
+    const prevStableItems = await ttPage.getStableSyncOutboxItems();
+    const prevKeys = ttPage.stableOutboxKeys(prevStableItems);
+    const pendingCountPrevGotoStable = prevStableItems.length;
 
     console.log("Reloading page");
     await page.goto(`${BASE_URL}`);
@@ -273,16 +275,22 @@ test.describe("OFFLINE-011: Extended Offline Session", () => {
     // Do not assert an exact count; internal coalescing/normalization may change it.
     const pendingCountAfterGoto = await getSyncOutboxCount(page);
 
-    await expect
-      .poll(async () => await getSyncOutboxCount(page), {
-        timeout: 10_000,
-        intervals: [250, 250, 500, 1000],
-      })
-      .toBe(pendingCountPrevGotoStable);
+    // Reload can enqueue extra startup repair/normalization rows while still
+    // offline. The key invariant is that already queued offline writes remain
+    // present. Verify each previously captured stable record still exists.
+    const afterReloadItems = await ttPage.getStableSyncOutboxItems();
+    const afterKeys = ttPage.stableOutboxKeys(afterReloadItems);
+    for (const key of prevKeys) {
+      expect(afterKeys.has(key)).toBe(true);
+    }
+
+    // Secondary lower-bound count assertion permits additional startup rows.
 
     const pendingCountFinal = await getSyncOutboxCount(page);
 
-    expect(pendingCountFinal).toBe(pendingCountPrevGotoStable);
+    expect(pendingCountFinal).toBeGreaterThanOrEqual(
+      pendingCountPrevGotoStable
+    );
 
     console.log(
       `📦 sync items (final): ${pendingCountFinal} pendingCountPrevGoto=${pendingCountPrevGoto} pendingCountPrevGotoStable=${pendingCountPrevGotoStable} pendingCountAfterGoto=${pendingCountAfterGoto}`
