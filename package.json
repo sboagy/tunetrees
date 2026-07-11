@@ -19,6 +19,7 @@
     "build:staging": "tsc -b && FORCE_COLOR=1 op run --env-file=\".env.staging.template\" -- vite build && node scripts/verify-sqlite-wasm-build.js",
     "build:preview-local": "tsc -b && FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- tsx scripts/build-preview-local.ts",
     "verify:sqlite-wasm-build": "node scripts/verify-sqlite-wasm-build.js",
+    "verify:deployed-pages-assets": "node scripts/verify-deployed-pages-assets.mjs",
     "preview": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- vite preview",
     "preview:local": "op run --env-file=\".env.local.template\" -- vite preview --strictPort --port 4173",
     "codegen:schema": "op run --env-file=\".env.local.template\" -- tsx node_modules/oosync/src/codegen-schema.ts",

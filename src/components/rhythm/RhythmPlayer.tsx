@@ -20,6 +20,7 @@ import {
   createSignal,
   For,
   onCleanup,
+  onMount,
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
@@ -237,6 +238,7 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
   const [loadedPattern, setLoadedPattern] =
     createSignal<RhythmPatternMetadata | null>(null);
   const [usePremiumLoop, setUsePremiumLoop] = createSignal(false);
+  const [isCountInEnabled, setIsCountInEnabled] = createSignal(true);
   const [selectedPatternId, setSelectedPatternId] = createSignal<string | null>(
     null
   );
@@ -453,14 +455,6 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     const tuneTypeName = props.tuneTypeName?.trim();
     return tuneTypeName ? `Rhythm Player: ${tuneTypeName}` : "Rhythm Player";
   });
-  const playToggleLabel = createMemo(() => {
-    if (isPatternLoading()) {
-      return "Loading";
-    }
-
-    return isPlaying() ? "Stop" : "Play";
-  });
-
   const closeCustomPatternEditor = () => {
     setIsCustomPatternEditorOpen(false);
     setIsDeleteCustomPatternDialogOpen(false);
@@ -729,6 +723,120 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     }
   };
 
+  const getPlaybackStartOptions = () => {
+    const usePremiumStartOffset =
+      Boolean(activePatternMetadata()?.premiumAudioUrl) && usePremiumLoop();
+
+    return {
+      startPositionMs: usePremiumStartOffset ? selectedStartPositionMs() : 0,
+      startBeatIndex: playbackPlan()?.startBeatIndex ?? 0,
+      startMeasure: playbackPlan()?.startMeasure ?? 0,
+      playbackRhythmAbc: usePremiumStartOffset
+        ? undefined
+        : (playbackAbc() ?? undefined),
+      ...(isCountInEnabled() ? {} : { useCountIn: false }),
+    };
+  };
+
+  const startPlayback = () => {
+    void service()?.play(getPlaybackStartOptions());
+  };
+
+  const playWithRestart = () => {
+    const currentService = service();
+    if (!currentService) {
+      return;
+    }
+
+    currentService.stop();
+    void currentService.play(getPlaybackStartOptions());
+  };
+
+  const shouldIgnoreTransportHotkeys = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    const editableTarget = target.closest<HTMLElement>(
+      "input, textarea, [contenteditable='true']"
+    );
+    if (!editableTarget || editableTarget.isContentEditable) {
+      return Boolean(editableTarget?.isContentEditable);
+    }
+
+    if (editableTarget instanceof HTMLTextAreaElement) {
+      return true;
+    }
+
+    if (!(editableTarget instanceof HTMLInputElement)) {
+      return false;
+    }
+
+    return ![
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "radio",
+      "range",
+      "reset",
+      "submit",
+    ].includes(editableTarget.type);
+  };
+
+  const handleTransportHotkeys = (event: KeyboardEvent) => {
+    if (
+      event.defaultPrevented ||
+      event.repeat ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      shouldIgnoreTransportHotkeys(event.target) ||
+      !service() ||
+      !activePatternMetadata() ||
+      isPatternLoading()
+    ) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    if (key === "/") {
+      if (!isPlaying() && !isPaused()) {
+        return;
+      }
+      event.preventDefault();
+      service()?.stop();
+      return;
+    }
+
+    if (key === ".") {
+      if (!isPlaying() && !isPaused()) {
+        return;
+      }
+      event.preventDefault();
+      playWithRestart();
+      return;
+    }
+
+    if (key !== ",") {
+      return;
+    }
+
+    event.preventDefault();
+    if (isPlaying()) {
+      service()?.pause();
+      return;
+    }
+
+    if (isPaused()) {
+      void service()?.resume();
+      return;
+    }
+
+    startPlayback();
+  };
+
   const handlePatternSelectionChange = (value: string) => {
     const nextPatternId = value.trim() || null;
 
@@ -943,6 +1051,22 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
     );
   };
 
+  const countInControls = () => (
+    <label class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+      <span class="font-medium text-slate-900 dark:text-slate-100">
+        One-bar count-in
+      </span>
+      <input
+        type="checkbox"
+        checked={isCountInEnabled()}
+        disabled={!service() || !activePatternMetadata() || isPatternLoading()}
+        onChange={(event) => setIsCountInEnabled(event.currentTarget.checked)}
+        class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        data-testid="rhythm-player-count-in-toggle"
+      />
+    </label>
+  );
+
   const getNotationContainer = (): HTMLDivElement | null => {
     const host = notationHostRef();
     if (!host) {
@@ -1122,6 +1246,11 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
 
   onCleanup(() => {
     clearActiveBeatTargets();
+    document.removeEventListener("keydown", handleTransportHotkeys);
+  });
+
+  onMount(() => {
+    document.addEventListener("keydown", handleTransportHotkeys);
   });
 
   return (
@@ -1209,6 +1338,10 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                         <div class="h-px bg-slate-200 dark:bg-slate-800" />
 
                         {metronomeControls()}
+
+                        <div class="h-px bg-slate-200 dark:bg-slate-800" />
+
+                        {countInControls()}
                       </div>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
@@ -1265,24 +1398,16 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   }
 
                   if (isPlaying()) {
-                    currentService.stop();
+                    currentService.pause();
                     return;
                   }
 
-                  const usePremiumStartOffset =
-                    Boolean(activePatternMetadata()?.premiumAudioUrl) &&
-                    usePremiumLoop();
+                  if (isPaused()) {
+                    void currentService.resume();
+                    return;
+                  }
 
-                  void currentService.play({
-                    startPositionMs: usePremiumStartOffset
-                      ? selectedStartPositionMs()
-                      : 0,
-                    startBeatIndex: playbackPlan()?.startBeatIndex ?? 0,
-                    startMeasure: playbackPlan()?.startMeasure ?? 0,
-                    playbackRhythmAbc: usePremiumStartOffset
-                      ? undefined
-                      : (playbackAbc() ?? undefined),
-                  });
+                  startPlayback();
                 }}
                 disabled={
                   !service() || !activePatternMetadata() || isPatternLoading()
@@ -1295,31 +1420,17 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   fallback={<LoaderCircle class="h-4 w-4 animate-spin" />}
                 >
                   {isPlaying() ? (
-                    <Square class="h-4 w-4" />
+                    <Pause class="h-4 w-4" />
                   ) : (
                     <Play class="h-4 w-4" />
                   )}
                 </Show>
-                {playToggleLabel()}
+                {isPlaying() ? "Pause (,)" : "Play (,)"}
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  const currentService = service();
-                  if (!currentService) {
-                    return;
-                  }
-
-                  if (isPlaying()) {
-                    currentService.pause();
-                    return;
-                  }
-
-                  if (isPaused()) {
-                    void currentService.resume();
-                  }
-                }}
+                onClick={playWithRestart}
                 disabled={
                   !service() ||
                   !activePatternMetadata() ||
@@ -1327,53 +1438,34 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   (!isPlaying() && !isPaused())
                 }
                 class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 md:h-auto md:w-auto md:min-w-[7rem] md:gap-2 md:px-4 md:py-2"
-                data-testid="rhythm-player-pause-button"
-                aria-label={isPlaying() ? "Pause" : "Resume"}
-                title={isPlaying() ? "Pause" : "Resume"}
+                data-testid="rhythm-player-restart-button"
+                aria-label="Restart (.)"
+                title="Restart (.)"
               >
-                <Pause class="h-4 w-4" />
-                <span class="sr-only">{isPlaying() ? "Pause" : "Resume"}</span>
-                <span class="hidden md:inline">
-                  {isPlaying() ? "Pause" : "Resume"}
-                </span>
+                <RotateCcw class="h-4 w-4" />
+                <span class="sr-only">Restart (.)</span>
+                <span class="text-xs font-semibold md:hidden">.</span>
+                <span class="hidden md:inline">Restart (.)</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  const currentService = service();
-                  if (currentService) {
-                    const usePremiumStartOffset =
-                      Boolean(activePatternMetadata()?.premiumAudioUrl) &&
-                      usePremiumLoop();
-
-                    void currentService.restart({
-                      startPositionMs: usePremiumStartOffset
-                        ? selectedStartPositionMs()
-                        : 0,
-                      startBeatIndex: playbackPlan()?.startBeatIndex ?? 0,
-                      startMeasure: playbackPlan()?.startMeasure ?? 0,
-                      playbackRhythmAbc: usePremiumStartOffset
-                        ? undefined
-                        : (playbackAbc() ?? undefined),
-                    });
-                  }
-                }}
+                onClick={() => service()?.stop()}
                 disabled={
                   !service() ||
                   !activePatternMetadata() ||
                   isPatternLoading() ||
-                  isPlaying() ||
-                  !isPaused()
+                  (!isPlaying() && !isPaused())
                 }
                 class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 md:h-auto md:w-auto md:min-w-[7rem] md:gap-2 md:px-4 md:py-2"
-                data-testid="rhythm-player-restart-button"
-                aria-label="Restart"
-                title="Restart"
+                data-testid="rhythm-player-stop-button"
+                aria-label="Stop (/)"
+                title="Stop (/)"
               >
-                <RotateCcw class="h-4 w-4" />
-                <span class="sr-only">Restart</span>
-                <span class="hidden md:inline">Restart</span>
+                <Square class="h-4 w-4" />
+                <span class="sr-only">Stop (/)</span>
+                <span class="text-xs font-semibold md:hidden">/</span>
+                <span class="hidden md:inline">Stop (/)</span>
               </button>
 
               <Show when={!isMobile()}>
@@ -1383,6 +1475,8 @@ export const RhythmPlayer: Component<RhythmPlayerProps> = (props) => {
                   {swingControls()}
 
                   {metronomeControls()}
+
+                  {countInControls()}
                 </div>
               </Show>
             </div>

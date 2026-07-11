@@ -84,8 +84,11 @@ In order, the workflow:
 7. Deploys the production Worker.
 8. Builds the production Pages bundle.
 9. Deploys Cloudflare Pages project `tunetrees-pwa` on branch `main`.
-10. Runs production-safe Playwright smoke tests.
-11. Writes the result to the GitHub job summary.
+10. Verifies every generated JavaScript, CSS, and WASM asset through
+    `https://tunetrees.com`, rejecting non-200 responses or incorrect MIME
+    types before the deployment can be marked successful.
+11. Runs production-safe Playwright smoke tests against the public hostname.
+12. Writes the result to the GitHub job summary.
 
 The workflow does not copy staging database data, staging R2 objects, or staging schema artifacts into production. Production database changes occur only through committed migrations applied by `db:production:schema:push`.
 

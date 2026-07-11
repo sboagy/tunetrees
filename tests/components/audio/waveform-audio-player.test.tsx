@@ -516,6 +516,38 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(loopToggle.checked).toBe(true);
   });
 
+  it("resumes a paused loop and stops it without restarting", async () => {
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-loop-transport",
+          referenceTitle: "Loop Transport",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Floop-transport.mp3",
+        }}
+      />
+    ));
+
+    await emitReadyAfterInit();
+    fireEvent.click(screen.getByTestId("audio-player-add-region-button"));
+    fireEvent.click(screen.getByTestId("audio-player-loop-toggle"));
+    fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
+
+    expect(waveSurferInstance.play).toHaveBeenCalledWith(0, 4);
+
+    waveSurferInstance.isPlaying.mockReturnValue(true);
+    fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
+    emitWaveEvent("pause");
+
+    waveSurferInstance.isPlaying.mockReturnValue(false);
+    fireEvent.click(screen.getByTestId("audio-player-play-toggle"));
+    expect(waveSurferInstance.play).toHaveBeenLastCalledWith();
+    emitWaveEvent("play");
+
+    fireEvent.click(screen.getByTestId("audio-player-stop-button"));
+    expect(waveSurferInstance.pause).toHaveBeenCalled();
+    expect(waveSurferInstance.setTime).toHaveBeenLastCalledWith(0);
+  });
+
   it("restores saved settings and annotations from persisted state", async () => {
     render(() => (
       <WaveformAudioPlayer
@@ -559,6 +591,10 @@ describe("WaveformAudioPlayer persistence", () => {
       (screen.getByTestId("audio-player-loop-toggle") as HTMLInputElement)
         .disabled
     ).toBe(true);
+    expect(
+      (screen.getByTestId("audio-player-loop-toggle") as HTMLInputElement)
+        .checked
+    ).toBe(false);
     expect(screen.getByText("Beat 1")).toBeDefined();
   });
 
@@ -599,9 +635,7 @@ describe("WaveformAudioPlayer persistence", () => {
     await emitReadyAfterInit();
 
     const renderedIds = Array.from(
-      screen
-        .getByTestId("audio-player-region-list")
-        .querySelectorAll('[role="option"]')
+      screen.getByTestId("audio-player-region-list").querySelectorAll("li")
     ).map((row) => (row as HTMLElement).dataset.testid);
 
     expect(renderedIds).toEqual([
@@ -865,7 +899,7 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(
       screen
         .getByTestId("audio-player-region-beat-1")
-        .getAttribute("aria-selected")
+        .getAttribute("data-selected")
     ).toBe("true");
 
     fireEvent.click(screen.getByTestId("audio-player-clear-selection-button"));
@@ -873,14 +907,14 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(
       screen
         .getByTestId("audio-player-region-beat-1")
-        .getAttribute("aria-selected")
+        .getAttribute("data-selected")
     ).toBe("false");
     expect(
       screen.queryByTestId("audio-player-clear-selection-button")
     ).toBeNull();
   });
 
-  it("adds beat, measure, and section marks from keyboard shortcuts", async () => {
+  it("adds beat and measure marks from keyboard shortcuts", async () => {
     const view = render(() => (
       <WaveformAudioPlayer
         track={{
@@ -907,11 +941,6 @@ describe("WaveformAudioPlayer persistence", () => {
       code: "KeyM",
       bubbles: true,
     });
-    fireEvent.keyDown(document.body, {
-      key: "s",
-      code: "KeyS",
-      bubbles: true,
-    });
 
     view.unmount();
 
@@ -932,7 +961,40 @@ describe("WaveformAudioPlayer persistence", () => {
     expect(storedState.regions).toMatchObject([
       { kind: "beat", label: "Beat 1", end: null },
       { kind: "measure", label: "Measure 1", end: null },
-      { kind: "section", label: "Section 1", end: null },
     ]);
+  });
+
+  it("supports pedal-compatible transport shortcuts", async () => {
+    render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-transport",
+          referenceTitle: "Transport Audio",
+          url: "http://localhost:8787/api/media/view?key=users%2Fabc%2Faudio%2Ftransport.mp3",
+        }}
+      />
+    ));
+
+    await emitReadyAfterInit();
+
+    fireEvent.keyDown(screen.getByTestId("audio-player-tempo-slider"), {
+      code: "Comma",
+      key: ",",
+    });
+    expect(waveSurferInstance.play).toHaveBeenCalledTimes(1);
+    emitWaveEvent("play");
+
+    fireEvent.keyDown(document.body, {
+      code: "Period",
+      key: ".",
+    });
+    expect(waveSurferInstance.pause).toHaveBeenCalledTimes(1);
+    expect(waveSurferInstance.setTime).toHaveBeenCalledWith(0);
+    expect(waveSurferInstance.play).toHaveBeenCalledTimes(2);
+    emitWaveEvent("play");
+
+    fireEvent.keyDown(document.body, { key: "/", code: "Slash" });
+    expect(waveSurferInstance.pause).toHaveBeenCalledTimes(2);
+    expect(waveSurferInstance.setTime).toHaveBeenLastCalledWith(0);
   });
 });

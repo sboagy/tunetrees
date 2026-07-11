@@ -5,6 +5,7 @@ import {
   Play,
   Repeat,
   Scissors,
+  Square,
   Trash2,
   X,
 } from "lucide-solid";
@@ -365,6 +366,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   const { session, localDb } = useAuth();
   const [isReady, setIsReady] = createSignal(false);
   const [isPlaying, setIsPlaying] = createSignal(false);
+  const [isPaused, setIsPaused] = createSignal(false);
   const [currentTime, setCurrentTime] = createSignal(0);
   const [duration, setDuration] = createSignal(
     props.track.durationSeconds ?? 0
@@ -408,6 +410,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   let didDragSelectionChange = false;
   let suppressNextRowClick = false;
   let objectUrlToRevoke: string | null = null;
+  let transportWasStopped = false;
 
   type RegionListModifiers = {
     shiftKey: boolean;
@@ -550,10 +553,28 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
   };
 
   const stopPlayback = () => {
+    transportWasStopped = true;
     waveSurfer?.pause();
     audioElement?.pause();
     setIsPlaying(false);
+    setIsPaused(false);
   };
+
+  const stopAndRewind = () => {
+    stopPlayback();
+    waveSurfer?.setTime(0);
+    setCurrentTime(0);
+  };
+
+  const restartPlayback = () => {
+    stopAndRewind();
+    if (loopEnabled() && playSelectedRegion()) {
+      return;
+    }
+    void waveSurfer?.play();
+  };
+
+  const canControlTransport = () => isPlaying() || currentTime() > 0;
 
   const collectSerializedRegions = () => {
     if (!regionsPlugin) {
@@ -774,14 +795,26 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     }
 
     if (waveSurfer.isPlaying()) {
+      transportWasStopped = false;
       waveSurfer.pause();
+      setIsPaused(true);
+      return;
+    }
+
+    if (isPaused()) {
+      transportWasStopped = false;
+      setIsPaused(false);
+      void waveSurfer.play();
       return;
     }
 
     if (loopEnabled() && playSelectedRegion()) {
+      transportWasStopped = false;
       return;
     }
 
+    transportWasStopped = false;
+    setIsPaused(false);
     void waveSurfer.play();
   };
 
@@ -844,15 +877,6 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       return;
     }
 
-    applyRegionListSelection(regionId, event);
-  };
-
-  const handleRegionListKeyDown = (regionId: string, event: KeyboardEvent) => {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-
-    event.preventDefault();
     applyRegionListSelection(regionId, event);
   };
 
@@ -990,13 +1014,85 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
         event.preventDefault();
         addAnnotation("measure");
         break;
-      case "s":
-        event.preventDefault();
-        addAnnotation("section");
-        break;
       default:
         break;
     }
+  };
+
+  const shouldIgnoreTransportHotkeys = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    const editableTarget = target.closest<HTMLElement>(
+      "input, textarea, [contenteditable='true']"
+    );
+    if (!editableTarget || editableTarget.isContentEditable) {
+      return Boolean(editableTarget?.isContentEditable);
+    }
+
+    if (editableTarget instanceof HTMLTextAreaElement) {
+      return true;
+    }
+
+    if (!(editableTarget instanceof HTMLInputElement)) {
+      return false;
+    }
+
+    return ![
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "radio",
+      "range",
+      "reset",
+      "submit",
+    ].includes(editableTarget.type);
+  };
+
+  const handleTransportHotkeys = (event: KeyboardEvent) => {
+    if (
+      event.defaultPrevented ||
+      event.repeat ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      shouldIgnoreTransportHotkeys(event.target)
+    ) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    if (key === "/") {
+      if (!canControlTransport()) {
+        return;
+      }
+      event.preventDefault();
+      stopAndRewind();
+      return;
+    }
+
+    if (key === ".") {
+      if (!canControlTransport()) {
+        return;
+      }
+      event.preventDefault();
+      restartPlayback();
+      return;
+    }
+
+    if (key !== ",") {
+      return;
+    }
+
+    if (!isReady()) {
+      return;
+    }
+
+    event.preventDefault();
+    handlePlayPause();
   };
 
   const handlePointerUp = () => {
@@ -1125,11 +1221,24 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
           }
         }
         isRestoringRegions = false;
+        // Region selection is session-only. A persisted loop setting without a
+        // selected loop would misleadingly appear enabled but play from zero.
+        setLoopEnabled(false);
         syncSerializedRegions();
       });
 
-      waveSurfer.on("play", () => setIsPlaying(true));
-      waveSurfer.on("pause", () => setIsPlaying(false));
+      waveSurfer.on("play", () => {
+        setIsPlaying(true);
+        setIsPaused(false);
+      });
+      waveSurfer.on("pause", () => {
+        setIsPlaying(false);
+        setIsPaused(!transportWasStopped);
+      });
+      waveSurfer.on("finish", () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      });
       waveSurfer.on("timeupdate", (time) => setCurrentTime(time));
       waveSurfer.on("error", (error) => {
         const message = error instanceof Error ? error.message : String(error);
@@ -1185,7 +1294,11 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       });
 
       regionsPlugin.on("region-out", (region) => {
-        if (!loopEnabled() || selectedRegionId() !== region.id || !waveSurfer) {
+        if (
+          !loopEnabled() ||
+          selectedRegionId() !== region.id ||
+          !waveSurfer?.isPlaying()
+        ) {
           return;
         }
 
@@ -1199,6 +1312,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     });
 
     document.addEventListener("keydown", handleAnnotationHotkeys);
+    document.addEventListener("keydown", handleTransportHotkeys);
     document.addEventListener("pointerup", handlePointerUp);
   });
 
@@ -1208,6 +1322,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
     props.onPersistRequestChange?.(null);
 
     document.removeEventListener("keydown", handleAnnotationHotkeys);
+    document.removeEventListener("keydown", handleTransportHotkeys);
     document.removeEventListener("pointerup", handlePointerUp);
 
     void flushPendingPersist(false).catch(() => undefined);
@@ -1228,6 +1343,39 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
       data-testid="audio-player-panel"
     >
       <div class="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handlePlayPause}
+            disabled={!isReady()}
+            class="inline-flex min-h-11 min-w-[7rem] items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            data-testid="audio-player-play-toggle"
+          >
+            {isPlaying() ? <Pause class="h-4 w-4" /> : <Play class="h-4 w-4" />}
+            {isPlaying() ? "Pause (,)" : "Play (,)"}
+          </button>
+          <button
+            type="button"
+            onClick={restartPlayback}
+            disabled={!isReady() || !canControlTransport()}
+            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            data-testid="audio-player-restart-button"
+          >
+            <Repeat class="h-4 w-4" />
+            Restart (.)
+          </button>
+          <button
+            type="button"
+            onClick={stopAndRewind}
+            disabled={!isReady() || !canControlTransport()}
+            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            data-testid="audio-player-stop-button"
+          >
+            <Square class="h-4 w-4" />
+            Stop (/)
+          </button>
+        </div>
+
         <div
           ref={waveformContainerRef}
           class="min-h-[128px] w-full"
@@ -1252,17 +1400,6 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
         </Show>
 
         <div class="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={handlePlayPause}
-            disabled={!isReady()}
-            class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-            data-testid="audio-player-play-toggle"
-          >
-            {isPlaying() ? <Pause class="h-4 w-4" /> : <Play class="h-4 w-4" />}
-            {isPlaying() ? "Pause" : "Play"}
-          </button>
-
           <div class="text-sm text-slate-600 dark:text-slate-300">
             <span data-testid="audio-player-current-time">
               {formatTime(currentTime())}
@@ -1439,25 +1576,23 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
             </Show>
           </div>
 
-          <div
+          <ul
             class="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1"
             onPointerDown={(event) => {
               if (event.target === event.currentTarget) {
                 clearSelection(true);
               }
             }}
-            role="listbox"
             aria-label="Saved marks and regions"
-            aria-multiselectable="true"
             data-testid="audio-player-region-list"
           >
             <Show
               when={regions().length > 0}
               fallback={
-                <p class="text-sm text-slate-500 dark:text-slate-400">
+                <li class="text-sm text-slate-500 dark:text-slate-400">
                   Add loop regions, section marks, or beat and measure marks to
                   save them with this audio reference.
-                </p>
+                </li>
               }
             >
               <For each={regions()}>
@@ -1465,23 +1600,16 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
                   (() => {
                     const kind = getAudioRegionKind(region);
                     return (
-                      <div
-                        onPointerDown={(event) =>
-                          handleRegionListPointerDown(region.id, event)
-                        }
-                        onClick={(event) =>
-                          handleRegionListClick(region.id, event)
-                        }
-                        onKeyDown={(event) =>
-                          handleRegionListKeyDown(region.id, event)
-                        }
+                      <li
                         onPointerEnter={() =>
                           handleRegionListPointerEnter(region.id)
                         }
                         class="grid w-full grid-cols-[minmax(0,1fr)_6.5rem_auto] items-center gap-2 rounded-lg border px-2 py-1 text-left transition-colors"
-                        role="option"
-                        tabIndex={0}
-                        aria-selected={selectedRegionIds().includes(region.id)}
+                        data-selected={
+                          selectedRegionIds().includes(region.id)
+                            ? "true"
+                            : "false"
+                        }
                         classList={{
                           "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/40":
                             selectedRegionIds().includes(region.id),
@@ -1492,7 +1620,21 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
                         }}
                         data-testid={`audio-player-region-${region.id}`}
                       >
-                        <div class="min-w-0 overflow-hidden text-left text-[13px] font-medium text-slate-900 dark:text-slate-100">
+                        <button
+                          type="button"
+                          onPointerDown={(event) =>
+                            handleRegionListPointerDown(region.id, event)
+                          }
+                          onClick={(event) =>
+                            handleRegionListClick(region.id, event)
+                          }
+                          class="min-w-0 overflow-hidden text-left text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
+                        >
+                          <span class="sr-only">
+                            {selectedRegionIds().includes(region.id)
+                              ? "Selected: "
+                              : "Not selected: "}
+                          </span>
                           <span class="truncate">
                             {getRegionDisplayLabel(region)}
                           </span>
@@ -1510,7 +1652,7 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
                               </span>
                             </Show>
                           </span>
-                        </div>
+                        </button>
 
                         <Show
                           when={!isRangeAnnotation(kind)}
@@ -1571,13 +1713,13 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
                             <Trash2 class="h-3.5 w-3.5" />
                           </button>
                         </div>
-                      </div>
+                      </li>
                     );
                   })()
                 }
               </For>
             </Show>
-          </div>
+          </ul>
         </div>
       </div>
     </div>
