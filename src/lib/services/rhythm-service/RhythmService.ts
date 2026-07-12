@@ -110,6 +110,7 @@ export interface PlaybackStartOptions {
   startBeatIndex?: number;
   startMeasure?: number;
   playbackRhythmAbc?: string;
+  useCountIn?: boolean;
 }
 
 export interface RhythmService {
@@ -879,7 +880,8 @@ export function createRhythmService(
     armDebugPlaybackPasses();
     const startPositionMs = Math.max(0, startOptions?.startPositionMs ?? 0);
     lastKnownPositionMs = startPositionMs;
-    const shouldCountIn = (options.initialCountInMeasures ?? 0) > 0;
+    const shouldCountIn =
+      startOptions?.useCountIn ?? (options.initialCountInMeasures ?? 0) > 0;
     await beginPlayback(
       startPositionMs || undefined,
       shouldCountIn,
@@ -913,17 +915,28 @@ export function createRhythmService(
 
   async function resume(): Promise<void> {
     setError(null);
-    armDebugPlaybackPasses();
-    if (lastKnownPositionMs <= 0) {
+    if (!timingCallbacks || !isPaused()) {
       await play();
       return;
     }
 
-    await beginPlayback(lastKnownPositionMs, false, {
-      startBeatIndex: playbackStartBeatIndex,
-      startMeasure: playbackStartMeasure,
-      playbackRhythmAbc: activePlaybackRhythmAbc ?? undefined,
-    });
+    claimGlobalPlayback();
+
+    const audioContext = await ensureAudioContext();
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+
+    // TimingCallbacks retains its own paused percentage and event cursor.
+    // Rebuilding it from a millisecond offset restarts its note sequence at
+    // the beginning, even though the visual timing position is preserved.
+    timingCallbacks.start();
+    if (premiumLoopAudio) {
+      await premiumLoopAudio.play();
+    }
+
+    setIsPaused(false);
+    setIsPlaying(true);
   }
 
   async function togglePlayback(): Promise<void> {

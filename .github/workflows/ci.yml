@@ -1032,6 +1032,9 @@ jobs:
               --project-name=tunetrees-pwa \
               --branch=staging
 
+      - name: Verify staging Pages assets through the public hostname
+        run: npm run verify:deployed-pages-assets -- https://staging.tunetrees.com
+
       - name: Install PostgreSQL 17 client
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_staging_data_refresh != 'true' }}
         run: |

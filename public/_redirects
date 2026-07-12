@@ -1,1 +1,19 @@
-/*    /index.html   200
+# Cloudflare Pages applies redirects before serving static files. Keep SPA
+# fallbacks limited to actual client routes so a missing hashed asset returns a
+# 404 instead of being rewritten to index.html with a misleading 200 response.
+/login                         /index.html 200
+/privacy                       /index.html 200
+/terms                         /index.html 200
+/auth/callback                 /index.html 200
+/reset-password                /index.html 200
+/user-settings                 /index.html 200
+/user-settings/*               /index.html 200
+/practice                      /index.html 200
+/practice/history              /index.html 200
+/repertoire                    /index.html 200
+/catalog                       /index.html 200
+/analysis                      /index.html 200
+/setlists                      /index.html 200
+/groups                        /index.html 200
+/debug/db                      /index.html 200
+/tunes/*                       /index.html 200

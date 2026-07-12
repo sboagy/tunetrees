@@ -1362,7 +1362,10 @@ describe("createRhythmService", () => {
 
       start(position?: number, units?: string) {
         this.startedWith.push({ position, units });
-        this.currentPositionMs = (position ?? 0) * 1000;
+        if (position !== undefined) {
+          this.currentPositionMs = position * 1000;
+        }
+        this.paused = false;
         this.options.beatCallback?.(1);
         this.options.eventCallback?.({
           type: "event",
@@ -1454,16 +1457,17 @@ describe("createRhythmService", () => {
 
     await service.resume();
 
-    expect(FakeTimingCallbacks.instances).toHaveLength(3);
-    expect(FakeTimingCallbacks.instances[2]?.startedWith[0]).toMatchObject({
-      position: 1.5,
-      units: "seconds",
-    });
+    expect(FakeTimingCallbacks.instances).toHaveLength(2);
+    expect(FakeTimingCallbacks.instances[1]?.startedWith).toEqual([
+      { position: 1.5, units: "seconds" },
+      { position: undefined, units: undefined },
+    ]);
+    expect(FakeTimingCallbacks.instances[1]?.currentPositionMs).toBe(1500);
 
     await service.play();
 
-    expect(FakeTimingCallbacks.instances).toHaveLength(4);
-    expect(FakeTimingCallbacks.instances[3]?.startedWith[0]).toMatchObject({
+    expect(FakeTimingCallbacks.instances).toHaveLength(3);
+    expect(FakeTimingCallbacks.instances[2]?.startedWith[0]).toMatchObject({
       position: undefined,
       units: "seconds",
     });

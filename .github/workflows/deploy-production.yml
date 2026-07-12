@@ -230,6 +230,9 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
+      - name: Verify production Pages assets through the public hostname
+        run: npm run verify:deployed-pages-assets -- https://tunetrees.com
+
       - name: Install Playwright browser for production smoke
         run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
 

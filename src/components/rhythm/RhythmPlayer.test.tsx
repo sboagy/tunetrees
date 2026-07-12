@@ -2471,7 +2471,7 @@ describe("RhythmPlayer", () => {
     });
   });
 
-  it("uses stop on the main button while playback is active", async () => {
+  it("uses pause on the main button while playback is active", async () => {
     const seedAbc = [
       "X:1",
       "T:Seed Pattern",
@@ -2518,15 +2518,121 @@ describe("RhythmPlayer", () => {
     await waitFor(() => {
       expect(
         view.getByTestId("rhythm-player-play-toggle").textContent
-      ).toContain("Stop");
+      ).toContain("Pause");
     });
 
     fireEvent.click(view.getByTestId("rhythm-player-play-toggle"));
 
-    expect(mocked.serviceStub.stop).toHaveBeenCalledTimes(1);
+    expect(mocked.serviceStub.pause).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps restart disabled until playback has been paused", async () => {
+  it("supports pedal-compatible transport shortcuts", async () => {
+    const seedAbc = [
+      "X:1",
+      "T:Seed Pattern",
+      "M:4/4",
+      "L:1/8",
+      "K:clef=perc",
+      "| A2 | A2 |",
+    ].join("\n");
+    const metadata = {
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: seedAbc,
+      rhythmSignature: "4/4",
+      patternType: "seed" as const,
+      tempoQpm: 120,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns" as const,
+    };
+    mocked.loadPatternMock.mockResolvedValue(metadata);
+    mocked.serviceStub.metadata = () => metadata;
+
+    const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+
+    await waitFor(() => {
+      expect(view.getByTestId("rhythm-player-play-toggle")).toBeTruthy();
+    });
+
+    fireEvent.keyDown(view.getByTestId("rhythm-player-count-in-toggle"), {
+      code: "Comma",
+      key: ",",
+    });
+    expect(mocked.serviceStub.play).toHaveBeenCalledTimes(1);
+
+    // The service exposes Solid accessors in production. Re-render with the
+    // playing accessor so the shortcut handler observes the same reactive
+    // transport state before testing restart and stop.
+    cleanup();
+    mocked.serviceStub.isPlaying = () => true;
+
+    const playingView = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+    await waitFor(() => {
+      expect(
+        playingView.getByTestId("rhythm-player-play-toggle").textContent
+      ).toContain("Pause");
+    });
+
+    fireEvent.keyDown(document.body, {
+      code: "Period",
+      key: ".",
+    });
+    expect(mocked.serviceStub.stop).toHaveBeenCalledTimes(1);
+    expect(mocked.serviceStub.play).toHaveBeenCalledTimes(2);
+
+    fireEvent.keyDown(document.body, { key: "/", code: "Slash" });
+    expect(mocked.serviceStub.stop).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets users disable the one-bar count-in", async () => {
+    const metadata = mocked.buildEditableRhythmPattern;
+    mocked.loadPatternMock.mockResolvedValue({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: metadata().abcString,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 120,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+    mocked.serviceStub.metadata = () => ({
+      genreName: "Irish Traditional",
+      tuneTypeName: "Reel",
+      rhythmAbc: metadata().abcString,
+      rhythmSignature: "4/4",
+      patternType: "seed",
+      tempoQpm: 120,
+      swingPercentage: 0,
+      sampleKit: "bodhran",
+      premiumAudioUrl: null,
+      premiumAudioTrimMs: 0,
+      premiumAudioSource: null,
+      premiumAudioSourceTempoQpm: null,
+      source: "rhythm_patterns",
+    });
+
+    const view = render(() => <RhythmPlayer tuneTypeName="Reel" />);
+    const toggle = await view.findByTestId("rhythm-player-count-in-toggle");
+    fireEvent.click(toggle);
+    fireEvent.click(view.getByTestId("rhythm-player-play-toggle"));
+
+    expect(mocked.serviceStub.play).toHaveBeenCalledWith(
+      expect.objectContaining({ useCountIn: false })
+    );
+  });
+
+  it("enables restart only while playback is active or paused", async () => {
     const seedAbc = [
       "X:1",
       "T:Seed Pattern",
@@ -2593,7 +2699,7 @@ describe("RhythmPlayer", () => {
     });
   });
 
-  it("resets the paused position without starting playback when restart is pressed", async () => {
+  it("restarts playback from the selected section", async () => {
     const seedAbc = [
       "X:1",
       "T:Seed Pattern",
@@ -2652,7 +2758,8 @@ describe("RhythmPlayer", () => {
     });
     fireEvent.click(restartButton);
 
-    expect(mocked.serviceStub.restart).toHaveBeenCalledWith({
+    expect(mocked.serviceStub.stop).toHaveBeenCalledTimes(1);
+    expect(mocked.serviceStub.play).toHaveBeenCalledWith({
       startPositionMs: 0,
       startBeatIndex: 3,
       startMeasure: 3,
@@ -2665,10 +2772,9 @@ describe("RhythmPlayer", () => {
         "| B2 | A2 | A2 | B2 |",
       ].join("\n"),
     });
-    expect(mocked.serviceStub.play).not.toHaveBeenCalled();
   });
 
-  it("pauses and resumes independently of the main play button", async () => {
+  it("pauses and resumes from the main play button", async () => {
     const seedAbc = [
       "X:1",
       "T:Seed Pattern",
@@ -2711,7 +2817,7 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.isPlaying = () => true;
 
     const playingView = render(() => <RhythmPlayer tuneTypeName="Reel" />);
-    const pauseButton = playingView.getByTestId("rhythm-player-pause-button");
+    const pauseButton = playingView.getByTestId("rhythm-player-play-toggle");
 
     await waitFor(() => {
       expect(pauseButton.textContent).toContain("Pause");
@@ -2726,10 +2832,10 @@ describe("RhythmPlayer", () => {
     mocked.serviceStub.isPaused = () => true;
 
     const pausedView = render(() => <RhythmPlayer tuneTypeName="Reel" />);
-    const resumeButton = pausedView.getByTestId("rhythm-player-pause-button");
+    const resumeButton = pausedView.getByTestId("rhythm-player-play-toggle");
 
     await waitFor(() => {
-      expect(resumeButton.textContent).toContain("Resume");
+      expect(resumeButton.textContent).toContain("Play");
       expect(resumeButton.hasAttribute("disabled")).toBe(false);
     });
 
