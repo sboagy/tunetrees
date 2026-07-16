@@ -173,7 +173,7 @@
     "tailwindcss": "^4.3.0",
     "tsx": "^4.21.0",
     "typescript": "6.0.3",
-    "vite": "8.1.0",
+    "vite": "8.1.4",
     "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-solid": "^2.11.12",
     "vite-plugin-static-copy": "^4.1.1",
