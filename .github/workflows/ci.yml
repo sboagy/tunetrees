@@ -243,9 +243,31 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Overlay checked-out Rhizome and oosync packages
+      - name: Link checked-out Rhizome and oosync packages
         run: |
-          npm install --ignore-scripts --no-save --no-package-lock ./rhizome ./oosync
+          # npm ci has installed the lockfile-resolved dependency graph. Link only
+          # the checked-out shared package source so npm does not re-resolve its
+          # transitive dependencies during this CI run.
+          rm -rf node_modules/@rhizome/core node_modules/oosync
+          ln -s "$GITHUB_WORKSPACE/rhizome" node_modules/@rhizome/core
+          ln -s "$GITHUB_WORKSPACE/oosync" node_modules/oosync
+
+      - name: Log shared package overlay versions
+        run: |
+          echo "rhizome source SHA: $(git -C rhizome rev-parse HEAD)"
+          echo "oosync source SHA: $(git -C oosync rev-parse HEAD)"
+          node -e '
+            const fs = require("node:fs");
+            for (const [packageName, manifestPath] of Object.entries({
+              "@rhizome/core": "node_modules/@rhizome/core/package.json",
+              oosync: "node_modules/oosync/package.json",
+              "@supabase/supabase-js": "node_modules/@supabase/supabase-js/package.json",
+              "@sqlite.org/sqlite-wasm": "node_modules/@sqlite.org/sqlite-wasm/package.json",
+            })) {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+              console.log(`${packageName}: version=${manifest.version} manifest=${fs.realpathSync(manifestPath)}`);
+            }
+          '
 
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
@@ -567,9 +589,30 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Overlay checked-out Rhizome and oosync packages
+      - name: Link checked-out Rhizome and oosync packages
         run: |
-          npm install --ignore-scripts --no-save --no-package-lock ./rhizome ./oosync
+          # Preserve the dependency graph installed by npm ci; only replace the
+          # checked-out shared package source used by this job.
+          rm -rf node_modules/@rhizome/core node_modules/oosync
+          ln -s "$GITHUB_WORKSPACE/rhizome" node_modules/@rhizome/core
+          ln -s "$GITHUB_WORKSPACE/oosync" node_modules/oosync
+
+      - name: Log shared package overlay versions
+        run: |
+          echo "rhizome source SHA: $(git -C rhizome rev-parse HEAD)"
+          echo "oosync source SHA: $(git -C oosync rev-parse HEAD)"
+          node -e '
+            const fs = require("node:fs");
+            for (const [packageName, manifestPath] of Object.entries({
+              "@rhizome/core": "node_modules/@rhizome/core/package.json",
+              oosync: "node_modules/oosync/package.json",
+              "@supabase/supabase-js": "node_modules/@supabase/supabase-js/package.json",
+              "@sqlite.org/sqlite-wasm": "node_modules/@sqlite.org/sqlite-wasm/package.json",
+            })) {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+              console.log(`${packageName}: version=${manifest.version} manifest=${fs.realpathSync(manifestPath)}`);
+            }
+          '
 
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
@@ -987,11 +1030,28 @@ jobs:
       - name: Install Worker Dependencies
         run: npm ci --prefix worker --ignore-scripts
 
-      - name: Overlay checked-out oosync package
+      - name: Link checked-out oosync package
         run: |
-          npm install --ignore-scripts --no-save --no-package-lock ./oosync
-          cd worker
-          npm install --ignore-scripts --no-save --no-package-lock ../oosync
+          # Both installs are already locked by npm ci. Replace only the oosync
+          # package source rather than asking npm to resolve a new dependency tree.
+          rm -rf node_modules/oosync worker/node_modules/oosync
+          ln -s "$GITHUB_WORKSPACE/oosync" node_modules/oosync
+          ln -s "$GITHUB_WORKSPACE/oosync" worker/node_modules/oosync
+
+      - name: Log oosync overlay versions
+        run: |
+          echo "oosync source SHA: $(git -C oosync rev-parse HEAD)"
+          node -e '
+            const fs = require("node:fs");
+            for (const [packageName, manifestPath] of Object.entries({
+              oosync: "node_modules/oosync/package.json",
+              "@sqlite.org/sqlite-wasm": "node_modules/@sqlite.org/sqlite-wasm/package.json",
+              "worker oosync": "worker/node_modules/oosync/package.json",
+            })) {
+              const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+              console.log(`${packageName}: version=${manifest.version} manifest=${fs.realpathSync(manifestPath)}`);
+            }
+          '
 
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
