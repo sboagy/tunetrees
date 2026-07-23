@@ -170,7 +170,7 @@
     "prettier": "^3.9.6",
     "shadcn-solid": "^0.7.7",
     "supabase": "^2.107.0",
-    "tailwindcss": "^4.3.0",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "6.0.3",
     "vite": "8.1.4",
