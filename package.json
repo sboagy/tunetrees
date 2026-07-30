@@ -151,7 +151,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@cloudflare/workers-types": "^5.20260708.1",
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.62.0",
     "@solidjs/testing-library": "^0.8.10",
     "@sonar/scan": "^5.0.0",
     "@tailwindcss/vite": "^4.3.1",
