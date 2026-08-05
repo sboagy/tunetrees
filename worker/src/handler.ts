@@ -1,3 +1,7 @@
+import {
+  type GoogleOAuthWorkerEnv,
+  handleGoogleOAuthRequest,
+} from "./google-oauth";
 import generatedWorker from "./index";
 import {
   getCorsHeaders,
@@ -5,13 +9,20 @@ import {
   type MediaWorkerEnv,
 } from "./media";
 
-const worker: ExportedHandler<MediaWorkerEnv> = {
+type WorkerEnv = MediaWorkerEnv & GoogleOAuthWorkerEnv;
+
+const worker: ExportedHandler<WorkerEnv> = {
   async fetch(request, env, _ctx) {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: getCorsHeaders(request),
       });
+    }
+
+    const googleOAuthResponse = await handleGoogleOAuthRequest(request, env);
+    if (googleOAuthResponse) {
+      return googleOAuthResponse;
     }
 
     const mediaResponse = await handleMediaRequest(request, env);

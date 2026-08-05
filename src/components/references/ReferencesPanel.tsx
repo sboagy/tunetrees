@@ -19,6 +19,10 @@ import {
 import { toast } from "solid-sonner";
 import { useAudioPlayer } from "@/components/audio/AudioPlayerContext";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { resolveByosAudioForPlayback } from "@/lib/byos/audio";
+import { validateByosAudioFile } from "@/lib/byos/audio-validation";
+import { getSelectedByosProvider } from "@/lib/byos/provider-selection";
+import { createByosProviders } from "@/lib/byos/providers";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import {
   getSidebarFontClasses,
@@ -26,6 +30,7 @@ import {
 } from "@/lib/context/UIPreferencesContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
+  buildByosStoragePath,
   createMediaAsset,
   getMediaAssetByReferenceId,
   getMediaAssetsByTune,
@@ -39,7 +44,7 @@ import {
   updateReference,
   updateReferenceOrder,
 } from "@/lib/db/queries/references";
-import { uploadReferenceAudioFile } from "@/lib/media/upload-reference-audio";
+import { ByosProviderConnection } from "./ByosProviderConnection";
 import { ReferenceForm, type ReferenceFormData } from "./ReferenceForm";
 import { ReferenceList } from "./ReferenceList";
 
@@ -186,21 +191,34 @@ export const ReferencesPanel: Component = () => {
       const db = getDb();
 
       if (data.sourceMode === "upload" && data.uploadFile) {
-        const accessToken = session()?.access_token;
-        if (!accessToken) {
-          throw new Error("You must be signed in to upload practice audio.");
+        const validationError = validateByosAudioFile(data.uploadFile);
+        if (validationError) {
+          throw new Error(validationError);
         }
-
-        const upload = await uploadReferenceAudioFile(
-          data.uploadFile,
-          accessToken
-        );
+        const providerId = await getSelectedByosProvider(db, currentUser.id);
+        if (!providerId) {
+          throw new Error(
+            "Choose and connect a storage provider before uploading audio."
+          );
+        }
+        const providers = createByosProviders({
+          userId: currentUser.id,
+          getAppAccessToken: () => session()?.access_token,
+        });
+        const provider = providers[providerId];
+        if (!provider.isConfigured()) {
+          throw new Error(
+            `${provider.label} is not configured for this environment.`
+          );
+        }
+        const upload = await provider.upload(data.uploadFile);
+        const storagePath = buildByosStoragePath(providerId, upload.fileId);
         const createdReference = await createReference(
           db,
           {
-            url: upload.url,
+            url: storagePath,
             tuneRef: tuneId,
-            title: data.title || defaultAudioTitle(upload.originalFilename),
+            title: data.title || defaultAudioTitle(upload.fileName),
             refType: "audio",
             comment: data.comment || undefined,
             favorite: data.favorite,
@@ -213,8 +231,11 @@ export const ReferencesPanel: Component = () => {
           await createMediaAsset(db, {
             referenceRef: createdReference.id,
             userRef: currentUser.id,
-            storagePath: upload.key,
-            originalFilename: upload.originalFilename,
+            storagePath,
+            storageKind: "byos",
+            byosProvider: providerId,
+            providerFileId: upload.fileId,
+            originalFilename: upload.fileName,
             contentType: upload.contentType,
             fileSizeBytes: upload.size,
           });
@@ -329,6 +350,24 @@ export const ReferencesPanel: Component = () => {
       const mediaAsset =
         freshMediaAsset || mediaAssetsByReferenceId().get(reference.id);
 
+      let playbackUrl = reference.url;
+      if (mediaAsset?.storageKind === "byos") {
+        const currentUser = user();
+        if (!currentUser) {
+          toast.error("This audio is unavailable on this device.");
+          return;
+        }
+        try {
+          playbackUrl = await resolveByosAudioForPlayback(mediaAsset, {
+            userId: currentUser.id,
+            getAppAccessToken: () => session()?.access_token,
+          });
+        } catch {
+          toast.error("This audio is unavailable on this device.");
+          return;
+        }
+      }
+
       openTrack({
         referenceId: reference.id,
         referenceTitle:
@@ -336,7 +375,7 @@ export const ReferencesPanel: Component = () => {
           defaultAudioTitle(
             mediaAsset?.originalFilename || `audio-${reference.id}.mp3`
           ),
-        url: reference.url,
+        url: playbackUrl,
         regionsJson: mediaAsset?.regionsJson,
         durationSeconds: mediaAsset?.durationSeconds,
         contentType: mediaAsset?.contentType,
@@ -480,6 +519,7 @@ export const ReferencesPanel: Component = () => {
           class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
           data-testid="references-add-form"
         >
+          <ByosProviderConnection />
           <ReferenceForm
             initialData={addDraft()}
             autoOpenTypeSelect={!addDraft()}

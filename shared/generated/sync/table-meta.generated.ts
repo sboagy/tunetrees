@@ -141,6 +141,8 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     columnDescriptions: {
       acceptable_delinquency_window: "User default delinquency window in days.",
       avatar_url: "URL to user avatar/profile picture.",
+      byos_provider:
+        "Selected BYOS provider identifier only. It never contains OAuth tokens, a provider account ID, or an email address.",
       deleted: "Soft-delete flag for the user profile.",
       device_id: "Device that last modified this record.",
       email: "User email address.",
@@ -461,18 +463,28 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     supportsIncremental: true,
     hasDeletedFlag: true,
     columnDescriptions: {
+      byos_provider:
+        "BYOS provider identifier (google-drive or dropbox). Never contains an account identity.",
       content_type: "Uploaded media MIME type.",
       deleted: "Soft-delete flag for the media asset.",
       device_id: "Device that last modified this record.",
       duration_seconds: "Decoded audio duration in seconds.",
       file_size_bytes: "Uploaded media size in bytes.",
       last_modified_at: "Timestamp of last modification.",
+      locator_version: "Version of the polymorphic media locator contract.",
       original_filename:
         "Original client-side filename captured at upload time.",
+      provider_file_id:
+        "Opaque provider file identifier for a BYOS locator. Never contains credentials.",
+      public_url:
+        "Optional provider-managed public URL cached in private synced metadata. It is a bearer-style link, never a token.",
       reference_ref: "Reference row that owns this uploaded media asset.",
       regions_json:
         "JSON-encoded WaveSurfer regions/markers for looping and annotations.",
-      storage_path: "Private R2 object key under the user namespace.",
+      storage_kind:
+        "Versioned media locator kind: r2 for permanent Worker reads or byos for browser-direct provider files.",
+      storage_path:
+        "Legacy R2 object key for r2 records; unique synthetic BYOS locator for byos records. Existing R2 values are retained indefinitely.",
       sync_version: "Sync version for conflict resolution.",
       user_ref: "Owner user_profile.id for auth scoping and sync.",
     },
