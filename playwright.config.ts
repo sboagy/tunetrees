@@ -198,6 +198,9 @@ export default defineConfig({
     {
       name: "chromium-pwa-offline",
       testDir: "./e2e/tests-preview", // Use a separate directory for PWA tests
+      // The offline suite shares one preview/PWA surface. Running its browser
+      // contexts concurrently can interrupt another test's sync requests.
+      workers: 1,
       use: {
         ...devices["Desktop Chrome"],
         // Base URL will point to the preview port
