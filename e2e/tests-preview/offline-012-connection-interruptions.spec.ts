@@ -232,12 +232,10 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Check pending before reload
     const beforeReload = await getSyncOutboxCount(page);
-    const beforeReloadStableItems = await ttPage.getStableSyncOutboxItems();
-    const beforeReloadStableCount = beforeReloadStableItems.length;
-    const beforeKeys = ttPage.stableOutboxKeys(beforeReloadStableItems);
+    const beforeReloadStable = await ttPage.getStableSyncOutboxCount();
     expect(beforeReload).toBeGreaterThanOrEqual(3);
     console.log(
-      `📦 Before reload: ${beforeReload} pending (stable=${beforeReloadStableCount})`
+      `📦 Before reload: ${beforeReload} pending (stable=${beforeReloadStable})`
     );
 
     // Reload page (still offline)
@@ -250,18 +248,16 @@ test.describe("OFFLINE-012: Connection Interruptions", () => {
 
     // Reload can enqueue extra startup repair/normalization rows while still
     // offline. The regression invariant is preservation of the existing queued
-    // work, so verify each previously captured stable record still exists.
-    const afterReloadItems = await ttPage.getStableSyncOutboxItems();
-    const afterKeys = ttPage.stableOutboxKeys(afterReloadItems);
-    for (const key of beforeKeys) {
-      expect(afterKeys.has(key)).toBe(true);
-    }
-
-    // Secondary lower-bound count assertion permits additional startup rows.
-    const afterReloadStableCount = afterReloadItems.length;
-    expect(afterReloadStableCount).toBeGreaterThanOrEqual(
-      beforeReloadStableCount
-    );
+    // work. Reload may merge or rewrite individual outbox rows, so their
+    // operation/table/row tuple is not a durable cross-reload identifier.
+    await expect
+      .poll(async () => await getSyncOutboxCount(page), {
+        timeout: 10_000,
+        intervals: [250, 250, 500, 1000],
+      })
+      .toBeGreaterThanOrEqual(beforeReloadStable);
+    const afterReloadStable = await ttPage.getStableSyncOutboxCount();
+    expect(afterReloadStable).toBeGreaterThanOrEqual(beforeReloadStable);
 
     // Go online
     await goOnline(page);

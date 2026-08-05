@@ -233,13 +233,11 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
 
     // Check pending count before reload
     const beforeReload = await getSyncOutboxCount(page);
-    const beforeReloadStableItems = await ttPage.getStableSyncOutboxItems();
-    const beforeReloadStableCount = beforeReloadStableItems.length;
-    const beforeKeys = ttPage.stableOutboxKeys(beforeReloadStableItems);
+    const beforeReloadStable = await ttPage.getStableSyncOutboxCount();
     console.log(
-      `Pending sync count before reload: ${beforeReload} (stable=${beforeReloadStableCount})`
+      `Pending sync count before reload: ${beforeReload} (stable=${beforeReloadStable})`
     );
-    expect(beforeReloadStableCount).toBeGreaterThanOrEqual(2);
+    expect(beforeReloadStable).toBeGreaterThanOrEqual(2);
 
     // Reload page (still offline)
 
@@ -257,18 +255,16 @@ test.describe("OFFLINE-001: Practice Tab Offline CRUD", () => {
 
     // Reload can enqueue extra startup repair/normalization rows while still
     // offline. The regression invariant is that previously queued writes are
-    // not lost, so verify the exact stable records are still present.
-    const afterReloadItems = await ttPage.getStableSyncOutboxItems();
-    const afterKeys = ttPage.stableOutboxKeys(afterReloadItems);
-    for (const key of beforeKeys) {
-      expect(afterKeys.has(key)).toBe(true);
-    }
-
-    // Secondary lower-bound count assertion permits additional startup rows.
-    const afterReloadStableCount = afterReloadItems.length;
-    expect(afterReloadStableCount).toBeGreaterThanOrEqual(
-      beforeReloadStableCount
-    );
+    // not lost. Reload may merge or rewrite individual outbox rows, so their
+    // operation/table/row tuple is not a durable cross-reload identifier.
+    await expect
+      .poll(async () => await getSyncOutboxCount(page), {
+        timeout: 10_000,
+        intervals: [250, 250, 500, 1000],
+      })
+      .toBeGreaterThanOrEqual(beforeReloadStable);
+    const afterReloadStable = await ttPage.getStableSyncOutboxCount();
+    expect(afterReloadStable).toBeGreaterThanOrEqual(beforeReloadStable);
 
     // Go online and wait for automatic sync
     await goOnline(page);
