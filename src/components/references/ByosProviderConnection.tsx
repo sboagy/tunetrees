@@ -112,6 +112,9 @@ export const ByosProviderConnection: Component = () => {
               disabled={isSaving()}
               onClick={() => void chooseProvider(provider.id)}
               data-testid={`byos-provider-${provider.id}`}
+              data-state={
+                currentProvider() === provider.id ? "selected" : "unselected"
+              }
             >
               {provider.label}
             </Button>
