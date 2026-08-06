@@ -335,7 +335,16 @@ jobs:
         working-directory: rhizome
         run: |
           supabase stop --no-backup 2>/dev/null || true
+          # Kill and remove ALL Docker containers to clear any stale state,
+          # including containers from concurrent CI runs on recycled runners.
+          # xargs -r skips the command when there is no input (no containers).
+          docker ps -q  | xargs -r docker kill    2>/dev/null || true
+          docker ps -aq | xargs -r docker rm -f   2>/dev/null || true
           docker network prune -f 2>/dev/null || true
+          # Force-release port 54322 if a non-Docker process still holds it.
+          sudo fuser -k 54322/tcp 2>/dev/null || true
+          # Brief pause to allow Docker networking and the OS to fully release the port.
+          sleep 2
 
       - name: Disable Supabase Edge Runtime For CI
         working-directory: rhizome
@@ -352,7 +361,25 @@ jobs:
         # here — that would wipe ALL app schemas (TuneTrees + CubeFSRS).
         working-directory: rhizome
         run: |
-          supabase start
+          for attempt in 1 2 3; do
+            echo "🚀 Supabase start attempt $attempt/3..."
+            if supabase start; then
+              echo "✅ Supabase started successfully on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "⚠️ Start failed on attempt $attempt; stopping, freeing port 54322, and retrying in 15s..."
+              supabase stop --no-backup 2>/dev/null || true
+              docker ps -q  | xargs -r docker kill    2>/dev/null || true
+              docker ps -aq | xargs -r docker rm -f   2>/dev/null || true
+              docker network prune -f 2>/dev/null || true
+              sudo fuser -k 54322/tcp 2>/dev/null || true
+              sleep 15
+            else
+              echo "❌ Supabase start failed after 3 attempts"
+              exit 1
+            fi
+          done
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
           echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
@@ -680,7 +707,16 @@ jobs:
         working-directory: rhizome
         run: |
           supabase stop --no-backup 2>/dev/null || true
+          # Kill and remove ALL Docker containers to clear any stale state,
+          # including containers from concurrent CI runs on recycled runners.
+          # xargs -r skips the command when there is no input (no containers).
+          docker ps -q  | xargs -r docker kill    2>/dev/null || true
+          docker ps -aq | xargs -r docker rm -f   2>/dev/null || true
           docker network prune -f 2>/dev/null || true
+          # Force-release port 54322 if a non-Docker process still holds it.
+          sudo fuser -k 54322/tcp 2>/dev/null || true
+          # Brief pause to allow Docker networking and the OS to fully release the port.
+          sleep 2
 
       - name: Disable Supabase Edge Runtime For CI
         working-directory: rhizome
@@ -694,12 +730,30 @@ jobs:
       - name: Start Supabase from Rhizome
         working-directory: rhizome
         run: |
-          supabase start
-          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
-          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
-          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')"   >> $GITHUB_ENV
-          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> $GITHUB_ENV
-          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> $GITHUB_ENV
+          for attempt in 1 2 3; do
+            echo "🚀 Supabase start attempt $attempt/3..."
+            if supabase start; then
+              echo "✅ Supabase started successfully on attempt $attempt"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "⚠️ Start failed on attempt $attempt; stopping, freeing port 54322, and retrying in 15s..."
+              supabase stop --no-backup 2>/dev/null || true
+              docker ps -q  | xargs -r docker kill    2>/dev/null || true
+              docker ps -aq | xargs -r docker rm -f   2>/dev/null || true
+              docker network prune -f 2>/dev/null || true
+              sudo fuser -k 54322/tcp 2>/dev/null || true
+              sleep 15
+            else
+              echo "❌ Supabase start failed after 3 attempts"
+              exit 1
+            fi
+          done
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
 
       - name: Wait for Supabase API
         run: |
