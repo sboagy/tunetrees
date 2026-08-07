@@ -8,7 +8,6 @@
     "skipLibCheck": true,
 
     /* Path Aliases (needed for oosync build) */
-    "baseUrl": ".",
     "paths": {
       "@oosync/*": ["./node_modules/oosync/src/*"],
       "@shared-generated/*": ["./shared/generated/*"],
