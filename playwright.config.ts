@@ -255,7 +255,12 @@ export default defineConfig({
     },
     // 2. Worker/API Server
     {
-      command: "npm run dev:worker",
+      // The PWA offline job targets the local Supabase instance. Using
+      // Miniflare there avoids a remote-dev disconnect cascading into every
+      // subsequent offline test, while other E2E jobs retain their worker mode.
+      command: process.env.PLAYWRIGHT_USE_LOCAL_WORKER === "true"
+        ? "npm run dev:worker:local"
+        : "npm run dev:worker",
       url: `http://localhost:${WORKER_PORT}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,

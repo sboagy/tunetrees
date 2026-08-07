@@ -857,7 +857,7 @@ jobs:
           done
 
           echo "🎭 Running PWA Offline Tests..."
-          npm run test:e2e:offline:ci -- \
+          PLAYWRIGHT_USE_LOCAL_WORKER=true npm run test:e2e:offline:ci -- \
             2>&1 | tee "playwright-logs/playwright-pwa.log"
         shell: bash
 
