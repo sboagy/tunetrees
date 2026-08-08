@@ -43,7 +43,8 @@
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tests/tsconfig.json --noEmit && tsc -p e2e/tsconfig.json --noEmit && npm --prefix worker exec -- tsc -p tsconfig.json --noEmit",
     "db:local:client:reset": "rm -rf .vscode/chrome-session && npm run db:local:auth:clear",
     "db:local:auth:clear": "rm -rf e2e/.auth",
-    "db:local:reset": "npm run db:local:auth:clear && FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright clear-cache && RESET_DB=true FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup && npm run db:local:seed",
+    "db:local:reset": "npm run db:local:auth:clear && RESET_DB=true FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=list e2e/setup/auth.setup.ts --project=setup && npm run db:local:seed",
+    "db:local:schema:reset": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- bash ./e2e-with-tee.sh -p -R && npm run codegen:schema:check",
     "db:local:seed": "psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/seeds/baseline_local_20260217.sql -f sql_scripts/update_genre_tune_tempo_and_rhythms.sql",
     "db:local:seed:apply-genre-rhythm": "tsx scripts/apply-genre-rhythm-seed.ts",
     "db:local:auth:reset": "bash node_modules/@rhizome/core/scripts/reset-shared-auth-users-local.sh",
@@ -166,7 +167,7 @@
     "concurrently": "^10.0.4",
     "dotenv": "^17.3.1",
     "drizzle-kit": "^0.31.10",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "postgres": "^3.4.9",
     "prettier": "^3.9.6",
     "shadcn-solid": "^0.7.7",
@@ -187,7 +188,7 @@
     "brace-expansion": "^5.0.6",
     "serialize-javascript": "^7.0.5",
     "ws": ">=8.21.0",
-    "undici": ">=7.28.0",
+    "undici": ">=8.10.0",
     "@babel/core": "^7.29.6"
   }
 }
