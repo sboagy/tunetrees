@@ -3,6 +3,7 @@ set -euo pipefail
 
 SHOW_REPORT=false
 RESET_MODE="none"
+RESET_ONLY=false
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
@@ -14,10 +15,11 @@ DROP_PUBLIC_SQL_FILE="${REPO_ROOT}/sql_scripts/drop_public_non_extension_objects
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [-r] [-f | -p] [-- playwright-args...]
+Usage: $(basename "$0") [-r] [-R] [-f | -p] [-- playwright-args...]
 
 Options:
   -r    Show Playwright HTML report after the run.
+  -R    Run the selected reset and exit without starting E2E tests.
   -f    Do a full shared Supabase reset first.
         This wipes the shared local instance, including cubefsrs schemas/tables.
   -p    Do a TuneTrees-focused fresh-data reset first.
@@ -170,9 +172,10 @@ SQL
     refresh_auth_state
 }
 
-while getopts "rfph" opt; do
+while getopts "rfpRh" opt; do
     case "$opt" in
         r) SHOW_REPORT=true ;;
+        R) RESET_ONLY=true ;;
         f)
             if [ "$RESET_MODE" != "none" ]; then
                 echo "Choose only one reset mode: -f or -p" >&2
@@ -210,6 +213,15 @@ case "$RESET_MODE" in
         ;;
 esac
 
+if [ "$RESET_ONLY" = true ]; then
+    if [ "$RESET_MODE" = "none" ]; then
+        echo "-R requires either -f or -p." >&2
+        exit 1
+    fi
+    echo "Reset completed. Skipping E2E tests."
+    exit 0
+fi
+
 SECONDS=0
 npm run test:e2e:chromium:all:html -- "$@" 2>&1 | tee "$LOG_FILE"
 # npm run test:e2e:chromium:html -- "$@" 2>&1 | tee "$LOG_FILE"
@@ -227,4 +239,3 @@ fi
 if [ "$SHOW_REPORT" = true ]; then
     npm exec -- playwright show-report
 fi
-
