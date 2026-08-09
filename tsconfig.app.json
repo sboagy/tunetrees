@@ -24,8 +24,8 @@
     "noUncheckedSideEffectImports": true,
     "ignoreDeprecations": "6.0",
     /* Path Aliases */
-    "baseUrl": ".",
     "paths": {
+      "*": ["./*"],
       "@/*": ["./src/*"],
       "@oosync/*": ["./node_modules/oosync/src/*"],
       "@shared-generated/*": ["./shared/generated/*"],
