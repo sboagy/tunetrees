@@ -1,6 +1,7 @@
 // spec: e2e/tests/notes-references-test-plan.md
 
 import { expect } from "@playwright/test";
+import { configureMockGoogleDriveByos } from "../helpers/byos-provider";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -82,9 +83,17 @@ test.describe("REFS-001: References CRUD Operations", () => {
 
   test("should open a file chooser from Choose Audio File and create an ingested audio reference", async ({
     page,
+    testUser,
   }) => {
+    await configureMockGoogleDriveByos(page, testUser.userId);
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
+
+    await ttPage.byosGoogleDriveProviderButton.click();
+    await expect(ttPage.byosGoogleDriveProviderButton).toHaveAttribute(
+      "data-state",
+      "selected"
+    );
 
     await ttPage.selectReferenceType("audio");
 

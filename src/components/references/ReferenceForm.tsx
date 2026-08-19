@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { validateByosAudioFile } from "@/lib/byos/audio-validation";
 import {
   getSidebarFontClasses,
   useUIPreferences,
@@ -169,8 +170,9 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
       return;
     }
 
-    if (!nextFile.type.startsWith("audio/")) {
-      setFileError("Please choose an audio file.");
+    const validationError = validateByosAudioFile(nextFile);
+    if (validationError) {
+      setFileError(validationError);
       return;
     }
 
