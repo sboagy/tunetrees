@@ -120,7 +120,7 @@
     "sonar:scan-and-fetch:pr": "npm run sonar:scan:pr && npm run sonar:wait && npm run sonar:issues:pr"
   },
   "dependencies": {
-    "@codemirror/lang-javascript": "^6.2.4",
+    "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/state": "^6.7.1",
     "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.43.4",
