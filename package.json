@@ -132,7 +132,7 @@
     "@supabase/supabase-js": "^2.112.2",
     "@tanstack/solid-table": "^8.21.3",
     "@tanstack/solid-virtual": "^3.13.36",
-    "abcjs": "^6.6.4",
+    "abcjs": "^6.7.0",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
