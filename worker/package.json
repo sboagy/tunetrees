@@ -13,13 +13,13 @@
     "start": "npm run dev"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260810.1",
+    "@cloudflare/workers-types": "^5.20260817.1",
     "typescript": "7.0.2",
-    "wrangler": "^4.120.0"
+    "wrangler": "^4.123.0"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
-    "jose": "^6.2.8",
+    "jose": "^6.2.9",
     "postgres": "^3.4.8"
   },
   "//": "esbuild >=0.28.1 addresses: GHSA-67mh-4wv8-2f99 (SSRF in dev server, patched in 0.25.0) and GHSA-g7r4-m6w7-qqqr (Windows path traversal, requires 0.28.1)",
