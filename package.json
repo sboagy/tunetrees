@@ -141,7 +141,7 @@
     "loglevel": "^1.9.2",
     "lucide-solid": "^1.23.0",
     "oosync": "git+https://github.com/sboagy/oosync.git#main",
-    "papaparse": "^5.5.4",
+    "papaparse": "^5.7.0",
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.13",
     "solid-sonner": "^0.3.1",
