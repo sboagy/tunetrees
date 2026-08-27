@@ -130,7 +130,7 @@
     "@solidjs/router": "^0.16.1",
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
     "@supabase/supabase-js": "^2.112.2",
-    "@tanstack/solid-table": "^8.21.3",
+    "@tanstack/solid-table": "^9.1.2",
     "@tanstack/solid-virtual": "^3.13.36",
     "abcjs": "^6.7.0",
     "chart.js": "^4.5.1",
