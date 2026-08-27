@@ -5,13 +5,13 @@
  * Ported from legacy React implementation to SolidJS with fine-grained reactivity.
  */
 
-import type { ColumnDef, Table } from "@tanstack/solid-table";
 import { ChevronDown, ChevronRight } from "lucide-solid";
 import { type Component, createEffect, Show } from "solid-js";
 import { getSubmittedEvaluationDisplay } from "./evaluation-display";
 import { GoalBadge } from "./GoalBadge";
 import { RecallEvalComboBox } from "./RecallEvalComboBox";
 import { ScheduledOverridePicker } from "./ScheduledOverridePicker";
+import type { ColumnDef, Table } from "./tanstack-table";
 import type { ICellEditorCallbacks, TablePurpose } from "./types";
 
 type CellScalar = string | number | null;
@@ -235,7 +235,7 @@ export function getCatalogColumns(
         );
       },
       // Keep numeric sorting for legacy numeric ids; string cast will yield NaN => sorts as 0 which groups UUIDs; acceptable fallback
-      sortingFn: numericSortingFn,
+      sortFn: numericSortingFn,
       size: 140,
       minSize: 80,
       maxSize: 310,
@@ -504,7 +504,7 @@ export function getCatalogColumns(
           <span class="text-gray-400">—</span>
         );
       },
-      sortingFn: numericSortingFn,
+      sortFn: numericSortingFn,
       size: 80,
       minSize: 70,
       maxSize: 100,
@@ -1131,7 +1131,7 @@ export function getScheduledColumns(
       },
       header: () => <StaticHeader title="Evaluation" />,
       enableSorting: false,
-      sortingFn: noSortingFn,
+      sortFn: noSortingFn,
       cell: (info) => {
         const row = info.row.original;
         const tuneId = row.tune_id || row.tune?.id || row.tuneRef || row.id;

@@ -14,7 +14,6 @@
  */
 
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
-import type { Table } from "@tanstack/solid-table";
 import {
   type Component,
   createEffect,
@@ -29,6 +28,7 @@ import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 import { CatalogToolbar } from "../components/catalog";
 import { TunesGridCatalog } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
+import type { Table } from "../components/grids/tanstack-table";
 import type { ITuneOverview } from "../components/grids/types";
 import { useAuth } from "../lib/auth/AuthContext";
 import { useCurrentRepertoire } from "../lib/context/CurrentRepertoireContext";
@@ -87,9 +87,8 @@ const CatalogPage: Component = () => {
   const [selectedRowsCount, setSelectedRowsCount] = createSignal(0);
 
   // Track table instance for column visibility control
-  const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
-    null
-  );
+  const [tableInstance, setTableInstance] =
+    createSignal<Table<ITuneOverview> | null>(null);
 
   // Track filter panel expanded state
   const [filterPanelExpanded, setFilterPanelExpanded] = createSignal(false);

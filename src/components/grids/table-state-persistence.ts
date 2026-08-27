@@ -74,7 +74,7 @@ export function getDefaultTableState(
     columnSizing: {},
     columnOrder: [],
     columnVisibility: {},
-    columnPinning: { left: [], right: [] },
+    columnPinning: { start: [], end: [] },
     viewMode: undefined,
     scrollTop: 0,
     sorting: [],

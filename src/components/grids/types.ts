@@ -46,8 +46,12 @@ export interface IColumnVisibility {
  * Column pinning state
  */
 export interface IColumnPinning {
+  /** v8 persisted physical pinning keys, retained only for migration. */
   left?: string[];
   right?: string[];
+  /** v9 logical pinning keys. */
+  start?: string[];
+  end?: string[];
 }
 
 /**

@@ -12,9 +12,7 @@
  * @module components/grids/TunesGridCatalog
  */
 
-import type { VisibilityState } from "@tanstack/solid-table";
 import { eq } from "drizzle-orm";
-
 import {
   type Component,
   createEffect,
@@ -34,6 +32,7 @@ import type { Tune } from "../../lib/db/types";
 import { RhythmDialog } from "../rhythm/RhythmDialog";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
+import type { VisibilityState } from "./tanstack-table";
 // Table state persistence is handled inside TunesGrid
 import type { IGridBaseProps, ITuneOverview } from "./types";
 

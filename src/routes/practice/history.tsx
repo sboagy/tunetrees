@@ -17,12 +17,8 @@
 
 import { useNavigate } from "@solidjs/router";
 import {
-  type ColumnDef,
-  createSolidTable,
+  createTable,
   flexRender,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
   type SortingState,
 } from "@tanstack/solid-table";
 import {
@@ -33,6 +29,10 @@ import {
   For,
   Show,
 } from "solid-js";
+import {
+  type ColumnDef,
+  gridTableFeatures,
+} from "../../components/grids/tanstack-table";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getPracticeRecords } from "../../lib/db/queries/practice";
 import type { PracticeRecordWithTune } from "../../lib/db/types";
@@ -274,14 +274,12 @@ const PracticeHistory: Component = () => {
   ];
 
   // Create table instance
-  const table = createSolidTable({
+  const table = createTable({
+    features: gridTableFeatures,
     get data() {
       return filteredRecords();
     },
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     state: {
       get sorting() {
         return sorting();
@@ -296,6 +294,7 @@ const PracticeHistory: Component = () => {
     onSortingChange: setSorting,
     initialState: {
       pagination: {
+        pageIndex: 0,
         pageSize: 25,
       },
     },
@@ -504,7 +503,7 @@ const PracticeHistory: Component = () => {
             {/* Pagination */}
             <div class="mt-4 flex items-center justify-between">
               <div class="text-sm text-gray-600 dark:text-gray-400">
-                Page {table.getState().pagination.pageIndex + 1} of{" "}
+                Page {table.atoms.pagination.get().pageIndex + 1} of{" "}
                 {table.getPageCount()}
               </div>
               <div class="flex gap-2">
