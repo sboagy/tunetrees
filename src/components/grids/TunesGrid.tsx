@@ -637,6 +637,10 @@ export const TunesGrid = (<T extends { id: string | number }>(
     // also ensures the expanded row model flattens subrows without registering
     // the client-side pagination row model (which would cap rows at pageSize).
     manualPagination: true,
+    // Expansion is controlled by the grid's auto/default-expanded props. V9's
+    // automatic reset can otherwise clear an auto-expanded tune set after a
+    // search replaces the table data, most visibly in the mobile list view.
+    autoResetExpanded: false,
     enableRowSelection: props.canSelectRow
       ? (row) => props.canSelectRow?.(row.original) ?? false
       : (props.enableRowSelection ?? true),
