@@ -31,7 +31,7 @@ import {
 } from "solid-js";
 import {
   type ColumnDef,
-  gridTableFeatures,
+  paginatedTableFeatures,
 } from "../../components/grids/tanstack-table";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { getPracticeRecords } from "../../lib/db/queries/practice";
@@ -275,7 +275,7 @@ const PracticeHistory: Component = () => {
 
   // Create table instance
   const table = createTable({
-    features: gridTableFeatures,
+    features: paginatedTableFeatures,
     get data() {
       return filteredRecords();
     },

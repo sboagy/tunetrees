@@ -23,6 +23,14 @@ export const gridTableFeatures = tableFeatures({
   ...stockFeatures,
   sortedRowModel: createSortedRowModel(),
   expandedRowModel: createExpandedRowModel(),
+});
+
+/**
+ * History is the only table that uses client-side pagination. Keep its row
+ * model separate so virtualized tune grids continue to expose every row.
+ */
+export const paginatedTableFeatures = tableFeatures({
+  ...gridTableFeatures,
   paginatedRowModel: createPaginatedRowModel(),
 });
 

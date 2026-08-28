@@ -633,6 +633,10 @@ export const TunesGrid = (<T extends { id: string | number }>(
       return resolvedColumns();
     },
     getSubRows: props.getSubRows ? (row) => props.getSubRows?.(row) : undefined,
+    // Virtualized grids render the complete client-side row set. In v9 this
+    // also ensures the expanded row model flattens subrows without registering
+    // the client-side pagination row model (which would cap rows at pageSize).
+    manualPagination: true,
     enableRowSelection: props.canSelectRow
       ? (row) => props.canSelectRow?.(row.original) ?? false
       : (props.enableRowSelection ?? true),
