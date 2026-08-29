@@ -94,7 +94,7 @@ Hand-written glue that stays stable around those artifacts:
 - `oosync.codegen.config.json`: the main TuneTrees-owned customization point for generation and sync policy overrides.
 - `src/lib/db/oosync-browser-sqlite-hooks.ts`: TuneTrees-specific browser DB hooks for views, compatibility objects, and migration-time cleanup.
 - `src/lib/db/init-view-column-meta.ts`, `src/lib/db/init-views.ts`, `src/lib/db/migration-version.ts`: app-specific helpers consumed by the browser DB hook layer.
-- `worker/src/handler.ts`, `worker/src/media.ts`: app-owned worker wrapper/routes that extend the generated sync worker with authenticated media handling.
+- `worker/src/handler.ts`, `worker/src/media.ts`, `worker/src/google-oauth.ts`: app-owned worker wrapper/routes that extend the generated sync worker with authenticated media handling and a stateless Google OAuth token-exchange proxy. The proxy holds only the Google client secret; browser-local code owns user tokens and direct provider binary transfers.
 
 Rule: do not hand-edit generated files. If generated output is wrong, fix the Postgres schema, Postgres comments, `oosync.codegen.config.json`, or the generator.
 
@@ -122,7 +122,7 @@ In TuneTrees, schema agreement is produced by codegen rather than maintained man
 5. `src/lib/sync/runtime-config.ts` injects TuneTrees runtime dependencies into oosync via the generated browser runtime wrapper: local schema, syncable tables, table ordering, SQLite instance access, trigger control, outbox backup helpers, persistence, and logging.
 6. Offline media uses external browser storage rather than SQLite blobs: `src/lib/media/media-vault.ts` stores pinned audio and queued note-upload drafts in IndexedDB, while a local-only SQLite table (`media_draft_outbox`) tracks pending note-media uploads that still need an authenticated worker round-trip.
 7. `AuthContext` starts the oosync sync service with the local DB, auth session, and any request overrides, and also runs offline-media maintenance (draft upload replay plus pinned-audio lookahead prefetch) when the app is online.
-8. The browser sends pending changes and pull state to the Cloudflare Worker via `/api/sync`, while authenticated media uploads/downloads go through `/api/media/*`.
+8. The browser sends pending changes and pull state to the Cloudflare Worker via `/api/sync`, while legacy authenticated media uploads/downloads go through `/api/media/*`. Google Drive OAuth code/refresh exchanges use the stateless `/api/byos/google/token` proxy; BYOS binary transfers never traverse the Worker.
 9. The worker evaluates generated sync rules, applies push policy against Postgres, pulls matching remote rows, and returns remote changes.
 10. oosync applies those remote changes back into local SQLite, suppressing triggers while applying remote data and restoring them afterward.
 11. SolidJS reacts to local DB changes. The UI continues to read local state; it does not switch to remote reads after sync.
