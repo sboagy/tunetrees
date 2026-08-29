@@ -7,7 +7,7 @@
  * - Data transformation for grid display
  * - Minimal stats footer
  */
-import type { VisibilityState } from "@tanstack/solid-table";
+
 import {
   type Component,
   createEffect,
@@ -25,6 +25,7 @@ import { useSidebarResize } from "../layout/SidebarResizeContext";
 import { RhythmDialog } from "../rhythm/RhythmDialog";
 import { GridStatusMessage } from "./GridStatusMessage";
 import { TunesGrid } from "./TunesGrid";
+import type { VisibilityState } from "./tanstack-table";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 export const TunesGridScheduled: Component<IGridBaseProps> = (props) => {

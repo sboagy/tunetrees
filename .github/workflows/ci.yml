@@ -465,7 +465,11 @@ jobs:
         run: |
           set -o pipefail
           echo "🎬 Running sharded test suite (shard ${{ matrix.shard }}/4)"
-          npm run test:e2e:both:ci -- \
+          # Remote wrangler dev can lose its tunnel part-way through a shard,
+          # cascading into connection-refused sync failures. All E2E services
+          # target the local Supabase instance, so use the same Miniflare mode
+          # already used by the offline suite.
+          PLAYWRIGHT_USE_LOCAL_WORKER=true npm run test:e2e:both:ci -- \
             --shard=${{ matrix.shard }}/4 \
             2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
 

@@ -13,7 +13,6 @@
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
 import { useSearchParams } from "@solidjs/router";
-import type { ColumnDef, Table } from "@tanstack/solid-table";
 import {
   ChevronDown,
   ChevronRight,
@@ -73,6 +72,7 @@ import { getTuneSetItems } from "@/lib/db/queries/tune-sets";
 import { getTunesForUser } from "@/lib/db/queries/tunes";
 import type { Tune, TuneSet } from "@/lib/db/types";
 import { createIsMobile } from "@/lib/hooks/useIsMobile";
+import type { ColumnDef, Table } from "../components/grids/tanstack-table";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -141,11 +141,11 @@ function cleanupOrphanedChildTuneRows(
 }
 
 function normalizeExclusiveLibrarySelection(
-  next: Record<string, boolean>,
-  prev: Record<string, boolean>,
+  next: Record<string, true>,
+  prev: Record<string, true>,
   getRow: (rowId: string) => ISetlistGridRow | undefined
-): Record<string, boolean> {
-  const normalized: Record<string, boolean> = { ...next };
+): Record<string, true> {
+  const normalized: Record<string, true> = { ...next };
   const nextIds = Object.keys(next);
   const prevIds = new Set(Object.keys(prev));
   const addedIds = nextIds.filter((rowId) => !prevIds.has(rowId));
@@ -1851,7 +1851,9 @@ const SetlistsPage: Component = () => {
                           tablePurpose="setlists"
                           userId={gridUserId("view")}
                           data={setlistGridRows().rows}
-                          columns={setlistViewColumns()}
+                          columns={
+                            setlistViewColumns() as unknown as ColumnDef<any>[]
+                          }
                           currentRowId={currentTuneId() ?? undefined}
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
@@ -1860,7 +1862,7 @@ const SetlistsPage: Component = () => {
                           getSubRows={getSetlistGridSubRows}
                           hierarchyColumnId="title"
                           onTableReady={(table) => {
-                            setViewTable(table);
+                            setViewTable(table as Table<ISetlistGridRow>);
                           }}
                           getRowProps={(row) =>
                             row.setlistPosition !== null &&
@@ -2084,7 +2086,9 @@ const SetlistsPage: Component = () => {
                           tablePurpose="setlists"
                           userId={gridUserId("library")}
                           data={libraryGridRows().rows}
-                          columns={libraryColumns()}
+                          columns={
+                            libraryColumns() as unknown as ColumnDef<any>[]
+                          }
                           currentRowId={currentTuneId() ?? undefined}
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
@@ -2100,8 +2104,8 @@ const SetlistsPage: Component = () => {
                           }
                           onSelectionChange={setLibrarySelectionCount}
                           onTableReady={(table) => {
-                            libraryTableRef = table;
-                            setLibraryTable(table);
+                            libraryTableRef = table as Table<ISetlistGridRow>;
+                            setLibraryTable(table as Table<ISetlistGridRow>);
                           }}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}
@@ -2443,7 +2447,9 @@ const SetlistsPage: Component = () => {
                           tablePurpose="setlists"
                           userId={gridUserId("editor")}
                           data={setlistGridRows().rows}
-                          columns={setlistEditColumns()}
+                          columns={
+                            setlistEditColumns() as unknown as ColumnDef<any>[]
+                          }
                           currentRowId={currentTuneId() ?? undefined}
                           onRowClick={handleGridRowClick}
                           enableColumnReorder={true}
@@ -2455,8 +2461,8 @@ const SetlistsPage: Component = () => {
                           }
                           onSelectionChange={setEditorSelectionCount}
                           onTableReady={(table) => {
-                            editorTableRef = table;
-                            setEditorTable(table);
+                            editorTableRef = table as Table<ISetlistGridRow>;
+                            setEditorTable(table as Table<ISetlistGridRow>);
                           }}
                           getRowId={getSetlistGridRowId}
                           getSubRows={getSetlistGridSubRows}

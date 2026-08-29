@@ -1,20 +1,12 @@
 import {
-  type Cell,
-  type Column,
-  type ColumnDef,
   type ColumnOrderState,
   type ColumnPinningState,
   type ColumnSizingState,
-  createSolidTable,
+  createTable,
   type ExpandedState,
   flexRender,
-  getCoreRowModel,
-  getExpandedRowModel,
-  getSortedRowModel,
   type RowSelectionState,
   type SortingState,
-  type Table,
-  type VisibilityState,
 } from "@tanstack/solid-table";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { ChevronDown, ChevronRight, GripVertical } from "lucide-solid";
@@ -54,6 +46,14 @@ import {
   mergeWithDefaults,
   saveTableState,
 } from "./table-state-persistence";
+import {
+  type Cell,
+  type Column,
+  type ColumnDef,
+  gridTableFeatures,
+  type Table,
+  type VisibilityState,
+} from "./tanstack-table";
 import type {
   ICellEditorCallbacks,
   ITableDisplayOptionsMeta,
@@ -227,12 +227,16 @@ export const TunesGrid = (<T extends { id: string | number }>(
       sorting: sanitizeSorting(state.sorting),
       viewMode: sanitizeViewMode(state.viewMode),
       columnPinning: {
-        left: (state.columnPinning?.left ?? []).filter((id) =>
-          allowedColumnIds.has(mapColumnId(id))
-        ),
-        right: (state.columnPinning?.right ?? []).filter((id) =>
-          allowedColumnIds.has(mapColumnId(id))
-        ),
+        start: (
+          state.columnPinning?.start ??
+          state.columnPinning?.left ??
+          []
+        ).filter((id) => allowedColumnIds.has(mapColumnId(id))),
+        end: (
+          state.columnPinning?.end ??
+          state.columnPinning?.right ??
+          []
+        ).filter((id) => allowedColumnIds.has(mapColumnId(id))),
       },
     };
   };
@@ -267,9 +271,6 @@ export const TunesGrid = (<T extends { id: string | number }>(
   const [sorting, setSorting] = createSignal<SortingState>(
     initialState.sorting || []
   );
-  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
-    initialState.rowSelection || {}
-  );
 
   const rowLookup = createMemo(() => {
     const rowsById: Record<string, T> = {};
@@ -291,7 +292,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
   });
 
   const compactRowSelection = (
-    selection: RowSelectionState
+    selection: Record<string, boolean>
   ): RowSelectionState => {
     const next: RowSelectionState = {};
     for (const [rowId, selected] of Object.entries(selection)) {
@@ -299,6 +300,17 @@ export const TunesGrid = (<T extends { id: string | number }>(
     }
     return next;
   };
+
+  const [rowSelection, setRowSelection] = createSignal<RowSelectionState>(
+    compactRowSelection(initialState.rowSelection || {})
+  );
+
+  const toColumnPinningState = (
+    pinning: ITableStateExtended["columnPinning"]
+  ): ColumnPinningState => ({
+    start: pinning?.start ?? pinning?.left ?? [],
+    end: pinning?.end ?? pinning?.right ?? [],
+  });
 
   const resolveRowSelectionUpdate = (
     updater:
@@ -339,7 +351,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
     initialState.columnVisibility || {}
   );
   const [columnPinning, setColumnPinning] = createSignal<ColumnPinningState>(
-    initialState.columnPinning || { left: [], right: [] }
+    toColumnPinningState(initialState.columnPinning)
   );
   const normalizeViewMode = (
     mode: TableViewMode | undefined
@@ -484,7 +496,7 @@ export const TunesGrid = (<T extends { id: string | number }>(
           `[TunesGrid ${props.tablePurpose}] Restoring ${Object.keys(loaded.rowSelection).length} row selections from localStorage`
         );
       }
-      setRowSelection(loaded.rowSelection);
+      setRowSelection(compactRowSelection(loaded.rowSelection));
     } else if (Object.keys(rowSelection()).length > 0) {
       setRowSelection({});
     }
@@ -612,17 +624,23 @@ export const TunesGrid = (<T extends { id: string | number }>(
   );
 
   // Create table instance
-  const table = createSolidTable<T>({
+  const table = createTable({
+    features: gridTableFeatures,
     get data() {
       return props.data;
     },
     get columns() {
       return resolvedColumns();
     },
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getExpandedRowModel: props.getSubRows ? getExpandedRowModel() : undefined,
     getSubRows: props.getSubRows ? (row) => props.getSubRows?.(row) : undefined,
+    // Virtualized grids render the complete client-side row set. In v9 this
+    // also ensures the expanded row model flattens subrows without registering
+    // the client-side pagination row model (which would cap rows at pageSize).
+    manualPagination: true,
+    // Expansion is controlled by the grid's auto/default-expanded props. V9's
+    // automatic reset can otherwise clear an auto-expanded tune set after a
+    // search replaces the table data, most visibly in the mobile list view.
+    autoResetExpanded: false,
     enableRowSelection: props.canSelectRow
       ? (row) => props.canSelectRow?.(row.original) ?? false
       : (props.enableRowSelection ?? true),
@@ -719,7 +737,8 @@ export const TunesGrid = (<T extends { id: string | number }>(
     if (merged.columnSizing && Object.keys(merged.columnSizing).length)
       setColumnSizing(merged.columnSizing);
     if (merged.sorting?.length) setSorting(merged.sorting);
-    if (merged.columnPinning) setColumnPinning(merged.columnPinning);
+    if (merged.columnPinning)
+      setColumnPinning(toColumnPinningState(merged.columnPinning));
     console.log(
       `[TunesGrid ${props.tablePurpose}] Restored state from DB (localStorage was empty)`
     );
@@ -1071,12 +1090,12 @@ export const TunesGrid = (<T extends { id: string | number }>(
   // Helpers for pinned column styling
   const getPinnedBorderClass = (column: Column<T, unknown>): string => {
     if (
-      column.getIsPinned() === "left" &&
-      column.getPinnedIndex() === table.getLeftLeafColumns().length - 1
+      column.getIsPinned() === "start" &&
+      column.getPinnedIndex() === table.getStartLeafColumns().length - 1
     ) {
       return " border-r-2 border-blue-300 dark:border-blue-600";
     }
-    if (column.getIsPinned() === "right" && column.getPinnedIndex() === 0) {
+    if (column.getIsPinned() === "end" && column.getPinnedIndex() === 0) {
       return " border-l-2 border-blue-300 dark:border-blue-600";
     }
     return "";
@@ -1088,9 +1107,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
     return {
       width: `${width}px`,
       position: "sticky" as const,
-      ...(isPinned === "left"
-        ? { left: `${column.getStart("left")}px` }
-        : { right: `${column.getAfter("right")}px` }),
+      ...(isPinned === "start"
+        ? { "inset-inline-start": `${column.getStart("start")}px` }
+        : { "inset-inline-end": `${column.getAfter("end")}px` }),
       "z-index": 20,
     };
   };
@@ -1101,9 +1120,9 @@ export const TunesGrid = (<T extends { id: string | number }>(
     return {
       width: `${width}px`,
       position: "sticky" as const,
-      ...(isPinned === "left"
-        ? { left: `${column.getStart("left")}px` }
-        : { right: `${column.getAfter("right")}px` }),
+      ...(isPinned === "start"
+        ? { "inset-inline-start": `${column.getStart("start")}px` }
+        : { "inset-inline-end": `${column.getAfter("end")}px` }),
       "z-index": 1,
     };
   };
