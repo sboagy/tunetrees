@@ -144,7 +144,7 @@
     "papaparse": "^5.7.0",
     "quickjs-emscripten": "^0.32.0",
     "solid-js": "^1.9.13",
-    "solid-sonner": "^0.3.1",
+    "solid-sonner": "^0.3.2",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
     "ts-fsrs": "^5.4.1",
