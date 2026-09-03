@@ -139,7 +139,7 @@
     "drizzle-orm": "^0.45.2",
     "jodit": "^4.13.6",
     "loglevel": "^1.9.2",
-    "lucide-solid": "^1.23.0",
+    "lucide-solid": "^1.37.0",
     "oosync": "git+https://github.com/sboagy/oosync.git#main",
     "papaparse": "^5.7.0",
     "quickjs-emscripten": "^0.32.0",
