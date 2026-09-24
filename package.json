@@ -161,7 +161,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.2.0",
     "@types/papaparse": "^5.5.2",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "concurrently": "^10.0.4",
@@ -179,7 +179,7 @@
     "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-solid": "^2.11.14",
     "vite-plugin-static-copy": "^4.1.1",
-    "vitest": "^4.1.10",
+    "vitest": "^5.0.1",
     "workbox-window": "^7.4.1",
     "wrangler": "^4.114.0"
   },
