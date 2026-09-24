@@ -36,7 +36,22 @@ const child = spawn(command, args, {
   env: process.env,
 });
 
+// Arguments contain secrets; lifecycle records deliberately include only metadata.
+child.on("spawn", () => {
+  console.error(
+    `[worker-launcher] ${new Date().toISOString()} started pid=${child.pid}`
+  );
+});
+child.on("error", (error) => {
+  console.error(
+    `[worker-launcher] ${new Date().toISOString()} spawn failed code=${error.code ?? "unknown"}`
+  );
+  process.exitCode = 1;
+});
 child.on("exit", (code, signal) => {
+  console.error(
+    `[worker-launcher] ${new Date().toISOString()} exited pid=${child.pid} code=${code} signal=${signal}`
+  );
   if (signal) {
     process.kill(process.pid, signal);
     return;
