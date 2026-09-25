@@ -72,6 +72,9 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+      - name: Test worker process recovery
+        run: node --test worker/scripts/run-wrangler-dev.test.mjs
+
   # --------------------------------------------------------------------------
   # JOB 1: UNIT TESTS (VITEST)
   # --------------------------------------------------------------------------
@@ -462,8 +465,16 @@ jobs:
           mkdir -p playwright-logs blob-report test-results
 
       - name: Run Playwright Tests (Shard ${{ matrix.shard }}/4)
+        # Leave time for diagnostics and artifact uploads before the job deadline.
+        timeout-minutes: 45
+        env:
+          WRANGLER_LOG_PATH: ${{ github.workspace }}/ci-diagnostics/wrangler
+          WRANGLER_LOG_SANITIZE: "true"
         run: |
           set -o pipefail
+          bash scripts/ci-diagnostics.sh &
+          DIAGNOSTICS_PID=$!
+          trap 'kill "$DIAGNOSTICS_PID" 2>/dev/null || true; wait "$DIAGNOSTICS_PID" || true' EXIT
           echo "🎬 Running sharded test suite (shard ${{ matrix.shard }}/4)"
           # Remote wrangler dev can lose its tunnel part-way through a shard,
           # cascading into connection-refused sync failures. All E2E services
@@ -472,6 +483,19 @@ jobs:
           PLAYWRIGHT_USE_LOCAL_WORKER=true npm run test:e2e:both:ci -- \
             --shard=${{ matrix.shard }}/4 \
             2>&1 | tee "playwright-logs/playwright-shard-${{ matrix.shard }}.log"
+
+      - name: Collect final CI diagnostics
+        if: always()
+        timeout-minutes: 1
+        run: bash scripts/ci-diagnostics.sh --final
+
+      - name: Upload CI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-diagnostics-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: ci-diagnostics/
+          retention-days: 7
 
       - name: Upload Playwright log (Shard ${{ matrix.shard }}/4)
         if: always()
@@ -490,7 +514,7 @@ jobs:
           retention-days: 1
 
       - name: Upload Test Artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.shard }}
@@ -507,7 +531,7 @@ jobs:
   test-pwa-offline:
     name: Run PWA Offline Test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [quality]
     concurrency:
       group: ci-fast-pwa-${{ github.ref }}
@@ -834,17 +858,26 @@ jobs:
         run: mkdir -p playwright-logs blob-report test-results
 
       - name: Run PWA Offline Tests
+        # Leave time for diagnostics and artifact uploads before the job deadline.
+        timeout-minutes: 15
+        env:
+          WRANGLER_LOG_PATH: ${{ github.workspace }}/ci-diagnostics/wrangler
+          WRANGLER_LOG_SANITIZE: "true"
         run: |
           : "${SUPABASE_URL:?SUPABASE_URL not set after Supabase start}"
           : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY not set after Supabase start}"
           export VITE_SUPABASE_URL="$SUPABASE_URL"
           export VITE_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
           set -o pipefail
+          bash scripts/ci-diagnostics.sh &
+          DIAGNOSTICS_PID=$!
           echo "🚀 Starting Preview Server on port 4173..."
-          npm run preview:local &
+          npm run preview:local > playwright-logs/preview.log 2>&1 &
           PREVIEW_PID=$!
 
           cleanup() {
+            kill "$DIAGNOSTICS_PID" 2>/dev/null || true
+            wait "$DIAGNOSTICS_PID" || true
             kill "$PREVIEW_PID" 2>/dev/null || true
             pkill -f "vite preview" 2>/dev/null || true
           }
@@ -865,6 +898,19 @@ jobs:
             2>&1 | tee "playwright-logs/playwright-pwa.log"
         shell: bash
 
+      - name: Collect final CI diagnostics
+        if: always()
+        timeout-minutes: 1
+        run: bash scripts/ci-diagnostics.sh --final
+
+      - name: Upload CI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-diagnostics-pwa-${{ github.run_attempt }}
+          path: ci-diagnostics/
+          retention-days: 7
+
       - name: Upload Playwright log (PWA)
         if: always()
         uses: actions/upload-artifact@v7
@@ -882,7 +928,7 @@ jobs:
           retention-days: 1
 
       - name: Upload Test Artifacts (PWA)
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-pwa

@@ -32,6 +32,7 @@ dist-ssr
 .dev.vars
 wrangler.toml.backup
 # Test artifacts and reports
+ci-diagnostics/
 test-results/
 playwright-report/
 coverage/
