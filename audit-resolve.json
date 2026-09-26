@@ -5,12 +5,6 @@
       "madeAt": 1779282553000,
       "expiresAt": 1794838153000,
       "reason": "Dev dependency only (drizzle-kit). esbuild vulnerability only affects development server, not production builds. No fix available that doesn't break drizzle-kit functionality."
-    },
-    "1110992|valibot": {
-      "decision": "ignore",
-      "madeAt": 1779282553000,
-      "expiresAt": 1794838153000,
-      "reason": "Dev dependency only (shadcn-solid tooling). Used only for component scaffolding and not in the shipped runtime path. No safe upstream fix is available in the current package line."
     }
   },
   "rules": {},
