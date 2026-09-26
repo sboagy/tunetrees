@@ -5,7 +5,7 @@
  * scroll persistence, resizing, and column reordering. Wrapper handles data
  * fetching, client-side filtering, selection summary, and row click behavior.
  */
-import type { VisibilityState } from "@tanstack/solid-table";
+
 import {
   type Component,
   createEffect,
@@ -39,6 +39,7 @@ import {
   isTuneSetGridRow,
 } from "./grouped-grid-rows";
 import { TunesGrid } from "./TunesGrid";
+import type { VisibilityState } from "./tanstack-table";
 import type { IGridBaseProps, ITuneOverview } from "./types";
 
 interface ITunesGridRepertoireProps extends IGridBaseProps {

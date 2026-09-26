@@ -13,11 +13,8 @@
  */
 
 import {
-  type ColumnDef,
-  createSolidTable,
+  createTable,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
   type SortingState,
 } from "@tanstack/solid-table";
 import { SquarePen, Trash2 } from "lucide-solid";
@@ -35,6 +32,7 @@ import {
   getUserRepertoires,
 } from "../../lib/db/queries/repertoires";
 import type { RepertoireWithSummary } from "../../lib/db/types";
+import { type ColumnDef, gridTableFeatures } from "../grids/tanstack-table";
 
 interface RepertoireListProps {
   /** Callback when a repertoire is selected for editing */
@@ -273,13 +271,12 @@ export const RepertoireList: Component<RepertoireListProps> = (props) => {
   ];
 
   // Create table instance
-  const table = createSolidTable({
+  const table = createTable({
+    features: gridTableFeatures,
     get data() {
       return filteredRepertoires();
     },
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     state: {
       get sorting() {
         return sorting();

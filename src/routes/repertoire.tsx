@@ -10,7 +10,6 @@
  */
 
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
-import type { Table } from "@tanstack/solid-table";
 import { and, eq } from "drizzle-orm";
 import {
   type Component,
@@ -27,6 +26,7 @@ import {
 import { AIChatDrawer } from "../components/ai/AIChatDrawer";
 import { TunesGridRepertoire } from "../components/grids";
 import { GRID_CONTENT_CONTAINER } from "../components/grids/shared-toolbar-styles";
+import type { Table } from "../components/grids/tanstack-table";
 import type { ITuneOverview } from "../components/grids/types";
 import {
   RepertoireEmptyState,
@@ -450,7 +450,7 @@ const RepertoirePage: Component = () => {
     // If more than one row is selected AND the changed row is among the selected,
     // offer to apply to all selected rows; otherwise single-row update.
     const selectedIds = selectedRows.map((r) => {
-      const orig = r.original as Record<string, unknown>;
+      const orig = r.original as unknown as Record<string, unknown>;
       return String(orig.tune_id ?? orig.id);
     });
     const isInSelection =
@@ -512,9 +512,8 @@ const RepertoirePage: Component = () => {
     }
   };
 
-  const [tableInstance, setTableInstance] = createSignal<Table<any> | null>(
-    null
-  );
+  const [tableInstance, setTableInstance] =
+    createSignal<Table<ITuneOverview> | null>(null);
 
   const getFilteredTuneIds = createMemo(() => {
     if (filterAnyTuneSet()) {

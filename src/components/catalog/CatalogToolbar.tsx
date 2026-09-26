@@ -18,7 +18,6 @@
  */
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import type { Table } from "@tanstack/solid-table";
 import {
   ChevronDown,
   ChevronRight,
@@ -52,6 +51,7 @@ import {
   TOOLBAR_SEARCH_INPUT,
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
+import type { Table } from "../grids/tanstack-table";
 import type { ITuneOverview } from "../grids/types";
 import { AddTuneDialog } from "../import/AddTuneDialog";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";

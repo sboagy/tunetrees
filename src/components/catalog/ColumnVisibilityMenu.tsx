@@ -8,10 +8,9 @@
  * @module components/catalog/ColumnVisibilityMenu
  */
 
-import type { Column, Table } from "@tanstack/solid-table";
+import type { RowData } from "@tanstack/solid-table";
 import { ArrowLeftToLine, ArrowRightToLine, PinOff } from "lucide-solid";
 import {
-  type Component,
   createEffect,
   createSignal,
   For,
@@ -20,12 +19,13 @@ import {
   Show,
 } from "solid-js";
 import { Portal } from "solid-js/web";
+import type { Column, Table } from "../grids/tanstack-table";
 import type { ITableDisplayOptionsMeta } from "../grids/types";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";
 
-export interface ColumnVisibilityMenuProps {
+export interface ColumnVisibilityMenuProps<TData extends RowData> {
   /** TanStack Table instance */
-  table: Table<any>;
+  table: Table<TData>;
   /** Whether menu is open */
   isOpen: boolean;
   /** Close handler */
@@ -52,8 +52,8 @@ export interface ColumnVisibilityMenuProps {
  * Automatically excludes non-toggleable columns (select, actions, etc.)
  * Uses Portal to render outside parent containers to avoid clipping.
  */
-export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
-  props
+export const ColumnVisibilityMenu = <TData extends RowData>(
+  props: ColumnVisibilityMenuProps<TData>
 ) => {
   let menuRef: HTMLDivElement | undefined;
 
@@ -207,7 +207,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
   };
 
   // Get display name for column - reads from column meta first, then falls back to nameMap
-  const getColumnDisplayName = (column: Column<any>): string => {
+  const getColumnDisplayName = (column: Column<TData>): string => {
     // Prefer headerLabel stored in the column definition's meta
     const meta = column.columnDef.meta as Record<string, unknown> | undefined;
     const metaLabel = meta?.headerLabel;
@@ -386,7 +386,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                   {/* Pin controls */}
                   <Show when={column.getCanPin()}>
                     <div class="flex items-center gap-0.5 flex-shrink-0">
-                      <Show when={column.getIsPinned() !== "left"}>
+                      <Show when={column.getIsPinned() !== "start"}>
                         <button
                           type="button"
                           title="Pin left"
@@ -394,7 +394,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                           on:click={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            column.pin("left");
+                            column.pin("start");
                           }}
                         >
                           <ArrowLeftToLine size={12} />
@@ -414,7 +414,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                           <PinOff size={12} />
                         </button>
                       </Show>
-                      <Show when={column.getIsPinned() !== "right"}>
+                      <Show when={column.getIsPinned() !== "end"}>
                         <button
                           type="button"
                           title="Pin right"
@@ -422,7 +422,7 @@ export const ColumnVisibilityMenu: Component<ColumnVisibilityMenuProps> = (
                           on:click={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
-                            column.pin("right");
+                            column.pin("end");
                           }}
                         >
                           <ArrowRightToLine size={12} />

@@ -17,7 +17,6 @@
  */
 
 import { DropdownMenu } from "@kobalte/core/dropdown-menu";
-import type { Table } from "@tanstack/solid-table";
 import {
   Calendar,
   ChevronDown,
@@ -44,6 +43,7 @@ import {
   TOOLBAR_INNER_CLASSES,
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
+import type { Table } from "../grids/tanstack-table";
 import { useRegisterMobileControlBar } from "../layout/MobileControlBarContext";
 import { TuneSetFilterDialog } from "../tune-sets/TuneSetFilterDialog";
 import { Switch, SwitchControl, SwitchLabel, SwitchThumb } from "../ui/switch";

@@ -2823,39 +2823,25 @@ export class TuneTreesPage {
   private async getDisplayModeSwitchChecked(
     displayModeSwitch: Locator
   ): Promise<boolean | null> {
-    const ariaChecked = await displayModeSwitch
-      .getAttribute("aria-checked")
-      .catch(() => null);
-    if (ariaChecked === "true") {
-      return true;
-    }
-    if (ariaChecked === "false") {
-      return false;
-    }
+    // The mobile menu can detach between visibility checks and interaction.
+    // Read one DOM snapshot without waiting for a missing switch to reappear;
+    // the caller can then reopen the menu within its bounded retry loop.
+    return displayModeSwitch
+      .evaluateAll((elements) => {
+        const element = elements[0];
+        if (!element) return null;
 
-    const dataChecked = await displayModeSwitch
-      .evaluate((el) => (el as HTMLElement).dataset.checked)
-      .catch(() => null);
-    if (dataChecked !== null) {
-      return true;
-    }
+        const ariaChecked = element.getAttribute("aria-checked");
+        if (ariaChecked === "true") return true;
+        if (ariaChecked === "false") return false;
+        if (Object.hasOwn(element.dataset, "checked")) return true;
 
-    const inputChecked = await displayModeSwitch
-      .locator('input[type="checkbox"], input[type="hidden"]')
-      .first()
-      .evaluate((element) => {
-        if (!(element instanceof HTMLInputElement)) {
-          return null;
-        }
-
-        return element.checked;
+        const input = element.querySelector(
+          'input[type="checkbox"], input[type="hidden"]'
+        );
+        return input instanceof HTMLInputElement ? input.checked : null;
       })
       .catch(() => null);
-    if (typeof inputChecked === "boolean") {
-      return inputChecked;
-    }
-
-    return null;
   }
 
   private async doesDisplayModeSwitchMatchMode(
@@ -3096,7 +3082,10 @@ export class TuneTreesPage {
         continue;
       }
 
-      await displayModeSwitch.scrollIntoViewIfNeeded().catch(() => undefined);
+      // A disappearing menu must leave time for the next reopen attempt.
+      await displayModeSwitch
+        .scrollIntoViewIfNeeded({ timeout: 2000 })
+        .catch(() => undefined);
       if (
         await this.tryClickDisplayModeSwitch(displayModeSwitch, mode, attempt)
       )
@@ -3798,7 +3787,7 @@ export class TuneTreesPage {
       }
 
       await displayOptionsButton
-        .scrollIntoViewIfNeeded()
+        .scrollIntoViewIfNeeded({ timeout: 2000 })
         .catch(() => undefined);
 
       // The Kobalte dropdown entry can detach as it closes itself while opening
@@ -3806,7 +3795,9 @@ export class TuneTreesPage {
       // direct dispatch when the DOM is mid-transition.
       await displayOptionsButton
         .click({ timeout: 2000 })
-        .catch(() => displayOptionsButton.dispatchEvent("click"))
+        .catch(() =>
+          displayOptionsButton.dispatchEvent("click", {}, { timeout: 2000 })
+        )
         .catch(() => undefined);
 
       // On mobile, clicking the overflow entry first closes the overflow menu
@@ -3842,7 +3833,9 @@ export class TuneTreesPage {
         await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
       }
       await this.openOverflowMenuEntry(columnsButton, displayOptionsButton);
-      await displayOptionsButton.click().catch(() => undefined);
+      await displayOptionsButton
+        .click({ timeout: 2000 })
+        .catch(() => undefined);
 
       const menuOpened = await this.waitForColumnVisibilityMenu(
         targetMenu,

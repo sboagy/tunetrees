@@ -18,7 +18,6 @@
  */
 
 import { useLocation, useNavigate } from "@solidjs/router";
-import type { Table } from "@tanstack/solid-table";
 import { ChevronDown, Columns2, Plus, Search, Trash2 } from "lucide-solid";
 import type { Component } from "solid-js";
 import { createEffect, createSignal } from "solid-js";
@@ -38,6 +37,7 @@ import {
   TOOLBAR_INNER_CLASSES,
   TOOLBAR_SPACER,
 } from "../grids/shared-toolbar-styles";
+import type { Table } from "../grids/tanstack-table";
 import type { ITuneOverview } from "../grids/types";
 import { CombinedFilterDropdown } from "./CombinedFilterDropdown";
 
