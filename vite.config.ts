@@ -162,7 +162,7 @@ export default defineConfig(() => {
     if (!rhythmAssetsBaseUrl) {
       // No R2 base URL configured – restrict to same-origin only so we don't
       // accidentally CacheFirst arbitrary cross-origin /audio/kits or /audio/loops URLs.
-      return url.origin === self.location.origin;
+      return url.origin === globalThis.location.origin;
     }
 
     try {
@@ -170,7 +170,7 @@ export default defineConfig(() => {
       return url.origin === configuredBase.origin;
     } catch {
       // Unparseable base URL – fall back to same-origin only.
-      return url.origin === self.location.origin;
+      return url.origin === globalThis.location.origin;
     }
   };
 
@@ -262,6 +262,8 @@ export default defineConfig(() => {
         "**/.yalc/**",
         "**/dist/**",
         "**/e2e/**", // Exclude Playwright E2E tests
+        // Worker launcher subprocess tests run with node --test in CI quality checks.
+        "worker/scripts/**/*.test.mjs",
         "**/legacy/**", // Exclude legacy code
         "**/*.spec.ts", // Exclude Playwright test files (use .test.ts for Vitest)
       ],

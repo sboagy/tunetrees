@@ -237,6 +237,9 @@ export default defineConfig({
   webServer: [
     // 1. Main Dev Server
     {
+      name: "vite",
+      stdout: "pipe",
+      stderr: "pipe",
       command: "npm run dev",
       url: `http://localhost:${DEV_PORT}`,
       reuseExistingServer: !process.env.CI,
@@ -255,6 +258,9 @@ export default defineConfig({
     },
     // 2. Worker/API Server
     {
+      name: "worker",
+      stdout: "pipe",
+      stderr: "pipe",
       // The PWA offline job targets the local Supabase instance. Using
       // Miniflare there avoids a remote-dev disconnect cascading into every
       // subsequent offline test, while other E2E jobs retain their worker mode.
@@ -264,6 +270,8 @@ export default defineConfig({
       url: `http://localhost:${WORKER_PORT}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      // Let the launcher stop its Wrangler/workerd process group before teardown.
+      gracefulShutdown: { signal: "SIGTERM", timeout: 10000 },
     },
     // 3. PWA PREVIEW SERVER (Defined here, but only runs when needed)
     // Must be run externally.
