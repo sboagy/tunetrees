@@ -85,7 +85,7 @@
     "test:e2e:report": "FORCE_COLOR=1 op run --env-file=\".env.local.template\" -- playwright test --reporter=html",
     "playwright:install": "playwright install",
     "audit:prod": "npm audit --production",
-    "audit:summary": "npm audit || echo '⚠️  Known dev-only vulnerabilities (esbuild, valibot, lodash.template) - see SECURITY.md'",
+    "audit:summary": "npm audit || echo '⚠️  Review audit findings; documented exceptions are in SECURITY.md'",
     "lighthouse": "npm run build && lhci autorun",
     "lighthouse:view": "npm run build && lighthouse http://localhost:4173 --view",
     "perf:test": "node scripts/performance-test.js",
@@ -155,7 +155,7 @@
     "@cloudflare/workers-types": "^5.20260921.1",
     "@playwright/test": "^1.62.1",
     "@solidjs/testing-library": "^0.8.10",
-    "@sonar/scan": "^5.0.0",
+    "@sonar/scan": "^5.0.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/user-event": "^14.6.1",
     "@types/better-sqlite3": "^7.6.13",
@@ -170,7 +170,6 @@
     "jsdom": "^30.0.1",
     "postgres": "^3.4.9",
     "prettier": "^3.9.6",
-    "shadcn-solid": "^0.7.7",
     "supabase": "^2.110.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
@@ -181,7 +180,7 @@
     "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^5.0.1",
     "workbox-window": "^7.4.1",
-    "wrangler": "^4.114.0"
+    "wrangler": "^4.136.1"
   },
   "overrides": {
     "axios": "^1.16.0",
