@@ -1,15 +1,9 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 # yamllint disable rule:line-length
 #
-# Secrets required in the `tunetrees_ci_env` environment:
-#   OP_SERVICE_ACCOUNT_TOKEN  — 1Password Service Account token (for op run)
-#
-# All other secrets (including test user passwords, Supabase keys, Cloudflare creds)
-# are resolved at runtime via `op run` or `op read` using .env.prod.template.
-#
-# All production secrets (CLOUDFLARE_*, VITE_SUPABASE_URL, etc.) are resolved
-# at deploy time via `op run --env-file=".env.prod.template"` so they do NOT
-# need to be stored individually as GitHub secrets.
+# OP_SERVICE_ACCOUNT_TOKEN is scoped to bootstrap steps only. Local E2E jobs
+# read the shared password once; deployment jobs resolve their template once.
+# All subsequent npm commands inherit the environment without contacting 1Password.
 
 name: CI - Tests
 
@@ -87,15 +81,10 @@ jobs:
     concurrency:
       group: ci-fast-unit-${{ github.ref }}
       cancel-in-progress: true
-    env:
-      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
     steps:
       - name: Checkout TuneTrees
         uses: actions/checkout@v5
-
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -137,8 +126,7 @@ jobs:
     timeout-minutes: 60
     environment: tunetrees_ci_env
     env:
-      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-      # These override anything from op run for the LOCAL Supabase instance.
+      # Runtime values for the LOCAL Supabase instance.
       # Values are populated after `supabase start` via $GITHUB_ENV.
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
@@ -276,11 +264,7 @@ jobs:
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
 
       - name: Resolve test secrets from 1Password
-        # Resolves the shared test-user password via 1Password so it is never
-        # stored as a GitHub secret. Both env vars point to the same value.
-        run: |
-          echo "ALICE_TEST_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
-          echo "TEST_USER_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+        run: node scripts/bootstrap-ci-env.mjs .env.local.template
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
@@ -421,15 +405,6 @@ jobs:
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
-      - name: Remove local Supabase bindings from .env.local.template
-        # Later npm scripts use `op run --env-file=.env.local.template`. Strip the
-        # local Supabase-derived keys so `op run` cannot override the runtime values
-        # already exported into $GITHUB_ENV after `supabase start`.
-        run: |
-          tmp_env_file="$(mktemp)"
-          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
-          mv "$tmp_env_file" .env.local.template
-
       - name: Check SQLite schema via Postgres introspection
         if: matrix.shard == 1
         run: npm run schema:sqlite:check
@@ -541,7 +516,6 @@ jobs:
       contents: read
     environment: tunetrees_ci_env
     env:
-      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
       VITE_SUPABASE_URL: ""
@@ -673,11 +647,7 @@ jobs:
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
 
       - name: Resolve test secrets from 1Password
-        # Resolves the shared test-user password via 1Password so it is never
-        # stored as a GitHub secret. Both env vars point to the same value.
-        run: |
-          echo "ALICE_TEST_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
-          echo "TEST_USER_PASSWORD=$(op read 'op://rhizome/shared-local/Test/ALICE_TEST_PASSWORD')" >> "$GITHUB_ENV"
+        run: node scripts/bootstrap-ci-env.mjs .env.local.template
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
@@ -810,15 +780,6 @@ jobs:
           ./scripts/db-push-local.sh --public-cleared ${{ github.workspace }}
         env:
           DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-
-      - name: Remove local Supabase bindings from .env.local.template
-        # Later npm scripts use `op run --env-file=.env.local.template`. Strip the
-        # local Supabase-derived keys so `op run` cannot override the runtime values
-        # already exported into $GITHUB_ENV after `supabase start`.
-        run: |
-          tmp_env_file="$(mktemp)"
-          awk '!/^(VITE_SUPABASE_URL|SUPABASE_URL|SUPABASE_ANON_KEY|VITE_SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY)=/' .env.local.template > "$tmp_env_file"
-          mv "$tmp_env_file" .env.local.template
 
       # --- Playwright PWA Specifics ---
       - name: Cache Playwright Browsers
@@ -1032,7 +993,6 @@ jobs:
       contents: read
       deployments: write
     env:
-      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
       RHIZOME_REPO_PATH: ${{ github.workspace }}/rhizome
 
     steps:
@@ -1160,19 +1120,22 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
 
+      - name: Resolve staging secrets once
+        run: node scripts/bootstrap-ci-env.mjs .env.staging.template
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
       - name: Apply staging Supabase migrations
         run: npm run db:staging:schema:push
 
       - name: Validate generated schema contract against staging
         run: |
-          op run --env-file=".env.staging.template" -- sh -c '
+          node scripts/run-with-env.mjs ".env.staging.template" -- sh -c '
             npx tsx node_modules/oosync/src/codegen-schema.ts \
               --check \
               --databaseUrl="$DATABASE_URL"
           '
           npm run typecheck
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Verify staging Worker dry run
         run: npm run worker:deploy:staging:dry-run
@@ -1191,7 +1154,7 @@ jobs:
 
       - name: Deploy staging Pages
         run: |
-          op run --env-file=".env.staging.template" -- \
+          node scripts/run-with-env.mjs ".env.staging.template" -- \
             npx wrangler pages deploy dist \
               --project-name=tunetrees-pwa \
               --branch=staging

@@ -204,31 +204,29 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
-      - name: Apply production Supabase migrations
-        timeout-minutes: 30
-        run: npm run db:production:schema:push
+      - name: Resolve production secrets once
+        run: node scripts/bootstrap-ci-env.mjs .env.prod.template
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
+      - name: Apply production Supabase migrations
+        timeout-minutes: 30
+        run: npm run db:production:schema:push
+
       - name: Deploy production Worker
         run: npm run worker:deploy:production
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Build production Pages bundle
         run: npm run build:production
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           VITE_BUILD_GIT_COMMIT: ${{ env.DEPLOY_SHA }}
 
       - name: Deploy production Pages
         run: |
-          op run --env-file=".env.prod.template" -- \
+          node scripts/run-with-env.mjs ".env.prod.template" -- \
             npx wrangler pages deploy dist \
               --project-name=tunetrees-pwa \
               --branch=main
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Verify production Pages assets through the public hostname
         run: npm run verify:deployed-pages-assets -- https://tunetrees.com
@@ -238,8 +236,6 @@ jobs:
 
       - name: Run production smoke tests
         run: npm run test:e2e:production
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
 
       - name: Record production deployment summary
         if: always()
