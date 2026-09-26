@@ -127,7 +127,7 @@
     "@kobalte/core": "^0.13.13",
     "@rhizome/core": "git+https://github.com/sboagy/rhizome.git#main",
     "@solid-primitives/refs": "^1.1.4",
-    "@solidjs/router": "^0.16.1",
+    "@solidjs/router": "^1.0.0",
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
     "@supabase/supabase-js": "^2.112.2",
     "@tanstack/solid-table": "^9.1.2",
