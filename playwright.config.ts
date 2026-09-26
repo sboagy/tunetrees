@@ -247,6 +247,11 @@ export default defineConfig({
       env: {
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || "",
         VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || "",
+        // BYOS tests mock Google HTTP calls but still need a configured provider.
+        // CI skips real OAuth credentials, so use a public test-only client ID.
+        VITE_GOOGLE_CLIENT_ID:
+          process.env.VITE_GOOGLE_CLIENT_ID ||
+          "e2e-google-client-id.apps.googleusercontent.com",
         VITE_DISABLE_HMR_FOR_E2E:
           process.env.VITE_DISABLE_HMR_FOR_E2E || "true",
         // Forward optional diagnostics flags into the Vite server process.
