@@ -30,6 +30,7 @@ import { expect, test as setup } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { config, parse } from "dotenv";
 import postgres from "postgres";
+import { resolveExecutable } from "../../scripts/resolve-executable.mjs";
 import {
   AUTH_STATE_DB_VERSION_STORAGE_KEY,
   AUTH_STATE_SNAPSHOT_VERSION_STORAGE_KEY,
@@ -131,7 +132,7 @@ function isLocalSupabaseUrl(url: string | undefined): boolean {
 function getLocalSupabaseServiceRoleKey(): string {
   try {
     const statusJson = execFileSync(
-      "supabase",
+      resolveExecutable("supabase", process.env.SUPABASE_EXECUTABLE),
       ["status", "--output", "json"],
       {
         cwd: REPO_ROOT,
@@ -234,16 +235,13 @@ function resolveTemplateEnv(
   let injectedEnvFile: string;
   try {
     injectedEnvFile = execFileSync(
-      "sh",
-      ["-lc", 'printf %s "$OP_INJECT_TEMPLATE" | op inject'],
+      resolveExecutable("op", process.env.OP_EXECUTABLE),
+      ["inject"],
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
-        env: {
-          ...process.env,
-          OP_INJECT_TEMPLATE: injectTemplate,
-        },
-        stdio: ["ignore", "pipe", "pipe"],
+        input: injectTemplate,
+        stdio: ["pipe", "pipe", "pipe"],
       }
     );
   } catch (error) {
@@ -261,6 +259,20 @@ function resolveTemplateEnv(
  * populate missing env vars through 1Password CLI so setup remains portable.
  */
 function injectOpEnvIfNeeded(): void {
+  if (process.env.CI) {
+    const required = [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_ANON_KEY",
+      "ALICE_TEST_PASSWORD",
+    ];
+    const missing = required.filter((key) => !hasEnvValue(key));
+    if (missing.length > 0) {
+      throw new Error(
+        `[auth.setup] Missing CI environment: ${missing.join(", ")}. Run the CI bootstrap before tests.`
+      );
+    }
+    return;
+  }
   if (hasEnvValue("VITE_SUPABASE_ANON_KEY")) {
     return;
   }

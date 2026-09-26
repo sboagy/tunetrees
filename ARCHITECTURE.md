@@ -324,3 +324,21 @@ When working in this repo, start by deciding which layer owns the change:
 - Do not bypass the generated Drizzle schema to write raw SQL queries in the UI layer. All local data access must flow through `src/lib/db/client-sqlite.ts`.
 
 Do not treat generated files as the place where business logic lives. In TuneTrees, the durable architecture is: remote schema and config as inputs, generated artifacts as contract, local SQLite as runtime source of truth, and oosync as the transport and reconciliation layer.
+
+## CI Secret Loading
+
+`scripts/bootstrap-ci-env.mjs` is the only CI secret-loading boundary. Each local
+E2E job reads the shared test password once and exports both password aliases;
+Supabase startup supplies the local database credentials. Unit tests require no
+1Password access. Each deployment job resolves its environment template once.
+Resolved values live in the job environment, with secret values registered for
+GitHub log masking; they are not cached or uploaded as artifacts.
+
+Npm commands use `scripts/run-with-env.mjs`. It reuses an inherited environment
+identified by the absolute template path, including nested commands in `worker/`.
+Outside CI it loads a different environment through `op run` when needed. In CI
+it fails if bootstrap has not run for the requested environment. Auth setup also
+fails on missing CI configuration instead of falling back to 1Password. The
+bootstrap also puts a failing `op` stub on PATH for subsequent steps. The
+service account token is available only during bootstrap, not during tests,
+server recovery, builds, or deployment commands.

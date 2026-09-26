@@ -44,7 +44,6 @@ jobs:
       contents: read
     env:
       DEPLOY_REF: ${{ inputs.deploy_ref }}
-      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
       RHIZOME_REPO_PATH: ${{ github.workspace }}/rhizome
 
     steps:
@@ -155,12 +154,17 @@ jobs:
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@a5215d3a7f75c1629216c465ea9ab3ab399c4b71
 
+      - name: Resolve staging secrets once
+        run: node scripts/bootstrap-ci-env.mjs .env.staging.template
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
       - name: Apply staging Supabase migrations
         run: npm run db:staging:schema:push
 
       - name: Validate generated schema contract against staging
         run: |
-          op run --env-file=".env.staging.template" -- sh -c '
+          node scripts/run-with-env.mjs ".env.staging.template" -- sh -c '
             npx tsx node_modules/oosync/src/codegen-schema.ts \
               --check \
               --databaseUrl="$DATABASE_URL"
@@ -184,7 +188,7 @@ jobs:
 
       - name: Deploy staging Pages
         run: |
-          op run --env-file=".env.staging.template" -- \
+          node scripts/run-with-env.mjs ".env.staging.template" -- \
             npx wrangler pages deploy dist \
               --project-name=tunetrees-pwa \
               --branch=staging
