@@ -72,6 +72,9 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+      - name: Test worker process recovery
+        run: node --test worker/scripts/run-wrangler-dev.test.mjs
+
   # --------------------------------------------------------------------------
   # JOB 1: UNIT TESTS (VITEST)
   # --------------------------------------------------------------------------
