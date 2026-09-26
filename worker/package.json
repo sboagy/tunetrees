@@ -13,12 +13,12 @@
     "start": "FORCE_COLOR=1 op run --env-file=\"../.env.local.template\" -- node ./scripts/run-wrangler-dev.mjs"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260831.1",
+    "@cloudflare/workers-types": "^5.20260921.1",
     "typescript": "7.0.2",
     "wrangler": "^4.136.1"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "jose": "^6.2.12",
     "postgres": "^3.4.8"
   },
