@@ -270,6 +270,8 @@ export default defineConfig({
       url: `http://localhost:${WORKER_PORT}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      // Let the launcher stop its Wrangler/workerd process group before teardown.
+      gracefulShutdown: { signal: "SIGTERM", timeout: 10000 },
     },
     // 3. PWA PREVIEW SERVER (Defined here, but only runs when needed)
     // Must be run externally.

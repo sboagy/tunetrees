@@ -307,6 +307,12 @@ This domain logic is independent of oosync. oosync moves the rows; TuneTrees ser
 
 ## Guidance For AI Agents
 
+For local E2E infrastructure, `worker/scripts/run-wrangler-dev.mjs` owns the
+Wrangler process lifecycle. In CI with `--local`, it allows at most two restarts
+after nonzero exits, logs each attempt, and cleans up the previous process group.
+Playwright sends SIGTERM during teardown so the launcher can stop its children.
+This mitigates local dev-server crashes; it does not alter deployed Worker behavior.
+
 When working in this repo, start by deciding which layer owns the change:
 
 - UI/workflow change: stay in `src/**` and keep the UI local-first.
