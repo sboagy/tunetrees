@@ -8,7 +8,8 @@ export const BASE_URL = {
       const url = test.info().project.use.baseURL;
 
       // 2. Return it, or fall back to dev if something goes wrong
-      return url || "http://localhost:5173";
+      // Callers append paths starting with "/"; doubled slashes do not match routes.
+      return (url || "http://localhost:5173").replace(/\/+$/, "");
     } catch {
       // Fallback for when this file is accessed outside of a test (e.g. during imports)
       return "http://localhost:5173";

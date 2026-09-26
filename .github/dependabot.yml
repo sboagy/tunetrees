@@ -9,6 +9,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
   - package-ecosystem: "npm"
     directory: "/worker"
     schedule:
