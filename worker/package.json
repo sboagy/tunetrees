@@ -24,6 +24,7 @@
   },
   "//": "esbuild >=0.28.1 addresses: GHSA-67mh-4wv8-2f99 (SSRF in dev server, patched in 0.25.0) and GHSA-g7r4-m6w7-qqqr (Windows path traversal, requires 0.28.1)",
   "overrides": {
-    "esbuild": ">=0.28.1"
+    "esbuild": ">=0.28.1",
+    "undici": "^7.29.1"
   }
 }
