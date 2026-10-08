@@ -147,7 +147,7 @@
     "solid-sonner": "^0.3.2",
     "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7",
-    "ts-fsrs": "^5.4.1",
+    "ts-fsrs": "^5.4.2",
     "wavesurfer.js": "^7.12.11"
   },
   "devDependencies": {
