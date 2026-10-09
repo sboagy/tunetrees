@@ -231,6 +231,7 @@ export class TuneTreesPage {
   readonly referenceAudioFileInput: Locator;
   readonly referenceAudioDropzone: Locator;
   readonly referenceAudioSelectedFile: Locator;
+  readonly byosGoogleDriveProviderButton: Locator;
   readonly referenceSubmitButton: Locator;
   readonly referenceCancelButton: Locator;
 
@@ -602,6 +603,9 @@ export class TuneTreesPage {
     this.referenceAudioDropzone = page.getByTestId("reference-audio-dropzone");
     this.referenceAudioSelectedFile = page.getByTestId(
       "reference-audio-selected-file"
+    );
+    this.byosGoogleDriveProviderButton = page.getByTestId(
+      "byos-provider-google-drive"
     );
     this.referenceSubmitButton = page.getByTestId("reference-submit-button");
     this.referenceCancelButton = page.getByTestId("reference-cancel-button");

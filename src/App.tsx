@@ -55,6 +55,7 @@ const GoalsSettingsPage = lazy(() => import("./routes/user-settings/goals"));
 
 // Lazy load auth callback pages
 const AuthCallback = lazy(() => import("./routes/auth/callback"));
+const ByosCallback = lazy(() => import("./routes/byos/callback"));
 const ResetPassword = lazy(() => import("./routes/reset-password"));
 
 /**
@@ -110,6 +111,10 @@ function App() {
                           <Route
                             path="/auth/callback"
                             component={AuthCallback}
+                          />
+                          <Route
+                            path="/byos/callback"
+                            component={ByosCallback}
                           />
                           <Route
                             path="/reset-password"

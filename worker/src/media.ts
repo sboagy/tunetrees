@@ -220,7 +220,15 @@ async function verifyJwtWithSupabase(
   return toMediaAuthUser(data.id);
 }
 
-async function authenticateMediaRequest(request: Request, env: MediaWorkerEnv) {
+/**
+ * Authenticates a request against the TuneTrees Supabase session. Media views
+ * may use a query token for audio element compatibility; all other routes must
+ * use an Authorization header.
+ */
+export async function authenticateMediaRequest(
+  request: Request,
+  env: MediaWorkerEnv
+) {
   const url = new URL(request.url);
   const allowQueryToken =
     (request.method === "GET" || request.method === "HEAD") &&

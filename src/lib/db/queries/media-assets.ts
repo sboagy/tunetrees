@@ -5,6 +5,7 @@
  */
 
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import type { ByosProviderId } from "@/lib/byos/types";
 import { generateId } from "@/lib/utils/uuid";
 import type { SqliteDatabase } from "../client-sqlite";
 import * as schema from "../schema";
@@ -22,12 +23,42 @@ export interface CreateMediaAssetData {
   fileSizeBytes: number;
   durationSeconds?: number;
   regionsJson?: string;
+  storageKind?: "r2" | "byos";
+  byosProvider?: ByosProviderId;
+  providerFileId?: string;
+  publicUrl?: string;
+  locatorVersion?: number;
 }
 
 export interface UpdateMediaAssetData {
   durationSeconds?: number | null;
   regionsJson?: string | null;
   deleted?: boolean;
+  publicUrl?: string | null;
+}
+
+export function buildByosStoragePath(
+  providerId: ByosProviderId,
+  providerFileId: string
+) {
+  return `byos:${providerId}:${providerFileId}`;
+}
+
+function validateCreateMediaAsset(data: CreateMediaAssetData) {
+  const storageKind = data.storageKind ?? "r2";
+  if (
+    storageKind === "byos" &&
+    (!data.byosProvider ||
+      !data.providerFileId ||
+      !data.storagePath.startsWith("byos:"))
+  ) {
+    throw new Error(
+      "BYOS media requires a provider, provider file ID, and synthetic locator."
+    );
+  }
+  if (storageKind === "r2" && (data.byosProvider || data.providerFileId)) {
+    throw new Error("Legacy R2 media cannot include a BYOS provider locator.");
+  }
 }
 
 export async function getMediaAssetsByTune(
@@ -87,6 +118,7 @@ export async function createMediaAsset(
   db: SqliteDatabase,
   data: CreateMediaAssetData
 ): Promise<MediaAsset> {
+  validateCreateMediaAsset(data);
   const now = new Date().toISOString();
 
   const result = db
@@ -101,6 +133,11 @@ export async function createMediaAsset(
       fileSizeBytes: data.fileSizeBytes,
       durationSeconds: data.durationSeconds ?? null,
       regionsJson: data.regionsJson ?? null,
+      storageKind: data.storageKind ?? "r2",
+      byosProvider: data.byosProvider ?? null,
+      providerFileId: data.providerFileId ?? null,
+      publicUrl: data.publicUrl ?? null,
+      locatorVersion: data.locatorVersion ?? 1,
       deleted: 0,
       syncVersion: 1,
       lastModifiedAt: now,
@@ -135,6 +172,10 @@ export async function updateMediaAssetByReferenceId(
 
   if (data.deleted !== undefined) {
     updateData.deleted = data.deleted ? 1 : 0;
+  }
+
+  if (data.publicUrl !== undefined) {
+    updateData.publicUrl = data.publicUrl;
   }
 
   const result = db

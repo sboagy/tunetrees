@@ -540,6 +540,10 @@ export const WORKER_SYNC_CONFIG = {
               kind: "int",
             },
             {
+              prop: "locatorVersion",
+              kind: "int",
+            },
+            {
               prop: "syncVersion",
               kind: "int",
             },

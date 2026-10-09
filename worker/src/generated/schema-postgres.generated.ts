@@ -161,6 +161,11 @@ export const mediaAsset = pgTable("media_asset", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  storageKind: text("storage_kind").notNull().default("r2"),
+  byosProvider: text("byos_provider"),
+  providerFileId: text("provider_file_id"),
+  publicUrl: text("public_url"),
+  locatorVersion: integer("locator_version").notNull().default(1),
 });
 
 export const note = pgTable("note", {
@@ -616,6 +621,7 @@ export const userProfile = pgTable("user_profile", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  byosProvider: text("byos_provider"),
 });
 
 export const tables = {

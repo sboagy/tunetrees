@@ -224,6 +224,11 @@ export const mediaAsset = sqliteTable(
     durationSeconds: real("duration_seconds"),
     regionsJson: text("regions_json"),
     deleted: integer("deleted").notNull().default(0),
+    storageKind: text("storage_kind").notNull().default("r2"),
+    byosProvider: text("byos_provider"),
+    providerFileId: text("provider_file_id"),
+    publicUrl: text("public_url"),
+    locatorVersion: integer("locator_version").notNull().default(1),
     ...sqliteSyncColumns,
   },
   (t) => [
@@ -799,5 +804,6 @@ export const userProfile = sqliteTable("user_profile", {
   ),
   avatarUrl: text("avatar_url"),
   deleted: integer("deleted").notNull().default(0),
+  byosProvider: text("byos_provider"),
   ...sqliteSyncColumns,
 });
