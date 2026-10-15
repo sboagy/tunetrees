@@ -6,10 +6,12 @@ import path from "node:path";
 import {
   build,
   type Connect,
+  preview,
   type ResolvedConfig,
   type ViteDevServer,
 } from "vite";
 import { afterEach, beforeEach, expect, test } from "vitest";
+import codegenConfig from "../oosync.codegen.config.json";
 import { sqliteMigrations } from "../scripts/vite-sqlite-migrations";
 
 let root: string;
@@ -67,7 +69,7 @@ function request(url: string, method = "GET", base = "/") {
   });
 }
 
-test("emits migration SQL unchanged at its root URL in production", async () => {
+test("emits migration SQL unchanged at its configured migration URL in production", async () => {
   await writeFile(path.join(root, "entry.js"), "export const example = 1;");
   await build({
     configFile: false,
@@ -77,18 +79,69 @@ test("emits migration SQL unchanged at its root URL in production", async () => 
     plugins: [sqliteMigrations()],
     build: { lib: { entry: path.join(root, "entry.js"), formats: ["es"] } },
   });
-  expect(await readFile(path.join(root, "dist/0001_example.sql"), "utf8")).toBe(
-    sql
-  );
-  await expect(readFile(path.join(root, "dist/README.md"))).rejects.toThrow();
+  expect(
+    await readFile(
+      path.join(root, "dist/drizzle/migrations/sqlite/0001_example.sql"),
+      "utf8"
+    )
+  ).toBe(sql);
+  await expect(
+    readFile(path.join(root, "dist/drizzle/migrations/sqlite/README.md"))
+  ).rejects.toThrow();
 });
 
 test("serves migration contents with a cache-busting query", async () => {
-  expect((await request("/0001_example.sql?v=2")).body).toBe(sql);
+  expect(
+    (await request("/drizzle/migrations/sqlite/0001_example.sql?v=2")).body
+  ).toBe(sql);
+});
+
+test("preview serves SQL at every URL configured for database initialization", async () => {
+  const repoRoot = path.resolve(import.meta.dirname, "..");
+  const outDir = path.join(root, "dist");
+  await writeFile(path.join(root, "entry.js"), "export const example = 1;");
+  await build({
+    configFile: false,
+    root: repoRoot,
+    publicDir: false,
+    logLevel: "silent",
+    plugins: [sqliteMigrations()],
+    build: {
+      outDir,
+      emptyOutDir: true,
+      lib: { entry: path.join(root, "entry.js"), formats: ["es"] },
+    },
+  });
+  const server = await preview({
+    configFile: false,
+    root: repoRoot,
+    logLevel: "silent",
+    build: { outDir },
+    preview: { host: "127.0.0.1", port: 0, open: false },
+  });
+  try {
+    const address = server.httpServer.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Expected a TCP preview server");
+    }
+    for (const url of codegenConfig.browserSqlite.migrationFiles) {
+      const response = await fetch(`http://127.0.0.1:${address.port}${url}`);
+      expect(response.status, url).toBe(200);
+      expect(await response.text(), url).toBe(
+        await readFile(path.join(repoRoot, url), "utf8")
+      );
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.httpServer.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
 });
 
 test("serves HEAD with content length and no body", async () => {
-  expect(await request("/0001_example.sql", "HEAD")).toEqual({
+  expect(
+    await request("/drizzle/migrations/sqlite/0001_example.sql", "HEAD")
+  ).toEqual({
     body: undefined,
     headers: {
       "Content-Type": "application/sql",
@@ -100,27 +153,38 @@ test("serves HEAD with content length and no body", async () => {
 });
 
 test("reads updated migration contents on the next request", async () => {
-  await request("/0001_example.sql");
+  await request("/drizzle/migrations/sqlite/0001_example.sql");
   await writeFile(path.join(directory, "0001_example.sql"), "SELECT 2;");
-  expect((await request("/0001_example.sql")).body).toBe("SELECT 2;");
+  expect(
+    (await request("/drizzle/migrations/sqlite/0001_example.sql")).body
+  ).toBe("SELECT 2;");
 });
 
 test("serves migrations under the configured base", async () => {
-  expect((await request("/app/0001_example.sql", "GET", "/app/")).body).toBe(
-    sql
-  );
+  expect(
+    (
+      await request(
+        "/app/drizzle/migrations/sqlite/0001_example.sql",
+        "GET",
+        "/app/"
+      )
+    ).body
+  ).toBe(sql);
 });
 
 test.each([
-  "/missing.sql",
-  "/README.md",
-  "/../secret.sql",
-  "/%2e%2e%2fsecret.sql",
+  "/drizzle/migrations/sqlite/missing.sql",
+  "/drizzle/migrations/sqlite/README.md",
+  "/drizzle/migrations/sqlite/../secret.sql",
+  "/drizzle/migrations/sqlite/%2e%2e%2fsecret.sql",
 ])("passes through requests outside the migration files: %s", async (url) => {
   await writeFile(path.join(root, "secret.sql"), "private");
   expect((await request(url)).passedThrough).toBe(true);
 });
 
 test("does not handle POST requests", async () => {
-  expect((await request("/0001_example.sql", "POST")).passedThrough).toBe(true);
+  expect(
+    (await request("/drizzle/migrations/sqlite/0001_example.sql", "POST"))
+      .passedThrough
+  ).toBe(true);
 });

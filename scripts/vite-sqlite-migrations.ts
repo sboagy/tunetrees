@@ -22,7 +22,7 @@ export function sqliteMigrations(): Plugin {
       for (const name of await migrationNames()) {
         this.emitFile({
           type: "asset",
-          fileName: name,
+          fileName: `drizzle/migrations/sqlite/${name}`,
           source: await readFile(path.join(directory, name)),
         });
       }
@@ -31,8 +31,9 @@ export function sqliteMigrations(): Plugin {
       server.middlewares.use((req, res, next) => {
         if (req.method !== "GET" && req.method !== "HEAD") return next();
         const pathname = (req.url ?? "").split("?")[0];
-        if (!pathname.startsWith(base)) return next();
-        const name = pathname.slice(base.length);
+        const prefix = `${base}drizzle/migrations/sqlite/`;
+        if (!pathname.startsWith(prefix)) return next();
+        const name = pathname.slice(prefix.length);
         // Only serve a direct child from the migration directory, never a path.
         if (!/^[^/\\]+\.sql$/.test(name)) return next();
         void (async () => {
