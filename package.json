@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": "=24"
   },
   "scripts": {
     "postinstall": "node scripts/patch-supabase-sourcemaps.js",
@@ -186,6 +186,7 @@
     "axios": "^1.16.0",
     "brace-expansion": "^5.0.12",
     "serialize-javascript": "^7.0.5",
+    "seroval": ">=1.6.3",
     "ws": ">=8.21.0",
     "undici": ">=8.11.2",
     "@babel/core": "^7.29.6"
