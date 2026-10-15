@@ -74,6 +74,22 @@ npm run test:e2e      # E2E tests (Playwright)
 npm run test:e2e:headed  # E2E tests with browser UI
 ```
 
+## Local SonarQube scans
+
+Install the standalone [SonarScanner CLI](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/scanners/sonarscanner-cli)
+for your platform and add its `bin` directory to `PATH`. Verify the installation
+with `sonar-scanner --version`. This is a separate prerequisite for local scans;
+`npm install` does not install the scanner.
+
+Run `npm run sonar:scan` for the current branch or `npm run sonar:scan:pr` for its
+open pull request. These commands still load `SONAR_TOKEN` through
+`.env.sonar.template` and use `sonar-project.properties` for the project and Cloud
+endpoint. The existing `sonar:scan-and-fetch` commands also work with the CLI.
+CI uses the SonarSource scan action and does not require a local CLI installation.
+
+The npm `@sonar/scan` wrapper was removed to eliminate its vulnerable `node-forge`
+dependency. Use the standalone CLI rather than reinstalling the npm wrapper.
+
 ## Project Structure
 
 ```

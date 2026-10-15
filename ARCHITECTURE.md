@@ -113,6 +113,11 @@ This architecture has two important flows: artifact flow and runtime flow.
 
 In TuneTrees, schema agreement is produced by codegen rather than maintained manually in parallel.
 
+`scripts/vite-sqlite-migrations.ts` serves the checked-in SQLite migration SQL
+files at their existing root URLs during development and emits them with the
+same filenames into the production build. It reads only direct `.sql` children
+of `drizzle/migrations/sqlite`; it does not generate or modify migrations.
+
 ### 2. Runtime Flow: User Action -> Local SQLite -> Worker -> Postgres -> Local SQLite
 
 1. Auth/bootstrap code initializes a per-user sql.js database in the browser through the generated `src/lib/db/client-sqlite.ts` wrapper, which delegates to oosync's generic browser runtime and restores persisted state from IndexedDB.
