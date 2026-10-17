@@ -13,12 +13,12 @@
     "start": "npm run dev"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260921.1",
+    "@cloudflare/workers-types": "^5.20261012.1",
     "typescript": "7.0.2",
-    "wrangler": "^4.136.1"
+    "wrangler": "^4.149.0"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "jose": "^6.2.12",
     "postgres": "^3.4.8"
   },

@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import solid from "vite-plugin-solid";
-import { viteStaticCopy } from "vite-plugin-static-copy";
+import { sqliteMigrations } from "./scripts/vite-sqlite-migrations.ts";
 
 export default defineConfig(() => {
   // Determine if we should show Workbox debug logs
@@ -275,15 +275,7 @@ export default defineConfig(() => {
     plugins: [
       solid(),
       tailwindcss(),
-      // Copy SQL migration files to dist
-      viteStaticCopy({
-        targets: [
-          {
-            src: "drizzle/migrations/sqlite/*.sql",
-            dest: ".",
-          },
-        ],
-      }),
+      sqliteMigrations(),
       VitePWA({
         registerType: "prompt",
         includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
