@@ -32,6 +32,9 @@ import {
 } from "@/lib/db/queries/references";
 
 interface ReferenceFormProps {
+  storageConfigured?: boolean;
+  saving?: boolean;
+  onDraftChange?: (data: ReferenceFormData) => void;
   reference?: Reference; // If editing existing reference
   onSubmit: (data: ReferenceFormData) => Promise<void> | void;
   onCancel: () => void;
@@ -136,13 +139,27 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   const isAudioUploadMode = () =>
     !props.reference && refType() === "audio" && sourceMode() === "upload";
   const canSubmit = () => {
+    if (props.saving) return false;
     if (isAudioUploadMode()) {
-      return selectedFile() !== null;
+      return selectedFile() !== null && props.storageConfigured === true;
     }
 
     const currentUrl = url().trim();
     return currentUrl.length > 0 && isValidUrl(currentUrl);
   };
+
+  createEffect(() =>
+    props.onDraftChange?.({
+      url: url(),
+      title: title(),
+      refType: refType(),
+      comment: comment(),
+      favorite: favorite(),
+      public: isPublic(),
+      sourceMode: sourceMode(),
+      uploadFile: selectedFile(),
+    })
+  );
 
   createEffect(() => {
     const initialData = props.initialData;
@@ -292,8 +309,10 @@ export const ReferenceForm: Component<ReferenceFormProps> = (props) => {
   // Handle form submission
   const handleSubmit = (e: Event) => {
     e.preventDefault();
+    if (props.saving) return;
 
     if (isAudioUploadMode()) {
+      if (!props.storageConfigured) return;
       if (!selectedFile()) {
         setFileError("Audio file is required");
         return;

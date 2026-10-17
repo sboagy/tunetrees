@@ -37,6 +37,7 @@ docs/
 - [FAQ](user/faq.md) - Common questions answered
 
 ### For Developers
+- [BYOS Storage](development/byos-storage.md) - Provider setup, offline audio drafts, manual acceptance, and schema rollout
 - [Setup Guide](development/setup.md) - Set up your development environment
 - [Architecture](development/architecture.md) - Understand the system design
 - [Database](development/database.md) - Database schema and sync architecture
@@ -54,5 +55,4 @@ docs/
 
 **Project:** [TuneTrees on GitHub](https://github.com/sboagy/tunetrees)  
 **Live App:** [tunetrees.com](https://tunetrees.com)
-
 

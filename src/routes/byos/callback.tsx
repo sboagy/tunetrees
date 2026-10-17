@@ -1,52 +1,91 @@
 import { useNavigate } from "@solidjs/router";
-import { createSignal, onMount } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
+import { toast } from "solid-sonner";
+import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
+import { readOAuthReturn } from "@/lib/byos/oauth-return";
 import { createByosProviderManager } from "@/lib/byos/provider-manager";
-import { BYOS_PROVIDER_IDS, type ByosProviderId } from "@/lib/byos/types";
-
-function isByosProviderId(value: string | null): value is ByosProviderId {
-  return !!value && (BYOS_PROVIDER_IDS as readonly string[]).includes(value);
-}
+import { saveStorageConfig } from "@/lib/byos/provider-selection";
 
 /** Completes provider OAuth and immediately removes its transient URL values. */
 export default function ByosCallback() {
   const navigate = useNavigate();
-  const { session, user } = useAuth();
+  const auth = useAuth();
+  const { openUserSettings } = useUserSettingsDialog();
+  const callbackUrl = new URL(location.href);
+  // Clean the URL immediately, including when auth bootstrap fails.
+  history.replaceState({}, document.title, "/byos/callback");
   const [message, setMessage] = createSignal(
     "Finishing storage-provider connection…"
   );
 
-  onMount(async () => {
-    const callbackUrl = new URL(globalThis.location.href);
-    const providerId = callbackUrl.searchParams.get("provider");
-    const currentUser = user();
-
-    if (!currentUser || !isByosProviderId(providerId)) {
-      setMessage("The storage-provider connection could not be completed.");
+  let started = false;
+  createEffect(() => {
+    const userId = auth.user()?.id;
+    const db = auth.localDb();
+    if (started || auth.loading()) return;
+    if (!userId) {
+      setMessage(
+        "Sign in to the same TuneTrees account to finish storage setup. Your draft remains saved on this device."
+      );
       return;
     }
-
-    try {
-      const manager = createByosProviderManager({
-        userId: currentUser.id,
-        getAppAccessToken: () => session()?.access_token,
-      });
-      await manager.completeAuthorization(providerId, callbackUrl);
-      globalThis.history.replaceState({}, document.title, "/");
-      navigate("/", { replace: true });
-    } catch (error) {
-      globalThis.history.replaceState({}, document.title, "/");
+    if (!db || !auth.session()) return;
+    started = true;
+    const context = readOAuthReturn(
+      sessionStorage.getItem("byos-oauth-return"),
+      userId,
+      callbackUrl.searchParams.get("provider")
+    );
+    sessionStorage.removeItem("byos-oauth-return");
+    if (!context) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "The storage-provider connection could not be completed."
+        "The storage-provider session has expired or belongs to another account. Return to TuneTrees and connect again."
       );
+      return;
     }
+    void (async () => {
+      try {
+        const manager = createByosProviderManager({
+          userId,
+          getAppAccessToken: () =>
+            auth.user()?.id === userId
+              ? auth.session()?.access_token
+              : undefined,
+        });
+        await manager.completeAuthorization(context.providerId, callbackUrl);
+        const folder = await manager.providers[context.providerId].ensureFolder(
+          context.folderName,
+          context.existingId
+        );
+        if (auth.user()?.id !== userId) return;
+        await saveStorageConfig(db, userId, {
+          version: 1,
+          providerId: context.providerId,
+          folderId: folder.id,
+          folderName: folder.name,
+        });
+        toast.success("Storage connected.");
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Storage connection failed. Your reference draft has been preserved."
+        );
+      } finally {
+        if (auth.user()?.id === userId) {
+          sessionStorage.setItem("byos-restore-draft", userId);
+          navigate(context.returnPath, { replace: true });
+          openUserSettings("storage-provider");
+        }
+      }
+    })();
   });
 
   return (
-    <main class="mx-auto flex min-h-screen max-w-lg items-center justify-center p-6 text-center">
+    <main class="mx-auto flex min-h-screen max-w-lg flex-col gap-4 items-center justify-center p-6 text-center">
       <p role="status">{message()}</p>
+      <a href="/">Return to TuneTrees</a>
     </main>
   );
 }

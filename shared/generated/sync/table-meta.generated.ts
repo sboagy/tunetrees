@@ -143,6 +143,8 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       avatar_url: "URL to user avatar/profile picture.",
       byos_provider:
         "Selected BYOS provider identifier only. It never contains OAuth tokens, a provider account ID, or an email address.",
+      byos_storage_config:
+        "Versioned completed BYOS setup: provider and folder locator/name only. No tokens or account identity.",
       deleted: "Soft-delete flag for the user profile.",
       device_id: "Device that last modified this record.",
       email: "User email address.",

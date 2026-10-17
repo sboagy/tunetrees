@@ -4,6 +4,7 @@ import {
   putLocalRefreshToken,
 } from "./local-secret-store";
 import { consumePkceTransaction, createPkceTransaction } from "./pkce";
+import { validateFolderName } from "./storage-config";
 import type {
   ByosAccessToken,
   ByosConnectionStatus,
@@ -72,7 +73,15 @@ abstract class BrowserStorageProvider implements ByosStorageProvider {
   protected abstract refreshAccessToken(
     refreshToken: string
   ): Promise<TokenResponse>;
-  abstract upload(file: File): Promise<ByosUploadedFile>;
+  abstract ensureFolder(
+    name: string,
+    existingId?: string
+  ): Promise<{ id: string; name: string }>;
+  abstract reserveUploadId(): Promise<string>;
+  abstract upload(
+    file: File,
+    target: { folderId: string; uploadId: string; signal?: AbortSignal }
+  ): Promise<ByosUploadedFile>;
   abstract resolveBlob(fileId: string): Promise<Blob>;
   abstract createPublicLink(fileId: string): Promise<string>;
 
@@ -282,13 +291,122 @@ class GoogleDriveProvider extends BrowserStorageProvider {
     };
   }
 
-  async upload(file: File): Promise<ByosUploadedFile> {
+  async ensureFolder(name: string, existingId?: string) {
+    name = validateFolderName(name);
     const token = await this.getAccessToken();
-    const metadata = { name: file.name, mimeType: file.type || "audio/mpeg" };
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    if (existingId) {
+      const response = await fetch(
+        `${GOOGLE_API_URL}/drive/v3/files/${encodeURIComponent(existingId)}?fields=id,name,mimeType,trashed`,
+        { headers }
+      );
+      assertSuccess(response, "Storage folder lookup");
+      const folder = await parseJson<{
+        id: string;
+        name: string;
+        mimeType: string;
+        trashed?: boolean;
+      }>(response, "Storage folder lookup");
+      if (
+        folder.trashed ||
+        folder.mimeType !== "application/vnd.google-apps.folder"
+      )
+        throw new Error(
+          "Storage folder is unavailable. Configure a new destination in Settings."
+        );
+      return { id: folder.id, name: folder.name };
+    }
+    // Reuse an app-accessible folder; never choose arbitrarily between duplicates.
+    const escaped = name
+      .replaceAll(/\\/g, String.raw`\\`)
+      .replaceAll("'", String.raw`\'`);
+    const query = new URLSearchParams({
+      q: `name = '${escaped}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false and 'root' in parents`,
+      fields: "files(id,name),nextPageToken",
+      pageSize: "2",
+    });
+    const listed = await fetch(`${GOOGLE_API_URL}/drive/v3/files?${query}`, {
+      headers,
+    });
+    assertSuccess(listed, "Storage folder lookup");
+    const result = await parseJson<{
+      files: { id: string; name: string }[];
+      nextPageToken?: string;
+    }>(listed, "Storage folder lookup");
+    if (result.files.length > 1 || result.nextPageToken)
+      throw new Error(
+        "Multiple storage folders have that name. Choose a unique folder name."
+      );
+    if (result.files.length === 1) return result.files[0];
+    const created = await fetch(
+      `${GOOGLE_API_URL}/drive/v3/files?fields=id,name`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name,
+          mimeType: "application/vnd.google-apps.folder",
+        }),
+      }
+    );
+    assertSuccess(created, "Storage folder creation");
+    return parseJson<{ id: string; name: string }>(
+      created,
+      "Storage folder creation"
+    );
+  }
+
+  async reserveUploadId() {
+    const token = await this.getAccessToken();
+    const response = await fetch(
+      `${GOOGLE_API_URL}/drive/v3/files/generateIds?count=1&space=drive&type=files`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    assertSuccess(response, "Audio upload preparation");
+    const result = await parseJson<{ ids: string[] }>(
+      response,
+      "Audio upload preparation"
+    );
+    if (!result.ids?.[0]) throw new Error("Could not prepare audio upload.");
+    return result.ids[0];
+  }
+
+  async upload(
+    file: File,
+    target: { folderId: string; uploadId: string; signal?: AbortSignal }
+  ): Promise<ByosUploadedFile> {
+    if (!target.folderId || !target.uploadId)
+      throw new Error("Configure a storage folder before uploading audio.");
+    await this.ensureFolder("tunetrees_storage", target.folderId);
+    const token = await this.getAccessToken();
+    const headers = { Authorization: `Bearer ${token}` };
+    // A pre-generated ID makes retry safe even if the successful response was lost.
+    const previous = await fetch(
+      `${GOOGLE_API_URL}/drive/v3/files/${encodeURIComponent(target.uploadId)}?fields=id,name,mimeType,size`,
+      { headers, signal: target.signal }
+    );
+    if (previous.ok)
+      return {
+        fileId: target.uploadId,
+        fileName: file.name,
+        contentType: file.type,
+        size: file.size,
+      };
+    if (previous.status !== 404) assertSuccess(previous, "Audio upload lookup");
+    const metadata = {
+      id: target.uploadId,
+      parents: [target.folderId],
+      name: file.name,
+      mimeType: file.type || "audio/mpeg",
+    };
     const start = await fetch(
       `${GOOGLE_API_URL}/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,size`,
       {
         method: "POST",
+        signal: target.signal,
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json; charset=UTF-8",
@@ -305,6 +423,7 @@ class GoogleDriveProvider extends BrowserStorageProvider {
     }
     const upload = await fetch(uploadUrl, {
       method: "PUT",
+      signal: target.signal,
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": metadata.mimeType,
@@ -449,17 +568,76 @@ class DropboxProvider extends BrowserStorageProvider {
     };
   }
 
-  async upload(file: File): Promise<ByosUploadedFile> {
+  async ensureFolder(name: string, existingId?: string) {
+    name = validateFolderName(name);
+    const token = await this.getAccessToken();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    const lookup = await fetch(`${DROPBOX_API_URL}/files/get_metadata`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ path: existingId || `/${name}` }),
+    });
+    if (lookup.ok) {
+      const folder = await parseJson<{
+        id: string;
+        name: string;
+        ".tag": string;
+      }>(lookup, "Storage folder lookup");
+      if (folder[".tag"] !== "folder")
+        throw new Error("The storage destination is not a folder.");
+      return { id: folder.id, name: folder.name };
+    }
+    if (existingId)
+      throw new Error(
+        "Storage folder is unavailable. Reconnect the original account or configure a new destination."
+      );
+    const error = await parseJson<{ error_summary?: string }>(
+      lookup,
+      "Storage folder lookup"
+    );
+    if (
+      lookup.status !== 409 ||
+      !error.error_summary?.startsWith("path/not_found")
+    )
+      throw new Error("Could not find the storage folder.");
+    const created = await fetch(`${DROPBOX_API_URL}/files/create_folder_v2`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ path: `/${name}`, autorename: false }),
+    });
+    assertSuccess(created, "Storage folder creation");
+    const result = await parseJson<{ metadata: { id: string; name: string } }>(
+      created,
+      "Storage folder creation"
+    );
+    return result.metadata;
+  }
+
+  async reserveUploadId() {
+    return crypto.randomUUID();
+  }
+
+  async upload(
+    file: File,
+    target: { folderId: string; uploadId: string; signal?: AbortSignal }
+  ): Promise<ByosUploadedFile> {
+    if (!target.folderId || !target.uploadId)
+      throw new Error("Configure a storage folder before uploading audio.");
+    await this.ensureFolder("tunetrees_storage", target.folderId);
     const token = await this.getAccessToken();
     const response = await fetch(`${DROPBOX_CONTENT_URL}/files/upload`, {
       method: "POST",
+      signal: target.signal,
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/octet-stream",
         "Dropbox-API-Arg": JSON.stringify({
-          path: `/${file.name}`,
-          mode: "add",
-          autorename: true,
+          path: `${target.folderId}/${target.uploadId}-${file.name.replaceAll("/", "_").replaceAll("\\", "_")}`,
+          mode: "overwrite",
+          autorename: false,
           mute: false,
         }),
       },
@@ -476,7 +654,7 @@ class DropboxProvider extends BrowserStorageProvider {
     }
     return {
       fileId: result.id,
-      fileName: result.name || file.name,
+      fileName: file.name,
       contentType: file.type || "audio/mpeg",
       size: result.size ?? file.size,
     };

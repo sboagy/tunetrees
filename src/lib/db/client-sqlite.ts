@@ -35,8 +35,8 @@ export const browserSqliteClient = createBrowserSqliteClient({
     outboxBackupKeyPrefix: "tunetrees-outbox-backup",
     lastSyncTimestampKeyPrefix: "TT_LAST_SYNC_TIMESTAMP",
   },
-  databaseVersion: 26,
-  schemaVersion: "2.3.0-byos-provider-selection",
+  databaseVersion: 27,
+  schemaVersion: "2.4.0-byos-storage-config",
   migrationFiles: [
     "/drizzle/migrations/sqlite/0000_lowly_obadiah_stane.sql",
     "/drizzle/migrations/sqlite/0001_thin_chronomancer.sql",
@@ -65,6 +65,7 @@ export const browserSqliteClient = createBrowserSqliteClient({
     "/drizzle/migrations/sqlite/0024_add_user_genre_selection_and_media_draft_outbox.sql",
     "/drizzle/migrations/sqlite/0025_add_byos_media_locator.sql",
     "/drizzle/migrations/sqlite/0026_add_selected_byos_provider.sql",
+    "/drizzle/migrations/sqlite/0027_add_byos_storage_config.sql",
   ],
   forceResetQueryParams: [
     { key: "reset", value: "true" },

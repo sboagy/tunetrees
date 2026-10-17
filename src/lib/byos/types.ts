@@ -40,7 +40,15 @@ export interface ByosStorageProvider {
   ): Promise<ByosConnectionStatus>;
   getConnectionStatus(): Promise<ByosConnectionStatus>;
   disconnect(): Promise<void>;
-  upload(file: File): Promise<ByosUploadedFile>;
+  ensureFolder(
+    name: string,
+    existingId?: string
+  ): Promise<{ id: string; name: string }>;
+  reserveUploadId(): Promise<string>;
+  upload(
+    file: File,
+    target: { folderId: string; uploadId: string; signal?: AbortSignal }
+  ): Promise<ByosUploadedFile>;
   resolveBlob(fileId: string): Promise<Blob>;
   createPublicLink(fileId: string): Promise<string>;
 }

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 const GOOGLE_SECRET_DATABASE = "tunetrees-byos-secrets";
 const GOOGLE_SECRET_STORE = "refresh-tokens";
@@ -112,12 +112,55 @@ export async function configureMockGoogleDriveByos(
     }
   );
   await page.route(
+    "https://www.googleapis.com/drive/v3/files?**",
+    async (route) =>
+      route.fulfill({
+        json: { files: [{ id: "e2e-folder", name: "tunetrees_storage" }] },
+      })
+  );
+  await page.route(
     "https://www.googleapis.com/drive/v3/files/**",
     async (route) => {
-      await route.fulfill({
-        contentType: "audio/wav",
-        body: createSilentWavBuffer(),
-      });
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/generateIds")) {
+        await route.fulfill({ json: { ids: [GOOGLE_FILE_ID] } });
+      } else if (url.pathname.endsWith("/e2e-folder")) {
+        await route.fulfill({
+          json: {
+            id: "e2e-folder",
+            name: "tunetrees_storage",
+            mimeType: "application/vnd.google-apps.folder",
+          },
+        });
+      } else if (url.searchParams.get("alt") === "media") {
+        await route.fulfill({
+          contentType: "audio/wav",
+          body: createSilentWavBuffer(),
+        });
+      } else {
+        await route.fulfill({ status: 404, json: {} });
+      }
     }
   );
+}
+
+/** Configure through the real settings dialog using the mocked local token. */
+export async function saveMockGoogleStorageSettings(page: Page) {
+  const before = page.url();
+  await page.getByTestId("byos-configure-storage").click();
+  await expect(page.getByTestId("byos-provider-google-drive")).toBeVisible({
+    timeout: 10000,
+  });
+  await page.getByTestId("byos-provider-google-drive").check();
+  await page.getByTestId("byos-folder-name").fill("tunetrees_storage");
+  await page.getByTestId("byos-storage-save").click();
+  await expect(page.getByTestId("byos-connection-status")).toContainText(
+    /configured|Connected/,
+    { timeout: 10000 }
+  );
+  await page.getByTestId("settings-close-button").click();
+  expect(page.url()).toBe(before);
+  await expect(page.getByTestId("reference-form")).toBeVisible({
+    timeout: 10000,
+  });
 }

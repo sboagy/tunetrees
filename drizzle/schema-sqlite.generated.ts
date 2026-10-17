@@ -805,5 +805,6 @@ export const userProfile = sqliteTable("user_profile", {
   avatarUrl: text("avatar_url"),
   deleted: integer("deleted").notNull().default(0),
   byosProvider: text("byos_provider"),
+  byosStorageConfig: text("byos_storage_config"),
   ...sqliteSyncColumns,
 });

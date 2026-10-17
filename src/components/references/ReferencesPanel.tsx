@@ -11,18 +11,32 @@
 import { Link, Plus } from "lucide-solid";
 import {
   type Component,
+  createEffect,
   createMemo,
   createResource,
   createSignal,
+  For,
+  onCleanup,
   Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
 import { useAudioPlayer } from "@/components/audio/AudioPlayerContext";
+import { useUserSettingsDialog } from "@/contexts/UserSettingsDialogContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { resolveByosAudioForPlayback } from "@/lib/byos/audio";
 import { validateByosAudioFile } from "@/lib/byos/audio-validation";
-import { getSelectedByosProvider } from "@/lib/byos/provider-selection";
-import { createByosProviders } from "@/lib/byos/providers";
+import {
+  deleteAudioDraft,
+  getAudioDraft,
+  listAudioDrafts,
+  putAudioDraft,
+  registerReferenceDraftCapture,
+} from "@/lib/byos/draft-store";
+import { getStorageConfig } from "@/lib/byos/provider-selection";
+import {
+  cancelAudioUpload,
+  isAudioUploadActive,
+} from "@/lib/byos/upload-queue";
 import { useCurrentTune } from "@/lib/context/CurrentTuneContext";
 import {
   getSidebarFontClasses,
@@ -30,8 +44,6 @@ import {
 } from "@/lib/context/UIPreferencesContext";
 import { getDb } from "@/lib/db/client-sqlite";
 import {
-  buildByosStoragePath,
-  createMediaAsset,
   getMediaAssetByReferenceId,
   getMediaAssetsByTune,
 } from "@/lib/db/queries/media-assets";
@@ -44,14 +56,15 @@ import {
   updateReference,
   updateReferenceOrder,
 } from "@/lib/db/queries/references";
-import { ByosProviderConnection } from "./ByosProviderConnection";
+import { generateId } from "@/lib/utils/uuid";
 import { ReferenceForm, type ReferenceFormData } from "./ReferenceForm";
 import { ReferenceList } from "./ReferenceList";
 
 export const ReferencesPanel: Component = () => {
-  const { currentTuneId } = useCurrentTune();
+  const { currentTuneId, setCurrentTuneId } = useCurrentTune();
+  const { openUserSettings } = useUserSettingsDialog();
   const { openTrack } = useAudioPlayer();
-  const { session, user } = useAuth();
+  const { session, user, localDb, remoteSyncDownCompletionVersion } = useAuth();
   const { sidebarFontSize } = useUIPreferences();
   const currentUserId = () => user()?.id ?? null;
 
@@ -65,11 +78,78 @@ export const ReferencesPanel: Component = () => {
   const [addDraft, setAddDraft] = createSignal<
     Partial<ReferenceFormData> | undefined
   >();
+  let liveDraft: ReferenceFormData | undefined;
+  let draftTuneId: string | null = null;
+  const [isSaving, setIsSaving] = createSignal(false);
+  const [revision, setRevision] = createSignal(0);
+  const refresh = () => setRevision((n) => n + 1);
+  for (const event of [
+    "byos-settings-changed",
+    "byos-drafts-changed",
+    "byos-upload-complete",
+  ])
+    window.addEventListener(event, refresh);
+  onCleanup(() => {
+    for (const event of [
+      "byos-settings-changed",
+      "byos-drafts-changed",
+      "byos-upload-complete",
+    ])
+      window.removeEventListener(event, refresh);
+  });
+  const storageConfig = createMemo(() => {
+    revision();
+    remoteSyncDownCompletionVersion();
+    const db = localDb();
+    const userId = user()?.id;
+    return db && userId ? getStorageConfig(db, userId) : null;
+  });
+  const [queued] = createResource(
+    () => ({ userId: user()?.id, revision: revision() }),
+    async ({ userId }) =>
+      userId
+        ? (await listAudioDrafts(userId)).filter((d) => d.id !== "oauth")
+        : []
+  );
+  onCleanup(
+    registerReferenceDraftCapture(async () => {
+      const userId = user()?.id;
+      const tuneId = draftTuneId;
+      if (isAdding() && liveDraft && userId && tuneId)
+        await putAudioDraft({ id: "oauth", userId, tuneId, fields: liveDraft });
+    })
+  );
+  createEffect(() => {
+    const userId = user()?.id;
+    if (!userId || !localDb()) return;
+    let current = true;
+    onCleanup(() => {
+      current = false;
+    });
+    void getAudioDraft(userId, "oauth")
+      .then((draft) => {
+        if (
+          !current ||
+          !draft ||
+          sessionStorage.getItem("byos-restore-draft") !== userId
+        )
+          return;
+        setCurrentTuneId(draft.tuneId);
+        draftTuneId = draft.tuneId;
+        setAddDraft(draft.fields);
+        setIsAdding(true);
+        sessionStorage.removeItem("byos-restore-draft");
+        void deleteAudioDraft(userId, "oauth");
+      })
+      .catch(() => toast.error("Could not restore the audio draft."));
+  });
   const INTERNAL_REFERENCE_DRAG_TYPE = "application/x-tunetrees-reference-id";
   const defaultAudioTitle = (filename: string) =>
     filename.replace(/\.[^.]+$/, "");
 
   const openAddForm = (initialData?: Partial<ReferenceFormData>) => {
+    draftTuneId = currentTuneId();
+    liveDraft = undefined;
     setAddDraft(initialData);
     setEditingReference(null);
     setIsAdding(true);
@@ -143,7 +223,11 @@ export const ReferencesPanel: Component = () => {
 
   // Load references for current tune
   const [references, { refetch }] = createResource(
-    () => ({ tuneId: currentTuneId(), userId: user()?.id }),
+    () => ({
+      tuneId: currentTuneId(),
+      userId: user()?.id,
+      revision: revision(),
+    }),
     async (params) => {
       if (!params.tuneId || !params.userId) return [];
       const db = getDb();
@@ -152,7 +236,11 @@ export const ReferencesPanel: Component = () => {
   );
 
   const [mediaAssets, { refetch: refetchMediaAssets }] = createResource(
-    () => ({ tuneId: currentTuneId(), userId: user()?.id }),
+    () => ({
+      tuneId: currentTuneId(),
+      userId: user()?.id,
+      revision: revision(),
+    }),
     async (params) => {
       if (!params.tuneId || !params.userId) return [];
       const db = getDb();
@@ -182,10 +270,11 @@ export const ReferencesPanel: Component = () => {
 
   // Handle creating a new reference
   const handleCreateReference = async (data: ReferenceFormData) => {
-    const tuneId = currentTuneId();
+    const tuneId = draftTuneId;
     const currentUser = user();
 
-    if (!tuneId || !currentUser?.id) return;
+    if (!tuneId || !currentUser?.id || isSaving()) return;
+    setIsSaving(true);
 
     try {
       const db = getDb();
@@ -195,54 +284,18 @@ export const ReferencesPanel: Component = () => {
         if (validationError) {
           throw new Error(validationError);
         }
-        const providerId = await getSelectedByosProvider(db, currentUser.id);
-        if (!providerId) {
-          throw new Error(
-            "Choose and connect a storage provider before uploading audio."
-          );
-        }
-        const providers = createByosProviders({
+        const destination = getStorageConfig(db, currentUser.id);
+        if (!destination)
+          throw new Error("Configure storage before saving an audio file.");
+        await putAudioDraft({
+          id: generateId(),
           userId: currentUser.id,
-          getAppAccessToken: () => session()?.access_token,
+          tuneId,
+          fields: data,
+          destination,
         });
-        const provider = providers[providerId];
-        if (!provider.isConfigured()) {
-          throw new Error(
-            `${provider.label} is not configured for this environment.`
-          );
-        }
-        const upload = await provider.upload(data.uploadFile);
-        const storagePath = buildByosStoragePath(providerId, upload.fileId);
-        const createdReference = await createReference(
-          db,
-          {
-            url: storagePath,
-            tuneRef: tuneId,
-            title: data.title || defaultAudioTitle(upload.fileName),
-            refType: "audio",
-            comment: data.comment || undefined,
-            favorite: data.favorite,
-            public: data.public,
-          },
-          currentUser.id
-        );
-
-        try {
-          await createMediaAsset(db, {
-            referenceRef: createdReference.id,
-            userRef: currentUser.id,
-            storagePath,
-            storageKind: "byos",
-            byosProvider: providerId,
-            providerFileId: upload.fileId,
-            originalFilename: upload.fileName,
-            contentType: upload.contentType,
-            fileSizeBytes: upload.size,
-          });
-        } catch (error) {
-          await deleteReference(db, createdReference.id);
-          throw error;
-        }
+        window.dispatchEvent(new Event("byos-retry-uploads"));
+        toast.success("Audio saved locally and queued for upload.");
       } else {
         const createData: CreateReferenceData = {
           url: data.url,
@@ -269,6 +322,8 @@ export const ReferencesPanel: Component = () => {
       toast.error(
         error instanceof Error ? error.message : "Failed to create reference."
       );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -519,8 +574,29 @@ export const ReferencesPanel: Component = () => {
           class="mb-3 p-2 bg-gray-50/50 dark:bg-gray-800/50 rounded border border-gray-200/30 dark:border-gray-700/30"
           data-testid="references-add-form"
         >
-          <ByosProviderConnection />
+          <button
+            type="button"
+            class="min-h-11 text-sm underline text-muted-foreground"
+            data-testid="byos-configure-storage"
+            onClick={() => openUserSettings("storage-provider")}
+          >
+            Configure storage
+          </button>
+          <Show when={!storageConfig()}>
+            <p
+              role="status"
+              class="mb-2 text-sm text-muted-foreground"
+              data-testid="byos-storage-warning"
+            >
+              Storage is not configured. Configure storage to save audio files.
+            </p>
+          </Show>
           <ReferenceForm
+            storageConfigured={!!storageConfig()}
+            saving={isSaving()}
+            onDraftChange={(data) => {
+              liveDraft = data;
+            }}
             initialData={addDraft()}
             autoOpenTypeSelect={!addDraft()}
             onSubmit={handleCreateReference}
@@ -530,6 +606,40 @@ export const ReferencesPanel: Component = () => {
       </Show>
 
       {/* Edit reference form */}
+      <For each={queued()?.filter((d) => d.tuneId === currentTuneId())}>
+        {(draft) => (
+          <div class="my-2 text-sm" data-testid="byos-queued-upload">
+            <p>
+              {draft.fields.title || draft.fields.uploadFile?.name}:{" "}
+              {isAudioUploadActive(draft.userId, draft.id)
+                ? "Uploading…"
+                : draft.error || "Queued for upload"}
+            </p>
+            <button
+              type="button"
+              class="min-h-11 underline mr-3"
+              onClick={() =>
+                window.dispatchEvent(new Event("byos-retry-uploads"))
+              }
+            >
+              Retry upload
+            </button>
+            <button
+              type="button"
+              class="min-h-11 underline"
+              onClick={() => {
+                const id = user()?.id;
+                if (id)
+                  void cancelAudioUpload(id, draft.id).catch(() =>
+                    toast.error("Could not cancel the draft.")
+                  );
+              }}
+            >
+              Cancel upload
+            </button>
+          </div>
+        )}
+      </For>
       <Show when={editingReference()}>
         {(ref) => (
           <div

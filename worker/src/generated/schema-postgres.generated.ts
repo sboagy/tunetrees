@@ -622,6 +622,7 @@ export const userProfile = pgTable("user_profile", {
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
   byosProvider: text("byos_provider"),
+  byosStorageConfig: text("byos_storage_config"),
 });
 
 export const tables = {
