@@ -28,6 +28,13 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
   );
 }
 
+if (process.env.GOOGLE_CLIENT_SECRET) {
+  args.push(
+    "--var",
+    `GOOGLE_CLIENT_SECRET:${process.env.GOOGLE_CLIENT_SECRET}`
+  );
+}
+
 args.push(...process.argv.slice(2));
 
 const command = process.platform === "win32" ? "npx.cmd" : "npx";

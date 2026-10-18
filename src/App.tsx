@@ -15,6 +15,7 @@ import { MainLayout } from "./components/layout";
 import { SidebarDockProvider } from "./components/layout/SidebarDockContext";
 import { UserSettingsDialog } from "./components/layout/UserSettingsDialog";
 import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
+import { ByosUploadMaintenance } from "./components/references/ByosUploadMaintenance";
 import { GroupsDialogProvider } from "./contexts/GroupsDialogContext";
 import { UserSettingsDialogProvider } from "./contexts/UserSettingsDialogContext";
 import { ChatProvider } from "./lib/ai/context";
@@ -52,9 +53,13 @@ const SpacedRepetitionPage = lazy(
 );
 const PluginsPage = lazy(() => import("./routes/user-settings/plugins"));
 const GoalsSettingsPage = lazy(() => import("./routes/user-settings/goals"));
+const StorageProviderPage = lazy(
+  () => import("./routes/user-settings/storage-provider")
+);
 
 // Lazy load auth callback pages
 const AuthCallback = lazy(() => import("./routes/auth/callback"));
+const ByosCallback = lazy(() => import("./routes/byos/callback"));
 const ResetPassword = lazy(() => import("./routes/reset-password"));
 
 /**
@@ -100,6 +105,7 @@ function App() {
                         <UpdatePrompt />
                         {/* Overlays rendered outside Router so underlying page stays mounted */}
                         <UserSettingsDialog />
+                        <ByosUploadMaintenance />
                         <GroupsManagerDialog />
                         {/* <ThemeDebugger /> */}
                         <Router>
@@ -110,6 +116,10 @@ function App() {
                           <Route
                             path="/auth/callback"
                             component={AuthCallback}
+                          />
+                          <Route
+                            path="/byos/callback"
+                            component={ByosCallback}
                           />
                           <Route
                             path="/reset-password"
@@ -142,6 +152,10 @@ function App() {
                               component={SpacedRepetitionPage}
                             />
                             <Route path="/plugins" component={PluginsPage} />
+                            <Route
+                              path="/storage-provider"
+                              component={StorageProviderPage}
+                            />
                             <Route path="/account" component={AccountPage} />
                             <Route
                               path="/goals"

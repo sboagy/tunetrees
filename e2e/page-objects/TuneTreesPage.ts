@@ -231,6 +231,7 @@ export class TuneTreesPage {
   readonly referenceAudioFileInput: Locator;
   readonly referenceAudioDropzone: Locator;
   readonly referenceAudioSelectedFile: Locator;
+  readonly byosGoogleDriveProviderButton: Locator;
   readonly referenceSubmitButton: Locator;
   readonly referenceCancelButton: Locator;
 
@@ -602,6 +603,9 @@ export class TuneTreesPage {
     this.referenceAudioDropzone = page.getByTestId("reference-audio-dropzone");
     this.referenceAudioSelectedFile = page.getByTestId(
       "reference-audio-selected-file"
+    );
+    this.byosGoogleDriveProviderButton = page.getByTestId(
+      "byos-provider-google-drive"
     );
     this.referenceSubmitButton = page.getByTestId("reference-submit-button");
     this.referenceCancelButton = page.getByTestId("reference-cancel-button");
@@ -4831,6 +4835,19 @@ export class TuneTreesPage {
         { timeout: timeoutMs, intervals: [100, 250, 500, 1000] }
       )
       .toBe(true);
+  }
+
+  async closeSettings() {
+    // OAuth and settings-save notifications overlap the close button on mobile.
+    // Dismiss them through their UI rather than forcing a click through them.
+    await this.clickWithToastRecovery(
+      this.page.getByTestId("settings-close-button"),
+      { timeout: 5_000 },
+      "closeSettings"
+    );
+    await expect(this.page.getByTestId("settings-modal")).toBeHidden({
+      timeout: 10_000,
+    });
   }
 
   private async dismissVisibleToasts(maxAttempts: number = 3) {

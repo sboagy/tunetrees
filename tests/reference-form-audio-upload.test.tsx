@@ -114,7 +114,11 @@ describe("ReferenceForm audio uploads", () => {
     const onSubmit = vi.fn();
 
     render(() => (
-      <ReferenceForm onSubmit={onSubmit} onCancel={() => undefined} />
+      <ReferenceForm
+        storageConfigured
+        onSubmit={onSubmit}
+        onCancel={() => undefined}
+      />
     ));
 
     fireEvent.click(screen.getByTestId("reference-type-option-audio"));
@@ -249,6 +253,7 @@ describe("ReferenceForm audio uploads", () => {
 
     render(() => (
       <ReferenceForm
+        storageConfigured
         onSubmit={() => undefined}
         onCancel={() => undefined}
         autoOpenTypeSelect={false}
@@ -268,5 +273,47 @@ describe("ReferenceForm audio uploads", () => {
       (screen.getByTestId("reference-submit-button") as HTMLButtonElement)
         .disabled
     ).toBe(false);
+  });
+
+  it("blocks an audio-file submission when storage has never been configured", () => {
+    const onSubmit = vi.fn();
+    render(() => (
+      <ReferenceForm
+        onSubmit={onSubmit}
+        onCancel={() => undefined}
+        autoOpenTypeSelect={false}
+        initialData={{
+          refType: "audio",
+          sourceMode: "upload",
+          uploadFile: new File(["audio"], "test.mp3", { type: "audio/mpeg" }),
+        }}
+      />
+    ));
+    expect(
+      (screen.getByTestId("reference-submit-button") as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    fireEvent.submit(screen.getByTestId("reference-form"));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("allows a configured user to save an audio draft while offline", () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const onSubmit = vi.fn();
+    render(() => (
+      <ReferenceForm
+        storageConfigured
+        onSubmit={onSubmit}
+        onCancel={() => undefined}
+        autoOpenTypeSelect={false}
+        initialData={{
+          refType: "audio",
+          sourceMode: "upload",
+          uploadFile: new File(["audio"], "test.mp3", { type: "audio/mpeg" }),
+        }}
+      />
+    ));
+    fireEvent.click(screen.getByTestId("reference-submit-button"));
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 });
