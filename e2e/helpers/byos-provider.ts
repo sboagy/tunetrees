@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 const GOOGLE_SECRET_DATABASE = "tunetrees-byos-secrets";
 const GOOGLE_SECRET_STORE = "refresh-tokens";
@@ -41,7 +42,7 @@ export async function configureMockGoogleDriveByos(
 ): Promise<void> {
   await page.evaluate(
     async ({ databaseName, storeName, key }) => {
-      await new Promise<void>((resolve, reject) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(databaseName, 1);
         request.onupgradeneeded = () => {
           if (!request.result.objectStoreNames.contains(storeName)) {
@@ -52,11 +53,11 @@ export async function configureMockGoogleDriveByos(
           reject(
             request.error ?? new Error("Could not open BYOS token store.")
           );
-        request.onsuccess = () => {
-          const transaction = request.result.transaction(
-            storeName,
-            "readwrite"
-          );
+        request.onsuccess = () => resolve(request.result);
+      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const transaction = database.transaction(storeName, "readwrite");
           transaction.objectStore(storeName).put({
             key,
             refreshToken: "e2e-google-refresh-token",
@@ -67,8 +68,10 @@ export async function configureMockGoogleDriveByos(
             reject(
               transaction.error ?? new Error("Could not seed BYOS token store.")
             );
-        };
-      });
+        });
+      } finally {
+        database.close();
+      }
     },
     {
       databaseName: GOOGLE_SECRET_DATABASE,
@@ -158,7 +161,7 @@ export async function saveMockGoogleStorageSettings(page: Page) {
     /configured|Connected/,
     { timeout: 10000 }
   );
-  await page.getByTestId("settings-close-button").click();
+  await new TuneTreesPage(page).closeSettings();
   expect(page.url()).toBe(before);
   await expect(page.getByTestId("reference-form")).toBeVisible({
     timeout: 10000,

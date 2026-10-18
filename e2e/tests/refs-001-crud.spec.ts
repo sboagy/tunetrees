@@ -166,6 +166,8 @@ test.describe("REFS-001: References CRUD Operations", () => {
     page,
     testUser,
   }) => {
+    // Includes deterministic setup plus a full reload and auth/SQLite bootstrap.
+    test.setTimeout(60_000);
     await configureMockGoogleDriveByos(page, testUser.userId);
     await ttPage.dropAudioFileOnReferencesPanel({
       fileName: "oauth-draft.mp3",
@@ -196,7 +198,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
     await expect(page.getByTestId("settings-modal")).toBeVisible({
       timeout: 10000,
     });
-    await page.getByTestId("settings-close-button").click();
+    await ttPage.closeSettings();
     await expect(ttPage.referenceAudioSelectedFile).toHaveText(
       "oauth-draft.mp3",
       { timeout: 10000 }
@@ -211,6 +213,8 @@ test.describe("REFS-001: References CRUD Operations", () => {
     page,
     testUser,
   }) => {
+    // Cancellation still reloads the app and restores its local draft/DB state.
+    test.setTimeout(60_000);
     await configureMockGoogleDriveByos(page, testUser.userId);
     await ttPage.dropAudioFileOnReferencesPanel({
       fileName: "cancelled-consent.mp3",
@@ -236,7 +240,7 @@ test.describe("REFS-001: References CRUD Operations", () => {
       page.getByTestId("byos-provider-connect").click(),
     ]);
     await expect(page).toHaveURL(returnUrl, { timeout: 20000 });
-    await page.getByTestId("settings-close-button").click();
+    await ttPage.closeSettings();
     await expect(ttPage.referenceAudioSelectedFile).toHaveText(
       "cancelled-consent.mp3",
       { timeout: 10000 }

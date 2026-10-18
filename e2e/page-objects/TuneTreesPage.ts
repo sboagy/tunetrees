@@ -4837,6 +4837,19 @@ export class TuneTreesPage {
       .toBe(true);
   }
 
+  async closeSettings() {
+    // OAuth and settings-save notifications overlap the close button on mobile.
+    // Dismiss them through their UI rather than forcing a click through them.
+    await this.clickWithToastRecovery(
+      this.page.getByTestId("settings-close-button"),
+      { timeout: 5_000 },
+      "closeSettings"
+    );
+    await expect(this.page.getByTestId("settings-modal")).toBeHidden({
+      timeout: 10_000,
+    });
+  }
+
   private async dismissVisibleToasts(maxAttempts: number = 3) {
     const toastCloser = this.page
       .getByRole("button", { name: "Close toast" })
