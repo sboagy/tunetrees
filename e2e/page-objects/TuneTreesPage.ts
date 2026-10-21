@@ -4864,7 +4864,14 @@ export class TuneTreesPage {
         return;
       }
 
-      await toastCloser.click({ timeout: 5_000 });
+      try {
+        await toastCloser.click({ timeout: 5_000 });
+      } catch (error) {
+        // A transient toast can expire while Playwright waits for its exit
+        // animation to settle. Disappearance already satisfies dismissal;
+        // a still-visible obstruction must retain the original failure.
+        if (await toastCloser.isVisible()) throw error;
+      }
       await expect(toastCloser).toBeHidden({ timeout: 5_000 });
     }
   }

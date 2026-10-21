@@ -5,7 +5,7 @@ const GOOGLE_SECRET_DATABASE = "tunetrees-byos-secrets";
 const GOOGLE_SECRET_STORE = "refresh-tokens";
 const GOOGLE_FILE_ID = "e2e-google-drive-audio";
 
-function createSilentWavBuffer(durationSeconds = 1, sampleRate = 8000) {
+export function createSilentWavBuffer(durationSeconds = 1, sampleRate = 8000) {
   const channelCount = 1;
   const bitsPerSample = 16;
   const bytesPerSample = bitsPerSample / 8;
@@ -40,6 +40,15 @@ export async function configureMockGoogleDriveByos(
   page: Page,
   userId: string
 ): Promise<void> {
+  await seedMockByosToken(page, userId, "google-drive");
+  await mockGoogleDriveRequests(page);
+}
+
+async function seedMockByosToken(
+  page: Page,
+  userId: string,
+  providerId: "google-drive" | "dropbox"
+) {
   await page.evaluate(
     async ({ databaseName, storeName, key }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -76,10 +85,12 @@ export async function configureMockGoogleDriveByos(
     {
       databaseName: GOOGLE_SECRET_DATABASE,
       storeName: GOOGLE_SECRET_STORE,
-      key: `${userId}:google-drive`,
+      key: `${userId}:${providerId}`,
     }
   );
+}
 
+async function mockGoogleDriveRequests(page: Page) {
   await page.route("**/api/byos/google/token", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -149,12 +160,19 @@ export async function configureMockGoogleDriveByos(
 
 /** Configure through the real settings dialog using the mocked local token. */
 export async function saveMockGoogleStorageSettings(page: Page) {
+  await saveMockStorageSettings(page, "google-drive");
+}
+
+export async function saveMockStorageSettings(
+  page: Page,
+  providerId: "google-drive" | "dropbox"
+) {
   const before = page.url();
   await page.getByTestId("byos-configure-storage").click();
   await expect(page.getByTestId("byos-provider-google-drive")).toBeVisible({
     timeout: 10000,
   });
-  await page.getByTestId("byos-provider-google-drive").check();
+  await page.getByTestId(`byos-provider-${providerId}`).check();
   await page.getByTestId("byos-folder-name").fill("tunetrees_storage");
   await page.getByTestId("byos-storage-save").click();
   await expect(page.getByTestId("byos-connection-status")).toContainText(
@@ -166,4 +184,51 @@ export async function saveMockGoogleStorageSettings(page: Page) {
   await expect(page.getByTestId("reference-form")).toBeVisible({
     timeout: 10000,
   });
+}
+
+/** Uses the production Dropbox adapter with real local token persistence. */
+export async function configureMockDropboxByos(page: Page, userId: string) {
+  await seedMockByosToken(page, userId, "dropbox");
+  await mockDropboxRequests(page);
+}
+
+export async function mockDropboxRequests(page: Page) {
+  await page.route("https://api.dropboxapi.com/oauth2/token", async (route) => {
+    await route.fulfill({
+      json: {
+        access_token: "e2e-dropbox-access-token",
+        refresh_token: "e2e-dropbox-refresh-token",
+        expires_in: 3600,
+      },
+    });
+  });
+  await page.route(
+    "https://api.dropboxapi.com/2/files/get_metadata",
+    async (route) => {
+      await route.fulfill({
+        json: {
+          id: "id:e2e-folder",
+          name: "tunetrees_storage",
+          ".tag": "folder",
+        },
+      });
+    }
+  );
+  await page.route(
+    "https://content.dropboxapi.com/2/files/upload",
+    async (route) => {
+      await route.fulfill({
+        json: { id: "id:e2e-dropbox-audio", size: 16044 },
+      });
+    }
+  );
+  await page.route(
+    "https://content.dropboxapi.com/2/files/download",
+    async (route) => {
+      await route.fulfill({
+        contentType: "audio/wav",
+        body: createSilentWavBuffer(),
+      });
+    }
+  );
 }

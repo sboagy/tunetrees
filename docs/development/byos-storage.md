@@ -26,6 +26,28 @@ Existing connections created before folder setup require completing setup in Set
 7. On a second device, configuration syncs but authorization must be granted separately. Cached playback remains available offline; uncached unavailable files must not cause repeated consent prompts.
 8. Repeat provider checks with Dropbox after configuring its App Folder app, client IDs, and callback URI. Verify existing R2 audio as a regression check.
 
+## Automated regression checks
+
+Run the required static/schema/unit gate:
+
+```sh
+npm run lint && npm run check && npm run typecheck && npm run codegen:schema:check && npm run test:unit
+```
+
+With the local app and Worker available, run the scoped desktop/mobile suite:
+
+```sh
+npm run test:e2e -- e2e/tests/byos-001-private-storage.spec.ts e2e/tests/refs-001-crud.spec.ts e2e/tests/refs-003-audio-player-persistence.spec.ts --project=chromium --project='Mobile Chrome' --workers=2
+```
+
+Provider HTTP is mocked; personal cloud accounts are not used. These tests exercise the production adapters, real browser IndexedDB, Web Locks, SQLite outbox triggers, and audio player. They cover Dropbox OAuth restoration, upload/cache playback, quota failure, queued reload, two-tab replay/cancellation, independent device-local authorization, metadata-only outbox records, and mixed legacy R2/BYOS playback. The Google suites retain ingestion and waveform/marker regression coverage.
+
+The second-device fixture copies the same user's persisted metadata/auth into an isolated browser context without provider credentials, pending drafts, or cached audio. It tests local authorization isolation, not a complete remote-sync bootstrap. R2 reads use mocked audio responses; Worker authentication/range behavior is covered separately by unit tests. Helpers that inspect browser stores import app modules through Vite, so this suite targets the dev server rather than the preview build.
+
+Real provider consent/refresh/revocation, account selection, folder placement, and metadata sync to a genuinely new device still require the manual checklist above. Repeat it before release and after provider/auth/upload/configuration changes.
+
+Private `byos:` cached audio is not evicted by the legacy scheduled-audio pin sweep. Browser storage limits and clearing site data can still remove cached audio.
+
 ## Schema rollout and rollback
 
 `20261001120000_add_byos_storage_config.sql` adds one nullable text column. Browser migration 0027 and regenerated artifacts include it. Old clients/Workers can omit it; existing schema fields, RLS, routes, and assets remain unchanged. The user-profile RPC returns the table row type, so its result gains the new field without a signature change; generic adapters handle casing. Deploy migration, Worker, then Pages using the standard schema-promotion runbook. Old PWA bundles continue using their existing locators. To roll back, restore the prior app/Worker while retaining the nullable column, browser drafts, and provider files; do not delete storage as part of rollback.
