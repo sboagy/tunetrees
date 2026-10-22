@@ -247,6 +247,13 @@ export default defineConfig({
       env: {
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || "",
         VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || "",
+        // BYOS tests mock Google HTTP calls but still need a configured provider.
+        // CI skips real OAuth credentials, so use a public test-only client ID.
+        VITE_GOOGLE_CLIENT_ID:
+          process.env.VITE_GOOGLE_CLIENT_ID ||
+          "e2e-google-client-id.apps.googleusercontent.com",
+        VITE_DROPBOX_CLIENT_ID:
+          process.env.VITE_DROPBOX_CLIENT_ID || "e2e-dropbox-client-id",
         VITE_DISABLE_HMR_FOR_E2E:
           process.env.VITE_DISABLE_HMR_FOR_E2E || "true",
         // Forward optional diagnostics flags into the Vite server process.
@@ -264,9 +271,10 @@ export default defineConfig({
       // The PWA offline job targets the local Supabase instance. Using
       // Miniflare there avoids a remote-dev disconnect cascading into every
       // subsequent offline test, while other E2E jobs retain their worker mode.
-      command: process.env.PLAYWRIGHT_USE_LOCAL_WORKER === "true"
-        ? "npm run dev:worker:local"
-        : "npm run dev:worker",
+      command:
+        process.env.PLAYWRIGHT_USE_LOCAL_WORKER === "true"
+          ? "npm run dev:worker:local"
+          : "npm run dev:worker",
       url: `http://localhost:${WORKER_PORT}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,

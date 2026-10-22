@@ -1,4 +1,8 @@
 import { expect, type Page } from "@playwright/test";
+import {
+  configureMockGoogleDriveByos,
+  saveMockGoogleStorageSettings,
+} from "../helpers/byos-provider";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -75,9 +79,13 @@ test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
 
   test("should persist waveform marks, regions, tempo, and zoom after closing and reopening", async ({
     page,
+    testUser,
   }) => {
+    await configureMockGoogleDriveByos(page, testUser.userId);
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
+
+    await saveMockGoogleStorageSettings(page);
 
     await ttPage.selectReferenceType("audio");
     await ttPage.referenceAudioSourceUploadButton.click();
