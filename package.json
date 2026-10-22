@@ -169,7 +169,7 @@
     "jsdom": "^30.1.2",
     "postgres": "^3.4.9",
     "prettier": "^3.9.6",
-    "supabase": "^2.110.0",
+    "supabase": "^2.121.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
     "typescript": "7.0.2",
