@@ -151,7 +151,7 @@
     "wavesurfer.js": "^7.12.11"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.2",
+    "@biomejs/biome": "^2.6.3",
     "@cloudflare/workers-types": "^5.20260921.1",
     "@playwright/test": "^1.62.1",
     "@solidjs/testing-library": "^0.8.10",
