@@ -42,6 +42,7 @@ The offline tests verify that the application works correctly when network conne
 ### ✅ Category 1: Core Offline Functionality
 
 #### `offline-001-practice-tab.spec.ts` (P0)
+
 - Practice evaluations work offline
 - Changes queue for sync
 - Sync completes when online
@@ -49,6 +50,7 @@ The offline tests verify that the application works correctly when network conne
 - Offline state persists across reloads
 
 #### `offline-002-repertoire-tab.spec.ts` (P0)
+
 - Delete tunes offline
 - Sort repertoire without network
 - Filter by tune type offline
@@ -57,6 +59,7 @@ The offline tests verify that the application works correctly when network conne
 ### ✅ Category 4: Complex Offline Scenarios
 
 #### `offline-011-extended-session.spec.ts` (P0)
+
 - 30+ operations across all tabs
 - Practice evaluations (20+)
 - Repertoire management
@@ -66,6 +69,7 @@ The offline tests verify that the application works correctly when network conne
 - Full sync completes successfully
 
 #### `offline-012-connection-interruptions.spec.ts` (P1)
+
 - Multiple offline/online transitions
 - Partial sync interruption
 - Queue preservation across states
@@ -75,6 +79,7 @@ The offline tests verify that the application works correctly when network conne
 ## Running Tests
 
 ### Prerequisites
+
 ```bash
 # Reset database to clean state
 npm run db:local:reset
@@ -110,12 +115,14 @@ Tests run automatically in CI pipeline:
 ## Test Coverage
 
 ### Implemented (4 tests)
+
 - ✅ Practice tab offline CRUD
 - ✅ Repertoire tab offline CRUD
 - ✅ Extended offline session (30+ operations)
 - ✅ Connection interruptions
 
 ### Planned (18 tests)
+
 See [issue #326](https://github.com/sboagy/tunetrees/issues/326) for full test plan:
 - Catalog tab offline operations
 - Analysis tab offline access
@@ -131,7 +138,7 @@ See [issue #326](https://github.com/sboagy/tunetrees/issues/326) for full test p
 
 Playwright's `context.setOffline()` is used to simulate offline mode:
 ```typescript
-await page.context().setOffline(true);  // Go offline
+await page.context().setOffline(true); // Go offline
 await page.context().setOffline(false); // Go online
 ```
 
@@ -173,7 +180,7 @@ const offline = await isOffline(page);
 console.log(`Offline: ${offline}`);
 
 // Inspect local record
-const record = await getSQLiteRecord(page, 'practice_record', '123');
+const record = await getSQLiteRecord(page, "practice_record", "123");
 console.log(record);
 ```
 

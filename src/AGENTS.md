@@ -33,12 +33,14 @@ Side Panels: Collapsible References & Notes (toggle icon changes). Use fixed wid
 
 ```ts
 const table = createSolidTable({
-  get data() { return tunes(); },
+  get data() {
+    return tunes();
+  },
   columns: [
-    { accessorKey: 'id', header: 'ID' },
-    { accessorKey: 'title', header: 'Title' },
-    { accessorKey: 'type', header: 'Type' },
-    { accessorKey: 'mode', header: 'Mode' },
+    { accessorKey: "id", header: "ID" },
+    { accessorKey: "title", header: "Title" },
+    { accessorKey: "type", header: "Type" },
+    { accessorKey: "mode", header: "Mode" },
     // scheduling fields etc.
   ],
   getCoreRowModel: getCoreRowModel(),
@@ -55,9 +57,12 @@ UI Requirements:
 
 Preference algorithm:
 ```ts
-function applyTheme(pref: 'light' | 'dark' | 'system') {
-  const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', isDark);
+function applyTheme(pref: "light" | "dark" | "system") {
+  const isDark =
+    pref === "dark" ||
+    (pref === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark", isDark);
 }
 ```
 Settings page exposes explicit selector; never hardcode theme to system only.
@@ -94,4 +99,5 @@ All interactive controls used by E2E must include stable `data-testid` values (k
 - Prefer context/signals over deep prop chains.
 
 ---
+
 UI-specific; keep concise and current. Global invariants live in root AGENTS.

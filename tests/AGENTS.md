@@ -57,4 +57,5 @@ it('renders title', () => {
 - E2E: `e2e/AGENTS.md`
 
 ---
+
 Update this file for unit-testing policy only. E2E belongs in `e2e/AGENTS.md`.

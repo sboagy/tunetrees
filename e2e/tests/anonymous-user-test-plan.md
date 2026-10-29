@@ -20,14 +20,14 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 
 ## E2E Test Implementation Files
 
-| Test File | Description | Priority |
-|-----------|-------------|----------|
-| `anonymous-001-sign-in-flow.spec.ts` | Anonymous sign-in button, success, session persistence | P0 |
-| `anonymous-002-banner.spec.ts` | Banner visibility, dismissal, navigation | P1 |
-| `anonymous-003-account-conversion.spec.ts` | Conversion UI, validation, UUID preservation | P0 |
-| `anonymous-004-data-functionality.spec.ts` | Catalog access, add to repertoire, data persistence | P1 |
-| `anonymous-005-edge-cases.spec.ts` | Double sign-in, regular signup, sign-out behavior | P2 |
-| `anonymous-006-data-preservation.spec.ts` | **CRITICAL**: Data preserved during/after conversion | P0 |
+| Test File                                  | Description                                            | Priority |
+| ------------------------------------------ | ------------------------------------------------------ | -------- |
+| `anonymous-001-sign-in-flow.spec.ts`       | Anonymous sign-in button, success, session persistence | P0       |
+| `anonymous-002-banner.spec.ts`             | Banner visibility, dismissal, navigation               | P1       |
+| `anonymous-003-account-conversion.spec.ts` | Conversion UI, validation, UUID preservation           | P0       |
+| `anonymous-004-data-functionality.spec.ts` | Catalog access, add to repertoire, data persistence    | P1       |
+| `anonymous-005-edge-cases.spec.ts`         | Double sign-in, regular signup, sign-out behavior      | P2       |
+| `anonymous-006-data-preservation.spec.ts`  | **CRITICAL**: Data preserved during/after conversion   | P0       |
 
 ---
 
@@ -38,6 +38,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 **Seed:** None required (fresh state)
 
 #### 1.1 Anonymous Sign-In Button Visibility
+
 **Steps:**
 1. Clear all browser storage (localStorage, IndexedDB)
 2. Navigate to http://localhost:5173/login
@@ -51,6 +52,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - OAuth buttons (Google, GitHub) visible
 
 #### 1.2 Anonymous Sign-In Success
+
 **Steps:**
 1. Clear all browser storage
 2. Navigate to http://localhost:5173/login
@@ -67,6 +69,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Supabase `user_profile` entry created
 
 #### 1.3 Anonymous User Session Persistence
+
 **Steps:**
 1. Complete anonymous sign-in (Scenario 1.2)
 2. Note the user UUID from console logs
@@ -86,6 +89,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 **Seed:** Complete anonymous sign-in first
 
 #### 2.1 Banner Visibility
+
 **Steps:**
 1. Sign in anonymously
 2. Observe the page layout below TopNav
@@ -99,6 +103,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - X dismiss button visible
 
 #### 2.2 Banner Appears on All Tabs
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to Practice tab
@@ -115,6 +120,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Banner position consistent across tabs
 
 #### 2.3 Banner Dismissal
+
 **Steps:**
 1. Sign in anonymously
 2. Click the X button on the banner
@@ -126,6 +132,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - localStorage key `tunetrees:anonymous-banner-dismissed` set to "true"
 
 #### 2.4 Banner Reappears on New Session
+
 **Steps:**
 1. Sign in anonymously
 2. Dismiss the banner
@@ -143,6 +150,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 **Seed:** Complete anonymous sign-in first
 
 #### 3.1 Access Practice Tab
+
 **Steps:**
 1. Sign in anonymously
 2. Click Practice tab
@@ -153,6 +161,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - "Database status" shows connected
 
 #### 3.2 Access Catalog Tab
+
 **Steps:**
 1. Sign in anonymously
 2. Click Catalog tab
@@ -163,6 +172,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Filter dropdowns work (Type, Mode, Genre)
 
 #### 3.3 Add Tune to Repertoire
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to Catalog tab
@@ -177,6 +187,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - `repertoire_tune` entry created with anonymous user's UUID
 
 #### 3.4 Create Practice Record
+
 **Steps:**
 1. Sign in anonymously
 2. Add tune to repertoire (from Scenario 3.3)
@@ -198,6 +209,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 **Seed:** Complete anonymous sign-in and create test data first
 
 #### 4.1 Conversion Entry Point (Banner Button)
+
 **Steps:**
 1. Sign in anonymously
 2. Create at least one tune in repertoire
@@ -209,6 +221,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - URL contains `?convert=true` parameter
 
 #### 4.2 Conversion UI Display
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to /login?convert=true
@@ -222,6 +235,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - OAuth buttons NOT visible in conversion mode
 
 #### 4.3 Conversion Success (UUID Preservation)
+
 **Steps:**
 1. Sign in anonymously
 2. Note the anonymous user UUID
@@ -245,6 +259,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Sync starts automatically
 
 #### 4.4 Data Preserved After Conversion
+
 **Steps:**
 1. Complete conversion (Scenario 4.3)
 2. Navigate to Repertoire tab
@@ -256,6 +271,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - `user_ref` FK still references SAME UUID
 
 #### 4.5 Conversion Validation Errors
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to /login?convert=true
@@ -274,6 +290,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 ### 5. Edge Cases
 
 #### 5.1 Double Anonymous Sign-In Attempt
+
 **Steps:**
 1. Sign in anonymously
 2. Manually navigate to /login
@@ -284,6 +301,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - No duplicate users created
 
 #### 5.2 Network Failure During Anonymous Sign-In
+
 **Steps:**
 1. Clear browser storage
 2. Navigate to /login
@@ -296,6 +314,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - User can retry when online
 
 #### 5.3 Network Failure During Conversion
+
 **Steps:**
 1. Sign in anonymously
 2. Create test data
@@ -311,6 +330,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Can retry when online
 
 #### 5.4 Sign In When Anonymous (Switch User)
+
 **Steps:**
 1. Sign in anonymously
 2. Create test data
@@ -323,6 +343,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Anonymous user's data remains orphaned in Supabase
 
 #### 5.5 OAuth Conversion (If Supported)
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to /login?convert=true
@@ -339,6 +360,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 **Seed:** Fresh anonymous sign-in
 
 #### 6.1 Genres Available in Dropdowns
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to Catalog tab
@@ -349,6 +371,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Console log: "📥 Synced X genres"
 
 #### 6.2 Tune Types Available in Dropdowns
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to Catalog tab
@@ -359,6 +382,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Console log: "📥 Synced X tune types"
 
 #### 6.3 Public Tunes in Catalog
+
 **Steps:**
 1. Sign in anonymously
 2. Navigate to Catalog tab
@@ -374,6 +398,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 **Seed:** None (fresh state)
 
 #### 7.1 Normal Sign-Up Flow Unaffected
+
 **Steps:**
 1. Clear all browser storage
 2. Navigate to /login
@@ -392,6 +417,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 ### 8. Sign Out Behavior
 
 #### 8.1 Sign Out as Anonymous User
+
 **Steps:**
 1. Sign in anonymously
 2. Click user menu (avatar/hamburger)
@@ -404,6 +430,7 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 - Console log: "🗑️ Cleared local database for anonymous user"
 
 #### 8.2 Sign Out After Conversion
+
 **Steps:**
 1. Sign in anonymously
 2. Convert to registered account
@@ -437,16 +464,19 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 ## Test Environment Requirements
 
 1. **Supabase Local**: Running with anonymous sign-ins enabled
+
    ```bash
    supabase start
    ```
 
 2. **Development Server**: Running on http://localhost:5173
+
    ```bash
    npm run dev
    ```
 
 3. **Config Verification**: Check `supabase/config.toml`:
+
    ```toml
    [auth]
    enable_anonymous_sign_ins = true
@@ -477,14 +507,14 @@ The Anonymous User Conversion Pattern (PR #287) implements a "Try Before You Buy
 
 ## Key Code Locations
 
-| Component | File |
-|-----------|------|
-| Auth Logic | `src/lib/auth/AuthContext.tsx` |
-| Login UI | `src/components/auth/LoginForm.tsx` |
-| Banner | `src/components/auth/AnonymousBanner.tsx` |
-| Layout Integration | `src/components/layout/MainLayout.tsx` |
-| Route Protection | `src/routes/Home.tsx`, `src/routes/Login.tsx` |
-| Supabase Config | `supabase/config.toml` |
+| Component          | File                                          |
+| ------------------ | --------------------------------------------- |
+| Auth Logic         | `src/lib/auth/AuthContext.tsx`                |
+| Login UI           | `src/components/auth/LoginForm.tsx`           |
+| Banner             | `src/components/auth/AnonymousBanner.tsx`     |
+| Layout Integration | `src/components/layout/MainLayout.tsx`        |
+| Route Protection   | `src/routes/Home.tsx`, `src/routes/Login.tsx` |
+| Supabase Config    | `supabase/config.toml`                        |
 
 ---
 

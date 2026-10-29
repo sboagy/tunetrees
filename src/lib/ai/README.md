@@ -14,6 +14,7 @@ A conversational AI assistant powered by Google Gemini that helps users manage t
 ## Architecture
 
 ### Backend (Supabase Edge Function)
+
 - **Location**: `supabase/functions/ai-chat/index.ts`
 - **Role**: Secure proxy and context manager
 - **Flow**:
@@ -24,6 +25,7 @@ A conversational AI assistant powered by Google Gemini that helps users manage t
   5. Returns text response OR tool call JSON
 
 ### Frontend (SolidJS)
+
 - **Context**: `src/lib/ai/context.tsx` - Chat state management
 - **Types**: `src/lib/ai/types.ts` - TypeScript interfaces
 - **Tool Executor**: `src/lib/ai/tool-executor.ts` - Executes AI commands
@@ -95,6 +97,7 @@ Click to open the chat drawer.
 The AI can execute these tools on your behalf:
 
 ### `filter_tunes`
+
 Filters the tune list by:
 - `genre` (Irish, Scottish, etc.)
 - `type` (Reel, Jig, Hornpipe, etc.)
@@ -102,16 +105,19 @@ Filters the tune list by:
 - `status` (new, learning, review, relearning)
 
 ### `log_practice`
+
 Logs a practice session:
 - `tune_title` (required)
 - `quality` (1-4, optional)
 
 ### `add_note`
+
 Adds/updates a note:
 - `tune_title` (required)
 - `note_content` (required)
 
 ### `get_tune_details`
+
 Retrieves full tune information:
 - `tune_title` (required)
 
@@ -125,15 +131,18 @@ Retrieves full tune information:
 ## Troubleshooting
 
 ### "Gemini API key not configured"
+
 Run: `supabase secrets set GEMINI_API_KEY=your_key`
 
 ### "Failed to get AI response"
+
 Check Edge Function logs:
 ```bash
 supabase functions logs ai-chat
 ```
 
 ### Chat drawer not appearing
+
 1. Ensure you're on the Catalog or Repertoire page
 2. Look for the blue/purple gradient FAB in bottom-right
 3. Check browser console for errors

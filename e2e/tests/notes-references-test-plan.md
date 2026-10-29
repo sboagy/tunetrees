@@ -46,6 +46,7 @@ The Notes and References feature allows users to manage personal notes and exter
 **Seed:** `e2e/tests/seed.spec.ts` with tune selected
 
 #### 1.1 Create Note with Text Content
+
 **Preconditions:**
 - User is logged in
 - A tune is selected in repertoire/catalog grid
@@ -66,6 +67,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Editor closes after save
 
 #### 1.2 Create Note and Cancel
+
 **Steps:**
 1. Click the "+ Add" button
 2. Type some content in the editor
@@ -77,6 +79,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Note count remains unchanged
 
 #### 1.3 Create Note with Empty Content
+
 **Steps:**
 1. Click the "+ Add" button
 2. Leave editor empty
@@ -91,6 +94,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 2. Notes - Edit Note
 
 #### 2.1 Edit Existing Note
+
 **Preconditions:**
 - At least one note exists for the selected tune
 
@@ -107,6 +111,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Note list updates with modified content
 
 #### 2.2 Cancel Edit Without Changes
+
 **Steps:**
 1. Click "Edit" on an existing note
 2. Click "Cancel" without making changes
@@ -116,6 +121,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Original content is preserved
 
 #### 2.3 Rich Text Formatting
+
 **Steps:**
 1. Edit a note
 2. Use toolbar to apply bold, italic, underline
@@ -133,6 +139,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 3. Notes - Delete Note
 
 #### 3.1 Delete Note with Confirmation
+
 **Preconditions:**
 - At least one note exists
 
@@ -146,6 +153,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Note count decreases
 
 #### 3.2 Cancel Delete
+
 **Steps:**
 1. Click "Delete" button
 2. Cancel in confirmation dialog
@@ -162,6 +170,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - At least 2 notes exist for the selected tune
 
 #### 4.1 Reorder Notes by Dragging
+
 **Steps:**
 1. Hover over grip handle (⋮⋮) on first note
 2. Drag first note below second note
@@ -173,6 +182,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - New order persists after page refresh
 
 #### 4.2 Reorder Notes - Persistence After Refresh
+
 **Steps:**
 1. Reorder notes via drag-and-drop
 2. Wait for sync (observe console or wait 5+ seconds)
@@ -188,6 +198,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 5. Notes - Persistence
 
 #### 5.1 Note Persists to SQLite WASM
+
 **Steps:**
 1. Create a new note
 2. Open browser DevTools → Application → IndexedDB
@@ -198,6 +209,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Note has valid UUID, tune_ref, note_text fields
 
 #### 5.2 Note Syncs to Supabase
+
 **Steps:**
 1. Create a new note
 2. Wait for background sync (default 5 second interval)
@@ -208,6 +220,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Fields match local data
 
 #### 5.3 Note Content Survives Browser Refresh
+
 **Steps:**
 1. Create a note with specific content
 2. Refresh browser
@@ -222,6 +235,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 6. References - Create Reference
 
 #### 6.1 Create Reference with YouTube URL
+
 **Steps:**
 1. Click "+ Add" button in References panel
 2. Enter YouTube URL: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
@@ -234,6 +248,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Reference appears in list with video icon
 
 #### 6.2 Create Reference with Sheet Music URL
+
 **Steps:**
 1. Add reference with URL: `https://thesession.org/tunes/2`
 
@@ -242,6 +257,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Title suggests "The Session: [tune-name]"
 
 #### 6.3 Create Reference with Custom Fields
+
 **Steps:**
 1. Add reference with any URL
 2. Manually change type dropdown
@@ -255,6 +271,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Favorite star appears if toggled on
 
 #### 6.4 Create Reference - Invalid URL
+
 **Steps:**
 1. Enter invalid URL (e.g., "not a url")
 2. Observe validation
@@ -264,6 +281,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Form does not submit
 
 #### 6.5 Create Reference - Cancel
+
 **Steps:**
 1. Open add reference form
 2. Enter some data
@@ -278,6 +296,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 7. References - Edit Reference
 
 #### 7.1 Edit Reference URL
+
 **Preconditions:**
 - At least one reference exists
 
@@ -292,6 +311,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Changes persist
 
 #### 7.2 Edit Reference Metadata
+
 **Steps:**
 1. Edit an existing reference
 2. Change title, type, comment, favorite
@@ -306,6 +326,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 8. References - Delete Reference
 
 #### 8.1 Delete Reference
+
 **Steps:**
 1. Click delete button on a reference
 2. Confirm deletion
@@ -322,6 +343,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - At least 2 references exist
 
 #### 9.1 Reorder References
+
 **Steps:**
 1. Drag first reference below second using grip handle
 2. Release
@@ -331,6 +353,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Visual feedback during drag
 
 #### 9.2 Reorder Persistence
+
 **Steps:**
 1. Reorder references
 2. Refresh page
@@ -344,6 +367,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 10. References - Open Links
 
 #### 10.1 Click Reference Opens in New Tab
+
 **Steps:**
 1. Click on a reference link text
 
@@ -356,6 +380,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 11. Cross-Feature: Tune Selection
 
 #### 11.1 Notes/References Update When Tune Changes
+
 **Steps:**
 1. Select Tune A (which has notes)
 2. Observe notes panel shows Tune A's notes
@@ -367,6 +392,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - No cross-contamination of data
 
 #### 11.2 Empty State When No Tune Selected
+
 **Steps:**
 1. Deselect all tunes (if possible) or navigate to view without selection
 
@@ -379,6 +405,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 12. Edge Cases
 
 #### 12.1 Very Long Note Content
+
 **Steps:**
 1. Create note with 10,000+ characters
 
@@ -387,6 +414,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Display truncates or scrolls appropriately
 
 #### 12.2 Special Characters in Note
+
 **Steps:**
 1. Create note with: `<script>alert('xss')</script>` and emoji 🎵🎶
 
@@ -395,6 +423,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - Emoji displays correctly
 
 #### 12.3 Concurrent Edits (Multi-tab)
+
 **Steps:**
 1. Open TuneTrees in two browser tabs
 2. Edit same note in both tabs
@@ -405,6 +434,7 @@ The Notes and References feature allows users to manage personal notes and exter
 - One tab may need refresh to see other's changes
 
 #### 12.4 Network Disconnection During Save
+
 **Steps:**
 1. Disable network (DevTools → Network → Offline)
 2. Create/edit a note
@@ -420,6 +450,7 @@ The Notes and References feature allows users to manage personal notes and exter
 ### 13. Performance
 
 #### 13.1 Many Notes Display Performance
+
 **Preconditions:**
 - Tune with 50+ notes
 
@@ -456,69 +487,70 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
-test.describe.serial("NOTES-001: Notes CRUD Operations", () => {
-  test.beforeEach(async ({ page, testUser }) => {
-    await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [TEST_TUNE_BANISH_ID],
-      scheduleTunes: false,
+test.describe
+  .serial("NOTES-001: Notes CRUD Operations", () => {
+    test.beforeEach(async ({ page, testUser }) => {
+      await setupForRepertoireTestsParallel(page, testUser, {
+        repertoireTunes: [TEST_TUNE_BANISH_ID],
+        scheduleTunes: false,
+      });
+      ttPage = new TuneTreesPage(page);
+
+      // Select tune to show sidebar panels
+      await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
+      await expect(ttPage.notesPanel).toBeVisible({ timeout: 10000 });
     });
-    ttPage = new TuneTreesPage(page);
-    
-    // Select tune to show sidebar panels
-    await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
-    await expect(ttPage.notesPanel).toBeVisible({ timeout: 10000 });
-  });
 
-  test("should display notes panel with empty state", async () => {
-    await expect(ttPage.notesPanel).toBeVisible({ timeout: 10000 });
-    await expect(ttPage.notesCount).toContainText("0 notes");
-    await expect(ttPage.notesEmptyMessage).toBeVisible({ timeout: 5000 });
-    await expect(ttPage.notesAddButton).toBeVisible({ timeout: 5000 });
-  });
+    test("should display notes panel with empty state", async () => {
+      await expect(ttPage.notesPanel).toBeVisible({ timeout: 10000 });
+      await expect(ttPage.notesCount).toContainText("0 notes");
+      await expect(ttPage.notesEmptyMessage).toBeVisible({ timeout: 5000 });
+      await expect(ttPage.notesAddButton).toBeVisible({ timeout: 5000 });
+    });
 
-  test("should create a new note with text content", async ({ page }) => {
-    // Click Add button
-    await ttPage.notesAddButton.click();
-    await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
-    
-    // Type in Jodit editor
-    const joditEditor = ttPage.notesNewEditor.locator(".jodit-wysiwyg");
-    await joditEditor.click();
-    await joditEditor.fill("Test note content");
-    
-    // Save
-    await expect(ttPage.notesSaveButton).toBeEnabled();
-    await ttPage.notesSaveButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    
-    // Verify note appears
-    await expect(ttPage.notesCount).toContainText("1 note");
-    await expect(ttPage.getAllNoteItems()).toHaveCount(1);
-  });
+    test("should create a new note with text content", async ({ page }) => {
+      // Click Add button
+      await ttPage.notesAddButton.click();
+      await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
 
-  test("should disable save button when editor is empty", async () => {
-    await ttPage.notesAddButton.click();
-    await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
-    await expect(ttPage.notesSaveButton).toBeDisabled();
-  });
+      // Type in Jodit editor
+      const joditEditor = ttPage.notesNewEditor.locator(".jodit-wysiwyg");
+      await joditEditor.click();
+      await joditEditor.fill("Test note content");
 
-  test("should cancel note creation without saving", async () => {
-    await ttPage.notesAddButton.click();
-    await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
-    
-    // Type content
-    const joditEditor = ttPage.notesNewEditor.locator(".jodit-wysiwyg");
-    await joditEditor.click();
-    await joditEditor.fill("This will be cancelled");
-    
-    // Cancel
-    await ttPage.notesCancelButton.click();
-    
-    // Verify editor closed and no note created
-    await expect(ttPage.notesNewEditor).not.toBeVisible();
-    await expect(ttPage.notesCount).toContainText("0 notes");
+      // Save
+      await expect(ttPage.notesSaveButton).toBeEnabled();
+      await ttPage.notesSaveButton.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+      // Verify note appears
+      await expect(ttPage.notesCount).toContainText("1 note");
+      await expect(ttPage.getAllNoteItems()).toHaveCount(1);
+    });
+
+    test("should disable save button when editor is empty", async () => {
+      await ttPage.notesAddButton.click();
+      await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
+      await expect(ttPage.notesSaveButton).toBeDisabled();
+    });
+
+    test("should cancel note creation without saving", async () => {
+      await ttPage.notesAddButton.click();
+      await expect(ttPage.notesNewEditor).toBeVisible({ timeout: 10000 });
+
+      // Type content
+      const joditEditor = ttPage.notesNewEditor.locator(".jodit-wysiwyg");
+      await joditEditor.click();
+      await joditEditor.fill("This will be cancelled");
+
+      // Cancel
+      await ttPage.notesCancelButton.click();
+
+      // Verify editor closed and no note created
+      await expect(ttPage.notesNewEditor).not.toBeVisible();
+      await expect(ttPage.notesCount).toContainText("0 notes");
+    });
   });
-});
 ```
 
 ---
@@ -544,57 +576,68 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
-test.describe.serial("NOTES-002: Notes Drag Reorder", () => {
-  test.beforeEach(async ({ page, testUser }) => {
-    await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [TEST_TUNE_BANISH_ID],
-      scheduleTunes: false,
+test.describe
+  .serial("NOTES-002: Notes Drag Reorder", () => {
+    test.beforeEach(async ({ page, testUser }) => {
+      await setupForRepertoireTestsParallel(page, testUser, {
+        repertoireTunes: [TEST_TUNE_BANISH_ID],
+        scheduleTunes: false,
+      });
+      ttPage = new TuneTreesPage(page);
+
+      // Select tune and create 2 notes for reordering tests
+      await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
+      await expect(ttPage.notesPanel).toBeVisible({ timeout: 10000 });
+
+      // Create first note
+      await ttPage.addNote("First note");
+      // Create second note
+      await ttPage.addNote("Second note");
+
+      await expect(ttPage.getAllNoteItems()).toHaveCount(2, { timeout: 10000 });
     });
-    ttPage = new TuneTreesPage(page);
-    
-    // Select tune and create 2 notes for reordering tests
-    await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
-    await expect(ttPage.notesPanel).toBeVisible({ timeout: 10000 });
-    
-    // Create first note
-    await ttPage.addNote("First note");
-    // Create second note
-    await ttPage.addNote("Second note");
-    
-    await expect(ttPage.getAllNoteItems()).toHaveCount(2, { timeout: 10000 });
-  });
 
-  test("should display drag handles on notes", async () => {
-    const noteItems = ttPage.getAllNoteItems();
-    const firstNoteTestId = await noteItems.first().getAttribute("data-testid");
-    const noteId = firstNoteTestId?.replace("note-item-", "");
-    
-    if (noteId) {
-      await expect(ttPage.getNoteDragHandle(noteId)).toBeVisible({ timeout: 5000 });
-    }
-  });
+    test("should display drag handles on notes", async () => {
+      const noteItems = ttPage.getAllNoteItems();
+      const firstNoteTestId = await noteItems
+        .first()
+        .getAttribute("data-testid");
+      const noteId = firstNoteTestId?.replace("note-item-", "");
 
-  test("should reorder notes via drag-and-drop", async ({ page }) => {
-    // Get initial order
-    const noteItems = ttPage.getAllNoteItems();
-    const firstNoteTestId = await noteItems.first().getAttribute("data-testid");
-    const secondNoteTestId = await noteItems.nth(1).getAttribute("data-testid");
-    
-    const firstNoteId = firstNoteTestId?.replace("note-item-", "") || "";
-    const secondNoteId = secondNoteTestId?.replace("note-item-", "") || "";
-    
-    // Drag first note to second position
-    const firstDragHandle = ttPage.getNoteDragHandle(firstNoteId);
-    const secondNoteItem = ttPage.getNoteItem(secondNoteId);
-    
-    await firstDragHandle.dragTo(secondNoteItem);
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    
-    // Verify order changed - second note should now be first
-    const newFirstNoteTestId = await noteItems.first().getAttribute("data-testid");
-    expect(newFirstNoteTestId).toBe(`note-item-${secondNoteId}`);
+      if (noteId) {
+        await expect(ttPage.getNoteDragHandle(noteId)).toBeVisible({
+          timeout: 5000,
+        });
+      }
+    });
+
+    test("should reorder notes via drag-and-drop", async ({ page }) => {
+      // Get initial order
+      const noteItems = ttPage.getAllNoteItems();
+      const firstNoteTestId = await noteItems
+        .first()
+        .getAttribute("data-testid");
+      const secondNoteTestId = await noteItems
+        .nth(1)
+        .getAttribute("data-testid");
+
+      const firstNoteId = firstNoteTestId?.replace("note-item-", "") || "";
+      const secondNoteId = secondNoteTestId?.replace("note-item-", "") || "";
+
+      // Drag first note to second position
+      const firstDragHandle = ttPage.getNoteDragHandle(firstNoteId);
+      const secondNoteItem = ttPage.getNoteItem(secondNoteId);
+
+      await firstDragHandle.dragTo(secondNoteItem);
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+      // Verify order changed - second note should now be first
+      const newFirstNoteTestId = await noteItems
+        .first()
+        .getAttribute("data-testid");
+      expect(newFirstNoteTestId).toBe(`note-item-${secondNoteId}`);
+    });
   });
-});
 ```
 
 ---
@@ -619,65 +662,70 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
-test.describe.serial("REFS-001: References CRUD Operations", () => {
-  test.beforeEach(async ({ page, testUser }) => {
-    await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [TEST_TUNE_BANISH_ID],
-      scheduleTunes: false,
+test.describe
+  .serial("REFS-001: References CRUD Operations", () => {
+    test.beforeEach(async ({ page, testUser }) => {
+      await setupForRepertoireTestsParallel(page, testUser, {
+        repertoireTunes: [TEST_TUNE_BANISH_ID],
+        scheduleTunes: false,
+      });
+      ttPage = new TuneTreesPage(page);
+
+      await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
+      await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
     });
-    ttPage = new TuneTreesPage(page);
-    
-    await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
-    await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
-  });
 
-  test("should display references panel with empty state", async () => {
-    await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
-    await expect(ttPage.referencesCount).toContainText("0 references");
-    await expect(ttPage.referencesAddButton).toBeVisible({ timeout: 5000 });
-  });
+    test("should display references panel with empty state", async () => {
+      await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
+      await expect(ttPage.referencesCount).toContainText("0 references");
+      await expect(ttPage.referencesAddButton).toBeVisible({ timeout: 5000 });
+    });
 
-  test("should create a reference with YouTube URL", async ({ page }) => {
-    await ttPage.referencesAddButton.click();
-    await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
-    
-    await ttPage.referenceUrlInput.fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-    
-    // Wait for auto-detection
-    await page.waitForTimeout(500);
-    
-    // Verify type auto-detected to video
-    await expect(ttPage.referenceTypeSelect).toHaveValue("video");
-    
-    await ttPage.referenceSubmitButton.click();
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    
-    // Verify reference appears
-    await expect(ttPage.referencesCount).toContainText("1 reference");
-    await expect(ttPage.getAllReferenceItems()).toHaveCount(1);
-  });
+    test("should create a reference with YouTube URL", async ({ page }) => {
+      await ttPage.referencesAddButton.click();
+      await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
 
-  test("should show validation error for invalid URL", async () => {
-    await ttPage.referencesAddButton.click();
-    await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
-    
-    await ttPage.referenceUrlInput.fill("not a valid url");
-    
-    // Validation error should appear
-    await expect(ttPage.page.getByText(/valid URL/i)).toBeVisible({ timeout: 5000 });
-  });
+      await ttPage.referenceUrlInput.fill(
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+      );
 
-  test("should cancel reference creation", async () => {
-    await ttPage.referencesAddButton.click();
-    await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
-    
-    await ttPage.referenceUrlInput.fill("https://example.com");
-    await ttPage.referenceCancelButton.click();
-    
-    await expect(ttPage.referenceForm).not.toBeVisible();
-    await expect(ttPage.referencesCount).toContainText("0 references");
+      // Wait for auto-detection
+      await page.waitForTimeout(500);
+
+      // Verify type auto-detected to video
+      await expect(ttPage.referenceTypeSelect).toHaveValue("video");
+
+      await ttPage.referenceSubmitButton.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+      // Verify reference appears
+      await expect(ttPage.referencesCount).toContainText("1 reference");
+      await expect(ttPage.getAllReferenceItems()).toHaveCount(1);
+    });
+
+    test("should show validation error for invalid URL", async () => {
+      await ttPage.referencesAddButton.click();
+      await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
+
+      await ttPage.referenceUrlInput.fill("not a valid url");
+
+      // Validation error should appear
+      await expect(ttPage.page.getByText(/valid URL/i)).toBeVisible({
+        timeout: 5000,
+      });
+    });
+
+    test("should cancel reference creation", async () => {
+      await ttPage.referencesAddButton.click();
+      await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
+
+      await ttPage.referenceUrlInput.fill("https://example.com");
+      await ttPage.referenceCancelButton.click();
+
+      await expect(ttPage.referenceForm).not.toBeVisible();
+      await expect(ttPage.referencesCount).toContainText("0 references");
+    });
   });
-});
 ```
 
 ---
@@ -702,54 +750,61 @@ import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
-test.describe.serial("REFS-002: References Drag Reorder", () => {
-  test.beforeEach(async ({ page, testUser }) => {
-    await setupForRepertoireTestsParallel(page, testUser, {
-      repertoireTunes: [TEST_TUNE_BANISH_ID],
-      scheduleTunes: false,
+test.describe
+  .serial("REFS-002: References Drag Reorder", () => {
+    test.beforeEach(async ({ page, testUser }) => {
+      await setupForRepertoireTestsParallel(page, testUser, {
+        repertoireTunes: [TEST_TUNE_BANISH_ID],
+        scheduleTunes: false,
+      });
+      ttPage = new TuneTreesPage(page);
+
+      await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
+      await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
+
+      // Create 2 references for reordering tests
+      await ttPage.addReference("https://www.youtube.com/watch?v=abc123");
+      await ttPage.addReference("https://thesession.org/tunes/2");
+
+      await expect(ttPage.getAllReferenceItems()).toHaveCount(2, {
+        timeout: 10000,
+      });
     });
-    ttPage = new TuneTreesPage(page);
-    
-    await ttPage.clickTune("Banish Misfortune", ttPage.repertoireGrid);
-    await expect(ttPage.referencesPanel).toBeVisible({ timeout: 10000 });
-    
-    // Create 2 references for reordering tests
-    await ttPage.addReference("https://www.youtube.com/watch?v=abc123");
-    await ttPage.addReference("https://thesession.org/tunes/2");
-    
-    await expect(ttPage.getAllReferenceItems()).toHaveCount(2, { timeout: 10000 });
-  });
 
-  test("should display drag handles on references", async () => {
-    const refItems = ttPage.getAllReferenceItems();
-    const firstRefTestId = await refItems.first().getAttribute("data-testid");
-    const refId = firstRefTestId?.replace("reference-item-", "");
-    
-    if (refId) {
-      await expect(ttPage.getReferenceDragHandle(refId)).toBeVisible({ timeout: 5000 });
-    }
-  });
+    test("should display drag handles on references", async () => {
+      const refItems = ttPage.getAllReferenceItems();
+      const firstRefTestId = await refItems.first().getAttribute("data-testid");
+      const refId = firstRefTestId?.replace("reference-item-", "");
 
-  test("should reorder references via drag-and-drop", async ({ page }) => {
-    const refItems = ttPage.getAllReferenceItems();
-    const firstRefTestId = await refItems.first().getAttribute("data-testid");
-    const secondRefTestId = await refItems.nth(1).getAttribute("data-testid");
-    
-    const firstRefId = firstRefTestId?.replace("reference-item-", "") || "";
-    const secondRefId = secondRefTestId?.replace("reference-item-", "") || "";
-    
-    // Drag first reference to second position
-    const firstDragHandle = ttPage.getReferenceDragHandle(firstRefId);
-    const secondRefItem = ttPage.getReferenceItem(secondRefId);
-    
-    await firstDragHandle.dragTo(secondRefItem);
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-    
-    // Verify order changed
-    const newFirstRefTestId = await refItems.first().getAttribute("data-testid");
-    expect(newFirstRefTestId).toBe(`reference-item-${secondRefId}`);
+      if (refId) {
+        await expect(ttPage.getReferenceDragHandle(refId)).toBeVisible({
+          timeout: 5000,
+        });
+      }
+    });
+
+    test("should reorder references via drag-and-drop", async ({ page }) => {
+      const refItems = ttPage.getAllReferenceItems();
+      const firstRefTestId = await refItems.first().getAttribute("data-testid");
+      const secondRefTestId = await refItems.nth(1).getAttribute("data-testid");
+
+      const firstRefId = firstRefTestId?.replace("reference-item-", "") || "";
+      const secondRefId = secondRefTestId?.replace("reference-item-", "") || "";
+
+      // Drag first reference to second position
+      const firstDragHandle = ttPage.getReferenceDragHandle(firstRefId);
+      const secondRefItem = ttPage.getReferenceItem(secondRefId);
+
+      await firstDragHandle.dragTo(secondRefItem);
+      await page.waitForLoadState("networkidle", { timeout: 15000 });
+
+      // Verify order changed
+      const newFirstRefTestId = await refItems
+        .first()
+        .getAttribute("data-testid");
+      expect(newFirstRefTestId).toBe(`reference-item-${secondRefId}`);
+    });
   });
-});
 ```
 
 ---
@@ -757,12 +812,14 @@ test.describe.serial("REFS-002: References Drag Reorder", () => {
 ## Test Implementation Notes
 
 ### Wait Strategies
+
 - Wait for Jodit editor initialization: check for `.jodit-wysiwyg` element
 - Wait for auto-save: 2500ms minimum after typing
 - Wait for sync: check sync queue or wait 6+ seconds
 - After drag-drop: `waitForLoadState('networkidle')`
 
 ### Test Data Cleanup
+
 - Each test should clean up created notes/references
 - Use soft delete or direct database cleanup
 - Consider using dedicated test repertoire/tunes
@@ -771,26 +828,27 @@ test.describe.serial("REFS-002: References Drag Reorder", () => {
 
 ## Priority Matrix
 
-| Test | Priority | Complexity |
-|------|----------|------------|
-| 1.1 Create Note | Critical | Low |
-| 2.1 Edit Note | Critical | Medium |
-| 3.1 Delete Note | Critical | Low |
-| 4.1 Drag Reorder Notes | High | High |
-| 4.2 Reorder Persistence | High | Medium |
-| 6.1 Create Reference | Critical | Low |
-| 7.1 Edit Reference | High | Medium |
-| 8.1 Delete Reference | High | Low |
-| 9.1 Drag Reorder Refs | High | High |
-| 9.2 Reorder Persistence | High | Medium |
-| 11.1 Tune Selection | Critical | Low |
-| 12.4 Offline Save | Medium | High |
+| Test                    | Priority | Complexity |
+| ----------------------- | -------- | ---------- |
+| 1.1 Create Note         | Critical | Low        |
+| 2.1 Edit Note           | Critical | Medium     |
+| 3.1 Delete Note         | Critical | Low        |
+| 4.1 Drag Reorder Notes  | High     | High       |
+| 4.2 Reorder Persistence | High     | Medium     |
+| 6.1 Create Reference    | Critical | Low        |
+| 7.1 Edit Reference      | High     | Medium     |
+| 8.1 Delete Reference    | High     | Low        |
+| 9.1 Drag Reorder Refs   | High     | High       |
+| 9.2 Reorder Persistence | High     | Medium     |
+| 11.1 Tune Selection     | Critical | Low        |
+| 12.4 Offline Save       | Medium   | High       |
 
 ---
 
 ## Data-testid Attributes (Implemented)
 
 ### Notes Panel (`NotesPanel.tsx`)
+
 - `notes-panel` - Container
 - `notes-count` - Header count text
 - `notes-add-button` - Add note button
@@ -810,6 +868,7 @@ test.describe.serial("REFS-002: References Drag Reorder", () => {
 - `note-date-{id}` - Date display
 
 ### References Panel (`ReferencesPanel.tsx`, `ReferenceList.tsx`, `ReferenceForm.tsx`)
+
 - `references-panel` - Container
 - `references-count` - Header count text
 - `references-add-button` - Add button

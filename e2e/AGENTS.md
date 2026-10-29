@@ -20,14 +20,14 @@ Inherits global execution guardrails from `.github/copilot-instructions.md` and 
 ## Standard Template
 
 ```ts
-import { expect } from '@playwright/test';
-import { setupDeterministicTestParallel } from '../helpers/practice-scenarios';
-import { test } from '../helpers/test-fixture';
-import { TuneTreesPage } from '../page-objects/TuneTreesPage';
+import { expect } from "@playwright/test";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
+import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 let ttPage: TuneTreesPage;
 
-test.describe('FEATURE-XXX: Suite Name', () => {
+test.describe("FEATURE-XXX: Suite Name", () => {
   test.beforeEach(async ({ page, testUser }) => {
     ttPage = new TuneTreesPage(page);
     await setupDeterministicTestParallel(page, testUser, {
@@ -36,14 +36,14 @@ test.describe('FEATURE-XXX: Suite Name', () => {
     });
   });
 
-  test('should perform expected action', async ({ page }) => {
+  test("should perform expected action", async ({ page }) => {
     await ttPage.practiceTab.click();
     await expect(ttPage.practiceGrid).toBeVisible({ timeout: 10000 });
   });
 });
 ```
 
-`setupDeterministicTestParallel` is the most basic of setup functions.  However, there is also `setupForPracticeTestsParallel`, `setupForRepertoireTestsParallel`, and `setupForCatalogTestsParallel` in `e2e/helpers/practice-scenarios.ts`, which may be used instead of `setupDeterministicTestParallel`.  Additional "setupXXXX" functions may be generated as needed.
+`setupDeterministicTestParallel` is the most basic of setup functions. However, there is also `setupForPracticeTestsParallel`, `setupForRepertoireTestsParallel`, and `setupForCatalogTestsParallel` in `e2e/helpers/practice-scenarios.ts`, which may be used instead of `setupDeterministicTestParallel`. Additional "setupXXXX" functions may be generated as needed.
 
 ## Critical Rules
 
@@ -92,4 +92,5 @@ npm run test:e2e:report     # HTML report
 - Helpers and page objects: `e2e/helpers/*`, `e2e/page-objects/*`
 
 ---
+
 Keep this file focused on Playwright structure, resilience, and conventions.

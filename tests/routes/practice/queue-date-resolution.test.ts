@@ -51,16 +51,14 @@ describe("practice queue date resolution from DB window_start_utc", () => {
   ];
 
   describe("fixed resolution (local noon)", () => {
-    it.each(
-      DB_CASES
-    )("resolves '$raw' to local date $expectedDate regardless of timezone", ({
-      raw,
-      expectedDate,
-    }) => {
-      const resolved = resolveWindowDateFixed(raw);
-      // Use local calendar methods — this must match the DB date in ANY timezone.
-      expect(toLocalDateString(resolved)).toBe(expectedDate);
-    });
+    it.each(DB_CASES)(
+      "resolves '$raw' to local date $expectedDate regardless of timezone",
+      ({ raw, expectedDate }) => {
+        const resolved = resolveWindowDateFixed(raw);
+        // Use local calendar methods — this must match the DB date in ANY timezone.
+        expect(toLocalDateString(resolved)).toBe(expectedDate);
+      }
+    );
 
     it("returns a local noon time (avoids DST edge)", () => {
       const resolved = resolveWindowDateFixed("2026-03-07 00:00:00");
