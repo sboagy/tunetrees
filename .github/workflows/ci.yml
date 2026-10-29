@@ -126,6 +126,8 @@ jobs:
     timeout-minutes: 60
     environment: tunetrees_ci_env
     env:
+      # Match setup-cli for v2.106.0: ECR throttles shared GitHub runner IPs.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
       # Runtime values for the LOCAL Supabase instance.
       # Values are populated after `supabase start` via $GITHUB_ENV.
       SUPABASE_URL: ""
@@ -310,9 +312,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/supabase-docker-images.tar
-          key: ${{ runner.os }}-supabase-docker-v2.106.0
-          restore-keys: |
-            ${{ runner.os }}-supabase-docker-
+          # Registry-qualified tags differ; do not restore the old ECR cache.
+          key: ${{ runner.os }}-supabase-docker-ghcr-v2.106.0
 
       - name: Load Cached Docker Images
         if: steps.cache-docker-images.outputs.cache-hit == 'true'
@@ -516,6 +517,8 @@ jobs:
       contents: read
     environment: tunetrees_ci_env
     env:
+      # Match setup-cli for v2.106.0: ECR throttles shared GitHub runner IPs.
+      SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
       SUPABASE_URL: ""
       SUPABASE_ANON_KEY: ""
       VITE_SUPABASE_URL: ""
@@ -693,9 +696,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/supabase-docker-images.tar
-          key: ${{ runner.os }}-supabase-docker-v2.106.0
-          restore-keys: |
-            ${{ runner.os }}-supabase-docker-
+          # Registry-qualified tags differ; do not restore the old ECR cache.
+          key: ${{ runner.os }}-supabase-docker-ghcr-v2.106.0
 
       - name: Load Cached Docker Images
         if: steps.cache-docker-images.outputs.cache-hit == 'true'
