@@ -123,7 +123,7 @@ test.describe("SCHEDULING-008: Interval Ordering Across First Evaluations", () =
         const firstCells = table
           ? Array.from(table.querySelectorAll("tbody tr td:nth-child(2)"))
               .slice(0, 3)
-              .map((td: Element) => (td as HTMLElement).innerText?.trim())
+              .map((td: Element) => td.textContent?.trim())
           : [];
         const searchInput = document.querySelector(
           '[data-testid="search-box-panel"]'
