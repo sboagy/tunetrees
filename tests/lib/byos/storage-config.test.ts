@@ -29,17 +29,10 @@ describe("BYOS storage setup", () => {
       folderId: "folder",
       folderName: "Music",
     }));
-  it.each([
-    "",
-    "../other",
-    "a/b",
-    "a\\b",
-    ".",
-    "..",
-    "a\n",
-    "a".repeat(101),
-  ])("rejects invalid folder name %j", (name) =>
-    expect(() => validateFolderName(name)).toThrow());
+  it.each(["", "../other", "a/b", "a\\b", ".", "..", "a\n", "a".repeat(101)])(
+    "rejects invalid folder name %j",
+    (name) => expect(() => validateFolderName(name)).toThrow()
+  );
   it("trims a valid folder name", () =>
     expect(validateFolderName(" My Music ")).toBe("My Music"));
 });

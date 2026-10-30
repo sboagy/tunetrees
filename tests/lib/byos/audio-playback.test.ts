@@ -66,28 +66,30 @@ describe("private audio cache and unavailable behavior", () => {
     );
   });
 
-  it.each([
-    "offline",
-    "Connect this storage provider",
-    "File unavailable",
-  ])("does not cache failed downloads or automatically authorize: %s", async (message) => {
-    mocks.download.mockRejectedValue(new Error(message));
-    await expect(resolveByosAudioForPlayback(asset, options)).rejects.toThrow(
-      message
-    );
-    expect(mocks.download).toHaveBeenCalledTimes(1);
-    expect(mocks.write).not.toHaveBeenCalled();
-  });
+  it.each(["offline", "Connect this storage provider", "File unavailable"])(
+    "does not cache failed downloads or automatically authorize: %s",
+    async (message) => {
+      mocks.download.mockRejectedValue(new Error(message));
+      await expect(resolveByosAudioForPlayback(asset, options)).rejects.toThrow(
+        message
+      );
+      expect(mocks.download).toHaveBeenCalledTimes(1);
+      expect(mocks.write).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     { storageKind: "r2" },
     { byosProvider: "unknown" },
     { providerFileId: null },
-  ])("does not route invalid or legacy locators through a BYOS provider: %j", async (override) => {
-    await expect(
-      resolveByosAudioForPlayback({ ...asset, ...override }, options)
-    ).rejects.toThrow("invalid BYOS locator");
-    expect(mocks.read).not.toHaveBeenCalled();
-    expect(mocks.providers).not.toHaveBeenCalled();
-  });
+  ])(
+    "does not route invalid or legacy locators through a BYOS provider: %j",
+    async (override) => {
+      await expect(
+        resolveByosAudioForPlayback({ ...asset, ...override }, options)
+      ).rejects.toThrow("invalid BYOS locator");
+      expect(mocks.read).not.toHaveBeenCalled();
+      expect(mocks.providers).not.toHaveBeenCalled();
+    }
+  );
 });

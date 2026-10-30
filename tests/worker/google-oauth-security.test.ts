@@ -49,10 +49,13 @@ describe("stateless Google exchange security boundaries", () => {
       code: "code",
       redirectUri: "https://app.example",
     }),
-  ])("rejects invalid exchange input without contacting Google: %s", async (body) => {
-    expect((await exchange(body))?.status).toBe(400);
-    expect(request).not.toHaveBeenCalled();
-  });
+  ])(
+    "rejects invalid exchange input without contacting Google: %s",
+    async (body) => {
+      expect((await exchange(body))?.status).toBe(400);
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
 
   it("does not echo or log provider errors containing credentials", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -87,17 +90,15 @@ describe("stateless Google exchange security boundaries", () => {
     });
   });
 
-  it.each([
-    "not-json",
-    "null",
-    '{"access_token":123}',
-    "{}",
-  ])("rejects malformed provider token responses: %s", async (body) => {
-    request.mockResolvedValueOnce(new Response(body));
-    const response = await exchange(JSON.stringify(refresh));
-    expect(response?.status).toBe(502);
-    expect(await response?.json()).toEqual({
-      error: "Google token exchange returned an invalid response",
-    });
-  });
+  it.each(["not-json", "null", '{"access_token":123}', "{}"])(
+    "rejects malformed provider token responses: %s",
+    async (body) => {
+      request.mockResolvedValueOnce(new Response(body));
+      const response = await exchange(JSON.stringify(refresh));
+      expect(response?.status).toBe(502);
+      expect(await response?.json()).toEqual({
+        error: "Google token exchange returned an invalid response",
+      });
+    }
+  );
 });

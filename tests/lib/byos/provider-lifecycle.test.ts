@@ -138,20 +138,21 @@ describe.each(cases)("$id private token lifecycle", ({ id, token, host }) => {
     expect(putLocalRefreshToken).not.toHaveBeenCalled();
   });
 
-  it.each([
-    403, 404, 429, 503,
-  ])("reports download failure %i without exposing the provider response", async (status) => {
-    request.mockResolvedValueOnce(Response.json(token));
-    request.mockResolvedValueOnce(
-      new Response("sensitive-provider-diagnostic", { status })
-    );
-    await expect(
-      createByosProviders(options)[id].resolveBlob("file-id")
-    ).rejects.toThrow(
-      "audio download failed. Please try again or reconnect your provider."
-    );
-    expect(request).toHaveBeenCalledTimes(2);
-  });
+  it.each([403, 404, 429, 503])(
+    "reports download failure %i without exposing the provider response",
+    async (status) => {
+      request.mockResolvedValueOnce(Response.json(token));
+      request.mockResolvedValueOnce(
+        new Response("sensitive-provider-diagnostic", { status })
+      );
+      await expect(
+        createByosProviders(options)[id].resolveBlob("file-id")
+      ).rejects.toThrow(
+        "audio download failed. Please try again or reconnect your provider."
+      );
+      expect(request).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it("can retry after a transient download failure", async () => {
     request.mockResolvedValueOnce(Response.json(token));

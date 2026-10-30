@@ -92,30 +92,32 @@ afterEach(() => {
 });
 
 describe("durable BYOS upload queue", () => {
-  it.each([
-    "unsupported",
-    "oversized",
-  ])("rejects %s files before upload or synced metadata creation", async (kind) => {
-    const draft = queue();
-    const files = {
-      unsupported: new File(["audio"], "recording.ogg", { type: "audio/ogg" }),
-      oversized: new File(["audio"], "recording.mp3", { type: "audio/mpeg" }),
-    };
-    Object.defineProperty(files.oversized, "size", {
-      value: 50 * 1024 * 1024 + 1,
-    });
-    draft.fields.uploadFile = files[kind as keyof typeof files];
-    await replayAudioDrafts(db, options, () => true);
-    expect(mocks.reserve).not.toHaveBeenCalled();
-    expect(mocks.upload).not.toHaveBeenCalled();
-    expect(
-      sqlite.prepare("SELECT count(*) AS count FROM reference").get()
-    ).toEqual({ count: 0 });
-    expect(
-      sqlite.prepare("SELECT count(*) AS count FROM media_asset").get()
-    ).toEqual({ count: 0 });
-    expect(mocks.drafts.size).toBe(1);
-  });
+  it.each(["unsupported", "oversized"])(
+    "rejects %s files before upload or synced metadata creation",
+    async (kind) => {
+      const draft = queue();
+      const files = {
+        unsupported: new File(["audio"], "recording.ogg", {
+          type: "audio/ogg",
+        }),
+        oversized: new File(["audio"], "recording.mp3", { type: "audio/mpeg" }),
+      };
+      Object.defineProperty(files.oversized, "size", {
+        value: 50 * 1024 * 1024 + 1,
+      });
+      draft.fields.uploadFile = files[kind as keyof typeof files];
+      await replayAudioDrafts(db, options, () => true);
+      expect(mocks.reserve).not.toHaveBeenCalled();
+      expect(mocks.upload).not.toHaveBeenCalled();
+      expect(
+        sqlite.prepare("SELECT count(*) AS count FROM reference").get()
+      ).toEqual({ count: 0 });
+      expect(
+        sqlite.prepare("SELECT count(*) AS count FROM media_asset").get()
+      ).toEqual({ count: 0 });
+      expect(mocks.drafts.size).toBe(1);
+    }
+  );
 
   it("writes only locator metadata, never draft bytes or extra credential fields", async () => {
     const draft = queue();
