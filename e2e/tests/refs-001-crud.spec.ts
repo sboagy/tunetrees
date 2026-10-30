@@ -1,6 +1,10 @@
 // spec: e2e/tests/notes-references-test-plan.md
 
 import { expect } from "@playwright/test";
+import {
+  configureMockGoogleDriveByos,
+  saveMockGoogleStorageSettings,
+} from "../helpers/byos-provider";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
@@ -82,9 +86,13 @@ test.describe("REFS-001: References CRUD Operations", () => {
 
   test("should open a file chooser from Choose Audio File and create an ingested audio reference", async ({
     page,
+    testUser,
   }) => {
+    await configureMockGoogleDriveByos(page, testUser.userId);
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
+
+    await saveMockGoogleStorageSettings(page);
 
     await ttPage.selectReferenceType("audio");
 
@@ -135,7 +143,11 @@ test.describe("REFS-001: References CRUD Operations", () => {
     });
   });
 
-  test("should seed the audio upload form when an audio file is dropped on the references panel", async () => {
+  test("should seed the audio upload form when an audio file is dropped on the references panel", async ({
+    page,
+    testUser,
+  }) => {
+    await configureMockGoogleDriveByos(page, testUser.userId);
     await ttPage.dropAudioFileOnReferencesPanel({
       fileName: "banish-misfortune.mp3",
     });
@@ -146,7 +158,118 @@ test.describe("REFS-001: References CRUD Operations", () => {
       { timeout: 5000 }
     );
     await expect(ttPage.referenceTypeSelect).toContainText(/audio/i);
+    await saveMockGoogleStorageSettings(page);
     await expect(ttPage.referenceSubmitButton).toBeEnabled({ timeout: 5000 });
+  });
+
+  test("should restore the selected file and reference fields after Google OAuth", async ({
+    page,
+    testUser,
+  }) => {
+    // Includes deterministic setup plus a full reload and auth/SQLite bootstrap.
+    test.setTimeout(60_000);
+    await configureMockGoogleDriveByos(page, testUser.userId);
+    await ttPage.dropAudioFileOnReferencesPanel({
+      fileName: "oauth-draft.mp3",
+    });
+    await ttPage.referenceTitleInput.fill("Keep this draft");
+    const returnUrl = page.url();
+    // Simulate Google's redirect without transmitting personal credentials.
+    await page.route(
+      "https://accounts.google.com/o/oauth2/v2/auth?**",
+      async (route) => {
+        const request = new URL(route.request().url());
+        const callback = new URL(request.searchParams.get("redirect_uri")!);
+        callback.searchParams.set("state", request.searchParams.get("state")!);
+        callback.searchParams.set("code", "mock-code");
+        await route.fulfill({
+          status: 302,
+          headers: { Location: callback.toString() },
+        });
+      }
+    );
+    await page.getByTestId("byos-configure-storage").click();
+    await page.getByTestId("byos-provider-google-drive").check();
+    await Promise.all([
+      page.waitForURL("**/byos/callback?**"),
+      page.getByTestId("byos-provider-connect").click(),
+    ]);
+    await expect(page).toHaveURL(returnUrl, { timeout: 20000 });
+    await expect(page.getByTestId("settings-modal")).toBeVisible({
+      timeout: 10000,
+    });
+    await ttPage.closeSettings();
+    await expect(ttPage.referenceAudioSelectedFile).toHaveText(
+      "oauth-draft.mp3",
+      { timeout: 10000 }
+    );
+    await expect(ttPage.referenceTitleInput).toHaveValue("Keep this draft", {
+      timeout: 10000,
+    });
+    await expect(ttPage.referenceSubmitButton).toBeEnabled({ timeout: 10000 });
+  });
+
+  test("should preserve the audio draft when Google consent is cancelled", async ({
+    page,
+    testUser,
+  }) => {
+    // Cancellation still reloads the app and restores its local draft/DB state.
+    test.setTimeout(60_000);
+    await configureMockGoogleDriveByos(page, testUser.userId);
+    await ttPage.dropAudioFileOnReferencesPanel({
+      fileName: "cancelled-consent.mp3",
+    });
+    const returnUrl = page.url();
+    await page.route(
+      "https://accounts.google.com/o/oauth2/v2/auth?**",
+      async (route) => {
+        const request = new URL(route.request().url());
+        const callback = new URL(request.searchParams.get("redirect_uri")!);
+        callback.searchParams.set("state", request.searchParams.get("state")!);
+        callback.searchParams.set("error", "access_denied");
+        await route.fulfill({
+          status: 302,
+          headers: { Location: callback.toString() },
+        });
+      }
+    );
+    await page.getByTestId("byos-configure-storage").click();
+    await page.getByTestId("byos-provider-google-drive").check();
+    await Promise.all([
+      page.waitForURL("**/byos/callback?**"),
+      page.getByTestId("byos-provider-connect").click(),
+    ]);
+    await expect(page).toHaveURL(returnUrl, { timeout: 20000 });
+    await ttPage.closeSettings();
+    await expect(ttPage.referenceAudioSelectedFile).toHaveText(
+      "cancelled-consent.mp3",
+      { timeout: 10000 }
+    );
+  });
+
+  test("should save a configured audio draft offline and upload once after reconnecting", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    await configureMockGoogleDriveByos(page, testUser.userId);
+    await ttPage.dropAudioFileOnReferencesPanel({
+      fileName: "offline-draft.mp3",
+    });
+    await saveMockGoogleStorageSettings(page);
+    await context.setOffline(true);
+    await ttPage.referenceSubmitButton.click();
+    await expect(page.getByTestId("byos-queued-upload")).toContainText(
+      "offline-draft",
+      { timeout: 10000 }
+    );
+    await context.setOffline(false);
+    await expect(ttPage.referencesList).toContainText("offline-draft", {
+      timeout: 20000,
+    });
+    await expect(page.getByTestId("byos-queued-upload")).toHaveCount(0, {
+      timeout: 10000,
+    });
   });
 
   test("should create a reference with YouTube URL", async () => {

@@ -25,6 +25,7 @@ import {
 
 // Matches sidebarNavItems href slugs in routes/user-settings/index.tsx
 export type UserSettingsTab =
+  | "storage-provider"
   | "appearance"
   | "catalog-sync"
   | "scheduling-options"
