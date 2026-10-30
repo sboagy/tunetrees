@@ -18,7 +18,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "suspicious": {
         "noExplicitAny": "off",
         "noUnknownAtRules": "off",
@@ -53,6 +53,11 @@
       "arrowParentheses": "always",
       "bracketSpacing": true,
       "quoteProperties": "asNeeded"
+    }
+  },
+  "markdown": {
+    "formatter": {
+      "enabled": false
     }
   },
   "css": {
