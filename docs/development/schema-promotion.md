@@ -47,6 +47,14 @@ The intended flow for schema-changing releases is:
    - Deploy production Worker and Pages.
    - Run production-safe smoke tests.
 
+Staging and production deployment jobs must use the root and Worker lockfiles
+from the same TuneTrees SHA via `npm ci --ignore-scripts`. Do not overlay oosync
+or Rhizome from a branch checkout in either staging deployment workflow. Update
+and commit the dependency lockfile first when testing a shared-library change.
+Shared-branch integration tests do not replace this pinned staging validation.
+Staging proofs made before deployment dependency parity was enforced should be
+regenerated with the corrected workflow before promotion.
+
 Existing staging proofs created before the staging migration gate was added are valid only for app-only releases with no Supabase migrations.
 
 ## Required Commands

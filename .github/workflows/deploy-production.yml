@@ -201,6 +201,20 @@ jobs:
       - name: Install Worker dependencies
         run: npm ci --prefix worker --ignore-scripts
 
+      # Deploy the lockfile dependency graph exactly as production does.
+      # Shared-repo branch overlays belong only in integration-test jobs.
+      - name: Log pinned shared dependencies
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            for (const name of ["@rhizome/core", "oosync"]) {
+              const entry = lock.packages[`node_modules/${name}`];
+              const manifest = JSON.parse(fs.readFileSync(`node_modules/${name}/package.json`, "utf8"));
+              console.log(`${name}: version=${manifest.version} resolved=${entry.resolved}`);
+            }
+          '
+
       - name: Install 1Password CLI
         uses: 1password/install-cli-action@8d006a0d0a4fd505af7f7ce589e7f768385ff5e4
 
@@ -232,7 +246,7 @@ jobs:
         run: npm run verify:deployed-pages-assets -- https://tunetrees.com
 
       - name: Install Playwright browser for production smoke
-        run: npx --ignore-scripts playwright@1.60.0 install --with-deps chromium
+        run: node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run production smoke tests
         run: npm run test:e2e:production

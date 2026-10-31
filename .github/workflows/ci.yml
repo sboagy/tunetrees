@@ -178,10 +178,12 @@ jobs:
               return
             }
 
-            shared_suffix="$candidate"
             case "$candidate" in
               tt-*|cf-*|os-*|rz-*)
                 shared_suffix="${candidate#*-}"
+                ;;
+              *)
+                shared_suffix="$candidate"
                 ;;
             esac
 
@@ -565,10 +567,12 @@ jobs:
               return
             }
 
-            shared_suffix="$candidate"
             case "$candidate" in
               tt-*|cf-*|os-*|rz-*)
                 shared_suffix="${candidate#*-}"
+                ;;
+              *)
+                shared_suffix="$candidate"
                 ;;
             esac
 
@@ -992,8 +996,6 @@ jobs:
     permissions:
       contents: read
       deployments: write
-    env:
-      RHIZOME_REPO_PATH: ${{ github.workspace }}/rhizome
 
     steps:
       # Pinned to a full commit SHA (not @v5) because this job has access to
@@ -1004,83 +1006,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Resolve shared repo refs
-        id: shared_refs
-        env:
-          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
-        run: |
-          has_remote_branch() {
-            local repo="$1"
-            local branch="$2"
-            git ls-remote --exit-code --heads "https://github.com/${repo}.git" "$branch" >/dev/null 2>&1
-          }
-
-          repo_prefix() {
-            case "$1" in
-              sboagy/tunetrees) printf 'tt' ;;
-              sboagy/cubefsrs) printf 'cf' ;;
-              sboagy/oosync) printf 'os' ;;
-              sboagy/rhizome) printf 'rz' ;;
-              *) return 1 ;;
-            esac
-          }
-
-          resolve_ref() {
-            local repo="$1"
-            local candidate="$2"
-            local target_prefix
-            local shared_suffix
-            local prefixed_candidate
-
-            if has_remote_branch "$repo" "$candidate"; then
-              printf '%s\n' "$candidate"
-              return
-            fi
-
-            target_prefix="$(repo_prefix "$repo")" || {
-              printf 'main\n'
-              return
-            }
-
-            shared_suffix="$candidate"
-            case "$candidate" in
-              tt-*|cf-*|os-*|rz-*)
-                shared_suffix="${candidate#*-}"
-                ;;
-            esac
-
-            prefixed_candidate="${target_prefix}-${shared_suffix}"
-            if has_remote_branch "$repo" "$prefixed_candidate"; then
-              printf '%s\n' "$prefixed_candidate"
-              return
-            fi
-
-            printf 'main\n'
-          }
-
-          echo "rhizome_ref=$(resolve_ref sboagy/rhizome "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
-          echo "oosync_ref=$(resolve_ref sboagy/oosync "$CANDIDATE_REF")" >> "$GITHUB_OUTPUT"
-
-      # Also SHA-pinned with persist-credentials: false (deploy job).
-      - name: Checkout rhizome (shared Supabase config + DB scripts)
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
-        with:
-          repository: sboagy/rhizome
-          ref: ${{ steps.shared_refs.outputs.rhizome_ref }}
-          path: rhizome
-          persist-credentials: false
-
-      # Also SHA-pinned with persist-credentials: false (deploy job).
-      - name: Checkout oosync
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
-        with:
-          repository: sboagy/oosync
-          ref: ${{ steps.shared_refs.outputs.oosync_ref }}
-          path: oosync
-          persist-credentials: false
-
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "24"
           cache: "npm"
@@ -1094,26 +1021,17 @@ jobs:
       - name: Install Worker Dependencies
         run: npm ci --prefix worker --ignore-scripts
 
-      - name: Link checked-out oosync package
+      # Deploy the lockfile dependency graph exactly as production does.
+      # Shared-repo branch overlays belong only in integration-test jobs.
+      - name: Log pinned shared dependencies
         run: |
-          # Both installs are already locked by npm ci. Replace only the oosync
-          # package source rather than asking npm to resolve a new dependency tree.
-          rm -rf node_modules/oosync worker/node_modules/oosync
-          ln -s "$GITHUB_WORKSPACE/oosync" node_modules/oosync
-          ln -s "$GITHUB_WORKSPACE/oosync" worker/node_modules/oosync
-
-      - name: Log oosync overlay versions
-        run: |
-          echo "oosync source SHA: $(git -C oosync rev-parse HEAD)"
           node -e '
             const fs = require("node:fs");
-            for (const [packageName, manifestPath] of Object.entries({
-              oosync: "node_modules/oosync/package.json",
-              "@sqlite.org/sqlite-wasm": "node_modules/@sqlite.org/sqlite-wasm/package.json",
-              "worker oosync": "worker/node_modules/oosync/package.json",
-            })) {
-              const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-              console.log(`${packageName}: version=${manifest.version} manifest=${fs.realpathSync(manifestPath)}`);
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            for (const name of ["@rhizome/core", "oosync"]) {
+              const entry = lock.packages[`node_modules/${name}`];
+              const manifest = JSON.parse(fs.readFileSync(`node_modules/${name}/package.json`, "utf8"));
+              console.log(`${name}: version=${manifest.version} resolved=${entry.resolved}`);
             }
           '
 

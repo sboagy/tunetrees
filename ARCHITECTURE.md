@@ -351,3 +351,18 @@ fails on missing CI configuration instead of falling back to 1Password. The
 bootstrap also puts a failing `op` stub on PATH for subsequent steps. The
 service account token is available only during bootstrap, not during tests,
 server recovery, builds, or deployment commands.
+
+## Deployment Dependency Parity
+
+Both staging deployment workflows and production install root and Worker
+packages with `npm ci --ignore-scripts` from the checked-out TuneTrees commit.
+They use the lockfile-pinned Rhizome and oosync packages without checking out or
+overlaying shared-repo branches. Shared-repo overlays in local integration-test
+jobs are not the dependency graph certified by staging deployment smoke tests.
+Deploy jobs log the locked shared dependency references and use the installed
+Playwright CLI for their browser setup.
+
+To promote a shared-library change, publish/push it upstream, update TuneTrees'
+lockfile, and deploy that TuneTrees SHA to staging before promoting the same SHA
+to production. Staging and production still have environment-specific builds,
+URLs, credentials, and data; dependency parity does not imply identical assets.
