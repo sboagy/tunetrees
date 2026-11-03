@@ -44,6 +44,9 @@ const PluginsPage = lazy(() => import("@/routes/user-settings/plugins"));
 const AccountPage = lazy(() => import("@/routes/user-settings/account"));
 const AvatarPage = lazy(() => import("@/routes/user-settings/avatar"));
 const GoalsPage = lazy(() => import("@/routes/user-settings/goals"));
+const StorageProviderPage = lazy(
+  () => import("@/routes/user-settings/storage-provider")
+);
 
 interface NavItem {
   title: string;
@@ -51,6 +54,7 @@ interface NavItem {
 }
 
 const sidebarNavItems: NavItem[] = [
+  { title: "Storage provider", tab: "storage-provider" },
   { title: "Appearance", tab: "appearance" },
   { title: "Catalog & Sync", tab: "catalog-sync" },
   { title: "Scheduling Options", tab: "scheduling-options" },
@@ -68,6 +72,9 @@ const TabContent: Component<{ tab: UserSettingsTab }> = (props) => (
     }
   >
     <Switch>
+      <Match when={props.tab === "storage-provider"}>
+        <StorageProviderPage />
+      </Match>
       <Match when={props.tab === "appearance"}>
         <AppearancePage />
       </Match>

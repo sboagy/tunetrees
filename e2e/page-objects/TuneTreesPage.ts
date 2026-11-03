@@ -231,6 +231,7 @@ export class TuneTreesPage {
   readonly referenceAudioFileInput: Locator;
   readonly referenceAudioDropzone: Locator;
   readonly referenceAudioSelectedFile: Locator;
+  readonly byosGoogleDriveProviderButton: Locator;
   readonly referenceSubmitButton: Locator;
   readonly referenceCancelButton: Locator;
 
@@ -602,6 +603,9 @@ export class TuneTreesPage {
     this.referenceAudioDropzone = page.getByTestId("reference-audio-dropzone");
     this.referenceAudioSelectedFile = page.getByTestId(
       "reference-audio-selected-file"
+    );
+    this.byosGoogleDriveProviderButton = page.getByTestId(
+      "byos-provider-google-drive"
     );
     this.referenceSubmitButton = page.getByTestId("reference-submit-button");
     this.referenceCancelButton = page.getByTestId("reference-cancel-button");
@@ -4833,6 +4837,19 @@ export class TuneTreesPage {
       .toBe(true);
   }
 
+  async closeSettings() {
+    // OAuth and settings-save notifications overlap the close button on mobile.
+    // Dismiss them through their UI rather than forcing a click through them.
+    await this.clickWithToastRecovery(
+      this.page.getByTestId("settings-close-button"),
+      { timeout: 5_000 },
+      "closeSettings"
+    );
+    await expect(this.page.getByTestId("settings-modal")).toBeHidden({
+      timeout: 10_000,
+    });
+  }
+
   private async dismissVisibleToasts(maxAttempts: number = 3) {
     const toastCloser = this.page
       .getByRole("button", { name: "Close toast" })
@@ -4847,7 +4864,14 @@ export class TuneTreesPage {
         return;
       }
 
-      await toastCloser.click({ timeout: 5_000 });
+      try {
+        await toastCloser.click({ timeout: 5_000 });
+      } catch (error) {
+        // A transient toast can expire while Playwright waits for its exit
+        // animation to settle. Disappearance already satisfies dismissal;
+        // a still-visible obstruction must retain the original failure.
+        if (await toastCloser.isVisible()) throw error;
+      }
       await expect(toastCloser).toBeHidden({ timeout: 5_000 });
     }
   }

@@ -68,13 +68,17 @@ export async function syncPinnedAudioVault({
   }
 
   const desiredUrls = new Set(
-    await listUpcomingAudioReferenceUrls(db, userId, lookaheadDays)
+    (await listUpcomingAudioReferenceUrls(db, userId, lookaheadDays)).filter(
+      (url) => !url.startsWith("byos:")
+    )
   );
   const existingUrls = await listMediaVaultKeysByKind("audio");
 
   let removedCount = 0;
   for (const key of existingUrls) {
-    if (!desiredUrls.has(key)) {
+    // Private provider caches belong to the BYOS resolver, not the legacy
+    // scheduled-audio pin list. Never evict them or fetch synthetic locators.
+    if (!key.startsWith("byos:") && !desiredUrls.has(key)) {
       await deleteMediaVaultBlob(key);
       removedCount += 1;
     }

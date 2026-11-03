@@ -23,6 +23,7 @@ interface SidebarNavItem {
 }
 
 const sidebarNavItems: SidebarNavItem[] = [
+  { title: "Storage provider", href: "/user-settings/storage-provider" },
   {
     title: "Appearance",
     href: "/user-settings/appearance",
@@ -146,8 +147,6 @@ const UserSettingsLayout: ParentComponent = (props) => {
       >
         <dialog
           class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-full md:max-w-6xl h-[calc(100vh-1rem)] md:max-h-[calc(100vh-8rem)] flex flex-col pointer-events-auto mx-2"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}
           aria-labelledby="settings-title"
           data-testid="settings-modal"
           open
