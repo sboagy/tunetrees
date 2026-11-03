@@ -81,6 +81,22 @@ If you prefer to remain anonymous, please let us know in your report.
 - Denial of service attacks
 - Issues in development dependencies that don't affect production
 
+## Build Dependency Security Overrides
+
+Dependabot alert [#248](https://github.com/sboagy/tunetrees/security/dependabot/248)
+([CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)) affects
+`deepmerge@4.3.1`, used through `vite-plugin-pwa` → `workbox-build` →
+`@rollup/plugin-node-resolve`. Upstream has no patched release as of November 3,
+2026. The root package override replaces this resolver's `deepmerge` with the
+exact version `npm:@stackline/deepmerge@1.1.0`, a compatible replacement that
+rejects `__proto__` keys, including while cloning target properties. It requires
+no installation scripts. Regression coverage is in
+`tests/deepmerge-security.test.ts`.
+
+Remove this override when the resolver uses a fixed upstream dependency or no
+longer depends on `deepmerge`; rerun the security tests and verify Workbox
+service-worker generation when changing the replacement.
+
 ## Known Dev-Only Vulnerabilities (Accepted Risk)
 
 The following vulnerabilities are present in development dependencies only and do not affect production builds:
