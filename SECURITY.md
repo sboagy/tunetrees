@@ -83,6 +83,19 @@ If you prefer to remain anonymous, please let us know in your report.
 
 ## Build Dependency Security Overrides
 
+Dependabot alerts [#251](https://github.com/sboagy/tunetrees/security/dependabot/251)
+([CVE-2026-118773](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)) and
+[#252](https://github.com/sboagy/tunetrees/security/dependabot/252)
+([CVE-2026-118764](https://github.com/advisories/GHSA-g3hv-75wg-m249)) affect
+`glob` and `minimatch` pulled in by `vite-plugin-pwa` → `workbox-build`.
+Root overrides require `glob@^14.0.2` and `minimatch@^11.0.1`, including the
+older `minimatch` used by Workbox's `ejs` → `jake` → `filelist` dependency chain.
+These versions fix cancellation bypass and pattern amplification, respectively.
+
+Remove these overrides once upstream dependencies require patched versions.
+When changing them, verify Workbox service-worker generation and FileList glob
+expansion: these overrides cross major versions of the upstream requirements.
+
 Dependabot alert [#248](https://github.com/sboagy/tunetrees/security/dependabot/248)
 ([CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)) affects
 `deepmerge@4.3.1`, used through `vite-plugin-pwa` → `workbox-build` →
