@@ -80,15 +80,6 @@ export default defineConfig({
       testMatch: /.*\.setup\.ts$/,
     },
 
-    {
-      name: "preview-setup",
-      testDir: "./e2e/setup",
-      testMatch: /.*\.setup\.ts$/,
-      use: {
-        baseURL: `http://localhost:${PREVIEW_PORT}`,
-      },
-    },
-
     // Auth tests run independently (no setup dependency, test login flow)
     {
       name: "chromium-auth",
@@ -206,7 +197,9 @@ export default defineConfig({
         // Base URL will point to the preview port
         baseURL: `http://localhost:${PREVIEW_PORT}`,
       },
-      dependencies: ["preview-setup"], // Ensure setup runs first if authenticated access is needed
+      // One writer owns the canonical dev-origin snapshots. The fixture maps
+      // copies to preview, including when this project is run on its own.
+      dependencies: ["setup"],
     },
     {
       name: "chromium-sboagy-1",

@@ -136,8 +136,7 @@ test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
     await expect(ttPage.audioPlayerZoomValue).toHaveText("80 px/s");
     await expect(ttPage.audioPlayerTempoSlider).toHaveValue("1.25");
 
-    await ttPage.audioPlayerCloseButton.click();
-    await expect(ttPage.audioPlayerOverlay).toBeHidden({ timeout: 10000 });
+    await ttPage.closeAudioPlayer();
     await page.waitForTimeout(500);
 
     const persistedRegionsJson = await readPersistedAudioState(

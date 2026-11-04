@@ -275,6 +275,7 @@ export async function waitForSyncComplete(
     }
 
     let status: {
+      authenticationMissing: boolean;
       version: number;
       successStr: string;
       success: boolean;
@@ -299,6 +300,11 @@ export async function waitForSyncComplete(
         const success = successStr === "true";
 
         return {
+          // Wait for auth initialization so a transient login route during
+          // session restoration does not get mistaken for a missing session.
+          authenticationMissing:
+            el?.dataset.authInitialized === "true" &&
+            window.location.pathname.replace(/\/+$/, "") === "/login",
           version,
           successStr,
           success,
@@ -317,6 +323,12 @@ export async function waitForSyncComplete(
         continue;
       }
       throw error;
+    }
+
+    if (status.authenticationMissing) {
+      throw new Error(
+        `Authentication missing while waiting for initial sync at ${page.url()}. The app reached /login after auth initialized. Check the auth snapshot user and origin, then rerun the setup project.`
+      );
     }
 
     lastStatus = {

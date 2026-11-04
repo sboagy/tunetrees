@@ -12,6 +12,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { BrowserContext } from "@playwright/test";
 
 // Must match the storageKey in src/lib/supabase/client.ts ("tunetrees-auth")
 const AUTH_STORAGE_KEY = "tunetrees-auth";
@@ -71,6 +72,7 @@ type StoredSession = {
 };
 
 type AuthStateOrigin = {
+  origin?: string;
   indexedDB?: unknown[];
   localStorage?: Array<{
     name?: string;
@@ -105,13 +107,14 @@ function parseStoredSession(value: string): StoredSession | null {
 }
 
 /**
- * Read metadata from a persisted Playwright auth state file without loading
- * the full IndexedDB content into memory.
+ * Read metadata for the expected origin only. Metadata from another origin
+ * must never make an unusable session look fresh.
  *
  * Returns null if the file does not exist or cannot be parsed.
  */
 export function readStoredAuthStateMetadata(
-  filePath: string
+  filePath: string,
+  expectedOrigin: string
 ): StoredAuthStateMetadata | null {
   if (!existsSync(filePath)) return null;
 
@@ -119,7 +122,10 @@ export function readStoredAuthStateMetadata(
     const authData = JSON.parse(readFileSync(filePath, "utf-8")) as {
       origins?: AuthStateOrigin[];
     };
-    const origins = authData.origins ?? [];
+    const origins = (authData.origins ?? []).filter(
+      (entry) => entry.origin === new URL(expectedOrigin).origin
+    );
+    if (origins.length !== 1) return null;
 
     const hasIndexedDbSnapshot = origins.some(
       (origin) => (origin.indexedDB?.length ?? 0) > 0
@@ -170,4 +176,41 @@ export function readStoredAuthStateMetadata(
   } catch {
     return null;
   }
+}
+
+/** Validate the user, origin, snapshot versions, and remaining token lifetime. */
+export function isAuthFileFresh(
+  filePath: string,
+  expectedOrigin: string,
+  expectedEmail: string,
+  nowMs = Date.now()
+): boolean {
+  const metadata = readStoredAuthStateMetadata(filePath, expectedOrigin);
+  return !!(
+    metadata?.hasIndexedDbSnapshot &&
+    metadata.storedUserEmail === expectedEmail &&
+    metadata.expiresAtMs != null &&
+    metadata.expiresAtMs - nowMs > 5 * 60 * 1000 &&
+    metadata.snapshotVersion === CURRENT_AUTH_STATE_SNAPSHOT_VERSION &&
+    (CURRENT_AUTH_STATE_DB_VERSION == null ||
+      metadata.dbVersion === CURRENT_AUTH_STATE_DB_VERSION)
+  );
+}
+
+type AuthStorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
+
+/** Copy the canonical app origin to a test target without changing the file. */
+export function mapAuthStateToOrigin(
+  state: AuthStorageState,
+  sourceUrl: string,
+  targetUrl: string
+): AuthStorageState {
+  const sourceOrigin = new URL(sourceUrl).origin;
+  const targetOrigin = new URL(targetUrl).origin;
+  return {
+    ...state,
+    origins: state.origins.map((entry) =>
+      entry.origin === sourceOrigin ? { ...entry, origin: targetOrigin } : entry
+    ),
+  };
 }

@@ -4850,6 +4850,16 @@ export class TuneTreesPage {
     });
   }
 
+  async closeAudioPlayer() {
+    // Upload notifications can cover the mobile player's close button.
+    await this.clickWithToastRecovery(
+      this.audioPlayerCloseButton,
+      { timeout: 5_000 },
+      "closeAudioPlayer"
+    );
+    await expect(this.audioPlayerOverlay).toBeHidden({ timeout: 10_000 });
+  }
+
   private async dismissVisibleToasts(maxAttempts: number = 3) {
     const toastCloser = this.page
       .getByRole("button", { name: "Close toast" })

@@ -36,6 +36,7 @@ import {
   AUTH_STATE_SNAPSHOT_VERSION_STORAGE_KEY,
   CURRENT_AUTH_STATE_DB_VERSION,
   CURRENT_AUTH_STATE_SNAPSHOT_VERSION,
+  isAuthFileFresh,
   readStoredAuthStateMetadata,
 } from "../helpers/auth-state";
 import { TEST_USERS } from "../helpers/test-users";
@@ -91,9 +92,6 @@ const TUNETREES_REPERTOIRE_CHILD_TABLES = [
   "practice_record",
   "repertoire_tune",
 ] as const;
-
-/** Minimum remaining validity before we consider the snapshot stale. */
-const AUTH_EXPIRY_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 
 function getRequiredTestPassword(): string {
   const value =
@@ -309,32 +307,6 @@ function injectOpEnvIfNeeded(): void {
     "ℹ️  Injected environment variables via 1Password CLI because " +
       "VITE_SUPABASE_ANON_KEY was missing"
   );
-}
-
-/**
- * Returns true when a saved auth state file is valid and does not need to be
- * regenerated. Checks:
- *   1. File exists and can be parsed
- *   2. Has an IndexedDB snapshot (local SQLite was persisted)
- *   3. Token has not expired (with safety buffer)
- *   4. Snapshot shape version matches CURRENT_AUTH_STATE_SNAPSHOT_VERSION
- *   5. DB schema version matches CURRENT_AUTH_STATE_DB_VERSION (if known)
- */
-function isAuthFileFresh(filePath: string): boolean {
-  if (!existsSync(filePath)) return false;
-  const metadata = readStoredAuthStateMetadata(filePath);
-  if (!metadata?.hasIndexedDbSnapshot) return false;
-  if (metadata.expiresAtMs == null) return false;
-  if (metadata.snapshotVersion !== CURRENT_AUTH_STATE_SNAPSHOT_VERSION) {
-    return false;
-  }
-  if (
-    CURRENT_AUTH_STATE_DB_VERSION != null &&
-    metadata.dbVersion !== CURRENT_AUTH_STATE_DB_VERSION
-  ) {
-    return false;
-  }
-  return metadata.expiresAtMs - Date.now() > AUTH_EXPIRY_SAFETY_WINDOW_MS;
 }
 
 /**
@@ -736,8 +708,12 @@ setup("authenticate all test users", async ({ browser }) => {
     const authFile = `${AUTH_DIR}/${userKey}.json`;
 
     // Skip re-auth for users whose snapshot is still fresh (local dev only)
-    if (!shouldReset && !isCI && isAuthFileFresh(authFile)) {
-      const metadata = readStoredAuthStateMetadata(authFile);
+    if (
+      !shouldReset &&
+      !isCI &&
+      isAuthFileFresh(authFile, String(BASE_URL), testUser.email)
+    ) {
+      const metadata = readStoredAuthStateMetadata(authFile, String(BASE_URL));
       const remainingMinutes = metadata?.expiresAtMs
         ? Math.round((metadata.expiresAtMs - Date.now()) / 1000 / 60)
         : 0;

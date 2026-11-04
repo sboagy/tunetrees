@@ -1,9 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
 const GOOGLE_SECRET_DATABASE = "tunetrees-byos-secrets";
 const GOOGLE_SECRET_STORE = "refresh-tokens";
-const GOOGLE_FILE_ID = "e2e-google-drive-audio";
 
 export function createSilentWavBuffer(durationSeconds = 1, sampleRate = 8000) {
   const channelCount = 1;
@@ -102,22 +102,25 @@ async function mockGoogleDriveRequests(page: Page) {
   await page.route(
     "https://www.googleapis.com/upload/drive/v3/files?**",
     async (route) => {
+      const metadata = route.request().postDataJSON() as { id: string };
       await route.fulfill({
         status: 200,
         headers: {
-          Location: "https://e2e-google-upload.invalid/session",
+          Location: `https://e2e-google-upload.invalid/session/${encodeURIComponent(metadata.id)}`,
           "Access-Control-Expose-Headers": "Location",
         },
       });
     }
   );
   await page.route(
-    "https://e2e-google-upload.invalid/session",
+    "https://e2e-google-upload.invalid/session/*",
     async (route) => {
       await route.fulfill({
         contentType: "application/json",
         body: JSON.stringify({
-          id: GOOGLE_FILE_ID,
+          id: decodeURIComponent(
+            new URL(route.request().url()).pathname.split("/").pop()!
+          ),
           name: "e2e-google-drive-audio.wav",
           mimeType: "audio/wav",
           size: "16044",
@@ -137,7 +140,11 @@ async function mockGoogleDriveRequests(page: Page) {
     async (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith("/generateIds")) {
-        await route.fulfill({ json: { ids: [GOOGLE_FILE_ID] } });
+        // Each reservation must be unique across workers and repeated runs:
+        // media_asset.storage_path is globally unique in the shared database.
+        await route.fulfill({
+          json: { ids: [`e2e-google-drive-${randomUUID()}`] },
+        });
       } else if (url.pathname.endsWith("/e2e-folder")) {
         await route.fulfill({
           json: {

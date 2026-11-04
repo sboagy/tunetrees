@@ -4,14 +4,9 @@
  */
 
 import { readFileSync } from "node:fs";
-import type { Page } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import { test as base } from "@playwright/test";
-import log from "loglevel";
-import {
-  CURRENT_AUTH_STATE_DB_VERSION,
-  CURRENT_AUTH_STATE_SNAPSHOT_VERSION,
-  readStoredAuthStateMetadata,
-} from "./auth-state";
+import { isAuthFileFresh, mapAuthStateToOrigin } from "./auth-state";
 import {
   clearTunetreesClientStorage,
   gotoE2eOrigin,
@@ -36,53 +31,6 @@ function isExpectedPlaywrightTeardownError(error: unknown): boolean {
     msg.includes("Target closed") ||
     msg.includes("Execution context was destroyed")
   );
-}
-
-/** Minimum remaining validity before we consider the snapshot stale. */
-const AUTH_EXPIRY_SAFETY_WINDOW_MS = 5 * 60 * 1000;
-
-/**
- * Check if a saved auth state file is still valid. Uses the metadata written
- * by `auth.setup.ts` (JWT expiry, snapshot version, DB schema version) instead
- * of file mtime.
- */
-function isAuthFresh(authFile: string): boolean {
-  const metadata = readStoredAuthStateMetadata(authFile);
-  if (!metadata?.hasIndexedDbSnapshot) {
-    console.log(
-      `⚠️  Auth file missing or has no IndexedDB snapshot: ${authFile}`
-    );
-    return false;
-  }
-  if (metadata.expiresAtMs == null) {
-    console.log(`⚠️  Auth file has no expiry: ${authFile}`);
-    return false;
-  }
-  if (metadata.snapshotVersion !== CURRENT_AUTH_STATE_SNAPSHOT_VERSION) {
-    console.log(
-      `⚠️  Auth snapshot version mismatch (got ${metadata.snapshotVersion}, expected ${CURRENT_AUTH_STATE_SNAPSHOT_VERSION}): ${authFile}`
-    );
-    return false;
-  }
-  if (
-    CURRENT_AUTH_STATE_DB_VERSION != null &&
-    metadata.dbVersion !== CURRENT_AUTH_STATE_DB_VERSION
-  ) {
-    console.log(
-      `⚠️  Auth DB version mismatch (got ${metadata.dbVersion}, expected ${CURRENT_AUTH_STATE_DB_VERSION}): ${authFile}`
-    );
-    return false;
-  }
-  if (metadata.expiresAtMs - Date.now() <= AUTH_EXPIRY_SAFETY_WINDOW_MS) {
-    const remaining = Math.round(
-      (metadata.expiresAtMs - Date.now()) / 1000 / 60
-    );
-    console.log(
-      `⚠️  Auth file token expiring soon (${remaining} min left): ${authFile}`
-    );
-    return false;
-  }
-  return true;
 }
 
 type ITuneTreesFixtures = TestUserFixture & {
@@ -155,37 +103,28 @@ export const test = base.extend<ITuneTreesFixtures>({
   storageState: async ({ testUserKey, testUser }, use, testInfo) => {
     const authFile = `e2e/.auth/${testUserKey}.json`;
 
-    // Check if auth file is fresh, warn if stale
-    if (!isAuthFresh(authFile)) {
-      console.log(
-        `❌ STALE AUTH: ${authFile} - Run 'npm run db:local:reset' to regenerate auth files`
-      );
+    const sourceUrl = testInfo.config.projects.find(
+      (project) => project.name === "setup"
+    )?.use.baseURL;
+    const targetUrl = testInfo.project.use.baseURL;
+    if (!sourceUrl || !targetUrl) {
       throw new Error(
-        `Authentication expired for ${testUser.email}. Run: npm run db:local:reset`
+        "Auth fixture requires setup and test project baseURL values."
       );
     }
 
-    // For preview/PWA tests (port 4173), rewrite origins from dev port (5173)
-    const baseUrl = testInfo.project.use.baseURL || "";
-    if (baseUrl.includes("4173")) {
-      const authData = JSON.parse(readFileSync(authFile, "utf-8"));
-
-      // Rewrite all origin URLs from localhost:5173 to localhost:4173
-      if (authData.origins) {
-        authData.origins = authData.origins.map((origin: any) => ({
-          ...origin,
-          origin: origin.origin?.replace("localhost:5173", "localhost:4173"),
-        }));
-      }
-
-      log.debug(
-        `🔐 Worker auth: ${authFile} (rewritten for preview port 4173)`
+    if (!isAuthFileFresh(authFile, sourceUrl, testUser.email)) {
+      throw new Error(
+        `Invalid authentication snapshot ${authFile}: expected ${testUser.email} at ${new URL(sourceUrl).origin} with a fresh session and compatible IndexedDB snapshot. Run the setup project again (without --no-deps); no database reset is required.`
       );
-      await use(authData);
-    } else {
-      log.debug(`🔐 Worker auth: ${authFile} (fresh)`);
-      await use(authFile);
     }
+
+    const authData = JSON.parse(readFileSync(authFile, "utf-8")) as Awaited<
+      ReturnType<BrowserContext["storageState"]>
+    >;
+    // Preview gets a copy of the dev snapshot; never write a remapped state
+    // back to the shared file used by desktop and mobile workers.
+    await use(mapAuthStateToOrigin(authData, sourceUrl, targetUrl));
   },
   // Capture browser console logs and attach to test report
   consoleLogs: async ({ page }, use, testInfo) => {
