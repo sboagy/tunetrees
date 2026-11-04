@@ -159,7 +159,7 @@ export const FlashcardCard: Component<FlashcardCardProps> = (props) => {
             </Show>
             <Show when={props.tune.mode && isFieldVisible()("mode")}>
               <span
-                class="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full"
+                class="text-muted-foreground"
                 data-testid="flashcard-field-mode"
               >
                 {formatMode(props.tune.mode)}
