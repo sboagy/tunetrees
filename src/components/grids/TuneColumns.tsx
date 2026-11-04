@@ -359,9 +359,7 @@ export function getCatalogColumns(
         const value = info.getValue() as string | null;
         return (
           <Show when={value} fallback={<span class="text-gray-400">—</span>}>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-              {value}
-            </span>
+            <span class="text-xs text-muted-foreground">{value}</span>
           </Show>
         );
       },

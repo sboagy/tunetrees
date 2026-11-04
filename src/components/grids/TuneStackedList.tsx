@@ -6,7 +6,7 @@
  * Tailwind `md` breakpoint (< 768 px).
  *
  * Each item shows a prioritised subset of fields stacked vertically (title,
- * type/mode badges, and purpose-specific secondary info) with a minimum 44 px
+ * type badges, mode text, and purpose-specific secondary info) with a minimum 44 px
  * touch target, dark-mode support, and current-row highlight.
  *
  * This is intentionally NOT a card grid – items are full-width single-column
@@ -112,11 +112,9 @@ const TypeBadge = (props: {
   </Show>
 );
 
-const ModeBadge = (props: { value: string | null | undefined }) => (
+const ModeText = (props: { value: string | null | undefined }) => (
   <Show when={props.value}>
-    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-      {props.value}
-    </span>
+    <span class="text-xs text-muted-foreground">{props.value}</span>
   </Show>
 );
 
@@ -703,7 +701,7 @@ export const TuneStackedList = (props: ITuneStackedListProps) => {
                         </div>
                       </Show>
                       <Show when={isColVisible("mode")}>
-                        <ModeBadge value={item.mode} />
+                        <ModeText value={item.mode} />
                       </Show>
                       <Show
                         when={
