@@ -205,28 +205,13 @@ test.describe("Regression: Add To Review must NOT regenerate the queue", () => {
     // Wait for the selection to register in the row model.
     await expect(extraTuneCheckbox).toBeChecked({ timeout: 5_000 });
 
-    // Set up dialog handler before clicking "Add To Review".
-    let dialogMessage = "";
-    page.on("dialog", async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.accept();
-    });
-
     // STEP 5: Click "Add To Review".
     await ttPage.clickRepertoireAddToReview();
 
-    // Wait deterministically for the dialog to fire and be handled.
-    await expect
-      .poll(() => dialogMessage, {
-        timeout: 10_000,
-        intervals: [100, 250, 500],
-      })
-      .toMatch(/Added \d+ tune/);
-
-    // Confirm the dialog shows the tune was added.
-    expect(dialogMessage, "Dialog should confirm tune was added").toMatch(
-      /Added \d+ tune/
-    );
+    // Success is shown only after the appended queue entry is saved locally.
+    await expect(
+      page.getByText("Added 1 tune to practice queue.", { exact: true })
+    ).toBeVisible({ timeout: 10_000 });
 
     // Wait for sync to flush local changes upstream before navigating away.
     await page.waitForLoadState("networkidle", { timeout: 15_000 });

@@ -38,10 +38,9 @@ import {
   createTuneSetFromTunes,
   getPersonalTuneSets,
 } from "../../lib/db/queries/tune-sets";
-import {
-  addSpecificTunesToExistingQueue,
-  generateOrGetPracticeQueue,
-} from "../../lib/services/practice-queue";
+import { addSpecificTunesToExistingQueue } from "../../lib/services/practice-queue";
+import { getPracticeDate } from "../../lib/utils/practice-date";
+import { getPreferredQueueWindowStart } from "../../lib/utils/queue-date-storage";
 import { ColumnVisibilityMenu } from "../catalog/ColumnVisibilityMenu";
 import { FilterPanel } from "../catalog/FilterPanel";
 import {
@@ -126,6 +125,7 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   const [addingToSetId, setAddingToSetId] = createSignal<string | null>(null);
   const [isSavingGroupAsSet, setIsSavingGroupAsSet] = createSignal(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = createSignal(false);
+  const [isAddingToReview, setIsAddingToReview] = createSignal(false);
   const [isRemoving, setIsRemoving] = createSignal(false);
   const [showOverflowMenu, setShowOverflowMenu] = createSignal(false);
   const [pendingDisplayOptionsOpen, setPendingDisplayOptionsOpen] =
@@ -195,79 +195,63 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
   );
 
   const handleAddToReview = async () => {
+    if (isAddingToReview()) return;
+    const currentUserId = user()?.id;
+    const repertoireId = props.repertoireId;
+    const table = props.table;
+    if (!table || !repertoireId || !currentUserId) {
+      toast.error("No active repertoire selected");
+      return;
+    }
+    const tuneIds = getSelectedTuneIds();
+    if (tuneIds.length === 0) return;
+
+    setIsAddingToReview(true);
     try {
-      if (!props.table) {
-        alert("Table not initialized");
-        return;
-      }
-      if (!props.repertoireId) {
-        alert("No active repertoire selected");
-        return;
-      }
-
-      const selectedRows = getSelectedFlatRows();
-      if (selectedRows.length === 0) {
-        alert(
-          "No tunes selected. Please select tunes to add to practice queue."
-        );
-        return;
-      }
-
-      const tuneIds = getSelectedTuneIds();
-      console.log(`Adding ${tuneIds.length} tunes to practice queue:`, tuneIds);
-
       const db = getDb();
-      const result = await addTunesToPracticeQueue(
+      const prepared = await addTunesToPracticeQueue(db, repertoireId, tuneIds);
+      if (prepared.skipped > 0) {
+        throw new Error(
+          "Some selected tunes could not be prepared for review. Please retry."
+        );
+      }
+      const added = await addSpecificTunesToExistingQueue(
         db,
-        props.repertoireId,
-        tuneIds
+        currentUserId,
+        repertoireId,
+        prepared.tuneIds,
+        getPracticeDate(),
+        null,
+        getPreferredQueueWindowStart()
       );
-
-      let message = "";
-      if (result.added > 0) {
-        message += `Added ${result.added} tune${result.added > 1 ? "s" : ""} to practice queue.`;
-      }
-      if (result.skipped > 0) {
-        message += ` ${result.skipped} tune${result.skipped > 1 ? "s were" : " was"} already scheduled.`;
-      }
-      alert(message || "No tunes were added.");
-
-      props.table.resetRowSelection();
-
-      // Ensure Add To Review makes explicitly selected tunes available in the
-      // current practice session. If no queue exists yet, generate today's
-      // normal queue first, then append any selected tunes not already included.
-      const currentUserId = user()?.id;
-      if (currentUserId && props.repertoireId && result.tuneIds.length > 0) {
-        try {
-          const db2 = getDb();
-          await generateOrGetPracticeQueue(
-            db2,
-            currentUserId,
-            props.repertoireId
-          );
-          await addSpecificTunesToExistingQueue(
-            db2,
-            currentUserId,
-            props.repertoireId,
-            result.tuneIds
-          );
-          console.log("✅ Tunes appended to existing practice queue");
-        } catch (err) {
-          console.error("Error appending tunes to practice queue:", err);
-        }
-      }
-
-      console.log("🔄 [AddToReview] Syncing changes to Supabase...");
-      await forceSyncUp();
+      const alreadyPresent = new Set(tuneIds).size - added.length;
+      const messages: string[] = [];
+      if (added.length > 0)
+        messages.push(
+          `Added ${added.length} tune${added.length === 1 ? "" : "s"} to practice queue.`
+        );
+      if (alreadyPresent > 0)
+        messages.push(
+          `${alreadyPresent} tune${alreadyPresent === 1 ? " is" : "s are"} already in this queue.`
+        );
+      // Local durability and UI updates must not depend on network availability.
       incrementPracticeListStagedChanged();
-
-      console.log("Add to review completed:", result);
+      table.resetRowSelection();
+      toast.success(messages.join(" "));
+      if (navigator.onLine) {
+        void forceSyncUp().catch((error: unknown) => {
+          console.warn("Add to review saved locally; sync will retry", error);
+        });
+      }
     } catch (error) {
       console.error("Error adding tunes to practice queue:", error);
-      alert(
-        `Error: ${error instanceof Error ? error.message : "Failed to add tunes to practice queue"}`
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to add tunes to practice queue"
       );
+    } finally {
+      setIsAddingToReview(false);
     }
   };
 
@@ -496,7 +480,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 type="button"
                 data-testid="add-to-review-button"
                 class={mobileMenuItemClasses}
-                disabled={!hasSelectedRows()}
+                disabled={!hasSelectedRows() || isAddingToReview()}
+                aria-busy={isAddingToReview()}
                 onClick={() => {
                   setShowOverflowMenu(false);
                   void handleAddToReview();
@@ -606,7 +591,8 @@ export const RepertoireToolbar: Component<RepertoireToolbarProps> = (props) => {
                 title="Add selected tunes to practice review queue"
                 class={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_PRIMARY}`}
                 data-testid="add-to-review-button"
-                disabled={!hasSelectedRows()}
+                disabled={!hasSelectedRows() || isAddingToReview()}
+                aria-busy={isAddingToReview()}
               >
                 <Plus class={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span>Add To Review</span>

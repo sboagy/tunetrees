@@ -1,15 +1,7 @@
 /**
- * E2E Test: Add To Review - ACTUAL FUNCTIONALITY TEST
- *
- * This test verifies that "Add To Review" ACTUALLY WORKS:
- * 1. Selects specific tunes from repertoire
- * 2. Adds them to practice queue
- * 3. Verifies those EXACT TUNES appear in the practice tab
- * 4. Verifies they are appended to today's practice queue without writing
- *    manual schedule overrides
- * 5. Verifies they persist after reload
+ * #609 / #769: Add To Review survives reload and preserves the active queue.
+ * No persistence test hook is called after the action under test.
  */
-
 import { expect } from "@playwright/test";
 import {
   CATALOG_TUNE_ABBY_REEL,
@@ -17,11 +9,8 @@ import {
   CATALOG_TUNE_MORRISON_ID,
 } from "../../src/lib/db/catalog-tune-ids";
 import { STANDARD_TEST_DATE, setStableDate } from "../helpers/clock-control";
-import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
-import {
-  runTestHook,
-  waitForPracticeViewSettled,
-} from "../helpers/practice-view";
+import { setupForRepertoireTestsParallel } from "../helpers/practice-scenarios";
+import { waitForPracticeViewSettled } from "../helpers/practice-view";
 import {
   queryPracticeQueue,
   queryScheduledDates,
@@ -29,169 +18,158 @@ import {
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
-async function setInjectedTestUserId(
-  page: import("@playwright/test").Page,
-  userId: string
-) {
-  await page.addInitScript((id) => {
-    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
-  }, userId);
-  await page.evaluate((id) => {
-    (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId = id;
-  }, userId);
-}
+const tuneIds = [
+  CATALOG_TUNE_ABBY_REEL,
+  CATALOG_TUNE_ALEXANDERS_ID,
+  CATALOG_TUNE_MORRISON_ID,
+];
 
-test.describe("Repertoire: Add To Review - FUNCTIONALITY TEST", () => {
+test.describe("Add To Review persistence", () => {
   let ttPage: TuneTreesPage;
-
-  let currentDate: Date;
-  const expectedTuneTitles = ["Abbey Reel", "Alexander's", "Morrison's Jig"];
-
   test.beforeEach(async ({ page, context, testUser }) => {
-    ttPage = new TuneTreesPage(page);
-
-    currentDate = new Date(STANDARD_TEST_DATE);
-    await setStableDate(context, currentDate);
-    await setInjectedTestUserId(page, testUser.userId);
-
-    // Setup with 3 known tunes in repertoire
-    await setupDeterministicTestParallel(page, testUser, {
-      clearRepertoire: true,
-      seedRepertoire: [
-        CATALOG_TUNE_ABBY_REEL,
-        CATALOG_TUNE_ALEXANDERS_ID,
-        CATALOG_TUNE_MORRISON_ID,
-      ], // User's private tune, Morrison's Jig, tune 54
+    await setStableDate(context, STANDARD_TEST_DATE);
+    await page.addInitScript((userId) => {
+      (globalThis as unknown as { __ttTestUserId?: string }).__ttTestUserId =
+        userId;
+    }, testUser.userId);
+    // Future overrides keep automatic queue generation empty. Explicit additions
+    // must still work and must leave those overrides unchanged.
+    await setupForRepertoireTestsParallel(page, testUser, {
+      repertoireTunes: tuneIds,
+      scheduleTunes: true,
+      scheduleDaysAgo: -30,
+      scheduleBaseDate: STANDARD_TEST_DATE,
     });
+    ttPage = new TuneTreesPage(page);
+    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
+    expect(await queryPracticeQueue(page, testUser.repertoireId)).toEqual([]);
+    // Isolate local durability from remote recovery, including after reload.
+    await page.route("**/api/sync**", (route) => route.abort());
   });
 
-  test("CRITICAL: Add To Review must actually add the selected tunes to practice queue", async ({
+  test("creates only selected entries and survives an immediate reload", async ({
     page,
     testUser,
   }) => {
-    // Navigate to Repertoire tab
-    await ttPage.navigateToTab("repertoire");
-
-    await ttPage.expectGridHasContent(ttPage.repertoireGrid);
-    await ttPage.setGridRowChecked(
-      CATALOG_TUNE_ABBY_REEL,
-      ttPage.repertoireGrid
+    // An unselected due tune would be pulled in by normal queue generation.
+    // Add To Review must create only the explicitly selected entry.
+    await page.evaluate(
+      async ({ repertoireId, tuneId }) => {
+        const api = window.__ttTestApi;
+        if (!api) throw new Error("Test API unavailable");
+        await api.updateScheduledDates(repertoireId, [
+          { tuneId, scheduled: "2025-07-20T00:00:00" },
+        ]);
+      },
+      { repertoireId: testUser.repertoireId, tuneId: CATALOG_TUNE_MORRISON_ID }
     );
-    await page.waitForTimeout(200);
-    await ttPage.setGridRowChecked(
-      CATALOG_TUNE_ALEXANDERS_ID,
-      ttPage.repertoireGrid
-    );
-    await page.waitForTimeout(200);
-    await ttPage.setGridRowChecked(
-      CATALOG_TUNE_MORRISON_ID,
-      ttPage.repertoireGrid
-    );
-    await page.waitForTimeout(200);
-
-    console.log("✅ Selected 3 tunes from repertoire");
-
-    // Click "Add To Review"
-    let dialogMessage = "";
-    page.on("dialog", async (dialog) => {
-      dialogMessage = dialog.message();
-      console.log("Dialog message:", dialog.message());
-      await dialog.accept();
-    });
-    await ttPage.clickRepertoireAddToReview();
-
-    // Wait for dialog
-    await page.waitForTimeout(500);
-
-    // Verify dialog shows correct count
-    expect(dialogMessage).toMatch(/Added \d+ tune/);
-    const addedCount = Number.parseInt(
-      dialogMessage.match(/Added (\d+)/)?.[1] || "0",
-      10
-    );
-    console.log(`📨 Dialog says added: ${addedCount} tunes`);
-    expect(addedCount).toBe(3);
-
-    await page.waitForLoadState("networkidle", { timeout: 15000 });
-
-    // Navigate to Practice tab
-    await ttPage.navigateToTab("practice");
-
-    // Select "Today" from queue date picker to trigger queue display
-    const queueButton = page.getByRole("button", {
-      name: /Select practice queue date/i,
-    });
-    if (await queueButton.isVisible()) {
-      await queueButton.click();
-      await page.getByRole("button", { name: /^Today$/ }).click();
-    }
-
-    await waitForPracticeViewSettled(page, ttPage, {
-      expectRows: true,
-      timeoutMs: 20000,
-    });
-
-    // CRITICAL: Verify those EXACT 3 tunes appear in the practice queue
-    console.log("🔍 Verifying the selected tunes appear in practice queue...");
-
-    for (const title of expectedTuneTitles) {
-      await ttPage.expectTuneVisible(title, ttPage.practiceGrid, 8000);
-    }
-
-    console.log(`✅ All 3 tunes found in practice queue!`);
-    // Add To Review appends the tunes directly to today's queue; it must NOT
-    // write a manual scheduled override. Verify the queue entries exist and the
-    // underlying scheduled column remains null for each selected tune.
-    const expectedTuneIds = [
-      CATALOG_TUNE_ABBY_REEL,
-      CATALOG_TUNE_ALEXANDERS_ID,
-      CATALOG_TUNE_MORRISON_ID,
-    ];
-    const queue = await queryPracticeQueue(page, testUser.repertoireId);
-    const activeQueueTuneIds = queue
-      .filter((item) => item.completed_at === null)
-      .map((item) => item.tune_ref)
-      .sort();
-
-    expect(activeQueueTuneIds).toEqual([...expectedTuneIds].sort());
-
-    const scheduledDates = await queryScheduledDates(
+    const schedulesBefore = await queryScheduledDates(
       page,
       testUser.repertoireId,
-      expectedTuneIds
+      tuneIds
     );
-    for (const tuneId of expectedTuneIds) {
-      expect(scheduledDates.get(tuneId)?.scheduled ?? null).toBeNull();
-    }
-
-    await runTestHook(page, "__persistDbForTest");
-
-    // RELOAD THE PAGE
-    console.log("🔄 Reloading page...");
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_ABBY_REEL,
+      ttPage.repertoireGrid
+    );
+    await ttPage.clickRepertoireAddToReview();
+    await expect(
+      page.getByText("Added 1 tune to practice queue.", { exact: true })
+    ).toBeVisible({ timeout: 10000 });
     await page.reload();
-    await setInjectedTestUserId(page, testUser.userId);
-
-    // Navigate back to Practice tab
     await ttPage.navigateToTab("practice");
     await waitForPracticeViewSettled(page, ttPage, {
       expectRows: true,
       timeoutMs: 20000,
     });
+    expect(
+      (await queryPracticeQueue(page, testUser.repertoireId)).map(
+        (row) => row.tune_ref
+      )
+    ).toEqual([CATALOG_TUNE_ABBY_REEL]);
+    expect(
+      await queryScheduledDates(page, testUser.repertoireId, tuneIds)
+    ).toEqual(schedulesBefore);
+  });
 
-    // CRITICAL: Verify those EXACT 3 tunes STILL appear after reload
-    console.log("🔍 Verifying tunes persist after reload...");
+  test("saves an offline addition before reporting success", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_ABBY_REEL,
+      ttPage.repertoireGrid
+    );
+    await context.setOffline(true);
+    await ttPage.clickRepertoireAddToReview();
+    await expect(
+      page.getByText("Added 1 tune to practice queue.", { exact: true })
+    ).toBeVisible({ timeout: 10000 });
+    // The dev server must be reachable to reload its assets; sync stays blocked.
+    await context.setOffline(false);
+    await page.reload();
+    await ttPage.navigateToTab("practice");
+    await waitForPracticeViewSettled(page, ttPage, {
+      expectRows: true,
+      timeoutMs: 20000,
+    });
+    expect(
+      (await queryPracticeQueue(page, testUser.repertoireId)).map(
+        (row) => row.tune_ref
+      )
+    ).toEqual([CATALOG_TUNE_ABBY_REEL]);
+  });
 
-    for (const title of expectedTuneTitles) {
-      await ttPage.expectTuneVisible(title, ttPage.practiceGrid, 5000);
-    }
-
-    const reloadedQueue = await queryPracticeQueue(page, testUser.repertoireId);
-    const reloadedActiveTuneIds = reloadedQueue
-      .filter((item) => item.completed_at === null)
-      .map((item) => item.tune_ref)
-      .sort();
-    expect(reloadedActiveTuneIds).toEqual([...expectedTuneIds].sort());
-
-    console.log(`✅ PASS: All 3 tunes persist after reload!`);
+  test("appends after rollover without replacing the previous queue", async ({
+    page,
+    context,
+    testUser,
+  }) => {
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_ABBY_REEL,
+      ttPage.repertoireGrid
+    );
+    await ttPage.clickRepertoireAddToReview();
+    await expect(
+      page.getByText("Added 1 tune to practice queue.", { exact: true })
+    ).toBeVisible({ timeout: 10000 });
+    const before = await queryPracticeQueue(page, testUser.repertoireId);
+    await setStableDate(context, "2025-07-21T14:00:00.000Z");
+    // Make today's normal queue nonempty, so a generation-before-append bug
+    // would create a different queue and hide yesterday's work.
+    await page.evaluate(
+      async ({ repertoireId, tuneId }) => {
+        const api = window.__ttTestApi;
+        if (!api) throw new Error("Test API unavailable");
+        await api.updateScheduledDates(repertoireId, [
+          { tuneId, scheduled: "2025-07-21T00:00:00" },
+        ]);
+      },
+      { repertoireId: testUser.repertoireId, tuneId: CATALOG_TUNE_MORRISON_ID }
+    );
+    await ttPage.setGridRowChecked(
+      CATALOG_TUNE_ALEXANDERS_ID,
+      ttPage.repertoireGrid
+    );
+    await ttPage.clickRepertoireAddToReview();
+    // Selection clears only after persistence finishes; the first toast may still exist.
+    await expect(page.getByText(/\d+ tunes? selected/)).not.toBeVisible({
+      timeout: 10000,
+    });
+    await page.reload();
+    await ttPage.navigateToTab("practice");
+    await waitForPracticeViewSettled(page, ttPage, {
+      expectRows: true,
+      timeoutMs: 20000,
+    });
+    const after = await queryPracticeQueue(page, testUser.repertoireId);
+    expect(after).toHaveLength(2);
+    expect(after[0]).toEqual(before[0]);
+    expect(after[1]).toMatchObject({
+      tune_ref: CATALOG_TUNE_ALEXANDERS_ID,
+      window_start_utc: before[0].window_start_utc,
+      order_index: before[0].order_index + 1,
+    });
   });
 });
