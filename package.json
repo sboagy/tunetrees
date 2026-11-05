@@ -156,7 +156,7 @@
     "@playwright/test": "^1.62.1",
     "@solidjs/testing-library": "^0.8.10",
     "@tailwindcss/vite": "^4.3.3",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/user-event": "^14.6.8",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
     "@types/papaparse": "^5.5.2",
