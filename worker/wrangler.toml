@@ -1,6 +1,7 @@
 name = "tunetrees-sync-worker"
 main = "src/handler.ts"
-compatibility_date = "2024-04-01"
+# postgres 4 requires the Node.js compatibility v2 APIs.
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 [dev]

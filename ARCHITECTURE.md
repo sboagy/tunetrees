@@ -276,6 +276,13 @@ These boundaries are strict. AI agents should treat them as design rules, not su
 - `worker/src/index.ts`: passes generated schema tables, syncable tables, table registry core, and worker config into the generic worker factory.
 - `worker/src/generated/*`: generated worker-facing schema and config derived from Postgres + TuneTrees overrides.
 
+Postgres.js 4 requires the Worker to enable `nodejs_compat` with a compatibility
+date of at least `2024-09-23`. Validate the Wrangler bundle as well as TypeScript:
+the root and Worker manifests alone do not determine the driver used by oosync;
+its own dependency must also be upgraded. Keep the package's `workerd` export
+condition intact so deployed connections use Cloudflare sockets. Driver upgrades
+do not require a schema migration or change the browser sync protocol.
+
 ### oosync Repo
 
 - `oosync/src/codegen-schema.ts`: generator entrypoint.
