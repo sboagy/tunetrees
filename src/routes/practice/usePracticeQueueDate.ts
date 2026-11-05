@@ -46,10 +46,17 @@ import {
   formatAsWindowStart,
   getPracticeDate,
 } from "../../lib/utils/practice-date";
+import {
+  parseStoredDate,
+  QUEUE_DATE_MANUAL_FLAG_KEY,
+  QUEUE_DATE_STORAGE_KEY,
+} from "../../lib/utils/queue-date-storage";
 
 // localStorage keys — single source of truth for the queue date persistence contract.
-export const QUEUE_DATE_STORAGE_KEY = "TT_PRACTICE_QUEUE_DATE";
-export const QUEUE_DATE_MANUAL_FLAG_KEY = "TT_PRACTICE_QUEUE_DATE_MANUAL";
+export {
+  QUEUE_DATE_MANUAL_FLAG_KEY,
+  QUEUE_DATE_STORAGE_KEY,
+} from "../../lib/utils/queue-date-storage";
 
 export interface PracticeQueueDateProps {
   localDb: Accessor<SqliteDatabase | null>;
@@ -96,59 +103,6 @@ export interface PracticeQueueDateState {
 }
 
 // --- Module-private helpers ---
-
-/**
- * Parse a queue date string from localStorage into a Date, or null if invalid.
- *
- * For values without an explicit timezone we do NOT force UTC — instead we
- * extract the YYYY-MM-DD portion and construct a Date at local noon, matching
- * getPracticeDate() convention and avoiding cross-timezone day shifts.
- */
-function parseStoredDate(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  // Case 1: plain date "YYYY-MM-DD" → local noon.
-  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
-  if (dateOnlyMatch) {
-    const localNoon = new Date(
-      Number(dateOnlyMatch[1]),
-      Number(dateOnlyMatch[2]) - 1,
-      Number(dateOnlyMatch[3]),
-      12,
-      0,
-      0,
-      0
-    );
-    return Number.isNaN(localNoon.getTime()) ? null : localNoon;
-  }
-
-  // Case 2: unzoned datetime "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS" —
-  // only the date part is relevant; use local noon.
-  const dateTimeNoZoneMatch =
-    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/.exec(trimmed);
-  if (dateTimeNoZoneMatch) {
-    const localNoon = new Date(
-      Number(dateTimeNoZoneMatch[1]),
-      Number(dateTimeNoZoneMatch[2]) - 1,
-      Number(dateTimeNoZoneMatch[3]),
-      12,
-      0,
-      0,
-      0
-    );
-    return Number.isNaN(localNoon.getTime()) ? null : localNoon;
-  }
-
-  // Case 3: explicit zone (e.g. toISOString() output) or other format —
-  // let the Date constructor handle it.
-  const normalized = trimmed.includes("T")
-    ? trimmed
-    : trimmed.replace(" ", "T");
-  const parsed = new Date(normalized);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
 
 /** Returns "YYYY-MM-DD" using the LOCAL calendar date (not UTC). */
 function toLocalDateString(d: Date): string {
@@ -308,7 +262,7 @@ export function usePracticeQueueDate(
           // If no rows exist, the manual flag is stale (set on a different device /
           // in a previous session before sync) — discard it and auto-resolve.
           const windowStartIso19 = formatAsWindowStart(storedDate);
-          const existingRows = await params.db.all<{ one: number }>(sql`
+          const existingRows = params.db.all<{ one: number }>(sql`
             SELECT 1 as one
             FROM daily_practice_queue
             WHERE user_ref = ${params.userId}

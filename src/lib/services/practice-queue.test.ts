@@ -17,8 +17,9 @@ import {
   type BetterSQLite3Database,
   drizzle,
 } from "drizzle-orm/better-sqlite3";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CATALOG_TUNE_ID_MAP } from "../db/catalog-tune-ids";
+import { persistDb } from "../db/client-sqlite";
 import {
   addSpecificTunesToExistingQueue,
   addTunesToQueue,
@@ -32,6 +33,10 @@ import {
   applyMigrations,
   createPracticeListStagedView,
 } from "./test-schema-loader";
+
+vi.mock("../db/client-sqlite", () => ({
+  persistDb: vi.fn().mockResolvedValue(undefined),
+}));
 
 // Test database setup
 let db: BetterSQLite3Database;
@@ -1205,24 +1210,20 @@ describe("addSpecificTunesToExistingQueue - Add To Review without regenerating q
     expect(tune3Row?.completedAt).toBeNull();
   });
 
-  it("should not create a new queue when no queue exists for today", async () => {
-    // Setup: tune in repertoire, but no queue exists for today
-    insertTune(tuneId(1), "Some Tune", null);
-
-    // No queue exists for today
+  it("creates a queue containing only selected tunes when none exists", async () => {
+    insertTune(tuneId(1), "Selected", null);
+    insertTune(tuneId(2), "Unselected due tune", "2025-10-16 00:00:00");
     const added = await addSpecificTunesToExistingQueue(
       db,
       TEST_USER_UUID,
       TEST_REPERTOIRE_UUID,
-      [tuneId(1)]
+      [tuneId(1)],
+      new Date("2025-10-16T12:00:00Z")
     );
-
-    // Should return empty (no queue to add to)
-    expect(added).toHaveLength(0);
-
-    // Verify the key assertion: addSpecificTunesToExistingQueue did NOT create a queue,
-    // it just returned empty.
-    expect(added).toEqual([]);
+    expect(added.map((row) => row.tuneRef)).toEqual([tuneId(1)]);
+    expect(db.all(sql`SELECT tune_ref FROM daily_practice_queue`)).toEqual([
+      { tune_ref: tuneId(1) },
+    ]);
   });
 
   it("should append to the latest active queue when today's queue has rolled over", async () => {
@@ -1302,5 +1303,155 @@ describe("addSpecificTunesToExistingQueue - Add To Review without regenerating q
       TEST_REPERTOIRE_UUID
     );
     expect(queue).toHaveLength(1);
+  });
+});
+
+describe("Add To Review durability and queue preservation", () => {
+  const today = new Date("2025-10-16T12:00:00Z");
+  const oldWindow = "2025-10-15 00:00:00";
+  const todayWindow = "2025-10-16 00:00:00";
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(persistDb).mockReset().mockResolvedValue(undefined);
+  });
+
+  it("preserves all existing row fields and appends after the last order index", async () => {
+    insertTune(tuneId(1), "Completed", null);
+    insertTune(tuneId(2), "In progress", null);
+    insertTune(tuneId(3), "Selected", null);
+    insertQueueRow("q1", tuneId(1), oldWindow, "2025-10-15 12:00:00");
+    insertQueueRow("q2", tuneId(2), oldWindow);
+    db.run(
+      sql`UPDATE daily_practice_queue SET order_index = 7, exposures_required = 3, exposures_completed = 1, outcome = 'partial' WHERE id = 'q2'`
+    );
+    const before = db.all(sql`SELECT * FROM daily_practice_queue ORDER BY id`);
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(1), tuneId(3), tuneId(3)],
+      today
+    );
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({
+      tuneRef: tuneId(3),
+      windowStartUtc: oldWindow,
+      orderIndex: 8,
+    });
+    expect(
+      db.all(
+        sql`SELECT * FROM daily_practice_queue WHERE id IN ('q1', 'q2') ORDER BY id`
+      )
+    ).toEqual(before);
+    expect(
+      db.all(sql`SELECT DISTINCT window_start_utc FROM daily_practice_queue`)
+    ).toEqual([{ window_start_utc: oldWindow }]);
+  });
+
+  it("honors an explicitly selected older queue even when today's queue exists", async () => {
+    insertTune(tuneId(1), "Existing", null);
+    insertTune(tuneId(2), "Selected", null);
+    insertQueueRow("q1", tuneId(1), oldWindow);
+    insertQueueRow("q2", tuneId(1), todayWindow);
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(2)],
+      today,
+      null,
+      oldWindow.replace(" ", "T")
+    );
+    expect(added[0].windowStartUtc).toBe(oldWindow);
+  });
+
+  it("ignores a saved selection with no queue rows and appends to the latest queue", async () => {
+    insertTune(tuneId(1), "Existing", null);
+    insertTune(tuneId(2), "Selected", null);
+    insertQueueRow("q1", tuneId(1), todayWindow);
+    const added = await addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(2)],
+      today,
+      null,
+      oldWindow
+    );
+    expect(added[0].windowStartUtc).toBe(todayWindow);
+  });
+
+  it("waits for local persistence before resolving", async () => {
+    insertTune(tuneId(1), "Selected", null);
+    vi.stubGlobal("indexedDB", {});
+    let finishSave: () => void = () => {};
+    const saving = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    vi.mocked(persistDb).mockReturnValueOnce(saving);
+    let resolved = false;
+    const adding = addSpecificTunesToExistingQueue(
+      db,
+      TEST_USER_UUID,
+      TEST_REPERTOIRE_UUID,
+      [tuneId(1)],
+      today
+    ).then(() => {
+      resolved = true;
+    });
+    await vi.waitFor(() => expect(persistDb).toHaveBeenCalledOnce());
+    expect(resolved).toBe(false);
+    finishSave();
+    await adding;
+    expect(resolved).toBe(true);
+  });
+
+  it("reports a persistence failure and saves successfully on retry without duplicating rows", async () => {
+    insertTune(tuneId(1), "Selected", null);
+    vi.stubGlobal("indexedDB", {});
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("Disk full"));
+    await expect(
+      addSpecificTunesToExistingQueue(
+        db,
+        TEST_USER_UUID,
+        TEST_REPERTOIRE_UUID,
+        [tuneId(1)],
+        today
+      )
+    ).rejects.toThrow("Disk full");
+    await expect(
+      addSpecificTunesToExistingQueue(
+        db,
+        TEST_USER_UUID,
+        TEST_REPERTOIRE_UUID,
+        [tuneId(1)],
+        today
+      )
+    ).resolves.toEqual([]);
+    expect(persistDb).toHaveBeenCalledTimes(2);
+    expect(db.all(sql`SELECT tune_ref FROM daily_practice_queue`)).toEqual([
+      { tune_ref: tuneId(1) },
+    ]);
+  });
+
+  it("rolls back the entire append if an insert fails", async () => {
+    insertTune(tuneId(1), "Selected", null);
+    insertTune(tuneId(2), "Rejected", null);
+    db.run(
+      sql.raw(
+        `CREATE TRIGGER reject_queue_insert BEFORE INSERT ON daily_practice_queue WHEN NEW.tune_ref = '${tuneId(2)}' BEGIN SELECT RAISE(ABORT, 'Rejected'); END`
+      )
+    );
+    await expect(
+      addSpecificTunesToExistingQueue(
+        db,
+        TEST_USER_UUID,
+        TEST_REPERTOIRE_UUID,
+        [tuneId(1), tuneId(2)],
+        today
+      )
+    ).rejects.toThrow("Rejected");
+    expect(db.all(sql`SELECT * FROM daily_practice_queue`)).toEqual([]);
   });
 });
