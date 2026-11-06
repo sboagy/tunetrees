@@ -445,33 +445,17 @@ test.describe
       const saveButton = page.getByTestId("settings-genre-save");
       await expect(saveButton).toBeEnabled({ timeout: 5000 });
 
-      const syncVersionBefore = await page.evaluate(() => {
-        const el = document.querySelector(
-          "[data-auth-initialized]"
-        ) as HTMLElement | null;
-        const versionStr = el?.dataset.syncVersion ?? "0";
-        return Number.parseInt(versionStr, 10) || 0;
-      });
-
       await saveButton.click();
+      // Disabled also means "Saving...", and an unrelated sync can increment
+      // syncVersion. Wait for the save handler's success before closing settings
+      // or reloading while its full sync and persistence are still in flight.
+      await expect(
+        page.getByText("Catalog selection saved successfully", { exact: true })
+      ).toBeVisible({ timeout: 20000 });
+      await expect(saveButton).toHaveText("Save Changes", { timeout: 10000 });
       await expect(saveButton).toBeDisabled({ timeout: 20000 });
 
-      await expect
-        .poll(async () => {
-          return page.evaluate(() => {
-            const el = document.querySelector(
-              "[data-auth-initialized]"
-            ) as HTMLElement | null;
-            const versionStr = el?.dataset.syncVersion ?? "0";
-            return Number.parseInt(versionStr, 10) || 0;
-          });
-        })
-        .toBeGreaterThan(syncVersionBefore);
-
-      await page.getByTestId("settings-close-button").click();
-      await page
-        .getByTestId("settings-modal")
-        .waitFor({ state: "hidden", timeout: 10000 });
+      await ttPage.closeSettings();
 
       await ttPage.navigateToTab("catalog");
 

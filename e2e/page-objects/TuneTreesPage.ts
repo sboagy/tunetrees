@@ -3455,6 +3455,13 @@ export class TuneTreesPage {
   ): Promise<Locator> {
     await this.ensureToolbarActionVisible(tab, action);
 
+    // The Kobalte root is a group, not the toggle itself. Its center can be
+    // empty space between the control and label; use the associated label.
+    const label = action.locator("label").first();
+    if (await label.isVisible()) {
+      return label;
+    }
+
     const actionVisible = await action
       .isVisible({ timeout: 300 })
       .catch(() => false);
@@ -3468,14 +3475,6 @@ export class TuneTreesPage {
       .catch(() => false);
     if (controlVisible) {
       return control;
-    }
-
-    const label = action.locator("label").first();
-    const labelVisible = await label
-      .isVisible({ timeout: 300 })
-      .catch(() => false);
-    if (labelVisible) {
-      return label;
     }
 
     return this.getToolbarSwitchTarget(tab, action);
@@ -3544,15 +3543,13 @@ export class TuneTreesPage {
         try {
           const target = await this.getToolbarSwitchClickTarget(tab, action);
 
-          try {
-            await target.click({ timeout: 1000 });
-          } catch {
-            try {
-              await target.click({ timeout: 1000, force: true });
-            } catch {
-              await target.dispatchEvent("click");
-            }
-          }
+          // Success/error notifications can cover the toolbar after submission.
+          // Dismiss the obstruction instead of force-clicking through a toast.
+          await this.clickWithToastRecovery(
+            target,
+            { timeout: 1000 },
+            "setToolbarSwitchChecked"
+          );
 
           await expect
             .poll(() => this.getToolbarSwitchChecked(tab, action), {

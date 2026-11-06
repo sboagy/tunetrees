@@ -160,16 +160,21 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
       )
       .toBeNull();
 
-    const fallbackLabel = ((await trigger.textContent()) ?? "").trim();
-    const fallbackTitle = await trigger.getAttribute("title");
+    const fallbackTitle = formatGridDateTitle(practiceRecord!.due);
     const triggerIcon = page.getByTestId(
       `scheduled-override-icon-${CATALOG_TUNE_KESH_ID}`
     );
 
-    expect(fallbackLabel.length).toBeGreaterThan(0);
-    expect(fallbackTitle).toBe(formatGridDateTitle(practiceRecord!.due));
+    // The database write can finish before the grid renders latest_due.
+    // Wait for the fallback UI before capturing its label; otherwise a stale
+    // "Yesterday" label can be paired with the refreshed "Tomorrow" title.
+    await expect(trigger).toHaveAttribute("title", fallbackTitle, {
+      timeout: 10000,
+    });
     await expect(triggerIcon).toHaveClass(/text-gray-(400|500)/);
     await expect(triggerIcon).toHaveClass(/border-transparent/);
+    const fallbackLabel = ((await trigger.textContent()) ?? "").trim();
+    expect(fallbackLabel.length).toBeGreaterThan(0);
 
     await trigger.click();
     await expect(popover).toBeVisible({ timeout: 10000 });
@@ -255,7 +260,7 @@ test.describe("SCHEDULE-OVERRIDE-001: Grid Picker", () => {
       .toBeNull();
 
     await expect(trigger).toHaveText(fallbackLabel, { timeout: 10000 });
-    await expect(trigger).toHaveAttribute("title", fallbackTitle ?? "", {
+    await expect(trigger).toHaveAttribute("title", fallbackTitle, {
       timeout: 10000,
     });
     await expect(triggerIcon).toHaveClass(/text-gray-(400|500)/);

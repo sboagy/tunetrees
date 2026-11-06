@@ -33,7 +33,6 @@ permissions:
 # Opt into Node.js 24 for JavaScript actions.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NPM_CONFIG_LEGACY_PEER_DEPS: "true"
 
 jobs:
   deploy-production:
