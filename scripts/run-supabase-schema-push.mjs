@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import postgres from "postgres";
 
-const SUPABASE_CLI_VERSION = "2.98.2";
+const SUPABASE_CLI_VERSION = "2.122.1";
 const MIGRATIONS_DIR = join(process.cwd(), "supabase", "migrations");
 // Absolute path avoids PATH-search command injection (SonarQube S4036).
 const NPX = join(dirname(process.execPath), "npx");
@@ -290,6 +290,8 @@ ${migrationListOutput.trim() || "(no output)"}
   }
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   fail(err instanceof Error ? err.message : String(err));
-});
+}
