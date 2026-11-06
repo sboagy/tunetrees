@@ -30,7 +30,6 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NPM_CONFIG_LEGACY_PEER_DEPS: "true"
 
 jobs:
   deploy-branch-staging:
