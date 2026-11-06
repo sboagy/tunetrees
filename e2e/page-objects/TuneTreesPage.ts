@@ -3870,16 +3870,23 @@ export class TuneTreesPage {
     const getCheckbox = () =>
       getOption().locator('input[type="checkbox"]').first();
 
+    // The portal can close between visibility checks and this read. Bound each
+    // getter, including reads inside expect.poll, so a missing checkbox cannot
+    // consume the test timeout before the reopen/retry logic runs. Missing is
+    // unknown, not unchecked: hiding a column must still verify its state.
+    const readChecked = () =>
+      getCheckbox()
+        .isChecked({ timeout: 500 })
+        .catch(() => null);
+
     await expect(getLabel()).toBeVisible({ timeout: 5000 });
     await getOption()
-      .scrollIntoViewIfNeeded()
+      .scrollIntoViewIfNeeded({ timeout: 2000 })
       .catch(() => undefined);
     await expect(getOption()).toBeVisible({ timeout: 5000 });
     await expect(getCheckbox()).toBeVisible({ timeout: 5000 });
 
-    const isChecked = await getCheckbox()
-      .isChecked()
-      .catch(() => false);
+    const isChecked = await readChecked();
     if (isChecked !== visible) {
       let visibilityUpdated = false;
 
@@ -3896,9 +3903,7 @@ export class TuneTreesPage {
           // Re-check the checkbox before clicking: if a prior attempt already
           // toggled it (or the menu reopened with the desired state), skip the
           // click to keep retries idempotent.
-          const alreadyMatches = await getCheckbox()
-            .isChecked()
-            .catch(() => null);
+          const alreadyMatches = await readChecked();
           if (alreadyMatches === visible) {
             visibilityUpdated = true;
             break;
@@ -3908,16 +3913,10 @@ export class TuneTreesPage {
           await getOption().click({ timeout: 2000 });
 
           visibilityUpdated = await expect
-            .poll(
-              async () =>
-                await getCheckbox()
-                  .isChecked()
-                  .catch(() => null),
-              {
-                timeout: 2000,
-                intervals: [100, 250, 500],
-              }
-            )
+            .poll(readChecked, {
+              timeout: 2000,
+              intervals: [100, 250, 500],
+            })
             .toBe(visible)
             .then(() => true)
             .catch(() => false);
