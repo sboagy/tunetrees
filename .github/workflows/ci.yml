@@ -278,7 +278,7 @@ jobs:
           path: |
             /usr/local/bin/supabase
             /usr/local/bin/supabase-go
-          key: ${{ runner.os }}-supabase-cli-v2.106.0
+          key: ${{ runner.os }}-supabase-cli-v2.122.1
           restore-keys: |
             ${{ runner.os }}-supabase-cli-v2.
 
@@ -289,7 +289,7 @@ jobs:
             echo "Supabase CLI install attempt $attempt/3..."
             rm -rf /tmp/supabase-cli && mkdir -p /tmp/supabase-cli
             if timeout 120 curl -fsSL --proto "=https" --tlsv1.2 \
-                https://github.com/supabase/cli/releases/download/v2.106.0/supabase_2.106.0_linux_amd64.tar.gz \
+                https://github.com/supabase/cli/releases/download/v2.122.1/supabase_2.122.1_linux_amd64.tar.gz \
                 | tar -xz -C /tmp/supabase-cli \
               && test -x /tmp/supabase-cli/supabase \
               && test -x /tmp/supabase-cli/supabase-go; then
@@ -312,7 +312,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/supabase-docker-images.tar
-          key: ${{ runner.os }}-supabase-docker-v2.106.0
+          key: ${{ runner.os }}-supabase-docker-v2.122.1
           restore-keys: |
             ${{ runner.os }}-supabase-docker-
 
@@ -663,7 +663,7 @@ jobs:
           path: |
             /usr/local/bin/supabase
             /usr/local/bin/supabase-go
-          key: ${{ runner.os }}-supabase-cli-v2.106.0
+          key: ${{ runner.os }}-supabase-cli-v2.122.1
           restore-keys: |
             ${{ runner.os }}-supabase-cli-v2.
 
@@ -674,7 +674,7 @@ jobs:
             echo "Supabase CLI install attempt $attempt/3..."
             rm -rf /tmp/supabase-cli && mkdir -p /tmp/supabase-cli
             if timeout 120 curl -fsSL --proto "=https" --tlsv1.2 \
-                https://github.com/supabase/cli/releases/download/v2.106.0/supabase_2.106.0_linux_amd64.tar.gz \
+                https://github.com/supabase/cli/releases/download/v2.122.1/supabase_2.122.1_linux_amd64.tar.gz \
                 | tar -xz -C /tmp/supabase-cli \
               && test -x /tmp/supabase-cli/supabase \
               && test -x /tmp/supabase-cli/supabase-go; then
@@ -697,7 +697,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/supabase-docker-images.tar
-          key: ${{ runner.os }}-supabase-docker-v2.106.0
+          key: ${{ runner.os }}-supabase-docker-v2.122.1
           restore-keys: |
             ${{ runner.os }}-supabase-docker-
 
