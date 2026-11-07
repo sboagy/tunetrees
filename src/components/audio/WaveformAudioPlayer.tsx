@@ -1329,6 +1329,10 @@ const WaveformAudioPlayer: Component<WaveformAudioPlayerProps> = (props) => {
 
     waveSurfer?.destroy();
     waveSurfer = null;
+    // WaveSurfer leaves externally supplied media untouched. Release our source
+    // after its listeners are detached, including downloads still in progress.
+    audioElement?.removeAttribute("src");
+    audioElement?.load();
     audioElement = null;
     regionsPlugin = null;
     if (objectUrlToRevoke) {
