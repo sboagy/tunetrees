@@ -162,23 +162,60 @@ describe("CI secret boundary", () => {
     });
     expect(result.stdout).toContain("::add-mask::fixture-password");
   });
-  it("resolves a deployment template once and exports only its keys", () => {
+  it.each([".env.staging.template", ".env.prod.template"])(
+    "resolves %s once and exports only its keys",
+    (template) => {
+      fakeOp();
+      env.OP_SERVICE_ACCOUNT_TOKEN = "fixture-token";
+      writeFileSync(
+        join(directory, template),
+        'SECRET="op://fixture/item/secret"\nPUBLIC=literal\n'
+      );
+      const result = run(bootstrap, [template]);
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(env.OP_TEST_CALLS as string, "utf8")).toBe("run\n");
+      expect(exportedEnv()).toEqual({
+        SECRET: "fixture-secret",
+        PUBLIC: "literal",
+        TUNETREES_LOADED_ENV: join(directory, template),
+      });
+      expect(result.stdout).toContain("::add-mask::fixture-secret");
+    }
+  );
+  it("exports quoted and multiline local values while preserving inherited overrides", () => {
     fakeOp();
-    env.OP_SERVICE_ACCOUNT_TOKEN = "fixture-token";
+    env.PUBLIC = "inherited";
     writeFileSync(
-      join(directory, ".env.staging.template"),
-      'SECRET="op://fixture/item/secret"\nPUBLIC=literal\n'
+      join(directory, ".env.local.template"),
+      'ALICE_TEST_PASSWORD="op://fixture/test/password"\nPUBLIC=file\nQUOTED="literal # value"\nMULTILINE="first\\nsecond"\nEMPTY=\nMISSING\n'
     );
-    const result = run(bootstrap, [".env.staging.template"]);
+    const result = run(bootstrap, [".env.local.template"]);
     expect(result.status, result.stderr).toBe(0);
-    expect(readFileSync(env.OP_TEST_CALLS as string, "utf8")).toBe("run\n");
     expect(exportedEnv()).toEqual({
-      SECRET: "fixture-secret",
-      PUBLIC: "literal",
-      TUNETREES_LOADED_ENV: join(directory, ".env.staging.template"),
+      ALICE_TEST_PASSWORD: "fixture-password",
+      TEST_USER_PASSWORD: "fixture-password",
+      PUBLIC: "inherited",
+      QUOTED: "literal # value",
+      MULTILINE: "first\nsecond",
+      VITE_WORKER_URL: "http://localhost:8787",
+      TUNETREES_LOADED_ENV: join(directory, ".env.local.template"),
     });
-    expect(result.stdout).toContain("::add-mask::fixture-secret");
+    expect(readFileSync(env.OP_TEST_CALLS as string, "utf8")).toBe("read\n");
   });
+  it.each([undefined, "", "op://fixture/item/secret"])(
+    "rejects unresolved deployment values (%s) without fetching secrets again",
+    (value) => {
+      writeFileSync(
+        join(directory, ".env.prod.template"),
+        'SECRET="op://fixture/item/secret"\n'
+      );
+      env.SECRET = value;
+      const result = run(bootstrap, [".env.prod.template", "--export"]);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Missing resolved CI value: SECRET");
+      expect(result.stdout).toBe("");
+    }
+  );
   it("reuses the same template from a Worker subdirectory", () => {
     mkdirSync(join(directory, "worker"));
     env.TUNETREES_LOADED_ENV = join(directory, ".env.local.template");
