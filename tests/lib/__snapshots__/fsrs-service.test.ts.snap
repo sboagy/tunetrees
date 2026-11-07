@@ -1,0 +1,286 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`FSRS package migration compatibility > preserves first-review scheduling for rating 1 1`] = `
+{
+  "difficulty": 6.4133,
+  "elapsed_days": 0,
+  "interval": 1,
+  "lapses": 0,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:01:00.000Z,
+  "reps": 1,
+  "scheduled_days": 0,
+  "stability": 0.212,
+  "state": 1,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves first-review scheduling for rating 2 1`] = `
+{
+  "difficulty": 5.11217071,
+  "elapsed_days": 0,
+  "interval": 1,
+  "lapses": 0,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:05:30.000Z,
+  "reps": 1,
+  "scheduled_days": 0,
+  "stability": 1.2931,
+  "state": 1,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves first-review scheduling for rating 3 1`] = `
+{
+  "difficulty": 2.11810397,
+  "elapsed_days": 0,
+  "interval": 1,
+  "lapses": 0,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:10:00.000Z,
+  "reps": 1,
+  "scheduled_days": 0,
+  "stability": 2.3065,
+  "state": 1,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves first-review scheduling for rating 4 1`] = `
+{
+  "difficulty": 1,
+  "elapsed_days": 0,
+  "interval": 8,
+  "lapses": 0,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-14T12:00:00.000Z,
+  "reps": 1,
+  "scheduled_days": 8,
+  "stability": 8.2956,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 1 with rating 1 1`] = `
+{
+  "difficulty": 8.34176237,
+  "elapsed_days": 5,
+  "interval": 1,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:01:00.000Z,
+  "reps": 11,
+  "scheduled_days": 0,
+  "stability": 1.40828908,
+  "state": 1,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 1 with rating 2 1`] = `
+{
+  "difficulty": 6.66599536,
+  "elapsed_days": 5,
+  "interval": 1,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:05:30.000Z,
+  "reps": 11,
+  "scheduled_days": 0,
+  "stability": 19.77973465,
+  "state": 1,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 1 with rating 3 1`] = `
+{
+  "difficulty": 4.99022837,
+  "elapsed_days": 5,
+  "interval": 1,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:10:00.000Z,
+  "reps": 11,
+  "scheduled_days": 0,
+  "stability": 24.93604032,
+  "state": 1,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 1 with rating 4 1`] = `
+{
+  "difficulty": 3.31446137,
+  "elapsed_days": 5,
+  "interval": 36,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-12-12T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 36,
+  "stability": 36.22790992,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 2 with rating 1 1`] = `
+{
+  "difficulty": 8.34176237,
+  "elapsed_days": 5,
+  "interval": 1,
+  "lapses": 3,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:10:00.000Z,
+  "reps": 11,
+  "scheduled_days": 0,
+  "stability": 1.40828908,
+  "state": 3,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 2 with rating 2 1`] = `
+{
+  "difficulty": 6.66599536,
+  "elapsed_days": 5,
+  "interval": 20,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-26T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 20,
+  "stability": 19.77973465,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 2 with rating 3 1`] = `
+{
+  "difficulty": 4.99022837,
+  "elapsed_days": 5,
+  "interval": 25,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-12-01T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 25,
+  "stability": 24.93604032,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 2 with rating 4 1`] = `
+{
+  "difficulty": 3.31446137,
+  "elapsed_days": 5,
+  "interval": 36,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-12-12T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 36,
+  "stability": 36.22790992,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 3 with rating 1 1`] = `
+{
+  "difficulty": 8.34176237,
+  "elapsed_days": 5,
+  "interval": 1,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:10:00.000Z,
+  "reps": 11,
+  "scheduled_days": 0,
+  "stability": 1.40828908,
+  "state": 3,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 3 with rating 2 1`] = `
+{
+  "difficulty": 6.66599536,
+  "elapsed_days": 5,
+  "interval": 1,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-06T12:15:00.000Z,
+  "reps": 11,
+  "scheduled_days": 0,
+  "stability": 19.77973465,
+  "state": 3,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 3 with rating 3 1`] = `
+{
+  "difficulty": 4.99022837,
+  "elapsed_days": 5,
+  "interval": 25,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-12-01T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 25,
+  "stability": 24.93604032,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves persisted state 3 with rating 4 1`] = `
+{
+  "difficulty": 3.31446137,
+  "elapsed_days": 5,
+  "interval": 36,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-12-12T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 36,
+  "stability": 36.22790992,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves stored 17-weight preferences 1`] = `
+{
+  "difficulty": 4.9899,
+  "elapsed_days": 5,
+  "interval": 22,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-28T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 22,
+  "stability": 21.87054898,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves stored 19-weight preferences 1`] = `
+{
+  "difficulty": 4.84153149,
+  "elapsed_days": 5,
+  "interval": 22,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-28T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 22,
+  "stability": 21.87054898,
+  "state": 2,
+}
+`;
+
+exports[`FSRS package migration compatibility > preserves stored 21-weight preferences 1`] = `
+{
+  "difficulty": 4.84153149,
+  "elapsed_days": 5,
+  "interval": 23,
+  "lapses": 2,
+  "last_review": 2026-11-06T12:00:00.000Z,
+  "nextDue": 2026-11-29T12:00:00.000Z,
+  "reps": 11,
+  "scheduled_days": 23,
+  "stability": 23.23042176,
+  "state": 2,
+}
+`;
