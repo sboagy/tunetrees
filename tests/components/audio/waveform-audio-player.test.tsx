@@ -19,6 +19,8 @@ type MockRegion = {
 
 const {
   audioPauseMock,
+  audioLoadMock,
+  audioRemoveAttributeMock,
   emitWaveEvent,
   getMediaVaultBlob,
   resetMocks,
@@ -60,6 +62,8 @@ const {
   };
 
   const audioPauseMock = vi.fn();
+  const audioLoadMock = vi.fn();
+  const audioRemoveAttributeMock = vi.fn();
   const updateMediaAssetByReferenceId = vi.fn(async () => undefined);
   const toastError = vi.fn();
   const getMediaVaultBlob = vi.fn<() => Promise<Blob | null>>(async () => null);
@@ -123,6 +127,8 @@ const {
     mockRegions = [];
 
     audioPauseMock.mockClear();
+    audioLoadMock.mockClear();
+    audioRemoveAttributeMock.mockClear();
     getMediaVaultBlob.mockClear();
     getMediaVaultBlob.mockResolvedValue(null);
     createObjectUrlMock.mockClear();
@@ -147,6 +153,8 @@ const {
 
   return {
     audioPauseMock,
+    audioLoadMock,
+    audioRemoveAttributeMock,
     emitWaveEvent: (event: string, ...args: unknown[]) =>
       emit(waveHandlers, event, ...args),
     getMediaVaultBlob,
@@ -203,6 +211,8 @@ class MockAudioElement {
   crossOrigin: string | null = null;
   duration = 180;
   pause = audioPauseMock;
+  load = audioLoadMock;
+  removeAttribute = audioRemoveAttributeMock;
   preservesPitch?: boolean;
   mozPreservesPitch?: boolean;
   webkitPreservesPitch?: boolean;
@@ -342,6 +352,36 @@ describe("WaveformAudioPlayer persistence", () => {
     view.unmount();
 
     expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:pinned-audio");
+    expect(audioRemoveAttributeMock).toHaveBeenCalledWith("src");
+    expect(audioLoadMock).toHaveBeenCalledTimes(1);
+    expect(waveSurferInstance.destroy.mock.invocationCallOrder[0]).toBeLessThan(
+      audioLoadMock.mock.invocationCallOrder[0]
+    );
+    expect(audioLoadMock.mock.invocationCallOrder[0]).toBeLessThan(
+      revokeObjectUrlMock.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("releases network media when closed before decoding completes", async () => {
+    const view = render(() => (
+      <WaveformAudioPlayer
+        track={{
+          referenceId: "ref-loading",
+          referenceTitle: "Loading Audio",
+          url: "https://example.com/loading.wav",
+        }}
+      />
+    ));
+
+    await waitFor(() => expect(waveSurferInstance.on).toHaveBeenCalled());
+    // No ready event: closing during a load must still cancel the media source.
+    view.unmount();
+
+    expect(audioPauseMock).toHaveBeenCalled();
+    expect(waveSurferInstance.destroy).toHaveBeenCalledTimes(1);
+    expect(audioRemoveAttributeMock).toHaveBeenCalledWith("src");
+    expect(audioLoadMock).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
   });
 
   it("does not initialize audio resources after unmount if the vault lookup resolves late", async () => {

@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import {
   configureMockGoogleDriveByos,
+  createSilentWavBuffer,
   saveMockGoogleStorageSettings,
 } from "../helpers/byos-provider";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
@@ -20,31 +21,6 @@ async function readPersistedAudioState(page: Page, referenceId: string) {
   return page.evaluate((id) => {
     return (globalThis as any).__ttTestApi?.readMediaAssetRegions(id) ?? null;
   }, referenceId);
-}
-
-function createSilentWavBuffer(durationSeconds = 1, sampleRate = 8000) {
-  const channelCount = 1;
-  const bitsPerSample = 16;
-  const bytesPerSample = bitsPerSample / 8;
-  const sampleCount = durationSeconds * sampleRate;
-  const dataSize = sampleCount * channelCount * bytesPerSample;
-  const buffer = Buffer.alloc(44 + dataSize);
-
-  buffer.write("RIFF", 0);
-  buffer.writeUInt32LE(36 + dataSize, 4);
-  buffer.write("WAVE", 8);
-  buffer.write("fmt ", 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(channelCount, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * channelCount * bytesPerSample, 28);
-  buffer.writeUInt16LE(channelCount * bytesPerSample, 32);
-  buffer.writeUInt16LE(bitsPerSample, 34);
-  buffer.write("data", 36);
-  buffer.writeUInt32LE(dataSize, 40);
-
-  return buffer;
 }
 
 test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
@@ -82,6 +58,14 @@ test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
     testUser,
   }) => {
     await configureMockGoogleDriveByos(page, testUser.userId);
+    // Use a long enough clip to observe transport transitions before it ends.
+    const audioBytes = createSilentWavBuffer(12);
+    await page.route(
+      (url) =>
+        url.hostname === "www.googleapis.com" &&
+        url.searchParams.get("alt") === "media",
+      (route) => route.fulfill({ contentType: "audio/wav", body: audioBytes })
+    );
     await ttPage.referencesAddButton.click();
     await expect(ttPage.referenceForm).toBeVisible({ timeout: 10000 });
 
@@ -92,7 +76,7 @@ test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
     await ttPage.referenceAudioFileInput.setInputFiles({
       name: "tt-e2e-audio-persist.wav",
       mimeType: "audio/wav",
-      buffer: createSilentWavBuffer(),
+      buffer: audioBytes,
     });
 
     await expect(ttPage.referenceAudioSelectedFile).toHaveText(
@@ -125,8 +109,50 @@ test.describe("REFS-003: Audio Reference Waveform Persistence", () => {
     // Ensure WaveSurfer and regions plugin are fully ready before annotation clicks.
     await expect(ttPage.audioPlayerPlayToggle).toBeEnabled({ timeout: 10000 });
 
+    await expect(page.getByTestId("audio-player-duration")).toHaveText("0:12");
+    // Canvas lives in WaveSurfer's open shadow root; readiness alone does not
+    // prove the waveform renderer survived the library upgrade.
+    await expect(
+      ttPage.audioPlayerWaveform.locator("canvas").first()
+    ).toBeVisible({
+      timeout: 10000,
+    });
+    await ttPage.audioPlayerPlayToggle.click();
+    await expect(ttPage.audioPlayerPlayToggle).toHaveText("Pause (,)");
+    await expect(page.getByTestId("audio-player-current-time")).not.toHaveText(
+      "0:00"
+    );
+    await ttPage.audioPlayerPlayToggle.click();
+    await expect(ttPage.audioPlayerPlayToggle).toHaveText("Play (,)");
+    await page.getByTestId("audio-player-stop-button").click();
+    await expect(page.getByTestId("audio-player-current-time")).toHaveText(
+      "0:00"
+    );
+    await ttPage.audioPlayerWaveform.click({ position: { x: 100, y: 64 } });
+    await expect(page.getByTestId("audio-player-current-time")).not.toHaveText(
+      "0:00"
+    );
+    await page.getByTestId("audio-player-stop-button").click();
+    await expect(page.getByTestId("audio-player-current-time")).toHaveText(
+      "0:00"
+    );
+
     await ttPage.audioPlayerAddRegionButton.click();
     await expect(ttPage.audioPlayerRegionList).toContainText("Loop 1");
+    await ttPage.audioPlayerLoopToggle.check();
+    await ttPage.audioPlayerPlayToggle.click();
+    // Observe a real wrap across the four-second region boundary, rather than
+    // only checking that the loop checkbox changes its appearance.
+    await expect(page.getByTestId("audio-player-current-time")).toHaveText(
+      "0:03",
+      { timeout: 10000 }
+    );
+    await expect(page.getByTestId("audio-player-current-time")).toHaveText(
+      "0:00",
+      { timeout: 10000 }
+    );
+    await expect(ttPage.audioPlayerPlayToggle).toHaveText("Pause (,)");
+    await page.getByTestId("audio-player-stop-button").click();
     await ttPage.audioPlayerAddBeatButton.click();
     await expect(ttPage.audioPlayerRegionList).toContainText("Beat 1");
 
