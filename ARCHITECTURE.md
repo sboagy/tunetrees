@@ -304,6 +304,13 @@ These principles define the product behavior and should be preserved.
 
 TuneTrees uses the FSRS algorithm (`ts-fsrs`):
 
+The app pins ts-fsrs 6.0.0 while retaining the FSRS-6 model through its
+compatibility API. `FSRSService` derives the persisted elapsed-day field from
+actual review timestamps; the library no longer returns that field. Existing
+weights and immutable history remain compatible with older clients. See
+[`ts-fsrs6-migration.md`](docs/development/ts-fsrs6-migration.md) for reviewed
+scheduling differences and the separate scope of a future FSRS-7 migration.
+
 ```text
 User rates tune -> FSRS calculates -> Next review date stored
        |

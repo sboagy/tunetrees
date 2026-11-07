@@ -21,7 +21,9 @@ import {
   createEmptyCard,
   fsrs,
   generatorParameters,
+  type Grade,
   Rating,
+  State,
   // type RecordLog,
 } from "ts-fsrs";
 import type { SqliteDatabase } from "../db/client-sqlite";
@@ -180,7 +182,8 @@ export class FSRSService implements SchedulingService {
       });
     }
 
-    // Initialize ts-fsrs scheduler with user preferences
+    // v6's compatibility facade retains FSRS-6 and existing stored weights.
+    // DefaultScheduler defaults to FSRS-7, which requires a separate history migration.
     this.scheduler = fsrs({
       w: weights,
       // High retention (95%) as default because 'Performance' requires higher recall than 'Facts'
@@ -208,21 +211,17 @@ export class FSRSService implements SchedulingService {
     const card = createEmptyCard(input.practiced);
     const rating = this.qualityToRating(input.quality);
 
-    // ts-fsrs v5.x uses repeat() for all reviews
+    // Preview all ratings through the FSRS-6 compatibility API.
     const recordLog = this.scheduler.repeat(card, input.practiced);
 
-    // Get the specific schedule for this rating (cast to Rating.Again/Hard/Good/Easy to index RecordLog)
-    const schedule =
-      recordLog[
-        rating as Rating.Again | Rating.Hard | Rating.Good | Rating.Easy
-      ];
+    const schedule = recordLog[rating];
 
     return {
       nextDue: schedule.card.due,
       state: schedule.card.state,
       stability: schedule.card.stability,
       difficulty: schedule.card.difficulty,
-      elapsed_days: this.getElapsedDays(schedule.card),
+      elapsed_days: 0,
       scheduled_days: schedule.card.scheduled_days,
       reps: schedule.card.reps,
       lapses: schedule.card.lapses,
@@ -242,17 +241,26 @@ export class FSRSService implements SchedulingService {
     input: RecordPracticeInput,
     latestRecord: PracticeRecord
   ): Promise<NextReviewSchedule> {
+    const state = latestRecord.state ?? State.New;
+    if (
+      state !== State.New &&
+      state !== State.Learning &&
+      state !== State.Review &&
+      state !== State.Relearning
+    ) {
+      throw new Error(`Invalid persisted FSRS state: ${state}`);
+    }
+
     // Reconstruct FSRS card from latest practice record
     const card: Card = {
       due: new Date(latestRecord.due ?? new Date()),
       stability: latestRecord.stability ?? 0,
       difficulty: latestRecord.difficulty ?? 0,
-      elapsed_days: latestRecord.elapsedDays ?? 0,
       scheduled_days: 0,
       learning_steps: 0, // Will be managed by FSRS
       reps: latestRecord.repetitions ?? 0,
       lapses: latestRecord.lapses ?? 0,
-      state: latestRecord.state ?? 0,
+      state,
       last_review: latestRecord.practiced
         ? new Date(latestRecord.practiced)
         : input.practiced,
@@ -262,17 +270,14 @@ export class FSRSService implements SchedulingService {
 
     // Process the review
     const recordLog = this.scheduler.repeat(card, input.practiced);
-    const schedule =
-      recordLog[
-        rating as Rating.Again | Rating.Hard | Rating.Good | Rating.Easy
-      ];
+    const schedule = recordLog[rating];
 
     return {
       nextDue: schedule.card.due,
       state: schedule.card.state,
       stability: schedule.card.stability,
       difficulty: schedule.card.difficulty,
-      elapsed_days: this.getElapsedDays(schedule.card),
+      elapsed_days: this.getElapsedDays(card, input.practiced),
       scheduled_days: schedule.card.scheduled_days,
       reps: schedule.card.reps,
       lapses: schedule.card.lapses,
@@ -281,8 +286,15 @@ export class FSRSService implements SchedulingService {
     };
   }
 
-  private getElapsedDays(card: Card): number {
-    return (card as unknown as Record<string, unknown>).elapsed_days as number;
+  private getElapsedDays(card: Card, practiced: Date): number {
+    // v6 removed Card.elapsed_days. Keep our persisted history/plugin field,
+    // using the same UTC calendar-day boundaries as v5, not the scheduled due date.
+    if (card.state === State.New || !card.last_review) return 0;
+    const utcDay = (date: Date) =>
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+    return Math.floor(
+      (utcDay(practiced) - utcDay(card.last_review)) / 86_400_000
+    );
   }
 
   /**
@@ -367,12 +379,11 @@ export class FSRSService implements SchedulingService {
       due: schedule.nextDue.toISOString(),
       backupPracticed: input.practiced.toISOString(),
       stability: schedule.stability,
-      elapsedDays: (schedule as unknown as Record<string, unknown>)
-        .elapsed_days as number,
+      elapsedDays: schedule.elapsed_days,
       lapses: schedule.lapses,
       state: schedule.state,
       difficulty: schedule.difficulty,
-      step: 0, // Legacy field (not used in FSRS v5)
+      step: 0, // Legacy field (not used for FSRS learning-step persistence)
       goal: input.goal ?? "recall",
       technique: input.technique,
     };
@@ -387,7 +398,7 @@ export class FSRSService implements SchedulingService {
    * @param quality - Quality value (0-5 scale)
    * @returns FSRS rating (1=Again, 2=Hard, 3=Good, 4=Easy)
    */
-  private qualityToRating(quality: number): Rating {
+  private qualityToRating(quality: number): Grade {
     const map: Rating[] = [
       Rating.Manual, // is really an error
       Rating.Again,
