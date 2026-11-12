@@ -160,7 +160,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/user-event": "^14.6.8",
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.6",
     "@types/papaparse": "^5.5.2",
     "@vitest/coverage-v8": "^5.1.0",
     "bcryptjs": "^3.0.3",
