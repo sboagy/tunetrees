@@ -172,7 +172,7 @@
     "postgres": "^4.1.0",
     "prettier": "^3.9.10",
     "supabase": "^2.122.1",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.7",
