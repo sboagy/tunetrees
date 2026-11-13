@@ -13,7 +13,7 @@ export interface PracticeSubmitProps {
   queueDate: Accessor<Date>;
   evaluationsCount: Accessor<number>;
   isStaging: Accessor<boolean>;
-  clearEvaluations: () => void;
+  prepareClearEvaluations: () => () => void;
   incrementPracticeListStagedChanged: () => void;
   syncPracticeScope: () => Promise<void> | void;
 }
@@ -59,6 +59,7 @@ export function usePracticeSubmit(
       `Submitting ${count} staged evaluations for repertoire ${repertoireId}`
     );
 
+    const clearSubmittedEvaluations = props.prepareClearEvaluations();
     try {
       const windowStartUtc = formatAsWindowStart(props.queueDate());
       const result = await commitStagedEvaluations(
@@ -76,7 +77,7 @@ export function usePracticeSubmit(
           }
         );
 
-        props.clearEvaluations();
+        clearSubmittedEvaluations();
         props.incrementPracticeListStagedChanged();
 
         console.log(

@@ -1,5 +1,8 @@
 import { expect } from "@playwright/test";
-import { getPrivateTuneIds } from "../../tests/fixtures/test-data";
+import {
+  getPrivateTuneIds,
+  TEST_TUNE_BANISH_ID,
+} from "../../tests/fixtures/test-data";
 import { setupForCatalogTestsParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import type { TestUser } from "../helpers/test-users";
@@ -82,6 +85,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Search for User's private tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await ttPage.ensureGridColumnVisible("catalog", "Ownership");
+    await ttPage.page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Get user's private tune IDs
     const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);
@@ -92,20 +96,21 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
       ttPage.catalogGrid
     );
 
-    // Verify the row exists
-    if (await userPrivateTune.isVisible({ timeout: 2000 })) {
-      const whichColumn = await ttPage.getColumnIndexByHeaderText(
-        "tunes-grid-catalog",
-        "Ownership"
-      );
-      const statusCell = userPrivateTune.locator("td").nth(whichColumn);
-      const statusText = await statusCell.textContent();
-      console.log(`Tune ${currentTestUser.userId} status: ${statusText}`);
-      expect(statusText).toBe("🔒 Private");
+    // Always assert the row and badge: an absent row must fail rather than
+    // silently skipping the ownership check.
+    await expect(userPrivateTune).toBeVisible({ timeout: 10_000 });
+    await expect(
+      await ttPage.getCatalogOwnershipCell(privateTune1Id)
+    ).toHaveText("🔒 Private", { timeout: 10_000 });
 
-      // For now, just verify the row exists - status badge display is separate issue
-      await expect(userPrivateTune).toBeVisible();
-    }
+    const publicTune = ttPage.getTuneRowById(
+      TEST_TUNE_BANISH_ID,
+      ttPage.catalogGrid
+    );
+    await expect(publicTune).toBeVisible({ timeout: 10_000 });
+    await expect(
+      await ttPage.getCatalogOwnershipCell(TEST_TUNE_BANISH_ID)
+    ).not.toContainText("Private", { timeout: 10_000 });
   });
 
   test("should show catalog toolbar", async () => {

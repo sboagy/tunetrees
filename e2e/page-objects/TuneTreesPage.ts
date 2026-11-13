@@ -2331,6 +2331,16 @@ export class TuneTreesPage {
     );
   }
 
+  async getCatalogOwnershipCell(tuneId: string): Promise<Locator> {
+    const columnIndex = await this.getColumnIndexByHeaderText(
+      "tunes-grid-catalog",
+      "Ownership"
+    );
+    return this.getTuneRowById(tuneId, this.catalogGrid)
+      .locator("td")
+      .nth(columnIndex);
+  }
+
   async setGridRowChecked(tuneId: string, grid: Locator, checked = true) {
     const row = this.getTuneRowById(tuneId, grid).first();
     await expect(row).toBeVisible({ timeout: 10000 });
@@ -3879,57 +3889,42 @@ export class TuneTreesPage {
         .isChecked({ timeout: 500 })
         .catch(() => null);
 
-    await expect(getLabel()).toBeVisible({ timeout: 5000 });
-    await getOption()
-      .scrollIntoViewIfNeeded({ timeout: 2000 })
-      .catch(() => undefined);
-    await expect(getOption()).toBeVisible({ timeout: 5000 });
-    await expect(getCheckbox()).toBeVisible({ timeout: 5000 });
+    let visibilityUpdated = false;
 
-    const isChecked = await readChecked();
-    if (isChecked !== visible) {
-      let visibilityUpdated = false;
+    // The mobile portal can detach even during the initial scroll, before a
+    // click is attempted. Retry the whole interaction, including those reads,
+    // so an early detachment does not bypass recovery. Each attempt reopens
+    // the menu and checks its state before toggling, keeping retries idempotent.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.openColumnVisibilityMenu(columnsButton);
+        await expect(getLabel()).toBeVisible({ timeout: 2000 });
+        await getOption().scrollIntoViewIfNeeded({ timeout: 2000 });
 
-      // This menu is conditionally mounted in a portal. On a reactive rerender,
-      // its option row can detach between Playwright's actionability check and
-      // click. Reopen and re-query it with bounded attempts instead of allowing
-      // one stale action to consume the full test timeout.
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          if (attempt > 0) {
-            await this.openColumnVisibilityMenu(columnsButton);
-          }
-
-          // Re-check the checkbox before clicking: if a prior attempt already
-          // toggled it (or the menu reopened with the desired state), skip the
-          // click to keep retries idempotent.
-          const alreadyMatches = await readChecked();
-          if (alreadyMatches === visible) {
-            visibilityUpdated = true;
-            break;
-          }
-
-          await expect(getOption()).toBeVisible({ timeout: 2000 });
-          await getOption().click({ timeout: 2000 });
-
-          visibilityUpdated = await expect
-            .poll(readChecked, {
-              timeout: 2000,
-              intervals: [100, 250, 500],
-            })
-            .toBe(visible)
-            .then(() => true)
-            .catch(() => false);
-          if (visibilityUpdated) {
-            break;
-          }
-        } catch {
-          // Transient detached portal row; continue to next attempt.
+        const alreadyMatches = await readChecked();
+        if (alreadyMatches === visible) {
+          visibilityUpdated = true;
+          break;
         }
-      }
 
-      expect(visibilityUpdated).toBe(true);
+        await getOption().click({ timeout: 2000 });
+        // Observe the checkbox update rather than assuming the click survived
+        // a portal rerender. A detached checkbox is unknown, never success.
+        await expect
+          .poll(readChecked, {
+            timeout: 2000,
+            intervals: [100, 250, 500],
+          })
+          .toBe(visible);
+        visibilityUpdated = true;
+        break;
+      } catch (error) {
+        // Preserve the final action's diagnostic if all bounded attempts fail.
+        if (attempt === 2) throw error;
+      }
     }
+
+    expect(visibilityUpdated).toBe(true);
 
     await this.closeColumnVisibilityMenu(menu);
   }
@@ -4588,6 +4583,17 @@ export class TuneTreesPage {
     }
 
     return tuneId;
+  }
+
+  getRowFluencyButton(row: Locator) {
+    return row.getByRole("button", { name: /fluency/i });
+  }
+
+  async selectRowFluency(row: Locator) {
+    await row.getByRole("button", { name: /recall/i }).click();
+    await this.page
+      .getByRole("menuitem", { name: "fluency", exact: true })
+      .click();
   }
 
   async setRowEvaluation(

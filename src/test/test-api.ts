@@ -42,6 +42,7 @@ import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
+import { isTransientRemoteRead } from "./remote-read";
 
 type SeedAddToReviewInput = {
   repertoireId: string; // UUID
@@ -960,14 +961,19 @@ async function getSyncErrors(): Promise<string[]> {
  */
 async function getSupabaseRecord(
   table: string,
-  recordId: string | number
+  recordId: string | number,
+  polling = false
 ): Promise<any> {
   // This requires network access - will fail in offline tests
-  const { data, error } = await supabase
-    .from(table)
-    .select("*")
-    .eq("id", recordId)
-    .single();
+  const query = supabase.from(table).select("*").eq("id", recordId);
+  const { data, error, status } = await (polling
+    ? query.maybeSingle()
+    : query.single());
+
+  // A missing row is expected until sync completes. Retry only transport or
+  // service availability errors; auth/schema failures must still fail the test.
+  if (polling && error && isTransientRemoteRead(status, error.code))
+    return null;
 
   if (error)
     throw new Error(`Failed to fetch Supabase record: ${error.message}`);
@@ -1170,6 +1176,10 @@ declare global {
       waitForIdle?: (timeoutMs?: number) => Promise<boolean>;
     };
     __ttTestApi?: {
+      // Exposes the production transport for real-worker tests in both Vite and
+      // built preview bundles. No source-module URL assumptions in those tests.
+      runPlugin: typeof import("@/lib/plugins/quickjs-host").runQuickJsPlugin;
+      disposePluginWorker: () => Promise<void>;
       // User ID injection for bypassing Supabase auth
       setTestUserId: (userId: string) => void;
       getTestUserId: () => string | undefined;
@@ -1196,6 +1206,12 @@ declare global {
       seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
         id: string;
       }>;
+      seedPracticeHistory: (input: {
+        repertoireId: string;
+        tuneId: string;
+        qualities: number[];
+        practicedBefore: string;
+      }) => Promise<void>;
       getPracticeCount: (repertoireId: string) => Promise<number>; // UUID
       getRepertoireTuneCount: (repertoireId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
@@ -1383,7 +1399,8 @@ declare global {
       getSyncErrors: () => Promise<string[]>;
       getSupabaseRecord: (
         table: string,
-        recordId: string | number
+        recordId: string | number,
+        polling?: boolean
       ) => Promise<any>;
       getLocalRecord: (
         table: string,
@@ -1425,6 +1442,10 @@ if (globalThis.window !== undefined) {
   // Idempotent attach
   if (!globalThis.window.__ttTestApi) {
     globalThis.window.__ttTestApi = {
+      runPlugin: async (input) =>
+        (await import("@/lib/plugins/quickjs-host")).runQuickJsPlugin(input),
+      disposePluginWorker: async () =>
+        (await import("@/lib/plugins/quickjs-host")).disposeQuickJsWorker(),
       // User ID injection methods
       setTestUserId: (userId: string) => {
         globalThis.window.__ttTestUserId = userId;
@@ -1612,6 +1633,42 @@ if (globalThis.window !== undefined) {
       },
       seedAddToReview,
       seedSchedulingPlugin,
+      seedPracticeHistory: async ({
+        repertoireId,
+        tuneId,
+        qualities,
+        practicedBefore,
+      }) => {
+        const db = await ensureDb();
+        for (const [index, quality] of [...qualities.entries()].reverse()) {
+          const practiced = new Date(practicedBefore);
+          practiced.setUTCDate(practiced.getUTCDate() - index - 1);
+          db.insert(practiceRecord)
+            .values({
+              id: generateId(),
+              repertoireRef: repertoireId,
+              tuneRef: tuneId,
+              practiced: practiced.toISOString(),
+              due: practicedBefore,
+              quality,
+              interval: 1,
+              state: 2,
+              step: 2,
+              stability: 3,
+              difficulty: 5,
+              repetitions: qualities.length - index,
+              lapses: 0,
+              elapsedDays: 1,
+              goal: "fluency",
+              technique: "fsrs",
+              syncVersion: 1,
+              lastModifiedAt: new Date().toISOString(),
+              deviceId: "local",
+            })
+            .run();
+        }
+        await persistDb();
+      },
       getPracticeCount,
       getRepertoireTuneCount,
       getTuneOverrideCountForCurrentUser,
@@ -1825,8 +1882,12 @@ if (globalThis.window !== undefined) {
       getSyncErrors: async () => {
         return await getSyncErrors();
       },
-      getSupabaseRecord: async (table: string, recordId: string | number) => {
-        return await getSupabaseRecord(table, recordId);
+      getSupabaseRecord: async (
+        table: string,
+        recordId: string | number,
+        polling = false
+      ) => {
+        return await getSupabaseRecord(table, recordId, polling);
       },
       getLocalRecord: async (table: string, recordId: string | number) => {
         return await getLocalRecord(table, recordId);

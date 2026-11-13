@@ -1,87 +1,27 @@
 /// <reference lib="webworker" />
-
+/** Worker shell: validated messages -> isolated VM invocation -> result.
+ * Host requests can overlap; each pending entry belongs to one invocation.
+ * The owning page terminates this worker when a plugin exceeds its deadline.
+ */
 import quickJsWasmUrl from "@jitl/quickjs-wasmfile-release-asyncify/wasm?url";
-import * as Papa from "papaparse";
-import type {
-  QuickJSAsyncContext,
-  QuickJSAsyncRuntime,
-  QuickJSHandle,
-} from "quickjs-emscripten";
 import {
   newQuickJSAsyncWASMModule,
   newVariant,
+  type QuickJSAsyncRuntime,
   RELEASE_ASYNC,
 } from "quickjs-emscripten";
+import { executePlugin } from "./quickjs-core";
+import {
+  type FsrsRequest,
+  type InvokeRequest,
+  isWorkerInput,
+  type QueryRequest,
+  type WorkerResponse,
+} from "./quickjs-protocol";
 
-export type PluginFunctionName = "parseImport" | "createScheduler";
-
-interface InvokeMessage {
-  type: "invoke";
-  id: number;
-  functionName: PluginFunctionName;
-  methodName?: "processFirstReview" | "processReview";
-  script: string;
-  payload: unknown;
-  meta?: unknown;
-}
-
-interface WorkerResponseOk {
-  id: number;
-  ok: true;
-  result: unknown;
-  timings?: Record<string, number>;
-}
-
-interface WorkerResponseError {
-  id: number;
-  ok: false;
-  error: {
-    message: string;
-    name?: string;
-    stack?: string;
-  };
-  timings?: Record<string, number>;
-}
-
-type WorkerResponse = WorkerResponseOk | WorkerResponseError;
-
-interface QueryRequest {
-  type: "query";
-  id: number;
-  invokeId: number;
-  sql: string;
-}
-
-interface QueryResponse {
-  type: "queryResult";
-  id: number;
-  ok: boolean;
-  result?: unknown;
-  error?: { message: string };
-}
-
-interface FsrsRequest {
-  type: "fsrs";
-  id: number;
-  invokeId: number;
-  method: "processFirstReview" | "processReview";
-  payload: unknown;
-}
-
-interface FsrsResponse {
-  type: "fsrsResult";
-  id: number;
-  ok: boolean;
-  result?: unknown;
-  error?: { message: string };
-}
-
-type AnyMessage = InvokeMessage | QueryResponse | FsrsResponse;
+export type { PluginFunctionName } from "./quickjs-protocol";
 
 const ctx = globalThis;
-
-type CallResult = ReturnType<QuickJSAsyncContext["callFunction"]>;
-
 const QUICKJS_ASYNC_VARIANT = newVariant(RELEASE_ASYNC, {
   wasmLocation: quickJsWasmUrl,
   locateFile: (fileName) =>
@@ -140,64 +80,6 @@ function getRuntime(): Promise<QuickJSAsyncRuntime> {
   return runtimePromise;
 }
 
-function buildStaticHandles(qjs: QuickJSAsyncContext) {
-  return {
-    undefined: qjs.undefined,
-    null: qjs.null,
-    true: qjs.true,
-    false: qjs.false,
-  } as const;
-}
-
-function createHandleMapper(params: {
-  qjs: QuickJSAsyncContext;
-  staticHandles: ReturnType<typeof buildStaticHandles>;
-}) {
-  const { qjs, staticHandles } = params;
-
-  const isStatic = (handle: QuickJSHandle) =>
-    handle === staticHandles.undefined ||
-    handle === staticHandles.null ||
-    handle === staticHandles.true ||
-    handle === staticHandles.false ||
-    handle === qjs.global;
-
-  const shouldDispose = (handle: QuickJSHandle) => !isStatic(handle);
-
-  const toHandle = (value: unknown): QuickJSHandle => {
-    if (value === null) return staticHandles.null;
-    if (value === undefined) return staticHandles.undefined;
-    if (typeof value === "string") return qjs.newString(value);
-    if (typeof value === "number") return qjs.newNumber(value);
-    if (typeof value === "boolean")
-      return value ? staticHandles.true : staticHandles.false;
-
-    if (Array.isArray(value)) {
-      const arrayHandle = qjs.newArray();
-      value.forEach((item, index) => {
-        const itemHandle = toHandle(item);
-        qjs.setProp(arrayHandle, index, itemHandle);
-        if (shouldDispose(itemHandle)) itemHandle.dispose();
-      });
-      return arrayHandle;
-    }
-
-    if (value && typeof value === "object") {
-      const objHandle = qjs.newObject();
-      for (const [key, entry] of Object.entries(value)) {
-        const entryHandle = toHandle(entry);
-        qjs.setProp(objHandle, key, entryHandle);
-        if (shouldDispose(entryHandle)) entryHandle.dispose();
-      }
-      return objHandle;
-    }
-
-    return staticHandles.undefined;
-  };
-
-  return { toHandle, shouldDispose };
-}
-
 function requestQuery(invokeId: number, sql: string): Promise<unknown> {
   queryRequestId += 1;
   const id = queryRequestId;
@@ -239,471 +121,84 @@ function requestFsrs(params: {
   });
 }
 
-/**
- * Install host API functions into the QuickJS context.
- * Returns the elapsed time and any handles that need disposal.
- */
-function installHostApis(params: {
-  qjs: QuickJSAsyncContext;
-  staticHandles: ReturnType<typeof buildStaticHandles>;
-  toHandle: ReturnType<typeof createHandleMapper>["toHandle"];
-  shouldDispose: ReturnType<typeof createHandleMapper>["shouldDispose"];
-  invokeId: number;
-}): number {
-  const { qjs, staticHandles, toHandle, shouldDispose, invokeId } = params;
+async function invoke(message: InvokeRequest): Promise<WorkerResponse> {
   const startedAt = performance.now();
-
-  const logHandle = qjs.newFunction("log", (...args) => {
-    const values = args.map((arg) => qjs.dump(arg));
-    // eslint-disable-next-line no-console
-    console.log("[Plugin]", ...values);
-    return staticHandles.undefined;
-  });
-  qjs.setProp(qjs.global, "log", logHandle);
-  if (shouldDispose(logHandle)) logHandle.dispose();
-
-  const parseJsonHandle = qjs.newFunction("parseJson", (arg) => {
-    const raw = qjs.dump(arg);
-    const text = typeof raw === "string" ? raw : JSON.stringify(raw ?? "");
-    const parsed = JSON.parse(text);
-    return toHandle(parsed);
-  });
-  qjs.setProp(qjs.global, "parseJson", parseJsonHandle);
-  if (shouldDispose(parseJsonHandle)) parseJsonHandle.dispose();
-
-  const parseCsvHandle = qjs.newFunction("parseCsv", (arg, configArg) => {
-    const raw = qjs.dump(arg);
-    if (typeof raw !== "string") {
-      throw new TypeError("parseCsv expects a CSV string");
-    }
-    const config = configArg ? qjs.dump(configArg) : undefined;
-    const parseConfig: Papa.ParseConfig = {
-      header: true,
-      skipEmptyLines: true,
-      ...(config && typeof config === "object" ? config : {}),
-      worker: false,
-    };
-    const result = Papa.parse(
-      raw,
-      parseConfig
-    ) as unknown as Papa.ParseResult<unknown>;
-    if (result.errors?.length) {
-      const msg = result.errors[0]?.message ?? "CSV parse error";
-      throw new Error(msg);
-    }
-    return toHandle(result.data);
-  });
-  qjs.setProp(qjs.global, "parseCsv", parseCsvHandle);
-  if (shouldDispose(parseCsvHandle)) parseCsvHandle.dispose();
-
-  const fetchUrlHandle = qjs.newAsyncifiedFunction(
-    "fetchUrl",
-    async (urlHandle, optionsHandle) => {
-      const urlValue = qjs.dump(urlHandle);
-      if (typeof urlValue !== "string") {
-        throw new TypeError("fetchUrl expects a URL string");
-      }
-      const options = optionsHandle ? qjs.dump(optionsHandle) : undefined;
-      const responseType =
-        options && typeof options === "object"
-          ? (options as Record<string, unknown>).responseType
-          : undefined;
-      const headers =
-        options && typeof options === "object"
-          ? (options as Record<string, unknown>).headers
-          : undefined;
-      const timeoutMs =
-        options && typeof options === "object"
-          ? Number((options as Record<string, unknown>).timeoutMs ?? 10000)
-          : 10000;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const proxyUrl = `/api/proxy?url=${encodeURIComponent(urlValue)}`;
-        const response = await fetch(proxyUrl, {
-          headers: {
-            Accept: responseType === "json" ? "application/json" : "text/plain",
-            ...(headers && typeof headers === "object" ? headers : {}),
-          },
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Proxy request failed: ${response.status}`);
-        }
-
-        if (responseType === "json") {
-          const data = await response.json();
-          return toHandle(data);
-        }
-
-        const text = await response.text();
-        return qjs.newString(text);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    }
-  );
-  qjs.setProp(qjs.global, "fetchUrl", fetchUrlHandle);
-  if (shouldDispose(fetchUrlHandle)) fetchUrlHandle.dispose();
-
-  const queryDbHandle = qjs.newAsyncifiedFunction(
-    "queryDb",
-    async (sqlHandle) => {
-      const raw = qjs.dump(sqlHandle);
-      if (typeof raw !== "string") {
-        throw new TypeError("queryDb expects a SQL string");
-      }
-      const result = await requestQuery(invokeId, raw);
-      return toHandle(result);
-    }
-  );
-  qjs.setProp(qjs.global, "queryDb", queryDbHandle);
-  if (shouldDispose(queryDbHandle)) queryDbHandle.dispose();
-
-  const fsrsSchedulerHandle = qjs.newObject();
-  const processFirstHandle = qjs.newAsyncifiedFunction(
-    "processFirstReview",
-    async (payloadHandle) => {
-      const payload = qjs.dump(payloadHandle);
-      const result = await requestFsrs({
-        invokeId,
-        method: "processFirstReview",
-        payload,
-      });
-      return toHandle(result);
-    }
-  );
-  qjs.setProp(fsrsSchedulerHandle, "processFirstReview", processFirstHandle);
-  if (shouldDispose(processFirstHandle)) processFirstHandle.dispose();
-
-  const processReviewHandle = qjs.newAsyncifiedFunction(
-    "processReview",
-    async (payloadHandle) => {
-      const payload = qjs.dump(payloadHandle);
-      const result = await requestFsrs({
-        invokeId,
-        method: "processReview",
-        payload,
-      });
-      return toHandle(result);
-    }
-  );
-  qjs.setProp(fsrsSchedulerHandle, "processReview", processReviewHandle);
-  if (shouldDispose(processReviewHandle)) processReviewHandle.dispose();
-  qjs.setProp(qjs.global, "fsrsScheduler", fsrsSchedulerHandle);
-  if (shouldDispose(fsrsSchedulerHandle)) fsrsSchedulerHandle.dispose();
-
-  return performance.now() - startedAt;
-}
-
-async function executeInvoke(message: InvokeMessage): Promise<WorkerResponse> {
-  const invokeStartedAt = performance.now();
-  const timings: Record<string, number> = {};
-  let qjsForDispose: QuickJSAsyncContext | null = null;
-  const disposables: QuickJSHandle[] = [];
-
   try {
-    console.info("[QuickJS][worker] invoke start", {
-      id: message.id,
-      functionName: message.functionName,
-      methodName: message.methodName,
-    });
-
     const runtime = await getRuntime();
-    if (runtimeInitMs !== null) {
-      timings.runtimeInitMs = runtimeInitMs;
-    }
-
-    const contextStartedAt = performance.now();
-    const qjs = runtime.newContext();
-    qjsForDispose = qjs;
-    timings.contextCreateMs = performance.now() - contextStartedAt;
-
-    const staticHandles = buildStaticHandles(qjs);
-    const { toHandle, shouldDispose } = createHandleMapper({
-      qjs,
-      staticHandles,
+    const result = await executePlugin(runtime, message, {
+      queryDb: (query) => requestQuery(message.id, query),
+      fsrsScheduler: {
+        processFirstReview: (payload) =>
+          requestFsrs({
+            invokeId: message.id,
+            method: "processFirstReview",
+            payload,
+          }),
+        processReview: (payload) =>
+          requestFsrs({
+            invokeId: message.id,
+            method: "processReview",
+            payload,
+          }),
+      },
     });
-    timings.hostApiInstallMs = installHostApis({
-      qjs,
-      staticHandles,
-      toHandle,
-      shouldDispose,
-      invokeId: message.id,
-    });
-
-    const track = (handle: QuickJSHandle) => {
-      if (shouldDispose(handle)) disposables.push(handle);
-      return handle;
-    };
-
-    const evalStartedAt = performance.now();
-    const evalResult = qjs.evalCode(message.script);
-    const evalHandle = qjs.unwrapResult(evalResult);
-    if (shouldDispose(evalHandle)) evalHandle.dispose();
-    timings.evalMs = performance.now() - evalStartedAt;
-
-    const callStartedAt = performance.now();
-    let callResult: CallResult;
-
-    if (message.functionName === "createScheduler") {
-      const factoryHandle = track(qjs.getProp(qjs.global, "createScheduler"));
-      if (qjs.typeof(factoryHandle) !== "function") {
-        throw new Error("Plugin did not define createScheduler()");
-      }
-
-      const contextHandle = track(qjs.newObject());
-      const fsrsHandle = track(qjs.getProp(qjs.global, "fsrsScheduler"));
-      const queryHandle = track(qjs.getProp(qjs.global, "queryDb"));
-      qjs.setProp(contextHandle, "fsrsScheduler", fsrsHandle);
-      qjs.setProp(contextHandle, "queryDb", queryHandle);
-
-      const schedulerResult = qjs.callFunction(
-        factoryHandle,
-        qjs.global,
-        contextHandle
-      );
-      const schedulerHandle = track(qjs.unwrapResult(schedulerResult));
-
-      if (!message.methodName) {
-        throw new Error("Missing scheduler method name");
-      }
-
-      const methodHandle = track(
-        qjs.getProp(schedulerHandle, message.methodName)
-      );
-      if (qjs.typeof(methodHandle) !== "function") {
-        throw new Error(
-          `Scheduler missing ${message.methodName}() implementation`
-        );
-      }
-
-      const payloadHandle = track(toHandle(message.payload));
-      const metaHandle = track(toHandle(message.meta ?? null));
-      callResult = qjs.callFunction(
-        methodHandle,
-        schedulerHandle,
-        payloadHandle,
-        metaHandle
-      );
-    } else {
-      const fnHandle = track(qjs.getProp(qjs.global, message.functionName));
-      if (qjs.typeof(fnHandle) !== "function") {
-        throw new Error(`Plugin did not define ${message.functionName}()`);
-      }
-
-      const payloadHandle = track(toHandle(message.payload));
-      const metaHandle = track(toHandle(message.meta ?? null));
-      callResult = qjs.callFunction(
-        fnHandle,
-        qjs.global,
-        payloadHandle,
-        metaHandle
-      );
-    }
-
-    timings.callMs = performance.now() - callStartedAt;
-
-    const valueHandle = track(qjs.unwrapResult(callResult));
-    const resolveStartedAt = performance.now();
-
-    let resolvedHandle = valueHandle;
-    let promiseState = qjs.getPromiseState(valueHandle);
-    let pendingJobsRounds = 0;
-
-    if (promiseState.type === "pending") {
-      const pendingJobsStartedAt = performance.now();
-      const maxPendingJobsRounds = 1024;
-
-      while (promiseState.type === "pending") {
-        pendingJobsRounds += 1;
-        if (pendingJobsRounds > maxPendingJobsRounds) {
-          break;
-        }
-
-        const pendingJobsResult = runtime.executePendingJobs();
-        try {
-          pendingJobsResult.unwrap();
-        } finally {
-          pendingJobsResult.dispose();
-        }
-
-        promiseState = qjs.getPromiseState(valueHandle);
-      }
-
-      timings.pendingJobsMs = performance.now() - pendingJobsStartedAt;
-      timings.pendingJobsRounds = pendingJobsRounds;
-    }
-
-    if (promiseState.type === "fulfilled") {
-      if (!promiseState.notAPromise && promiseState.value !== valueHandle) {
-        resolvedHandle = track(promiseState.value);
-      }
-    } else if (promiseState.type === "rejected") {
-      const dumped = qjs.dump(promiseState.error);
-      throw new Error(
-        typeof dumped === "string"
-          ? dumped
-          : JSON.stringify(dumped ?? "Plugin promise rejected")
-      );
-    } else {
-      console.warn("[QuickJS][worker] Promise still pending after job drain", {
-        id: message.id,
-        pendingJobsRounds,
-      });
-      const resolvedResult = await qjs.resolvePromise(valueHandle);
-      resolvedHandle = track(qjs.unwrapResult(resolvedResult));
-    }
-
-    timings.resolvePromiseMs = performance.now() - resolveStartedAt;
-
-    const dumpStartedAt = performance.now();
-    const result = qjs.dump(resolvedHandle);
-    timings.dumpMs = performance.now() - dumpStartedAt;
-    timings.totalMs = performance.now() - invokeStartedAt;
-
-    console.info("[QuickJS][worker] invoke complete", {
-      id: message.id,
-      functionName: message.functionName,
-      methodName: message.methodName,
-      timings,
-    });
-
     return {
       id: message.id,
       ok: true,
       result,
-      timings,
+      timings: {
+        runtimeInitMs: runtimeInitMs ?? 0,
+        totalMs: performance.now() - startedAt,
+      },
     };
   } catch (error) {
-    const err = error as Error;
-    timings.totalMs = performance.now() - invokeStartedAt;
-    console.warn("[QuickJS][worker] invoke failed", {
-      id: message.id,
-      functionName: message.functionName,
-      methodName: message.methodName,
-      timings,
-      error: err.message || "Plugin execution failed",
-    });
+    const err = error instanceof Error ? error : new Error(String(error));
     return {
       id: message.id,
       ok: false,
-      error: {
-        message: err.message || "Plugin execution failed",
-        name: err.name,
-        stack: err.stack,
-      },
-      timings,
+      error: { message: err.message, name: err.name, stack: err.stack },
     };
   } finally {
-    for (const handle of disposables) {
-      try {
-        handle.dispose();
-      } catch {
-        // ignore dispose errors
-      }
+    // Release fire-and-forget host requests too. Their rejection is observed by
+    // the core bridge, which no longer accesses its disposed guest context.
+    for (const map of [pendingQueries, pendingFsrs]) {
+      for (const [id, pending] of map)
+        if (pending.invokeId === message.id) {
+          map.delete(id);
+          pending.reject(new Error("Plugin invocation finished"));
+        }
     }
-    qjsForDispose?.dispose();
   }
 }
-
-ctx.addEventListener("message", (event: MessageEvent<AnyMessage>) => {
-  // In a dedicated worker, all messages originate from the owning context.
-  // See: https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/message_event
-  if (!(event instanceof MessageEvent)) return;
-
-  // Verify the origin of the message
-  if (
-    typeof event.origin === "string" &&
-    event.origin !== self.location.origin
-  ) {
-    console.warn("[QuickJS][worker] Message received from untrusted origin", {
-      receivedOrigin: event.origin,
-      expectedOrigin: self.location.origin,
-    });
-    return;
-  }
-
+// S2819: this dedicated worker receives messages from its owning page through
+// Worker.postMessage(), not through a window's cross-origin message listener.
+// Dedicated-worker messages have an empty event.origin; comparing it with our
+// origin would drop valid invocations and bridge replies. Validate the private
+// channel's protocol below instead. Keep this exception local to this listener.
+// https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/message_event
+// biome-ignore format: NOSONAR must stay on the listener's reported line.
+ctx.addEventListener("message", (event: MessageEvent<unknown>) => { // NOSONAR: S2819 — private dedicated-worker channel; see rationale above.
+  if (!isWorkerInput(event.data)) return;
   const message = event.data;
   if (message.type === "invoke") {
-    executeInvoke(message)
-      .then((response) => {
-        ctx.postMessage(response);
-      })
-      .catch((error: Error) => {
-        const err = error instanceof Error ? error : new Error("Invoke failed");
-        console.warn("[QuickJS][worker] Unhandled invoke failure", {
-          id: message.id,
-          functionName: message.functionName,
-          methodName: message.methodName,
-          error: err.message,
-        });
+    void invoke(message)
+      .then((response) => ctx.postMessage(response))
+      .catch((error: unknown) => {
+        // A result can fail structured cloning. Reply with plain strings using
+        // the original invocation ID so only this caller is rejected.
         ctx.postMessage({
           id: message.id,
           ok: false,
-          error: {
-            message: err.message || "Plugin execution failed",
-            name: err.name,
-            stack: err.stack,
-          },
-          timings: {},
-        } satisfies WorkerResponseError);
+          error: { message: error instanceof Error ? error.message : String(error) },
+        } satisfies WorkerResponse);
       });
     return;
   }
-
-  if (message.type === "queryResult") {
-    const pendingQuery = pendingQueries.get(message.id);
-    if (!pendingQuery) return;
-    pendingQueries.delete(message.id);
-    const durationMs = performance.now() - pendingQuery.startedAt;
-    if (message.ok) {
-      console.info("[QuickJS][worker] queryResult received", {
-        invokeId: pendingQuery.invokeId,
-        queryId: message.id,
-        durationMs,
-      });
-      pendingQuery.resolve(message.result);
-    } else {
-      console.warn("[QuickJS][worker] queryResult failed", {
-        invokeId: pendingQuery.invokeId,
-        queryId: message.id,
-        durationMs,
-        error: message.error?.message ?? "queryDb failed",
-      });
-      pendingQuery.reject(
-        new Error(message.error?.message ?? "queryDb failed")
-      );
-    }
-    return;
-  }
-
-  if (message.type === "fsrsResult") {
-    const pendingRequest = pendingFsrs.get(message.id);
-    if (!pendingRequest) return;
-    pendingFsrs.delete(message.id);
-    const durationMs = performance.now() - pendingRequest.startedAt;
-    if (message.ok) {
-      console.info("[QuickJS][worker] fsrsResult received", {
-        invokeId: pendingRequest.invokeId,
-        fsrsId: message.id,
-        method: pendingRequest.method,
-        durationMs,
-      });
-      pendingRequest.resolve(message.result);
-    } else {
-      console.warn("[QuickJS][worker] fsrsResult failed", {
-        invokeId: pendingRequest.invokeId,
-        fsrsId: message.id,
-        method: pendingRequest.method,
-        durationMs,
-        error: message.error?.message ?? "fsrsScheduler failed",
-      });
-      pendingRequest.reject(
-        new Error(message.error?.message ?? "fsrsScheduler failed")
-      );
-    }
-  }
+  const map = message.type === "queryResult" ? pendingQueries : pendingFsrs;
+  const pending = map.get(message.id);
+  if (!pending) return;
+  map.delete(message.id);
+  if (message.ok) pending.resolve(message.result);
+  else
+    pending.reject(new Error(message.error?.message ?? "Plugin bridge failed"));
 });

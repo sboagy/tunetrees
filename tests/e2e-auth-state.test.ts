@@ -8,6 +8,7 @@ import {
   CURRENT_AUTH_STATE_DB_VERSION,
   CURRENT_AUTH_STATE_SNAPSHOT_VERSION,
   isAuthFileFresh,
+  isAuthFileSessionValid,
   mapAuthStateToOrigin,
 } from "../e2e/helpers/auth-state";
 
@@ -26,6 +27,7 @@ function makeState(origin = DEV_ORIGIN, email = EMAIL) {
           {
             name: "tunetrees-auth",
             value: JSON.stringify({
+              access_token: "test-token",
               user: { email },
               expires_at: NOW / 1000 + 3600,
             }),
@@ -61,6 +63,52 @@ describe("E2E auth snapshot validation", () => {
   it("accepts a fresh snapshot for the expected origin and user", () => {
     writeFileSync(authFile, JSON.stringify(makeState()));
     expect(isAuthFileFresh(authFile, `${DEV_ORIGIN}/`, EMAIL, NOW)).toBe(true);
+  });
+
+  it("rejects a locally fresh JWT whose server session was deleted", async () => {
+    writeFileSync(authFile, JSON.stringify(makeState()));
+    expect(isAuthFileFresh(authFile, DEV_ORIGIN, EMAIL, NOW)).toBe(true);
+    expect(
+      await isAuthFileSessionValid(
+        authFile,
+        DEV_ORIGIN,
+        EMAIL,
+        "http://localhost:54321",
+        "test-key",
+        async () =>
+          new Response(JSON.stringify({ code: "session_not_found" }), {
+            status: 403,
+          })
+      )
+    ).toBe(false);
+  });
+
+  it("reuses a session verified by the server for the expected user", async () => {
+    writeFileSync(authFile, JSON.stringify(makeState()));
+    expect(
+      await isAuthFileSessionValid(
+        authFile,
+        DEV_ORIGIN,
+        EMAIL,
+        "http://localhost:54321",
+        "test-key",
+        async () => new Response(JSON.stringify({ email: EMAIL }))
+      )
+    ).toBe(true);
+  });
+
+  it("does not treat an auth server outage as a revoked session", async () => {
+    writeFileSync(authFile, JSON.stringify(makeState()));
+    await expect(
+      isAuthFileSessionValid(
+        authFile,
+        DEV_ORIGIN,
+        EMAIL,
+        "http://localhost:54321",
+        "test-key",
+        async () => new Response("Unavailable", { status: 503 })
+      )
+    ).rejects.toThrow("HTTP 503");
   });
 
   it("rejects a fresh preview snapshot for dev tests", () => {

@@ -1,4 +1,4 @@
-import type { PluginFunctionName } from "./quickjs-worker";
+import type { PluginInvocation } from "./quickjs-protocol";
 
 function extractPluginMeta(meta: unknown): {
   pluginId?: string;
@@ -13,21 +13,18 @@ function extractPluginMeta(meta: unknown): {
   return { pluginId, pluginName };
 }
 
-export async function runPluginFunction(params: {
-  script: string;
-  functionName: PluginFunctionName;
-  methodName?: "processFirstReview" | "processReview";
-  payload: unknown;
-  meta?: unknown;
-  timeoutMs?: number;
-  bridge?: {
-    queryDb?: (sql: string) => Promise<unknown>;
-    fsrsScheduler?: {
-      processFirstReview: (payload: unknown) => Promise<unknown>;
-      processReview: (payload: unknown) => Promise<unknown>;
+export async function runPluginFunction(
+  params: PluginInvocation & {
+    timeoutMs?: number;
+    bridge?: {
+      queryDb?: (sql: string) => Promise<unknown>;
+      fsrsScheduler?: {
+        processFirstReview: (payload: unknown) => Promise<unknown>;
+        processReview: (payload: unknown) => Promise<unknown>;
+      };
     };
-  };
-}): Promise<unknown> {
+  }
+): Promise<unknown> {
   const startedAt = performance.now();
   const pluginMeta = extractPluginMeta(params.meta);
   const { runQuickJsPlugin } = await import("./quickjs-host");
