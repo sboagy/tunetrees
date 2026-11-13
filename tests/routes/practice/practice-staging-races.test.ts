@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+
 import type { SQL } from "drizzle-orm";
 import { SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
 import { createRoot, createSignal } from "solid-js";
