@@ -99,24 +99,18 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Always assert the row and badge: an absent row must fail rather than
     // silently skipping the ownership check.
     await expect(userPrivateTune).toBeVisible({ timeout: 10_000 });
-    const whichColumn = await ttPage.getColumnIndexByHeaderText(
-      "tunes-grid-catalog",
-      "Ownership"
-    );
-    await expect(userPrivateTune.locator("td").nth(whichColumn)).toHaveText(
-      "🔒 Private",
-      { timeout: 10_000 }
-    );
+    await expect(
+      await ttPage.getCatalogOwnershipCell(privateTune1Id)
+    ).toHaveText("🔒 Private", { timeout: 10_000 });
 
     const publicTune = ttPage.getTuneRowById(
       TEST_TUNE_BANISH_ID,
       ttPage.catalogGrid
     );
     await expect(publicTune).toBeVisible({ timeout: 10_000 });
-    await expect(publicTune.locator("td").nth(whichColumn)).not.toContainText(
-      "Private",
-      { timeout: 10_000 }
-    );
+    await expect(
+      await ttPage.getCatalogOwnershipCell(TEST_TUNE_BANISH_ID)
+    ).not.toContainText("Private", { timeout: 10_000 });
   });
 
   test("should show catalog toolbar", async () => {

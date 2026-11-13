@@ -1633,7 +1633,7 @@ if (globalThis.window !== undefined) {
         practicedBefore,
       }) => {
         const db = await ensureDb();
-        for (const [index, quality] of qualities.entries()) {
+        for (const [index, quality] of [...qualities.entries()].reverse()) {
           const practiced = new Date(practicedBefore);
           practiced.setUTCDate(practiced.getUTCDate() - index - 1);
           db.insert(practiceRecord)

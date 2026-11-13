@@ -2331,6 +2331,16 @@ export class TuneTreesPage {
     );
   }
 
+  async getCatalogOwnershipCell(tuneId: string): Promise<Locator> {
+    const columnIndex = await this.getColumnIndexByHeaderText(
+      "tunes-grid-catalog",
+      "Ownership"
+    );
+    return this.getTuneRowById(tuneId, this.catalogGrid)
+      .locator("td")
+      .nth(columnIndex);
+  }
+
   async setGridRowChecked(tuneId: string, grid: Locator, checked = true) {
     const row = this.getTuneRowById(tuneId, grid).first();
     await expect(row).toBeVisible({ timeout: 10000 });
