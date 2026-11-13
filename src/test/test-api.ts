@@ -5,7 +5,6 @@
  * bypassing slow remote DB resets. Attached as globalThis.__ttTestApi.
  */
 
-import { isTransientRemoteRead } from "./remote-read";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   clearDb,
@@ -43,6 +42,7 @@ import { serializeCapabilities } from "@/lib/plugins/capabilities";
 import { generateOrGetPracticeQueue } from "@/lib/services/practice-queue";
 import { supabase } from "@/lib/supabase/client";
 import { generateId } from "@/lib/utils/uuid";
+import { isTransientRemoteRead } from "./remote-read";
 
 type SeedAddToReviewInput = {
   repertoireId: string; // UUID

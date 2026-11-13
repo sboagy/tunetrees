@@ -3,8 +3,8 @@ import { createResource, createRoot, createSignal } from "solid-js";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ITuneOverview } from "@/components/grids/types";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
-import { usePracticeListData } from "@/routes/practice/usePracticeListData";
 import { usePracticeEvaluations } from "@/routes/practice/usePracticeEvaluations";
+import { usePracticeListData } from "@/routes/practice/usePracticeListData";
 
 const { getPracticeList } = vi.hoisted(() => ({ getPracticeList: vi.fn() }));
 vi.mock("@/lib/db/queries/practice", () => ({ getPracticeList }));

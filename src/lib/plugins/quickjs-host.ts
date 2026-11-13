@@ -3,11 +3,11 @@
 import {
   type FsrsResult,
   type InvokeRequest,
-  isWorkerOutput,
   isWorkerInput,
-  type PluginInvocation,
+  isWorkerOutput,
   type PluginBridge,
   type PluginFunctionName,
+  type PluginInvocation,
   type QueryResult,
 } from "./quickjs-protocol";
 
