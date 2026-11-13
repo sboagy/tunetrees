@@ -1,12 +1,18 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { DEFAULT_PLUGIN_SCRIPT } from "../../src/lib/plugins/scheduling-template";
+import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
+import { test } from "../helpers/test-fixture";
 
-/** SCHEDULING-011 (HIGH): real module-worker/VM transport, without auth or DB.
+/** SCHEDULING-011 (HIGH): real module-worker/VM transport, with deterministic worker credentials.
  * Uses the same browser API against dev and preview builds so emitted WASM and
  * worker URLs are covered too. Database behavior is covered by scheduling-012.
  */
 const pageErrors = new WeakMap<Page, string[]>();
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, testUser }) => {
+  await setupDeterministicTestParallel(page, testUser, {
+    clearRepertoire: true,
+    seedRepertoire: [],
+  });
   const errors: string[] = [];
   pageErrors.set(page, errors);
   page.on("pageerror", (error) => errors.push(error.message));

@@ -122,6 +122,9 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
     await ttPage.waitForHome({ timeoutMs: 30_000 });
     await ttPage.openUserMenu();
     await page.getByRole("button", { name: /Sign Out/i }).click();
+    // Let the logout request finish before asserting, so the saved-session
+    // check below runs after any server-side revocation has happened.
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
     await expect(page).toHaveURL(/.*\/login/, { timeout: 10000 });
     await expect(ttPage.userMenuButton).not.toBeVisible({ timeout: 10000 });

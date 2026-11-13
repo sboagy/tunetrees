@@ -85,6 +85,7 @@ test.describe("CATALOG-001: Public + Private Tunes Display", () => {
     // Search for User's private tune
     await ttPage.searchForTune("Banish Misfortune", ttPage.catalogGrid);
     await ttPage.ensureGridColumnVisible("catalog", "Ownership");
+    await ttPage.page.waitForLoadState("networkidle", { timeout: 15000 });
 
     // Get user's private tune IDs
     const { privateTune1Id } = getPrivateTuneIds(currentTestUser.userId);

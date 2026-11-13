@@ -32,10 +32,9 @@ test.describe("Fluency scheduling", () => {
       startTab: "practice",
     });
     const row = tt.getRows("scheduled").first();
-    await row.getByRole("button", { name: /recall/i }).click();
-    await page.getByRole("menuitem", { name: "fluency", exact: true }).click();
+    await tt.selectRowFluency(row);
     await page.waitForLoadState("networkidle", { timeout: 15000 });
-    await expect(row.getByRole("button", { name: /fluency/i })).toBeVisible({
+    await expect(tt.getRowFluencyButton(row)).toBeVisible({
       timeout: 10000,
     });
   });
@@ -49,6 +48,7 @@ test.describe("Fluency scheduling", () => {
       userId: testUser.userId,
     });
     await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
     const preview = await page.evaluate(
       async (rep) => window.__ttTestApi?.getPracticeListStaged(rep),
@@ -126,8 +126,10 @@ test.describe("Fluency scheduling", () => {
     );
     await context.setOffline(true);
     await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
     await submitAndWaitForPracticeSettled(page, tt);
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
@@ -168,6 +170,7 @@ test.describe("Fluency scheduling", () => {
       userId: testUser.userId,
     });
     await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     await expect(
       page.getByText("Scheduling plugin failed", { exact: true })
     ).toBeVisible({ timeout: 10000 });
@@ -176,6 +179,7 @@ test.describe("Fluency scheduling", () => {
     ).toBeVisible({ timeout: 10000 });
     await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
     await submitAndWaitForPracticeSettled(page, tt);
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,
@@ -200,6 +204,7 @@ test.describe("Fluency scheduling", () => {
     });
     await tt.setRowEvaluation(tt.getRows("scheduled").first(), "good");
     await expect(tt.submitEvaluationsButton).toBeDisabled({ timeout: 10000 });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     // Exercise the production 30-second deadline all the way through staging.
     // Short injected deadlines are covered separately by the transport tests.
     await expect(page.getByText(/Plugin execution timed out/)).toBeVisible({
@@ -207,6 +212,7 @@ test.describe("Fluency scheduling", () => {
     });
     await expect(tt.submitEvaluationsButton).toBeEnabled({ timeout: 10000 });
     await submitAndWaitForPracticeSettled(page, tt);
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
     const record = await queryLatestPracticeRecord(
       page,
       TEST_TUNE_BANISH_ID,

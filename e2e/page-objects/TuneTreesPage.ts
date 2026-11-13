@@ -4575,6 +4575,17 @@ export class TuneTreesPage {
     return tuneId;
   }
 
+  getRowFluencyButton(row: Locator) {
+    return row.getByRole("button", { name: /fluency/i });
+  }
+
+  async selectRowFluency(row: Locator) {
+    await row.getByRole("button", { name: /recall/i }).click();
+    await this.page
+      .getByRole("menuitem", { name: "fluency", exact: true })
+      .click();
+  }
+
   async setRowEvaluation(
     whichRow: Locator,
     evalValue: string,
