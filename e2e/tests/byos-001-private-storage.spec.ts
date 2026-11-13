@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, type Route } from "@playwright/test";
 import {
   addLegacyAudio,
@@ -122,7 +123,9 @@ test.describe("BYOS-001: private storage regressions", () => {
     expect(outbox).toContain("media_asset");
     expect(outbox).toContain("reference");
     // Assert real trigger rows AND their source records, not an empty outbox.
-    expect(JSON.stringify(data.assets)).toContain("id:e2e-dropbox-audio");
+    expect(JSON.stringify(data.assets)).toMatch(
+      /id:e2e-dropbox-audio-[0-9a-f-]{36}/
+    );
     expect(JSON.stringify(data)).not.toMatch(
       /PRIVATE_BINARY_SENTINEL|e2e-(google|dropbox)-(refresh|access)-token/
     );
@@ -235,11 +238,13 @@ test.describe("BYOS-001: private storage regressions", () => {
         release = resolve;
       });
       let uploads = 0;
+      // Both tabs share this upload identity, but other runs must not reuse it.
+      const uploadedFileId = `id:e2e-dropbox-audio-${randomUUID()}`;
       const holdUpload = async (route: Route) => {
         uploads += 1;
         await barrier;
         await route.fulfill({
-          json: { id: "id:e2e-dropbox-audio", size: 16044 },
+          json: { id: uploadedFileId, size: 16044 },
         });
       };
       // Intercept both tabs: a locking regression must fail, never reach Dropbox.
@@ -277,7 +282,7 @@ test.describe("BYOS-001: private storage regressions", () => {
         );
         await replayFromTab(page, testUser.userId);
         const data = JSON.stringify((await readByosDatabase(page)).assets);
-        expect(data.includes("id:e2e-dropbox-audio")).toBe(!cancel);
+        expect(data.includes(uploadedFileId)).toBe(!cancel);
         expect(uploads).toBe(1);
       } finally {
         release();

@@ -16,6 +16,7 @@ import {
   getTestUserClient,
   setupForPracticeTestsParallel,
 } from "../helpers/practice-scenarios";
+import { triggerManualSync, waitForSync } from "../helpers/sync-verification";
 import { test } from "../helpers/test-fixture";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
 
@@ -65,6 +66,11 @@ async function waitForTestApi(page: Page) {
 }
 
 async function resetLocalDbAndReopenPractice(page: Page, userId: string) {
+  // A local completion and networkidle do not guarantee an upload: automatic
+  // sync runs on a timer. Drain pending writes before deleting the local DB so
+  // these tests restore the saved queue instead of discarding unsynced reviews.
+  await triggerManualSync(page);
+  await waitForSync(page);
   await resetLocalDbAndResync(page);
   ttPage = new TuneTreesPage(page);
   await setInjectedTestUserId(page, userId);

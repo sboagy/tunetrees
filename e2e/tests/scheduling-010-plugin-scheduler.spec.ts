@@ -180,6 +180,12 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
     });
 
     await seedSchedulingPluginLocally(page, {
+      // 17 days is distinct from the first-review fallback for this fixture.
+      script: `function createScheduler() {
+        function apply(p) { const due = new Date(p.input.practiced); due.setDate(due.getDate() + 17);
+          return {...p.fallback, interval:17, scheduledDays:17, nextDue:due.toISOString()}; }
+        return {processFirstReview:apply,processReview:apply};
+      }`,
       goals: ["recall"],
       userId: testUser.userId,
     });
@@ -279,14 +285,17 @@ test.describe("SCHEDULING-010: Plugin Scheduler Override", () => {
         due: record.due,
       });
 
-      expect(record.interval).toBe(1);
+      expect(record.interval).toBe(17);
+      await expect(
+        page.getByText("Scheduling plugin failed", { exact: true })
+      ).toHaveCount(0);
 
       const practiced = new Date(record.practiced);
       const due = new Date(record.due);
       const diffDays = Math.round(
         (due.getTime() - practiced.getTime()) / (1000 * 60 * 60 * 24)
       );
-      expect(diffDays).toBe(1);
+      expect(diffDays).toBe(17);
       stamp("assertions-complete", { diffDays, interval: record.interval });
     } finally {
       page.off("console", onConsole);

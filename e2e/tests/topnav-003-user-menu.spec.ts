@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { expect } from "@playwright/test";
+import { isAuthFileSessionValid } from "../helpers/auth-state";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
-import type { TestUser } from "../helpers/test-users";
+import { getRequiredTestPassword, type TestUser } from "../helpers/test-users";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 /**
  * TOPNAV-003: User menu shows user's information
@@ -103,17 +106,39 @@ test.describe("TOPNAV-003: User Menu Dropdown", () => {
 
   test("should sign out and redirect to login when Sign Out clicked", async ({
     page,
+    testUserKey,
+    testUser,
   }) => {
+    // Registered-user logout revokes all sessions for that account. Never use
+    // the shared worker account here: later browser projects load its saved
+    // session again. A disposable account keeps this destructive auth action
+    // isolated while still exercising the real registered-user logout path.
+    await ttPage.gotoLogin();
+    await ttPage.signUp(
+      `logout-${randomUUID()}@tunetrees.test`,
+      getRequiredTestPassword(),
+      "Logout Test"
+    );
+    await ttPage.waitForHome({ timeoutMs: 30_000 });
     await ttPage.openUserMenu();
-
-    // Click Sign Out
     await page.getByRole("button", { name: /Sign Out/i }).click();
-    await page.waitForTimeout(1000);
+    // Let the logout request finish before asserting, so the saved-session
+    // check below runs after any server-side revocation has happened.
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
 
-    // Should redirect to login page
-    await expect(page).toHaveURL(/.*\/login/, { timeout: 5000 });
+    await expect(page).toHaveURL(/.*\/login/, { timeout: 10000 });
+    await expect(ttPage.userMenuButton).not.toBeVisible({ timeout: 10000 });
 
-    // User menu button should no longer be visible
-    await expect(ttPage.userMenuButton).not.toBeVisible();
+    // Check the saved token against Supabase, not just its future expiry.
+    // This catches the cross-test session revocation that broke Fluency later.
+    expect(
+      await isAuthFileSessionValid(
+        `e2e/.auth/${testUserKey}.json`,
+        String(BASE_URL),
+        testUser.email,
+        process.env.VITE_SUPABASE_URL ?? "http://127.0.0.1:54321",
+        process.env.VITE_SUPABASE_ANON_KEY ?? ""
+      )
+    ).toBe(true);
   });
 });

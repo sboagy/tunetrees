@@ -86,9 +86,14 @@ describe("usePracticeEvaluations", () => {
     const [practiceListData] = createSignal<ITuneOverview[]>([tune]);
     const [filteredPracticeList] = createSignal<ITuneOverview[]>([tune]);
 
+    const db = {
+      select: () => ({
+        from: () => ({ where: () => ({ get: () => ({ goal: "recall" }) }) }),
+      }),
+    };
     const state = createRoot((dispose) => {
       const hook = usePracticeEvaluations({
-        localDb: () => ({}) as never,
+        localDb: () => db as never,
         getUserId: async () => "user-1",
         currentRepertoireId: () => "rep-1",
         practiceListData,
@@ -105,9 +110,48 @@ describe("usePracticeEvaluations", () => {
 
     await state.handleRecallEvalChange(tune.id, "good");
 
+    expect(stagePracticeEvaluationMock).toHaveBeenCalledOnce();
     expect(state.evaluations()[tune.id]).toBe("good");
     expect(state.evaluationsCount()).toBe(1);
 
+    state.dispose();
+  });
+
+  it("uses Recall for a cleared stored goal while the view still says Fluency", async () => {
+    stagePracticeEvaluationMock.mockResolvedValue(undefined);
+    const tune = makeTune({ goal: "fluency" });
+    // A goal change has reached SQLite, but the overview has not refreshed.
+    const db = {
+      select: () => ({
+        from: () => ({ where: () => ({ get: () => ({ goal: null }) }) }),
+      }),
+    };
+    const state = createRoot((dispose) => ({
+      ...usePracticeEvaluations({
+        localDb: () => db as never,
+        getUserId: async () => "user-1",
+        currentRepertoireId: () => "rep-1",
+        practiceListData: () => [tune],
+        filteredPracticeList: () => [tune],
+        goalsMap: () => new Map(),
+        incrementPracticeListStagedChanged: () => undefined,
+        suppressNextViewRefresh: () => undefined,
+      }),
+      dispose,
+    }));
+
+    await state.handleRecallEvalChange(tune.id, "good");
+
+    expect(stagePracticeEvaluationMock).toHaveBeenCalledWith(
+      db,
+      "user-1",
+      "rep-1",
+      tune.id,
+      "good",
+      "recall",
+      "fsrs",
+      expect.any(Function)
+    );
     state.dispose();
   });
 
@@ -121,9 +165,14 @@ describe("usePracticeEvaluations", () => {
     const [practiceListData] = createSignal<ITuneOverview[]>([stagedTune]);
     const [filteredPracticeList] = createSignal<ITuneOverview[]>([stagedTune]);
 
+    const db = {
+      select: () => ({
+        from: () => ({ where: () => ({ get: () => ({ goal: "recall" }) }) }),
+      }),
+    };
     const state = createRoot((dispose) => {
       const hook = usePracticeEvaluations({
-        localDb: () => ({}) as never,
+        localDb: () => db as never,
         getUserId: async () => "user-1",
         currentRepertoireId: () => "rep-1",
         practiceListData,

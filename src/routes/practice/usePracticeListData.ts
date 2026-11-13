@@ -33,6 +33,14 @@ export interface PracticeListDataState {
 export function usePracticeListData(
   props: PracticeListDataProps
 ): PracticeListDataState {
+  // Identity changes invalidate retained resource rows, even if a later reset
+  // returns to the same repertoire or database reference.
+  const generation = createMemo(() => ({
+    db: props.localDb(),
+    userId: props.userId(),
+    repertoireId: props.currentRepertoireId(),
+    windowStartUtc: formatAsWindowStart(props.queueDate()),
+  }));
   const [practiceListData] = createResource(
     () => {
       const db = props.localDb();
@@ -53,6 +61,7 @@ export function usePracticeListData(
         initialized &&
         !isQueueLoading
         ? {
+            generation: generation(),
             db,
             userId: resolvedUserId,
             repertoireId,
@@ -63,24 +72,29 @@ export function usePracticeListData(
         : null;
     },
     async (params) => {
-      if (!params) return [];
+      if (!params) return undefined;
       const { getPracticeList } = await import("../../lib/db/queries/practice");
       console.log(
         `[PracticePage] Fetching practice list for repertoire ${params.repertoireId} (queueReady=${params.queueReady})`
       );
-      return getPracticeList(
+      const rows = await getPracticeList(
         params.db,
         params.userId,
         params.repertoireId,
         7,
         params.windowStartUtc
       );
+      return { generation: params.generation, rows };
     }
   );
 
-  const practiceRows = createMemo<ITuneOverview[]>(() => {
-    return practiceListData.latest ?? practiceListData() ?? [];
+  const currentData = createMemo(() => {
+    const data = practiceListData.latest;
+    return data?.generation === generation() ? data : undefined;
   });
+  const practiceRows = createMemo<ITuneOverview[]>(
+    () => currentData()?.rows ?? []
+  );
 
   const [isQueueCompleted, setIsQueueCompleted] = createSignal(false);
   createEffect(() => {
@@ -113,7 +127,7 @@ export function usePracticeListData(
   });
 
   const practiceListLoading = createMemo(() => {
-    const hasCachedRows = practiceListData.latest != null;
+    const hasCachedRows = currentData() != null;
     return (
       (practiceListData.loading || props.queueReady.loading) && !hasCachedRows
     );

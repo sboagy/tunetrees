@@ -224,8 +224,10 @@ export async function mockDropboxRequests(page: Page) {
   await page.route(
     "https://content.dropboxapi.com/2/files/upload",
     async (route) => {
+      // storage_path is globally unique in the shared database, including
+      // across workers and repeated runs of the same test.
       await route.fulfill({
-        json: { id: "id:e2e-dropbox-audio", size: 16044 },
+        json: { id: `id:e2e-dropbox-audio-${randomUUID()}`, size: 16044 },
       });
     }
   );

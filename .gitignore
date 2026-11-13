@@ -201,3 +201,4 @@ issues.json
 sonar_issues.json
 
 .github/triage_states
+.vitest/json/output.json

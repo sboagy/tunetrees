@@ -326,6 +326,16 @@ Key tables:
 - `repertoire_tune`: current scheduling state per tune within a repertoire.
 - `daily_practice_queue`: frozen daily queue snapshot used to present the day's work.
 
+Scheduling plugins run during evaluation, before the staged schedule is written.
+`src/lib/plugins/quickjs-host.ts` owns worker deadlines and reply routing;
+`quickjs-worker.ts` owns message validation and runtime initialization;
+`quickjs-core.ts` owns a separate VM context per invocation, promise-based host
+bridges, guest job draining, and handle cleanup. These use the shared protocol
+in `quickjs-protocol.ts`. A timed-out worker is replaced; replies from its old
+invocations cannot reach its replacement. Plugin failures preserve the practice
+flow's goal-ladder/FSRS fallback. Staging checks request ownership immediately
+before SQLite writes so older evaluations cannot overwrite newer selections.
+
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 
 ## Guidance For AI Agents
