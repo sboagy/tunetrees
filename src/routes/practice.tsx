@@ -237,7 +237,7 @@ const PracticePage: Component = () => {
     evaluationsCount,
     handleRecallEvalChange,
     handleGoalChange,
-    clearEvaluations,
+    prepareClearEvaluations,
   } = usePracticeEvaluations({
     localDb,
     getUserId,
@@ -260,7 +260,7 @@ const PracticePage: Component = () => {
     queueDate,
     evaluationsCount,
     isStaging,
-    clearEvaluations,
+    prepareClearEvaluations,
     incrementPracticeListStagedChanged,
     syncPracticeScope,
   });

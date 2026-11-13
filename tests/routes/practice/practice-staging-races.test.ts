@@ -1,16 +1,20 @@
 // @vitest-environment jsdom
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { SQL } from "drizzle-orm";
+import { SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
 import { createRoot, createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ITuneOverview } from "@/components/grids/types";
 import type { SqliteDatabase } from "@/lib/db/client-sqlite";
+import { repertoireTune } from "@/lib/db/schema";
 import type { NextReviewSchedule } from "@/lib/db/types";
 import { usePracticeEvaluations } from "@/routes/practice/usePracticeEvaluations";
 
 const mocks = vi.hoisted(() => ({
   evaluate: vi.fn(),
+  getUserId: vi.fn(),
   persist: vi.fn(),
   error: vi.fn(),
+  refresh: vi.fn(),
 }));
 vi.mock("@/lib/db/client-sqlite", () => ({ persistDb: mocks.persist }));
 vi.mock("@/lib/services/practice-recording", () => ({
@@ -45,37 +49,83 @@ function schedule(interval: number): { schedule: NextReviewSchedule } {
     },
   };
 }
-let sqlite: InstanceType<typeof Database>;
+let practiceRows: ITuneOverview[];
+let stagedRows: Map<string, { recall_eval: string; interval: number }>;
+let goals: Map<string, string | null>;
+const dialect = new SQLiteSyncDialect();
+// Compile Drizzle predicates/parameters without opening a native database.
+// The fake implements only the synchronous reads/writes used by staging.
+function createDbFake(): SqliteDatabase {
+  return {
+    run(statement: SQL) {
+      const { sql, params } = dialect.sqlToQuery(statement);
+      const tuneId = String(params[1]);
+      if (sql.trimStart().startsWith("INSERT")) {
+        stagedRows.set(tuneId, {
+          recall_eval: String(params[14]),
+          interval: Number(params[6]),
+        });
+      } else if (sql.trimStart().startsWith("DELETE")) {
+        stagedRows.delete(tuneId);
+      } else throw new Error(`Unexpected statement: ${sql}`);
+    },
+    select() {
+      return {
+        from: (table: unknown) => ({
+          where: (predicate: SQL) => ({
+            get: () => {
+              const { params } = dialect.sqlToQuery(predicate);
+              if (table === repertoireTune)
+                return { goal: goals.get(String(params[0])) };
+              const row = stagedRows.get(String(params[1]));
+              return row ? { recallEval: row.recall_eval } : undefined;
+            },
+          }),
+        }),
+      };
+    },
+    update() {
+      return {
+        set: ({ goal }: { goal: string | null }) => ({
+          where: (predicate: SQL) => ({
+            run: () => {
+              const { params } = dialect.sqlToQuery(predicate);
+              goals.set(String(params[0]), goal);
+            },
+          }),
+        }),
+      };
+    },
+  } as unknown as SqliteDatabase;
+}
 let db: SqliteDatabase;
 let state: ReturnType<typeof usePracticeEvaluations>;
 let dispose: () => void;
 let setRepertoire: (value: string) => string;
 beforeEach(async () => {
   vi.clearAllMocks();
+  practiceRows = [];
+  mocks.getUserId.mockResolvedValue("user");
   vi.spyOn(console, "log").mockImplementation(() => {});
   mocks.persist.mockResolvedValue(undefined);
-  sqlite = new Database(":memory:");
-  sqlite.exec(`CREATE TABLE repertoire_tune (repertoire_ref TEXT, tune_ref TEXT, goal TEXT);
-    INSERT INTO repertoire_tune VALUES ('rep','tune','fluency'),('rep','other','fluency');
-    CREATE TABLE table_transient_data (user_id TEXT, tune_id TEXT, repertoire_id TEXT, quality INTEGER,
-    difficulty REAL, stability REAL, interval INTEGER, step INTEGER, repetitions INTEGER, practiced TEXT,
-    due TEXT, state INTEGER, goal TEXT, technique TEXT, recall_eval TEXT, sync_version INTEGER,
-    last_modified_at TEXT, PRIMARY KEY(user_id,tune_id,repertoire_id));`);
-  // Same synchronous SQLite/Drizzle operations as the browser service, with a
-  // native in-memory driver at this test boundary. Only scheduling is delayed.
-  db = drizzle(sqlite) as unknown as SqliteDatabase;
+  stagedRows = new Map();
+  goals = new Map([
+    ["tune", "fluency"],
+    ["other", "fluency"],
+  ]);
+  db = createDbFake();
   createRoot((cleanup) => {
     dispose = cleanup;
     const [repertoire, set] = createSignal("rep");
     setRepertoire = set;
     state = usePracticeEvaluations({
       localDb: () => db,
-      getUserId: async () => "user",
+      getUserId: () => mocks.getUserId(),
       currentRepertoireId: repertoire,
-      practiceListData: () => [],
+      practiceListData: () => practiceRows,
       filteredPracticeList: () => [],
       goalsMap: () => new Map(),
-      incrementPracticeListStagedChanged: () => {},
+      incrementPracticeListStagedChanged: mocks.refresh,
       suppressNextViewRefresh: () => {},
     });
   });
@@ -83,15 +133,9 @@ beforeEach(async () => {
 });
 afterEach(() => {
   dispose();
-  sqlite.close();
   vi.restoreAllMocks();
 });
-const row = () =>
-  sqlite
-    .prepare(
-      "SELECT recall_eval, interval FROM table_transient_data WHERE tune_id = ?"
-    )
-    .get("tune");
+const row = () => stagedRows.get("tune");
 const begin = async (value: string) => {
   const reply = deferred<ReturnType<typeof schedule>>();
   mocks.evaluate.mockReturnValueOnce(reply.promise);
@@ -103,7 +147,33 @@ const begin = async (value: string) => {
   );
   return { ...reply, task };
 };
-describe("staging request ownership with real SQLite writes", () => {
+describe("staging request ownership with synchronous writes", () => {
+  it("preserves a same-value rating started after the submission snapshot", async () => {
+    mocks.evaluate.mockResolvedValueOnce(schedule(2));
+    await state.handleRecallEvalChange("tune", "good");
+    const clearSubmitted = state.prepareClearEvaluations();
+    const later = await begin("good");
+    clearSubmitted();
+    expect(state.isStaging()).toBe(true);
+    expect(state.evaluations().tune).toBe("good");
+    later.resolve(schedule(7));
+    await later.task;
+    expect(row()).toEqual({ recall_eval: "good", interval: 7 });
+  });
+  it("clears submitted overrides but retains a later completed edit", async () => {
+    mocks.evaluate.mockResolvedValue(schedule(2));
+    await state.handleRecallEvalChange("other", "hard");
+    const clearSubmitted = state.prepareClearEvaluations();
+    await state.handleRecallEvalChange("tune", "easy");
+    clearSubmitted();
+    expect(state.evaluations()).toEqual({ tune: "easy" });
+  });
+  it("refreshes the stored goal after persistence fails", async () => {
+    mocks.persist.mockRejectedValueOnce(new Error("persist failed"));
+    await state.handleGoalChange("tune", "recall");
+    expect(goals.get("tune")).toBe("recall");
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
   it("keeps Submit blocked when an older rating finishes first", async () => {
     const first = await begin("good");
     const second = await begin("easy");
@@ -135,6 +205,61 @@ describe("staging request ownership with real SQLite writes", () => {
     await first.task;
     expect(row()).toEqual({ recall_eval: "easy", interval: 7 });
     expect(mocks.error).not.toHaveBeenCalled();
+  });
+  it("restores the staged rating when a newer rating fails while an older one is pending", async () => {
+    mocks.evaluate.mockResolvedValueOnce(schedule(2));
+    await state.handleRecallEvalChange("tune", "hard");
+    const older = await begin("good");
+    const newer = await begin("easy");
+    newer.reject(new Error("scheduling failed"));
+    await newer.task;
+    // "good" was only the older request's optimistic value; "hard" is staged.
+    expect(state.evaluations().tune).toBe("hard");
+    older.resolve(schedule(4));
+    await older.task;
+    expect(state.evaluations().tune).toBe("hard");
+    expect(row()).toEqual({ recall_eval: "hard", interval: 2 });
+  });
+  it("does not restore a cancelled optimistic rating when the goal change fails", async () => {
+    const pending = await begin("good");
+    mocks.persist.mockRejectedValueOnce(new Error("persist failed"));
+    await state.handleGoalChange("tune", "recall");
+    // Nothing is staged, so Submit must not count the cancelled rating.
+    expect(state.evaluations().tune).toBeFalsy();
+    expect(state.evaluationsCount()).toBe(0);
+    pending.resolve(schedule(4));
+    await pending.task;
+    expect(row()).toBeUndefined();
+    expect(state.evaluationsCount()).toBe(0);
+  });
+  it("reconciles a failed goal clear even when user lookup finishes after the goal task", async () => {
+    mocks.evaluate.mockResolvedValueOnce(schedule(2));
+    await state.handleRecallEvalChange("tune", "hard");
+    // Only these overview fields are consumed by the hook. Keep the view stale
+    // after SQLite clears its row to reproduce the original phantom Submit count.
+    practiceRows = [
+      { id: "tune", has_staged: 1, recall_eval: "hard" } as ITuneOverview,
+    ];
+    const persistence = deferred<void>();
+    mocks.persist.mockReturnValueOnce(persistence.promise);
+    const goal = state.handleGoalChange("tune", "recall");
+    await vi.waitFor(() => expect(row()).toBeUndefined());
+
+    const userLookup = deferred<string>();
+    mocks.getUserId.mockReturnValueOnce(userLookup.promise);
+    const rating = state.handleRecallEvalChange("tune", "good");
+    persistence.reject(new Error("persist failed"));
+    await goal;
+    // The goal has already left the pending map when lookup returns. The
+    // rating must retain its rejected task and recover from SQLite, not stage.
+    userLookup.resolve("user");
+    await rating;
+
+    expect(row()).toBeUndefined();
+    expect(state.evaluations().tune).toBe("");
+    expect(state.evaluationsCount()).toBe(0);
+    expect(state.isStaging()).toBe(false);
+    expect(mocks.evaluate).toHaveBeenCalledTimes(1);
   });
   it("does not resurrect a cleared evaluation", async () => {
     const first = await begin("good");
@@ -189,8 +314,6 @@ describe("staging request ownership with real SQLite writes", () => {
     expect(state.isStaging()).toBe(true);
     first.resolve(schedule(4));
     await first.task;
-    expect(
-      sqlite.prepare("SELECT count(*) AS count FROM table_transient_data").get()
-    ).toEqual({ count: 2 });
+    expect(stagedRows.size).toBe(2);
   });
 });
