@@ -82,7 +82,8 @@ export async function addLegacyAudio(page: Page, userId: string) {
       throw new Error(
         "Expected the BYOS reference before seeding legacy audio"
       );
-    const key = `users/${id}/audio/legacy-regression.wav`;
+    // Repeated runs can retain remote assets; each fixture needs its own path.
+    const key = `users/${id}/audio/${crypto.randomUUID()}/legacy-regression.wav`;
     const url = `http://localhost:8787/api/media/view?key=${encodeURIComponent(key)}`;
     const reference = await references.createReference(
       db,
