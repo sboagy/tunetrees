@@ -1,4 +1,4 @@
-import type { PluginFunctionName } from "./quickjs-worker";
+import type { PluginFunctionName } from "./quickjs-protocol";
 
 function extractPluginMeta(meta: unknown): {
   pluginId?: string;

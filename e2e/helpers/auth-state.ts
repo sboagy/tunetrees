@@ -65,6 +65,7 @@ export const CURRENT_AUTH_STATE_DB_VERSION = readCurrentAuthStateDbVersion();
 // ── internal types ─────────────────────────────────────────────────────────
 
 type StoredSession = {
+  access_token?: unknown;
   expires_at?: unknown;
   user?: {
     email?: unknown;
@@ -194,6 +195,49 @@ export function isAuthFileFresh(
     metadata.snapshotVersion === CURRENT_AUTH_STATE_SNAPSHOT_VERSION &&
     (CURRENT_AUTH_STATE_DB_VERSION == null ||
       metadata.dbVersion === CURRENT_AUTH_STATE_DB_VERSION)
+  );
+}
+
+/**
+ * Token expiry alone cannot establish that Supabase still owns the session.
+ * A sign-out or database reset can delete it while a long-lived JWT remains
+ * locally "fresh". Validate before reusing the snapshot; do not refresh its
+ * shared refresh token or hide server/network failures as stale credentials.
+ */
+export async function isAuthFileSessionValid(
+  filePath: string,
+  expectedOrigin: string,
+  expectedEmail: string,
+  supabaseUrl: string,
+  anonKey: string,
+  fetcher: typeof fetch = fetch
+): Promise<boolean> {
+  const state = JSON.parse(readFileSync(filePath, "utf-8")) as {
+    origins?: AuthStateOrigin[];
+  };
+  const origin = state.origins?.find(
+    (entry) => entry.origin === new URL(expectedOrigin).origin
+  );
+  const raw = origin?.localStorage?.find(
+    (entry) => entry.name === AUTH_STORAGE_KEY
+  )?.value;
+  const token = raw ? parseStoredSession(raw)?.access_token : undefined;
+  if (typeof token !== "string" || !token) return false;
+
+  const response = await fetcher(new URL("/auth/v1/user", supabaseUrl), {
+    headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (response.status === 401 || response.status === 403) return false;
+  if (!response.ok) {
+    throw new Error(`Auth snapshot validation failed: HTTP ${response.status}`);
+  }
+  const user: unknown = await response.json();
+  return (
+    typeof user === "object" &&
+    user !== null &&
+    "email" in user &&
+    user.email === expectedEmail
   );
 }
 

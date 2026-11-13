@@ -279,7 +279,12 @@ export function normalizeScheduleOutput(
   output: unknown,
   fallback: NextReviewSchedule
 ): NextReviewSchedule | null {
-  if (!output || typeof output !== "object") return null;
+  // null intentionally declines the override. Missing returns and arrays are
+  // mistakes, not silent FSRS overrides; partial schedule objects remain valid.
+  if (output === null) return null;
+  if (typeof output !== "object" || Array.isArray(output)) {
+    throw new TypeError("Scheduler must return a schedule object or null");
+  }
   const data = output as Record<string, unknown>;
 
   const nextDueRaw =
@@ -421,13 +426,16 @@ export async function applySchedulingPlugin(params: {
       );
     }
 
-    console.warn("Scheduling plugin failed, falling back to FSRS", error);
+    console.warn("Scheduling plugin failed; using default scheduling", error);
     const message =
       error instanceof Error ? error.message : "Plugin execution failed";
+    const compatibilityHint = message.includes("playlist_ref")
+      ? " This plugin uses the old playlist API. Update playlist_ref to repertoire_ref and input.playlistRef to input.repertoireRef in User Settings → Plugins."
+      : "";
     const pluginLabel = params.plugin.name || "Unknown plugin";
     const pluginId = params.plugin.id ? ` (${params.plugin.id})` : "";
     toast.error("Scheduling plugin failed", {
-      description: `Plugin: ${pluginLabel}${pluginId}. Method: ${methodName}. ${message}`,
+      description: `Plugin: ${pluginLabel}${pluginId}. Method: ${methodName}. ${message}${compatibilityHint} Default scheduling will be used.`,
       duration: Infinity,
     });
     return null;

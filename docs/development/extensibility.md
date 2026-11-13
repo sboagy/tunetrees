@@ -10,7 +10,10 @@ TuneTrees now ships a **sandboxed QuickJS plugin system** for imports and goal-b
 
 - Database table: `plugin`
 - UI: **User Settings → Plugins**
-- Runtime: `src/lib/plugins/quickjs-worker.ts` (Web Worker sandbox)
+- Transport and deadlines: `src/lib/plugins/quickjs-host.ts`
+- Worker channel and initialization: `src/lib/plugins/quickjs-worker.ts`
+- VM contexts, host promises, and cleanup: `src/lib/plugins/quickjs-core.ts`
+- Shared message validation: `src/lib/plugins/quickjs-protocol.ts`
 
 ### Capabilities
 
@@ -32,7 +35,7 @@ Supported capabilities:
 
 The sandbox provides:
 
-- `fetchUrl(url, options)` — fetch via `/api/proxy` (CORS-safe)
+- `await fetchUrl(url, options)` — fetch via `/api/proxy` (CORS-safe)
 - `parseCsv(text)` — CSV → array of objects
 - `parseJson(text)` — JSON → object
 - `log(...args)` — logs to console
@@ -67,7 +70,27 @@ Return an object with tune fields:
 
 The factory returns an object with `processFirstReview` and `processReview`.
 Input payload includes a `fallback` schedule (FSRS result). Return a full or
-partial schedule; missing fields will be filled from the fallback.
+partial schedule; missing fields will be filled from the fallback. The factory
+itself is synchronous; its review methods may return a value or a promise.
+Return `null` to decline an override. Returning `payload.fallback` explicitly
+chooses FSRS. Missing returns (`undefined`), arrays, and other primitives are
+errors and produce a notification before default scheduling resumes.
+
+`queryDb`, both `fsrsScheduler` methods, and `fetchUrl` return promises. Always
+await them (or return their promise). `parseCsv`, `parseJson`, and `log` are
+synchronous. Host requests started without awaiting them are abandoned when
+the invocation ends.
+
+A scheduling failure does not discard the evaluation: the practice flow uses
+the goal's interval ladder when available, otherwise FSRS, then finishes staging
+so Submit becomes available. A timeout terminates the shared worker; other
+active calls receive a worker-reset error and also recover through their caller's
+fallback. The next call starts a fresh worker. The scheduling deadline remains
+30 seconds to accommodate cold WASM initialization.
+
+Older saved scripts using `playlist_ref` / `input.playlistRef` must be reviewed
+and updated to `repertoire_ref` / `input.repertoireRef` in User Settings → Plugins.
+Updating the app's template does not rewrite saved or customized scripts.
 
 Helpers available:
 

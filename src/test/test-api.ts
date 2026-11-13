@@ -1170,6 +1170,10 @@ declare global {
       waitForIdle?: (timeoutMs?: number) => Promise<boolean>;
     };
     __ttTestApi?: {
+      // Exposes the production transport for real-worker tests in both Vite and
+      // built preview bundles. No source-module URL assumptions in those tests.
+      runPlugin: typeof import("@/lib/plugins/quickjs-host").runQuickJsPlugin;
+      disposePluginWorker: () => Promise<void>;
       // User ID injection for bypassing Supabase auth
       setTestUserId: (userId: string) => void;
       getTestUserId: () => string | undefined;
@@ -1196,6 +1200,12 @@ declare global {
       seedSchedulingPlugin: (input?: SeedSchedulingPluginInput) => Promise<{
         id: string;
       }>;
+      seedPracticeHistory: (input: {
+        repertoireId: string;
+        tuneId: string;
+        qualities: number[];
+        practicedBefore: string;
+      }) => Promise<void>;
       getPracticeCount: (repertoireId: string) => Promise<number>; // UUID
       getRepertoireTuneCount: (repertoireId: string) => Promise<number>; // UUID
       getTuneOverrideCountForCurrentUser: () => Promise<number>;
@@ -1425,6 +1435,10 @@ if (globalThis.window !== undefined) {
   // Idempotent attach
   if (!globalThis.window.__ttTestApi) {
     globalThis.window.__ttTestApi = {
+      runPlugin: async (input) =>
+        (await import("@/lib/plugins/quickjs-host")).runQuickJsPlugin(input),
+      disposePluginWorker: async () =>
+        (await import("@/lib/plugins/quickjs-host")).disposeQuickJsWorker(),
       // User ID injection methods
       setTestUserId: (userId: string) => {
         globalThis.window.__ttTestUserId = userId;
@@ -1612,6 +1626,42 @@ if (globalThis.window !== undefined) {
       },
       seedAddToReview,
       seedSchedulingPlugin,
+      seedPracticeHistory: async ({
+        repertoireId,
+        tuneId,
+        qualities,
+        practicedBefore,
+      }) => {
+        const db = await ensureDb();
+        for (const [index, quality] of qualities.entries()) {
+          const practiced = new Date(practicedBefore);
+          practiced.setUTCDate(practiced.getUTCDate() - index - 1);
+          db.insert(practiceRecord)
+            .values({
+              id: generateId(),
+              repertoireRef: repertoireId,
+              tuneRef: tuneId,
+              practiced: practiced.toISOString(),
+              due: practicedBefore,
+              quality,
+              interval: 1,
+              state: 2,
+              step: 2,
+              stability: 3,
+              difficulty: 5,
+              repetitions: qualities.length - index,
+              lapses: 0,
+              elapsedDays: 1,
+              goal: "fluency",
+              technique: "fsrs",
+              syncVersion: 1,
+              lastModifiedAt: new Date().toISOString(),
+              deviceId: "local",
+            })
+            .run();
+        }
+        await persistDb();
+      },
       getPracticeCount,
       getRepertoireTuneCount,
       getTuneOverrideCountForCurrentUser,

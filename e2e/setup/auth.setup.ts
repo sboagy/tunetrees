@@ -37,6 +37,7 @@ import {
   CURRENT_AUTH_STATE_DB_VERSION,
   CURRENT_AUTH_STATE_SNAPSHOT_VERSION,
   isAuthFileFresh,
+  isAuthFileSessionValid,
   readStoredAuthStateMetadata,
 } from "../helpers/auth-state";
 import { TEST_USERS } from "../helpers/test-users";
@@ -707,11 +708,19 @@ setup("authenticate all test users", async ({ browser }) => {
   for (const [userKey, testUser] of Object.entries(TEST_USERS)) {
     const authFile = `${AUTH_DIR}/${userKey}.json`;
 
-    // Skip re-auth for users whose snapshot is still fresh (local dev only)
+    // Reuse only snapshots whose server session still exists. A future JWT
+    // expiry does not detect a session revoked since the snapshot was saved.
     if (
       !shouldReset &&
       !isCI &&
-      isAuthFileFresh(authFile, String(BASE_URL), testUser.email)
+      isAuthFileFresh(authFile, String(BASE_URL), testUser.email) &&
+      (await isAuthFileSessionValid(
+        authFile,
+        String(BASE_URL),
+        testUser.email,
+        process.env.VITE_SUPABASE_URL ?? "http://127.0.0.1:54321",
+        process.env.VITE_SUPABASE_ANON_KEY ?? ""
+      ))
     ) {
       const metadata = readStoredAuthStateMetadata(authFile, String(BASE_URL));
       const remainingMinutes = metadata?.expiresAtMs

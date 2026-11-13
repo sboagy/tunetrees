@@ -86,7 +86,8 @@ export async function stagePracticeEvaluation(
   tuneId: string,
   evaluation: string,
   goal: string = "recall",
-  technique: string = ""
+  technique: string = "",
+  isCurrent: () => boolean = () => true
 ): Promise<FSRSPreviewMetrics> {
   const now = new Date();
   // Make practiced timestamps deterministic across devices by removing
@@ -126,6 +127,11 @@ export async function stagePracticeEvaluation(
     goal,
     technique,
   };
+
+  // Scheduling can finish after the user changed rating, goal, or repertoire.
+  // The ownership check belongs here, immediately before the synchronous write;
+  // checking only in the UI after this function returns would be too late.
+  if (!isCurrent()) return preview;
 
   // UPSERT to table_transient_data
   const lastModifiedAt = now.toISOString();

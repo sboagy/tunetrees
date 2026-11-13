@@ -289,7 +289,16 @@ function createScheduler({ fsrsScheduler, queryDb }) {
 - `fallback`: serialized FSRS schedule (see below)
 
 **Return value:** an object shaped like `NextReviewSchedule` (strings are OK; the
-host normalizes). Use `payload.fallback` as a template.
+host normalizes). Partial objects retain the missing FSRS fields. Use
+`payload.fallback` as a template, or return it to explicitly select FSRS. Return
+`null` to decline an override and use the goal ladder (if available), then FSRS.
+An omitted return, array, or primitive other than `null` is a plugin error.
+Errors notify the user and allow staging/submission with default scheduling.
+
+The factory is synchronous. Review methods may be asynchronous. `queryDb`,
+`fsrsScheduler.processFirstReview`, `fsrsScheduler.processReview`, and `fetchUrl`
+return promises and must be awaited or returned. See the
+[plugin runtime and recovery contract](../development/extensibility.md).
 
 ### Helpers
 
