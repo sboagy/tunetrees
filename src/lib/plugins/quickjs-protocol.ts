@@ -109,3 +109,15 @@ export function isWorkerOutput(value: unknown): value is WorkerMessage {
   if (value.type === "fsrs") return id(value.invokeId) && method(value.method);
   return value.type === undefined && reply(value);
 }
+
+export type PluginInvocation = {
+  script: string;
+  payload: unknown;
+  meta?: unknown;
+} & (
+  | { functionName: "parseImport"; methodName?: never }
+  | {
+      functionName: "createScheduler";
+      methodName: "processFirstReview" | "processReview";
+    }
+);

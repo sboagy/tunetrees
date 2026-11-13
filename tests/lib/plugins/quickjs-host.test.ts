@@ -55,8 +55,22 @@ describe("worker transport lifetime", () => {
     const active = runQuickJsPlugin(params);
     const worker = latest();
     await expect(
+      // @ts-expect-error Exercise invalid input from an untyped caller.
       runQuickJsPlugin({ ...params, functionName: "createScheduler" })
     ).rejects.toThrow("Missing scheduler method name");
+    expect(worker.messages).toHaveLength(1);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    worker.receive({ id: worker.invocation.id, ok: true, result: 6 });
+    expect(await active).toBe(6);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("rejects an import method before queuing or resetting active work", async () => {
+    const active = runQuickJsPlugin(params);
+    const worker = latest();
+    await expect(
+      // @ts-expect-error Exercise invalid input from an untyped caller.
+      runQuickJsPlugin({ ...params, methodName: "processReview" })
+    ).rejects.toThrow("Invalid plugin invocation parameters");
     expect(worker.messages).toHaveLength(1);
     expect(worker.terminate).not.toHaveBeenCalled();
     worker.receive({ id: worker.invocation.id, ok: true, result: 6 });

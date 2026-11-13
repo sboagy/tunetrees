@@ -495,12 +495,12 @@ const PluginsPage: Component = () => {
       const selectedFunction = testFunction();
       const result = await runPluginFunction({
         script: currentDraft.script,
-        functionName:
-          selectedFunction === "parseImport"
-            ? "parseImport"
-            : "createScheduler",
-        methodName:
-          selectedFunction === "parseImport" ? undefined : selectedFunction,
+        ...(selectedFunction === "parseImport"
+          ? { functionName: "parseImport" as const }
+          : {
+              functionName: "createScheduler" as const,
+              methodName: selectedFunction,
+            }),
         payload,
         meta,
         timeoutMs: 30000,

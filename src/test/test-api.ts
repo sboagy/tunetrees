@@ -5,6 +5,7 @@
  * bypassing slow remote DB resets. Attached as globalThis.__ttTestApi.
  */
 
+import { isTransientRemoteRead } from "./remote-read";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   clearDb,
@@ -960,14 +961,19 @@ async function getSyncErrors(): Promise<string[]> {
  */
 async function getSupabaseRecord(
   table: string,
-  recordId: string | number
+  recordId: string | number,
+  polling = false
 ): Promise<any> {
   // This requires network access - will fail in offline tests
-  const { data, error } = await supabase
-    .from(table)
-    .select("*")
-    .eq("id", recordId)
-    .single();
+  const query = supabase.from(table).select("*").eq("id", recordId);
+  const { data, error, status } = await (polling
+    ? query.maybeSingle()
+    : query.single());
+
+  // A missing row is expected until sync completes. Retry only transport or
+  // service availability errors; auth/schema failures must still fail the test.
+  if (polling && error && isTransientRemoteRead(status, error.code))
+    return null;
 
   if (error)
     throw new Error(`Failed to fetch Supabase record: ${error.message}`);
@@ -1393,7 +1399,8 @@ declare global {
       getSyncErrors: () => Promise<string[]>;
       getSupabaseRecord: (
         table: string,
-        recordId: string | number
+        recordId: string | number,
+        polling?: boolean
       ) => Promise<any>;
       getLocalRecord: (
         table: string,
@@ -1875,8 +1882,12 @@ if (globalThis.window !== undefined) {
       getSyncErrors: async () => {
         return await getSyncErrors();
       },
-      getSupabaseRecord: async (table: string, recordId: string | number) => {
-        return await getSupabaseRecord(table, recordId);
+      getSupabaseRecord: async (
+        table: string,
+        recordId: string | number,
+        polling = false
+      ) => {
+        return await getSupabaseRecord(table, recordId, polling);
       },
       getLocalRecord: async (table: string, recordId: string | number) => {
         return await getLocalRecord(table, recordId);

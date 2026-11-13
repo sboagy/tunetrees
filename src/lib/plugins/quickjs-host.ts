@@ -4,6 +4,8 @@ import {
   type FsrsResult,
   type InvokeRequest,
   isWorkerOutput,
+  isWorkerInput,
+  type PluginInvocation,
   type PluginBridge,
   type PluginFunctionName,
   type QueryResult,
@@ -256,17 +258,17 @@ function ensureWorker(): Worker {
   return worker;
 }
 
-export async function runQuickJsPlugin(params: {
-  script: string;
-  functionName: PluginFunctionName;
-  methodName?: "processFirstReview" | "processReview";
-  payload: unknown;
-  meta?: unknown;
-  timeoutMs?: number;
-  bridge?: PluginBridge;
-}): Promise<unknown> {
+export async function runQuickJsPlugin(
+  params: PluginInvocation & {
+    timeoutMs?: number;
+    bridge?: PluginBridge;
+  }
+): Promise<unknown> {
   if (params.functionName === "createScheduler" && !params.methodName) {
     throw new Error("Missing scheduler method name");
+  }
+  if (!isWorkerInput({ ...params, type: "invoke", id: 1 })) {
+    throw new Error("Invalid plugin invocation parameters");
   }
   const runner = ensureWorker();
   requestId += 1;

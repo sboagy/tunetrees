@@ -233,6 +233,21 @@ describe("staging request ownership with synchronous writes", () => {
     expect(state.evaluations().tune).toBe("hard");
     expect(row()).toEqual({ recall_eval: "hard", interval: 2 });
   });
+  it("refreshes the view after a newer failure restores an older persisted rating", async () => {
+    const saving = deferred<void>();
+    mocks.persist.mockReturnValueOnce(saving.promise);
+    mocks.evaluate.mockResolvedValueOnce(schedule(2));
+    const older = state.handleRecallEvalChange("tune", "good");
+    await vi.waitFor(() => expect(row()?.recall_eval).toBe("good"));
+    const newer = await begin("easy");
+    saving.resolve();
+    await older;
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    newer.reject(new Error("scheduling failed"));
+    await newer.task;
+    expect(state.evaluations().tune).toBe("good");
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
   it("does not restore a cancelled optimistic rating when the goal change fails", async () => {
     const pending = await begin("good");
     mocks.persist.mockRejectedValueOnce(new Error("persist failed"));

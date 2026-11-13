@@ -148,7 +148,7 @@ export function usePracticeEvaluations(
     }
 
     if (Object.keys(hydrated).length > 0) {
-      setEvaluations(hydrated);
+      setEvaluations((prev) => ({ ...hydrated, ...prev }));
     }
     setDidHydrateEvaluations(true);
   });
@@ -253,6 +253,7 @@ export function usePracticeEvaluations(
         error
       );
       restoreStagedEvaluation(db, userIdValue, repertoireId, tuneId);
+      props.incrementPracticeListStagedChanged();
       toast.error("Failed to stage evaluation. Please try again.");
     } finally {
       // An older request cannot clear the pending marker of a newer rating.

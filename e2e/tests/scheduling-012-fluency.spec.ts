@@ -149,7 +149,11 @@ test.describe("Fluency scheduling", () => {
         () =>
           page.evaluate(
             async (id) =>
-              window.__ttTestApi?.getSupabaseRecord("practice_record", id),
+              window.__ttTestApi?.getSupabaseRecord(
+                "practice_record",
+                id,
+                true
+              ),
             record?.id ?? "missing"
           ),
         { timeout: 30000 }
