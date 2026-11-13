@@ -19,7 +19,7 @@
  */
 
 import { and, eq, isNull, or, sql } from "drizzle-orm";
-import type { SqliteDatabase } from "../db/client-sqlite";
+import { persistDb, type SqliteDatabase } from "../db/client-sqlite";
 import {
   getLatestPracticeRecord,
   getUserPreferences,
@@ -710,7 +710,9 @@ export async function commitStagedEvaluations(
       userIdType: typeof userId,
       repertoireIdType: typeof repertoireId,
     });
-    const { persistDb } = await import("../db/client-sqlite");
+    // Do not yield before selecting and deleting the staged rows: the caller's
+    // UI revision snapshot and this synchronous transaction must own the same
+    // ratings. Later edits can run only once persistence yields below.
 
     // 2. Determine which queue window we're working with
     let activeWindowStart: string;

@@ -127,6 +127,7 @@ export function usePracticeEvaluations(
 
   createEffect(() => {
     props.currentRepertoireId();
+    props.localDb();
     invalidate();
     setDidHydrateEvaluations(false);
     setEvaluations({});

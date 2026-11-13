@@ -100,6 +100,7 @@ function createDbFake(): SqliteDatabase {
   } as unknown as SqliteDatabase;
 }
 let db: SqliteDatabase;
+let setDb: (value: SqliteDatabase) => SqliteDatabase;
 let state: ReturnType<typeof usePracticeEvaluations>;
 let dispose: () => void;
 let setRepertoire: (value: string) => string;
@@ -119,8 +120,10 @@ beforeEach(async () => {
     dispose = cleanup;
     const [repertoire, set] = createSignal("rep");
     setRepertoire = set;
+    const [localDb, replaceDb] = createSignal(db);
+    setDb = replaceDb;
     state = usePracticeEvaluations({
-      localDb: () => db,
+      localDb,
       getUserId: () => mocks.getUserId(),
       currentRepertoireId: repertoire,
       practiceListData: () => practiceRows,
@@ -149,6 +152,15 @@ const begin = async (value: string) => {
   return { ...reply, task };
 };
 describe("staging request ownership with synchronous writes", () => {
+  it("invalidates pending ratings when the database changes in the same repertoire", async () => {
+    const pending = await begin("good");
+    setDb(createDbFake());
+    expect(state.isStaging()).toBe(false);
+    expect(state.evaluations()).toEqual({});
+    pending.resolve(schedule(7));
+    await pending.task;
+    expect(row()).toBeUndefined();
+  });
   it("preserves a same-value rating started after the submission snapshot", async () => {
     mocks.evaluate.mockResolvedValueOnce(schedule(2));
     await state.handleRecallEvalChange("tune", "good");
