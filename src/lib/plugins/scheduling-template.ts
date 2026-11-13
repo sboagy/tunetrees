@@ -26,15 +26,10 @@ function pickIntervalDays(qualities) {
   let goodStreak = 0;
   let easyStreak = 0;
   for (const q of qualities) {
-    if (q >= 4) {
-      easyStreak += 1;
-      goodStreak += 1;
-    } else if (q >= 3) {
-      goodStreak += 1;
-      easyStreak = 0;
-    } else {
-      break;
-    }
+    if (q < 3) break;
+    // Easy counts only while every newer rating was Easy too.
+    if (q >= 4 && easyStreak === goodStreak) easyStreak += 1;
+    goodStreak += 1;
   }
 
   if (easyStreak >= 3) return 7; // weekly

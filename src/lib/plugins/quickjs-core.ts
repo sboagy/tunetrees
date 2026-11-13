@@ -12,6 +12,7 @@ import type {
   QuickJSAsyncRuntime,
   QuickJSDeferredPromise,
   QuickJSHandle,
+  VmFunctionImplementation,
 } from "quickjs-emscripten";
 import type { InvokeRequest, PluginBridge } from "./quickjs-protocol";
 
@@ -73,6 +74,69 @@ function createHandleMapper(params: {
   return { toHandle, shouldDispose };
 }
 
+// Plain-data Papa options a plugin may set, with the values each accepts.
+// Everything else (download, worker, callbacks) is ignored, so guest input
+// cannot change how the host fetches or parses.
+const isString = (value: unknown) => typeof value === "string";
+const isBoolean = (value: unknown) => typeof value === "boolean";
+const isNonnegativeInteger = (value: unknown) =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
+const CSV_OPTIONS = new Map<string, (value: unknown) => boolean>([
+  ["delimiter", isString],
+  ["newline", (value) => value === "\r" || value === "\n" || value === "\r\n"],
+  ["quoteChar", isString],
+  ["escapeChar", isString],
+  ["comments", (value) => value === false || isString(value)],
+  ["header", isBoolean],
+  // Papa supports a boolean for all columns or a boolean map keyed by header
+  // name/column index. Keep that plain-data form without accepting callbacks.
+  [
+    "dynamicTyping",
+    (value) =>
+      isBoolean(value) ||
+      (typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value) &&
+        Object.values(value).every(isBoolean)),
+  ],
+  ["fastMode", isBoolean],
+  ["skipEmptyLines", (value) => isBoolean(value) || value === "greedy"],
+  ["preview", isNonnegativeInteger],
+  ["skipFirstNLines", isNonnegativeInteger],
+  [
+    "delimitersToGuess",
+    (value) => Array.isArray(value) && value.every(isString),
+  ],
+]);
+
+// Config accepted by the synchronous Papa.parse overload for string input.
+type CsvParseConfig = Papa.ParseConfig<unknown> & {
+  download?: false;
+  worker?: false;
+};
+
+function toCsvParseConfig(config: unknown): CsvParseConfig {
+  const options: Record<string, unknown> = {};
+  if (config && typeof config === "object") {
+    for (const [name, value] of Object.entries(config)) {
+      const accepts = CSV_OPTIONS.get(name);
+      if (!accepts || value === undefined) continue;
+      if (!accepts(value))
+        throw new TypeError(
+          `parseCsv option "${name}" has an unsupported value`
+        );
+      options[name] = value;
+    }
+  }
+  return {
+    header: true,
+    skipEmptyLines: true,
+    // Names and value types were checked against CSV_OPTIONS above.
+    ...(options as Partial<Papa.ParseConfig<unknown>>),
+    worker: false,
+  };
+}
+
 // A runtime has one guest job queue even when several contexts are active.
 // Coalesce drains, and route job errors to the invocation owning that context.
 const pumps = new WeakMap<
@@ -80,6 +144,7 @@ const pumps = new WeakMap<
   {
     failures: Map<QuickJSAsyncContext, (error: unknown) => void>;
     schedule: () => void;
+    drain: () => void;
   }
 >();
 function getPump(runtime: QuickJSAsyncRuntime) {
@@ -87,25 +152,28 @@ function getPump(runtime: QuickJSAsyncRuntime) {
   if (existing) return existing;
   const failures = new Map<QuickJSAsyncContext, (error: unknown) => void>();
   let queued = false;
+  const drain = () => {
+    if (!runtime.alive) return;
+    const result = runtime.executePendingJobs();
+    try {
+      if (result.error) {
+        const context = result.error.context as QuickJSAsyncContext;
+        const error = context.dump(result.error);
+        failures.get(context)?.(new Error(error?.message ?? String(error)));
+      }
+    } finally {
+      result.dispose();
+    }
+  };
   const schedule = () => {
     if (queued) return;
     queued = true;
     queueMicrotask(() => {
       queued = false;
-      if (!runtime.alive) return;
-      const result = runtime.executePendingJobs();
-      try {
-        if (result.error) {
-          const context = result.error.context as QuickJSAsyncContext;
-          const error = context.dump(result.error);
-          failures.get(context)?.(new Error(error?.message ?? String(error)));
-        }
-      } finally {
-        result.dispose();
-      }
+      drain();
     });
   };
-  const pump = { failures, schedule };
+  const pump = { failures, schedule, drain };
   pumps.set(runtime, pump);
   return pump;
 }
@@ -124,6 +192,36 @@ export async function executePlugin(
   });
   const handles: QuickJSHandle[] = [];
   const deferreds: QuickJSDeferredPromise[] = [];
+  const revokers: QuickJSHandle[] = [];
+  // Guest aliases retain only a wrapper. Its private callback binding can be
+  // cleared explicitly, releasing the HostRef before runtime disposal runs GC.
+  const wrapCallback = qjs.unwrapResult(
+    qjs.evalCode(`
+    (callback => ({
+      invoke: (...args) => callback(...args),
+      release: () => { callback = undefined; }
+    }))
+  `)
+  );
+  const newFunction = (
+    name: string,
+    implementation: VmFunctionImplementation<QuickJSHandle>
+  ) => {
+    const target = qjs.newFunction(name, implementation);
+    try {
+      const pair = qjs.unwrapResult(
+        qjs.callFunction(wrapCallback, qjs.undefined, target)
+      );
+      try {
+        revokers.push(qjs.getProp(pair, "release"));
+        return qjs.getProp(pair, "invoke");
+      } finally {
+        pair.dispose();
+      }
+    } finally {
+      target.dispose();
+    }
+  };
   const controller = new AbortController();
   const pump = getPump(runtime);
   let active = true;
@@ -144,15 +242,20 @@ export async function executePlugin(
     name: string,
     run: (...args: unknown[]) => Promise<unknown>
   ) =>
-    qjs.newFunction(name, (...args) => {
+    newFunction(name, (...args) => {
       const copied = args.map((arg) => qjs.dump(arg));
       const deferred = qjs.newPromise();
       deferreds.push(deferred);
       const settle = (value: unknown, rejected: boolean) => {
         if (!active) return;
-        const handle = rejected
-          ? qjs.newError(value instanceof Error ? value.message : String(value))
-          : toHandle(value);
+        let handle: QuickJSHandle;
+        if (rejected) {
+          const message =
+            value instanceof Error ? value.message : String(value);
+          handle = qjs.newError(message);
+        } else {
+          handle = toHandle(value);
+        }
         try {
           if (rejected) deferred.reject(handle);
           else deferred.resolve(handle);
@@ -162,7 +265,8 @@ export async function executePlugin(
         pump.schedule();
       };
       void Promise.resolve()
-        .then(() => run(...copied))
+        // A job drained after the invocation ended must not start host work.
+        .then(() => (active ? run(...copied) : undefined))
         .then(
           (value) => settle(value, false),
           (error) => settle(error, true)
@@ -172,7 +276,7 @@ export async function executePlugin(
     });
 
   try {
-    const logHandle = qjs.newFunction("log", (...args) => {
+    const logHandle = newFunction("log", (...args) => {
       const values = args.map((arg) => qjs.dump(arg));
       // eslint-disable-next-line no-console
       console.log("[Plugin]", ...values);
@@ -181,7 +285,7 @@ export async function executePlugin(
     qjs.setProp(qjs.global, "log", logHandle);
     if (shouldDispose(logHandle)) logHandle.dispose();
 
-    const parseJsonHandle = qjs.newFunction("parseJson", (arg) => {
+    const parseJsonHandle = newFunction("parseJson", (arg) => {
       const raw = qjs.dump(arg);
       const text = typeof raw === "string" ? raw : JSON.stringify(raw ?? "");
       const parsed = JSON.parse(text);
@@ -190,22 +294,13 @@ export async function executePlugin(
     qjs.setProp(qjs.global, "parseJson", parseJsonHandle);
     if (shouldDispose(parseJsonHandle)) parseJsonHandle.dispose();
 
-    const parseCsvHandle = qjs.newFunction("parseCsv", (arg, configArg) => {
+    const parseCsvHandle = newFunction("parseCsv", (arg, configArg) => {
       const raw = qjs.dump(arg);
       if (typeof raw !== "string") {
         throw new TypeError("parseCsv expects a CSV string");
       }
-      const config = configArg ? qjs.dump(configArg) : undefined;
-      const parseConfig: Papa.ParseConfig = {
-        header: true,
-        skipEmptyLines: true,
-        ...(config && typeof config === "object" ? config : {}),
-        worker: false,
-      };
-      const result = Papa.parse(
-        raw,
-        parseConfig
-      ) as unknown as Papa.ParseResult<unknown>;
+      const config: unknown = configArg ? qjs.dump(configArg) : undefined;
+      const result = Papa.parse<unknown>(raw, toCsvParseConfig(config));
       if (result.errors?.length) {
         const msg = result.errors[0]?.message ?? "CSV parse error";
         throw new Error(msg);
@@ -324,23 +419,23 @@ export async function executePlugin(
     active = false;
     controller.abort();
     pump.failures.delete(qjs);
+    // A script that throws early, or a job error, can leave this invocation's
+    // promise jobs queued on the shared runtime; disposing the context does
+    // not remove them. Run them out now, while this invocation still owns its
+    // deadline, so they can never execute inside a later invocation. Bridge
+    // calls made by these jobs start no host work: the invocation is inactive.
+    while (runtime.alive && runtime.hasPendingJob()) pump.drain();
     // Deferred disposal also releases uncalled resolve/reject callbacks for
     // fire-and-forget bridge calls. It is safe after normal settlement too.
     for (const deferred of deferreds) deferred.dispose();
     for (const handle of handles.reverse()) if (handle.alive) handle.dispose();
-    // Release the VM's references to host callbacks before freeing its global
-    // object. QuickJS 0.32 otherwise retains these through global-object cycles
-    // and attempts to release HostRefs after the runtime has been unregistered.
-    for (const name of [
-      "log",
-      "parseJson",
-      "parseCsv",
-      "queryDb",
-      "fsrsScheduler",
-      "fetchUrl",
-    ]) {
-      qjs.setProp(qjs.global, name, qjs.undefined);
+    // Clear wrapper callback bindings before context/runtime disposal; clearing global
+    // names alone cannot release callbacks retained by guest aliases or cycles.
+    for (const revoke of revokers) {
+      qjs.callFunction(revoke, qjs.undefined).dispose();
+      revoke.dispose();
     }
+    wrapCallback.dispose();
     qjs.dispose();
   }
 }

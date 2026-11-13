@@ -51,6 +51,18 @@ afterEach(() => {
 });
 
 describe("worker transport lifetime", () => {
+  it("rejects a missing scheduler method without interrupting active work", async () => {
+    const active = runQuickJsPlugin(params);
+    const worker = latest();
+    await expect(
+      runQuickJsPlugin({ ...params, functionName: "createScheduler" })
+    ).rejects.toThrow("Missing scheduler method name");
+    expect(worker.messages).toHaveLength(1);
+    expect(worker.terminate).not.toHaveBeenCalled();
+    worker.receive({ id: worker.invocation.id, ok: true, result: 6 });
+    expect(await active).toBe(6);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it("distinguishes a timeout from another invocation interrupted by reset", async () => {
     const a = runQuickJsPlugin(params);
     const b = runQuickJsPlugin({ ...params, timeoutMs: 500 });

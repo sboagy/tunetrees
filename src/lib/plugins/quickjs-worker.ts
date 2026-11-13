@@ -170,14 +170,28 @@ async function invoke(message: InvokeRequest): Promise<WorkerResponse> {
     }
   }
 }
-ctx.addEventListener("message", (event: MessageEvent<unknown>) => {
-  // Dedicated workers receive parent messages with an empty event.origin.
-  // Window-style origin comparisons drop valid invocations and bridge replies.
-  // Validate the private channel's protocol instead (see MDN worker message).
+// S2819: this dedicated worker receives messages from its owning page through
+// Worker.postMessage(), not through a window's cross-origin message listener.
+// Dedicated-worker messages have an empty event.origin; comparing it with our
+// origin would drop valid invocations and bridge replies. Validate the private
+// channel's protocol below instead. Keep this exception local to this listener.
+// https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/message_event
+// biome-ignore format: NOSONAR must stay on the listener's reported line.
+ctx.addEventListener("message", (event: MessageEvent<unknown>) => { // NOSONAR: S2819 — private dedicated-worker channel; see rationale above.
   if (!isWorkerInput(event.data)) return;
   const message = event.data;
   if (message.type === "invoke") {
-    void invoke(message).then((response) => ctx.postMessage(response));
+    void invoke(message)
+      .then((response) => ctx.postMessage(response))
+      .catch((error: unknown) => {
+        // A result can fail structured cloning. Reply with plain strings using
+        // the original invocation ID so only this caller is rejected.
+        ctx.postMessage({
+          id: message.id,
+          ok: false,
+          error: { message: error instanceof Error ? error.message : String(error) },
+        } satisfies WorkerResponse);
+      });
     return;
   }
   const map = message.type === "queryResult" ? pendingQueries : pendingFsrs;

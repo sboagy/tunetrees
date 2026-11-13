@@ -265,6 +265,9 @@ export async function runQuickJsPlugin(params: {
   timeoutMs?: number;
   bridge?: PluginBridge;
 }): Promise<unknown> {
+  if (params.functionName === "createScheduler" && !params.methodName) {
+    throw new Error("Missing scheduler method name");
+  }
   const runner = ensureWorker();
   requestId += 1;
   const id = requestId;

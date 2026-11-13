@@ -54,6 +54,18 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
   const run = (script: string, bridge: PluginBridge = {}) =>
     executePlugin(runtime, invocation(script), bridge);
 
+  it("releases callbacks retained by guest aliases and cycles", async () => {
+    expect(
+      await run(`
+      const alias = queryDb;
+      const cycle = { callback: parseCsv, scheduler: fsrsScheduler.processReview };
+      cycle.self = cycle;
+      globalThis.saved = [alias, cycle, log, parseJson, fetchUrl];
+      function parseImport() { return 8; }
+    `)
+    ).toBe(8);
+    // afterEach disposes the real runtime, exposing retained HostRef failures.
+  });
   it("returns a synchronous result", async () => {
     expect(
       await run('function parseImport() { return {title: "Tune"}; }')
@@ -97,6 +109,25 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       )
     ).toMatchObject({ interval: 2 });
   });
+  // History is newest first and follows the rating being scheduled.
+  it.each([
+    { quality: 4, history: [4, 4, 3], interval: 7 },
+    { quality: 3, history: [4, 4, 4], interval: 4 },
+  ])(
+    "counts the template's Easy streak from the newest rating only: $quality then $history",
+    async ({ quality, history, interval }) => {
+      const result = await executePlugin(
+        runtime,
+        invocation(DEFAULT_PLUGIN_SCRIPT, {
+          functionName: "createScheduler",
+          methodName: "processReview",
+          payload: { ...payload, input: { ...payload.input, quality } },
+        }),
+        { queryDb: async () => history.map((value) => ({ quality: value })) }
+      );
+      expect(result).toMatchObject({ interval });
+    }
+  );
   it("reaches a bridge after an initial guest await", async () => {
     expect(
       await run(
@@ -114,9 +145,12 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       })
     ).rejects.toThrow("no such column: playlist_ref");
   });
-  it.each(["processFirstReview", "processReview"] as const)(
-    "supports the %s FSRS bridge",
-    async (method) => {
+  it.each([
+    { method: "processFirstReview", expectedInterval: 9 },
+    { method: "processReview", expectedInterval: 11 },
+  ] as const)(
+    "supports the $method FSRS bridge",
+    async ({ method, expectedInterval }) => {
       const bridge = {
         processFirstReview: async () => ({ interval: 9 }),
         processReview: async () => ({ interval: 11 }),
@@ -126,7 +160,7 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
           `async function parseImport(p) { return await fsrsScheduler.${method}(p); }`,
           { fsrsScheduler: bridge }
         )
-      ).toEqual({ interval: method === "processReview" ? 11 : 9 });
+      ).toEqual({ interval: expectedInterval });
     }
   );
   it("keeps overlapping invocations isolated when replies arrive in reverse order", async () => {
@@ -168,6 +202,19 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(await run("function parseImport() { return 5; }")).toBe(5);
+  });
+  it("leaves no guest jobs behind when a script fails after queueing one", async () => {
+    const queryDb = vi.fn(async () => []);
+    await expect(
+      run(
+        'Promise.resolve().then(() => queryDb("stale")); throw new Error("early failure");',
+        { queryDb }
+      )
+    ).rejects.toThrow("early failure");
+    // The runtime is shared: a leftover job would run inside the next plugin.
+    expect(runtime.hasPendingJob()).toBe(false);
+    expect(await run("function parseImport() { return 5; }")).toBe(5);
+    expect(queryDb).not.toHaveBeenCalled();
   });
   it("reports a missing bridge promptly", async () => {
     await expect(
@@ -217,6 +264,48 @@ describe("QuickJS plugin execution with the real asyncify VM", () => {
       "/api/proxy?url=https%3A%2F%2Fexample.test%2Ftunes",
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
+  });
+  it("applies supported parseCsv options and ignores the rest", async () => {
+    expect(
+      await run(
+        'function parseImport() { return parseCsv("a;b\\n1;2", { delimiter: ";", download: true }); }'
+      )
+    ).toEqual([{ a: "1", b: "2" }]);
+  });
+  it("preserves CSV typing by header while leaving other columns as strings", async () => {
+    expect(
+      await run(
+        'function parseImport(){return parseCsv("name,count\\n001,2",{dynamicTyping:{name:false,count:true}});}'
+      )
+    ).toEqual([{ name: "001", count: 2 }]);
+  });
+  it("preserves CSV typing by column index without a header", async () => {
+    expect(
+      await run(
+        'function parseImport(){return parseCsv("001,2",{header:false,dynamicTyping:{0:false,1:true}});}'
+      )
+    ).toEqual([["001", 2]]);
+  });
+  it("rejects non-boolean values in CSV column typing maps", async () => {
+    await expect(
+      run(
+        'function parseImport(){return parseCsv("name,count\\nTune,2",{dynamicTyping:{count:"yes"}});}'
+      )
+    ).rejects.toThrow('parseCsv option "dynamicTyping"');
+  });
+  it("preserves custom delimiter detection and skipped preamble lines", async () => {
+    expect(
+      await run(
+        'function parseImport(){return parseCsv("preamble\\nname^count\\nTune^2",{skipFirstNLines:1,delimitersToGuess:["^"]});}'
+      )
+    ).toEqual([{ name: "Tune", count: "2" }]);
+  });
+  it("rejects a parseCsv option with an unsupported value", async () => {
+    await expect(
+      run(
+        'function parseImport() { return parseCsv("a,b\\n1,2", { delimiter: 5 }); }'
+      )
+    ).rejects.toThrow('parseCsv option "delimiter"');
   });
   it("reports failed fetches", async () => {
     const fetcher = vi
