@@ -7,18 +7,20 @@ import quickJsWasmUrl from "@jitl/quickjs-wasmfile-release-asyncify/wasm?url";
 import {
   newQuickJSAsyncWASMModule,
   newVariant,
-  RELEASE_ASYNC,
   type QuickJSAsyncRuntime,
+  RELEASE_ASYNC,
 } from "quickjs-emscripten";
 import { executePlugin } from "./quickjs-core";
 import {
-  isWorkerInput,
-  type QueryRequest,
   type FsrsRequest,
   type InvokeRequest,
+  isWorkerInput,
+  type QueryRequest,
   type WorkerResponse,
 } from "./quickjs-protocol";
+
 export type { PluginFunctionName } from "./quickjs-protocol";
+
 const ctx = globalThis;
 const QUICKJS_ASYNC_VARIANT = newVariant(RELEASE_ASYNC, {
   wasmLocation: quickJsWasmUrl,

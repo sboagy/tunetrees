@@ -4,9 +4,9 @@ import {
   runQuickJsPlugin,
 } from "../../../src/lib/plugins/quickjs-host";
 import {
+  type InvokeRequest,
   isWorkerInput,
   isWorkerOutput,
-  type InvokeRequest,
 } from "../../../src/lib/plugins/quickjs-protocol";
 
 class FakeWorker {

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { DEFAULT_PLUGIN_SCRIPT } from "../../src/lib/plugins/scheduling-template";
 
 /** SCHEDULING-011 (HIGH): real module-worker/VM transport, without auth or DB.

@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   newQuickJSAsyncWASMModule,
   type QuickJSAsyncRuntime,
 } from "quickjs-emscripten";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { executePlugin } from "../../../src/lib/plugins/quickjs-core";
 import type {
   InvokeRequest,

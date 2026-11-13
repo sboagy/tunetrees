@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { expect } from "@playwright/test";
+import { isAuthFileSessionValid } from "../helpers/auth-state";
 import { setupDeterministicTestParallel } from "../helpers/practice-scenarios";
 import { test } from "../helpers/test-fixture";
 import { getRequiredTestPassword, type TestUser } from "../helpers/test-users";
-import { isAuthFileSessionValid } from "../helpers/auth-state";
-import { BASE_URL } from "../test-config";
 import { TuneTreesPage } from "../page-objects/TuneTreesPage";
+import { BASE_URL } from "../test-config";
 
 /**
  * TOPNAV-003: User menu shows user's information

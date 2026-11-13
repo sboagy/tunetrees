@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { normalizeScheduleOutput } from "../../../src/lib/plugins/scheduling";
 import type { NextReviewSchedule } from "../../../src/lib/db/types";
+import { normalizeScheduleOutput } from "../../../src/lib/plugins/scheduling";
+
 const fallback: NextReviewSchedule = {
   nextDue: new Date("2026-01-22T12:00:00Z"),
   last_review: new Date("2026-01-20T12:00:00Z"),

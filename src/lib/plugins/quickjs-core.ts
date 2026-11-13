@@ -10,8 +10,8 @@ import * as Papa from "papaparse";
 import type {
   QuickJSAsyncContext,
   QuickJSAsyncRuntime,
-  QuickJSHandle,
   QuickJSDeferredPromise,
+  QuickJSHandle,
 } from "quickjs-emscripten";
 import type { InvokeRequest, PluginBridge } from "./quickjs-protocol";
 

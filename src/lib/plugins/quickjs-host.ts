@@ -1,12 +1,12 @@
 /** The page owns invocation deadlines and the worker generation. Bridge replies
  * return only to that same worker and only while their invocation is active. */
 import {
-  isWorkerOutput,
-  type PluginFunctionName,
-  type InvokeRequest,
-  type QueryResult,
   type FsrsResult,
+  type InvokeRequest,
+  isWorkerOutput,
   type PluginBridge,
+  type PluginFunctionName,
+  type QueryResult,
 } from "./quickjs-protocol";
 
 interface PendingRequest {

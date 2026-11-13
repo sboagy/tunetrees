@@ -28,8 +28,8 @@ import {
   parseCapabilities,
   serializeCapabilities,
 } from "@/lib/plugins/capabilities";
-import { DEFAULT_PLUGIN_SCRIPT } from "@/lib/plugins/scheduling-template";
 import { runPluginFunction } from "@/lib/plugins/runtime";
+import { DEFAULT_PLUGIN_SCRIPT } from "@/lib/plugins/scheduling-template";
 
 interface PluginDraft {
   id: string;
