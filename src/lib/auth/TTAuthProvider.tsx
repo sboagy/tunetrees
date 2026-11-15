@@ -21,6 +21,10 @@ import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import { sql } from "drizzle-orm";
 import {
+  BrowserSqliteMigrationBlockedError,
+  type BrowserSqliteMigrationBlockReason,
+} from "oosync/runtime/browser-sqlite";
+import {
   type Accessor,
   createContext,
   createEffect,
@@ -29,13 +33,16 @@ import {
   onCleanup,
   onMount,
   type ParentComponent,
+  Show,
 } from "solid-js";
 import { toast } from "solid-sonner";
+import { DatabaseUpgradeBlocked } from "@/components/auth/DatabaseUpgradeBlocked";
 import {
   clearDb as clearSqliteDb,
   closeDb as closeSqliteDb,
   getSqliteInstance,
   initializeDb as initializeSqliteDb,
+  persistDb,
   type SqliteDatabase,
   setupAutoPersist,
 } from "../db/client-sqlite";
@@ -43,6 +50,10 @@ import {
   enableSyncTriggers,
   suppressSyncTriggers,
 } from "../db/install-triggers";
+import {
+  finishUpgradeFullPull,
+  withUpgradeIdentity,
+} from "../db/upgrade-policy";
 import {
   captureSyncBaselineSnapshot,
   installSyncBaselineFetchDiagnostics,
@@ -422,6 +433,9 @@ const TTInner: ParentComponent = (props) => {
   // Read user/session/loading/isAnonymous reactively from rhizome's AuthProvider.
   // TTAuthContext forwards these plus TT-specific state to consumers.
   const rhizome = useRhizomeAuth();
+
+  const [upgradeBlocked, setUpgradeBlocked] =
+    createSignal<BrowserSqliteMigrationBlockReason | null>(null);
 
   // TT-specific signals
   const [userIdInt, setUserIdInt] = createSignal<string | null>(null);
@@ -1051,6 +1065,21 @@ const TTInner: ParentComponent = (props) => {
           affectedTables: result?.affectedTables ?? [],
           timestamp: result?.timestamp ?? null,
         });
+        if (
+          result.success &&
+          !result.errors?.length &&
+          syncServiceInstance?.getLastSyncDownTimestamp() &&
+          !catalogSyncPending()
+        ) {
+          try {
+            await finishUpgradeFullPull(authUserId, persistDb);
+          } catch (error) {
+            log.warn(
+              "Keeping upgrade recovery marker after persistence failure",
+              error
+            );
+          }
+        }
         const isFirstSyncCompletion = !firstSyncCompletionHandled;
         if (isFirstSyncCompletion) firstSyncCompletionHandled = true;
 
@@ -1249,8 +1278,17 @@ const TTInner: ParentComponent = (props) => {
     while (true) {
       attempt += 1;
       try {
-        return await initializeSqliteDb(userId);
+        setUpgradeBlocked(null);
+        return await withUpgradeIdentity(
+          userId,
+          context === "authenticated",
+          () => initializeSqliteDb(userId)
+        );
       } catch (error) {
+        if (error instanceof BrowserSqliteMigrationBlockedError) {
+          setUpgradeBlocked(error.reason);
+          throw error;
+        }
         if (isE2eDbClearInProgress()) {
           console.warn(
             `[TTAuthProvider] ${contextLabel} aborted during E2E clear; not retrying`
@@ -1972,7 +2010,9 @@ const TTInner: ParentComponent = (props) => {
         data-initial-sync-complete={String(initialSyncComplete())}
         style={{ display: "contents" }}
       >
-        {props.children}
+        <Show when={upgradeBlocked()} fallback={props.children}>
+          {(reason) => <DatabaseUpgradeBlocked reason={reason()} />}
+        </Show>
       </div>
     </TTAuthContext.Provider>
   );

@@ -191,6 +191,33 @@ TuneTrees also uses the `browserSqlite` config block to drive the generated brow
 
 This keeps the generic browser runtime in oosync while preserving TuneTrees-specific behavior in a small, explicit hook surface.
 
+### Browser upgrade preservation
+
+The browser runtime refuses destructive rebuilds with outstanding outbox rows,
+unreplayed backups, or unapproved populated tables. TuneTrees implements its
+consumer policy in `src/lib/db/upgrade-policy.ts`, injected through the existing
+browser hooks. The approved table list is an audited pre-goals contract, not a
+projection of new generated metadata: adding a syncable table requires a new
+preservation review. Approval requires an authenticated initialization, a prior
+successful sync watermark and the old table's insert/update/delete tracking
+triggers. It relies on the normal outbox invariant and coordinated synchronization
+before cutover; it is not a remote row-by-row verification. Missing evidence
+blocks. Anonymous data, unknown/removed tables, and `media_draft_outbox` are never
+automatically discarded. `view_column_meta` and `sync_change_log` are regenerable.
+
+The local-table inventory is recorded in `docs/development/database-upgrades.md`.
+Separate media/BYOS IndexedDB stores, cached blobs, OAuth secrets and localStorage
+preferences are not cleared by this rebuild. A blocked initialization replaces
+the application screen with recovery guidance and a reload-only retry action;
+it never calls the destructive reset or sign-out flow.
+
+A per-user `TT_UPGRADE_FULL_PULL_<userId>` marker is set on creation or migration
+clearing. Existing databases with that marker discard the sync watermark before
+starting a new sync engine. The marker survives failed/interrupted downloads and
+is cleared only after a successful sync has a download watermark, catalog setup
+is complete, and SQLite persistence resolves. This closes the window between the
+engine storing its watermark and the browser persisting downloaded rows.
+
 ### Table Metadata Overrides
 
 TuneTrees uses `tableMeta` overrides to keep app-specific semantics out of oosync core:
