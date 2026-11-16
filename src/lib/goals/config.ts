@@ -36,6 +36,7 @@ export interface GoalConfig {
 export interface GoalOverrides {
   version?: 1; // Empty {} is the database default: inherit everything.
   displayName?: string;
+  description?: string;
   daily?: Partial<DailyGoalSettings>;
   scheduler?: GoalScheduler;
   evaluations?: EvaluationChoice[];
@@ -269,13 +270,25 @@ export function parseGoalConfig(value: unknown): GoalConfig {
 export function parseGoalOverrides(value: unknown): GoalOverrides {
   const copy: unknown = JSON.parse(canonicalJson(value));
   requireValue(object(copy), "Overrides must be an object");
-  keys(copy, ["version", "displayName", "daily", "scheduler", "evaluations"]);
+  keys(copy, [
+    "version",
+    "displayName",
+    "description",
+    "daily",
+    "scheduler",
+    "evaluations",
+  ]);
   requireValue(
     copy.version === undefined || copy.version === 1,
     "Unsupported overrides version"
   );
   if ("displayName" in copy)
     requireValue(label(copy.displayName), "Display name must not be empty");
+  if ("description" in copy)
+    requireValue(
+      typeof copy.description === "string",
+      "Description must be text"
+    );
   if ("daily" in copy) validateDaily(copy.daily, true);
   if ("scheduler" in copy) validateScheduler(copy.scheduler);
   if ("evaluations" in copy) validateEvaluations(copy.evaluations);
@@ -296,13 +309,14 @@ export function resolveGoalConfig(
 }
 
 export function resolveGoalDefinition(
-  defaults: { displayName: string; config: GoalConfig },
+  defaults: { displayName: string; description: string; config: GoalConfig },
   overrides: unknown = {}
-): { displayName: string; config: GoalConfig } {
+): { displayName: string; description: string; config: GoalConfig } {
   requireValue(label(defaults.displayName), "Display name must not be empty");
   const custom = parseGoalOverrides(overrides);
   return {
     displayName: custom.displayName ?? defaults.displayName,
+    description: custom.description ?? defaults.description,
     config: resolveGoalConfig(defaults.config, custom),
   };
 }

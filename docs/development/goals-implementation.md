@@ -12,7 +12,7 @@ upgrade-only feature. The approved detailed plan remains in `_notes/426_goals_pl
 
 ## Checkpoint 1: built-in definitions and calculation contract
 
-`src/lib/goals/builtins.ts` is the editable source for built-in labels, evaluation
+`src/lib/goals/builtins.ts` is the editable source for built-in labels, intent descriptions, evaluation
 IDs/actions, interval ladders and daily defaults. It retains existing goal UUIDs.
 The current scheduler's legacy ladder fallback reads these intervals, preserving
 its behavior. New definitions are not yet written to the database.
@@ -20,7 +20,10 @@ its behavior. New definitions are not yet written to the database.
 `config.ts` validates versioned JSON, byte limits, daily min/max, explicit actions,
 and scheduler/choice consistency. Overrides merge daily properties individually
 and replace scheduler/evaluation sections whole. Empty overrides restore inherited
-values; display names remain separate from identity. Returned objects are copies.
+values; display names and intent descriptions remain separate from identity.
+The effective definition preserves descriptions and supports personal text overrides.
+Persist goal descriptions in the upcoming schema and show them in goal selection
+and expanded settings panels; they do not affect scheduler state. Returned objects are copies.
 The current contract covers built-in FSRS-6 and interval ladders; plugin descriptors
 and compatibility decoding will be added with the plugin execution integration.
 

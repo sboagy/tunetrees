@@ -11,6 +11,7 @@ export interface BuiltInGoalDefinition {
   id: string;
   name: string;
   displayName: string;
+  description: string;
   config: GoalConfig;
 }
 
@@ -21,6 +22,8 @@ const ladders = [
     id: "00000000-0000-0000-0000-000000000002",
     name: "initial_learn",
     displayName: "Initial learning",
+    description:
+      "Learn the tune well enough to play it through independently, without frequent prompts.",
     intervalsDays: [0.1, 0.5, 1, 2, 4],
     choices: [
       [
@@ -53,6 +56,8 @@ const ladders = [
     id: "00000000-0000-0000-0000-000000000003",
     name: "fluency",
     displayName: "Fluency",
+    description:
+      "Build smooth, accurate playing at your intended tempo, with fewer stops and less effort.",
     intervalsDays: [1, 3, 7, 14, 21],
     choices: [
       ["fragmented", "Fragmented", "Frequent stops or errors", "reset"],
@@ -70,6 +75,8 @@ const ladders = [
     id: "00000000-0000-0000-0000-000000000004",
     name: "session_ready",
     displayName: "Session ready",
+    description:
+      "Prepare to join in confidently and keep the tune flowing when playing with others.",
     intervalsDays: [0.5, 1, 2, 3, 5],
     choices: [
       [
@@ -92,6 +99,8 @@ const ladders = [
     id: "00000000-0000-0000-0000-000000000005",
     name: "performance_polish",
     displayName: "Performance polish",
+    description:
+      "Refine a familiar tune into a reliable, controlled and expressive performance.",
     intervalsDays: [2, 5, 10, 15, 21],
     choices: [
       [
@@ -119,6 +128,7 @@ const ladders = [
   id: string;
   name: string;
   displayName: string;
+  description: string;
   intervalsDays: number[];
   choices: Array<[string, string, string, LadderAction]>;
 }>;
@@ -129,6 +139,8 @@ export function getBuiltInGoals(): BuiltInGoalDefinition[] {
     id: "00000000-0000-0000-0000-000000000001",
     name: "recall",
     displayName: "Recall",
+    description:
+      "Keep a learned tune available in memory so you can play it without needing a reminder.",
     config: parseGoalConfig({
       version: 1,
       daily: { minimum: 3, maximum: 10, autoNew: true, delinquencyDays: 7 },
@@ -177,6 +189,7 @@ export function getBuiltInGoals(): BuiltInGoalDefinition[] {
       id: goal.id,
       name: goal.name,
       displayName: goal.displayName,
+      description: goal.description,
       config: parseGoalConfig({
         version: 1,
         daily: { minimum: 0, maximum: 2, autoNew: true, delinquencyDays: 7 },
