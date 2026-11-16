@@ -104,6 +104,21 @@ export const goal = pgTable("goal", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  displayName: text("display_name"),
+  description: text("description"),
+  defaultConfig: text("default_config"),
+});
+
+export const goalUserSettings = pgTable("goal_user_settings", {
+  userId: uuid("user_id").notNull(),
+  goalId: uuid("goal_id").notNull(),
+  overrides: text("overrides").notNull().default("{}"),
+  deleted: boolean("deleted").notNull().default(false),
+  syncVersion: integer("sync_version").notNull().default(1),
+  lastModifiedAt: text("last_modified_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  deviceId: text("device_id"),
 });
 
 export const groupMember = pgTable("group_member", {
@@ -631,6 +646,7 @@ export const tables = {
   genre: genre,
   genre_tune_type: genreTuneType,
   goal: goal,
+  goal_user_settings: goalUserSettings,
   group_member: groupMember,
   instrument: instrument,
   media_asset: mediaAsset,

@@ -368,7 +368,17 @@ editable built-in definitions, `config.ts` validates JSON and resolves overrides
 and `ladder.ts` calculates independent, versioned ladder state without DB writes.
 The existing FSRS service reads its legacy ladder fallback intervals from this
 source. The new ladder calculator is not connected to staging until the additive
-schema and atomic predecessor checks land. See
+schema and atomic predecessor checks land.
+
+Goal storage now adds nullable display/description/default-config fields and a
+composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded
+JSON TEXT. Generated Worker rules bind camelCase ownership properties; Postgres
+triggers protect goal ownership and settings visibility even for privileged Worker
+writes. Built-in definitions are seeded from the typed source; trusted migration
+and staging-restore transactions explicitly enable shared-goal writes. Staging
+refresh reapplies generated defaults after importing production rows. SQLite v28
+uses the guarded rebuild/full-pull path. The old scheduler/preferences remain
+active until the event/queue integration checkpoint. See
 [`goals-implementation.md`](docs/development/goals-implementation.md) for the
 checkpoint boundary and remaining integration work.
 

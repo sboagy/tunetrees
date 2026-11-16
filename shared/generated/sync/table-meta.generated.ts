@@ -23,6 +23,7 @@ export const SYNCABLE_TABLES = [
   "user_profile",
   "daily_practice_queue",
   "goal",
+  "goal_user_settings",
   "instrument",
   "plugin",
   "prefs_scheduling_options",
@@ -209,12 +210,26 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
     columnDescriptions: {
       base_intervals:
         "JSON array of day-values; used when default_technique = base_interval.",
+      default_config:
+        "Versioned JSON TEXT scheduling definition. NULL supports legacy goal writes.",
       default_technique: "One of: fsrs, base_interval, or a plugin id string.",
       device_id: "Device that last modified this record.",
       last_modified_at: "Timestamp of last modification.",
       private_for:
         "Owner user_profile.id; NULL = system goal visible to all users.",
       sync_version: "Sync version for conflict resolution.",
+    },
+  },
+  goal_user_settings: {
+    primaryKey: ["user_id", "goal_id"],
+    uniqueKeys: ["user_id", "goal_id"],
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      overrides:
+        "JSON TEXT partial definition; daily fields merge, scheduler/evaluations replace whole sections.",
     },
   },
   instrument: {

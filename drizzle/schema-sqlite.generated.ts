@@ -145,11 +145,33 @@ export const goal = sqliteTable(
     defaultTechnique: text("default_technique").notNull().default("fsrs"),
     baseIntervals: text("base_intervals"),
     deleted: integer("deleted").notNull().default(0),
+    displayName: text("display_name"),
+    description: text("description"),
+    defaultConfig: text("default_config"),
     ...sqliteSyncColumns,
   },
   (t) => [
     uniqueIndex("goal_name_owner_uniq").on(t.name, t.privateFor),
     index("idx_goal_private_for").on(t.privateFor),
+  ]
+);
+
+export const goalUserSettings = sqliteTable(
+  "goal_user_settings",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => userProfile.id),
+    goalId: text("goal_id")
+      .notNull()
+      .references(() => goal.id),
+    overrides: text("overrides").notNull().default("{}"),
+    deleted: integer("deleted").notNull().default(0),
+    ...sqliteSyncColumns,
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.goalId] }),
+    index("idx_goal_user_settings_goal").on(t.goalId),
   ]
 );
 

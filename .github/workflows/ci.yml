@@ -407,6 +407,12 @@ jobs:
         if: matrix.shard == 1
         run: npm run schema:sqlite:check
 
+      - name: Verify goal configuration seeds and database guards
+        if: matrix.shard == 1
+        run: |
+          npm run goals:seed:check
+          npm run test:db:goals
+
       # --- Playwright Setup ---
       - name: Cache Playwright Browsers
         id: cache-playwright

@@ -60,3 +60,9 @@ before the watermark advances, and only finishes recovery for a successful full
 pull with no errors and completed catalog setup. Marker generations prevent an
 older persistence completion from clearing a newer full-download requirement.
 No database/schema version is bumped by the guard integration itself.
+
+The goals configuration expansion now advances SQLite to version 28 with migration
+0028. It uses this guard and full-download marker; it does not weaken the approval
+list. Populated `goal_user_settings` is currently blocked on a subsequent rebuild
+until its new application write paths receive a preservation review. Finish and
+synchronize pending practice before testing a version-27 database upgrade.

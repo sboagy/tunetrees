@@ -145,6 +145,10 @@ export const WORKER_SYNC_CONFIG = {
           },
         ],
       },
+      goal_user_settings: {
+        kind: "eqUserId",
+        column: "user_id",
+      },
       instrument: {
         kind: "orNullEqUserId",
         column: "private_to_user",
@@ -505,8 +509,20 @@ export const WORKER_SYNC_CONFIG = {
             },
           ],
         },
-        bindAuthUserIdProps: ["private_for"],
-        denyDelete: false,
+        bindAuthUserIdProps: ["privateFor"],
+        denyDelete: true,
+      },
+      goal_user_settings: {
+        sanitize: {
+          coerceNumericProps: [
+            {
+              prop: "syncVersion",
+              kind: "int",
+            },
+          ],
+        },
+        bindAuthUserIdProps: ["userId"],
+        denyDelete: true,
       },
       group_member: {
         sanitize: {

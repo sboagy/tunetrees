@@ -15,15 +15,15 @@ upgrade-only feature. The approved detailed plan remains in `_notes/426_goals_pl
 `src/lib/goals/builtins.ts` is the editable source for built-in labels, intent descriptions, evaluation
 IDs/actions, interval ladders and daily defaults. It retains existing goal UUIDs.
 The current scheduler's legacy ladder fallback reads these intervals, preserving
-its behavior. New definitions are not yet written to the database.
+its behavior. Checkpoint 2a persists these definitions without activating the new scheduler.
 
 `config.ts` validates versioned JSON, byte limits, daily min/max, explicit actions,
 and scheduler/choice consistency. Overrides merge daily properties individually
 and replace scheduler/evaluation sections whole. Empty overrides restore inherited
 values; display names and intent descriptions remain separate from identity.
 The effective definition preserves descriptions and supports personal text overrides.
-Persist goal descriptions in the upcoming schema and show them in goal selection
-and expanded settings panels; they do not affect scheduler state. Returned objects are copies.
+Goal descriptions now have storage; show them in goal selection
+and expanded settings panels in the UI checkpoint; they do not affect scheduler state. Returned objects are copies.
 The current contract covers built-in FSRS-6 and interval ladders; plugin descriptors
 and compatibility decoding will be added with the plugin execution integration.
 
@@ -45,11 +45,54 @@ Validation covers developer-default inheritance, user overrides, label changes,
 action remapping, isolated instances, malformed JSON/configurations, ladder
 boundaries, fractional due times, changed-goal/changed-ladder resets and pure previews.
 
+## Checkpoint 2a: goal configuration storage and ownership
+
+The additive Postgres migration adds nullable `display_name`, `description` and
+`default_config` to `goal`, plus `goal_user_settings` keyed by `(user_id, goal_id)`.
+JSON TEXT preserves exact payloads; database checks require objects up to 64 KiB.
+Application validators remain responsible for full scheduler/config semantics.
+Legacy goal writes can omit the new fields. Old preference tables, queries and
+scheduling remain in use. Recall preference copying is deferred until cutover,
+so edits made while these checkpoints are developed will not be lost.
+
+Worker ownership binding uses the Drizzle properties `privateFor` and `userId`.
+Goals/settings use soft tombstones. Database triggers reject goal ownership/ID
+changes, forged existing IDs, and settings pointing at another user's goal even
+when writes bypass RLS. Direct authenticated access also has RLS. Shared defaults
+require a trusted postgres transaction with `tunetrees.goal_seed_write = 'on'`.
+Current UI deletion already uses soft deletes; normal legacy custom-goal writes
+remain valid. This is intentional security tightening, not a schema contraction.
+
+`npm run goals:seed:create -- supabase/migrations/<timestamp>_seed_goal_configuration.sql`
+serializes `builtins.ts` into a new, non-overwritable migration and the reusable
+`sql_scripts/seed_goal_configuration.sql`. Update `goals:seed:check` to the newest
+migration when defaults change. Both outputs are generated; do not hand-edit them.
+These initial seeds preserve existing timestamps and require the coordinated full
+pull. A later release changing defaults must arrange its own incremental timestamp
+update or explicit full pull. Personal override rows are never reseeded.
+Staging refresh explicitly authorizes its trusted restore transaction and reapplies
+this release's defaults after importing older production data; no refresh was run.
+
+SQLite migration 0028 and database version 28 use the existing guarded rebuild
+and full-download recovery path. Generated schemas/metadata put goals before
+settings, register the composite key and user category, and enable incremental
+sync through the server change-log trigger. The new table is deliberately not
+added to the rebuild approval list yet: no app path writes it at this checkpoint;
+review its write paths before permitting a later rebuild of populated settings.
+
+Validation: real PostgreSQL tests cover privileged and RLS writes, legacy writes,
+JSON bounds, goal/settings identity, soft tombstones and seed authorization.
+SQLite WASM tests run the actual migration and check composite outbox entries.
+Adapter tests preserve JSON TEXT and fractional numbers through casing conversion.
+CI shard 1 runs the database and seed-drift checks. Full Worker/browser round-trip
+coverage remains part of the next integration checkpoint.
+
 ## Remaining checkpoints
 
-1. Additive schema, protected settings/goal ownership, identity and payload guards,
-   generated contracts, seed migration from the definition source, and real sync
-   round-trip tests. Audit legacy identity collisions before backfill.
+1. Practice/staging/queue goal identity and payload additions, event identity guards,
+   generated contracts, and full Worker/browser sync round-trip tests. Audit legacy
+   identity collisions before backfill (the local development DB currently has no
+   custom goals; this is not a production audit).
 2. Effective DB resolver, canonical history order and legacy decoder; selected
    scheduler execution, plugin contracts, staged snapshots, stale-preview checks,
    fractional event commit and idempotency/conflict enforcement.

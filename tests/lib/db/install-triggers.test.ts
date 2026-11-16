@@ -4,6 +4,7 @@
  * @module tests/lib/db/install-triggers.test
  */
 
+import { readFileSync } from "node:fs";
 import { TABLE_REGISTRY } from "@sync-schema/table-meta";
 import type { SqliteRawDatabase as Database } from "oosync/runtime/browser-sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -212,6 +213,15 @@ beforeEach(async () => {
       last_modified_at TEXT
     )
   `);
+
+  // Exercise the real expansion migration against the legacy goal fixture.
+  const goalMigration = readFileSync(
+    "drizzle/migrations/sqlite/0028_add_goal_configuration.sql",
+    "utf8"
+  );
+  for (const statement of goalMigration.split("--> statement-breakpoint")) {
+    db.run(statement);
+  }
 
   db.run(`
     CREATE TABLE user_group (
@@ -591,6 +601,30 @@ describe("trigger functionality", () => {
     expect(parsed.screen_size).toBe("desktop");
     expect(parsed.purpose).toBe("practice");
     expect(parsed.repertoire_id).toBe("rep-1");
+  });
+
+  it("tracks goal settings with both identities and preserves fractional JSON", () => {
+    db.run("INSERT INTO user_profile (id) VALUES ('settings-user')");
+    db.run(
+      "INSERT INTO goal (id, name, private_for) VALUES ('settings-goal', 'Custom', 'settings-user')"
+    );
+    const overrides = '{"intervals":[0.1,0.3333333333333333]}';
+    db.run(
+      "INSERT INTO goal_user_settings (user_id, goal_id, overrides, last_modified_at) VALUES (?, ?, ?, ?)",
+      ["settings-user", "settings-goal", overrides, "2026-11-16T12:00:00Z"]
+    );
+    const outbox = db.exec(
+      "SELECT row_id, operation FROM sync_push_queue WHERE table_name = 'goal_user_settings'"
+    );
+    expect(outbox[0]?.values).toHaveLength(1);
+    expect(JSON.parse(String(outbox[0]?.values[0]?.[0]))).toEqual({
+      user_id: "settings-user",
+      goal_id: "settings-goal",
+    });
+    expect(outbox[0]?.values[0]?.[1]).toBe("INSERT");
+    expect(
+      db.exec("SELECT overrides FROM goal_user_settings")[0]?.values[0]?.[0]
+    ).toBe(overrides);
   });
 
   it("generates unique outbox IDs", () => {

@@ -18,8 +18,8 @@
     "dbVersionKeyPrefix": "tunetrees-db-version",
     "outboxBackupKeyPrefix": "tunetrees-outbox-backup",
     "lastSyncTimestampKeyPrefix": "TT_LAST_SYNC_TIMESTAMP",
-    "schemaVersion": "2.4.0-byos-storage-config",
-    "databaseVersion": 27,
+    "schemaVersion": "2.5.0-goal-configuration",
+    "databaseVersion": 28,
     "migrationDirectory": "drizzle/migrations/sqlite",
     "migrationFileNotes": {
       "0004_true_union_jack.sql": "Intentionally skipped for browser SQLite: 0002 already creates user_profile.avatar_url, so replaying 0004 on fresh databases would fail on the duplicate column; 0004's sync_queue rebuild applies only to the legacy sync_queue path.",
@@ -53,7 +53,8 @@
       "/drizzle/migrations/sqlite/0024_add_user_genre_selection_and_media_draft_outbox.sql",
       "/drizzle/migrations/sqlite/0025_add_byos_media_locator.sql",
       "/drizzle/migrations/sqlite/0026_add_selected_byos_provider.sql",
-      "/drizzle/migrations/sqlite/0027_add_byos_storage_config.sql"
+      "/drizzle/migrations/sqlite/0027_add_byos_storage_config.sql",
+      "/drizzle/migrations/sqlite/0028_add_goal_configuration.sql"
     ],
     "forceResetQueryParams": [
       { "key": "reset", "value": "true" },
@@ -96,7 +97,8 @@
       "tag": "repertoire",
       "tune_override": "repertoire",
       "plugin": "user",
-      "goal": "user"
+      "goal": "user",
+      "goal_user_settings": "user"
     },
     "tableToSchemaKeyOverrides": {
       "plugin": "plugin"
@@ -176,6 +178,10 @@
             "kind": "orEqUserIdOrTrue",
             "column": "user_ref",
             "orColumn": "is_public"
+          },
+          "goal_user_settings": {
+            "kind": "eqUserId",
+            "column": "user_id"
           },
           "goal": {
             "kind": "compound",
@@ -320,9 +326,13 @@
           "user_genre_selection": {
             "denyDelete": false
           },
+          "goal_user_settings": {
+            "bindAuthUserIdProps": ["userId"],
+            "denyDelete": true
+          },
           "goal": {
-            "bindAuthUserIdProps": ["private_for"],
-            "denyDelete": false
+            "bindAuthUserIdProps": ["privateFor"],
+            "denyDelete": true
           },
           "media_asset": {
             "bindAuthUserIdProps": ["userRef"],
