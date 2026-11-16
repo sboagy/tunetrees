@@ -166,12 +166,34 @@ export interface AuthState {
   /** Last successful syncDown ISO timestamp (null if none yet) */
   lastSyncTimestamp: Accessor<string | null>;
   /** Mode of last syncDown ('full' | 'incremental' | null if none yet) */
-  lastSyncMode: Accessor<"full" | "incremental" | null>;
+  lastSyncMode: Accessor<SyncPullMode>;
   /** Scoped practice sync (repertoire_tune, practice_record, daily_practice_queue, table_transient_data) */
   syncPracticeScope: () => Promise<void>;
 }
 
+type SyncPullMode = "full" | "incremental" | null;
+
 type ViewRefreshCategory = "repertoire" | "practice" | "catalog";
+
+function resolveCatalogGenreSelection(params: {
+  selected: string[];
+  required: string[];
+  repertoireCount: number;
+  repertoireTuneCount: number;
+  repertoireDefaults: string[];
+  tuneGenres: string[];
+}): string[] {
+  if (params.selected.length > 0) {
+    return Array.from(new Set([...params.selected, ...params.required]));
+  }
+  if (params.repertoireCount === 0) return [];
+  if (params.repertoireTuneCount > 0) {
+    return Array.from(
+      new Set([...params.tuneGenres, ...params.repertoireDefaults])
+    );
+  }
+  return Array.from(new Set(params.repertoireDefaults));
+}
 
 type AuthSessionDiagnostic = {
   label: string;
@@ -451,9 +473,7 @@ const TTInner: ParentComponent = (props) => {
   const [lastSyncTimestamp, setLastSyncTimestamp] = createSignal<string | null>(
     null
   );
-  const [lastSyncMode, setLastSyncMode] = createSignal<
-    "full" | "incremental" | null
-  >(null);
+  const [lastSyncMode, setLastSyncMode] = createSignal<SyncPullMode>(null);
   const [lastSyncSuccess, setLastSyncSuccess] = createSignal<boolean | null>(
     null
   );
@@ -809,20 +829,14 @@ const TTInner: ParentComponent = (props) => {
 
       catalogSelectionReconciledKey = reconcileKey;
 
-      let effectiveSelected: string[] = [];
-      if (selected.length > 0) {
-        effectiveSelected = Array.from(new Set([...selected, ...required]));
-      } else if (repertoireCount > 0) {
-        if (repertoireTuneCount > 0) {
-          effectiveSelected = Array.from(
-            new Set([...tuneGenres, ...repertoireDefaults])
-          );
-        } else {
-          effectiveSelected = Array.from(new Set(repertoireDefaults));
-        }
-      } else {
-        effectiveSelected = [];
-      }
+      const effectiveSelected = resolveCatalogGenreSelection({
+        selected,
+        required,
+        repertoireCount,
+        repertoireTuneCount,
+        repertoireDefaults,
+        tuneGenres,
+      });
 
       if (effectiveSelected.length === 0) return;
 
@@ -836,34 +850,32 @@ const TTInner: ParentComponent = (props) => {
         if (!isCurrent()) return;
       }
 
-      if (effectiveSelected.length > 0) {
-        const allGenres = await genreQueries.getAllGenres(params.db);
-        if (!isCurrent()) return;
-        const unselected = allGenres
-          .map((g) => g.id)
-          .filter((id) => !effectiveSelected.includes(id));
+      const allGenres = await genreQueries.getAllGenres(params.db);
+      if (!isCurrent()) return;
+      const unselected = allGenres
+        .map((g) => g.id)
+        .filter((id) => !effectiveSelected.includes(id));
 
-        const purgeResult = await genreSelection.purgeLocalCatalogForGenres(
-          params.db,
-          params.userId,
-          unselected,
-          isCurrent
-        );
-        if (!isCurrent()) return;
+      const purgeResult = await genreSelection.purgeLocalCatalogForGenres(
+        params.db,
+        params.userId,
+        unselected,
+        isCurrent
+      );
+      if (!isCurrent()) return;
 
-        if (!params.skipSync) {
-          if (selectionChanged && !params.isAnonymousUser) {
-            await forceSyncUp({ allowDeletes: true }, isCurrent);
-            if (!isCurrent()) return;
-          }
-          if (selectionChanged || purgeResult.tuneIds.length > 0) {
-            await forceSyncDown({ full: true }, isCurrent);
-            if (!isCurrent()) return;
-          }
+      if (!params.skipSync) {
+        if (selectionChanged && !params.isAnonymousUser) {
+          await forceSyncUp({ allowDeletes: true }, isCurrent);
+          if (!isCurrent()) return;
         }
-
-        incrementCatalogListChanged();
+        if (selectionChanged || purgeResult.tuneIds.length > 0) {
+          await forceSyncDown({ full: true }, isCurrent);
+          if (!isCurrent()) return;
+        }
       }
+
+      incrementCatalogListChanged();
     } catch (error) {
       console.warn(
         "[TTAuthProvider] Failed to reconcile catalog genre selection:",
@@ -939,7 +951,7 @@ const TTInner: ParentComponent = (props) => {
           service: syncServiceInstance,
         }
       );
-    let completionPullMode: "full" | "incremental" | null = null;
+    let completionPullMode: SyncPullMode = null;
     let completionPullGeneration: string | null = null;
     const requestOverridesProvider = async () => {
       completionPullGeneration = getUpgradeFullPullGeneration(authUserId);
