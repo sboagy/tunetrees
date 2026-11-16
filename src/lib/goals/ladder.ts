@@ -99,6 +99,15 @@ export async function calculateLadder(input: {
   if (!Number.isFinite(due.getTime()) || due.getTime() <= practiced.getTime())
     throw new Error("Interval cannot be represented at second precision");
   const intervalDays = (due.getTime() - practiced.getTime()) / 86400000;
+  let boundary: "shortest" | "longest" | null = null;
+  if (choice.action.kind === "back" && current === 0) {
+    boundary = "shortest";
+  } else if (
+    choice.action.kind === "advance" &&
+    current === intervals.length - 1
+  ) {
+    boundary = "longest";
+  }
   return {
     practiced,
     due,
@@ -107,11 +116,6 @@ export async function calculateLadder(input: {
     state: { version: 1, ladderIndex, ladderHash } satisfies LadderState,
     continued,
     evaluation: choice,
-    boundary:
-      choice.action.kind === "back" && current === 0
-        ? "shortest"
-        : choice.action.kind === "advance" && current === intervals.length - 1
-          ? "longest"
-          : null,
+    boundary,
   };
 }

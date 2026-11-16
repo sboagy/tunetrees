@@ -32,8 +32,9 @@ The legacy integer projection is returned separately and never drives the due da
 The new calculator is not yet connected to staging/Submit: that requires the new
 schema and atomic predecessor/config checks first.
 
-The pinned ts-fsrs compatibility API supplies FSRS-6 defaults: maximum interval
-36,500 days, retention 0.9, 21 weights and false fuzz. The migration must preserve
+The pinned ts-fsrs model-specific exports supply the 21 FSRS-6 weights and
+36,500-day maximum interval. The definition retains retention 0.9, false fuzz,
+and the existing learning steps; regression fixtures protect these values. The migration must preserve
 existing explicit Recall preferences, including a smaller saved maximum; these
 new defaults do not replace stored personal values.
 

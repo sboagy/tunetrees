@@ -99,7 +99,12 @@ export function canonicalJson(
         "JSON objects must be plain objects"
       );
       result = `{${Object.keys(item)
-        .sort()
+        // Canonical hashes use UTF-16 code-unit order, never locale collation.
+        .sort((left, right) => {
+          if (left < right) return -1;
+          if (left > right) return 1;
+          return 0;
+        })
         .map((key) => `${JSON.stringify(key)}:${visit(item[key])}`)
         .join(",")}}`;
     }
@@ -274,7 +279,7 @@ export function parseGoalOverrides(value: unknown): GoalOverrides {
   if ("daily" in copy) validateDaily(copy.daily, true);
   if ("scheduler" in copy) validateScheduler(copy.scheduler);
   if ("evaluations" in copy) validateEvaluations(copy.evaluations);
-  return copy as GoalOverrides;
+  return copy;
 }
 export function resolveGoalConfig(
   defaults: GoalConfig,

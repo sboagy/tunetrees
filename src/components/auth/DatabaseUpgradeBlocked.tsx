@@ -42,7 +42,7 @@ export function DatabaseUpgradeBlocked(props: {
         variant="outline"
         class="min-h-11"
         data-testid="retry-database-upgrade"
-        onClick={() => window.location.reload()}
+        onClick={() => globalThis.location.reload()}
       >
         Retry after preserving local work
       </Button>

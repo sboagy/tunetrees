@@ -69,7 +69,8 @@ export const canDiscardLocalTable: NonNullable<
   const triggers = new Set(
     rawDb
       .exec("SELECT name FROM sqlite_master WHERE type = 'trigger'")[0]
-      ?.values.map((row) => String(row[0])) ?? []
+      ?.values.map((row) => row[0])
+      .filter((name): name is string => typeof name === "string") ?? []
   );
   return ["insert", "update", "delete"].every((operation) =>
     triggers.has(`trg_${tableName}_${operation}`)

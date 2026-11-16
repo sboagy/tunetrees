@@ -20,6 +20,14 @@ describe("goal definitions and overrides", () => {
     expect(recall.config.scheduler).toMatchObject({
       id: "builtin:fsrs6",
       maximumIntervalDays: 36500,
+      retention: 0.9,
+      learningStepsMinutes: [1, 10],
+      relearningStepsMinutes: [10],
+      weights: [
+        0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722,
+        0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425,
+        0.0912, 0.0658, 0.1542,
+      ],
       fuzz: false,
     });
     expect(recall.config.daily).toMatchObject({ minimum: 3, maximum: 10 });
@@ -126,6 +134,11 @@ describe("canonical JSON boundary", () => {
     expect(canonicalJson({ z: [2, 1], a: { y: 2, x: 1 } })).toBe(
       '{"a":{"x":1,"y":2},"z":[2,1]}'
     );
+  });
+  it("uses stable code-unit key order rather than locale collation", () => {
+    const expected = '{"10":4,"2":5,"Z":0,"a":1,"ä":2}';
+    expect(canonicalJson({ ä: 2, a: 1, Z: 0, 2: 5, 10: 4 })).toBe(expected);
+    expect(canonicalJson({ 10: 4, Z: 0, 2: 5, a: 1, ä: 2 })).toBe(expected);
   });
   it.each([NaN, Infinity, undefined, new Date(), { missing: undefined }])(
     "rejects lossy values %j",

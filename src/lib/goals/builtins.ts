@@ -1,4 +1,5 @@
-import { generatorParameters } from "ts-fsrs";
+import { DEFAULT_MAXIMUM_INTERVAL } from "ts-fsrs";
+import { FSRS6_DEFAULT_WEIGHTS } from "ts-fsrs/models/fsrs-6";
 import {
   type EvaluationChoice,
   type GoalConfig,
@@ -124,7 +125,6 @@ const ladders = [
 
 /** Fresh instances prevent edits to one goal from changing another's defaults. */
 export function getBuiltInGoals(): BuiltInGoalDefinition[] {
-  const fsrs = generatorParameters(); // Pinned compatibility API selects FSRS-6.
   const recall: BuiltInGoalDefinition = {
     id: "00000000-0000-0000-0000-000000000001",
     name: "recall",
@@ -135,12 +135,13 @@ export function getBuiltInGoals(): BuiltInGoalDefinition[] {
       scheduler: {
         id: "builtin:fsrs6",
         version: 1,
-        weights: [...fsrs.w],
-        retention: fsrs.request_retention,
-        maximumIntervalDays: fsrs.maximum_interval,
+        // Select FSRS-6 explicitly; the default scheduler now uses FSRS-7.
+        weights: [...FSRS6_DEFAULT_WEIGHTS],
+        retention: 0.9,
+        maximumIntervalDays: DEFAULT_MAXIMUM_INTERVAL,
         learningStepsMinutes: [1, 10],
         relearningStepsMinutes: [10],
-        fuzz: fsrs.enable_fuzz,
+        fuzz: false,
       },
       evaluations: [
         {
