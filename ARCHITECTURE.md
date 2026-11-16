@@ -363,6 +363,15 @@ invocations cannot reach its replacement. Plugin failures preserve the practice
 flow's goal-ladder/FSRS fallback. Staging checks request ownership immediately
 before SQLite writes so older evaluations cannot overwrite newer selections.
 
+The #426 domain foundation lives in `src/lib/goals`: `builtins.ts` holds the
+editable built-in definitions, `config.ts` validates JSON and resolves overrides,
+and `ladder.ts` calculates independent, versioned ladder state without DB writes.
+The existing FSRS service reads its legacy ladder fallback intervals from this
+source. The new ladder calculator is not connected to staging until the additive
+schema and atomic predecessor checks land. See
+[`goals-implementation.md`](docs/development/goals-implementation.md) for the
+checkpoint boundary and remaining integration work.
+
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 
 ## Guidance For AI Agents

@@ -35,6 +35,7 @@ import type {
   PrefsSpacedRepetition,
   RecordPracticeInput,
 } from "../db/types";
+import { getBuiltInGoals } from "../goals/builtins";
 import { generateId } from "../utils/uuid";
 import type { SchedulingService } from "./scheduler-interface";
 
@@ -55,13 +56,17 @@ export const FSRS_QUALITY_MAP = {
  * this constant acts as a compile-time fallback for system goals.
  * Reference: legacy schedule.py _calculate_goal_specific_due
  */
-export const GOAL_BASE_INTERVALS: Record<string, ReadonlyArray<number>> = {
-  initial_learn: [0.1, 0.5, 1, 2, 4], // Very frequent practice
-  fluency: [1, 3, 7, 14, 21], // Building consistency
-  session_ready: [0.5, 1, 2, 3, 5], // Intensive short-term
-  performance_polish: [2, 5, 10, 15, 21], // Quality refinement
-  recall: [], // Uses FSRS algorithm
-};
+export const GOAL_BASE_INTERVALS: Record<
+  string,
+  ReadonlyArray<number>
+> = Object.fromEntries(
+  getBuiltInGoals().map((goal) => [
+    goal.name,
+    goal.config.scheduler.id === "builtin:interval-ladder"
+      ? goal.config.scheduler.intervalsDays
+      : [],
+  ])
+);
 
 /**
  * Technique-specific interval modifiers
