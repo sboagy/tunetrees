@@ -134,6 +134,21 @@ const TABLE_EXTRAS: Record<
       sync_version: "Sync version for conflict resolution.",
     },
   },
+  goal: {
+    changeCategory: "user",
+    columnDescriptions: {
+      base_intervals:
+        "JSON array of day-values; used when default_technique = base_interval.",
+      default_config:
+        "Versioned JSON TEXT scheduling definition. NULL supports legacy goal writes.",
+      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
+      device_id: "Device that last modified this record.",
+      last_modified_at: "Timestamp of last modification.",
+      private_for:
+        "Owner user_profile.id; NULL = system goal visible to all users.",
+      sync_version: "Sync version for conflict resolution.",
+    },
+  },
   daily_practice_queue: {
     changeCategory: "practice",
     normalize: (row) =>
@@ -150,6 +165,8 @@ const TABLE_EXTRAS: Record<
       bucket: "Priority bucket (lower = higher priority).",
       completed_at: "Timestamp when queue entry was completed.",
       device_id: "Device that last modified this record.",
+      displayed_practice_record_id:
+        "Event displayed by this queue row; validated soft reference, not an inferred latest review.",
       exposures_completed: "Number of exposures completed so far.",
       exposures_required: "Number of exposures required for this queue item.",
       generated_at: "Timestamp when queue entry was generated.",
@@ -169,21 +186,6 @@ const TABLE_EXTRAS: Record<
       user_ref: "User ID who owns this queue entry.",
       window_end_utc: "End of practice window (UTC).",
       window_start_utc: "Start of practice window (UTC).",
-    },
-  },
-  goal: {
-    changeCategory: "user",
-    columnDescriptions: {
-      base_intervals:
-        "JSON array of day-values; used when default_technique = base_interval.",
-      default_config:
-        "Versioned JSON TEXT scheduling definition. NULL supports legacy goal writes.",
-      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
-      device_id: "Device that last modified this record.",
-      last_modified_at: "Timestamp of last modification.",
-      private_for:
-        "Owner user_profile.id; NULL = system goal visible to all users.",
-      sync_version: "Sync version for conflict resolution.",
     },
   },
   goal_user_settings: {
@@ -346,6 +348,8 @@ const TABLE_EXTRAS: Record<
       goal: "Practice goal for this record.",
       id: "Primary key for the practice record.",
       interval: "Days until next review (interval).",
+      interval_days:
+        "Fractional days from persisted practiced to due. Legacy interval remains an integer projection.",
       lapses: "Number of times forgotten (lapses).",
       last_modified_at: "Timestamp of last modification.",
       practiced: "Timestamp when the tune was practiced.",
@@ -434,10 +438,16 @@ const TABLE_EXTRAS: Record<
       easiness: "Easiness factor (staged).",
       goal: "Practice goal (staged).",
       interval: "Interval (staged).",
+      interval_days:
+        "Fractional days from persisted practiced to due. Legacy interval remains an integer projection.",
       last_modified_at: "Timestamp of last modification.",
       note_private: "Private practice note (not synced to others).",
       note_public: "Public practice note (shared).",
+      practice_record_id:
+        "Stable event UUID allocated during staging and reused on Submit retries; validated soft reference.",
       practiced: "Timestamp when practiced (staged).",
+      predecessor_record_id:
+        "Latest submitted event used for calculation, checked atomically at local Submit; validated soft reference.",
       purpose: "Purpose/context of this staged data.",
       quality: "Quality rating (staged).",
       recall_eval: "Recall evaluation selection.",
@@ -664,11 +674,11 @@ export function parseOutboxRowId(
 }
 
 export const TABLE_SYNC_ORDER: Record<string, number> = {
-  daily_practice_queue: 6,
+  daily_practice_queue: 7,
   event: 29,
   genre: 1,
   genre_tune_type: 3,
-  goal: 7,
+  goal: 6,
   goal_user_settings: 8,
   group_member: 27,
   instrument: 9,

@@ -90,18 +90,50 @@ Adapter tests preserve JSON TEXT and fractional numbers through casing conversio
 CI shard 1 runs the database and seed-drift checks. Full Worker/browser round-trip
 coverage remains part of the next integration checkpoint.
 
+## Checkpoint 2b: practice-event and staged-preview storage
+
+The additive migration retains all existing fields and adds nullable goal,
+evaluation and scheduler identity, bounded JSON TEXT snapshots/state, and
+`interval_days` (Postgres double precision / SQLite REAL). Staging also holds a
+predecessor UUID/fingerprint, configuration hash and stable prospective event UUID.
+Repertoire tunes gain goal identity; queue rows gain allocation goal, selection
+reason and displayed-event soft reference. Soft references will be validated by
+application transactions at integration, not enforced as remote foreign keys.
+
+New-format submitted events reject content changes, while allowing transport
+metadata updates and identical retries. An advisory transaction lock serializes
+inserts at the existing tune/repertoire/practiced natural key; a different UUID
+cannot silently replace a new-format event through the Worker's natural-key
+upsert. Legacy-only writes retain existing behavior. Goal-reference guards reject
+private goals belonging to another repertoire owner, including privileged writes.
+Full payload semantics remain the application's responsibility.
+
+Generated artifacts come from the local Postgres migration and codegen configuration.
+Explicit repertoire-based pull rules prevent the new goal foreign keys from changing
+ownership inference for history and repertoire tunes. The unused minimal-retry
+payload list was removed so it cannot later strip event metadata.
+
+`npm run test:db:practice-goals` runs SQLite WASM persistence/outbox, the actual
+Worker handler in process, and local Postgres, with isolated fixtures and an
+ephemeral JWT key. It checks JSON TEXT, exact 0.1-day transport, a nontrivial
+fraction within one microsecond (well inside timestamp precision), event retries,
+identity/content conflicts, JSON/numeric guards and overlapping natural-key writes.
+CI shard 1 runs it alongside the goal configuration checks. This is a storage
+integration test; browser UI/Submit tests belong to the next checkpoint.
+
+The active scheduler and UI still use the legacy paths. SQLite v29 uses the
+existing guarded rebuild/full-pull mechanism; no production migration, data wipe,
+backfill or deployment was performed. Old browser bundles continue to omit the new
+nullable columns; new-format writes require the later coordinated cutover.
+
 ## Remaining checkpoints
 
-1. Practice/staging/queue goal identity and payload additions, event identity guards,
-   generated contracts, and full Worker/browser sync round-trip tests. Audit legacy
-   identity collisions before backfill (the local development DB currently has no
-   custom goals; this is not a production audit).
-2. Effective DB resolver, canonical history order and legacy decoder; selected
+1. Effective DB resolver, canonical history order and legacy decoder; selected
    scheduler execution, plugin contracts, staged snapshots, stale-preview checks,
    fractional event commit and idempotency/conflict enforcement.
-3. Per-goal queue allocation across generation, Refresh and manual additions,
+2. Per-goal queue allocation across generation, Refresh and manual additions,
    retained work accounting and displayed-event links.
-4. Consolidated settings, goal-aware evaluation/history displays, Practice again,
+3. Consolidated settings, goal-aware evaluation/history displays, Practice again,
    desktop/mobile E2E and final documentation.
 
 Each checkpoint should pass its local checks before push. Keep #940 a draft until

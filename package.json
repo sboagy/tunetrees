@@ -28,6 +28,7 @@
     "goals:seed:create": "tsx scripts/generate-goal-seed.ts --create",
     "goals:seed:check": "tsx scripts/generate-goal-seed.ts --check",
     "test:db:goals": "supabase test db --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres supabase/tests/goal_configuration.test.sql",
+    "test:db:practice-goals": "tsx --tsconfig tsconfig.app.json scripts/test-goal-practice-storage.mjs",
     "schema:sqlite:gen": "npm run codegen:schema",
     "schema:sqlite:check": "npm run codegen:schema:check",
     "db:views:create": "FORCE_COLOR=1 node scripts/run-with-env.mjs \".env.local.template\" -- tsx scripts/create-db-views.ts",

@@ -34,6 +34,17 @@ describe("goal settings sync contract", () => {
     });
   });
 
+  it.each(["practice_record", "repertoire_tune"] as const)(
+    "keeps %s scoped to repertoire ownership despite its goal reference",
+    (table) => {
+      expect(WORKER_SYNC_CONFIG.pull.tableRules[table]).toEqual({
+        kind: "inCollection",
+        column: "repertoire_ref",
+        collection: "repertoireIds",
+      });
+    }
+  );
+
   it("round trips settings through sync adapters without changing JSON TEXT", () => {
     const adapter = getAdapter("goal_user_settings");
     const local = {

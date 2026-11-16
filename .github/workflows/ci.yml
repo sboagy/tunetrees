@@ -412,6 +412,7 @@ jobs:
         run: |
           npm run goals:seed:check
           npm run test:db:goals
+          npm run test:db:practice-goals
 
       # --- Playwright Setup ---
       - name: Cache Playwright Browsers

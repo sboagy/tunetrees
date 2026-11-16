@@ -21,8 +21,8 @@ export const SYNCABLE_TABLES = [
   "genre_tune_type",
   "rhythm_patterns",
   "user_profile",
-  "daily_practice_queue",
   "goal",
+  "daily_practice_queue",
   "goal_user_settings",
   "instrument",
   "plugin",
@@ -158,6 +158,26 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       sync_version: "Sync version for conflict resolution.",
     },
   },
+  goal: {
+    primaryKey: "id",
+    uniqueKeys: ["name", "private_for"],
+    timestamps: ["last_modified_at"],
+    booleanColumns: ["deleted"],
+    supportsIncremental: true,
+    hasDeletedFlag: true,
+    columnDescriptions: {
+      base_intervals:
+        "JSON array of day-values; used when default_technique = base_interval.",
+      default_config:
+        "Versioned JSON TEXT scheduling definition. NULL supports legacy goal writes.",
+      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
+      device_id: "Device that last modified this record.",
+      last_modified_at: "Timestamp of last modification.",
+      private_for:
+        "Owner user_profile.id; NULL = system goal visible to all users.",
+      sync_version: "Sync version for conflict resolution.",
+    },
+  },
   daily_practice_queue: {
     primaryKey: "id",
     uniqueKeys: ["user_ref", "repertoire_ref", "window_start_utc", "tune_ref"],
@@ -179,6 +199,8 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       bucket: "Priority bucket (lower = higher priority).",
       completed_at: "Timestamp when queue entry was completed.",
       device_id: "Device that last modified this record.",
+      displayed_practice_record_id:
+        "Event displayed by this queue row; validated soft reference, not an inferred latest review.",
       exposures_completed: "Number of exposures completed so far.",
       exposures_required: "Number of exposures required for this queue item.",
       generated_at: "Timestamp when queue entry was generated.",
@@ -198,26 +220,6 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       user_ref: "User ID who owns this queue entry.",
       window_end_utc: "End of practice window (UTC).",
       window_start_utc: "Start of practice window (UTC).",
-    },
-  },
-  goal: {
-    primaryKey: "id",
-    uniqueKeys: ["name", "private_for"],
-    timestamps: ["last_modified_at"],
-    booleanColumns: ["deleted"],
-    supportsIncremental: true,
-    hasDeletedFlag: true,
-    columnDescriptions: {
-      base_intervals:
-        "JSON array of day-values; used when default_technique = base_interval.",
-      default_config:
-        "Versioned JSON TEXT scheduling definition. NULL supports legacy goal writes.",
-      default_technique: "One of: fsrs, base_interval, or a plugin id string.",
-      device_id: "Device that last modified this record.",
-      last_modified_at: "Timestamp of last modification.",
-      private_for:
-        "Owner user_profile.id; NULL = system goal visible to all users.",
-      sync_version: "Sync version for conflict resolution.",
     },
   },
   goal_user_settings: {
@@ -433,6 +435,8 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       goal: "Practice goal for this record.",
       id: "Primary key for the practice record.",
       interval: "Days until next review (interval).",
+      interval_days:
+        "Fractional days from persisted practiced to due. Legacy interval remains an integer projection.",
       lapses: "Number of times forgotten (lapses).",
       last_modified_at: "Timestamp of last modification.",
       practiced: "Timestamp when the tune was practiced.",
@@ -541,10 +545,16 @@ export const TABLE_REGISTRY_CORE: Record<SyncableTableName, TableMetaCore> = {
       easiness: "Easiness factor (staged).",
       goal: "Practice goal (staged).",
       interval: "Interval (staged).",
+      interval_days:
+        "Fractional days from persisted practiced to due. Legacy interval remains an integer projection.",
       last_modified_at: "Timestamp of last modification.",
       note_private: "Private practice note (not synced to others).",
       note_public: "Public practice note (shared).",
+      practice_record_id:
+        "Stable event UUID allocated during staging and reused on Submit retries; validated soft reference.",
       practiced: "Timestamp when practiced (staged).",
+      predecessor_record_id:
+        "Latest submitted event used for calculation, checked atomically at local Submit; validated soft reference.",
       purpose: "Purpose/context of this staged data.",
       quality: "Quality rating (staged).",
       recall_eval: "Recall evaluation selection.",

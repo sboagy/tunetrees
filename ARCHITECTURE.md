@@ -249,7 +249,7 @@ Examples in TuneTrees:
 
 - `plugin`, `goal`, and `tune` use declarative pull rules with ownership/public logic.
 - `note` and `reference` use RPC pull rules with explicit `paramMap` bindings.
-- `practice_record` push behavior is customized with `denyDelete`, minimal retry payloads, and timestamp sanitization.
+- `practice_record` push behavior is customized with `denyDelete`, stable event IDs, and timestamp sanitization. Its pull policy and `repertoire_tune` remain explicitly scoped to repertoire ownership, independent of goal foreign keys.
 - `user_profile` and related user-owned tables bind auth user IDs through worker rules instead of ad hoc client logic.
 
 This file is the first place to look when sync behavior is correct in principle but wrong for TuneTrees-specific policy.
@@ -391,6 +391,17 @@ uses the guarded rebuild/full-pull path. The old scheduler/preferences remain
 active until the event/queue integration checkpoint. See
 [`goals-implementation.md`](docs/development/goals-implementation.md) for the
 checkpoint boundary and remaining integration work.
+
+Practice-event storage (SQLite v29) adds nullable goal/evaluation/scheduler identity,
+bounded JSON TEXT snapshots/state, and fractional `interval_days`. Staging adds
+predecessor/config fingerprints and a stable prospective event UUID; queue rows gain
+allocation and displayed-event references. These fields are not yet written by the
+practice UI. Legacy integer intervals and preference paths remain intact. Postgres
+serializes inserts sharing a practice natural key, rejects different event UUIDs at
+that key when either event uses the new format, and permits only transport metadata
+updates to submitted new-format events. Legacy-only upserts remain compatible.
+The same event UUID/content can be retried. Application-side atomic preview checks
+and selected-scheduler integration are the next checkpoint.
 
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 

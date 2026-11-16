@@ -16,7 +16,7 @@
  * @module lib/db/queries/practice
  */
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
@@ -410,28 +410,11 @@ export async function getPracticeHistory(
 ): Promise<PracticeRecordWithTune[]> {
   let query = db
     .select({
-      // Practice record fields
-      id: practiceRecord.id,
-      repertoireRef: practiceRecord.repertoireRef,
-      tuneRef: practiceRecord.tuneRef,
-      practiced: practiceRecord.practiced,
-      quality: practiceRecord.quality,
-      easiness: practiceRecord.easiness,
-      interval: practiceRecord.interval,
-      repetitions: practiceRecord.repetitions,
-      due: practiceRecord.due,
+      // Include new event metadata as the generated schema expands. Retain the
+      // historical aliases below for existing consumers.
+      ...getTableColumns(practiceRecord),
       backup_practiced: practiceRecord.backupPracticed,
-      stability: practiceRecord.stability,
       elapsed_days: practiceRecord.elapsedDays,
-      lapses: practiceRecord.lapses,
-      state: practiceRecord.state,
-      difficulty: practiceRecord.difficulty,
-      step: practiceRecord.step,
-      goal: practiceRecord.goal,
-      technique: practiceRecord.technique,
-      syncVersion: practiceRecord.syncVersion,
-      lastModifiedAt: practiceRecord.lastModifiedAt,
-      deviceId: practiceRecord.deviceId,
 
       // Tune fields
       tune: {
@@ -624,28 +607,11 @@ export async function getPracticeRecords(
 ): Promise<PracticeRecordWithTune[]> {
   const results = await db
     .select({
-      // Practice record fields
-      id: practiceRecord.id,
-      repertoireRef: practiceRecord.repertoireRef,
-      tuneRef: practiceRecord.tuneRef,
-      practiced: practiceRecord.practiced,
-      quality: practiceRecord.quality,
-      easiness: practiceRecord.easiness,
-      interval: practiceRecord.interval,
-      repetitions: practiceRecord.repetitions,
-      due: practiceRecord.due,
+      // Include new event metadata as the generated schema expands. Retain the
+      // historical aliases below for existing consumers.
+      ...getTableColumns(practiceRecord),
       backup_practiced: practiceRecord.backupPracticed,
-      stability: practiceRecord.stability,
       elapsed_days: practiceRecord.elapsedDays,
-      lapses: practiceRecord.lapses,
-      state: practiceRecord.state,
-      difficulty: practiceRecord.difficulty,
-      step: practiceRecord.step,
-      goal: practiceRecord.goal,
-      technique: practiceRecord.technique,
-      syncVersion: practiceRecord.syncVersion,
-      lastModifiedAt: practiceRecord.lastModifiedAt,
-      deviceId: practiceRecord.deviceId,
 
       // Tune fields
       tune: {

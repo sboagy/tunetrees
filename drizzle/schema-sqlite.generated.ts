@@ -47,12 +47,16 @@ export const dailyPracticeQueue = sqliteTable(
     exposuresCompleted: integer("exposures_completed").default(0),
     outcome: text("outcome"),
     active: integer("active").notNull().default(1),
+    allocationGoalId: text("allocation_goal_id").references(() => goal.id),
+    selectionReason: text("selection_reason"),
+    displayedPracticeRecordId: text("displayed_practice_record_id"),
     ...sqliteSyncColumns,
   },
   (t) => [
     uniqueIndex(
       "daily_practice_queue_user_ref_playlist_ref_window_start_utc_key"
     ).on(t.userRef, t.repertoireRef, t.windowStartUtc, t.tuneRef),
+    index("idx_daily_practice_queue_allocation_goal_id").on(t.allocationGoalId),
     index("idx_queue_generated_at").on(t.generatedAt),
     index("idx_queue_user_playlist_active").on(
       t.userRef,
@@ -350,6 +354,13 @@ export const practiceRecord = sqliteTable(
     backupPracticed: text("backup_practiced"),
     goal: text("goal").default("recall"),
     technique: text("technique"),
+    goalId: text("goal_id").references(() => goal.id),
+    evaluationId: text("evaluation_id"),
+    evaluationSnapshot: text("evaluation_snapshot"),
+    schedulerId: text("scheduler_id"),
+    schedulerVersion: integer("scheduler_version"),
+    schedulerState: text("scheduler_state"),
+    intervalDays: real("interval_days"),
     ...sqliteSyncColumns,
   },
   (t) => [
@@ -358,6 +369,7 @@ export const practiceRecord = sqliteTable(
       t.repertoireRef,
       t.practiced
     ),
+    index("idx_practice_record_goal_id").on(t.goalId),
     index("idx_practice_record_id").on(t.id),
     index("idx_practice_record_practiced").on(t.practiced),
     index("idx_practice_record_tune_playlist_practiced").on(
@@ -461,9 +473,13 @@ export const repertoireTune = sqliteTable(
     scheduled: text("scheduled"),
     goal: text("goal").default("recall"),
     deleted: integer("deleted").notNull().default(0),
+    goalId: text("goal_id").references(() => goal.id),
     ...sqliteSyncColumns,
   },
-  (t) => [primaryKey({ columns: [t.repertoireRef, t.tuneRef] })]
+  (t) => [
+    primaryKey({ columns: [t.repertoireRef, t.tuneRef] }),
+    index("idx_repertoire_tune_goal_id").on(t.goalId),
+  ]
 );
 
 export const rhythmPatterns = sqliteTable(
@@ -623,9 +639,23 @@ export const tableTransientData = sqliteTable(
     technique: text("technique"),
     stability: real("stability"),
     state: integer("state").default(2),
+    goalId: text("goal_id").references(() => goal.id),
+    evaluationId: text("evaluation_id"),
+    evaluationSnapshot: text("evaluation_snapshot"),
+    schedulerId: text("scheduler_id"),
+    schedulerVersion: integer("scheduler_version"),
+    schedulerState: text("scheduler_state"),
+    intervalDays: real("interval_days"),
+    predecessorRecordId: text("predecessor_record_id"),
+    predecessorFingerprint: text("predecessor_fingerprint"),
+    calculationConfigHash: text("calculation_config_hash"),
+    practiceRecordId: text("practice_record_id"),
     ...sqliteSyncColumns,
   },
-  (t) => [primaryKey({ columns: [t.tuneId, t.userId, t.repertoireId] })]
+  (t) => [
+    primaryKey({ columns: [t.tuneId, t.userId, t.repertoireId] }),
+    index("idx_table_transient_data_goal_id").on(t.goalId),
+  ]
 );
 
 export const tag = sqliteTable(

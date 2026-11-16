@@ -46,6 +46,9 @@ export const dailyPracticeQueue = pgTable("daily_practice_queue", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  allocationGoalId: uuid("allocation_goal_id"),
+  selectionReason: text("selection_reason"),
+  displayedPracticeRecordId: uuid("displayed_practice_record_id"),
 });
 
 export const event = pgTable("event", {
@@ -253,6 +256,13 @@ export const practiceRecord = pgTable("practice_record", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  goalId: uuid("goal_id"),
+  evaluationId: text("evaluation_id"),
+  evaluationSnapshot: text("evaluation_snapshot"),
+  schedulerId: text("scheduler_id"),
+  schedulerVersion: integer("scheduler_version"),
+  schedulerState: text("scheduler_state"),
+  intervalDays: real("interval_days"),
 });
 
 export const prefsSchedulingOptions = pgTable("prefs_scheduling_options", {
@@ -342,6 +352,7 @@ export const repertoireTune = pgTable("repertoire_tune", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  goalId: uuid("goal_id"),
 });
 
 export const rhythmPatterns = pgTable("rhythm_patterns", {
@@ -470,6 +481,17 @@ export const tableTransientData = pgTable("table_transient_data", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
   deviceId: text("device_id"),
+  goalId: uuid("goal_id"),
+  evaluationId: text("evaluation_id"),
+  evaluationSnapshot: text("evaluation_snapshot"),
+  schedulerId: text("scheduler_id"),
+  schedulerVersion: integer("scheduler_version"),
+  schedulerState: text("scheduler_state"),
+  intervalDays: real("interval_days"),
+  predecessorRecordId: uuid("predecessor_record_id"),
+  predecessorFingerprint: text("predecessor_fingerprint"),
+  calculationConfigHash: text("calculation_config_hash"),
+  practiceRecordId: uuid("practice_record_id"),
 });
 
 export const tag = pgTable("tag", {
