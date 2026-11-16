@@ -877,7 +877,14 @@ const TTInner: ParentComponent = (props) => {
       }
     };
 
+    let userSyncService: SyncService | null = null;
+    let completionPullMode: "full" | "incremental" | null = null;
     const requestOverridesProvider = async () => {
+      // The engine calls this after choosing its cursor and before downloading.
+      // Capture here: getLastSyncMode() reflects the advanced cursor on completion.
+      completionPullMode = userSyncService?.getLastSyncDownTimestamp()
+        ? "incremental"
+        : "full";
       try {
         const { buildGenreFilterOverrides } = await import(
           "@/lib/sync/genre-filter"
@@ -1065,10 +1072,13 @@ const TTInner: ParentComponent = (props) => {
           affectedTables: result?.affectedTables ?? [],
           timestamp: result?.timestamp ?? null,
         });
+        const completedPullMode = completionPullMode;
+        completionPullMode = null;
         if (
           result.success &&
           !result.errors?.length &&
-          syncServiceInstance?.getLastSyncDownTimestamp() &&
+          completedPullMode === "full" &&
+          userSyncService?.getLastSyncDownTimestamp() &&
           !catalogSyncPending()
         ) {
           try {
@@ -1235,6 +1245,7 @@ const TTInner: ParentComponent = (props) => {
       };
     }
 
+    userSyncService = syncWorker.service;
     return syncWorker;
   }
 
@@ -1498,6 +1509,7 @@ const TTInner: ParentComponent = (props) => {
   }
 
   async function cleanupOnSignOut() {
+    setUpgradeBlocked(null);
     catalogSelectionReconciledKey = null;
     reconcileRunCount = 0;
 

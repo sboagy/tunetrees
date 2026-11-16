@@ -89,6 +89,17 @@ describe("goal definitions and overrides", () => {
       })
     ).toThrow(/Unknown/);
   });
+  it("rejects an array masquerading as an action kind", () => {
+    const value = config();
+    expect(() =>
+      parseGoalConfig({
+        ...value,
+        evaluations: [
+          { ...value.evaluations[0], action: { kind: ["advance"] } },
+        ],
+      })
+    ).toThrow(/Unknown/);
+  });
   it("rejects duplicate evaluation identities", () => {
     const value = config();
     value.evaluations.push(value.evaluations[0]);
@@ -148,6 +159,14 @@ describe("canonical JSON boundary", () => {
   );
   it("enforces UTF-8 bytes rather than character count", () => {
     expect(() => canonicalJson("éé", 5)).toThrow(/large/);
+  });
+  it("rejects a sparse array whose extra property hides the hole", () => {
+    const value = Object.assign(new Array(1), { extra: 1 });
+    expect(() => canonicalJson(value)).toThrow(/Sparse or decorated/);
+  });
+  it("rejects nonenumerable array decorations", () => {
+    const value = Object.defineProperty([1], "extra", { value: 2 });
+    expect(() => canonicalJson(value)).toThrow(/Sparse or decorated/);
   });
   it("rejects cycles", () => {
     const value: Record<string, unknown> = {};

@@ -202,7 +202,7 @@ preservation review. Approval requires an authenticated initialization, a prior
 successful sync watermark and the old table's insert/update/delete tracking
 triggers. It relies on the normal outbox invariant and coordinated synchronization
 before cutover; it is not a remote row-by-row verification. Missing evidence
-blocks. Anonymous data, unknown/removed tables, and `media_draft_outbox` are never
+blocks. Anonymous data, unknown/removed tables, `table_transient_data`, and `media_draft_outbox` are never
 automatically discarded. `view_column_meta` and `sync_change_log` are regenerable.
 
 The local-table inventory is recorded in `docs/development/database-upgrades.md`.
@@ -214,8 +214,8 @@ it never calls the destructive reset or sign-out flow.
 A per-user `TT_UPGRADE_FULL_PULL_<userId>` marker is set on creation or migration
 clearing. Existing databases with that marker discard the sync watermark before
 starting a new sync engine. The marker survives failed/interrupted downloads and
-is cleared only after a successful sync has a download watermark, catalog setup
-is complete, and SQLite persistence resolves. This closes the window between the
+is cleared only after a successful sync has a download watermark, `result.errors`
+is empty, catalog setup is complete, and SQLite persistence resolves. This closes the window between the
 engine storing its watermark and the browser persisting downloaded rows.
 
 ### Table Metadata Overrides

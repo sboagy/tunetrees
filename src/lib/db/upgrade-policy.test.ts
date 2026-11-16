@@ -58,6 +58,31 @@ describe("upgrade preservation policy", () => {
   it("protects anonymous data even with old triggers and a download timestamp", async () => {
     expect(await approve("tune", false)).toBe(false);
   });
+  it("protects staging rows even with historical tracking triggers", async () => {
+    db.run("CREATE TABLE table_transient_data (id TEXT)");
+    for (const operation of ["insert", "update", "delete"]) {
+      db.run(
+        `CREATE TRIGGER trg_table_transient_data_${operation} AFTER ${operation} ON table_transient_data BEGIN SELECT 1; END`
+      );
+    }
+    expect(await approve("table_transient_data")).toBe(false);
+  });
+  it("keeps approval until overlapping authenticated initialization completes", async () => {
+    await withUpgradeIdentity(userId, true, async () => {
+      await approve("tune");
+      expect(
+        canDiscardLocalTable({ rawDb: db, userId, tableName: "tune" })
+      ).toBe(true);
+    });
+  });
+  it("does not let anonymous initialization clear authenticated approval", async () => {
+    await withUpgradeIdentity(userId, true, async () => {
+      await approve("tune", false);
+      expect(
+        canDiscardLocalTable({ rawDb: db, userId, tableName: "tune" })
+      ).toBe(true);
+    });
+  });
   it("protects pending media uploads", async () => {
     expect(await approve("media_draft_outbox")).toBe(false);
   });
@@ -87,7 +112,7 @@ describe("durable upgrade download recovery", () => {
   it("clears the old cursor before the new sync engine starts", () => {
     requireUpgradeFullPull(userId);
     expect(localStorage.getItem(timestampKey)).toBeNull();
-    expect(localStorage.getItem(markerKey)).toBe("1");
+    expect(localStorage.getItem(markerKey)).toBeTruthy();
   });
   it("repeats the full pull after a crash between watermark and database persistence", () => {
     requireUpgradeFullPull(userId);
@@ -102,16 +127,48 @@ describe("durable upgrade download recovery", () => {
         throw new Error("disk full");
       })
     ).rejects.toThrow("disk full");
-    expect(localStorage.getItem(markerKey)).toBe("1");
+    expect(localStorage.getItem(markerKey)).toBeTruthy();
   });
-  it("allows incremental sync only after the downloaded database is durable", async () => {
+  it("keeps the marker while persistence is in progress", async () => {
+    requireUpgradeFullPull(userId);
+    let release = () => {};
+    const pending = finishUpgradeFullPull(
+      userId,
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+    expect(localStorage.getItem(markerKey)).toBeTruthy();
+    release();
+    await pending;
+  });
+  it("removes the marker after persistence completes", async () => {
+    requireUpgradeFullPull(userId);
+    await finishUpgradeFullPull(userId, async () => {});
+    expect(localStorage.getItem(markerKey)).toBeNull();
+  });
+  it("does not reset the cursor when resumed after completion", async () => {
     requireUpgradeFullPull(userId);
     localStorage.setItem(timestampKey, "download-complete");
-    await finishUpgradeFullPull(userId, async () => {
-      expect(localStorage.getItem(markerKey)).toBe("1");
-    });
+    await finishUpgradeFullPull(userId, async () => {});
     resumeUpgradeFullPull(userId);
-    expect(localStorage.getItem(markerKey)).toBeNull();
     expect(localStorage.getItem(timestampKey)).toBe("download-complete");
+  });
+  it("preserves a new requirement raised during persistence", async () => {
+    requireUpgradeFullPull(userId);
+    let release = () => {};
+    const pending = finishUpgradeFullPull(
+      userId,
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+    requireUpgradeFullPull(userId);
+    const newGeneration = localStorage.getItem(markerKey);
+    release();
+    await pending;
+    expect(localStorage.getItem(markerKey)).toBe(newGeneration);
   });
 });

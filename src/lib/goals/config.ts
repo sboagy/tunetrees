@@ -89,7 +89,10 @@ export function canonicalJson(
     let result: string;
     if (Array.isArray(item)) {
       requireValue(
-        Object.keys(item).length === item.length,
+        Reflect.ownKeys(item).length === item.length + 1 &&
+          Array.from({ length: item.length }, (_, index) => index).every(
+            (index) => Object.hasOwn(item, index)
+          ),
         "Sparse or decorated arrays are not supported"
       );
       result = `[${item.map(visit).join(",")}]`;
@@ -237,9 +240,8 @@ function validateEvaluations(
     } else {
       keys(choice.action, ["kind"]);
       requireValue(
-        ["reset", "back", "stay", "advance"].includes(
-          String(choice.action.kind)
-        ),
+        typeof choice.action.kind === "string" &&
+          ["reset", "back", "stay", "advance"].includes(choice.action.kind),
         "Unknown ladder action"
       );
     }

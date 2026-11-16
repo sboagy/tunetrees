@@ -23,7 +23,6 @@ const REDOWNLOADABLE_TABLES = new Set([
   "reference",
   "media_asset",
   "repertoire_tune",
-  "table_transient_data",
   "tag",
   "tune_override",
   "user_genre_selection",
@@ -36,18 +35,27 @@ const REDOWNLOADABLE_TABLES = new Set([
   "tune_set_item",
 ]);
 const REGENERATED_TABLES = new Set(["view_column_meta", "sync_change_log"]);
-const authenticatedInitializations = new Set<string>();
+const authenticatedInitializations = new Map<string, number>();
 
 export async function withUpgradeIdentity<T>(
   userId: string,
   authenticated: boolean,
   initialize: () => Promise<T>
 ): Promise<T> {
-  if (authenticated) authenticatedInitializations.add(userId);
+  if (authenticated) {
+    authenticatedInitializations.set(
+      userId,
+      (authenticatedInitializations.get(userId) ?? 0) + 1
+    );
+  }
   try {
     return await initialize();
   } finally {
-    authenticatedInitializations.delete(userId);
+    if (authenticated) {
+      const remaining = (authenticatedInitializations.get(userId) ?? 1) - 1;
+      if (remaining) authenticatedInitializations.set(userId, remaining);
+      else authenticatedInitializations.delete(userId);
+    }
   }
 }
 
@@ -79,7 +87,7 @@ export const canDiscardLocalTable: NonNullable<
 
 const fullPullKey = (userId: string) => `TT_UPGRADE_FULL_PULL_${userId}`;
 export function requireUpgradeFullPull(userId: string): void {
-  localStorage.setItem(fullPullKey(userId), "1");
+  localStorage.setItem(fullPullKey(userId), crypto.randomUUID());
   resumeUpgradeFullPull(userId);
 }
 export function resumeUpgradeFullPull(userId: string): void {
@@ -91,9 +99,12 @@ export async function finishUpgradeFullPull(
   userId: string,
   persist: () => Promise<void>
 ): Promise<void> {
-  if (!localStorage.getItem(fullPullKey(userId))) return;
+  const generation = localStorage.getItem(fullPullKey(userId));
+  if (!generation) return;
   // The engine advances its watermark before SQLite persistence. Keep the
   // marker across crashes/failures so the next startup repeats the full pull.
   await persist();
-  localStorage.removeItem(fullPullKey(userId));
+  if (localStorage.getItem(fullPullKey(userId)) === generation) {
+    localStorage.removeItem(fullPullKey(userId));
+  }
 }

@@ -17,13 +17,14 @@ export function DatabaseUpgradeBlocked(props: {
   return (
     <main
       class="mx-auto max-w-2xl space-y-4 p-6"
-      role="alert"
       data-testid="database-upgrade-blocked"
     >
-      <h1 class="text-xl font-semibold">
-        Your local data needs attention before upgrading
-      </h1>
-      <p>{explanations[props.reason]}</p>
+      <div role="alert" class="space-y-4">
+        <h1 class="text-xl font-semibold">
+          Your local data needs attention before upgrading
+        </h1>
+        <p>{explanations[props.reason]}</p>
+      </div>
       <p>
         Your stored database has been kept. Do not clear site data, reset the
         database, or sign out to bypass this message.
