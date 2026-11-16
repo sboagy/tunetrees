@@ -6,7 +6,8 @@ import { canonicalJson } from "../src/lib/goals/config";
 const [mode, destination] = process.argv.slice(2);
 if (
   mode !== "--refresh-current" &&
-  (!destination || !["--create", "--check"].includes(mode))
+  mode !== "--check" &&
+  (mode !== "--create" || !destination)
 ) {
   throw new Error(
     "Usage: tsx scripts/generate-goal-seed.ts --create|--check <migration.sql> or --refresh-current"
@@ -33,14 +34,26 @@ ${rows.join(",\n")}
 ON CONFLICT (id) DO UPDATE SET
   display_name = EXCLUDED.display_name,
   description = EXCLUDED.description,
-  default_config = EXCLUDED.default_config;
+  default_config = EXCLUDED.default_config,
+  default_technique = EXCLUDED.default_technique,
+  base_intervals = EXCLUDED.base_intervals;
 -- Preserve existing last_modified_at. Coordinated cutover requires a full pull.
 -- Personal overrides live separately and are never replaced by this seed.
 COMMIT;
 `;
 const currentSeed = "sql_scripts/seed_goal_configuration.sql";
+const currentMigration = "config/current-goal-seed.json";
 if (mode === "--check") {
-  for (const file of [destination, currentSeed]) {
+  const reference: unknown = JSON.parse(readFileSync(currentMigration, "utf8"));
+  if (
+    !reference ||
+    typeof reference !== "object" ||
+    !("migration" in reference) ||
+    typeof reference.migration !== "string"
+  ) {
+    throw new Error("Invalid current goal seed reference");
+  }
+  for (const file of [destination ?? reference.migration, currentSeed]) {
     if (readFileSync(file, "utf8") !== sql) {
       throw new Error(`Goal seed differs from developer defaults: ${file}`);
     }
@@ -49,4 +62,10 @@ if (mode === "--check") {
   if (mode === "--create") writeFileSync(destination, sql, { flag: "wx" });
   // Reusable trusted restore seed; versioned migration files remain immutable.
   writeFileSync(currentSeed, sql);
+  if (mode === "--create") {
+    writeFileSync(
+      currentMigration,
+      `${JSON.stringify({ migration: destination }, null, 2)}\n`
+    );
+  }
 }

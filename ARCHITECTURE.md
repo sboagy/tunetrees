@@ -216,7 +216,17 @@ clearing. Existing databases with that marker discard the sync watermark before
 starting a new sync engine. The marker survives failed/interrupted downloads and
 is cleared only after a successful sync has a download watermark, `result.errors`
 is empty, catalog setup is complete, and SQLite persistence resolves. This closes the window between the
-engine storing its watermark and the browser persisting downloaded rows.
+engine storing its watermark and the browser persisting downloaded rows. The
+completion carries the marker generation captured at pull start and checks the
+active user, database and service identities before persisting. Stop/reset invalidates
+completion ownership and pending startup lifetimes before asynchronous teardown;
+unmount permanently invalidates the provider lifetime. New services are published
+synchronously with creation. Callback continuations, deferred reconciliation, and
+post-sync persistence recheck ownership after awaiting work. Ownership and marker generation
+are rechecked after persistence before recovery is cleared. This guards completion
+side effects; it does not cancel an in-flight oosync request or an export already
+started while its owner was active. Persistence performed internally by oosync
+before invoking the callback is outside this consumer-side guard.
 
 ### Table Metadata Overrides
 

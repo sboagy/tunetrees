@@ -127,7 +127,13 @@ export function canonicalJson(
   return result;
 }
 
-export function validateIntervals(value: unknown): asserts value is number[] {
+// ECMAScript Date supports +/- 100,000,000 days from the epoch. With no
+// practiced time yet, reject durations impossible even from its earliest date.
+export const MAX_DATE_MS = 8_640_000_000_000_000;
+export function validateIntervals(
+  value: unknown,
+  practicedMs = -MAX_DATE_MS
+): asserts value is number[] {
   requireValue(
     Array.isArray(value) && value.length > 0,
     "A ladder needs at least one interval"
@@ -138,6 +144,13 @@ export function validateIntervals(value: unknown): asserts value is number[] {
         positive(entry) && (index === 0 || entry > value[index - 1])
     ),
     "Ladder intervals must be finite, positive and strictly increasing"
+  );
+  requireValue(
+    value.every((entry) => {
+      const seconds = Math.round(entry * 86400);
+      return seconds >= 1 && seconds * 1000 <= MAX_DATE_MS - practicedMs;
+    }),
+    "Ladder intervals must fit second precision and the supported Date range"
   );
 }
 function validateDaily(value: unknown, partial = false): void {

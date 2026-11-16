@@ -26,7 +26,7 @@
     "codegen:schema": "node scripts/run-with-env.mjs \".env.local.template\" -- tsx node_modules/oosync/src/codegen-schema.ts",
     "codegen:schema:check": "tsx node_modules/oosync/src/codegen-schema.ts --check",
     "goals:seed:create": "tsx scripts/generate-goal-seed.ts --create",
-    "goals:seed:check": "tsx scripts/generate-goal-seed.ts --check supabase/migrations/20261116090100_seed_goal_configuration.sql",
+    "goals:seed:check": "tsx scripts/generate-goal-seed.ts --check",
     "test:db:goals": "supabase test db --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres supabase/tests/goal_configuration.test.sql",
     "schema:sqlite:gen": "npm run codegen:schema",
     "schema:sqlite:check": "npm run codegen:schema:check",

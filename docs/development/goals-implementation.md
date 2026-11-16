@@ -65,8 +65,11 @@ remain valid. This is intentional security tightening, not a schema contraction.
 
 `npm run goals:seed:create -- supabase/migrations/<timestamp>_seed_goal_configuration.sql`
 serializes `builtins.ts` into a new, non-overwritable migration and the reusable
-`sql_scripts/seed_goal_configuration.sql`. Update `goals:seed:check` to the newest
-migration when defaults change. Both outputs are generated; do not hand-edit them.
+`sql_scripts/seed_goal_configuration.sql`. Creation also updates
+`config/current-goal-seed.json`; `goals:seed:check` reads that reference, so applied
+historical migrations remain untouched. Both SQL outputs are generated; do not
+hand-edit them. Seed upserts keep legacy technique/interval columns aligned with
+`default_config` for the supported practice and settings consumers.
 These initial seeds preserve existing timestamps and require the coordinated full
 pull. A later release changing defaults must arrange its own incremental timestamp
 update or explicit full pull. Personal override rows are never reseeded.

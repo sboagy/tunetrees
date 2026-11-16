@@ -1,4 +1,5 @@
 import type { IBrowserSqliteHooks } from "oosync/runtime/browser-sqlite";
+import { lastSyncTimestampKey } from "../sync/storage-keys";
 
 // Audited pre-goals sync contract. Do not derive this from new generated metadata:
 // adding a formerly local-only table must not silently authorize its deletion.
@@ -70,7 +71,7 @@ export const canDiscardLocalTable: NonNullable<
     !REDOWNLOADABLE_TABLES.has(tableName)
   )
     return false;
-  if (!localStorage.getItem(`TT_LAST_SYNC_TIMESTAMP_${userId}`)) return false;
+  if (!localStorage.getItem(lastSyncTimestampKey(userId))) return false;
   // Older installations may predate a table's sync support. An audited table
   // must also have tracked writes in this snapshot. The runtime independently
   // refuses any outstanding queue rows and unreplayed backups.
@@ -86,25 +87,34 @@ export const canDiscardLocalTable: NonNullable<
 };
 
 const fullPullKey = (userId: string) => `TT_UPGRADE_FULL_PULL_${userId}`;
+export function getUpgradeFullPullGeneration(userId: string): string | null {
+  return localStorage.getItem(fullPullKey(userId));
+}
 export function requireUpgradeFullPull(userId: string): void {
   localStorage.setItem(fullPullKey(userId), crypto.randomUUID());
   resumeUpgradeFullPull(userId);
 }
 export function resumeUpgradeFullPull(userId: string): void {
   if (localStorage.getItem(fullPullKey(userId))) {
-    localStorage.removeItem(`TT_LAST_SYNC_TIMESTAMP_${userId}`);
+    localStorage.removeItem(lastSyncTimestampKey(userId));
   }
 }
 export async function finishUpgradeFullPull(
   userId: string,
-  persist: () => Promise<void>
+  persist: () => Promise<void>,
+  generation: string | null,
+  isCurrent: () => boolean
 ): Promise<void> {
-  const generation = localStorage.getItem(fullPullKey(userId));
-  if (!generation) return;
+  if (
+    !isCurrent() ||
+    !generation ||
+    getUpgradeFullPullGeneration(userId) !== generation
+  )
+    return;
   // The engine advances its watermark before SQLite persistence. Keep the
   // marker across crashes/failures so the next startup repeats the full pull.
   await persist();
-  if (localStorage.getItem(fullPullKey(userId)) === generation) {
+  if (isCurrent() && localStorage.getItem(fullPullKey(userId)) === generation) {
     localStorage.removeItem(fullPullKey(userId));
   }
 }

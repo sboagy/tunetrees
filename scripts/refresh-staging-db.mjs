@@ -837,6 +837,7 @@ async function main() {
   const sanitizePath = join(workDir, "sanitize.sql");
   const cleanupPath = join(workDir, "cleanup.sql");
 
+  let destructiveRestoreStarted = false;
   try {
     await writeFile(preRestorePath, preRestoreSql());
     await writeFile(
@@ -894,6 +895,7 @@ async function main() {
       schemaPreflightPath,
       "staging schema preflight"
     );
+    destructiveRestoreStarted = true;
     await runPsql(
       targetDatabaseUrl,
       preRestorePath,
@@ -924,6 +926,12 @@ async function main() {
       "Staging database refresh, sanitization, and validation completed."
     );
   } catch (error) {
+    if (!destructiveRestoreStarted) {
+      console.error(
+        "Staging refresh preflight failed; target data was not changed."
+      );
+      throw error;
+    }
     console.error(
       "Staging refresh failed. Running fail-safe auth.users cleanup before exiting."
     );

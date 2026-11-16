@@ -13,7 +13,9 @@ VALUES
 ON CONFLICT (id) DO UPDATE SET
   display_name = EXCLUDED.display_name,
   description = EXCLUDED.description,
-  default_config = EXCLUDED.default_config;
+  default_config = EXCLUDED.default_config,
+  default_technique = EXCLUDED.default_technique,
+  base_intervals = EXCLUDED.base_intervals;
 -- Preserve existing last_modified_at. Coordinated cutover requires a full pull.
 -- Personal overrides live separately and are never replaced by this seed.
 COMMIT;

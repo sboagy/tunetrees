@@ -3,6 +3,7 @@ import {
   type GoalConfig,
   parseGoalConfig,
   SCHEDULER_STATE_BYTES,
+  validateIntervals,
 } from "./config";
 
 export interface LadderState {
@@ -71,6 +72,7 @@ export async function calculateLadder(input: {
   // Existing event uniqueness is second-based. Quantize before computing due.
   const practiced = new Date(Math.floor(practicedMs / 1000) * 1000);
   const intervals = config.scheduler.intervalsDays;
+  validateIntervals(intervals, practiced.getTime());
   const ladderHash = await hashIntervals(intervals);
   const previous = input.predecessor;
   let prior: LadderState | null = null;

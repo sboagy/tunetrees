@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { getBuiltInGoals } from "./builtins";
 import {
   canonicalJson,
+  MAX_DATE_MS,
   parseGoalConfig,
   resolveGoalConfig,
   resolveGoalDefinition,
+  validateIntervals,
 } from "./config";
 
 function config(name = "fluency") {
@@ -14,9 +16,12 @@ function config(name = "fluency") {
 }
 
 describe("goal definitions and overrides", () => {
-  it("keeps built-in identities and the pinned FSRS-6 default", () => {
+  it("keeps the recall identity", () => {
     const recall = getBuiltInGoals()[0];
     expect(recall.id).toBe("00000000-0000-0000-0000-000000000001");
+  });
+  it("keeps the pinned FSRS-6 scheduler", () => {
+    const recall = getBuiltInGoals()[0];
     expect(recall.config.scheduler).toMatchObject({
       id: "builtin:fsrs6",
       maximumIntervalDays: 36500,
@@ -30,7 +35,12 @@ describe("goal definitions and overrides", () => {
       ],
       fuzz: false,
     });
+  });
+  it("keeps recall daily settings", () => {
+    const recall = getBuiltInGoals()[0];
     expect(recall.config.daily).toMatchObject({ minimum: 3, maximum: 10 });
+  });
+  it("keeps fluency daily settings", () => {
     expect(config().daily).toMatchObject({ minimum: 0, maximum: 2 });
   });
   it("merges daily fields independently, preserving false and Unlimited", () => {
@@ -58,17 +68,25 @@ describe("goal definitions and overrides", () => {
       evaluations
     );
   });
-  it("inherits changed defaults, preserves customized choices, and resets by omission", () => {
-    const old = config();
+  it("inherits changed default evaluations", () => {
     const updated = config();
     updated.evaluations[0].label = "New developer label";
     expect(resolveGoalConfig(updated).evaluations[0].label).toBe(
       "New developer label"
     );
+  });
+  it("preserves overridden evaluations when defaults change", () => {
+    const old = config();
+    const updated = config();
+    updated.evaluations[0].label = "New developer label";
     expect(
       resolveGoalConfig(updated, { evaluations: old.evaluations })
         .evaluations[0].label
     ).toBe("Fragmented");
+  });
+  it("uses updated defaults for an empty override", () => {
+    const updated = config();
+    updated.evaluations[0].label = "New developer label";
     expect(resolveGoalConfig(updated, {}).evaluations[0].label).toBe(
       "New developer label"
     );
@@ -172,5 +190,25 @@ describe("canonical JSON boundary", () => {
     const value: Record<string, unknown> = {};
     value.self = value;
     expect(() => canonicalJson(value)).toThrow(/cycles/);
+  });
+});
+
+describe("ladder interval representation", () => {
+  it("rejects intervals rounded to zero seconds", () => {
+    expect(() => validateIntervals([0.49 / 86400])).toThrow(/second precision/);
+  });
+  it("accepts intervals rounded to one second", () => {
+    expect(() => validateIntervals([0.5 / 86400])).not.toThrow();
+  });
+  it("rejects intervals longer than the entire Date range", () => {
+    expect(() => validateIntervals([200_000_001])).toThrow(/Date range/);
+  });
+  it("accepts the full Date span from the earliest practiced time", () => {
+    expect(() => validateIntervals([200_000_000], -MAX_DATE_MS)).not.toThrow();
+  });
+  it("rejects a due date beyond the range for the supplied practiced time", () => {
+    expect(() => validateIntervals([1], MAX_DATE_MS - 1000)).toThrow(
+      /Date range/
+    );
   });
 });

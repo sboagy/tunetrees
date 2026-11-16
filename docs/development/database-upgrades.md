@@ -36,6 +36,14 @@ Populated staging tables are excluded from rebuild approval until a separate,
 verified export/restore path exists; finish and synchronize staged practice using
 a compatible app before upgrading. Triggers alone do not waive this block.
 
+Trigger coverage was verified by reconstructing database version 27 from commit
+`f980a876` and running the pinned oosync installer against its historical metadata.
+All 30 currently approved tables have `trg_<table>_insert`, `trg_<table>_update`,
+and `trg_<table>_delete` (90 matching triggers). The earlier count of 31 included
+staging, which is now excluded. The guard therefore keeps its exact-name check.
+The upgrade cursor helper derives its prefix from `oosync.codegen.config.json`,
+the same source used to generate the SQLite storage configuration.
+
 Before cutover, synchronize each device using a compatible app, finish pending
 uploads, and close old tabs. If blocked, retain site storage. Use the previous
 compatible version on the same browser origin/profile to finish synchronization,
@@ -57,8 +65,19 @@ awaits before starting the sync service and its cursor-reading engine.
 
 The completion callback records the pull mode when request overrides are prepared,
 before the watermark advances, and only finishes recovery for a successful full
-pull with no errors and completed catalog setup. Marker generations prevent an
-older persistence completion from clearing a newer full-download requirement.
+pull with no errors and completed catalog setup. The marker generation is captured at pull start: a stale callback cannot persist
+or finish a newer recovery request, and a generation change during persistence
+also prevents clearing the newer marker. Completion additionally requires the same
+active user, database instance and service instance. Stop/reset invalidates ownership
+before awaiting destruction, including pending startups; unmount permanently
+invalidates the provider. Service creation and publication occur in one synchronous
+turn. Callback continuations and deferred catalog reconciliation recheck ownership
+after asynchronous work, and sync retries stay bound to their original service.
+SQLite catalog mutation batches do not yield between their ownership check and
+completion. Ownership is checked again after persistence. An export
+already started is not cancelled, but a stale completion cannot clear recovery.
+These guards cover TuneTrees callback work, not persistence that oosync performs
+internally before invoking the callback.
 No database/schema version is bumped by the guard integration itself.
 
 The goals configuration expansion now advances SQLite to version 28 with migration

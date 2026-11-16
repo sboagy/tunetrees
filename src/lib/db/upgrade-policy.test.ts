@@ -5,8 +5,14 @@ import {
 import type { SqliteRawDatabase } from "oosync/runtime/browser-sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ownsActiveSync,
+  type SyncCompletionOwner,
+} from "../sync/completion-owner";
+import { lastSyncTimestampKey } from "../sync/storage-keys";
+import {
   canDiscardLocalTable,
   finishUpgradeFullPull,
+  getUpgradeFullPullGeneration,
   requireUpgradeFullPull,
   resumeUpgradeFullPull,
   withUpgradeIdentity,
@@ -14,7 +20,7 @@ import {
 
 let db: SqliteRawDatabase;
 const userId = "upgrade-user";
-const timestampKey = `TT_LAST_SYNC_TIMESTAMP_${userId}`;
+const timestampKey = lastSyncTimestampKey(userId);
 const markerKey = `TT_UPGRADE_FULL_PULL_${userId}`;
 function approve(tableName: string, authenticated = true) {
   return withUpgradeIdentity(userId, authenticated, async () =>
@@ -109,6 +115,33 @@ describe("upgrade preservation policy", () => {
 });
 
 describe("durable upgrade download recovery", () => {
+  it("does not persist a stale pull after a new database requires recovery", async () => {
+    requireUpgradeFullPull(userId);
+    const oldGeneration = getUpgradeFullPullGeneration(userId);
+    requireUpgradeFullPull(userId);
+    const persist = vi.fn(async () => {});
+    await finishUpgradeFullPull(userId, persist, oldGeneration, () => true);
+    expect(persist).not.toHaveBeenCalled();
+  });
+  it("does not remove a new database's marker on stale pull completion", async () => {
+    requireUpgradeFullPull(userId);
+    const oldGeneration = getUpgradeFullPullGeneration(userId);
+    requireUpgradeFullPull(userId);
+    const newGeneration = getUpgradeFullPullGeneration(userId);
+    await finishUpgradeFullPull(
+      userId,
+      async () => {},
+      oldGeneration,
+      () => true
+    );
+    expect(getUpgradeFullPullGeneration(userId)).toBe(newGeneration);
+  });
+  it("does not finish a marker created after an unmarked pull started", async () => {
+    requireUpgradeFullPull(userId);
+    const persist = vi.fn(async () => {});
+    await finishUpgradeFullPull(userId, persist, null, () => true);
+    expect(persist).not.toHaveBeenCalled();
+  });
   it("clears the old cursor before the new sync engine starts", () => {
     requireUpgradeFullPull(userId);
     expect(localStorage.getItem(timestampKey)).toBeNull();
@@ -123,9 +156,14 @@ describe("durable upgrade download recovery", () => {
   it("keeps recovery pending when persistence fails", async () => {
     requireUpgradeFullPull(userId);
     await expect(
-      finishUpgradeFullPull(userId, async () => {
-        throw new Error("disk full");
-      })
+      finishUpgradeFullPull(
+        userId,
+        async () => {
+          throw new Error("disk full");
+        },
+        getUpgradeFullPullGeneration(userId),
+        () => true
+      )
     ).rejects.toThrow("disk full");
     expect(localStorage.getItem(markerKey)).toBeTruthy();
   });
@@ -137,7 +175,9 @@ describe("durable upgrade download recovery", () => {
       () =>
         new Promise<void>((resolve) => {
           release = resolve;
-        })
+        }),
+      getUpgradeFullPullGeneration(userId),
+      () => true
     );
     expect(localStorage.getItem(markerKey)).toBeTruthy();
     release();
@@ -145,13 +185,23 @@ describe("durable upgrade download recovery", () => {
   });
   it("removes the marker after persistence completes", async () => {
     requireUpgradeFullPull(userId);
-    await finishUpgradeFullPull(userId, async () => {});
+    await finishUpgradeFullPull(
+      userId,
+      async () => {},
+      getUpgradeFullPullGeneration(userId),
+      () => true
+    );
     expect(localStorage.getItem(markerKey)).toBeNull();
   });
   it("does not reset the cursor when resumed after completion", async () => {
     requireUpgradeFullPull(userId);
     localStorage.setItem(timestampKey, "download-complete");
-    await finishUpgradeFullPull(userId, async () => {});
+    await finishUpgradeFullPull(
+      userId,
+      async () => {},
+      getUpgradeFullPullGeneration(userId),
+      () => true
+    );
     resumeUpgradeFullPull(userId);
     expect(localStorage.getItem(timestampKey)).toBe("download-complete");
   });
@@ -163,12 +213,69 @@ describe("durable upgrade download recovery", () => {
       () =>
         new Promise<void>((resolve) => {
           release = resolve;
-        })
+        }),
+      getUpgradeFullPullGeneration(userId),
+      () => true
     );
     requireUpgradeFullPull(userId);
     const newGeneration = localStorage.getItem(markerKey);
     release();
     await pending;
     expect(localStorage.getItem(markerKey)).toBe(newGeneration);
+  });
+});
+
+describe("sync completion ownership", () => {
+  const owner: SyncCompletionOwner = { userId, database: {}, service: {} };
+  it.each([
+    ["account switch", { ...owner, userId: "other-user" }],
+    ["database replacement", { ...owner, database: {} }],
+    ["service replacement", { ...owner, service: {} }],
+    ["service teardown", { ...owner, service: null }],
+  ])(
+    "preserves recovery after %s with an unchanged marker",
+    async (_name, active) => {
+      requireUpgradeFullPull(userId);
+      const generation = getUpgradeFullPullGeneration(userId);
+      const persist = vi.fn(async () => {});
+      await finishUpgradeFullPull(userId, persist, generation, () =>
+        ownsActiveSync(owner, active)
+      );
+      expect(persist).not.toHaveBeenCalled();
+      expect(getUpgradeFullPullGeneration(userId)).toBe(generation);
+    }
+  );
+
+  it("keeps recovery pending when ownership changes during persistence", async () => {
+    requireUpgradeFullPull(userId);
+    const generation = getUpgradeFullPullGeneration(userId);
+    let active = owner;
+    let release = () => {};
+    const pending = finishUpgradeFullPull(
+      userId,
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      generation,
+      () => ownsActiveSync(owner, active)
+    );
+    active = { ...owner, service: {} };
+    release();
+    await pending;
+    expect(getUpgradeFullPullGeneration(userId)).toBe(generation);
+  });
+
+  it("finishes recovery for the active user, database and service", async () => {
+    requireUpgradeFullPull(userId);
+    const persist = vi.fn(async () => {});
+    await finishUpgradeFullPull(
+      userId,
+      persist,
+      getUpgradeFullPullGeneration(userId),
+      () => ownsActiveSync(owner, owner)
+    );
+    expect(persist).toHaveBeenCalledOnce();
+    expect(getUpgradeFullPullGeneration(userId)).toBeNull();
   });
 });
