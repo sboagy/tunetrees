@@ -8,6 +8,10 @@ import { getBuiltInGoals } from "../src/lib/goals/builtins.ts";
 import { prepareGoalCutoverPlan } from "../src/lib/goals/cutover-plan.ts";
 import { prepareLegacyGoalDefinition } from "../src/lib/goals/legacy-goals.ts";
 import { prepareLegacyRecallSettings } from "../src/lib/goals/legacy-preferences.ts";
+import {
+  legacyPreferences,
+  readGoalCutoverSnapshot,
+} from "./lib/goal-cutover-snapshot.mjs";
 
 function auditRecallPreferences(users, result) {
   for (const user of users) {
@@ -44,14 +48,6 @@ function auditGoalDefinition(goal, builtins, result) {
   }
 }
 
-function legacyPreferences(user) {
-  return {
-    hasExistingOverride: user.existing,
-    scheduling: user.scheduling ? camelizeKeys(user.scheduling) : null,
-    spacedRepetition: user.fsrs ? camelizeKeys(user.fsrs) : null,
-  };
-}
-
 function hasBlockers(report) {
   return (
     report.invalidRecallPreferenceUserIds.length ||
@@ -83,21 +79,7 @@ try {
     "isolation level repeatable read read only",
     async (tx) => {
       const builtins = getBuiltInGoals();
-      const recall = builtins.find((goal) => goal.name === "recall");
-      if (!recall) throw new Error("Recall defaults are unavailable");
-      const users = await tx`
-      SELECT u.id, to_jsonb(s) AS scheduling, to_jsonb(f) AS fsrs,
-        EXISTS (SELECT 1 FROM public.goal_user_settings g
-          WHERE g.user_id = u.id AND g.goal_id = ${recall.id}) AS existing
-      FROM public.user_profile u
-      LEFT JOIN public.prefs_scheduling_options s ON s.user_id = u.id
-      LEFT JOIN public.prefs_spaced_repetition f
-        ON f.user_id = u.id AND f.alg_type = 'fsrs'
-    `;
-      const goals = await tx`
-      SELECT id, name, private_for, default_config, deleted, default_technique,
-        base_intervals, display_name, description, last_modified_at FROM public.goal
-    `;
+      const { users, goals } = await readGoalCutoverSnapshot(tx);
       const result = {
         users: users.length,
         recallSettingsReady: 0,

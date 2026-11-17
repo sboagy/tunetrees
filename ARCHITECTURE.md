@@ -409,8 +409,15 @@ configuration is validated and retained, including its choice identities.
 `cutover-plan.ts` assembles definition updates and absent Recall-settings inserts
 with their source snapshots. The audit's optional `--prepare <new-plan.json>` writes
 this review artifact with private permissions; it has no database apply mode.
-Server insertion, plugin conversion and reference attribution remain part of the
-coordinated cutover implementation.
+`scripts/lib/goal-cutover-snapshot.mjs` shares that database snapshot with the local
+rehearsal. `goal-cutover-transaction.mjs` revalidates each planned value and source
+under table locks, then writes definitions/settings inside a savepoint. Exact retries
+make no further writes; changed preferences/overrides are not overwritten. Existing
+goal timestamps are checked after UPDATE, with normal ownership/sync triggers enabled.
+`scripts/rehearse-goal-cutover.mjs` is local-only and always rolls back, including
+sync-log effects. It has no commit mode or remote connection option. Production
+migration/deployment integration, plugin conversion and reference attribution remain
+part of the coordinated cutover implementation.
 
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.

@@ -414,6 +414,48 @@ compatibility changes. No E2E rerun was needed for this inactive preparation cod
 Fresh local CodeRabbit review of this uncommitted checkpoint (including untracked
 files) completed with zero findings across all seven files.
 
+## Checkpoint 3h: transactional local cutover rehearsal
+
+The audit and rehearsal share `scripts/lib/goal-cutover-snapshot.mjs`; timestamp
+snapshots now use Postgres text output so microseconds survive without JavaScript
+Date truncation. Regenerate plans before rehearsing rather than reusing old exports.
+
+`goal-cutover-transaction.mjs` validates every definition/settings entry before
+writing. It rederives proposed values from source data, rejects stale snapshots,
+duplicate identities and changed overrides/tombstones, and accepts identical already
+applied results without writes. SHARE ROW EXCLUSIVE locks cover goals, settings,
+preferences and users, including missing rows that might otherwise be inserted
+concurrently. Locks have a two-second acquisition timeout; SQL statements have a
+15-second timeout. An internal savepoint rolls back failures even if the caller
+catches them. Existing goal timestamps are verified after updates. No triggers are
+disabled: the audited ownership guards and sync change-log triggers stay active.
+
+`npx tsx scripts/rehearse-goal-cutover.mjs <plan.json>` targets local Postgres only
+and always rolls back its transaction. There is no commit mode or environment URL
+override. The fresh local rehearsal validated 209 Recall inserts and rolled them
+back; persisted settings counts were unchanged. These local tools are not connected
+to browser startup, practice, settings or sync runtime paths.
+
+`npm run test:db:goal-cutover` uses isolated UUID fixtures inside rolled-back
+transactions. It verifies custom-goal microsecond timestamp preservation, unchanged
+legacy names/intervals, exact retry behavior, stale/altered input rejection, override
+tombstone preservation, competing-writer blocking and rollback of both application
+rows and sync-log effects. A transient constraint forces a later SQL insert failure
+after a goal update; the batch and test constraint both roll back. The command is
+wired into CI's existing shard-one database checks before Playwright.
+
+Validation: 1,213 unit tests, typecheck, lint, formatting, script Biome and diff checks
+passed, as did the real Postgres integration tests and local CLI rehearsal. No E2E
+rerun was needed. There are no persistent schema/generated changes or deployment
+actions. The SQL writes affect only additive definition/settings fields; legacy
+goal keys, scheduler preferences, practice dates and history remain unchanged.
+Production migration/deployment integration, stable goal-key/reference backfills,
+plugin conversion and UI activation remain pending. A successful rehearsal does
+not establish that devices are synchronized or authorize production application.
+
+Fresh local CodeRabbit review of checkpoint 3h, including untracked scripts,
+completed with zero findings across all nine files.
+
 ## CodeRabbit checkpoint review (2026-11-16)
 
 A manual full review of `ca331abf` inspected 43 files (generated artifacts and the
