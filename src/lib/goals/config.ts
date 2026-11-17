@@ -66,6 +66,19 @@ function label(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+// PostgreSQL's JSON validation rejects NUL and unpaired UTF-16 surrogates.
+// Iterate code points so valid surrogate pairs (such as emoji) remain accepted.
+function storageJsonString(value: string): string {
+  for (const character of value) {
+    const point = character.codePointAt(0) ?? 0;
+    requireValue(
+      point !== 0 && (point < 0xd800 || point > 0xdfff),
+      "JSON text contains NUL or an unpaired Unicode surrogate"
+    );
+  }
+  return JSON.stringify(value);
+}
+
 /** Canonical JSON rejects lossy values instead of silently converting them. */
 export function canonicalJson(
   value: unknown,
@@ -73,8 +86,8 @@ export function canonicalJson(
 ): string {
   const ancestors = new Set<object>();
   const visit = (item: unknown): string => {
-    if (item === null || typeof item === "string" || typeof item === "boolean")
-      return JSON.stringify(item);
+    if (typeof item === "string") return storageJsonString(item);
+    if (item === null || typeof item === "boolean") return JSON.stringify(item);
     if (typeof item === "number") {
       requireValue(Number.isFinite(item), "JSON numbers must be finite");
       return JSON.stringify(item);
@@ -109,7 +122,7 @@ export function canonicalJson(
           if (left > right) return 1;
           return 0;
         })
-        .map((key) => `${JSON.stringify(key)}:${visit(item[key])}`)
+        .map((key) => `${storageJsonString(key)}:${visit(item[key])}`)
         .join(",")}}`;
     }
     ancestors.delete(item);

@@ -4,6 +4,7 @@ import {
   canonicalJson,
   MAX_DATE_MS,
   parseGoalConfig,
+  parseGoalOverrides,
   resolveGoalConfig,
   resolveGoalDefinition,
   validateIntervals,
@@ -16,6 +17,29 @@ function config(name = "fluency") {
 }
 
 describe("goal definitions and overrides", () => {
+  it.each(["\u0000", "\ud800", "\udfff"])(
+    "rejects unstorable override text %j",
+    (text) => {
+      expect(() => parseGoalOverrides({ description: text })).toThrow(
+        /NUL|surrogate/
+      );
+    }
+  );
+  it.each(["\u0000", "\ud800", "\udfff"])(
+    "rejects unstorable configuration text %j",
+    (text) => {
+      const value = config();
+      value.evaluations[0].label = text;
+      expect(() => parseGoalConfig(value)).toThrow(/NUL|surrogate/);
+    }
+  );
+  it("preserves valid Unicode including surrogate pairs", () => {
+    const description = "Flûte 🎵";
+    expect(parseGoalOverrides({ description })).toEqual({ description });
+  });
+  it("rejects unstorable JSON object keys", () => {
+    expect(() => canonicalJson({ "\ud800": 1 })).toThrow(/surrogate/);
+  });
   it("keeps the recall identity", () => {
     const recall = getBuiltInGoals()[0];
     expect(recall.id).toBe("00000000-0000-0000-0000-000000000001");

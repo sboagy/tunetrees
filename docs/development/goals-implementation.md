@@ -139,3 +139,18 @@ nullable columns; new-format writes require the later coordinated cutover.
 Each checkpoint should pass its local checks before push. Keep #940 a draft until
 these behaviors and the coordinated cutover are reviewed. No deployment or data
 wipe is implied by an implementation checkpoint.
+
+## CodeRabbit checkpoint review (2026-11-16)
+
+A manual full review of `ca331abf` inspected 43 files (generated artifacts and the
+lockfile were excluded by CodeRabbit's filters). Three actionable findings were
+confirmed and addressed locally: retain recovery metadata across both engine calls
+in one service operation; restore lifetime-safe local test-user initialization;
+and reject NUL/unpaired Unicode surrogates before storing configuration JSON.
+The catalog-purge test now records deletion count at the ownership-change microtask,
+so it detects yielding midway through the batch.
+
+The linked-issue check correctly observes that the goal-aware evaluation picker
+is still missing. It remains part of this draft PR's planned UI integration, not
+an accepted omission or a separate follow-up. Scheduler integration also remains
+subject to the open scheduler-state representation review in plan section 6.3.

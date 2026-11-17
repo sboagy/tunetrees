@@ -9,6 +9,7 @@ import {
 
 type TestUser = {
   id: string;
+  email?: string;
   is_anonymous: boolean;
   user_metadata: Record<string, string>;
 };
@@ -182,6 +183,92 @@ afterEach(() => {
 });
 
 describe("provider sync completion lifetime", () => {
+  it("clears recovery after full upload/download followed by incremental download", async () => {
+    setUser({ ...user, email: "owner-a@example.test" });
+    mocks.selectRows.mockResolvedValue([{ id: user.id }]);
+    mount();
+    await started();
+    localStorage.setItem("TT_UPGRADE_FULL_PULL_owner-a", "generation-a");
+    await workerConfig.requestOverridesProvider();
+    service.getLastSyncDownTimestamp = () => "2026-11-16T12:00:00Z";
+    await workerConfig.requestOverridesProvider();
+    await workerConfig.onSyncComplete(result);
+    expect(localStorage.getItem("TT_UPGRADE_FULL_PULL_owner-a")).toBeNull();
+  });
+
+  it("does not clear a newer recovery generation after the first full pull", async () => {
+    setUser({ ...user, email: "owner-a@example.test" });
+    mocks.selectRows.mockResolvedValue([{ id: user.id }]);
+    mount();
+    await started();
+    localStorage.setItem("TT_UPGRADE_FULL_PULL_owner-a", "generation-a");
+    await workerConfig.requestOverridesProvider();
+    service.getLastSyncDownTimestamp = () => "2026-11-16T12:00:00Z";
+    localStorage.setItem("TT_UPGRADE_FULL_PULL_owner-a", "generation-b");
+    await workerConfig.requestOverridesProvider();
+    await workerConfig.onSyncComplete(result);
+    expect(localStorage.getItem("TT_UPGRADE_FULL_PULL_owner-a")).toBe(
+      "generation-b"
+    );
+  });
+
+  it("does not reuse a failed operation's full-pull metadata on later completion", async () => {
+    setUser({ ...user, email: "owner-a@example.test" });
+    mocks.selectRows.mockResolvedValue([{ id: user.id }]);
+    mount();
+    await started();
+    localStorage.setItem("TT_UPGRADE_FULL_PULL_owner-a", "generation-a");
+    await workerConfig.requestOverridesProvider();
+    service.getLastSyncDownTimestamp = () => "2026-11-16T12:00:00Z";
+    await workerConfig.onSyncComplete({
+      ...result,
+      success: false,
+      errors: ["failed"],
+    });
+    await workerConfig.requestOverridesProvider();
+    await workerConfig.onSyncComplete(result);
+    expect(localStorage.getItem("TT_UPGRADE_FULL_PULL_owner-a")).toBe(
+      "generation-a"
+    );
+  });
+
+  it("initializes an injected local test user without an auth session or worker", async () => {
+    setUser(null);
+    mount();
+    await state.signInAnonymously("injected-test-user");
+    expect(state.localDb()).toBe(db);
+    expect(state.userIdInt()).toBe("injected-test-user");
+    expect(state.initialSyncComplete()).toBe(true);
+    expect(mocks.start).not.toHaveBeenCalled();
+  });
+
+  it("does not publish an injected database after unmount", async () => {
+    setUser(null);
+    const gate = deferred<object>();
+    mocks.initialize.mockReturnValueOnce(gate.promise);
+    const view = mount();
+    const pending = state.signInAnonymously("injected-test-user");
+    await waitFor(() => expect(mocks.initialize).toHaveBeenCalledOnce());
+    view.unmount();
+    gate.resolve(db);
+    await pending;
+    expect(state.localDb()).toBeNull();
+  });
+
+  it("allows real sign-in to supersede a pending injected initialization", async () => {
+    setUser(null);
+    const gate = deferred<object>();
+    mocks.initialize.mockReturnValueOnce(gate.promise);
+    mount();
+    const pending = state.signInAnonymously("injected-test-user");
+    await waitFor(() => expect(mocks.initialize).toHaveBeenCalledOnce());
+    setUser(user);
+    await started();
+    gate.resolve({ stale: true });
+    await pending;
+    expect(state.localDb()).toBe(db);
+  });
+
   it("does not start a service after unmount during startup repairs", async () => {
     const gate = deferred<object>();
     mocks.repair.mockReturnValueOnce(gate.promise);

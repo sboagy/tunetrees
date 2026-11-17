@@ -498,6 +498,7 @@ const TTInner: ParentComponent = (props) => {
   let isInitializing = false;
   let disposed = false;
   let lifecycleVersion = 0;
+  let injectedTestInitialization = false;
   const captureLifetime = (userId: string) => {
     const version = lifecycleVersion;
     return () =>
@@ -954,12 +955,15 @@ const TTInner: ParentComponent = (props) => {
     let completionPullMode: SyncPullMode = null;
     let completionPullGeneration: string | null = null;
     const requestOverridesProvider = async () => {
-      completionPullGeneration = getUpgradeFullPullGeneration(authUserId);
-      // The engine calls this after choosing its cursor and before downloading.
-      // Capture here: getLastSyncMode() reflects the advanced cursor on completion.
-      completionPullMode = userSyncService?.getLastSyncDownTimestamp()
-        ? "incremental"
-        : "full";
+      // One service operation can upload/download and then download again.
+      // Retain the first full pull and its generation until onSyncComplete;
+      // the second engine call may already see the advanced cursor.
+      if (completionPullMode !== "full") {
+        completionPullGeneration = getUpgradeFullPullGeneration(authUserId);
+        completionPullMode = userSyncService?.getLastSyncDownTimestamp()
+          ? "incremental"
+          : "full";
+      }
       try {
         const { buildGenreFilterOverrides } = await import(
           "@/lib/sync/genre-filter"
@@ -1437,8 +1441,11 @@ const TTInner: ParentComponent = (props) => {
     }
   }
 
-  async function initializeAnonymousDatabase(anonymousUserId: string) {
-    const isCurrent = captureLifetime(anonymousUserId);
+  async function initializeAnonymousDatabase(
+    anonymousUserId: string,
+    testLifetime?: () => boolean
+  ) {
+    const isCurrent = testLifetime ?? captureLifetime(anonymousUserId);
     if (!isCurrent() || isE2eDbClearInProgress()) return;
     if (isInitializing) return;
 
@@ -1536,6 +1543,11 @@ const TTInner: ParentComponent = (props) => {
       // Offline-first: local SQLite is immediately usable
       setUserIdInt(anonymousUserId);
 
+      // An injected local identity has no authenticated session for sync.
+      if (testLifetime) {
+        setInitialSyncComplete(true);
+        return;
+      }
       const isSyncDisabled = import.meta.env.VITE_DISABLE_SYNC === "true";
       if (isSyncDisabled) {
         log.warn("⚠️ Sync disabled via VITE_DISABLE_SYNC environment variable");
@@ -1663,6 +1675,7 @@ const TTInner: ParentComponent = (props) => {
     on(rhizome.user, async (currentUser, prevUser) => {
       // User signed in (null → User)
       if (currentUser && !prevUser) {
+        if (injectedTestInitialization) invalidateSync();
         markSyncBaselineEvent("auth:user-signed-in", {
           userId: currentUser.id,
           anonymous: isUserAnonymous(currentUser),
@@ -1755,7 +1768,27 @@ const TTInner: ParentComponent = (props) => {
    */
   const signInAnonymously = async (injectedUserId?: string) => {
     if (injectedUserId) {
-      await initializeAnonymousDatabase(injectedUserId);
+      const currentUser = rhizome.user();
+      if (currentUser?.id === injectedUserId) {
+        await initializeAnonymousDatabase(injectedUserId);
+        return { error: null };
+      }
+      if (currentUser) {
+        return {
+          error: new Error(
+            "Local test injection cannot replace an authenticated user"
+          ),
+        };
+      }
+      const version = lifecycleVersion;
+      const ownsTestLifetime = () =>
+        !disposed && version === lifecycleVersion && rhizome.user() === null;
+      injectedTestInitialization = true;
+      try {
+        await initializeAnonymousDatabase(injectedUserId, ownsTestLifetime);
+      } finally {
+        injectedTestInitialization = false;
+      }
       return { error: null };
     }
     // Session restoration + new anon sign-in is handled via overrideSignInAnonymously

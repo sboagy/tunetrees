@@ -47,13 +47,16 @@ describe("catalog purge ownership", () => {
 
   it("does not yield partway through an authorized deletion batch", async () => {
     let current = true;
+    let deletionsBeforeOwnershipChanged = 0;
     mocks.raw.mockResolvedValue({});
     mocks.remove.mockImplementationOnce(() => {
       queueMicrotask(() => {
+        deletionsBeforeOwnershipChanged = mocks.remove.mock.calls.length;
         current = false;
       });
     });
     await purgeLocalCatalogForGenres(db, "owner", ["irish"], () => current);
+    expect(deletionsBeforeOwnershipChanged).toBe(9);
     expect(mocks.remove).toHaveBeenCalledTimes(9);
   });
 });

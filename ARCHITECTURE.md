@@ -228,6 +228,13 @@ side effects; it does not cancel an in-flight oosync request or an export alread
 started while its owner was active. Persistence performed internally by oosync
 before invoking the callback is outside this consumer-side guard.
 
+A service operation may perform an upload/download followed by another download.
+Full-pull completion metadata retains the first full pull's generation across both
+engine requests and resets at the service callback, including failed operations.
+The explicit injected-user test path can initialize local anonymous storage without
+an auth session. Its lifetime expires on unmount, reset or real sign-in; it starts
+no sync service without an authenticated identity.
+
 ### Table Metadata Overrides
 
 TuneTrees uses `tableMeta` overrides to keep app-specific semantics out of oosync core:
