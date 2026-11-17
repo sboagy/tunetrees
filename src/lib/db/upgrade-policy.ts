@@ -71,6 +71,8 @@ export const canDiscardLocalTable: NonNullable<
     !REDOWNLOADABLE_TABLES.has(tableName)
   )
     return false;
+  // A watermark can advance before the recovered database is durably saved.
+  if (getUpgradeFullPullGeneration(userId) !== null) return false;
   if (!localStorage.getItem(lastSyncTimestampKey(userId))) return false;
   // Older installations may predate a table's sync support. An audited table
   // must also have tracked writes in this snapshot. The runtime independently

@@ -233,6 +233,16 @@ describe("goal-selected calculations with JSON state", () => {
     });
     expect(result.continued).toBe(false);
   });
+  it("explains a fresh start when legacy Recall used a custom plugin", async () => {
+    const result = await calculateGoalPractice({
+      ...options(),
+      predecessor: { ...legacy(), technique: "custom-plugin" },
+    });
+    expect(result.continued).toBe(false);
+    expect(result.limitations).toEqual([
+      "Legacy scheduler state cannot be inferred",
+    ]);
+  });
   it("does not fall back to typed FSRS fields for corrupt JSON", async () => {
     await expect(
       calculateGoalPractice({

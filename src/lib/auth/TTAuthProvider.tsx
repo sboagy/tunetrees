@@ -498,7 +498,7 @@ const TTInner: ParentComponent = (props) => {
   let isInitializing = false;
   let disposed = false;
   let lifecycleVersion = 0;
-  let injectedTestInitialization = false;
+  let injectedTestInitialization: Promise<void> | null = null;
   const captureLifetime = (userId: string) => {
     const version = lifecycleVersion;
     return () =>
@@ -1675,7 +1675,17 @@ const TTInner: ParentComponent = (props) => {
     on(rhizome.user, async (currentUser, prevUser) => {
       // User signed in (null → User)
       if (currentUser && !prevUser) {
-        if (injectedTestInitialization) invalidateSync();
+        const pendingInjection = injectedTestInitialization;
+        if (pendingInjection) {
+          invalidateSync();
+          const isCurrent = captureLifetime(currentUser.id);
+          // The runtime shares its pending initialization across users. Let it
+          // settle before asking it to persist/close and switch databases.
+          await pendingInjection.catch(() => {
+            // A failed test initialization must not prevent real sign-in.
+          });
+          if (!isCurrent()) return;
+        }
         markSyncBaselineEvent("auth:user-signed-in", {
           userId: currentUser.id,
           anonymous: isUserAnonymous(currentUser),
@@ -1783,11 +1793,15 @@ const TTInner: ParentComponent = (props) => {
       const version = lifecycleVersion;
       const ownsTestLifetime = () =>
         !disposed && version === lifecycleVersion && rhizome.user() === null;
-      injectedTestInitialization = true;
+      const pending =
+        injectedTestInitialization ??
+        initializeAnonymousDatabase(injectedUserId, ownsTestLifetime);
+      injectedTestInitialization = pending;
       try {
-        await initializeAnonymousDatabase(injectedUserId, ownsTestLifetime);
+        await pending;
       } finally {
-        injectedTestInitialization = false;
+        if (injectedTestInitialization === pending)
+          injectedTestInitialization = null;
       }
       return { error: null };
     }
@@ -2003,6 +2017,7 @@ const TTInner: ParentComponent = (props) => {
       const serviceWithDestroy = syncServiceInstance;
       // Invalidate completion ownership before asynchronous teardown starts.
       invalidateSync();
+      const ownsReset = captureLifetime(currentUser.id);
       if (serviceWithDestroy?.destroy) {
         try {
           await serviceWithDestroy.destroy();
@@ -2014,6 +2029,11 @@ const TTInner: ParentComponent = (props) => {
         }
       }
 
+      if (!ownsReset()) {
+        throw new Error(
+          "Local reset did not run because the active session changed"
+        );
+      }
       if (autoPersistCleanup) {
         autoPersistCleanup();
         autoPersistCleanup = null;
@@ -2029,6 +2049,7 @@ const TTInner: ParentComponent = (props) => {
       setLastSyncErrorSummary(null);
 
       await clearSqliteDb();
+      if (!ownsReset()) return;
 
       if (isUserAnonymous(currentUser)) {
         await initializeAnonymousDatabase(currentUser.id);

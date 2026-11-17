@@ -199,8 +199,8 @@ consumer policy in `src/lib/db/upgrade-policy.ts`, injected through the existing
 browser hooks. The approved table list is an audited pre-goals contract, not a
 projection of new generated metadata: adding a syncable table requires a new
 preservation review. Approval requires an authenticated initialization, a prior
-successful sync watermark and the old table's insert/update/delete tracking
-triggers. It relies on the normal outbox invariant and coordinated synchronization
+successful sync watermark, no pending full-pull recovery marker, and the old
+table's insert/update/delete tracking triggers. It relies on the normal outbox invariant and coordinated synchronization
 before cutover; it is not a remote row-by-row verification. Missing evidence
 blocks. Anonymous data, unknown/removed tables, `table_transient_data`, and `media_draft_outbox` are never
 automatically discarded. `view_column_meta` and `sync_change_log` are regenerable.
@@ -233,7 +233,11 @@ Full-pull completion metadata retains the first full pull's generation across bo
 engine requests and resets at the service callback, including failed operations.
 The explicit injected-user test path can initialize local anonymous storage without
 an auth session. Its lifetime expires on unmount, reset or real sign-in; it starts
-no sync service without an authenticated identity.
+no sync service without an authenticated identity. Real sign-in waits for pending
+injected initialization to settle before requesting another user's database, because
+the runtime shares an in-flight initialization promise. Explicit reset rechecks its
+session/lifetime after service teardown before clearing storage, and after clearing
+before starting a replacement.
 
 ### Table Metadata Overrides
 

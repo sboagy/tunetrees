@@ -140,6 +140,23 @@ export function canonicalJson(
   return result;
 }
 
+/** Shared snapshot serialization keeps settings validation and practice in sync. */
+export function serializeEvaluationSnapshot(
+  goalLabel: string,
+  choice: { label: string; description: string; action: unknown }
+): string {
+  return canonicalJson(
+    {
+      version: 1,
+      goalLabel,
+      choiceLabel: choice.label,
+      choiceDescription: choice.description,
+      action: choice.action,
+    },
+    SCHEDULER_STATE_BYTES
+  );
+}
+
 // ECMAScript Date supports +/- 100,000,000 days from the epoch. With no
 // practiced time yet, reject durations impossible even from its earliest date.
 export const MAX_DATE_MS = 8_640_000_000_000_000;
@@ -255,6 +272,11 @@ function validateEvaluations(
       label(choice.label) && typeof choice.description === "string",
       "Invalid evaluation label or description"
     );
+    serializeEvaluationSnapshot("", {
+      label: choice.label,
+      description: choice.description,
+      action: choice.action,
+    });
     requireValue(object(choice.action), "Evaluation needs an explicit action");
     if (choice.action.kind === "fsrs") {
       keys(choice.action, ["kind", "rating"]);
@@ -319,7 +341,20 @@ export function parseGoalOverrides(value: unknown): GoalOverrides {
     );
   if ("daily" in copy) validateDaily(copy.daily, true);
   if ("scheduler" in copy) validateScheduler(copy.scheduler);
-  if ("evaluations" in copy) validateEvaluations(copy.evaluations);
+  if (typeof copy.displayName === "string") {
+    serializeEvaluationSnapshot(copy.displayName, {
+      label: "",
+      description: "",
+      action: {},
+    });
+  }
+  if ("evaluations" in copy) {
+    validateEvaluations(copy.evaluations);
+    if (typeof copy.displayName === "string") {
+      for (const choice of copy.evaluations)
+        serializeEvaluationSnapshot(copy.displayName, choice);
+    }
+  }
   return copy;
 }
 export function resolveGoalConfig(
@@ -342,9 +377,14 @@ export function resolveGoalDefinition(
 ): { displayName: string; description: string; config: GoalConfig } {
   requireValue(label(defaults.displayName), "Display name must not be empty");
   const custom = parseGoalOverrides(overrides);
+  const displayName = custom.displayName ?? defaults.displayName;
+  const config = resolveGoalConfig(defaults.config, custom);
+  // Inherited names/evaluations can each fit separately but exceed the budget together.
+  for (const choice of config.evaluations)
+    serializeEvaluationSnapshot(displayName, choice);
   return {
-    displayName: custom.displayName ?? defaults.displayName,
+    displayName,
     description: custom.description ?? defaults.description,
-    config: resolveGoalConfig(defaults.config, custom),
+    config,
   };
 }

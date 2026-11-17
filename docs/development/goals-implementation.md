@@ -198,3 +198,16 @@ is still missing. It remains part of this draft PR's planned UI integration, not
 an accepted omission or a separate follow-up. The state review in plan section 6.3
 is resolved in favor of authoritative JSON for all new scheduler results; checkpoint
 3a implements that calculation boundary before activating it in the application.
+
+
+## CodeRabbit checkpoint follow-up for `1b538e9b`
+
+The five findings from the second full review are addressed locally: serialize
+injected-test initialization before real sign-in; reject a reset whose ownership
+changed during teardown; deny rebuild approval while recovery remains pending;
+retain the explanation for unavailable legacy Recall state; and validate evaluation
+snapshot bytes in configuration/overrides and the resolved goal definition.
+Settings and practice use the same snapshot serializer, including goal-name bytes,
+Unicode and JSON escaping. Regressions exercise the shared runtime promise,
+replacement-user reset protection, recovery completion and exact size boundaries.
+These changes do not activate the new scheduler or change schema contracts.

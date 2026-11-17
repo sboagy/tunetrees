@@ -61,6 +61,18 @@ describe("upgrade preservation policy", () => {
   it("approves an audited previously tracked table after authenticated sync", async () => {
     expect(await approve("tune")).toBe(true);
   });
+  it("rejects an advanced watermark while recovery is not durably complete", async () => {
+    requireUpgradeFullPull(userId);
+    localStorage.setItem(timestampKey, "2026-11-17T00:00:00Z");
+    expect(await approve("tune")).toBe(false);
+    await finishUpgradeFullPull(
+      userId,
+      async () => {},
+      getUpgradeFullPullGeneration(userId),
+      () => true
+    );
+    expect(await approve("tune")).toBe(true);
+  });
   it("protects anonymous data even with old triggers and a download timestamp", async () => {
     expect(await approve("tune", false)).toBe(false);
   });

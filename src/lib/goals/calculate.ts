@@ -4,6 +4,7 @@ import {
   type GoalConfig,
   parseGoalConfig,
   SCHEDULER_STATE_BYTES,
+  serializeEvaluationSnapshot,
 } from "./config";
 import { calculateFsrs, effectiveFsrsMaximum } from "./fsrs";
 import { calculateLadder } from "./ladder";
@@ -63,16 +64,13 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
   );
   if (!evaluation) throw new Error("Choose a valid goal evaluation");
   const previous = predecessorForGoal(input);
-  const evaluationSnapshot = canonicalJson(
-    {
-      version: 1,
-      goalLabel: input.goalLabel,
-      choiceLabel: evaluation.label,
-      choiceDescription: evaluation.description,
-      action: evaluation.action,
-    },
-    SCHEDULER_STATE_BYTES
+  const evaluationSnapshot = serializeEvaluationSnapshot(
+    input.goalLabel,
+    evaluation
   );
+  const limitations: string[] = [];
+  if (previous?.kind === "unavailable") limitations.push(previous.reason);
+  if (previous?.kind === "fsrs6") limitations.push(...previous.limitations);
   const common = {
     goalId: input.goalId,
     evaluationId: evaluation.id,
@@ -148,7 +146,7 @@ export async function calculateGoalPractice(input: GoalPracticeInput) {
     intervalDays,
     schedulerState: canonicalJson(result.state, SCHEDULER_STATE_BYTES),
     continued,
-    limitations: previous?.kind === "fsrs6" ? previous.limitations : [],
+    limitations,
     compatibility: {
       interval: intervalDays === 0 ? 0 : Math.max(1, Math.ceil(intervalDays)),
       technique: "fsrs",

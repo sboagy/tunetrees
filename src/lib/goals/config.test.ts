@@ -7,6 +7,8 @@ import {
   parseGoalOverrides,
   resolveGoalConfig,
   resolveGoalDefinition,
+  SCHEDULER_STATE_BYTES,
+  serializeEvaluationSnapshot,
   validateIntervals,
 } from "./config";
 
@@ -17,6 +19,55 @@ function config(name = "fluency") {
 }
 
 describe("goal definitions and overrides", () => {
+  it.each(["x".repeat(17000), "🎵".repeat(5000), "x\n".repeat(6000)])(
+    "rejects evaluations exceeding the serialized snapshot budget (%#)",
+    (text) => {
+      const value = config();
+      value.evaluations[0].label = text;
+      expect(() => parseGoalConfig(value)).toThrow(/large/);
+      expect(() =>
+        parseGoalOverrides({ evaluations: value.evaluations })
+      ).toThrow(/large/);
+    }
+  );
+  it("rejects combined evaluation text that exceeds the snapshot budget", () => {
+    const value = config();
+    value.evaluations[0].label = "x".repeat(9000);
+    value.evaluations[0].description = "y".repeat(9000);
+    expect(() => parseGoalConfig(value)).toThrow(/large/);
+  });
+  it("checks inherited evaluations against the overridden goal name", () => {
+    const defaults = { displayName: "Goal", description: "", config: config() };
+    defaults.config.evaluations[0].label = "x".repeat(9000);
+    const overrides = { displayName: "y".repeat(9000) };
+    expect(() => parseGoalOverrides(overrides)).not.toThrow();
+    expect(() => resolveGoalDefinition(defaults, overrides)).toThrow(/large/);
+  });
+  it("checks overridden evaluations against the inherited goal name", () => {
+    const defaults = {
+      displayName: "x".repeat(9000),
+      description: "",
+      config: config(),
+    };
+    const evaluations = config().evaluations;
+    evaluations[0].label = "y".repeat(9000);
+    expect(() => resolveGoalDefinition(defaults, { evaluations })).toThrow(
+      /large/
+    );
+  });
+  it("accepts a complete snapshot exactly at the byte limit", () => {
+    const defaults = { displayName: "Goal", description: "", config: config() };
+    const choice = defaults.config.evaluations[0];
+    choice.description = "";
+    const size = new TextEncoder().encode(
+      serializeEvaluationSnapshot(defaults.displayName, choice)
+    ).length;
+    choice.description = "x".repeat(SCHEDULER_STATE_BYTES - size);
+    expect(() => resolveGoalDefinition(defaults)).not.toThrow();
+    choice.description += "x";
+    expect(() => resolveGoalDefinition(defaults)).toThrow(/large/);
+  });
+
   it.each(["\u0000", "\ud800", "\udfff"])(
     "rejects unstorable override text %j",
     (text) => {

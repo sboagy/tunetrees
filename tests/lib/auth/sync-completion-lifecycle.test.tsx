@@ -255,7 +255,29 @@ describe("provider sync completion lifetime", () => {
     expect(state.localDb()).toBeNull();
   });
 
-  it("allows real sign-in to supersede a pending injected initialization", async () => {
+  it("allows real sign-in to supersede a shared pending injected initialization", async () => {
+    setUser(null);
+    const gate = deferred<object>();
+    // Match the runtime: all calls while initialization is pending share one DB.
+    let runtimePending = true;
+    mocks.initialize.mockImplementation(() =>
+      runtimePending ? gate.promise : Promise.resolve(db)
+    );
+    mount();
+    const pending = state.signInAnonymously("injected-test-user");
+    await waitFor(() => expect(mocks.initialize).toHaveBeenCalledOnce());
+    setUser(user);
+    await Promise.resolve();
+    expect(mocks.initialize).toHaveBeenCalledOnce();
+    runtimePending = false;
+    gate.resolve({ stale: true });
+    await pending;
+    await started();
+    expect(mocks.initialize).toHaveBeenLastCalledWith(user.id);
+    expect(state.localDb()).toBe(db);
+  });
+
+  it("abandons a waiting sign-in after sign-out during injected initialization", async () => {
     setUser(null);
     const gate = deferred<object>();
     mocks.initialize.mockReturnValueOnce(gate.promise);
@@ -263,10 +285,33 @@ describe("provider sync completion lifetime", () => {
     const pending = state.signInAnonymously("injected-test-user");
     await waitFor(() => expect(mocks.initialize).toHaveBeenCalledOnce());
     setUser(user);
-    await started();
+    setUser(null);
+    await waitFor(() => expect(mocks.close).toHaveBeenCalledOnce());
     gate.resolve({ stale: true });
     await pending;
-    expect(state.localDb()).toBe(db);
+    await Promise.resolve();
+    expect(mocks.initialize).toHaveBeenCalledOnce();
+    expect(state.localDb()).toBeNull();
+  });
+
+  it("does not clear a replacement user's database after reset teardown", async () => {
+    mount();
+    await started();
+    const gate = deferred<void>();
+    mocks.destroy.mockReturnValueOnce(gate.promise);
+    const reset = state.forceCleanLocalReset();
+    const rejected = expect(reset).rejects.toThrow("Local reset did not run");
+    await waitFor(() => expect(mocks.destroy).toHaveBeenCalledOnce());
+    setUser(null);
+    await waitFor(() => expect(mocks.close).toHaveBeenCalledOnce());
+    const replacementDb = { ...db };
+    mocks.initialize.mockResolvedValue(replacementDb);
+    setUser({ ...user, id: "owner-b" });
+    await waitFor(() => expect(state.localDb()).toBe(replacementDb));
+    gate.resolve();
+    await rejected;
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(state.localDb()).toBe(replacementDb);
   });
 
   it("does not start a service after unmount during startup repairs", async () => {
