@@ -420,3 +420,21 @@ No E2E timeout or interval assertion was relaxed.
 Validation: all 1,186 unit tests, typecheck, lint, formatting and diff checks passed.
 SCHEDULING-008 passed four focused runs (twice desktop Chromium and twice Mobile
 Chrome), plus auth setup, using the existing servers. This is not a full E2E rerun.
+
+### Fresh CodeRabbit review of `6928d04e`
+
+A fresh committed-change review against `b0cceaa2` covered all 15 checkpoint files
+and returned two findings:
+
+- Postgres verification gap: the parity script now inspects the live local
+  `practice_list_joined` definition with `pg_get_viewdef` and asserts its explicit
+  practiced/modified `DESC NULLS LAST` and ID tie-breaker before checking fixtures.
+  The read-only check passes, as do typecheck, script Biome and diff checks.
+- Existing SQLite view refresh concern: no runtime change is needed. The oosync
+  runtime awaits `onExistingDatabaseLoaded`; TuneTrees' hook calls `recreateViews`,
+  which drops all seven views, including the three flagged views, before calling
+  `initializeViews`. Persisted databases therefore receive current definitions.
+
+At review completion, CI quality/unit, security, SonarCloud, Lighthouse and PWA
+checks passed; the four Playwright shards were still running. This review follow-up
+changes verification/documentation only and remains separate from UI activation.
