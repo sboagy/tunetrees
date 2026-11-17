@@ -1313,27 +1313,9 @@ export class TuneTreesPage {
       timeout: timeoutMs,
     });
     await this.dateRolloverRefreshButton.click();
-    await expect
-      .poll(
-        async () => {
-          const visible = await this.dateRolloverRefreshButton
-            .isVisible()
-            .catch(() => false);
-          if (!visible) {
-            return "hidden";
-          }
-
-          const enabled = await this.dateRolloverRefreshButton
-            .isEnabled()
-            .catch(() => false);
-          return enabled ? "enabled" : "disabled";
-        },
-        {
-          timeout: timeoutMs,
-          intervals: [100, 250, 500, 1000],
-        }
-      )
-      .not.toBe("enabled");
+    // The refresh control stays visible until persistence completes. Wait for
+    // that final state directly: a separate isVisible/isEnabled poll races with
+    // removal and can wait for an already-completed refresh button to reappear.
     await expect(this.dateRolloverRefreshButton).toBeHidden({
       timeout: timeoutMs,
     });
