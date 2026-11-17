@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getBuiltInGoals } from "./builtins";
 import {
   type LegacyRecallPreferences,
   prepareLegacyRecallSettings,
-} from "./legacy-preferences";
+} from "../../../scripts/lib/goal-cutover/legacy-preferences";
+import { getBuiltInGoals } from "../../../src/lib/goals/builtins";
 
 const fsrsPreferences = {
   algType: "fsrs",

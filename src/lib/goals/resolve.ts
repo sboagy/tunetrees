@@ -10,37 +10,11 @@ import {
 } from "../db/schema";
 import { getBuiltInGoals } from "./builtins";
 import { parseGoalConfig, resolveGoalDefinition } from "./config";
+import { resolveGoalReference } from "./references";
+
+export { type GoalReference, resolveGoalReference } from "./references";
 
 type GoalRow = typeof goal.$inferSelect;
-export interface GoalReference {
-  goalId: string | null;
-  goal: string | null;
-}
-
-/** IDs on history are final attribution; active legacy edits can supersede a stale ID. */
-export function resolveGoalReference(
-  goals: readonly GoalRow[],
-  userId: string,
-  reference: GoalReference,
-  historical = false
-): GoalRow | null {
-  const visible = goals.filter(
-    (row) => row.privateFor === null || row.privateFor === userId
-  );
-  const byId = visible.find((row) => row.id === reference.goalId);
-  if (historical && reference.goalId !== null) return byId ?? null;
-  if (reference.goalId !== null && !byId) return null;
-  const key = reference.goal?.trim() || "recall";
-  if (byId && (!reference.goal?.trim() || byId.name === key))
-    return byId.deleted ? null : byId;
-  const candidates = visible.filter(
-    (row) => row.name === key && (historical || !row.deleted)
-  );
-  const owned = candidates.filter((row) => row.privateFor === userId);
-  const preferred = owned.length ? owned : candidates;
-  if (preferred.length > 1) throw new Error("Ambiguous legacy goal identity");
-  return preferred[0] ?? null;
-}
 
 function defaultDefinition(row: GoalRow) {
   if (row.defaultConfig !== null)

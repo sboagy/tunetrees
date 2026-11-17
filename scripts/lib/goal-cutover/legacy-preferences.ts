@@ -1,9 +1,9 @@
-import { getBuiltInGoals } from "./builtins";
+import { getBuiltInGoals } from "../../../src/lib/goals/builtins";
 import {
   type GoalOverrides,
   parseGoalOverrides,
   resolveGoalConfig,
-} from "./config";
+} from "../../../src/lib/goals/config";
 
 /** Server-snapshot inputs, not a browser-time fallback to global preferences. */
 export interface LegacyRecallPreferences {

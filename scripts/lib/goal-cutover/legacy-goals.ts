@@ -1,9 +1,12 @@
-import { getBuiltInGoals, getCustomGoalConfig } from "./builtins";
+import {
+  getBuiltInGoals,
+  getCustomGoalConfig,
+} from "../../../src/lib/goals/builtins";
 import {
   canonicalJson,
   type GoalConfig,
   resolveGoalDefinition,
-} from "./config";
+} from "../../../src/lib/goals/config";
 
 export interface LegacyGoalDefinition {
   id: string;

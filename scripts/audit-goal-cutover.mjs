@@ -5,9 +5,10 @@ import { writeFileSync } from "node:fs";
 import { camelizeKeys } from "oosync/sync/casing";
 import postgres from "postgres";
 import { getBuiltInGoals } from "../src/lib/goals/builtins.ts";
-import { prepareGoalCutoverPlan } from "../src/lib/goals/cutover-plan.ts";
-import { prepareLegacyGoalDefinition } from "../src/lib/goals/legacy-goals.ts";
-import { prepareLegacyRecallSettings } from "../src/lib/goals/legacy-preferences.ts";
+import { prepareGoalCutoverPlan } from "./lib/goal-cutover/cutover-plan.ts";
+import { prepareLegacyGoalDefinition } from "./lib/goal-cutover/legacy-goals.ts";
+import { prepareLegacyRecallSettings } from "./lib/goal-cutover/legacy-preferences.ts";
+import { prepareGoalReferenceBackfill } from "./lib/goal-cutover/reference-backfill.ts";
 import {
   legacyPreferences,
   readGoalCutoverSnapshot,
@@ -79,7 +80,7 @@ try {
     "isolation level repeatable read read only",
     async (tx) => {
       const builtins = getBuiltInGoals();
-      const { users, goals } = await readGoalCutoverSnapshot(tx);
+      const { users, goals, references } = await readGoalCutoverSnapshot(tx);
       const result = {
         users: users.length,
         recallSettingsReady: 0,
@@ -104,6 +105,12 @@ try {
       };
       auditRecallPreferences(users, result);
       for (const goal of goals) auditGoalDefinition(goal, builtins, result);
+      const attribution = prepareGoalReferenceBackfill(
+        goals.map(camelizeKeys),
+        references
+      );
+      result.goalReferencesReady = attribution.updates.length;
+      result.unresolvedGoalReferences = attribution.unresolved;
       const plan =
         destination && !hasBlockers(result)
           ? prepareGoalCutoverPlan(
@@ -111,7 +118,8 @@ try {
               users.map((user) => ({
                 id: user.id,
                 preferences: legacyPreferences(user),
-              }))
+              })),
+              references
             )
           : null;
       return { report: result, plan };
@@ -126,7 +134,7 @@ try {
       mode: 0o600,
     });
     console.log(
-      "Prepared definition/settings plan; no database writes performed."
+      "Prepared definition/settings/reference plan; no database writes performed."
     );
   }
 } finally {

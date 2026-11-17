@@ -27,5 +27,34 @@ export async function readGoalCutoverSnapshot(tx) {
         base_intervals, display_name, description, last_modified_at::text FROM public.goal
     `;
 
-  return { users, goals };
+  const assignments = await tx`
+    SELECT r.user_ref AS owner, to_jsonb(rt) AS row
+    FROM public.repertoire_tune rt JOIN public.repertoire r ON r.repertoire_id = rt.repertoire_ref
+    WHERE NOT rt.deleted AND NOT r.deleted
+  `;
+  const history = await tx`
+    SELECT r.user_ref AS owner, to_jsonb(pr) AS row
+    FROM public.practice_record pr JOIN public.repertoire r ON r.repertoire_id = pr.repertoire_ref
+  `;
+  const references = [
+    ...assignments.map(({ owner, row }) => ({
+      kind: "assignment",
+      key: JSON.stringify([row.repertoire_ref, row.tune_ref]),
+      ownerId: owner,
+      goal: row.goal,
+      goalId: row.goal_id,
+      schedulerId: null,
+      row,
+    })),
+    ...history.map(({ owner, row }) => ({
+      kind: "history",
+      key: row.id,
+      ownerId: owner,
+      goal: row.goal,
+      goalId: row.goal_id,
+      schedulerId: row.scheduler_id,
+      row,
+    })),
+  ];
+  return { users, goals, references };
 }

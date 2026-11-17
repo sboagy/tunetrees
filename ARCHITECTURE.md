@@ -397,7 +397,13 @@ The existing FSRS service reads its legacy ladder fallback intervals from this
 source. The new calculators feed the guarded staging and Submit boundaries below;
 selected-scheduler activation in the UI remains pending.
 
-`goals/legacy-preferences.ts` prepares validated Recall overrides from a synchronized
+Migration-only TypeScript modules live in `scripts/lib/goal-cutover/`, with tests in
+`tests/scripts/goal-cutover/`. They are checked by `tsconfig.node.json` and the
+standard lint/format commands, but are not imported by browser entry points.
+Shared defaults, configuration validation and reference resolution remain under
+`src/lib/goals/` for reuse by runtime and administrative code.
+
+`scripts/lib/goal-cutover/legacy-preferences.ts` prepares validated Recall overrides from a synchronized
 server snapshot for the eventual cutover. It is not imported by the browser runtime:
 old global preferences must not become a continuing fallback. The local-only,
 read-only `scripts/audit-goal-cutover.mjs` exercises this conversion in a repeatable-read
@@ -406,18 +412,31 @@ data nor certifies device synchronization. `legacy-goals.ts` prepares missing cu
 FSRS/ladder definitions; generic custom evaluations/defaults live in `builtins.ts`.
 Unknown plugin contracts and system-name collisions block preparation. Existing
 configuration is validated and retained, including its choice identities.
-`cutover-plan.ts` assembles definition updates and absent Recall-settings inserts
-with their source snapshots. The audit's optional `--prepare <new-plan.json>` writes
+`cutover-plan.ts` assembles definition updates, absent Recall-settings inserts and
+legacy goal-reference backfills with their source snapshots. Version-2 plans replace
+the earlier definition/settings-only format; regenerate old review artifacts.
+The audit's optional `--prepare <new-plan.json>` writes
 this review artifact with private permissions; it has no database apply mode.
 `scripts/lib/goal-cutover-snapshot.mjs` shares that database snapshot with the local
 rehearsal. `goal-cutover-transaction.mjs` revalidates each planned value and source
-under table locks, then writes definitions/settings inside a savepoint. Exact retries
+under table locks, then writes definitions/settings/references inside a savepoint. Exact retries
 make no further writes; changed preferences/overrides are not overwritten. Existing
 goal timestamps are checked after UPDATE, with normal ownership/sync triggers enabled.
 `scripts/rehearse-goal-cutover.mjs` is local-only and always rolls back, including
 sync-log effects. It has no commit mode or remote connection option. Production
-migration/deployment integration, plugin conversion and reference attribution remain
-part of the coordinated cutover implementation.
+migration/deployment integration, plugin conversion, custom-key renames and queue
+attribution remain part of the coordinated cutover implementation.
+
+`goals/references.ts` contains the existing owner-before-system name resolution,
+shared by the runtime resolver and `reference-backfill.ts`. The latter attributes
+legacy events without IDs and reconciles active repertoire assignments. Attributed
+history and new-format events (including partially populated new metadata) are
+never rewritten; unknown/ambiguous legacy names
+remain unattributed and are reported. `goal-reference-transaction.mjs` revalidates
+owner, row content and namespace resolution before changing only `goal_id`. Comparing
+the complete returned row verifies that raw names, dates, scheduler data and sync
+timestamps remain intact. Repertoire ownership, assignments and history join the
+tables locked for the rehearsal. No guard or sync trigger is disabled.
 
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.

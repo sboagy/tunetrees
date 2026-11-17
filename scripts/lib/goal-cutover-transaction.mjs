@@ -1,30 +1,17 @@
 import { camelizeKeys } from "oosync/sync/casing";
 import { getBuiltInGoals } from "../../src/lib/goals/builtins.ts";
-import { canonicalJson, parseGoalConfig } from "../../src/lib/goals/config.ts";
-import { prepareLegacyGoalDefinition } from "../../src/lib/goals/legacy-goals.ts";
-import { prepareLegacyRecallSettings } from "../../src/lib/goals/legacy-preferences.ts";
+import { parseGoalConfig } from "../../src/lib/goals/config.ts";
+import { prepareLegacyGoalDefinition } from "./goal-cutover/legacy-goals.ts";
+import { prepareLegacyRecallSettings } from "./goal-cutover/legacy-preferences.ts";
+import { requireValue, same, uniqueEntries } from "./cutover-checks.mjs";
 import {
   legacyPreferences,
   readGoalCutoverSnapshot,
 } from "./goal-cutover-snapshot.mjs";
-
-function requireValue(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-function same(left, right) {
-  return canonicalJson(left) === canonicalJson(right);
-}
-
-function uniqueEntries(entries, key) {
-  requireValue(Array.isArray(entries), "Invalid cutover plan entries");
-  const ids = entries.map((entry) => entry?.[key]);
-  requireValue(
-    ids.every((id) => typeof id === "string") &&
-      new Set(ids).size === ids.length,
-    "Duplicate or invalid cutover identity"
-  );
-}
+import {
+  validateReferenceUpdates,
+  writeReferenceUpdates,
+} from "./goal-reference-transaction.mjs";
 
 function validateGoalUpdate(entry, current) {
   requireValue(
@@ -93,7 +80,7 @@ async function validateRecallInsert(tx, entry, user, recallId) {
 }
 
 /**
- * Apply only definition/settings entries inside a caller-owned transaction.
+ * Apply definition/settings and goal-reference entries inside a caller-owned transaction.
  * The only CLI caller always rolls back. Locks protect both existing and absent
  * rows, including preference inserts and override tombstones, until completion.
  * A savepoint also guarantees batch rollback if the caller catches a failure.
@@ -104,8 +91,8 @@ export async function applyGoalCutoverPlan(tx, plan) {
 
 async function applyLockedPlan(tx, plan) {
   requireValue(
-    plan?.version === 1 && plan.scope === "definitions-and-recall-settings",
-    "Unsupported cutover plan"
+    plan?.version === 2 && plan.scope === "definitions-settings-and-references",
+    "Unsupported cutover plan; prepare a new version-2 plan"
   );
   uniqueEntries(plan.goalUpdates, "id");
   uniqueEntries(plan.recallSettingsInserts, "userId");
@@ -113,8 +100,9 @@ async function applyLockedPlan(tx, plan) {
   await tx`SET LOCAL statement_timeout = '15s'`;
   await tx`LOCK TABLE public.goal, public.goal_user_settings,
     public.prefs_scheduling_options, public.prefs_spaced_repetition,
-    public.user_profile IN SHARE ROW EXCLUSIVE MODE`;
-  const { users, goals } = await readGoalCutoverSnapshot(tx);
+    public.user_profile, public.repertoire, public.repertoire_tune,
+    public.practice_record IN SHARE ROW EXCLUSIVE MODE`;
+  const { users, goals, references } = await readGoalCutoverSnapshot(tx);
   const recallId = getBuiltInGoals().find((goal) => goal.name === "recall")?.id;
   requireValue(
     goals.some(
@@ -144,6 +132,11 @@ async function applyLockedPlan(tx, plan) {
       inserts.push(entry);
     }
   }
+  const referenceWrites = validateReferenceUpdates(
+    goals.map(camelizeKeys),
+    references,
+    plan.references?.updates
+  );
   for (const entry of updates) {
     const [updated] = await tx`
       UPDATE public.goal SET display_name = ${entry.values.displayName},
@@ -167,12 +160,16 @@ async function applyLockedPlan(tx, plan) {
       "Recall insert conflicted; transaction must roll back"
     );
   }
+  await writeReferenceUpdates(tx, referenceWrites);
   return {
+    referencesUpdated: referenceWrites.length,
     goalsUpdated: updates.length,
     recallSettingsInserted: inserts.length,
     alreadyApplied:
       plan.goalUpdates.length +
-      plan.recallSettingsInserts.length -
+      plan.recallSettingsInserts.length +
+      plan.references.updates.length -
+      referenceWrites.length -
       updates.length -
       inserts.length,
   };

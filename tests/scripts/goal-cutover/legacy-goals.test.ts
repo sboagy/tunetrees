@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getBuiltInGoals } from "./builtins";
-import { prepareGoalCutoverPlan } from "./cutover-plan";
+import { prepareGoalCutoverPlan } from "../../../scripts/lib/goal-cutover/cutover-plan";
 import {
   type LegacyGoalDefinition,
   prepareLegacyGoalDefinition,
-} from "./legacy-goals";
+} from "../../../scripts/lib/goal-cutover/legacy-goals";
+import { getBuiltInGoals } from "../../../src/lib/goals/builtins";
 
 const custom: LegacyGoalDefinition = {
   id: "11111111-1111-4111-8111-111111111111",

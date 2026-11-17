@@ -351,7 +351,7 @@ wipe is implied by an implementation checkpoint.
 
 ## Checkpoint 3f: Recall preference conversion preparation
 
-`goals/legacy-preferences.ts` prepares validated Recall overrides from synchronized
+`scripts/lib/goal-cutover/legacy-preferences.ts` prepares validated Recall overrides from synchronized
 legacy scheduling/FSRS preference rows. It reuses the built-in defaults and existing
 configuration validators. Zero limits (including Unlimited), false auto-new/fuzz,
 zero delinquency, fractional learning steps and empty step arrays retain their
@@ -456,6 +456,61 @@ not establish that devices are synchronized or authorize production application.
 Fresh local CodeRabbit review of checkpoint 3h, including untracked scripts,
 completed with zero findings across all nine files.
 
+## Checkpoint 3i: stable goal-reference backfill rehearsal
+
+The existing pure goal-name resolver moved from `resolve.ts` to `references.ts`
+without changing its rules or public re-export. Runtime and controlled backfill now
+share owner-before-system precedence, deleted-goal handling and legacy-name/ID
+reconciliation. `reference-backfill.ts` proposes IDs for unambiguous legacy events
+without attribution and active repertoire assignments. It preserves existing
+historical IDs, refuses to infer missing IDs on new-format events, and reports
+unknown/ambiguous names without rewriting their raw evidence or silently assigning
+them to Recall. An absent legacy name still uses the established Recall default.
+
+The audit exports version-2 plans with reference changes and unresolved-reference
+reports. Version-1 artifacts are rejected by the rehearsal; prepare a fresh snapshot.
+Full row snapshots retain timestamp microseconds through Postgres JSON serialization.
+`goal-reference-transaction.mjs` rechecks row contents, owner and current goal
+resolution under the same transaction's locks. It writes only `goal_id`, then checks
+the entire returned row against the expected result. Already-applied entries make
+no further writes. Repertoire/assignment/history tables join the existing lock set,
+and the batch savepoint includes definitions, settings and references together.
+
+Local rehearsal validated 1,699 reference updates and 209 settings inserts with
+zero unresolved references, then rolled all changes back. Postgres fixtures verify
+unchanged raw goal names, practiced/due/manual-schedule dates, quality and
+microsecond modification timestamps; stale history and forged attribution fail
+before writes. A late practice-record constraint failure rolls back earlier goal,
+settings and assignment writes. These checks extend the existing CI database test.
+
+Validation: all 1,223 unit tests passed, plus typecheck, lint, formatting, script
+Biome/diff checks, real Postgres integration tests and a full local CLI rehearsal.
+No E2E run was performed. There are no schema/generated-artifact changes, runtime
+scheduler activation or persisted database changes. Runtime impact is limited to
+extracting the existing identity helper; its behavior remains covered by the same
+preview/staging/Submit tests. Production application still requires the coordinated
+full-download cutover. Custom-key renames, staged-work preflight, queue allocation/
+displayed-event attribution, plugin integration and deployment wiring remain pending.
+
+### CodeRabbit follow-up for checkpoint 3i
+
+The local review covered 13 files and raised three questions. One was confirmed:
+the expanded schema permits partial event metadata with null scheduler/goal IDs.
+The backfill now excludes any row with populated evaluation ID/snapshot, scheduler
+ID/version/state or fractional interval. Zero and empty-string values count as
+populated. Both preparation and the SQL update predicate enforce this conservative
+boundary; genuinely legacy rows with all these fields null remain eligible.
+Parameterized unit cases cover every marker. A real Postgres regression proves the
+schema accepts a partial event and that preparation, an edited plan and a direct
+writer attempt leave it unattributed. Validation: all 1,230 unit tests, typecheck,
+changed-file Biome checks, the database integration test and diff checks passed.
+
+The other two concerns were refuted against current code and executable checks:
+an existing assignment ID with a matching legacy name remains authoritative even
+after a same-name owner goal appears; and the changed audit caller passes the full
+reference snapshot as its third argument. A real snapshot with one legacy history
+row produced its expected attribution. No code changes were needed for those two.
+
 ## CodeRabbit checkpoint review (2026-11-16)
 
 A manual full review of `ca331abf` inspected 43 files (generated artifacts and the
@@ -545,3 +600,13 @@ and returned two findings:
 At review completion, CI quality/unit, security, SonarCloud, Lighthouse and PWA
 checks passed; the four Playwright shards were still running. This review follow-up
 changes verification/documentation only and remains separate from UI activation.
+
+### Administrative module placement
+
+The four migration preparation modules (`legacy-preferences.ts`, `legacy-goals.ts`,
+`cutover-plan.ts`, and `reference-backfill.ts`) live in
+`scripts/lib/goal-cutover/`; their tests live in `tests/scripts/goal-cutover/`.
+`npm run typecheck` explicitly includes these modules through `tsconfig.node.json`,
+and the standard lint and format commands include the same directory. Existing
+unit-test discovery covers the relocated tests. Shared runtime rules remain in
+`src/lib/goals/`; browser code does not import the administrative modules.

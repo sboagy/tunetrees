@@ -1,5 +1,5 @@
-import { getBuiltInGoals } from "./builtins";
-import { canonicalJson } from "./config";
+import { getBuiltInGoals } from "../../../src/lib/goals/builtins";
+import { canonicalJson } from "../../../src/lib/goals/config";
 import {
   type LegacyGoalDefinition,
   prepareLegacyGoalDefinition,
@@ -8,11 +8,16 @@ import {
   type LegacyRecallPreferences,
   prepareLegacyRecallSettings,
 } from "./legacy-preferences";
+import {
+  type GoalReferenceSource,
+  prepareGoalReferenceBackfill,
+} from "./reference-backfill";
 
 /** An inspectable data plan, not executable SQL or permission to apply a cutover. */
 export function prepareGoalCutoverPlan(
   goals: readonly LegacyGoalDefinition[],
-  users: readonly { id: string; preferences: LegacyRecallPreferences }[]
+  users: readonly { id: string; preferences: LegacyRecallPreferences }[],
+  references: readonly GoalReferenceSource[] = []
 ) {
   const recall = getBuiltInGoals().find((goal) => goal.name === "recall");
   if (!recall) throw new Error("Recall defaults are unavailable");
@@ -43,9 +48,10 @@ export function prepareGoalCutoverPlan(
   });
   // Clone so subsequent mutation of the input snapshot cannot change the plan.
   return structuredClone({
-    version: 1,
-    scope: "definitions-and-recall-settings",
+    version: 2,
+    scope: "definitions-settings-and-references",
     goalUpdates,
     recallSettingsInserts,
+    references: prepareGoalReferenceBackfill(goals, references),
   });
 }
