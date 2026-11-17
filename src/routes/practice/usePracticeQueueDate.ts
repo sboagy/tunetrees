@@ -34,6 +34,7 @@ import {
   type Accessor,
   createResource,
   createSignal,
+  onCleanup,
   type Resource,
 } from "solid-js";
 import type { SqliteDatabase } from "../../lib/db/client-sqlite";
@@ -94,6 +95,8 @@ export interface PracticeQueueDateState {
    * The caller (handlePracticeDateRefresh) is responsible for that.
    */
   clearManualAndSetToday: () => void;
+  /** Capture selection ownership before async refresh work; false after newer navigation. */
+  captureQueueSelection: () => () => boolean;
   /** Return to the most recent queue instead of staying on a manual date. */
   selectLatestQueueDate: () => Promise<void>;
   /** Refresh latest/recent queue metadata after queue mutations. */
@@ -129,6 +132,24 @@ function persistToStorage(date: Date, manual: boolean): void {
 export function usePracticeQueueDate(
   props: PracticeQueueDateProps
 ): PracticeQueueDateState {
+  let selectionVersion = 0;
+  let disposed = false;
+  onCleanup(() => {
+    disposed = true;
+  });
+  const captureQueueSelection = () => {
+    const version = selectionVersion;
+    const db = props.localDb();
+    const userId = props.userId();
+    const repertoireId = props.currentRepertoireId();
+    return () =>
+      !disposed &&
+      version === selectionVersion &&
+      db === props.localDb() &&
+      userId === props.userId() &&
+      repertoireId === props.currentRepertoireId();
+  };
+
   // Bootstrap signals from localStorage so the UI shows a stable initial date
   // before the async resource resolves. The resource will overwrite if stale.
   const storedInitial = parseStoredDate(
@@ -348,6 +369,8 @@ export function usePracticeQueueDate(
    * Picking today is treated as clearing the manual flag.
    */
   const setManualDate = async (date: Date): Promise<void> => {
+    // Count intent, including selecting the same date again while a refresh waits.
+    selectionVersion += 1;
     const dateAtNoon = new Date(date);
     dateAtNoon.setHours(12, 0, 0, 0);
 
@@ -379,6 +402,7 @@ export function usePracticeQueueDate(
    * (handlePracticeDateRefresh) is responsible for creating today's queue.
    */
   const clearManualAndSetToday = (): void => {
+    selectionVersion += 1;
     const today = getPracticeDate();
     setQueueDate(today);
     setIsManual(false);
@@ -386,6 +410,7 @@ export function usePracticeQueueDate(
   };
 
   const selectLatestQueueDate = async (): Promise<void> => {
+    selectionVersion += 1;
     const targetDate = latestQueueDate() ?? getPracticeDate();
 
     setQueueDate(targetDate);
@@ -410,6 +435,7 @@ export function usePracticeQueueDate(
     queueReady,
     setManualDate,
     clearManualAndSetToday,
+    captureQueueSelection,
     selectLatestQueueDate,
     refreshQueueWindowState,
     loadMoreRecentQueueDates,

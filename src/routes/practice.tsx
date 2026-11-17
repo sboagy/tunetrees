@@ -178,6 +178,7 @@ const PracticePage: Component = () => {
     queueReady,
     setManualDate,
     clearManualAndSetToday,
+    captureQueueSelection,
     selectLatestQueueDate,
     refreshQueueWindowState,
     loadMoreRecentQueueDates,
@@ -307,10 +308,13 @@ const PracticePage: Component = () => {
   };
 
   const handlePracticeDateRefresh = async () => {
+    const isCurrentSelection = captureQueueSelection();
     const practiceDate = getPracticeDate();
     const db = localDb();
     const repertoireId = currentRepertoireId();
     const userIdValue = await getUserId();
+
+    if (!isCurrentSelection()) return;
 
     if (!db || !repertoireId || !userIdValue) {
       console.warn(
@@ -334,16 +338,20 @@ const PracticePage: Component = () => {
         "per_day",
         true
       );
+      if (!isCurrentSelection()) return;
       await refreshQueueWindowState();
     } catch (error) {
       console.warn(
         "[PracticePage] Failed to regenerate queue during refresh:",
         error
       );
-      toast.error("Could not refresh the practice queue. Please try again.");
+      if (isCurrentSelection())
+        toast.error("Could not refresh the practice queue. Please try again.");
       return;
     }
 
+    // A newer calendar/Latest selection owns the view even if this refresh saved.
+    if (!isCurrentSelection()) return;
     // Generation awaits IndexedDB persistence. Keep the rollover button visible
     // and busy until that completes so hiding it means a reload is safe.
     clearManualAndSetToday();
