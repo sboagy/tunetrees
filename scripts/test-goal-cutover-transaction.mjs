@@ -334,6 +334,15 @@ try {
       }),
       (error) => error.code === "55P03"
     );
+    // Assignment attribution cannot change between validation and commit.
+    await assert.rejects(
+      sql.begin(async (other) => {
+        await other`SET LOCAL lock_timeout = '100ms'`;
+        await other`UPDATE public.repertoire_tune SET goal_id = ${recallId}
+          WHERE repertoire_ref = ${repertoireId} AND tune_ref = ${tuneId}`;
+      }),
+      (error) => error.code === "55P03"
+    );
     // The empty staging check is protected against concurrent draft insertion.
     await assert.rejects(
       sql.begin(async (other) => {

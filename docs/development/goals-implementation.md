@@ -631,3 +631,23 @@ Real Postgres tests cover all three draft shapes, unchanged drafts/settings/hist
 and sync logs after rejection, and a concurrent staging insert blocked by the
 rehearsal lock. The local read-only audit reports no server staging rows. All test
 writes roll back. No browser runtime or schema changes; no E2E rerun needed.
+
+### CodeRabbit review through `69e592b1`
+
+A fresh local review of the 19 changed files since `c7e4bca6` raised two safety
+questions and one test weakness. The preservation test now captures an independent
+snapshot before preparation and checks both the input and returned evidence against
+it; previously an input mutation could have escaped detection.
+
+Both safety questions were refuted against the current implementation. A history
+row with null goal/scheduler IDs and `scheduler_version=0` is excluded by preparation
+and rejected by edited-plan validation; the SQL writer also requires that field to
+be null. Added the exact zero-version unit case. The cutover transaction already
+locks `repertoire_tune` before taking its validation snapshot and holds the lock
+through completion; an added two-connection Postgres regression confirms a competing
+attribution update times out. No runtime or migration behavior changed.
+
+Validation: typecheck, all 18 reference-backfill tests, the database transaction
+suite, changed-file Biome checks and diff checks passed. An executable check also
+confirmed rejection of the exact zero-version edited-plan input. Review follow-ups
+are test/documentation changes only; no local E2E rerun is required.

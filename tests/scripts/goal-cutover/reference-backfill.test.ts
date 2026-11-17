@@ -33,9 +33,11 @@ function source(
 describe("legacy goal-reference backfill", () => {
   it("uses owner-before-system attribution without changing raw evidence", () => {
     const original = source();
+    const before = structuredClone(original);
     const result = prepareGoalReferenceBackfill(goals, [original]);
     expect(result.updates[0].goalId).toBe("owned");
-    expect(result.updates[0].expected).toEqual(original);
+    expect(original).toEqual(before);
+    expect(result.updates[0].expected).toEqual(before);
     expect(result.updates[0].expected).not.toBe(original);
     expect(original.goalId).toBeNull();
   });
@@ -101,6 +103,7 @@ describe("legacy goal-reference backfill", () => {
     ["evaluation_snapshot", "{}"],
     ["scheduler_id", "builtin:fsrs6"],
     ["scheduler_version", 1],
+    ["scheduler_version", 0],
     ["scheduler_state", "{}"],
     ["interval_days", 0],
   ])("leaves partial event metadata (%s) unattributed", (field, value) => {
