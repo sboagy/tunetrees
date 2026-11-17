@@ -295,6 +295,11 @@ test.describe("BYOS-001: private storage regressions", () => {
     test(`preserves the file and fields after Dropbox OAuth ${outcome}`, async ({
       page,
     }) => {
+      // OAuth restores an unsaved draft; it must not create a reference. Catalog
+      // references can vary by fixture/user, so preserve the actual starting count.
+      const originalReferenceCount =
+        (await app.referencesCount.textContent()) ?? "";
+      expect(originalReferenceCount).toMatch(/^\d+ references?$/i);
       await app.referenceTitleInput.fill("Keep my Dropbox draft");
       const returnUrl = page.url();
       await page.route(
@@ -332,7 +337,7 @@ test.describe("BYOS-001: private storage regressions", () => {
         "Keep my Dropbox draft",
         { timeout: 10000 }
       );
-      await expect(app.referencesCount).toHaveText(/^1 reference$/i, {
+      await expect(app.referencesCount).toHaveText(originalReferenceCount, {
         timeout: 10000,
       });
     });
