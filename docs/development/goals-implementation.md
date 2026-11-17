@@ -349,6 +349,35 @@ Each checkpoint should pass its local checks before push. Keep #940 a draft unti
 these behaviors and the coordinated cutover are reviewed. No deployment or data
 wipe is implied by an implementation checkpoint.
 
+## Checkpoint 3f: Recall preference conversion preparation
+
+`goals/legacy-preferences.ts` prepares validated Recall overrides from synchronized
+legacy scheduling/FSRS preference rows. It reuses the built-in defaults and existing
+configuration validators. Zero limits (including Unlimited), false auto-new/fuzz,
+zero delinquency, fractional learning steps and empty step arrays retain their
+meaning. Only `alg_type='fsrs'` contributes scheduler parameters; malformed saved
+values block conversion instead of silently resetting the user's settings.
+Existing override rows, including tombstones, prevent re-import. This is a pure
+preparation function: the eventual server insertion must also enforce insert-if-absent.
+
+Run `npx tsx scripts/audit-goal-cutover.mjs` against the existing local Postgres.
+It uses one read-only repeatable-read transaction, reports counts/identifiers only,
+and flags invalid preferences/configurations, missing built-ins, unconverted custom
+goals and custom/system name collisions. The local snapshot had 203 users whose
+Recall preferences converted, with no goal blockers found. This is not a production
+inventory, a device-sync check, an audit of existing override contents, or a complete
+cutover readiness gate. The existing local Postgres collation warning is unrelated.
+
+No migration or backfill is applied here: legacy preferences remain editable in the
+active UI, so a live import now could become stale before activation. Custom/plugin
+conversion, stable reference attribution, server-side insert/backfill SQL and
+selected-scheduler/UI activation remain pending. There are no generated-contract
+changes, new runtime readers, database writes or schema compatibility changes.
+
+Validation: all 1,196 unit tests passed, including ten conversion cases, plus
+typecheck, lint, formatting, script Biome checks and diff checks. The local
+read-only audit passed. No E2E rerun was needed for this inactive preparation code.
+
 ## CodeRabbit checkpoint review (2026-11-16)
 
 A manual full review of `ca331abf` inspected 43 files (generated artifacts and the

@@ -397,6 +397,14 @@ The existing FSRS service reads its legacy ladder fallback intervals from this
 source. The new calculators feed the guarded staging and Submit boundaries below;
 selected-scheduler activation in the UI remains pending.
 
+`goals/legacy-preferences.ts` prepares validated Recall overrides from a synchronized
+server snapshot for the eventual cutover. It is not imported by the browser runtime:
+old global preferences must not become a continuing fallback. The local-only,
+read-only `scripts/audit-goal-cutover.mjs` exercises this conversion in a repeatable-read
+Postgres transaction and inventories goal-definition blockers. It neither backfills
+data nor certifies device synchronization. Server insertion, custom-goal conversion
+and reference attribution remain part of the coordinated cutover implementation.
+
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.
 It reconciles active legacy keys while preserving attributed history IDs, and exposes
