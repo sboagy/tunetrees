@@ -402,8 +402,15 @@ server snapshot for the eventual cutover. It is not imported by the browser runt
 old global preferences must not become a continuing fallback. The local-only,
 read-only `scripts/audit-goal-cutover.mjs` exercises this conversion in a repeatable-read
 Postgres transaction and inventories goal-definition blockers. It neither backfills
-data nor certifies device synchronization. Server insertion, custom-goal conversion
-and reference attribution remain part of the coordinated cutover implementation.
+data nor certifies device synchronization. `legacy-goals.ts` prepares missing custom
+FSRS/ladder definitions; generic custom evaluations/defaults live in `builtins.ts`.
+Unknown plugin contracts and system-name collisions block preparation. Existing
+configuration is validated and retained, including its choice identities.
+`cutover-plan.ts` assembles definition updates and absent Recall-settings inserts
+with their source snapshots. The audit's optional `--prepare <new-plan.json>` writes
+this review artifact with private permissions; it has no database apply mode.
+Server insertion, plugin conversion and reference attribution remain part of the
+coordinated cutover implementation.
 
 `resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
 active tune assignments, visible goal definitions, personal overrides and history.

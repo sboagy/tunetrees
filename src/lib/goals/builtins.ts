@@ -3,9 +3,17 @@ import { FSRS6_DEFAULT_WEIGHTS } from "ts-fsrs/models/fsrs-6";
 import {
   type EvaluationChoice,
   type GoalConfig,
+  type GoalScheduler,
   type LadderAction,
   parseGoalConfig,
 } from "./config";
+
+const customDailyDefaults = {
+  minimum: 0,
+  maximum: 2,
+  autoNew: true,
+  delinquencyDays: 7,
+};
 
 export interface BuiltInGoalDefinition {
   id: string;
@@ -192,7 +200,7 @@ export function getBuiltInGoals(): BuiltInGoalDefinition[] {
       description: goal.description,
       config: parseGoalConfig({
         version: 1,
-        daily: { minimum: 0, maximum: 2, autoNew: true, delinquencyDays: 7 },
+        daily: customDailyDefaults,
         scheduler: {
           id: "builtin:interval-ladder",
           version: 1,
@@ -209,4 +217,38 @@ export function getBuiltInGoals(): BuiltInGoalDefinition[] {
       }),
     })),
   ];
+}
+
+/** Generic custom-goal choices state their scheduling effect, not a skill level. */
+export function getCustomGoalConfig(
+  scheduler: GoalScheduler,
+  createChoiceId: () => string = () => crypto.randomUUID()
+): GoalConfig {
+  const recall = getBuiltInGoals().find((goal) => goal.name === "recall");
+  if (!recall) throw new Error("Recall defaults are unavailable");
+  const evaluations: EvaluationChoice[] =
+    scheduler.id === "builtin:fsrs6"
+      ? recall.config.evaluations.map((choice) => ({
+          ...choice,
+          id: createChoiceId(),
+        }))
+      : (
+          [
+            ["reset", "Restart", "Return to the first interval"],
+            ["back", "Step back", "Use the previous, shorter interval"],
+            ["stay", "Keep interval", "Repeat the current interval"],
+            ["advance", "Advance", "Use the next, longer interval"],
+          ] satisfies Array<[LadderAction, string, string]>
+        ).map(([kind, label, description]) => ({
+          id: createChoiceId(),
+          label,
+          description,
+          action: { kind },
+        }));
+  return parseGoalConfig({
+    version: 1,
+    daily: customDailyDefaults,
+    scheduler,
+    evaluations,
+  });
 }

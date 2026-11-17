@@ -378,6 +378,42 @@ Validation: all 1,196 unit tests passed, including ten conversion cases, plus
 typecheck, lint, formatting, script Biome checks and diff checks. The local
 read-only audit passed. No E2E rerun was needed for this inactive preparation code.
 
+## Checkpoint 3g: custom definitions and server-snapshot preparation
+
+`legacy-goals.ts` prepares missing owner-defined FSRS/interval-ladder configurations.
+Custom FSRS uses shared FSRS-6 parameters, not the owner's personalized Recall values.
+Custom goals start with minimum zero; generic ladder choices describe reset/back/stay/
+advance directly. Choice IDs are UUIDs and valid existing configurations are retained
+without regeneration. Defaults and labels live in `builtins.ts`; the existing built-in
+seed output is unchanged. Malformed configurations/intervals, unsupported plugin
+techniques, unknown shared legacy definitions and custom/system name collisions block
+preparation instead of guessing meanings.
+
+`cutover-plan.ts` combines proposed definition updates and absent Recall-settings
+inserts with source snapshots. It returns no partial plan if conversion fails.
+`npx tsx scripts/audit-goal-cutover.mjs --prepare <new-plan.json>` exports the plan
+from one local read-only repeatable-read transaction. The artifact has mode 0600,
+refuses overwrite and is not printed to the console. Keep these user-specific files
+out of version control. The audit now distinguishes convertible legacy goals from
+blocked ones; listing a goal as convertible does not mean it has been migrated.
+
+Local preparation produced 209 Recall inserts and zero custom updates. Unit fixtures
+exercise custom conversion because the local snapshot has no legacy custom goals.
+This remains preparation, not an executable migration: goal-key renames/reference
+attribution, timestamp-preserving server writes, stale-snapshot checks, idempotent
+insertion and plugin conversion remain pending. Before applying anything, repeat
+preflight against the synchronized target database and complete the coordinated
+cutover procedure. Active UI/settings behavior is unchanged.
+
+Validation: 1,213 unit tests passed, typecheck, lint, formatting, script Biome checks,
+built-in seed parity and diff checks passed. A local export verified its scope/counts,
+private permissions and refusal to overwrite an existing artifact. No schema or
+generated artifacts changed; there are no new database writes or old-client schema
+compatibility changes. No E2E rerun was needed for this inactive preparation code.
+
+Fresh local CodeRabbit review of this uncommitted checkpoint (including untracked
+files) completed with zero findings across all seven files.
+
 ## CodeRabbit checkpoint review (2026-11-16)
 
 A manual full review of `ca331abf` inspected 43 files (generated artifacts and the
