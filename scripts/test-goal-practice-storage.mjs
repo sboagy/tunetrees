@@ -13,6 +13,9 @@ import {
 import { camelizeKeys, snakifyKeys } from "oosync/sync/casing";
 import postgres from "postgres";
 import { installSyncTriggers } from "../src/lib/db/install-triggers.ts";
+import { getBuiltInGoals } from "../src/lib/goals/builtins.ts";
+import { calculateGoalPractice } from "../src/lib/goals/calculate.ts";
+import { readPracticeState } from "../src/lib/goals/practice-state.ts";
 import worker from "../worker/src/index.ts";
 
 const databaseUrl = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
@@ -45,8 +48,8 @@ const token = `${signingInput}.${signature}`;
 const sqliteModule = await initSqliteWasm();
 let local;
 
-function localRows(query, values = []) {
-  const result = local.exec(query, values)[0];
+function localRows(query) {
+  const result = local.exec(query)[0];
   return result
     ? result.values.map((row) =>
         Object.fromEntries(result.columns.map((column, i) => [column, row[i]]))
@@ -302,6 +305,67 @@ try {
     await sql`SELECT interval_days, extract(epoch FROM due - practiced) / 86400 AS duration FROM public.practice_record WHERE id = ${eventId}`;
   assert.equal(stored.interval_days, 0.1);
   assert.equal(Number(stored.duration), 0.1);
+  // Persist an actual FSRS result without any typed state projections, then
+  // download it and prove it can continue using only the JSON contract.
+  const recall = getBuiltInGoals()[0];
+  const fsrsInput = {
+    goalId: recall.id,
+    goalLabel: recall.displayName,
+    config: recall.config,
+    evaluationId: "good",
+    practiced: new Date("2025-11-17T15:00:00Z"),
+    goalTuneCount: 100,
+    predecessor: null,
+    legacyGoalId: null,
+  };
+  const fsrsResult = await calculateGoalPractice(fsrsInput);
+  const fsrsId = randomUUID();
+  local.run(
+    `INSERT INTO practice_record
+    (id, repertoire_ref, tune_ref, practiced, due, goal_id, evaluation_id,
+     evaluation_snapshot, scheduler_id, scheduler_version, scheduler_state, interval_days, last_modified_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      fsrsId,
+      repertoireId,
+      tuneId,
+      fsrsResult.practiced,
+      fsrsResult.due,
+      fsrsResult.goalId,
+      fsrsResult.evaluationId,
+      fsrsResult.evaluationSnapshot,
+      fsrsResult.schedulerId,
+      fsrsResult.schedulerVersion,
+      fsrsResult.schedulerState,
+      fsrsResult.intervalDays,
+      stamp,
+    ]
+  );
+  const fsrsBytes = local.export();
+  local.close();
+  local = createSqliteWasmDatabase(sqliteModule, fsrsBytes);
+  const fsrsRow = camelizeKeys(
+    localRows("SELECT * FROM practice_record").find((row) => row.id === fsrsId)
+  );
+  const fsrsPush = await sync([change("practice_record", fsrsRow)]);
+  assert.equal(fsrsPush.status, 200, await fsrsPush.clone().text());
+  const fsrsPull = await sync([]);
+  assert.equal(fsrsPull.status, 200, await fsrsPull.clone().text());
+  const fsrsDownloaded = (await fsrsPull.json()).changes.find(
+    (row) => row.data.id === fsrsId
+  ).data;
+  assert.equal(fsrsDownloaded.schedulerState, fsrsResult.schedulerState);
+  assert.equal(fsrsDownloaded.stability, null);
+  assert.equal(readPracticeState(fsrsDownloaded, null).kind, "fsrs6");
+  const fsrsRetry = await sync([change("practice_record", fsrsDownloaded)]);
+  assert.equal(fsrsRetry.status, 200, await fsrsRetry.clone().text());
+  const nextFsrs = await calculateGoalPractice({
+    ...fsrsInput,
+    practiced: new Date(fsrsResult.due),
+    predecessor: fsrsDownloaded,
+  });
+  assert.equal(nextFsrs.continued, true);
+  assert.equal(JSON.parse(nextFsrs.schedulerState).status, 2);
   const collision = await sync([
     change("practice_record", { ...originalEvent, id: randomUUID() }),
   ]);

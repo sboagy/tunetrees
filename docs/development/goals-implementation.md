@@ -126,10 +126,53 @@ existing guarded rebuild/full-pull mechanism; no production migration, data wipe
 backfill or deployment was performed. Old browser bundles continue to omit the new
 nullable columns; new-format writes require the later coordinated cutover.
 
+## Checkpoint 3a: uniform JSON state and selected-scheduler calculation
+
+The approved state decision is now implemented at the pure calculation boundary.
+`state.ts` validates versioned, bounded FSRS-6 and ladder payloads;
+`practice-state.ts` is the shared decoder; `calculate.ts` dispatches only to the
+selected scheduler. These functions do not yet replace the active staging/Submit path.
+
+New FSRS state stores stability, difficulty, scheduledDays, learningSteps, reps,
+lapses and status. `scheduledDays` is the FSRS model's scheduled-day value;
+common `intervalDays` remains the actual fractional duration between event timestamps.
+Ladder state contains its index and interval-definition hash. Neither scheduler
+runs the other behind the scenes. Compatibility projections are separate outputs.
+New JSON is authoritative: corrupt or unsupported new state cannot fall back to
+old typed fields. Goal changes start fresh using only the supplied latest event;
+there is no search for an older matching goal.
+
+Unambiguous historical built-in Recall records decode into the same FSRS state
+contract. Historical learning progress and model scheduled-day state were not
+stored reliably; their zero initialization matches the old reader and is explicitly
+reported as a limitation. Legacy plugin/ladder or unresolved goal records cannot
+be inferred from FSRS-looking columns. Owner-scoped legacy goal resolution remains
+part of the database integration step.
+
+The documentation-only Postgres migration marks legacy column status and JSON
+authority; generated metadata includes those descriptions. It changes no row values,
+column types or constraints and preserves old app/Worker compatibility, including
+old PWA bundles during deployment. No historical rewrite or physical removal occurs.
+
+Validation includes parity with the existing FSRS service, retained same-day learning
+progress, goal resets, strict payload validation and fractional intervals. The real
+SQLite/Worker/Postgres test now persists and syncs a calculated JSON-only FSRS event,
+retries its downloaded representation, and continues learning from that JSON without
+typed FSRS projections. All 1,091 unit tests, typechecking, formatting, lint,
+schema-generation and seed checks pass. UI, plugin execution and transactional
+Submit are still pending.
+
+The SonarQube follow-up uses the supported `DefaultScheduler` API with FSRS-6
+selected explicitly. Model-parity tests pass below the interval cap. Unlike the
+deprecated API, the current API enforces that cap during Easy graduation from
+Learning/Relearning too (the regression fixture schedules 30 days instead of 36).
+This follows the approved maximum-interval policy; FSRS-7 remains out of scope.
+The SQL literal cleanup changes no resulting column comments or schema shape.
+
 ## Remaining checkpoints
 
-1. Effective DB resolver, canonical history order and legacy decoder; selected
-   scheduler execution, plugin contracts, staged snapshots, stale-preview checks,
+1. Effective DB resolver, canonical history order and owner-scoped legacy decoding;
+   selected-scheduler activation, plugin contracts, staged snapshots, stale-preview checks,
    fractional event commit and idempotency/conflict enforcement.
 2. Per-goal queue allocation across generation, Refresh and manual additions,
    retained work accounting and displayed-event links.
@@ -152,5 +195,6 @@ so it detects yielding midway through the batch.
 
 The linked-issue check correctly observes that the goal-aware evaluation picker
 is still missing. It remains part of this draft PR's planned UI integration, not
-an accepted omission or a separate follow-up. Scheduler integration also remains
-subject to the open scheduler-state representation review in plan section 6.3.
+an accepted omission or a separate follow-up. The state review in plan section 6.3
+is resolved in favor of authoritative JSON for all new scheduler results; checkpoint
+3a implements that calculation boundary before activating it in the application.

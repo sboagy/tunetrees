@@ -382,10 +382,16 @@ before SQLite writes so older evaluations cannot overwrite newer selections.
 
 The #426 domain foundation lives in `src/lib/goals`: `builtins.ts` holds the
 editable built-in definitions, `config.ts` validates JSON and resolves overrides,
-and `ladder.ts` calculates independent, versioned ladder state without DB writes.
+and `calculate.ts` dispatches pure previews to `fsrs.ts` or `ladder.ts` without
+DB writes. `state.ts` validates versioned JSON state for both schedulers;
+`practice-state.ts` decodes new JSON or unambiguous legacy Recall state. New JSON
+is authoritative; typed FSRS columns are historical decoder inputs or compatibility
+projections, never a fallback for malformed new JSON. Common timestamps and
+fractional durations stay outside scheduler state. Legacy learning progress that
+was not stored is initialized to zero with an explicit decoder limitation.
 The existing FSRS service reads its legacy ladder fallback intervals from this
-source. The new ladder calculator is not connected to staging until the additive
-schema and atomic predecessor checks land.
+source. The new calculators are not connected to staging until atomic predecessor/config
+checks and selected-scheduler activation land.
 
 Goal storage now adds nullable display/description/default-config fields and a
 composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded

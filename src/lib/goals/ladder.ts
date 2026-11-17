@@ -2,15 +2,13 @@ import {
   canonicalJson,
   type GoalConfig,
   parseGoalConfig,
-  SCHEDULER_STATE_BYTES,
   validateIntervals,
 } from "./config";
 
-export interface LadderState {
-  version: 1;
-  ladderIndex: number;
-  ladderHash: string;
-}
+import { type LadderState, parseLadderState } from "./state";
+
+export type { LadderState } from "./state";
+
 export interface LadderPredecessor {
   goalId: string;
   schedulerId: string;
@@ -26,29 +24,6 @@ async function hashIntervals(intervals: number[]): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0")
   ).join("");
-}
-
-function readState(value: unknown): LadderState | null {
-  // Absent legacy state is fresh; malformed new state must be corrected.
-  if (value === null) return null;
-  canonicalJson(value, SCHEDULER_STATE_BYTES);
-  if (typeof value !== "object" || !value || Array.isArray(value))
-    throw new Error("Invalid ladder state");
-  if (!("version" in value) || value.version !== 1) return null;
-  if (
-    !("ladderIndex" in value) ||
-    typeof value.ladderIndex !== "number" ||
-    !Number.isSafeInteger(value.ladderIndex) ||
-    value.ladderIndex < 0 ||
-    !("ladderHash" in value) ||
-    typeof value.ladderHash !== "string"
-  )
-    throw new Error("Invalid ladder state");
-  return {
-    version: 1,
-    ladderIndex: value.ladderIndex,
-    ladderHash: value.ladderHash,
-  };
 }
 
 /** Pure calculation: caller supplies only the latest submitted predecessor. */
@@ -81,7 +56,7 @@ export async function calculateLadder(input: {
     previous.schedulerId === config.scheduler.id &&
     previous.schedulerVersion === config.scheduler.version
   ) {
-    prior = readState(previous.schedulerState);
+    prior = parseLadderState(previous.schedulerState);
   }
   const compatible = prior?.ladderHash === ladderHash ? prior : null;
   const continued = compatible !== null;
