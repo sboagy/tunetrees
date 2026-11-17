@@ -169,10 +169,45 @@ Learning/Relearning too (the regression fixture schedules 30 days instead of 36)
 This follows the approved maximum-interval policy; FSRS-7 remains out of scope.
 The SQL literal cleanup changes no resulting column comments or schema shape.
 
+## Checkpoint 3b: owner-scoped preview inputs
+
+`readGoalPracticeContext` checks repertoire ownership and active tune membership,
+resolves owner-before-system legacy names, applies per-user overrides across
+repertoires and counts active tunes for the effective goal. A missing/deleted or
+inaccessible active goal falls back visibly to Recall; history IDs remain attributed
+to the original goal, including tombstones. Raw historical rows and due dates are
+not rewritten. Corrupt configuration blocks calculation. Null built-in configuration
+uses typed defaults; unconverted custom/plugin definitions require an explicit
+configuration before this new path can be activated. Cutover must still initialize
+those definitions and copy existing Recall preferences.
+
+`utils/practice-history.ts` normalizes UTC timestamps with six fractional digits and chooses the
+latest event overall by practiced time, modified time and ID, with nulls last.
+Sorting is currently scoped to the selected tune's loaded history; it preserves
+microseconds that SQLite date functions would round. Existing latest/per-tune queries
+and Practice History charts now share this implementation; display-only callers
+retain malformed dates as missing rather than crashing. Limited per-tune history
+is sorted before slicing. These reads load that tune's history (not the repertoire's
+entire history); a future SQL optimization must preserve the same ordering contract.
+
+`prepareGoalPracticePreview` now connects that database snapshot to the pure
+calculator. It returns predecessor ID/fingerprint and a configuration fingerprint
+including selected evaluation, effective settings, population and calculation-contract
+version. New JSON state is fingerprinted canonically; transport bookkeeping and
+redundant typed projections are excluded. A checked first practice has null predecessor
+fields but a nonnull configuration fingerprint. No staged/event/queue rows are written.
+
+The SQLite tests use actual SQLite WASM with the configured production migrations,
+cover ownership, overrides, fallback, legacy attribution, ordering/ties/microseconds,
+non-mutating preview calculation and fingerprint sensitivity. All 1,127 unit tests,
+typechecking, formatting, lint and seed checks pass. No schema change or deployment
+is involved. Transactional staging/Submit and browser E2E remain subsequent work.
+
 ## Remaining checkpoints
 
-1. Effective DB resolver, canonical history order and owner-scoped legacy decoding;
-   selected-scheduler activation, plugin contracts, staged snapshots, stale-preview checks,
+1. Align remaining repertoire-wide SQL consumers and views with canonical history order; initialize legacy
+   goal definitions/preferences at cutover; selected-scheduler activation, plugin
+   contracts, staged snapshots, stale-preview checks,
    fractional event commit and idempotency/conflict enforcement.
 2. Per-goal queue allocation across generation, Refresh and manual additions,
    retained work accounting and displayed-event links.
@@ -211,3 +246,34 @@ Settings and practice use the same snapshot serializer, including goal-name byte
 Unicode and JSON escaping. Regressions exercise the shared runtime promise,
 replacement-user reset protection, recovery completion and exact size boundaries.
 These changes do not activate the new scheduler or change schema contracts.
+
+
+### DRY audit and remaining integration boundaries
+
+- `hashCanonicalJson` in `goals/config.ts` is the sole canonical JSON/SHA-256
+  implementation for interval ladders and preview fingerprints. Each caller retains
+  its own byte budget; existing ladder hashes do not change.
+- `utils/practice-history.ts` owns timestamp normalization and canonical ordering.
+  `readPracticeRecordsForTune` is the shared synchronous database read used by the
+  resolver, `getLatestPracticeRecord` and `getPracticeRecordsForTune`.
+  `getPracticeHistory` applies the same ordering to its enriched rows, before limiting;
+  Practice History charts and streaks use its reverse for chronological display.
+- Remaining SQL consumers are explicitly tracked for the query/view integration step:
+  `getPracticeRecords` in `queries/practice.ts` (repertoire-wide limit), analysis
+  projections in `queries/analysis.ts`, the queue-generator latest-record subquery,
+  and SQLite/Postgres practice views. Do not load every repertoire event into JS just
+  to reuse a sorter. Align their SQL ordering and add cross-engine parity fixtures
+  before activating the new goal scheduling/queue path.
+- Queue window/date-only utilities and scheduled-override second-precision comparisons
+  have separate contracts; they are not interchangeable with event ordering. OAuth
+  PKCE hashes raw verifier bytes to base64url, not canonical JSON to hexadecimal.
+  Those implementations intentionally remain separate.
+
+This checkpoint changes active history query/chart ordering in tied or differently
+formatted timestamps. It does not activate goal-based staging/Submit. The developer
+reported local browser E2E passing before this checkpoint was committed.
+
+Local CodeRabbit review identified inconsistent timestamp parsing in chart labels.
+Chart labels and table dates now use the shared UTC normalizer, retaining damaged-date
+fallbacks. All seven history utility tests pass with `TZ=America/Los_Angeles`, including
+the offset-free timestamp regression; typechecking, lint and formatting also pass.

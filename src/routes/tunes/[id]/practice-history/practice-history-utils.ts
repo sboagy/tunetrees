@@ -1,6 +1,10 @@
 import type { ChartData } from "chart.js";
 import type { PracticeRecord } from "@/lib/db/types";
 import { FSRS_QUALITY_MAP } from "@/lib/scheduling/fsrs-service";
+import {
+  normalizePracticeTimestamp,
+  orderPracticeHistory,
+} from "@/lib/utils/practice-history";
 
 export interface PracticeHistoryQualityDisplay {
   label: string;
@@ -46,18 +50,22 @@ const STATE_LABELS: Record<number, string> = {
   3: "Relearning",
 };
 
-function getComparableTimestamp(value: string | null | undefined): number {
+function getDisplayTimestamp(value: string | null | undefined): number | null {
   if (!value) {
-    return 0;
+    return null;
   }
 
-  const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? 0 : timestamp;
+  try {
+    return Date.parse(normalizePracticeTimestamp(value));
+  } catch {
+    // Keep damaged historical rows visible with a fallback label.
+    return null;
+  }
 }
 
 function getShortSessionLabel(record: PracticeRecord, index: number): string {
-  const timestamp = getComparableTimestamp(record.practiced);
-  if (!timestamp) {
+  const timestamp = getDisplayTimestamp(record.practiced);
+  if (timestamp === null) {
     return `#${index + 1}`;
   }
 
@@ -65,14 +73,6 @@ function getShortSessionLabel(record: PracticeRecord, index: number): string {
     month: "short",
     day: "numeric",
   });
-}
-
-function getOrderedRecords(records: PracticeRecord[]): PracticeRecord[] {
-  return [...records].sort(
-    (left, right) =>
-      getComparableTimestamp(left.practiced) -
-      getComparableTimestamp(right.practiced)
-  );
 }
 
 export function getPracticeHistoryQualityDisplay(
@@ -108,12 +108,8 @@ export function getPracticeHistoryStateLabel(
 export function formatPracticeHistoryDate(
   value: string | null | undefined
 ): string {
-  if (!value) {
-    return "—";
-  }
-
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) {
+  const timestamp = getDisplayTimestamp(value);
+  if (timestamp === null) {
     return "—";
   }
 
@@ -138,7 +134,7 @@ export function buildPracticeHistorySummary(
     };
   }
 
-  const orderedRecords = getOrderedRecords(records);
+  const orderedRecords = orderPracticeHistory(records, "as-missing").reverse();
   const successCount = orderedRecords.filter(
     (record) =>
       record.quality === FSRS_QUALITY_MAP.GOOD ||
@@ -180,7 +176,7 @@ export function buildPracticeHistoryQualityChart(
     return null;
   }
 
-  const orderedRecords = getOrderedRecords(records);
+  const orderedRecords = orderPracticeHistory(records, "as-missing").reverse();
 
   return {
     labels: orderedRecords.map((record, index) =>
@@ -203,9 +199,9 @@ export function buildPracticeHistoryQualityChart(
 export function buildPracticeHistoryStabilityChart(
   records: PracticeRecord[]
 ): ChartData<"line"> | null {
-  const stableRecords = getOrderedRecords(records).filter(
-    (record) => record.stability != null
-  );
+  const stableRecords = orderPracticeHistory(records, "as-missing")
+    .reverse()
+    .filter((record) => record.stability != null);
 
   if (stableRecords.length === 0) {
     return null;

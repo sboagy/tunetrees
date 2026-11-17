@@ -1,6 +1,6 @@
 import {
-  canonicalJson,
   type GoalConfig,
+  hashCanonicalJson,
   parseGoalConfig,
   validateIntervals,
 } from "./config";
@@ -14,16 +14,6 @@ export interface LadderPredecessor {
   schedulerId: string;
   schedulerVersion: number;
   schedulerState: unknown;
-}
-
-async function hashIntervals(intervals: number[]): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(canonicalJson(intervals))
-  );
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0")
-  ).join("");
 }
 
 /** Pure calculation: caller supplies only the latest submitted predecessor. */
@@ -48,7 +38,7 @@ export async function calculateLadder(input: {
   const practiced = new Date(Math.floor(practicedMs / 1000) * 1000);
   const intervals = config.scheduler.intervalsDays;
   validateIntervals(intervals, practiced.getTime());
-  const ladderHash = await hashIntervals(intervals);
+  const ladderHash = await hashCanonicalJson(intervals);
   const previous = input.predecessor;
   let prior: LadderState | null = null;
   if (

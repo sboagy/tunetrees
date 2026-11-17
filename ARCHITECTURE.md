@@ -397,6 +397,21 @@ The existing FSRS service reads its legacy ladder fallback intervals from this
 source. The new calculators are not connected to staging until atomic predecessor/config
 checks and selected-scheduler activation land.
 
+`resolve.ts` reads one synchronous, owner-scoped local snapshot of the repertoire,
+active tune assignments, visible goal definitions, personal overrides and history.
+It reconciles active legacy keys while preserving attributed history IDs, and exposes
+Recall fallback notices. Unknown custom/plugin definitions require explicit conversion;
+corrupt definitions never silently become built-in defaults. `utils/practice-history.ts` implements
+canonical timestamp/modified/ID order with UTC microsecond normalization. The goal
+resolver and existing latest/per-tune history queries share `readPracticeRecordsForTune`;
+the enriched per-tune query and history charts use the same generic ordering helper.
+Display callers explicitly tolerate invalid timestamps as missing; scheduling rejects
+them. Canonical JSON hashing lives once in `goals/config.ts` and serves ladders and
+preview fingerprints with unchanged digest bytes.
+`preview.ts` calculates from that snapshot and fingerprints its relevant inputs without
+writing. These fingerprints are preparation for, not a substitute for, atomic Submit
+validation. Repertoire-wide SQL consumers and views still require alignment at activation.
+
 Goal storage now adds nullable display/description/default-config fields and a
 composite `(user_id, goal_id)` settings table. Configurations/overrides use bounded
 JSON TEXT. Generated Worker rules bind camelCase ownership properties; Postgres

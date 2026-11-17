@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { getBuiltInGoals } from "./builtins";
 import {
   canonicalJson,
+  hashCanonicalJson,
   MAX_DATE_MS,
   parseGoalConfig,
   parseGoalOverrides,
@@ -285,5 +287,17 @@ describe("ladder interval representation", () => {
     expect(() => validateIntervals([1], MAX_DATE_MS - 1000)).toThrow(
       /Date range/
     );
+  });
+});
+
+describe("canonical JSON hashing", () => {
+  it("hashes the same bytes regardless of object insertion order", async () => {
+    const expected = createHash("sha256").update('{"a":1,"b":2}').digest("hex");
+    expect(await hashCanonicalJson({ b: 2, a: 1 })).toBe(expected);
+    expect(await hashCanonicalJson({ a: 1, b: 2 })).toBe(expected);
+  });
+  it("preserves caller-specific UTF-8 payload budgets", async () => {
+    await expect(hashCanonicalJson("é", 3)).rejects.toThrow(/large/);
+    await expect(hashCanonicalJson("é", 4)).resolves.toMatch(/^[a-f0-9]{64}$/);
   });
 });

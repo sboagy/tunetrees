@@ -1,4 +1,6 @@
 /** Pure selected-scheduler preview. No DB writes, plugins, or queue mutations. */
+
+import { normalizePracticeTimestamp } from "../utils/practice-history";
 import {
   canonicalJson,
   type GoalConfig,
@@ -26,17 +28,7 @@ export interface GoalPracticeInput {
 
 function eventDate(text: string | null): Date {
   if (!text) throw new Error("Missing predecessor timestamp");
-  // SQLite legacy timestamps without a suffix are UTC, not device-local time.
-  const normalized = text
-    .trim()
-    .replace(" ", "T")
-    .replace(/([+-]\d{2})$/, "$1:00");
-  const date = new Date(
-    /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized) ? normalized : `${normalized}Z`
-  );
-  if (!Number.isFinite(date.getTime()))
-    throw new Error("Invalid predecessor timestamp");
-  return date;
+  return new Date(normalizePracticeTimestamp(text));
 }
 
 function predecessorForGoal(input: GoalPracticeInput) {

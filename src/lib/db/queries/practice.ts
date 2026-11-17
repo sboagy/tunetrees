@@ -18,6 +18,7 @@
 
 import { and, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { orderPracticeHistory } from "../../utils/practice-history";
 import { generateId } from "../../utils/uuid";
 import { persistDb, type SqliteDatabase } from "../client-sqlite";
 import {
@@ -36,6 +37,7 @@ import type {
   PrefsSpacedRepetition,
 } from "../types";
 import type { ITuneOverview } from "../view-types";
+import { readPracticeRecordsForTune } from "./practice-records";
 
 /**
  * Practice List Staged Row
@@ -287,19 +289,7 @@ export async function getLatestPracticeRecord(
   tuneId: string,
   repertoireId: string
 ): Promise<PracticeRecord | null> {
-  const results = await db
-    .select()
-    .from(practiceRecord)
-    .where(
-      and(
-        eq(practiceRecord.tuneRef, tuneId),
-        eq(practiceRecord.repertoireRef, repertoireId)
-      )
-    )
-    .orderBy(desc(practiceRecord.practiced))
-    .limit(1);
-
-  return results[0] ?? null;
+  return readPracticeRecordsForTune(db, tuneId, repertoireId)[0] ?? null;
 }
 
 /**
@@ -408,7 +398,7 @@ export async function getPracticeHistory(
   repertoireId: string,
   limit?: number
 ): Promise<PracticeRecordWithTune[]> {
-  let query = db
+  const query = db
     .select({
       // Include new event metadata as the generated schema expands. Retain the
       // historical aliases below for existing consumers.
@@ -451,14 +441,11 @@ export async function getPracticeHistory(
         eq(practiceRecord.tuneRef, tuneId),
         eq(practiceRecord.repertoireRef, repertoireId)
       )
-    )
-    .orderBy(desc(practiceRecord.practiced));
+    );
 
-  if (limit) {
-    query = query.limit(limit) as typeof query;
-  }
-
-  const results = await query;
+  // Apply limits after ordering actual instants, not SQLite timestamp text.
+  const ordered = orderPracticeHistory(await query, "as-missing");
+  const results = limit ? ordered.slice(0, limit) : ordered;
 
   // Convert null to undefined for repertoireName to match interface
   return results.map((r) => ({
