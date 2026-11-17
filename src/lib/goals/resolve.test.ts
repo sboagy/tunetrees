@@ -13,6 +13,7 @@ import {
 } from "../db/queries/practice";
 import { getPracticeRecordsForTune } from "../db/queries/practice-records";
 import {
+  dailyPracticeQueue,
   goal,
   goalUserSettings,
   practiceRecord,
@@ -24,6 +25,7 @@ import {
   orderPracticeHistory,
 } from "../utils/practice-history";
 import { getBuiltInGoals } from "./builtins";
+import { commitGoalPracticeEvaluations, type GoalCommitItem } from "./commit";
 import { canonicalJson } from "./config";
 import {
   practiceContextFingerprints,
@@ -277,6 +279,17 @@ describe("owner-scoped goal practice context", () => {
   });
 });
 
+// Perform a real intervening SQLite mutation while calculation is awaiting crypto.
+function duringCalculation(action: () => void) {
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  vi.spyOn(crypto.subtle, "digest").mockImplementationOnce(
+    (algorithm, data) => {
+      action();
+      return digest(algorithm, data);
+    }
+  );
+}
+
 describe("goal preview staging", () => {
   const input = () => ({
     userId: "owner",
@@ -286,16 +299,6 @@ describe("goal preview staging", () => {
     practiced: new Date(stamp),
   });
   const draft = () => db.select().from(tableTransientData).get();
-  // Perform a real intervening SQLite mutation while calculation is awaiting crypto.
-  function duringCalculation(action: () => void) {
-    const digest = crypto.subtle.digest.bind(crypto.subtle);
-    vi.spyOn(crypto.subtle, "digest").mockImplementationOnce(
-      (algorithm, data) => {
-        action();
-        return digest(algorithm, data);
-      }
-    );
-  }
 
   it("stores a complete checked first preview without changing history or queue", async () => {
     const result = await stageGoalPracticeEvaluation(db, input(), () => true);
@@ -646,5 +649,276 @@ describe("prepared goal previews and fingerprints", () => {
       (await practiceContextFingerprints(context(), "good"))
         .calculationConfigHash
     ).not.toBe(renamed.calculationConfigHash);
+  });
+});
+
+describe("atomic goal practice submission", () => {
+  async function item(
+    tuneId = "tune",
+    evaluationId = "good"
+  ): Promise<GoalCommitItem> {
+    const queueRowId = `queue-${tuneId}`;
+    db.insert(dailyPracticeQueue)
+      .values({
+        id: queueRowId,
+        userRef: "owner",
+        repertoireRef: "rep",
+        tuneRef: tuneId,
+        windowStartUtc: stamp,
+        windowEndUtc: "2026-11-17T12:00:00Z",
+        bucket: 1,
+        orderIndex: 0,
+        snapshotCoalescedTs: stamp,
+        generatedAt: stamp,
+        lastModifiedAt: stamp,
+      })
+      .run();
+    const result = await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId,
+        evaluationId,
+        practiced: new Date(stamp),
+      },
+      () => true
+    );
+    if (result.status !== "staged") throw new Error("Fixture did not stage");
+    const draft = db
+      .select()
+      .from(tableTransientData)
+      .all()
+      .find((row) => row.tuneId === tuneId);
+    if (!draft) throw new Error("Missing fixture draft");
+    return { queueRowId, draft };
+  }
+  const submit = (items: GoalCommitItem[], isCurrent = () => true) =>
+    commitGoalPracticeEvaluations(
+      db,
+      { userId: "owner", repertoireId: "rep", items },
+      isCurrent
+    );
+  const events = () => db.select().from(practiceRecord).all();
+  const drafts = () => db.select().from(tableTransientData).all();
+  const queue = () => db.select().from(dailyPracticeQueue).get();
+
+  it("atomically records the reviewed event and completes its queue item", async () => {
+    const receipt = await item();
+    expect(await submit([receipt])).toEqual({
+      status: "committed",
+      eventIds: [receipt.draft.practiceRecordId],
+    });
+    expect(events()).toHaveLength(1);
+    expect(events()[0]).toMatchObject({
+      id: receipt.draft.practiceRecordId,
+      practiced: receipt.draft.practiced,
+      due: receipt.draft.due,
+      schedulerState: receipt.draft.schedulerState,
+      intervalDays: receipt.draft.intervalDays,
+    });
+    expect(drafts()).toEqual([]);
+    expect(queue()).toMatchObject({
+      displayedPracticeRecordId: receipt.draft.practiceRecordId,
+      exposuresCompleted: 1,
+      completedAt: expect.any(String),
+    });
+    expect(db.select().from(repertoireTune).get()?.current).toBe(
+      receipt.draft.due
+    );
+  });
+
+  it("preserves sub-day ladder timing and leaves FSRS projections empty", async () => {
+    const initial = getBuiltInGoals().find(
+      (row) => row.name === "initial_learn"
+    );
+    if (!initial) throw new Error("Missing fixture goal");
+    assign(initial.id, initial.name);
+    const receipt = await item("tune", "cannot_play");
+    await submit([receipt]);
+    expect(events()[0]).toMatchObject({
+      intervalDays: 0.1,
+      due: "2026-11-16T14:24:00.000Z",
+      stability: null,
+      difficulty: null,
+    });
+  });
+
+  it("preserves a newer draft when retrying an older completed submission", async () => {
+    const receipt = await item();
+    await submit([receipt]);
+    await stageGoalPracticeEvaluation(
+      db,
+      {
+        userId: "owner",
+        repertoireId: "rep",
+        tuneId: "tune",
+        evaluationId: "good",
+        practiced: new Date("2026-11-17T12:00:00Z"),
+      },
+      () => true
+    );
+    const newer = drafts();
+    expect((await submit([receipt])).status).toBe("committed");
+    expect(drafts()).toEqual(newer);
+    expect(events()).toHaveLength(1);
+  });
+
+  it("preserves a newer explicit schedule", async () => {
+    const receipt = await item();
+    raw.run("UPDATE repertoire_tune SET scheduled='2026-12-01T12:00:00Z'");
+    await submit([receipt]);
+    expect(db.select().from(repertoireTune).get()?.scheduled).toBe(
+      "2026-12-01T12:00:00Z"
+    );
+  });
+
+  it("does not discard notes held only by the draft", async () => {
+    const receipt = await item();
+    raw.run("UPDATE table_transient_data SET note_private='Keep this note'");
+    receipt.draft = drafts()[0];
+    await expect(submit([receipt])).rejects.toThrow(
+      "Save or explicitly clear draft notes"
+    );
+    expect(events()).toEqual([]);
+    expect(drafts()[0].notePrivate).toBe("Keep this note");
+    expect(queue()?.completedAt).toBeNull();
+  });
+
+  it("rejects backdated ladder submission instead of regressing the current schedule", async () => {
+    const initial = getBuiltInGoals().find(
+      (row) => row.name === "initial_learn"
+    );
+    if (!initial) throw new Error("Missing fixture goal");
+    assign(initial.id, initial.name);
+    event("later", "2026-11-17T12:00:00Z");
+    raw.run("UPDATE repertoire_tune SET current='2026-11-18T12:00:00Z'");
+    const receipt = await item("tune", "cannot_play");
+    await expect(submit([receipt])).rejects.toThrow(
+      "Practice time precedes the latest submitted event"
+    );
+    expect(events()).toHaveLength(1);
+    expect(drafts()).toHaveLength(1);
+    expect(db.select().from(repertoireTune).get()?.current).toBe(
+      "2026-11-18T12:00:00Z"
+    );
+  });
+
+  it("retries without rewriting a later schedule or incrementing counters", async () => {
+    const receipt = await item();
+    await submit([receipt]);
+    raw.run("UPDATE repertoire_tune SET current='2027-01-01T12:00:00Z'");
+    expect((await submit([receipt])).status).toBe("committed");
+    expect(events()).toHaveLength(1);
+    expect(queue()?.exposuresCompleted).toBe(1);
+    expect(db.select().from(repertoireTune).get()?.current).toBe(
+      "2027-01-01T12:00:00Z"
+    );
+  });
+
+  it("retries persistence after an already committed local transaction", async () => {
+    const receipt = await item();
+    vi.mocked(persistDb).mockRejectedValueOnce(new Error("Persistence failed"));
+    await expect(submit([receipt])).rejects.toThrow("Persistence failed");
+    expect(events()).toHaveLength(1);
+    expect(drafts()).toEqual([]);
+    expect((await submit([receipt])).status).toBe("committed");
+    expect(queue()?.exposuresCompleted).toBe(1);
+  });
+
+  it("rejects a changed predecessor without consuming the draft", async () => {
+    const receipt = await item();
+    event("arrived", "2026-11-15T12:00:00Z");
+    expect(await submit([receipt])).toEqual({ status: "stale" });
+    expect(events().map((row) => row.id)).toEqual(["arrived"]);
+    expect(drafts()).toHaveLength(1);
+    expect(queue()?.completedAt).toBeNull();
+  });
+
+  it("checks queue changes made while awaiting calculation", async () => {
+    const receipt = await item();
+    duringCalculation(() =>
+      raw.run("UPDATE daily_practice_queue SET exposures_completed=4")
+    );
+    expect(await submit([receipt])).toEqual({ status: "stale" });
+    expect(events()).toEqual([]);
+    expect(drafts()).toHaveLength(1);
+    expect(queue()?.exposuresCompleted).toBe(4);
+  });
+
+  it("does not submit after the caller lifetime ends", async () => {
+    const receipt = await item();
+    let current = true;
+    duringCalculation(() => {
+      current = false;
+    });
+    expect(await submit([receipt], () => current)).toEqual({
+      status: "superseded",
+    });
+    expect(events()).toEqual([]);
+    expect(drafts()).toHaveLength(1);
+  });
+
+  it("rolls back the whole batch when the second queue update fails", async () => {
+    db.insert(repertoireTune)
+      .values({
+        repertoireRef: "rep",
+        tuneRef: "second",
+        goal: "recall",
+        lastModifiedAt: stamp,
+      })
+      .run();
+    const first = await item();
+    const second = await item("second");
+    raw.exec(
+      "CREATE TRIGGER reject_second BEFORE UPDATE ON daily_practice_queue WHEN NEW.tune_ref='second' BEGIN SELECT RAISE(ABORT, 'injected failure'); END"
+    );
+    await expect(submit([first, second])).rejects.toThrow("injected failure");
+    expect(events()).toEqual([]);
+    expect(drafts()).toHaveLength(2);
+    expect(
+      db
+        .select()
+        .from(dailyPracticeQueue)
+        .all()
+        .map((row) => row.completedAt)
+    ).toEqual([null, null]);
+    expect(
+      db
+        .select()
+        .from(repertoireTune)
+        .all()
+        .map((row) => row.current)
+    ).toEqual([null, null, null]);
+  });
+
+  it("rejects a different UUID at the same normalized practiced time", async () => {
+    const receipt = await item();
+    event("collision", "2026-11-16T07:00:00-05:00");
+    await expect(submit([receipt])).rejects.toThrow(
+      "already uses this practiced time"
+    );
+    expect(events()).toHaveLength(1);
+    expect(drafts()).toHaveLength(1);
+  });
+
+  it("rejects reuse of an event UUID with different content", async () => {
+    const receipt = await item();
+    await submit([receipt]);
+    raw.run("UPDATE practice_record SET interval_days=999");
+    await expect(submit([receipt])).rejects.toThrow(
+      "conflicts with different content"
+    );
+    expect(queue()?.exposuresCompleted).toBe(1);
+  });
+
+  it("requires review of legacy incomplete drafts", async () => {
+    const receipt = await item();
+    receipt.draft.schedulerState = null;
+    await expect(submit([receipt])).rejects.toThrow(
+      "must be recalculated and reviewed"
+    );
+    expect(events()).toEqual([]);
+    expect(drafts()).toHaveLength(1);
   });
 });

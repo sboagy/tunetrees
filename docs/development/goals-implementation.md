@@ -248,12 +248,48 @@ runs: three each on desktop Chromium and Mobile Chrome. This is focused E2E cove
 not a full-suite rerun. The SQL-editor parser adjustment also passed the 35 focused
 resolver/staging tests. No schema or generated artifacts changed.
 
+## Checkpoint 3d: atomic goal-aware Submit boundary
+
+`src/lib/goals/commit.ts` accepts the reviewed draft receipts and queue-row IDs for
+one user/repertoire batch. Before writing, it verifies predecessor/configuration
+fingerprints and recalculates the original preview at its original practiced time.
+A synchronous transaction rechecks ownership, caller lifetime, queue rows, drafts
+and scheduling context, then writes history, current due dates, displayed-event
+links and completion counters, and removes drafts together. A failure rolls back
+the whole batch. Stale previews return a status requiring renewed review.
+
+Stable event UUIDs support exact retries, including retry after IndexedDB persistence
+fails following a successful SQLite transaction. Retry does not rewrite later due
+dates, consume newer drafts or increment counters again. Different content at the
+same UUID and different UUIDs at the same normalized practiced time fail explicitly.
+Fractional ladder intervals retain their due times; typed FSRS projections remain
+empty for ladder events. Existing scheduled-override consumption logic is reused.
+The staging draft selector is shared with Submit.
+Backdated submissions are rejected rather than regressing the schedule behind the
+latest event. Drafts containing private/public note fields are also rejected with
+an explicit save/clear instruction, preserving user text. Current note editors save
+through the separate notes API; the new Submit boundary does not yet transfer old
+transient notes. UI integration must handle that error without deleting the draft.
+
+Validation: 15 new SQLite-backed Submit cases cover success, whole-batch rollback,
+stale inputs, lifetime cancellation, exact retries, persistence retry, conflicting
+identities/times, fractional ladder timing, newer drafts/schedules, pending notes
+and backdated events. Local CodeRabbit reviewed the three code files and found the
+note-loss and backdated-schedule cases above; both now have guards and regressions.
+All 1,168 unit tests, typecheck, lint, formatting and diff checks pass. Browser E2E
+was not rerun for this inactive boundary.
+
+
+This boundary remains disconnected from the active practice UI. It completes one
+explicit exposure per selected queue row; Practice again reopening, per-goal queue
+allocation, legacy conversion and UI integration remain subsequent work. There are
+no schema/generated-artifact changes or deployment actions in this checkpoint.
+
 ## Remaining checkpoints
 
 1. Align remaining repertoire-wide SQL consumers and views with canonical history order; initialize legacy
    goal definitions/preferences at cutover; selected-scheduler activation, plugin
-   contracts, staged snapshots, stale-preview checks,
-   fractional event commit and idempotency/conflict enforcement.
+   contracts and UI integration of the staged-preview/atomic Submit boundaries.
 2. Per-goal queue allocation across generation, Refresh and manual additions,
    retained work accounting and displayed-event links.
 3. Consolidated settings, goal-aware evaluation/history displays, Practice again,

@@ -443,8 +443,14 @@ practice UI. Legacy integer intervals and preference paths remain intact. Postgr
 serializes inserts sharing a practice natural key, rejects different event UUIDs at
 that key when either event uses the new format, and permits only transport metadata
 updates to submitted new-format events. Legacy-only upserts remain compatible.
-The same event UUID/content can be retried. Application-side atomic preview checks
-and selected-scheduler integration are the next checkpoint.
+The same event UUID/content can be retried. `src/lib/goals/commit.ts` implements the
+new-format batch Submit boundary, currently disconnected from the UI. It validates
+reviewed draft receipts against current predecessor/configuration, then synchronously
+rechecks ownership, queue and draft snapshots before atomically writing events,
+current due dates, queue completion/display links and draft removal. Stale previews
+require review; event identity/time conflicts fail explicitly. Identical completed
+retries flush persistence without reapplying schedules or queue counters. Cutover
+conversion, query/view alignment and selected-scheduler UI activation remain pending.
 
 This domain logic is independent of oosync. oosync moves the rows; TuneTrees services decide what those rows mean.
 

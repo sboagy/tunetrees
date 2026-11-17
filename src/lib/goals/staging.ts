@@ -6,7 +6,9 @@ import { readGoalPracticeContext } from "./resolve";
 
 type StageInput = Parameters<typeof prepareGoalPracticePreview>[1];
 
-function draftWhere(input: StageInput) {
+export function practiceDraftWhere(
+  input: Pick<StageInput, "userId" | "repertoireId" | "tuneId">
+) {
   return and(
     eq(tableTransientData.userId, input.userId),
     eq(tableTransientData.repertoireId, input.repertoireId),
@@ -27,7 +29,7 @@ export async function stageGoalPracticeEvaluation(
   // Capture mutable caller inputs before any await (including the Date object).
   const input = { ...requested, practiced: new Date(requested.practiced) };
   if (!isCurrent()) return { status: "superseded" as const };
-  const where = draftWhere(input);
+  const where = practiceDraftWhere(input);
   const initialDraft = db.select().from(tableTransientData).where(where).get();
   const initialDraftKey = JSON.stringify(initialDraft ?? null);
   const preview = await prepareGoalPracticePreview(db, input);
